@@ -1319,7 +1319,17 @@ export default function VendorSettings() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {additionalOwners.map((owner: any, idx: number) => (
                   <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
-                    <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
+                    <div className="flex items-center gap-3">
+                      {owner.photo && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={owner.photo}
+                          alt={`Owner ${idx + 2} profile`}
+                          className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0"
+                        />
+                      )}
+                      <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
+                    </div>
                     {(owner.name || owner.firstName) && <Field label="Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />}
                     {owner.designation && <Field label="Designation" value={owner.designation} />}
                     {owner.email && <Field label="Primary Email" value={owner.email} />}

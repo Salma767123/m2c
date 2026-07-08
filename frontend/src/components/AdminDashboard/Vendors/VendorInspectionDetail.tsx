@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Building2, User, Mail, Phone, MapPin, Calendar, CheckCircle, XCircle, FileText, ClipboardCheck, Clock, Factory, Shield, Wrench, Camera, AlertTriangle, Eye, Download, Loader2 } from "lucide-react";
+import { ArrowLeft, Building2, User, Mail, Phone, MapPin, Calendar, CheckCircle, XCircle, FileText, ClipboardCheck, Clock, Factory, Shield, Wrench, Camera, AlertTriangle, Eye, Download, Loader2, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
@@ -9,8 +9,11 @@ import { Badge } from "../../UI/Badge";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import vendorService from "@/services/vendorService";
 import { hasPermission } from "@/lib/auth";
-import reinspectionService, { AuditLogEntry } from "@/services/reinspectionService";
+import reinspectionService, { AuditLogEntry, AdminReviewPayload } from "@/services/reinspectionService";
 import InspectionAuditTimeline from "../ReInspection/InspectionAuditTimeline";
+import RejectionModal from "./RejectionModal";
+import AdminReviewModal from "../ReInspection/AdminReviewModal";
+import axiosInstance from "@/lib/axios";
 import { generateFactoryInspectionPdf, pdfFileName } from "@/lib/factoryInspectionReportPdf";
 import VendorInspectionData from "./VendorInspectionData";
 import InspectionChecklist from "./InspectionChecklist";
@@ -91,6 +94,10 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
   const [vendor, setVendor] = useState<any>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [reportBusy, setReportBusy] = useState<null | "view" | "download">(null);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [reinspectModalOpen, setReinspectModalOpen] = useState(false);
+  const [checkers, setCheckers] = useState<{ id: string; name: string }[]>([]);
 
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -157,6 +164,55 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
     }
   };
 
+  const handleRejectConfirm = async (reason: string) => {
+    setRejecting(true);
+    try {
+      await vendorService.rejectVendor(vendorId, reason);
+      showSuccessToast("Vendor Rejected", "The vendor has been notified of the rejection.");
+      setRejectModalOpen(false);
+      await loadVendor();
+    } catch (err: any) {
+      console.error("Reject vendor failed:", err);
+      const msg = err?.response?.data?.error || err?.message || "Could not reject vendor. Please try again.";
+      showErrorToast("Rejection Failed", msg);
+    } finally {
+      setRejecting(false);
+    }
+  };
+
+  const openReinspectModal = async () => {
+    // Lazy-load active checkers for the optional reassignment dropdown
+    if (checkers.length === 0) {
+      try {
+        const res = await axiosInstance.get("/qc-checkers", { params: { limit: 50, status: "ACTIVE" } });
+        setCheckers(
+          (res.data.checkers || []).map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))
+        );
+      } catch { /* dropdown simply stays empty */ }
+    }
+    setReinspectModalOpen(true);
+  };
+
+  const handleReinspectionSubmit = async (payload: AdminReviewPayload) => {
+    // AdminReviewModal surfaces thrown errors inline, so no try/catch here
+    await reinspectionService.reviewFactoryInspection(inspection.id, payload);
+    showSuccessToast(
+      "Re-Inspection Requested",
+      "A new inspection cycle has been created and the checker has been notified."
+    );
+    // Refresh inspection + vendor + audit trail so the page reflects the new cycle
+    const [inspRes] = await Promise.all([
+      vendorService.getInspectionByVendorId(vendorId),
+      loadVendor(),
+    ]);
+    if (inspRes?.success && inspRes.inspection) {
+      setInspection(inspRes.inspection);
+      reinspectionService.getAuditTrail("FACTORY_INSPECTION", inspRes.inspection.id)
+        .then((res) => setAuditLogs(res.logs || []))
+        .catch(() => {});
+    }
+  };
+
   const formData: InspectionData = inspection?.itemsToInspect && typeof inspection.itemsToInspect === 'object' && !Array.isArray(inspection.itemsToInspect)
     ? inspection.itemsToInspect
     : {};
@@ -203,6 +259,12 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
       vendorObj?.ownerPhoto ? fetchImgDataUrl(vendorObj.ownerPhoto) : Promise.resolve(null),
       vendorObj?.mainContact?.photo ? fetchImgDataUrl(vendorObj.mainContact.photo) : Promise.resolve(null),
     ]);
+    // Additional owners' photos — index-aligned with additionalOwners.
+    const additionalOwnerPhotoDataUrls = await Promise.all(
+      (Array.isArray(vendorObj?.additionalOwners) ? vendorObj.additionalOwners : []).map(
+        (o: any) => (o?.photo ? fetchImgDataUrl(o.photo) : Promise.resolve(null)),
+      ),
+    );
 
     const qc = vendorObj?.assignedQc || null;
     const reportMeta = {
@@ -232,6 +294,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
       companyLogoDataUrl,
       ownerPhotoDataUrl,
       mainContactPhotoDataUrl,
+      additionalOwnerPhotoDataUrls,
     });
     return { doc, reportMeta };
   };
@@ -348,15 +411,37 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
             <p className="text-slate-500 mt-1">{vendor?.companyName || formData.vendorName || "Vendor"}</p>
           </div>
         </div>
-        {isAwaitingAdminAction && vendorStatus === 'UNDER_REVIEW' && hasPermission('vendor_management:approve') && (
-          <button
-            onClick={handleApprove}
-            disabled={approving}
-            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
-          >
-            <CheckCircle className="h-5 w-5" />
-            {approving ? "Approving..." : "Approve Vendor"}
-          </button>
+        {isAwaitingAdminAction && vendorStatus === 'UNDER_REVIEW' && (
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {hasPermission('vendor_management:approve') && (
+              <button
+                onClick={handleApprove}
+                disabled={approving}
+                className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
+              >
+                <CheckCircle className="h-5 w-5" />
+                {approving ? "Approving..." : "Approve Vendor"}
+              </button>
+            )}
+            {hasPermission('reinspection_review:approve') && (
+              <button
+                onClick={openReinspectModal}
+                className="flex items-center gap-2 px-5 py-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors"
+              >
+                <RefreshCw className="h-5 w-5" />
+                Request Reinspection
+              </button>
+            )}
+            {hasPermission('vendor_management:approve') && (
+              <button
+                onClick={() => setRejectModalOpen(true)}
+                className="flex items-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors"
+              >
+                <XCircle className="h-5 w-5" />
+                Reject Vendor
+              </button>
+            )}
+          </div>
         )}
         {vendorStatus === 'APPROVED' && (
           <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-base px-4 py-2">
@@ -644,26 +729,76 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
         </Card>
       )}
 
-      {/* Approve Action at Bottom */}
-      {isAwaitingAdminAction && vendorStatus === 'UNDER_REVIEW' && hasPermission('vendor_management:approve') && (
+      {/* Decision Actions at Bottom */}
+      {isAwaitingAdminAction && vendorStatus === 'UNDER_REVIEW' && (
         <Card className="border-2 border-emerald-200 bg-emerald-50">
           <CardContent className="p-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Ready for Approval</h3>
-                <p className="text-slate-500 mt-1">QC inspection is complete. Review the report above and approve the vendor to send login credentials.</p>
+                <h3 className="text-lg font-semibold text-slate-900">Ready for Decision</h3>
+                <p className="text-slate-500 mt-1">QC inspection is complete. Review the report above, then approve the vendor, send it back for re-inspection, or reject.</p>
               </div>
-              <button
-                onClick={handleApprove}
-                disabled={approving}
-                className="flex items-center gap-2 px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
-              >
-                <CheckCircle className="h-5 w-5" />
-                {approving ? "Approving..." : "Approve Vendor"}
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                {hasPermission('vendor_management:approve') && (
+                  <button
+                    onClick={handleApprove}
+                    disabled={approving}
+                    className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
+                  >
+                    <CheckCircle className="h-5 w-5" />
+                    {approving ? "Approving..." : "Approve Vendor"}
+                  </button>
+                )}
+                {hasPermission('reinspection_review:approve') && (
+                  <button
+                    onClick={openReinspectModal}
+                    className="flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors"
+                  >
+                    <RefreshCw className="h-5 w-5" />
+                    Request Reinspection
+                  </button>
+                )}
+                {hasPermission('vendor_management:approve') && (
+                  <button
+                    onClick={() => setRejectModalOpen(true)}
+                    className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors"
+                  >
+                    <XCircle className="h-5 w-5" />
+                    Reject Vendor
+                  </button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Reject Vendor modal (reason + category, same flow as Vendor Management) */}
+      <RejectionModal
+        isOpen={rejectModalOpen}
+        onClose={() => setRejectModalOpen(false)}
+        onConfirm={handleRejectConfirm}
+        vendor={vendor ? {
+          id: vendor.id,
+          companyName: vendor.companyName || v.companyName || 'Vendor',
+          ownerName: vendor.ownerName || v.ownerName || '',
+          email: vendor.email || v.email || '',
+        } : null}
+        isLoading={rejecting}
+      />
+
+      {/* Request Re-Inspection modal (locked to RAISE_REINSPECTION) */}
+      {inspection && (
+        <AdminReviewModal
+          isOpen={reinspectModalOpen}
+          onClose={() => setReinspectModalOpen(false)}
+          onSubmit={handleReinspectionSubmit}
+          entityType="factory"
+          entityName={vendor?.companyName || v.companyName || 'Vendor'}
+          cycleNumber={inspection.cycleNumber || 1}
+          checkers={checkers}
+          lockedDecision="RAISE_REINSPECTION"
+        />
       )}
     </div>
   );

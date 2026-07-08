@@ -207,6 +207,22 @@ const getAllQCCheckers = async (req, res) => {
                     completedInspections: true,
                     createdAt: true,
                     updatedAt: true,
+                    // Live counts — the `assignedVendors` / `completedInspections`
+                    // Int columns drift: they are only incremented by legacy
+                    // code paths, while the inspection-assignment flow sets
+                    // vendor.assignedQcId / creates Inspection rows directly —
+                    // so the stored counters read 0 even for active checkers.
+                    _count: {
+                        select: {
+                            vendorsList: true,
+                            // "Performed" inspections — anything the checker has
+                            // actually worked past scheduling (submitted, under
+                            // review, rejected, re-inspection, completed).
+                            inspections: {
+                                where: { status: { notIn: ['SCHEDULED', 'IN_PROGRESS', 'CANCELLED'] } },
+                            },
+                        },
+                    },
                 },
                 orderBy: { createdAt: 'desc' },
                 skip,
@@ -217,7 +233,14 @@ const getAllQCCheckers = async (req, res) => {
 
         res.json({
             success: true,
-            data: checkers,
+            // Overwrite the drifted counters with the live relation counts so
+            // every consumer (assignment dropdown, checker management list)
+            // sees the real numbers.
+            data: checkers.map(({ _count, ...checker }) => ({
+                ...checker,
+                assignedVendors: _count.vendorsList,
+                completedInspections: _count.inspections,
+            })),
             pagination: {
                 total,
                 page: parseInt(page),

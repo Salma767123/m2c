@@ -221,6 +221,12 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 vendor.ownerPhoto ? fetchImgDataUrl(vendor.ownerPhoto) : Promise.resolve(null),
                 vendor.mainContact?.photo ? fetchImgDataUrl(vendor.mainContact.photo) : Promise.resolve(null),
             ])
+            // Additional owners' photos — index-aligned with additionalOwners.
+            const additionalOwnerPhotoDataUrls = await Promise.all(
+                (Array.isArray(vendor.additionalOwners) ? vendor.additionalOwners : []).map(
+                    (o: any) => (o?.photo ? fetchImgDataUrl(o.photo) : Promise.resolve(null)),
+                ),
+            )
             const meta: FactoryReportMeta = {
                 inspectorName: fd.inspectorName || formatCheckerName(inspection.checker),
                 inspectionDate: fd.inspectionDate,
@@ -239,6 +245,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 companyLogoDataUrl,
                 ownerPhotoDataUrl,
                 mainContactPhotoDataUrl,
+                additionalOwnerPhotoDataUrls,
             })
             const vendorName = vendor.companyName || fd.vendorName || 'Report'
             pdf.save(`Factory_Report_${vendorName.replace(/\s+/g, '_')}_${inspectionId.slice(-8).toUpperCase()}.pdf`)
@@ -286,6 +293,12 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 vendor.ownerPhoto ? fetchImgDataUrl(vendor.ownerPhoto) : Promise.resolve(null),
                 vendor.mainContact?.photo ? fetchImgDataUrl(vendor.mainContact.photo) : Promise.resolve(null),
             ])
+            // Additional owners' photos — index-aligned with additionalOwners.
+            const additionalOwnerPhotoDataUrls = await Promise.all(
+                (Array.isArray(vendor.additionalOwners) ? vendor.additionalOwners : []).map(
+                    (o: any) => (o?.photo ? fetchImgDataUrl(o.photo) : Promise.resolve(null)),
+                ),
+            )
             const meta: FactoryReportMeta = {
                 inspectorName: fd.inspectorName || formatCheckerName(inspection.checker),
                 inspectionDate: fd.inspectionDate,
@@ -304,6 +317,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 companyLogoDataUrl,
                 ownerPhotoDataUrl,
                 mainContactPhotoDataUrl,
+                additionalOwnerPhotoDataUrls,
             })
             const vendorName = vendor.companyName || fd.vendorName || 'Report'
             pdf.save(`Factory_Report_${vendorName.replace(/\s+/g, '_')}_${inspectionId.slice(-8).toUpperCase()}.pdf`)
@@ -581,7 +595,17 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                                 <div className="space-y-4">
                                     {vendor.additionalOwners.map((owner: any, idx: number) => (
                                         <div key={idx} className="bg-slate-50/60 border border-slate-200 rounded-xl p-4">
-                                            <p className="text-xs font-bold text-slate-600 mb-3">Owner #{idx + 2}</p>
+                                            <div className="flex items-center gap-3 mb-3">
+                                                {owner.photo && (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img
+                                                        src={owner.photo}
+                                                        alt={`Owner ${idx + 2} profile`}
+                                                        className="w-12 h-12 rounded-full object-cover border border-slate-200"
+                                                    />
+                                                )}
+                                                <p className="text-xs font-bold text-slate-600">Owner #{idx + 2}</p>
+                                            </div>
                                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                                 <VCard label="Full Name"
                                                     value={buildName(owner.title, owner.firstName, owner.middleName, owner.lastName)}

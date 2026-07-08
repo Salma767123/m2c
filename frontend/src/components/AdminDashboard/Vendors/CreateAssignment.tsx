@@ -27,6 +27,9 @@ interface Vendor {
 
 interface QCChecker {
   id: string;
+  /** Human-readable checker code (e.g. QC-001) — shown in the dropdown so
+   *  two checkers with the same name stay distinguishable. */
+  checkerId?: string;
   name: string;
   assignedVendors: number;
 }
@@ -58,17 +61,27 @@ export default function CreateAssignment() {
     const fetchData = async () => {
       try {
         const vendorRes = await vendorService.getAllVendors({ limit: 100 });
-        const AllVendors = vendorRes.vendors.map((v: any) => ({
-          id: v.id,
-          companyName: v.companyName,
-          location: `${v.businessCity}, ${v.businessState}`,
-          contactPerson: v.ownerName,
-          phone: v.businessPhone,
-          email: v.email,
-          productCategories: v.productCategories || [],
-          productTypes: v.productTypes || [],
-          specializations: v.specializations || [],
-        }));
+        const AllVendors = vendorRes.vendors.map((v: any) => {
+          // "Contact Person" must be one coherent person: prefer the Main
+          // Contact from the Contact & Trade step (with THEIR phone/email),
+          // fall back to the owner's profile. The old mapping mixed three
+          // unrelated fields (owner name + business phone + login email).
+          const mc = v.mainContact && typeof v.mainContact === 'object' ? v.mainContact : null;
+          const mcName = mc
+            ? [mc.title, mc.firstName, mc.middleName, mc.lastName].filter(Boolean).join(' ') || mc.name
+            : '';
+          return {
+            id: v.id,
+            companyName: v.companyName,
+            location: [v.businessCity, v.businessState].filter(Boolean).join(', ') || '—',
+            contactPerson: mcName || v.ownerName || '—',
+            phone: (mc && (mc.phone1 || mc.phone)) || v.ownerPhone || v.businessPhone || '',
+            email: (mc && (mc.email1 || mc.email)) || v.ownerEmail || v.businessEmail || v.email || '',
+            productCategories: v.productCategories || [],
+            productTypes: v.productTypes || [],
+            specializations: v.specializations || [],
+          };
+        });
         setVendors(AllVendors);
 
         const checkersResponse = await qcCheckerService.getAllQCCheckers();
@@ -109,7 +122,9 @@ export default function CreateAssignment() {
             setFormData(prev => ({
               ...prev,
               checkerId: insp.checkerId || "",
-              client: insp.clientName || "",
+              // Keep the auto-filled company name when the stored assignment
+              // has no client of its own.
+              client: insp.clientName || prev.client,
               scheduledDate: insp.scheduledDate || "",
               scheduledTime: insp.scheduledTime || "",
               priority: insp.priority || "",
@@ -124,6 +139,17 @@ export default function CreateAssignment() {
       fetchExisting();
     }
   }, [preSelectedVendorId])
+
+  // Auto-fill Client Name with the selected vendor's company name once the
+  // vendor list has loaded (covers both the ?vendorId= deep link and manual
+  // dropdown selection). Only fills when empty — an admin-typed value or a
+  // stored assignment's client is never overwritten.
+  useEffect(() => {
+    if (!formData.vendorId || vendors.length === 0) return;
+    const v = vendors.find((x) => x.id === formData.vendorId);
+    if (!v) return;
+    setFormData(prev => (prev.client ? prev : { ...prev, client: v.companyName }));
+  }, [formData.vendorId, vendors]);
 
   // Dynamically generate inspection items based on the selected vendor.
   // Factory/vendor inspections audit capability at the category level, so we
@@ -311,7 +337,7 @@ export default function CreateAssignment() {
                         { value: "", label: "Choose a QC checker" },
                         ...qcCheckers.map((checker) => ({
                           value: checker.id,
-                          label: `${formatCheckerName(checker)} (${checker.assignedVendors} vendors)`,
+                          label: `${formatCheckerName(checker)}${checker.checkerId ? ` · ${checker.checkerId}` : ''} (${checker.assignedVendors} vendor${checker.assignedVendors === 1 ? '' : 's'})`,
                         })),
                       ]}
                       onChange={handleCheckerChange}

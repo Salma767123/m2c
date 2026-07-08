@@ -418,7 +418,7 @@ export default function VendorsTable() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search by company, GST, owner, email…"
+              placeholder="Search by vendor ID, company, GST, owner, email…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -480,13 +480,13 @@ export default function VendorsTable() {
               <Table className="table-fixed">
                 <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50">
                   <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
-                    <TableHead className="w-[20%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Vendor</TableHead>
-                    <TableHead className="w-[13%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
-                    <TableHead className="w-[18%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact</TableHead>
-                    <TableHead className="w-[15%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Status</TableHead>
-                    <TableHead className="w-[10%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center whitespace-nowrap">Completion</TableHead>
-                    <TableHead className="w-[9%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center whitespace-nowrap">Join Date</TableHead>
-                    <TableHead className="w-[15%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-right whitespace-nowrap">Actions</TableHead>
+                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider whitespace-nowrap">Vendor ID</TableHead>
+                    <TableHead className="w-[18%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                    <TableHead className="w-[14%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
+                    <TableHead className="w-[16%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact</TableHead>
+                    <TableHead className="w-[14%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Status</TableHead>
+                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center whitespace-nowrap">Join Date</TableHead>
+                    <TableHead className="w-[14%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-right whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -495,6 +495,15 @@ export default function VendorsTable() {
                       key={vendor.id}
                       className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0"
                     >
+                      {/* Vendor ID */}
+                      <TableCell className="py-3 px-3 align-top">
+                        {vendor.vendorCode ? (
+                          <span className="text-xs font-mono font-semibold text-slate-700 whitespace-nowrap">{vendor.vendorCode}</span>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">—</span>
+                        )}
+                      </TableCell>
+
                       {/* Vendor */}
                       <TableCell className="py-3 px-3 align-top">
                         <div className="flex flex-col gap-0.5">
@@ -539,30 +548,6 @@ export default function VendorsTable() {
                             <p className="text-xs text-orange-600">by {vendor.rejectionRequestedByName}</p>
                           )}
                         </div>
-                      </TableCell>
-
-                      {/* Completion */}
-                      <TableCell className="py-3 px-3 align-middle">
-                        {(() => {
-                          const pct = vendor.completionPercentage ?? 0
-                          const gradient = pct === 100
-                            ? 'from-emerald-500 to-emerald-400'
-                            : pct >= 50 ? 'from-blue-500 to-blue-400' : 'from-orange-500 to-amber-400'
-                          const textColor = pct === 100
-                            ? 'text-emerald-600'
-                            : pct >= 50 ? 'text-blue-600' : 'text-orange-500'
-                          return (
-                            <div className="flex items-center gap-1.5">
-                              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full bg-linear-to-r ${gradient} transition-[width] duration-500`}
-                                  style={{ width: `${pct}%` }}
-                                />
-                              </div>
-                              <span className={`text-xs font-bold tabular-nums shrink-0 ${textColor}`}>{pct}%</span>
-                            </div>
-                          )
-                        })()}
                       </TableCell>
 
                       {/* Join Date */}

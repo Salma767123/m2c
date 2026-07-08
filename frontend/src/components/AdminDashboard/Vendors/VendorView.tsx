@@ -820,9 +820,19 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   <div className="space-y-3">
                     {owners.map((owner: any, index: number) => (
                       <div key={index} className="flex items-start gap-4 p-3 bg-slate-50 rounded-lg">
-                        <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 mt-0.5">
-                          {index + 2}
-                        </div>
+                        {/* Profile photo when uploaded; numbered badge as fallback */}
+                        {owner.photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={owner.photo}
+                            alt={`Owner ${index + 2} profile`}
+                            className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0 mt-0.5"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 mt-0.5">
+                            {index + 2}
+                          </div>
+                        )}
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 flex-1 text-sm">
                           <div>
                             <p className="text-slate-500">Full Name</p>

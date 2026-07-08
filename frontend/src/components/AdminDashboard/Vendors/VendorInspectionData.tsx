@@ -217,6 +217,14 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {additionalOwners.map((o, i) => (
                 <div key={i} className="bg-slate-50/60 border border-slate-200 rounded-xl p-3">
+                  {o.photo && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={o.photo}
+                      alt={`Owner ${i + 2} profile`}
+                      className="w-14 h-14 rounded-full object-cover border border-slate-200 mb-2"
+                    />
+                  )}
                   <Row label="Name" value={buildFullName(o.title, o.firstName, o.middleName, o.lastName, o.name)} />
                   <Row label="Designation" value={o.designation === "Others" ? o.customDesignation : titleCase(o.designation)} />
                   <Row label="Email" value={o.email} />

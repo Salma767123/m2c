@@ -69,6 +69,8 @@ export interface VendorRegistrationData {
     phone: string;
     phone2?: string;
     landline?: string;
+    /** Profile photo — base64 data URI (new upload) or Cloudinary URL. */
+    photo?: string;
   }>;
   /** Full date — preferred over legacy `yearEstablished`. Backend derives
    *  `establishedYear` from this. */
@@ -255,6 +257,8 @@ export interface VendorProfile {
     phone: string;
     phone2?: string;
     landline?: string;
+    /** Profile photo — Cloudinary URL once persisted. */
+    photo?: string;
   }>;
   /** Full date — backend derives `establishedYear` from this. */
   businessStartDate?: string;

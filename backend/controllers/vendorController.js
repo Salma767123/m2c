@@ -486,6 +486,13 @@ const registerVendor = async (req, res) => {
       folder: 'vendor-contact-photos',
       resource_type: 'image',
     });
+    // Additional owners (Step 3) carry a per-owner profile photo as a base64
+    // data URI (`additionalOwners[].photo`) — resolve to Cloudinary URLs the
+    // same way as the contact photos above.
+    const parsedAdditionalOwners = await resolveBase64InValue(
+      safeJsonParse(additionalOwners),
+      { folder: 'vendor-owner-photos', resource_type: 'image' },
+    );
     const parsedImportCountries = safeJsonParse(importCountries);
     const parsedExportCountries = safeJsonParse(exportCountries);
     const parsedBankingDetails = safeJsonParse(bankingDetails);
@@ -585,7 +592,7 @@ const registerVendor = async (req, res) => {
       // the business address. Re-add only when a real owner-address input
       // ships on Step 3.
       ownerPhoto: ownerPhotoUrl,
-      additionalOwners: safeJsonParse(additionalOwners),
+      additionalOwners: parsedAdditionalOwners,
       businessStartDate: businessStartDateValid ? parsedBusinessStartDate : null,
       employeeCount: employeeCount || null,
 
@@ -1563,6 +1570,15 @@ const updateVendorById = async (req, res) => {
       folder: 'vendor-contact-photos',
       resource_type: 'image',
     });
+    // Additional owners carry a per-owner profile photo as a base64 data URI
+    // (`additionalOwners[].photo`) — resolve to Cloudinary URLs like above.
+    const resolvedAdditionalOwners =
+      updateData.additionalOwners !== undefined
+        ? await resolveBase64InValue(safeJsonParse(updateData.additionalOwners), {
+            folder: 'vendor-owner-photos',
+            resource_type: 'image',
+          })
+        : undefined;
 
     // Mirror registration path: keep the raw multi-select array alongside
     // the legacy single-enum derivation so multi-role vendors aren't lossy.
@@ -1661,8 +1677,8 @@ const updateVendorById = async (req, res) => {
       ownerLandline: updateData.ownerLandline || null,
       ownerLocalLandlineStd: updateData.ownerLocalLandlineStd || null,
       ownerIntlLandline: updateData.ownerIntlLandline || null,
-      ...(updateData.additionalOwners !== undefined && {
-        additionalOwners: safeJsonParse(updateData.additionalOwners)
+      ...(resolvedAdditionalOwners !== undefined && {
+        additionalOwners: resolvedAdditionalOwners
       }),
       businessStartDate: businessStartDateValid ? parsedBusinessStartDate : null,
       establishedYear: derivedEstablishedYear,

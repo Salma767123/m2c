@@ -19,6 +19,9 @@ interface AdminReviewModalProps {
   entityName: string;
   cycleNumber: number;
   checkers?: { id: string; name: string }[];
+  /** Pre-select a decision and hide the decision picker — used by pages that
+   *  offer a dedicated action button (e.g. "Request Reinspection"). */
+  lockedDecision?: 'APPROVE' | 'FINAL_REJECT' | 'RAISE_REINSPECTION';
 }
 
 export default function AdminReviewModal({
@@ -29,8 +32,9 @@ export default function AdminReviewModal({
   entityName,
   cycleNumber,
   checkers,
+  lockedDecision,
 }: AdminReviewModalProps) {
-  const [decision, setDecision] = useState<'APPROVE' | 'FINAL_REJECT' | 'RAISE_REINSPECTION' | ''>('');
+  const [decision, setDecision] = useState<'APPROVE' | 'FINAL_REJECT' | 'RAISE_REINSPECTION' | ''>(lockedDecision || '');
   const [reason, setReason] = useState('');
   const [remarks, setRemarks] = useState('');
   const [notes, setNotes] = useState('');
@@ -82,7 +86,7 @@ export default function AdminReviewModal({
   };
 
   const handleClose = () => {
-    setDecision('');
+    setDecision(lockedDecision || '');
     setReason('');
     setRemarks('');
     setNotes('');
@@ -103,7 +107,9 @@ export default function AdminReviewModal({
         <div className="p-6">
           {/* Header */}
           <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">Review Inspection</h2>
+            <h2 className="text-lg font-semibold text-gray-900">
+              {lockedDecision === 'RAISE_REINSPECTION' ? 'Request Re-Inspection' : 'Review Inspection'}
+            </h2>
             <div className="text-sm text-gray-500 mt-1">
               {entityType === 'factory' ? 'Factory' : 'Product'} Inspection: <strong>{entityName}</strong>
               {cycleNumber > 1 && (
@@ -113,7 +119,8 @@ export default function AdminReviewModal({
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Decision Selection */}
+            {/* Decision Selection (hidden when the caller locks the decision) */}
+            {!lockedDecision && (
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Decision *</label>
               <div className="grid grid-cols-3 gap-2">
@@ -157,6 +164,7 @@ export default function AdminReviewModal({
                 </button>
               </div>
             </div>
+            )}
 
             {/* Reason (required for FINAL_REJECT, optional for RAISE_REINSPECTION) */}
             {(decision === 'FINAL_REJECT' || decision === 'RAISE_REINSPECTION') && (

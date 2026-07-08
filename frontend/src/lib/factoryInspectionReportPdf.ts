@@ -48,6 +48,9 @@ export interface FactoryReportOptions {
   companyLogoDataUrl?: string | null
   ownerPhotoDataUrl?: string | null
   mainContactPhotoDataUrl?: string | null
+  /** Data URLs for `vendor.additionalOwners[].photo`, aligned by index
+   *  (null for owners without a photo). */
+  additionalOwnerPhotoDataUrls?: (string | null)[] | null
 }
 
 // ── Colours ───────────────────────────────────────────────────────────────────
@@ -393,6 +396,13 @@ export function generateFactoryInspectionPdf(
         val(o.phone),
       ])
     )
+    // Per-owner profile photos (aligned by index; skips owners without one).
+    additionalOwners.forEach((_o: any, i: number) => {
+      renderThumbnail(
+        options.additionalOwnerPhotoDataUrls?.[i],
+        `Owner ${i + 2} Profile Photo`,
+      )
+    })
   }
 
   // ── D. Vendor Classification ────────────────────────────────────────────────

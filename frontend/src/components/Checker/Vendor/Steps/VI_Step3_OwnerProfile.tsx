@@ -59,6 +59,7 @@ export default function VI_Step3_OwnerProfile({ vendor: v, verifications, onChan
           ? `${owner.intlLandlineCountryCode}-${owner.intlLandlineStd}-${owner.intlLandlineNumber}`
           : null
         return [
+          ...(owner.photo ? [`o_add_${idx}_photo`] : []),
           `o_add_${idx}_name`,
           `o_add_${idx}_designation`,
           ...(owner.designation === 'Others' && owner.customDesignation ? [`o_add_${idx}_customDesignation`] : []),
@@ -132,6 +133,7 @@ export default function VI_Step3_OwnerProfile({ vendor: v, verifications, onChan
             return (
               <div key={idx} className="bg-slate-50/60 border border-slate-200 rounded-xl p-4 space-y-4">
                 <p className="text-sm font-bold text-slate-700">Owner #{idx + 2}</p>
+                {owner.photo && vf(`o_add_${idx}_photo`, 'Owner Photo', owner.photo, 'image')}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {vf(`o_add_${idx}_name`, 'Full Name', name)}
                   {vf(`o_add_${idx}_designation`, 'Designation', owner.designation)}

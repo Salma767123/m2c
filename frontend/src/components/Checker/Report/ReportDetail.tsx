@@ -466,7 +466,17 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
                 <div className="space-y-4">
                   {vendor.additionalOwners.map((owner: any, idx: number) => (
                     <div key={idx} className="bg-slate-50/60 border border-slate-200 rounded-xl p-4">
-                      <p className="text-xs font-bold text-slate-600 mb-3">Owner #{idx + 2}</p>
+                      <div className="flex items-center gap-3 mb-3">
+                        {owner.photo && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={owner.photo}
+                            alt={`Owner ${idx + 2} profile`}
+                            className="w-12 h-12 rounded-full object-cover border border-slate-200"
+                          />
+                        )}
+                        <p className="text-xs font-bold text-slate-600">Owner #{idx + 2}</p>
+                      </div>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         <VCard label="Full Name" value={buildName(owner.title, owner.firstName, owner.middleName, owner.lastName)} k={`o_add_${idx}_name`} vf={vf} />
                         <VCard label="Designation" value={owner.designation} k={`o_add_${idx}_designation`} vf={vf} />

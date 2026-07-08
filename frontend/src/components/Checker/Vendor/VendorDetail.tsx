@@ -961,7 +961,24 @@ export default function VendorDetail({
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {fullVendor.additionalOwners.map((owner: any, idx: number) => (
                           <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
-                            <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
+                            <div className="flex items-center gap-3">
+                              {owner.photo ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setViewerDoc({ url: owner.photo, name: `Owner ${idx + 2} Photo` })}
+                                  className="group relative block w-12 h-12 rounded-full overflow-hidden border-2 border-slate-200 hover:border-brand-300 transition-colors shrink-0"
+                                  aria-label={`View Owner ${idx + 2} photo`}
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={owner.photo} alt={`Owner ${idx + 2}`} className="w-full h-full object-cover" />
+                                </button>
+                              ) : (
+                                <div className="w-12 h-12 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center shrink-0">
+                                  <UserCircle className="w-6 h-6 text-slate-300" />
+                                </div>
+                              )}
+                              <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
+                            </div>
                             {(owner.name || owner.firstName) && <Field label="Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />}
                             {owner.designation && <Field label="Designation" value={owner.designation} />}
                             {owner.email && <Field label="Primary Email" value={owner.email} />}

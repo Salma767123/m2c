@@ -179,6 +179,10 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     intlLandlineCountryCode: string;
     intlLandlineStd: string;
     intlLandlineNumber: string;
+    /** Profile photo — base64 data URI (new upload) or Cloudinary URL
+     *  (reloaded). The backend swaps data URIs for Cloudinary URLs via
+     *  resolveBase64InValue, same as mainContact.photo. */
+    photo?: string;
   }>>(
     (data.additionalOwners || []).map((o: any) => ({
       ...o,
@@ -348,6 +352,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       intlLandlineCountryCode: '',
       intlLandlineStd: '',
       intlLandlineNumber: '',
+      photo: '',
     }]);
   };
 
@@ -364,6 +369,39 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     if (errors[errorKey]) {
       setErrors(prev => ({ ...prev, [errorKey]: '' }));
     }
+  };
+
+  // Additional owner profile photo — validated like the primary owner's
+  // photo, then stored as a base64 data URI on the owner row (same
+  // transport as mainContact.photo; the backend uploads it to Cloudinary).
+  const handleAdditionalOwnerPhoto = (index: number, file: File) => {
+    const errorKey = `additionalOwner_${index}_photo`;
+    const result = handleUpload(file, {
+      label: 'Owner Photo',
+      allowedTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'],
+      allowedLabel: 'PNG, JPG, or WEBP',
+      maxBytes: 2 * 1024 * 1024,
+      maxLabel: '2,048 KB',
+    });
+    if (!result.ok) {
+      setErrors(prev => ({ ...prev, [errorKey]: result.message }));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setAdditionalOwners(prev => prev.map((owner, i) =>
+        i === index ? { ...owner, photo: dataUrl } : owner
+      ));
+    };
+    reader.readAsDataURL(file);
+    setErrors(prev => (prev[errorKey] ? { ...prev, [errorKey]: '' } : prev));
+  };
+
+  const handleRemoveAdditionalOwnerPhoto = (index: number) => {
+    setAdditionalOwners(prev => prev.map((owner, i) =>
+      i === index ? { ...owner, photo: '' } : owner
+    ));
   };
 
   const handleInputChange = useCallback(
@@ -549,6 +587,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       if (owner.firstName || owner.email || owner.phone) {
         if (!owner.firstName) newErrors[`additionalOwner_${index}_firstName`] = 'First name is required';
         if (!owner.lastName) newErrors[`additionalOwner_${index}_lastName`] = 'Last name is required';
+        if (!owner.photo) newErrors[`additionalOwner_${index}_photo`] = 'Owner profile photo is required';
         if (!owner.email) {
           newErrors[`additionalOwner_${index}_email`] = 'Email is required';
         } else if (!EMAIL_RE.test(owner.email)) {
@@ -1145,6 +1184,48 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                     The earlier 3-col grid left empty placeholder columns on
                     rows 1 and 2 which read as awkward visual gaps. */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Owner profile photo — same requirement as the primary
+                      owner; stored as base64 on the owner row. */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Owner Profile Photo <span className="text-red-500" aria-hidden="true">*</span>
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-16 h-16 shrink-0 bg-white rounded-full border overflow-hidden flex items-center justify-center shadow-sm ${errors[`additionalOwner_${index}_photo`] ? 'border-red-300' : 'border-slate-200'}`}>
+                        {owner.photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={owner.photo} alt={`Owner ${index + 2} profile`} className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon className="w-5 h-5 text-slate-300" aria-hidden="true" />
+                        )}
+                      </div>
+                      <label className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg transition-colors duration-200 cursor-pointer">
+                        {owner.photo ? 'Change' : 'Browse'}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleAdditionalOwnerPhoto(index, f);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                      {owner.photo && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAdditionalOwnerPhoto(index)}
+                          className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-red-500 hover:bg-red-50 transition-colors duration-200"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    {errors[`additionalOwner_${index}_photo`] && (
+                      <p className="text-red-600 text-xs mt-1 font-medium">{errors[`additionalOwner_${index}_photo`]}</p>
+                    )}
+                  </div>
                   {/* Name row: Title | First | Middle | Last — single line */}
                   <div className="sm:col-span-2 grid grid-cols-[100px_1fr_1fr_1fr] gap-3">
                     <div>

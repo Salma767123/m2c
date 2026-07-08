@@ -36,12 +36,74 @@ interface CertificateStatus {
 
 // ── Local presentational helpers ────────────────────────────────────────
 
-const InfoRow: React.FC<{ label: string; value: string | React.ReactNode }> = ({ label, value }) => (
-  <div className="flex flex-col sm:flex-row sm:items-start py-3 border-b border-slate-100 last:border-0 px-6">
+const InfoRow: React.FC<{ label: string; value: string | React.ReactNode; inset?: boolean }> = ({ label, value, inset }) => (
+  <div className={`flex flex-col sm:flex-row sm:items-start py-3 border-b border-slate-100 last:border-0 ${inset ? 'px-4' : 'px-6'}`}>
     <span className="text-sm font-medium text-slate-500 sm:w-1/3 shrink-0">{label}</span>
     <span className="text-sm font-medium text-slate-900 sm:w-2/3">{value || '—'}</span>
   </div>
 );
+
+// Consistent sub-entity card — used for every repeated block inside a review
+// section (facility details, contact persons, additional owners) so nested
+// data reads as a clearly bounded group instead of floating indented rows.
+const SubCard: React.FC<{ title: React.ReactNode; children: React.ReactNode }> = ({ title, children }) => (
+  <div className="mx-6 my-3 rounded-xl border border-slate-200 overflow-hidden bg-white shadow-xs">
+    <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 text-sm font-bold text-slate-800">
+      {title}
+    </div>
+    <div className="flex flex-col">{children}</div>
+  </div>
+);
+
+// Bold in-section heading — mirrors the accordion sub-section titles of the
+// source form so the review reads in the same order the data was entered.
+const SubHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="font-bold text-sm text-slate-900 px-6 py-2 bg-slate-50/60 border-b border-slate-100">
+    {children}
+  </div>
+);
+
+// Slot id → the label shown above each upload tile in the form's
+// "Factory & Facility Photos" grid. Keep in sync with FACTORY_IMAGE_SLOTS
+// in CompanyDetails/WarehouseDetails.
+const FACTORY_SLOT_LABELS: Record<string, string> = {
+  nameBoard: 'Factory Name Board',
+  frontView: 'Front View',
+  backView: 'Back View',
+  leftView: 'Left View',
+  rightView: 'Right View',
+  roadView: 'Road View',
+  insideFactory: 'Inside Factory',
+  others: 'Others',
+};
+
+// Captioned photo grid for the factory photo slots — thumbnail + slot name,
+// matching how the form presents the same grid.
+const FactoryPhotoGrid: React.FC<{ images: any }> = ({ images }) => {
+  const entries: { key: string; val: any }[] = images
+    ? Array.isArray(images)
+      ? images.map((v: any, i: number) => ({ key: String(i), val: v }))
+      : Object.entries(images).map(([k, v]) => ({ key: k, val: v }))
+    : [];
+  const thumbs = entries
+    .map((e) => ({ key: e.key, url: resolveImageUrl(e.val?.preview || e.val?.url || e.val?.file || e.val) }))
+    .filter((t) => !!t.url);
+  if (thumbs.length === 0) {
+    return <span className="text-slate-400 text-sm px-6 py-3 block">No photos uploaded</span>;
+  }
+  return (
+    <div className="flex flex-wrap gap-3 px-6 py-3">
+      {thumbs.map((t) => (
+        <div key={t.key} className="flex flex-col items-center gap-1">
+          <Thumb src={t.url as string} alt={FACTORY_SLOT_LABELS[t.key] || 'Factory photo'} />
+          <span className="text-[11px] font-medium text-slate-500">
+            {FACTORY_SLOT_LABELS[t.key] || `Photo ${t.key}`}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 // Address block rendered field-by-field in the same order as the address
 // form (Line 1 / 2 / 3, Landmark, City, State, Country, ZIP) instead of a
@@ -199,7 +261,20 @@ const getCompanyIdLabel = (businessType: string): string => {
     'partnership-firm': 'Partnership Deed',
     'llp': 'LLPIN Number',
   };
-  return labels[businessType] || 'Business Registration ID';
+  // Custom "Others" business types collect this via the
+  // "Others Registration Number" field.
+  return labels[businessType] || 'Others Registration Number';
+};
+
+// The type-specific certificate upload's label, exactly as the form shows it.
+const getTypeCertLabel = (businessType: string): string => {
+  const labels: Record<string, string> = {
+    'proprietorship': 'IEC Certificate',
+    'pvt-ltd': 'CIN Certificate',
+    'partnership-firm': 'Partnership Deed Certificate',
+    'llp': 'LLPIN Certificate',
+  };
+  return labels[businessType] || 'Other Supporting Document';
 };
 
 const getCertificateStatus = (expiryDate: string): CertificateStatus | null => {
@@ -276,20 +351,34 @@ export default function VendorDataSummary({
     headerExtra: renderEditBtn(stepNum)
   });
 
-  // Manufacturing Facilities labels
+  // Manufacturing Facilities labels — keep in sync with the FACILITIES
+  // catalog in ManufacturingFacilities.tsx.
+  const FACILITY_LABELS: Record<string, string> = {
+    spinning: 'Spinning',
+    weaving: 'Weaving',
+    dyeing: 'Dyeing',
+    printing: 'Printing',
+    stitching: 'Stitching',
+    finishing: 'Final Packing and Dispatch',
+  };
+  // Per-facility detail field labels, exactly as the form shows them.
+  const FACILITY_FIELD_LABELS: Record<string, string> = {
+    spinningMachines: 'Number of Machines',
+    spinningCapacity: 'Daily Capacity (kg)',
+    loomCount: 'Number of Machines',
+    weavingCapacity: 'Daily Capacity (kg)',
+    dyeingMachines: 'Number of Machines',
+    dyeingCapacity: 'Daily Capacity (kg)',
+    printingMachines: 'Number of Machines',
+    printingCapacity: 'Daily Capacity (kg)',
+    stitchingMachines: 'Number of Machines',
+    stitchingCapacity: 'Daily Capacity (Pieces)',
+    finishingCapacity: 'Daily Capacity (Pieces)',
+    remarks: 'Remarks',
+  };
   const enabledFacilities = Object.entries(data.enabledFacilities || {})
     .filter(([_, enabled]) => enabled)
-    .map(([id]) => {
-      const facilityLabels: Record<string, string> = {
-        spinning: 'Spinning',
-        weaving: 'Weaving',
-        dyeing: 'Dyeing',
-        printing: 'Printing',
-        stitching: 'Stitching',
-        finishing: 'Finishing',
-      };
-      return facilityLabels[id] || id;
-    })
+    .map(([id]) => FACILITY_LABELS[id] || id)
     .filter(Boolean);
 
   // Certifications
@@ -310,14 +399,18 @@ export default function VendorDataSummary({
     return { id: c, label: certLabels[c] || c };
   });
 
-  // Selected product categories (IDs resolved to names via categoryNameMap)
+  // Selected product categories (IDs resolved to names via categoryNameMap).
+  // The form stores `{ [categoryId]: boolean }`; legacy records may still
+  // carry the old `{ [categoryId]: string[] }` sub-category shape.
   const getSelectedCategories = (): string[] => {
     const categories = data.selectedCategories || {};
     const result: string[] = [];
-    Object.entries(categories).forEach(([categoryId, subCategories]) => {
-      if (Array.isArray(subCategories) && subCategories.length > 0) {
-        const categoryName = categoryNameMap[categoryId] || categoryId;
-        result.push(`${categoryName}: ${subCategories.join(', ')}`);
+    Object.entries(categories).forEach(([categoryId, value]) => {
+      const categoryName = categoryNameMap[categoryId] || categoryId;
+      if (Array.isArray(value)) {
+        if (value.length > 0) result.push(`${categoryName}: ${value.join(', ')}`);
+      } else if (value) {
+        result.push(categoryName);
       }
     });
     return result;
@@ -327,25 +420,54 @@ export default function VendorDataSummary({
     <div className="space-y-6">
       <AccordionSection {...sectionProps('company', 'Company Details', 'Business identity and registration info', <Building2 className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('company'))}>
         <div className="flex flex-col">
+          {/* ── Business Profile — mirrors the form's first accordion ── */}
+          <SubHeader>Business Profile</SubHeader>
           <InfoRow label="Business Type" value={getBusinessTypeLabel(data.businessType)} />
           <InfoRow label="Company Name" value={data.companyName} />
+          {/* Prefer the File over the preview string: the preview is a bare
+              blob: object URL with no extension or MIME info, so DocValue
+              can't tell a PDF from an image and renders a broken <img>. The
+              File carries type + name; the string is only the fallback for
+              saved vendors (remote URL) where no File exists. */}
+          <InfoRow label="Company Logo" value={<DocValue src={data.logoFile || data.logo} alt="Company logo" />} />
           <InfoRow label="GST Number" value={data.gstNumber || 'Not provided'} />
-          {/* Type-specific regulatory ID — IEC / CIN / Deed / LLPIN. */}
+          <InfoRow label="GST Certificate" value={<DocValue src={data.gstFile || data.gstDocument} alt="GST certificate" />} />
+          {data.aadhaarNumber && <InfoRow label="Aadhaar Number" value={data.aadhaarNumber} />}
+          {(data.aadhaarFile || data.aadhaarDocument) && (
+            <InfoRow label="Aadhaar Card" value={<DocValue src={data.aadhaarFile || data.aadhaarDocument} alt="Aadhaar card" />} />
+          )}
+          {/* Type-specific regulatory ID (CIN / Deed / LLPIN / Others reg. no.)
+              paired with its certificate, labelled exactly as the form. */}
           {data.companyIdNumber && (
             <InfoRow
               label={getCompanyIdLabel(data.businessType)}
               value={data.companyIdNumber}
             />
           )}
+          {(data.typeCertFile || data.typeCertDocument) && (
+            <InfoRow label={getTypeCertLabel(data.businessType)} value={<DocValue src={data.typeCertFile || data.typeCertDocument} alt={getTypeCertLabel(data.businessType)} />} />
+          )}
           {data.panNumber && <InfoRow label={data.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number'} value={data.panNumber} />}
-          {data.aadhaarNumber && <InfoRow label="Aadhaar Number" value={data.aadhaarNumber} />}
-          <InfoRow label="Primary Email" value={data.email} />
+          {(data.panCardFile || data.panCardDocument) && (
+            <InfoRow label={data.businessType === 'proprietorship' ? 'Proprietor PAN Card' : 'Company PAN Card'} value={<DocValue src={data.panCardFile || data.panCardDocument} alt="PAN card" />} />
+          )}
+
+          {/* ── Contact & Communication ────────────────────────────── */}
+          <SubHeader>Contact &amp; Communication</SubHeader>
+          <InfoRow label="Business Email" value={data.email} />
           {data.email2 && <InfoRow label="Secondary Email" value={data.email2} />}
           <InfoRow label="Primary Phone" value={data.phone} />
           {data.phoneNumber2 && <InfoRow label="Secondary Phone" value={data.phoneNumber2} />}
           {data.landlineNumber && <InfoRow label="Local Landline" value={data.landlineNumber} />}
           {data.intlLandline && <InfoRow label="International Landline" value={data.intlLandline} />}
           <InfoRow label="Website" value={data.website} />
+
+          {/* ── Legal Address & Factory Site ────────────────────────── */}
+          <SubHeader>Legal Address &amp; Factory Site</SubHeader>
+          <InfoRow
+            label="Factory Ownership"
+            value={data.factoryOwnershipType ? <span className="capitalize">{data.factoryOwnershipType}</span> : '—'}
+          />
           <AddressRows
             line1={data.address}
             line2={data.addressLine2}
@@ -356,49 +478,25 @@ export default function VendorDataSummary({
             country={data.country}
             zip={data.zipCode}
           />
-          {data.factoryOwnershipType && (
-            <InfoRow
-              label="Factory Ownership Type"
-              value={<span className="capitalize">{data.factoryOwnershipType}</span>}
-            />
-          )}
-          <InfoRow label="Same as Warehouse" value={data.sameAsWarehouse ? 'Yes' : 'No'} />
-          {/* Factory-site capacity + photos collected on Step 1. When the
-              "Same as warehouse" link is on they're mirrored into the
-              warehouse fields and shown in that section instead, so only
-              render here when the link is off to avoid duplicate rows. */}
-          {!data.sameAsWarehouse && data.factorySiteCapacity && (
-            <InfoRow label="Factory Site Capacity" value={`${data.factorySiteCapacity} sq ft`} />
-          )}
-          {!data.sameAsWarehouse && (() => {
-            const fsi = data.factorySiteImages;
-            const entries = fsi ? Object.entries(fsi) : [];
-            const thumbs = entries
-              .map(([key, val]: [string, any]) => ({ key, url: resolveImageUrl(val?.preview || val?.url || val?.file || val) }))
-              .filter((t) => !!t.url);
-            if (thumbs.length === 0) return null;
-            return (
-              <InfoRow
-                label="Factory Site Images"
-                value={
-                  <div className="flex flex-wrap gap-2">
-                    {thumbs.map((t) => (
-                      <Thumb key={t.key} src={t.url as string} alt="Factory site image" />
-                    ))}
-                  </div>
-                }
-              />
-            );
-          })()}
-          <InfoRow label="Company Logo" value={<DocValue src={data.logo || data.logoFile} alt="Company logo" />} />
-          <InfoRow label="GST Certificate" value={<DocValue src={data.gstDocument || data.gstFile} alt="GST certificate" />} />
-          <InfoRow label={data.businessType === 'proprietorship' ? 'Proprietor PAN Card' : 'Company PAN Card'} value={<DocValue src={data.panCardDocument || data.panCardFile} alt="PAN card" />} />
-          {(data.typeCertFile || data.typeCertDocument) && (
-            <InfoRow label="Business Reg. Certificate" value={<DocValue src={data.typeCertDocument || data.typeCertFile} alt="Business registration certificate" />} />
-          )}
-          {(data.aadhaarFile || data.aadhaarDocument) && (
-            <InfoRow label="Aadhaar Card" value={<DocValue src={data.aadhaarDocument || data.aadhaarFile} alt="Aadhaar card" />} />
-          )}
+          <InfoRow
+            label="Warehousing Capacity"
+            value={data.factorySiteCapacity ? `${data.factorySiteCapacity} sq ft` : 'Not provided'}
+          />
+
+          {/* ── Factory & Facility Photos — always shown here since they
+                 are collected on this step regardless of the "Same as
+                 Warehouse" checkbox. ─────────────────────────────────── */}
+          <SubHeader>Factory &amp; Facility Photos</SubHeader>
+          {/* Legacy fallback: older records only carry the mirrored
+              warehouse-side `factoryImages`, not `factorySiteImages`. */}
+          <FactoryPhotoGrid
+            images={
+              data.factorySiteImages && Object.keys(data.factorySiteImages).length > 0
+                ? data.factorySiteImages
+                : data.factoryImages
+            }
+          />
+          <InfoRow label="Same as Warehouse Address & Warehouse Photos" value={data.sameAsWarehouse ? 'Yes' : 'No'} />
         </div>
       </AccordionSection>
 
@@ -413,9 +511,10 @@ export default function VendorDataSummary({
           ) : (
             <>
               <InfoRow label="Ownership Type" value={getOwnershipTypeLabel(data.ownershipType)} />
-              {data.warehousingCapacity && (
-                <InfoRow label="Warehousing Capacity" value={`${data.warehousingCapacity} sq ft`} />
-              )}
+              <InfoRow
+                label="Warehousing Capacity"
+                value={data.warehousingCapacity ? `${data.warehousingCapacity} sq ft` : 'Not provided'}
+              />
               <AddressRows
                 line1={data.warehouseAddress}
                 line2={data.warehouseAddressLine2}
@@ -426,34 +525,8 @@ export default function VendorDataSummary({
                 country={data.warehouseCountry}
                 zip={data.warehouseZip}
               />
-              {(() => {
-                const fi = data.factoryImages;
-                const entries: { key: string; val: any }[] = fi
-                  ? Array.isArray(fi)
-                    ? fi.map((v: any, i: number) => ({ key: String(i), val: v }))
-                    : Object.entries(fi).map(([k, v]) => ({ key: k, val: v }))
-                  : [];
-                const thumbs = entries
-                  .map((e) => ({ key: e.key, url: resolveImageUrl(e.val?.preview || e.val?.url || e.val?.file || e.val) }))
-                  .filter((t) => !!t.url);
-                return (
-                  <InfoRow
-                    label="Factory Images"
-                    value={
-                      thumbs.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {thumbs.map((t) => (
-                            <Thumb key={t.key} src={t.url as string} alt="Factory image" />
-                          ))}
-                        </div>
-                      ) : (
-                        `${entries.length} file(s) uploaded`
-                      )
-                    }
-                  />
-                );
-              })()}
-              <InfoRow label="Map Link" value={data.mapLink ? 'Provided' : 'Not provided'} />
+              <SubHeader>Factory &amp; Facility Photos</SubHeader>
+              <FactoryPhotoGrid images={data.factoryImages} />
             </>
           )}
         </div>
@@ -485,13 +558,13 @@ export default function VendorDataSummary({
           {data.ownerIntlLandline && <InfoRow label="International Landline" value={data.ownerIntlLandline} />}
           {data.businessStartDate ? (
             <InfoRow
-              label="Business Start Date"
+              label="Start Business Date"
               value={new Date(data.businessStartDate).toLocaleDateString('en-IN')}
             />
           ) : (
             <InfoRow label="Year Established" value={data.yearEstablished} />
           )}
-          <InfoRow label="Employee Count" value={getEmployeeCountLabel(data.employeeCount)} />
+          <InfoRow label="Number of Employees" value={getEmployeeCountLabel(data.employeeCount)} />
           {/* Same formatter as the form's read-only "Total Business Duration"
               field (e.g. "13 Years / 6 Months / 12 Days") so the review shows
               exactly what the vendor saw while filling the step. */}
@@ -508,34 +581,31 @@ export default function VendorDataSummary({
               return 'N/A';
             })()}
           />
-          {data.additionalOwners && data.additionalOwners.length > 0 && (
-            <>
-              <div className="border-t border-slate-100 pt-2 mt-2 px-6">
-                <p className="text-sm font-bold text-slate-900 mb-1">
-                  Additional Owners ({data.additionalOwners.length})
-                </p>
-              </div>
-              {data.additionalOwners.map((owner: any, index: number) => (
-                <div key={index} className="pl-4 border-l-2 border-slate-200 space-y-1 my-2">
-                  <p className="text-sm font-bold text-slate-800 px-6 mt-2">Owner {index + 2}</p>
-                  <InfoRow label="Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />
-                  {owner.designation && <InfoRow label="Designation" value={owner.designation} />}
-                  {owner.designation === 'Others' && owner.customDesignation && (
-                    <InfoRow label="Custom Designation" value={owner.customDesignation} />
-                  )}
-                  <InfoRow label="Primary Email" value={owner.email} />
-                  {owner.email2 && <InfoRow label="Secondary Email" value={owner.email2} />}
-                  <InfoRow label="Primary Phone" value={owner.phone} />
-                  {owner.phone2 && <InfoRow label="Secondary Phone" value={owner.phone2} />}
-                  {owner.localLandline && <InfoRow label="Local Landline" value={owner.localLandline} />}
-                  {owner.intlLandline && <InfoRow label="International Landline" value={owner.intlLandline} />}
-                  {!owner.localLandline && !owner.intlLandline && owner.landline && (
-                    <InfoRow label="Landline" value={owner.landline} />
-                  )}
-                </div>
-              ))}
-            </>
-          )}
+          {data.additionalOwners && data.additionalOwners.length > 0 &&
+            data.additionalOwners.map((owner: any, index: number) => (
+              <SubCard key={index} title={`Owner ${index + 2}`}>
+                {(() => {
+                  const photoUrl = resolveImageUrl(owner.photo);
+                  return photoUrl ? (
+                    <InfoRow inset label="Profile Photo" value={<Thumb src={photoUrl} alt={`Owner ${index + 2} profile photo`} rounded />} />
+                  ) : null;
+                })()}
+                <InfoRow inset label="Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />
+                {owner.designation && <InfoRow inset label="Designation" value={owner.designation} />}
+                {owner.designation === 'Others' && owner.customDesignation && (
+                  <InfoRow inset label="Custom Designation" value={owner.customDesignation} />
+                )}
+                <InfoRow inset label="Primary Email" value={owner.email} />
+                {owner.email2 && <InfoRow inset label="Secondary Email" value={owner.email2} />}
+                <InfoRow inset label="Primary Phone" value={owner.phone} />
+                {owner.phone2 && <InfoRow inset label="Secondary Phone" value={owner.phone2} />}
+                {owner.localLandline && <InfoRow inset label="Local Landline" value={owner.localLandline} />}
+                {owner.intlLandline && <InfoRow inset label="International Landline" value={owner.intlLandline} />}
+                {!owner.localLandline && !owner.intlLandline && owner.landline && (
+                  <InfoRow inset label="Landline" value={owner.landline} />
+                )}
+              </SubCard>
+            ))}
         </div>
       </AccordionSection>
 
@@ -639,18 +709,18 @@ export default function VendorDataSummary({
               />
               {Object.entries(data.facilityDetails || {}).map(([facilityId, details]: [string, any]) => {
                 if (!data.enabledFacilities?.[facilityId]) return null;
-                const facilityName = enabledFacilities.find((f) => f.toLowerCase().includes(facilityId)) || facilityId;
+                const facilityName = FACILITY_LABELS[facilityId] || facilityId;
                 return (
-                  <div key={facilityId} className="ml-4 space-y-1 border-l-2 border-slate-200 pl-4 my-2">
-                    <div className="font-bold text-sm text-slate-900 px-6 py-2">{facilityName} Details:</div>
+                  <SubCard key={facilityId} title={facilityName}>
                     {Object.entries(details || {}).map(([key, value]: [string, any]) => (
                       <InfoRow
                         key={key}
-                        label={key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())}
+                        inset
+                        label={FACILITY_FIELD_LABELS[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())}
                         value={value}
                       />
                     ))}
-                  </div>
+                  </SubCard>
                 );
               })}
             </>
@@ -724,36 +794,54 @@ export default function VendorDataSummary({
               label="Other Certifications"
               value={
                 <div className="space-y-2">
-                  {data.otherCertifications.map((cert: any) => (
-                    <div key={cert.id} className="border border-orange-200 bg-orange-50/40 rounded-lg p-3">
-                      <p className="text-sm font-semibold text-slate-900">{cert.name}</p>
-                      {cert.description && (
-                        <p className="text-xs text-slate-600 mt-1">{cert.description}</p>
-                      )}
-                    </div>
-                  ))}
+                  {data.otherCertifications.map((cert: any) => {
+                    // Custom certs store their file + expiry in the shared
+                    // maps keyed by the cert's own id — same as catalog certs.
+                    const expiryDate = data.certificationExpiryDates?.[cert.id];
+                    const status = expiryDate ? getCertificateStatus(expiryDate) : null;
+                    const hasFile = data.certificationFiles?.[cert.id];
+                    return (
+                      <div key={cert.id} className="border border-orange-200 bg-orange-50/40 rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold text-slate-900">{cert.name}</p>
+                          {hasFile ? (
+                            <span className="text-xs text-success-700 bg-success-50 px-2.5 py-0.5 rounded border border-success-200/50 font-semibold">
+                              ✓ File Uploaded
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-500 bg-slate-100/80 px-2.5 py-0.5 rounded border border-slate-200/50 font-medium">
+                              No File
+                            </span>
+                          )}
+                        </div>
+                        {cert.description && (
+                          <p className="text-xs text-slate-600 mt-1">{cert.description}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-2">
+                          <Calendar className={`w-4 h-4 ${expiryDate ? 'text-slate-400' : 'text-slate-300'}`} />
+                          {expiryDate ? (
+                            <>
+                              <span className="text-sm text-slate-600 font-medium">
+                                Expires: {new Date(expiryDate).toLocaleDateString('en-IN')}
+                              </span>
+                              {status && (
+                                <span className={`text-xs px-2 py-0.5 rounded border ${status.color} ml-2`}>
+                                  {status.message}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-sm text-slate-400 font-medium">No expiry date set</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               }
             />
           )}
           <InfoRow label="Quality Control Process" value={data.qualityControlProcess || 'Not provided'} />
-          <InfoRow label="Compliance Standards" value={data.complianceStandards || 'Not provided'} />
-          {data.packagingCapabilities && <InfoRow label="Packaging Capabilities" value={data.packagingCapabilities} />}
-          {data.logisticsPartners && <InfoRow label="Logistics Partners" value={data.logisticsPartners} />}
-          {Array.isArray(data.shippingMethods) && data.shippingMethods.length > 0 && (
-            <InfoRow
-              label="Shipping Methods"
-              value={
-                <div className="flex flex-wrap gap-2">
-                  {data.shippingMethods.map((method: string) => (
-                    <span key={method} className="inline-flex items-center px-2.5 py-0.5 bg-slate-100 text-slate-800 rounded text-xs font-semibold border border-slate-200">
-                      {method}
-                    </span>
-                  ))}
-                </div>
-              }
-            />
-          )}
         </div>
       </AccordionSection>
 
@@ -761,92 +849,88 @@ export default function VendorDataSummary({
         <div className="flex flex-col">
           {/* Contact Person 1 — mirrors the "Main Contact Person" section of the
               Contact & Trade form, which numbers additional contacts from 2. */}
-          <div className="font-bold text-sm text-slate-900 px-6 py-2">Contact Person 1</div>
-          {(() => {
-            const contactPhotoUrl = resolveImageUrl(data.mainContact?.photo || data.mainContact?.photoFile);
-            return contactPhotoUrl ? (
-              <InfoRow label="Profile Photo" value={<Thumb src={contactPhotoUrl} alt="Contact person 1 photo" rounded />} />
-            ) : null;
-          })()}
-          <InfoRow label="Name" value={buildFullName(data.mainContact?.title, data.mainContact?.firstName, data.mainContact?.middleName, data.mainContact?.lastName, data.mainContact?.name) || 'Not provided'} />
-          <InfoRow
-            label="Designation"
-            value={data.mainContact?.designation || 'Not provided'}
-          />
-          {data.mainContact?.designation === 'Others' && data.mainContact?.customDesignation && (
-            <InfoRow label="Custom Designation" value={data.mainContact.customDesignation} />
-          )}
-          <InfoRow label="Primary Email" value={data.mainContact?.email1 || data.mainContact?.email || 'Not provided'} />
-          {data.mainContact?.email2 && (
-            <InfoRow label="Secondary Email" value={data.mainContact.email2} />
-          )}
-          <InfoRow label="Primary Phone" value={data.mainContact?.phone1 || data.mainContact?.phone || 'Not provided'} />
-          {data.mainContact?.phone2 && (
-            <InfoRow label="Secondary Phone" value={data.mainContact.phone2} />
-          )}
-          {(() => {
-            const ll = getLandlineDisplay(data.mainContact);
-            return (
-              <>
-                {ll.local && <InfoRow label="Local Landline" value={ll.local} />}
-                {ll.intl && <InfoRow label="International Landline" value={ll.intl} />}
-                {!ll.hasNew && ll.legacy && <InfoRow label="Landline" value={ll.legacy} />}
-              </>
-            );
-          })()}
-          <InfoRow
-            label="Department"
-            value={data.mainContact?.department || 'Not provided'}
-          />
-          {data.mainContact?.department === 'Others' && data.mainContact?.customDepartment && (
-            <InfoRow label="Custom Department" value={data.mainContact.customDepartment} />
-          )}
+          <SubCard title="Contact Person 1">
+            {(() => {
+              const contactPhotoUrl = resolveImageUrl(data.mainContact?.photo || data.mainContact?.photoFile);
+              return contactPhotoUrl ? (
+                <InfoRow inset label="Profile Photo" value={<Thumb src={contactPhotoUrl} alt="Contact person 1 photo" rounded />} />
+              ) : null;
+            })()}
+            <InfoRow inset label="Name" value={buildFullName(data.mainContact?.title, data.mainContact?.firstName, data.mainContact?.middleName, data.mainContact?.lastName, data.mainContact?.name) || 'Not provided'} />
+            <InfoRow
+              inset
+              label="Designation"
+              value={data.mainContact?.designation || 'Not provided'}
+            />
+            {data.mainContact?.designation === 'Others' && data.mainContact?.customDesignation && (
+              <InfoRow inset label="Custom Designation" value={data.mainContact.customDesignation} />
+            )}
+            <InfoRow inset label="Primary Email" value={data.mainContact?.email1 || data.mainContact?.email || 'Not provided'} />
+            {data.mainContact?.email2 && (
+              <InfoRow inset label="Secondary Email" value={data.mainContact.email2} />
+            )}
+            <InfoRow inset label="Primary Phone" value={data.mainContact?.phone1 || data.mainContact?.phone || 'Not provided'} />
+            {data.mainContact?.phone2 && (
+              <InfoRow inset label="Secondary Phone" value={data.mainContact.phone2} />
+            )}
+            {(() => {
+              const ll = getLandlineDisplay(data.mainContact);
+              return (
+                <>
+                  {ll.local && <InfoRow inset label="Local Landline" value={ll.local} />}
+                  {ll.intl && <InfoRow inset label="International Landline" value={ll.intl} />}
+                  {!ll.hasNew && ll.legacy && <InfoRow inset label="Landline" value={ll.legacy} />}
+                </>
+              );
+            })()}
+            <InfoRow
+              inset
+              label="Department"
+              value={data.mainContact?.department || 'Not provided'}
+            />
+            {data.mainContact?.department === 'Others' && data.mainContact?.customDepartment && (
+              <InfoRow inset label="Custom Department" value={data.mainContact.customDepartment} />
+            )}
+          </SubCard>
           {(data.alternateContacts || []).map((contact: any, index: number) => (
-            <div key={contact.id || index}>
-              <div className="font-bold text-sm text-slate-900 px-6 py-2">Contact Person {index + 2}</div>
-              <InfoRow label="Name" value={buildFullName(contact.title, contact.firstName, contact.middleName, contact.lastName, contact.name) || 'Not provided'} />
+            <SubCard key={contact.id || index} title={`Contact Person ${index + 2}`}>
+              {(() => {
+                const photoUrl = resolveImageUrl(contact.photo || contact.photoFile);
+                return photoUrl ? (
+                  <InfoRow inset label="Profile Photo" value={<Thumb src={photoUrl} alt={`Contact person ${index + 2} photo`} rounded />} />
+                ) : null;
+              })()}
+              <InfoRow inset label="Name" value={buildFullName(contact.title, contact.firstName, contact.middleName, contact.lastName, contact.name) || 'Not provided'} />
               <InfoRow
+                inset
                 label="Designation"
                 value={contact.designation || 'Not provided'}
               />
               {contact.designation === 'Others' && contact.customDesignation && (
-                <InfoRow label="Custom Designation" value={contact.customDesignation} />
+                <InfoRow inset label="Custom Designation" value={contact.customDesignation} />
               )}
-              <InfoRow label="Primary Email" value={contact.email1 || contact.email || 'Not provided'} />
-              {contact.email2 && <InfoRow label="Secondary Email" value={contact.email2} />}
-              <InfoRow label="Primary Phone" value={contact.phone1 || contact.phone || 'Not provided'} />
-              {contact.phone2 && <InfoRow label="Secondary Phone" value={contact.phone2} />}
+              <InfoRow inset label="Primary Email" value={contact.email1 || contact.email || 'Not provided'} />
+              {contact.email2 && <InfoRow inset label="Secondary Email" value={contact.email2} />}
+              <InfoRow inset label="Primary Phone" value={contact.phone1 || contact.phone || 'Not provided'} />
+              {contact.phone2 && <InfoRow inset label="Secondary Phone" value={contact.phone2} />}
               {(() => {
                 const ll = getLandlineDisplay(contact);
                 return (
                   <>
-                    {ll.local && <InfoRow label="Local Landline" value={ll.local} />}
-                    {ll.intl && <InfoRow label="International Landline" value={ll.intl} />}
-                    {!ll.hasNew && ll.legacy && <InfoRow label="Landline" value={ll.legacy} />}
+                    {ll.local && <InfoRow inset label="Local Landline" value={ll.local} />}
+                    {ll.intl && <InfoRow inset label="International Landline" value={ll.intl} />}
+                    {!ll.hasNew && ll.legacy && <InfoRow inset label="Landline" value={ll.legacy} />}
                   </>
                 );
               })()}
               {contact.department && (
-                <InfoRow label="Department" value={contact.department} />
+                <InfoRow inset label="Department" value={contact.department} />
               )}
               {contact.department === 'Others' && contact.customDepartment && (
-                <InfoRow label="Custom Department" value={contact.customDepartment} />
+                <InfoRow inset label="Custom Department" value={contact.customDepartment} />
               )}
-            </div>
+            </SubCard>
           ))}
-          {data.tradeLicenseNumber && <InfoRow label="Trade License Number" value={data.tradeLicenseNumber} />}
-          {data.businessRegistrationNumber && <InfoRow label="Business Registration Number" value={data.businessRegistrationNumber} />}
-          {data.taxIdentificationNumber && <InfoRow label="Tax Identification Number" value={data.taxIdentificationNumber} />}
-          {data.bankingDetails?.bankName && (
-            <>
-              <InfoRow label="Bank Name" value={data.bankingDetails.bankName} />
-              {data.bankingDetails.accountNumber && (
-                <InfoRow label="Account Number" value={'****' + data.bankingDetails.accountNumber.slice(-4)} />
-              )}
-              {data.bankingDetails.swiftCode && <InfoRow label="SWIFT / BIC Code" value={data.bankingDetails.swiftCode} />}
-              {data.bankingDetails.iban && <InfoRow label="IBAN" value={data.bankingDetails.iban} />}
-            </>
-          )}
         </div>
       </AccordionSection>
 
@@ -863,7 +947,7 @@ export default function VendorDataSummary({
             <>
               {data.iecCode && <InfoRow label="IEC Code" value={data.iecCode} />}
               {(data.iecCertFile || data.iecCertDocument) && (
-                <InfoRow label="IEC Certificate" value={<DocValue src={data.iecCertDocument || data.iecCertFile} alt="IEC certificate" />} />
+                <InfoRow label="IEC Certificate" value={<DocValue src={data.iecCertFile || data.iecCertDocument} alt="IEC certificate" />} />
               )}
               <InfoRow label="Import Countries" value={(data.importCountries || []).join(', ') || 'None'} />
               <InfoRow label="Export Countries" value={(data.exportCountries || []).join(', ') || 'None'} />
