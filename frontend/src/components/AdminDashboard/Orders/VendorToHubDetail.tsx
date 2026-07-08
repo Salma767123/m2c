@@ -195,7 +195,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           </div>
         </div>
         <div className="flex gap-3">
-          {shipment.status === "ORDER_CREATED" && hasPermission('vendor_to_hub:edit') && (
+          {shipment.status === "ORDER_CREATED" && hasPermission('vendor_to_hub:update_status') && (
             <button
               onClick={handleProceed}
               className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
@@ -203,7 +203,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               Assign Hub / Proceed
             </button>
           )}
-          {shipment.status === "IN_TRANSIT_TO_ADMIN_HUB" && hasPermission('vendor_to_hub:edit') && (
+          {shipment.status === "IN_TRANSIT_TO_ADMIN_HUB" && hasPermission('vendor_to_hub:update_status') && (
             <button
               onClick={handleMarkAsReceived}
               disabled={isProcessing}

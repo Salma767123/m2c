@@ -257,7 +257,7 @@ export default function InvoiceManagement() {
                               <Eye className="h-4 w-4" />
                             </button>
                           )}
-                          {order.invoiceNo && hasPermission('invoices:view') && (
+                          {order.invoiceNo && hasPermission('invoices:print') && (
                             <button
                               onClick={() => handlePrintInvoice(order)}
                               className="p-1.5 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"

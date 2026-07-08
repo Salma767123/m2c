@@ -154,7 +154,7 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
             </div>
           </div>
         </div>
-        {hasPermission("invoices:view") && (
+        {hasPermission("invoices:print") && (
           <button
             onClick={handlePrint}
             disabled={printing}

@@ -239,7 +239,7 @@ export default function VendorEnquiryManagement() {
                               <Eye className="w-4 h-4" />
                             </Button>
                           )}
-                          {enquiry.status === 'pending' && hasPermission('vendor_enquiries:edit') && (
+                          {enquiry.status === 'pending' && hasPermission('vendor_enquiries:approve') && (
                             <>
                               <Button
                                 size="sm"

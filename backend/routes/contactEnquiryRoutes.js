@@ -17,7 +17,7 @@ router.post('/submit', submitContactEnquiry);
 router.get('/', authenticateToken, requireRole('admin'), requirePermission('website_enquiries:view'), getAllContactEnquiries);
 router.get('/stats', authenticateToken, requireRole('admin'), requirePermission('website_enquiries:view'), getContactEnquiryStats);
 router.get('/:id', authenticateToken, requireRole('admin'), requirePermission('website_enquiries:view'), getContactEnquiryById);
-router.put('/:id/status', authenticateToken, requireRole('admin'), requirePermission('website_enquiries:edit'), updateContactEnquiryStatus);
+router.put('/:id/status', authenticateToken, requireRole('admin'), requirePermission('website_enquiries:resolve'), updateContactEnquiryStatus);
 router.delete('/:id', authenticateToken, requireRole('admin'), requirePermission('website_enquiries:delete'), deleteContactEnquiry);
 
 module.exports = router;

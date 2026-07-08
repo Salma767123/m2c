@@ -35,7 +35,7 @@ const ACTION_LABELS: Record<PermissionAction, string> = {
   delete: 'Delete',
 }
 
-const permName = (submoduleKey: string, action: PermissionAction) => `${submoduleKey}:${action}`
+const permName = (submoduleKey: string, action: string) => `${submoduleKey}:${action}`
 
 export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) {
   const router = useRouter()
@@ -80,7 +80,10 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
   const allPermissionNames = useMemo(
     () =>
       modules.flatMap(m =>
-        m.submodules.flatMap(s => PERMISSION_ACTIONS.filter(a => s.actions[a]).map(a => permName(s.key, a)))
+        m.submodules.flatMap(s => [
+          ...PERMISSION_ACTIONS.filter(a => s.actions[a]).map(a => permName(s.key, a)),
+          ...(s.extra || []).map(x => permName(s.key, x.key)),
+        ])
       ),
     [modules]
   )
@@ -96,14 +99,15 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
     if (errors.permissions) setErrors(prev => ({ ...prev, permissions: '' }))
   }
 
-  // Toggling create/edit/delete implies view; removing view clears the row.
-  const toggleAction = (sub: PermissionSubmodule, action: PermissionAction) => {
+  // Toggling any non-view action (incl. special buttons) implies view;
+  // removing view clears the whole row.
+  const toggleAction = (sub: PermissionSubmodule, action: string) => {
     const name = permName(sub.key, action)
     setSelection(next => {
       if (next.has(name)) {
         next.delete(name)
         if (action === 'view') {
-          PERMISSION_ACTIONS.forEach(a => next.delete(permName(sub.key, a)))
+          submodulePerms(sub).forEach(p => next.delete(p))
         }
       } else {
         next.add(name)
@@ -114,8 +118,10 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
     })
   }
 
-  const submodulePerms = (sub: PermissionSubmodule) =>
-    PERMISSION_ACTIONS.filter(a => sub.actions[a]).map(a => permName(sub.key, a))
+  const submodulePerms = (sub: PermissionSubmodule) => [
+    ...PERMISSION_ACTIONS.filter(a => sub.actions[a]).map(a => permName(sub.key, a)),
+    ...(sub.extra || []).map(x => permName(sub.key, x.key)),
+  ]
 
   const toggleSubmoduleAll = (sub: PermissionSubmodule) => {
     const perms = submodulePerms(sub)
@@ -468,6 +474,9 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                                   </th>
                                 )
                               })}
+                              <th className="px-3 py-3 text-left min-w-[180px]">
+                                <span className="font-semibold text-gray-700">Special buttons</span>
+                              </th>
                               <th className="px-3 py-3 text-center w-20">
                                 <span className="font-semibold text-gray-700">All</span>
                               </th>
@@ -509,6 +518,38 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                                       )}
                                     </td>
                                   ))}
+                                  <td className="px-3 py-3">
+                                    {sub.extra && sub.extra.length > 0 ? (
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {sub.extra.map(x => {
+                                          const on = selected.has(permName(sub.key, x.key))
+                                          return (
+                                            <button
+                                              key={x.key}
+                                              type="button"
+                                              onClick={() => toggleAction(sub, x.key)}
+                                              disabled={isLoading}
+                                              title={x.description || x.label}
+                                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-xs font-medium transition-colors ${on
+                                                ? 'bg-black border-black text-white'
+                                                : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
+                                                }`}
+                                            >
+                                              {on && <Check className="w-3 h-3" />}
+                                              {x.label}
+                                            </button>
+                                          )
+                                        })}
+                                      </div>
+                                    ) : (
+                                      <span
+                                        className="inline-flex items-center text-gray-300 select-none"
+                                        title={`No special buttons for ${sub.name}`}
+                                      >
+                                        <Minus className="w-4 h-4" />
+                                      </span>
+                                    )}
+                                  </td>
                                   <td className="px-3 py-3 text-center">
                                     <button
                                       type="button"
@@ -533,7 +574,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                       </div>
                       <p className="text-xs text-gray-500 mt-2 flex items-center gap-1.5">
                         <Minus className="w-3.5 h-3.5 text-gray-400" />
-                        means the action does not exist for that submodule. Granting Create, Edit or Delete automatically grants View.
+                        means the action does not exist for that submodule. Special buttons are page-specific actions (Approve, Suspend, Mark as Paid…). Granting any action automatically grants View.
                       </p>
                     </div>
                   )}

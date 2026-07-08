@@ -348,7 +348,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
             <p className="text-slate-500 mt-1">{vendor?.companyName || formData.vendorName || "Vendor"}</p>
           </div>
         </div>
-        {isAwaitingAdminAction && vendorStatus === 'UNDER_REVIEW' && hasPermission('vendor_management:edit') && (
+        {isAwaitingAdminAction && vendorStatus === 'UNDER_REVIEW' && hasPermission('vendor_management:approve') && (
           <button
             onClick={handleApprove}
             disabled={approving}
@@ -645,7 +645,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
       )}
 
       {/* Approve Action at Bottom */}
-      {isAwaitingAdminAction && vendorStatus === 'UNDER_REVIEW' && hasPermission('vendor_management:edit') && (
+      {isAwaitingAdminAction && vendorStatus === 'UNDER_REVIEW' && hasPermission('vendor_management:approve') && (
         <Card className="border-2 border-emerald-200 bg-emerald-50">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">

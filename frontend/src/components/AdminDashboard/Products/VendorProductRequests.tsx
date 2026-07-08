@@ -544,9 +544,9 @@ export default function VendorProductRequests() {
                               <Eye className="h-4 w-4" />
                             </button>
                           )}
-                          {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'REINSPECTION') && hasPermission('vendor_product_requests:edit') && (
+                          {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'REINSPECTION') && (
                             <>
-                              {request.approvalStatus === 'QC_APPROVED' && (
+                              {request.approvalStatus === 'QC_APPROVED' && hasPermission('vendor_product_requests:approve') && (
                                 <button
                                   title="Final Approve & Set Price"
                                   onClick={() => handleApproveClick(request.id)}
@@ -555,14 +555,16 @@ export default function VendorProductRequests() {
                                   <Check className="h-4 w-4" />
                                 </button>
                               )}
-                              <button
-                                title="Reject"
-                                onClick={() => handleRejectClick(request.id)}
-                                className="p-2 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                              {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'REINSPECTION') && (
+                              {hasPermission('vendor_product_requests:approve') && (
+                                <button
+                                  title="Reject"
+                                  onClick={() => handleRejectClick(request.id)}
+                                  className="p-2 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              )}
+                              {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'REINSPECTION') && hasPermission('vendor_product_requests:assign_qc') && (
                                 request.assignedQcId ? (
                                   <button
                                     title="Reassign QC Checker"

@@ -9,6 +9,7 @@ import AdminReviewModal from '@/components/AdminDashboard/ReInspection/AdminRevi
 import { Badge } from '@/components/UI/Badge';
 import { Button } from '@/components/UI/Button';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { openDoc } from '@/lib/docViewerBus';
 import {
   IconArrowLeft,
   IconLoader2,
@@ -312,14 +313,14 @@ export default function FactoryInspectionReviewPage() {
                   : photo?.label || photo?.name || `Factory photo ${i + 1}`;
                 if (!url) return null;
                 return (
-                <a key={i} href={url} target="_blank" rel="noopener noreferrer" title={name} className="flex flex-col items-center gap-1 w-20">
+                <button key={i} type="button" onClick={() => openDoc(url, name)} title={name} className="flex flex-col items-center gap-1 w-20">
                   <img
                     src={url}
                     alt={name}
                     className="w-20 h-20 object-cover rounded-lg border hover:ring-2 ring-blue-300 transition-all"
                   />
                   <span className="text-[10px] text-gray-600 font-medium text-center truncate w-full">{name}</span>
-                </a>
+                </button>
                 );
               })}
             </div>

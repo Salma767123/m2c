@@ -278,7 +278,7 @@ export default function SettlementManagement() {
                             <span className={`text-sm ${new Date(settlement.dueDate) < new Date() && settlement.status !== 'Paid' ? 'text-red-600 font-medium' : ''}`}>
                               {new Date(settlement.dueDate).toLocaleDateString()}
                             </span>
-                            {settlement.status !== 'Paid' && hasPermission('settlement:edit') && (
+                            {settlement.status !== 'Paid' && hasPermission('settlement:set_due_date') && (
                               <button onClick={() => handleSetDueDate(settlement)} className="p-1 text-gray-400 hover:text-gray-700 rounded transition-colors" title="Edit due date">
                                 <CalendarDays className="h-3.5 w-3.5" />
                               </button>
@@ -288,7 +288,7 @@ export default function SettlementManagement() {
                           settlement.status === 'Pending' ? (
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-amber-600 font-medium">Awaiting Approval</span>
-                              {hasPermission('settlement:edit') && (
+                              {hasPermission('settlement:set_due_date') && (
                                 <button onClick={() => handleSetDueDate(settlement)} className="p-1 text-gray-400 hover:text-gray-700 rounded transition-colors" title="Set due date manually">
                                   <CalendarDays className="h-3.5 w-3.5" />
                                 </button>
@@ -327,7 +327,7 @@ export default function SettlementManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2 items-center">
-                        {(settlement.status === "Pending" || settlement.status === "Processing") && hasPermission('settlement:edit') ? (
+                        {(settlement.status === "Pending" || settlement.status === "Processing") && hasPermission('settlement:mark_paid') ? (
                           (() => {
                             const os = settlement.order?.status?.toUpperCase() || '';
                             const isDelivered = os === 'DELIVERED' || os === 'COMPLETED';

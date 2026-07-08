@@ -520,7 +520,7 @@ export default function ProductsTable() {
                       </Link>
                     )}
 
-                    {product.approvalStatus === 'QC_APPROVED' && hasPermission('all_products:edit') && (
+                    {product.approvalStatus === 'QC_APPROVED' && hasPermission('all_products:approve') && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -532,7 +532,7 @@ export default function ProductsTable() {
                       </Button>
                     )}
 
-                    {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED') && hasPermission('all_products:edit') && (
+                    {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED') && hasPermission('all_products:approve') && (
                       <Button
                         variant="ghost"
                         size="sm"

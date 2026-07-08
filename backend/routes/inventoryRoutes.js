@@ -30,7 +30,7 @@ router.post('/admin', authenticateToken, requireRole('admin'), requirePermission
 router.put('/admin/:id', authenticateToken, requireRole('admin'), requirePermission('inventory:edit'), updateInventoryItem);
 router.delete('/admin/:id', authenticateToken, requireRole('admin'), requirePermission('inventory:delete'), deleteInventoryItem);
 router.get('/admin/:id/history', authenticateToken, requireRole('admin'), requirePermission('inventory:view'), getStockHistory);
-router.patch('/admin/:id/stock', authenticateToken, requireRole('admin'), requirePermission('inventory:edit'), updateStock);
+router.patch('/admin/:id/stock', authenticateToken, requireRole('admin'), requirePermission('inventory:update_stock'), updateStock);
 router.post('/admin/recalculate-stock', authenticateToken, requireRole('admin'), requirePermission('inventory:edit'), recalculateAllStock);
 
 // All vendor routes require vendor authentication

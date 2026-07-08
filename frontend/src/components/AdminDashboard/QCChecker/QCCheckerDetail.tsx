@@ -11,6 +11,7 @@ import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { qcCheckerService, QCCheckerData } from "@/services/qcCheckerService";
 import { showErrorToast } from "@/lib/toast-utils";
 import { formatCheckerName } from "@/lib/checkerUtils";
+import { openDoc } from "@/lib/docViewerBus";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -187,14 +188,13 @@ export default function QCCheckerDetail() {
             <div>
               <label className="block text-slate-500 font-medium mb-1.5 text-xs uppercase tracking-wide">ID Proof</label>
               {checker.idProof ? (
-                <a
-                  href={checker.idProof}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => checker.idProof && openDoc(checker.idProof, "ID Proof")}
                   className="inline-flex items-center gap-2 px-4 py-3 text-sm font-medium text-brand-700 bg-brand-50 border border-brand-200 rounded-xl hover:bg-brand-100 transition-colors"
                 >
                   <FileText className="w-4 h-4" /> View ID Proof{isPdfIdProof ? " (PDF)" : ""} <ExternalLink className="w-3.5 h-3.5" />
-                </a>
+                </button>
               ) : (
                 <div className="px-4 py-3 border border-dashed border-slate-200 rounded-xl text-sm text-slate-400">No ID proof uploaded</div>
               )}

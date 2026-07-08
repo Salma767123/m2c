@@ -593,7 +593,7 @@ export default function VendorsTable() {
                               </button>
                             </Link>
                           )}
-                          {(vendor.status === 'PENDING' || vendor.status === 'UNDER_REVIEW') && hasPermission('vendor_management:edit') && (
+                          {(vendor.status === 'PENDING' || vendor.status === 'UNDER_REVIEW') && hasPermission('vendor_management:approve') && (
                             <>
                               <button
                                 title="Approve Vendor"
@@ -615,7 +615,7 @@ export default function VendorsTable() {
                               </button>
                             </>
                           )}
-                          {vendor.status === 'APPROVED' && hasPermission('vendor_management:edit') && (
+                          {vendor.status === 'APPROVED' && hasPermission('vendor_management:suspend') && (
                             <button
                               title="Suspend Vendor"
                               onClick={() => handleSuspendVendor(vendor)}

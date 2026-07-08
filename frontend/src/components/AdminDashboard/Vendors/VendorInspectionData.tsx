@@ -7,6 +7,7 @@ import {
 import { Card, CardContent } from "../../UI/Card";
 import { Badge } from "../../UI/Badge";
 import { buildFullName } from "@/lib/utils";
+import { openDoc } from "@/lib/docViewerBus";
 import { Country } from "country-state-city";
 
 // name → ISO code for flag images (flag emoji don't render on Windows).
@@ -79,7 +80,7 @@ function DocThumb({ url, name }: { url?: string; name?: string }) {
   if (!url) return null;
   const img = isImageUrl(url);
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="block border border-slate-200 rounded-xl overflow-hidden hover:border-brand-300 transition-colors">
+    <button type="button" onClick={() => openDoc(url, name || "Image")} className="block border border-slate-200 rounded-xl overflow-hidden hover:border-brand-300 transition-colors">
       {img ? (
         <img src={url} alt={name || "Image"} className="w-full h-32 object-cover" loading="lazy" />
       ) : (
@@ -89,7 +90,7 @@ function DocThumb({ url, name }: { url?: string; name?: string }) {
         </div>
       )}
       {name && <div className="px-2 py-1.5 text-xs font-medium text-slate-700 truncate" title={name}>{name}</div>}
-    </a>
+    </button>
   );
 }
 

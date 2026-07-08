@@ -5,6 +5,7 @@ import { Button } from '@/components/UI/Button';
 import { User, Calendar, Users, Mail, Plus, Trash2, ArrowLeft, ArrowRight, IdCard, Phone as PhoneIcon, Image as ImageIcon } from 'lucide-react';
 import { ToggleButton, PhoneInput, validatePhoneE164, AccordionSection, LocalLandlineInput, parsePhone, TitleSelect, type LocalLandlineValue } from '@/components/VendorHub/FormUI';
 import { scrollToFirstError } from '@/lib/formErrorScroll';
+import { calculateDuration } from '@/lib/utils';
 import { handleUpload } from '@/lib/toast-utils';
 import { centerNotice } from '@/components/UI/CenterNotice';
 import ImageCropModal from '@/components/UI/ImageCropModal';
@@ -52,42 +53,6 @@ const SECTION_FIELDS: Record<string, string[]> = {
   team: [],
   history: ['businessStartDate'],
   size: ['employeeCount'],
-};
-
-// Exact calendar duration between the start date and today, formatted in full
-// words — e.g. "9 Years, 8 Months, 18 Days". Returns '' when no/invalid date
-// so the caller can show a placeholder. Recomputed on every render, so it
-// updates live whenever businessStartDate changes.
-const calculateDuration = (startDate: string) => {
-  if (!startDate) return '';
-  const start = new Date(startDate);
-  const now = new Date();
-  if (isNaN(start.getTime()) || start > now) return '';
-
-  let years = now.getFullYear() - start.getFullYear();
-  let months = now.getMonth() - start.getMonth();
-  let days = now.getDate() - start.getDate();
-
-  if (days < 0) {
-    months -= 1;
-    // Borrow the number of days in the month preceding `now`.
-    days += new Date(now.getFullYear(), now.getMonth(), 0).getDate();
-  }
-  if (months < 0) {
-    years -= 1;
-    months += 12;
-  }
-  // Guard against rare month-length edges leaving a negative remainder.
-  if (days < 0) days = 0;
-  if (months < 0) months = 0;
-  if (years < 0) years = 0;
-
-  const part = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-  return [
-    years > 0 ? part(years, 'Year') : '',
-    months > 0 ? part(months, 'Month') : '',
-    days > 0 ? part(days, 'Day') : '',
-  ].filter(Boolean).join(' / ') || '0 Days';
 };
 
 // ── Company-type → owner structure (Change 14) ────────────────────────

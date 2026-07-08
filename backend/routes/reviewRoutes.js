@@ -10,7 +10,7 @@ router.get('/check-status', authenticateToken, reviewController.checkReviewStatu
 
 // Admin routes
 router.get('/admin/all', authenticateToken, requireAdminRole, requirePermission('customer_reviews:view'), reviewController.getAllReviews);
-router.patch('/:id/status', authenticateToken, requireAdminRole, requirePermission('customer_reviews:edit'), reviewController.updateReviewStatus);
+router.patch('/:id/status', authenticateToken, requireAdminRole, requirePermission('customer_reviews:approve'), reviewController.updateReviewStatus);
 router.delete('/:id', authenticateToken, requireAdminRole, requirePermission('customer_reviews:delete'), reviewController.deleteReview);
 
 // Export

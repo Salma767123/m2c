@@ -447,14 +447,14 @@ export default function VendorDetail({
         <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">{icon} {heading}</h4>
         <div className="flex flex-wrap gap-4">
           {items.map((m, i) => (
-            <a key={`${m.label}-${i}`} href={m.url} target="_blank" rel="noopener noreferrer" className="group block">
+            <button key={`${m.label}-${i}`} type="button" onClick={() => setViewerDoc({ url: m.url, name: m.label })} className="group block">
               <img
                 src={m.url}
                 alt={m.label}
                 className="w-28 h-28 object-cover rounded-xl border border-slate-200 group-hover:border-brand-300 transition-colors"
               />
               <p className="text-xs font-semibold text-slate-600 mt-1.5 text-center max-w-28 truncate" title={m.label}>{m.label}</p>
-            </a>
+            </button>
           ))}
         </div>
       </div>
@@ -469,9 +469,9 @@ export default function VendorDetail({
           {docs.map((doc: any, idx: number) => (
             <div key={doc.id || idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-3 space-y-2">
               {isImageUrl(doc.documentUrl, doc.name) ? (
-                <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer">
+                <button type="button" onClick={() => setViewerDoc({ url: doc.documentUrl, name: doc.name || 'Document' })} className="block w-full">
                   <img src={doc.documentUrl} alt={doc.name} className="w-full h-32 object-cover rounded-lg border border-slate-200" />
-                </a>
+                </button>
               ) : (
                 <div className="w-full h-32 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-300">
                   <FileText className="w-10 h-10" />

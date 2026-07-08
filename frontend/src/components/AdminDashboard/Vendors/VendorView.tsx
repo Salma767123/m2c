@@ -320,7 +320,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
               )}
 
               {/* Action Buttons */}
-              {vendor.status === 'PENDING' && hasPermission('vendor_management:edit') && (
+              {vendor.status === 'PENDING' && hasPermission('vendor_management:approve') && (
                 <>
                   <Button
                     onClick={handleApprove}
@@ -354,7 +354,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                 </>
               )}
 
-              {vendor.status === 'APPROVED' && hasPermission('vendor_management:edit') && (
+              {vendor.status === 'APPROVED' && hasPermission('vendor_management:suspend') && (
                 <Button
                   onClick={handleSuspend}
                   disabled={actionLoading === 'suspend'}

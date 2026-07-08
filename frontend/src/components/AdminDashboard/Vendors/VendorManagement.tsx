@@ -84,7 +84,7 @@ export default function VendorManagement() {
                       <Badge variant={vendor.status === 'PENDING' ? 'default' : 'secondary'}>
                         {vendor.status}
                       </Badge>
-                      {vendor.status === 'PENDING' && hasPermission('vendor_management:edit') && (
+                      {vendor.status === 'PENDING' && hasPermission('vendor_management:approve') && (
                         <>
                           <Button
                             size="sm"

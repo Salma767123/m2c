@@ -365,7 +365,7 @@ export default function CustomerReviews() {
                             <Eye className="h-4 w-4" />
                           </button>
                         )}
-                        {hasPermission('customer_reviews:edit') && (
+                        {hasPermission('customer_reviews:approve') && (
                           review.isApproved ? (
                             <button
                               onClick={() => handleReject(review.id)}

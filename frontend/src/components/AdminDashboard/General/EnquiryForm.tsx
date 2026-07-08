@@ -34,7 +34,7 @@ import { hasPermission } from '@/lib/auth';
 
 const EnquiryForm = () => {
   const canView = hasPermission('vendor_enquiries:view');
-  const canManage = hasPermission('vendor_enquiries:edit');
+  const canManage = hasPermission('vendor_enquiries:approve');
   const canDelete = hasPermission('vendor_enquiries:delete');
   const [enquiries, setEnquiries] = useState<VendorEnquiry[]>([]);
   const [isLoading, setIsLoading] = useState(true);

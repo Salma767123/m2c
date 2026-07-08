@@ -1,6 +1,7 @@
 "use client"
 
 import { Image as ImageIcon, User, MapPin, ExternalLink, Building2, Users } from "lucide-react"
+import { openDoc } from "@/lib/docViewerBus"
 import type { StepErrors } from "../validation"
 import {
     READONLY_CLS,
@@ -181,9 +182,9 @@ function VendorMedia({ logo, documents }: { logo?: string | null; documents?: an
             {hasLogo && (
                 <div>
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Company Logo</p>
-                    <a href={logo!} target="_blank" rel="noopener noreferrer" className="inline-block">
+                    <button type="button" onClick={() => openDoc(logo!, 'Company Logo')} className="inline-block">
                         <img src={logo!} alt="Company logo" className="w-28 h-28 object-contain rounded-xl border border-slate-200 bg-white p-2" />
-                    </a>
+                    </button>
                 </div>
             )}
 
@@ -192,7 +193,7 @@ function VendorMedia({ logo, documents }: { logo?: string | null; documents?: an
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Factory Images</p>
                     <div className="flex flex-wrap gap-3">
                         {factoryImages.map((img, idx) => (
-                            <a key={idx} href={img.url} target="_blank" rel="noopener noreferrer" className="group block w-28">
+                            <button key={idx} type="button" onClick={() => openDoc(img.url, img.label || 'Factory Photo')} className="group block w-28 text-left">
                                 {isImageUrl(img.url) ? (
                                     <img src={img.url} alt={img.label} className="w-28 h-28 object-cover rounded-xl border border-slate-200" />
                                 ) : (
@@ -201,7 +202,7 @@ function VendorMedia({ logo, documents }: { logo?: string | null; documents?: an
                                     </div>
                                 )}
                                 <p className="mt-1 text-[11px] text-slate-500 truncate group-hover:text-slate-700">{img.label}</p>
-                            </a>
+                            </button>
                         ))}
                     </div>
                 </div>

@@ -366,17 +366,19 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
           <Badge className={getStatusColor(product.approvalStatus)}>
             {product.approvalStatus.replace('_', ' ').charAt(0).toUpperCase() + product.approvalStatus.replace('_', ' ').slice(1).toLowerCase()}
           </Badge>
-          {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED' || product.approvalStatus === 'REINSPECTION' || product.approvalStatus === 'REJECTED') && hasPermission('vendor_product_requests:edit') && (
+          {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED' || product.approvalStatus === 'REINSPECTION' || product.approvalStatus === 'REJECTED') && (
             <>
               {product.approvalStatus === 'QC_APPROVED' ? (
-                <Button
-                  onClick={() => setShowApprovalModal(true)}
-                  disabled={actionLoading}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <Check className="h-4 w-4 mr-2" />
-                  {actionLoading ? 'Processing...' : 'Approve'}
-                </Button>
+                hasPermission('vendor_product_requests:approve') && (
+                  <Button
+                    onClick={() => setShowApprovalModal(true)}
+                    disabled={actionLoading}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Check className="h-4 w-4 mr-2" />
+                    {actionLoading ? 'Processing...' : 'Approve'}
+                  </Button>
+                )
               ) : product.approvalStatus === 'REINSPECTION' ? (
                 <div className="flex flex-col items-end">
                   <Badge variant="outline" className="text-orange-600 mb-1 border-orange-200">
@@ -387,14 +389,16 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   </span>
                 </div>
               ) : product.approvalStatus === 'REJECTED' ? (
-                <Button
-                  variant="outline"
-                  onClick={() => window.location.href = `/admin/dashboard/reinspection-review/product/${product.id}`}
-                  className="border-blue-300 text-blue-600 hover:bg-blue-50"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Review &amp; Re-Inspect
-                </Button>
+                hasPermission('reinspection_review:view') && (
+                  <Button
+                    variant="outline"
+                    onClick={() => window.location.href = `/admin/dashboard/reinspection-review/product/${product.id}`}
+                    className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Review &amp; Re-Inspect
+                  </Button>
+                )
               ) : (
                 <div className="flex flex-col items-end">
                   <Badge variant="outline" className="text-yellow-600 mb-1 border-yellow-200">
@@ -405,7 +409,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   </span>
                 </div>
               )}
-              {product.approvalStatus === 'PENDING' && (
+              {product.approvalStatus === 'PENDING' && hasPermission('vendor_product_requests:approve') && (
                 <Button
                   variant="outline"
                   onClick={() => setShowRejectionModal(true)}

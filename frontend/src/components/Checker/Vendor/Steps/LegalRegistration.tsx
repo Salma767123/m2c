@@ -1,6 +1,7 @@
 "use client"
 
 import { FileText, ExternalLink, CheckCircle, XCircle, MinusCircle } from "lucide-react"
+import { openDoc } from "@/lib/docViewerBus"
 import type { StepErrors } from "../validation"
 import {
     READONLY_CLS,
@@ -269,15 +270,14 @@ export default function LegalRegistration({ formData, setFormData, errors = {}, 
                                             )}
                                         </div>
 
-                                        <a
-                                            href={doc.documentUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
+                                        <button
+                                            type="button"
+                                            onClick={() => openDoc(doc.documentUrl, doc.name || 'Document')}
                                             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors shrink-0"
                                         >
                                             <ExternalLink className="w-3.5 h-3.5" />
                                             Open
-                                        </a>
+                                        </button>
                                     </div>
 
                                     {/* Status badge (current state at a glance) */}

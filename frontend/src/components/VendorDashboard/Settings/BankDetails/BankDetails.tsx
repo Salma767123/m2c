@@ -6,6 +6,7 @@ import VendorService, { VendorBankDetails, VendorDocument } from '@/services/ven
 import Dropdown from '@/components/UI/Dropdown'
 import { Button } from '@/components/UI/Button'
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
+import { openDoc } from '@/lib/docViewerBus'
 
 interface BankDetailsForm {
   accountHolderName: string
@@ -731,10 +732,10 @@ export default function BankDetails() {
                     <Button
                       variant="link"
                       size="sm"
-                      asChild
                       className="h-auto p-0 text-xs text-brand-600 hover:text-brand-700"
+                      onClick={() => doc?.documentUrl && openDoc(doc.documentUrl, label || 'Bank Document')}
                     >
-                      <a href={doc?.documentUrl} target="_blank" rel="noopener noreferrer">View</a>
+                      View
                     </Button>
                     <Button
                       variant="link"

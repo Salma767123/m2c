@@ -9,6 +9,7 @@ import AdminReviewModal from '@/components/AdminDashboard/ReInspection/AdminRevi
 import { Badge } from '@/components/UI/Badge';
 import { Button } from '@/components/UI/Button';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { openDoc } from '@/lib/docViewerBus';
 import {
   IconArrowLeft,
   IconLoader2,
@@ -364,13 +365,13 @@ function QCInspectionDataView({ data }: { data: Record<string, unknown> }) {
               <span className="text-xs text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
               <div className="flex gap-2 flex-wrap mt-1">
                 {(data[key] as string[]).filter(url => url.startsWith('http')).map((url, i) => (
-                  <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                  <button key={i} type="button" onClick={() => openDoc(url, `${key} ${i + 1}`)}>
                     <img
                       src={url}
                       alt={`${key} ${i + 1}`}
                       className="w-16 h-16 object-cover rounded border hover:ring-2 ring-blue-300 transition-all"
                     />
-                  </a>
+                  </button>
                 ))}
               </div>
             </div>

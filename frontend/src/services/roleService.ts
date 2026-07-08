@@ -13,12 +13,21 @@ export interface Permission {
     submodule?: string;
 }
 
+/** A page-specific button permission (Approve, Suspend, Mark as Paid, …). */
+export interface PermissionExtraAction {
+    key: string;
+    label: string;
+    description?: string;
+}
+
 /** One sidebar submodule and the subset of view/create/edit/delete it supports. */
 export interface PermissionSubmodule {
     key: string;
     name: string;
     description: string;
     actions: Record<PermissionAction, boolean>;
+    /** Special button permissions beyond the core four. */
+    extra?: PermissionExtraAction[];
 }
 
 /** Top-level sidebar module (Vendors / Customers / Admin). */

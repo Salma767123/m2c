@@ -18,17 +18,17 @@ router.use(authenticateToken);
 // ============================================
 router.get('/admin/shipments', requireAdminRole, requirePermission('vendor_to_hub:view'), adminOrderController.getAllShipmentsAdmin);
 router.get('/admin/shipments/:id', requireAdminRole, requirePermission('vendor_to_hub:view'), adminOrderController.getShipmentByIdAdmin);
-router.put('/admin/shipments/:id/status', requireAdminRole, requirePermission('vendor_to_hub:edit'), adminOrderController.updateShipmentStatusAdmin);
+router.put('/admin/shipments/:id/status', requireAdminRole, requirePermission('vendor_to_hub:update_status'), adminOrderController.updateShipmentStatusAdmin);
 
 // ============================================
 // ADMIN ORDER ROUTES (/api/orders/admin/*)
 // ============================================
 router.get('/admin', requireAdminRole, requirePermission(['hub_to_customer:view', 'invoices:view']), adminOrderController.getAllOrdersAdmin);
 router.get('/admin/:id', requireAdminRole, requirePermission(['hub_to_customer:view', 'invoices:view']), adminOrderController.getAdminOrderById);
-router.put('/admin/:id/status', requireAdminRole, requirePermission('hub_to_customer:edit'), adminOrderController.updateAdminOrderStatus);
+router.put('/admin/:id/status', requireAdminRole, requirePermission('hub_to_customer:update_status'), adminOrderController.updateAdminOrderStatus);
 
 // Admin: Get invoice HTML for an order — part of the Billing module
-router.get('/admin/:id/invoice', requireAdminRole, requirePermission(['invoices:view', 'hub_to_customer:view']), async (req, res) => {
+router.get('/admin/:id/invoice', requireAdminRole, requirePermission(['invoices:print', 'invoices:view', 'hub_to_customer:view']), async (req, res) => {
     try {
         const { id } = req.params;
         const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);

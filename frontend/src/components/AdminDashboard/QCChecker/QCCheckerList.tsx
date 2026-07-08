@@ -306,7 +306,7 @@ export default function QCCheckerList() {
                             <Edit className="h-4 w-4" />
                           </Link>
                         )}
-                        {hasPermission('qc_checker_management:edit') && (
+                        {hasPermission('qc_checker_management:resend_credentials') && (
                           <button
                             onClick={() => handleResendClick(checker.id, checker.email)}
                             disabled={resendingId === checker.id}

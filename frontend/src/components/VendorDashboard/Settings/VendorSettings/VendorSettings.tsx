@@ -33,6 +33,7 @@ import { buildFullName } from "@/lib/utils";
 import ResultModal from "@/components/UI/ResultModal";
 import { PhoneInput, LocalLandlineInput, getLandlineDisplay } from "@/components/VendorHub/FormUI";
 import { downloadDoc, isDocImageUrl } from "@/lib/docDownload";
+import { openDoc } from "@/lib/docViewerBus";
 
 // A certificate may only be edited/replaced when it is expired or within this
 // many days of expiring. Valid certs (and certs with no expiry) stay locked.
@@ -324,14 +325,14 @@ function ImageStrip({
       <SubHeading>{icon} {heading}</SubHeading>
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
         {items.map((m, i) => (
-          <a key={`${m.label}-${i}`} href={m.url} target="_blank" rel="noopener noreferrer" className="group block" title={m.label}>
+          <button key={`${m.label}-${i}`} type="button" onClick={() => openDoc(m.url, m.label)} className="group block" title={m.label}>
             <img
               src={m.url}
               alt={m.label}
               className="w-full aspect-square object-cover rounded-lg border border-slate-200 group-hover:border-brand-300 transition-colors"
             />
             <p className="text-[10px] font-medium text-slate-500 mt-1 text-center truncate" title={m.label}>{m.label}</p>
-          </a>
+          </button>
         ))}
       </div>
     </div>
@@ -349,9 +350,9 @@ function DocsGrid({ heading, docs }: { heading: string; docs: any[] }) {
           return (
             <div key={doc.id || idx} className="bg-white border border-slate-200/80 rounded-lg p-2 space-y-2 shadow-xs hover:shadow-sm hover:border-brand-200 transition-all">
               {isImageUrl(doc.documentUrl, doc.name) ? (
-                <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer">
+                <button type="button" onClick={() => openDoc(doc.documentUrl, doc.name)} className="block w-full">
                   <img src={doc.documentUrl} alt={doc.name} className="w-full h-20 object-cover rounded-md border border-slate-200" />
-                </a>
+                </button>
               ) : (
                 <div className="w-full h-20 flex items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-300">
                   <FileText className="w-8 h-8" />
@@ -1122,9 +1123,9 @@ export default function VendorSettings() {
       <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-3">
           {contact.photo ? (
-            <a href={contact.photo} target="_blank" rel="noopener noreferrer" className="shrink-0">
+            <button type="button" onClick={() => openDoc(contact.photo, cName || `Contact ${idx + 1}`)} className="shrink-0">
               <img src={contact.photo} alt={cName || `Contact ${idx + 1}`} className="h-10 w-10 rounded-full object-cover border border-slate-200" />
-            </a>
+            </button>
           ) : (
             <div className="h-10 w-10 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0">
               <UserCircle className="h-5 w-5 text-brand-500" />

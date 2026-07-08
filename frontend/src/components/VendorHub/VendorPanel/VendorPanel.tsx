@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import CompanyDetails from "../CompanyDetails/CompanyDetails";
 import WarehouseDetails from "../WarehouseDetails/WarehouseDetails";
 import OwnerProfile from "../OwnerProfile/OwnerProfile";
@@ -25,6 +25,20 @@ const steps = [
 
 const MANUFACTURING_STEP_INDEX = 4;
 
+// Review & Submit renders each step's data as a section whose card is
+// `[aria-labelledby="section-<id>-title"]`. Maps a wizard step index to that
+// section id so, after editing a section from Review, we can scroll back to it
+// instead of jumping to the top.
+const STEP_TO_REVIEW_SECTION: Record<number, string> = {
+  0: "company",
+  1: "warehouse",
+  2: "owner",
+  3: "vendor",
+  4: "manufacturing",
+  5: "certifications",
+  6: "contact",
+};
+
 interface FormData {
   vendorType?: string | string[];
   [key: string]: any;
@@ -35,6 +49,10 @@ export default function VendorPanel() {
   const [formData, setFormData] = useState<FormData>({});
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [isEditingFromReview, setIsEditingFromReview] = useState(false);
+  // When the user edits a section from Review & Submit and saves, we return to
+  // Review and scroll back to THAT section instead of the top. Holds the
+  // section id to scroll to on the next render of the Review step.
+  const reviewScrollSectionRef = useRef<string | null>(null);
 
   // Whenever the active step changes (Next / Back / sidebar jump), scroll the
   // viewport back to the top so each step opens at its heading instead of
@@ -44,6 +62,23 @@ export default function VendorPanel() {
   // against late layout shifts / scroll-anchoring.
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    // Returning to Review after a section edit → scroll to that section, not top.
+    const targetSection = reviewScrollSectionRef.current;
+    if (targetSection && currentStep === steps.length - 1) {
+      reviewScrollSectionRef.current = null;
+      const toSection = () => {
+        const el = document.querySelector(`[aria-labelledby="section-${targetSection}-title"]`);
+        if (el) el.scrollIntoView({ behavior: "auto", block: "start" });
+      };
+      // Run across frames so the just-rendered Review content has settled.
+      const r1 = requestAnimationFrame(() => {
+        toSection();
+        requestAnimationFrame(toSection);
+      });
+      return () => cancelAnimationFrame(r1);
+    }
+
     const toTop = () => {
       window.scrollTo({ top: 0, left: 0, behavior: "auto" });
       // Fallbacks for browsers where the scrolling root is the element.
@@ -96,6 +131,8 @@ export default function VendorPanel() {
   const nextStep = () => {
     if (isEditingFromReview) {
       markStepAsCompleted(currentStep);
+      // Remember which section to land on when Review re-renders.
+      reviewScrollSectionRef.current = STEP_TO_REVIEW_SECTION[currentStep] ?? null;
       setCurrentStep(steps.length - 1);
       setIsEditingFromReview(false);
       return;
@@ -109,6 +146,7 @@ export default function VendorPanel() {
 
   const prevStep = () => {
     if (isEditingFromReview) {
+      reviewScrollSectionRef.current = STEP_TO_REVIEW_SECTION[currentStep] ?? null;
       setCurrentStep(steps.length - 1);
       setIsEditingFromReview(false);
       return;

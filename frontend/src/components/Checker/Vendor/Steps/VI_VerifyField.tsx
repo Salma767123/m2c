@@ -3,6 +3,7 @@
 import React, { useContext, createContext, useState } from 'react'
 import { FileText, ExternalLink, Eye } from 'lucide-react'
 import DocViewerModal from '@/components/UI/DocViewerModal'
+import { openDoc } from '@/lib/docViewerBus'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type FieldVerification = { ok: boolean | null; remarks: string }
@@ -45,9 +46,9 @@ export function renderValue(value: any, type?: string): React.ReactNode {
   }
   if (type === 'image' || (type !== 'document' && typeof value === 'string' && isImageUrl(value))) {
     return (
-      <a href={value} target="_blank" rel="noopener noreferrer" className="block w-fit">
+      <button type="button" onClick={() => openDoc(value, 'Uploaded Image')} className="block w-fit">
         <img src={value} alt="Uploaded" className="w-32 h-32 object-cover rounded-lg border border-slate-200 hover:border-brand-300 transition-colors" />
-      </a>
+      </button>
     )
   }
   if (type === 'document' && typeof value === 'string') {

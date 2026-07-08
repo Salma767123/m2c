@@ -1,6 +1,7 @@
 "use client"
 
 import { Package, Image as ImageIcon } from "lucide-react"
+import { openDoc } from "@/lib/docViewerBus"
 import type { StepErrors } from "../validation"
 import {
     READONLY_CLS,
@@ -154,7 +155,7 @@ function VendorProducts({ products }: { products?: any[] }) {
                                         {photos.length > 0 ? (
                                             <div className="flex flex-wrap gap-3">
                                                 {photos.map((url, idx) => (
-                                                    <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block w-24">
+                                                    <button key={idx} type="button" onClick={() => openDoc(url, product?.name || 'Product Photo')} className="block w-24">
                                                         {isImageUrl(url) ? (
                                                             <img src={url} alt={product?.name || "Product"} className="w-24 h-24 object-cover rounded-lg border border-slate-200" />
                                                         ) : (
@@ -162,7 +163,7 @@ function VendorProducts({ products }: { products?: any[] }) {
                                                                 <ImageIcon className="w-7 h-7 text-slate-400" />
                                                             </div>
                                                         )}
-                                                    </a>
+                                                    </button>
                                                 ))}
                                             </div>
                                         ) : (

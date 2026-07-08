@@ -334,7 +334,7 @@ export default function WebsiteEnquiryManagement() {
                   <div>{getStatusBadge(selectedEnquiry.status)}</div>
                 </div>
 
-                {hasPermission('website_enquiries:edit') && selectedEnquiry.status !== 'closed' && (
+                {hasPermission('website_enquiries:resolve') && selectedEnquiry.status !== 'closed' && (
                   <div className="flex gap-2 pt-4 border-t">
                     {selectedEnquiry.status !== 'replied' && (
                       <Button onClick={() => handleUpdateStatus('replied')} className="flex-1">

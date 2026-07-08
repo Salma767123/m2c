@@ -406,7 +406,7 @@ export default function Inventory() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
-                            {hasPermission('inventory:edit') && (
+                            {hasPermission('inventory:update_stock') && (
                               item.hasProductCreated && item.productApprovalStatus === 'APPROVED' ? (
                                 <Button
                                   variant="outline"

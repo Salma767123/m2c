@@ -345,6 +345,9 @@ export default function RolesPermissions() {
                                 {action}
                               </th>
                             ))}
+                            <th className="text-left font-semibold text-gray-700 px-3 py-2.5 min-w-[180px]">
+                              Special buttons
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -365,6 +368,23 @@ export default function RolesPermissions() {
                                   )}
                                 </td>
                               ))}
+                              <td className="px-3 py-3">
+                                {sub.extra && sub.extra.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {sub.extra.map((x) => (
+                                      <Badge
+                                        key={x.key}
+                                        className="bg-gray-100 text-gray-700 text-xs"
+                                        title={x.description || x.label}
+                                      >
+                                        {x.label}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-300" title={`No special buttons for ${sub.name}`}>—</span>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>

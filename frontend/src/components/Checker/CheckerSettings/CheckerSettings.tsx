@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { User, Loader2, Mail, Phone, MapPin, Shield, FileText, ExternalLink } from "lucide-react"
 import { qcCheckerService, QCCheckerData } from "@/services/qcCheckerService"
+import { openDoc } from "@/lib/docViewerBus"
 import { formatCheckerName } from "@/lib/checkerUtils"
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
@@ -184,14 +185,13 @@ export default function SettingsPage() {
               <div>
                 <label className="block text-slate-500 font-medium mb-1.5 text-xs uppercase tracking-wide">ID Proof</label>
                 {profile?.idProof ? (
-                  <a
-                    href={profile.idProof}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => profile.idProof && openDoc(profile.idProof, 'ID Proof')}
                     className="inline-flex items-center gap-2 px-4 py-3 text-sm font-medium text-brand-700 bg-brand-50 border border-brand-200 rounded-xl hover:bg-brand-100 transition-colors"
                   >
                     <FileText className="w-4 h-4" /> View ID Proof{isPdfIdProof ? " (PDF)" : ""} <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
+                  </button>
                 ) : (
                   <div className="px-4 py-3 border border-dashed border-slate-200 rounded-xl text-sm text-slate-400">No ID proof uploaded</div>
                 )}

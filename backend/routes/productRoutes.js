@@ -35,9 +35,9 @@ router.get('/admin/:id', authenticateToken, requireAdminRole, requirePermission(
 router.post('/admin', authenticateToken, requireAdminRole, requirePermission('all_products:create'), createProductByAdmin);
 router.put('/admin/:id', authenticateToken, requireAdminRole, requirePermission('all_products:edit'), updateProductByAdmin);
 router.delete('/admin/:id', authenticateToken, requireAdminRole, requirePermission('all_products:delete'), deleteProductByAdmin);
-router.put('/:id/approve', authenticateToken, requireAdminRole, requirePermission(['vendor_product_requests:edit', 'all_products:edit']), approveProduct);
-router.put('/:id/reject', authenticateToken, requireAdminRole, requirePermission(['vendor_product_requests:edit', 'all_products:edit']), rejectProduct);
-router.post('/admin/:id/assign-qc', authenticateToken, requireAdminRole, requirePermission('vendor_product_requests:edit'), assignQCCheckerToProduct);
+router.put('/:id/approve', authenticateToken, requireAdminRole, requirePermission(['vendor_product_requests:approve', 'all_products:approve']), approveProduct);
+router.put('/:id/reject', authenticateToken, requireAdminRole, requirePermission(['vendor_product_requests:approve', 'all_products:approve']), rejectProduct);
+router.post('/admin/:id/assign-qc', authenticateToken, requireAdminRole, requirePermission('vendor_product_requests:assign_qc'), assignQCCheckerToProduct);
 router.put('/admin/:id/variants/stock', authenticateToken, requireAdminRole, requirePermission('all_products:edit'), updateVariantStocks);
 
 // Vendor routes - specific named routes MUST come before /:id

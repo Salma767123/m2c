@@ -61,6 +61,6 @@ router.get('/', authenticateToken, requireAdminRole, requirePermission('qc_check
 router.get('/:id', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:view'), getQCCheckerById);
 router.put('/:id', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:edit'), updateQCChecker);
 router.delete('/:id', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:delete'), deleteQCChecker);
-router.post('/:id/resend-credentials', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:edit'), resendCredentials);
+router.post('/:id/resend-credentials', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:resend_credentials'), resendCredentials);
 
 module.exports = router;

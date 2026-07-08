@@ -497,7 +497,7 @@ export default function UserManagement() {
                             <Edit className="h-4 w-4" />
                           </Button>
                         )}
-                        {hasPermission('staff_management:edit') && user.status === 'active' ? (
+                        {hasPermission('staff_management:suspend') && user.status === 'active' ? (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -507,7 +507,7 @@ export default function UserManagement() {
                           >
                             <UserX className="h-4 w-4" />
                           </Button>
-                        ) : hasPermission('staff_management:edit') ? (
+                        ) : hasPermission('staff_management:suspend') ? (
                           <Button
                             variant="ghost"
                             size="sm"

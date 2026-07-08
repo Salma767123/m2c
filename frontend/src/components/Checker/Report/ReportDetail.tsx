@@ -9,6 +9,7 @@ import {
   Phone, Award,
 } from "lucide-react"
 import { Badge } from "@/components/UI/Badge"
+import { openDoc } from "@/lib/docViewerBus"
 import qcCheckerService from "@/services/qcCheckerService"
 import { formatCheckerName } from "@/lib/checkerUtils"
 
@@ -946,11 +947,11 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
                   <div className="flex flex-wrap gap-2">
                     {(fd.documentsUpload as DocItem[]).map((doc, i) =>
                       doc?.data ? (
-                        <a key={i} href={doc.data} target="_blank" rel="noopener noreferrer"
+                        <button key={i} type="button" onClick={() => doc.data && openDoc(doc.data, doc.name || `Document ${i + 1}`)}
                           className="flex items-center gap-2 px-3 py-2 bg-brand-50 text-brand-700 border border-brand-200 rounded-lg text-xs font-medium hover:bg-brand-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1">
                           <FileText className="w-3.5 h-3.5" />
                           {doc.name || `Document ${i + 1}`}
-                        </a>
+                        </button>
                       ) : (
                         <span key={i} className="px-3 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">
                           {doc?.name || `Document ${i + 1}`}

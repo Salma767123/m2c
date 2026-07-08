@@ -11,7 +11,7 @@ router.use(authenticateToken, requireAdminRole);
 // ------------------------------------
 router.get('/customers', requirePermission('customer_management:view'), userManagementController.getCustomers);
 router.get('/customers/:id', requirePermission('customer_management:view'), userManagementController.getCustomerById);
-router.put('/customers/:id/status', requirePermission('customer_management:edit'), userManagementController.updateCustomerStatus);
+router.put('/customers/:id/status', requirePermission('customer_management:suspend'), userManagementController.updateCustomerStatus);
 router.delete('/customers/:id', requirePermission('customer_management:delete'), userManagementController.deleteCustomer);
 
 // ------------------------------------
@@ -21,7 +21,7 @@ router.get('/staff', requirePermission('staff_management:view'), userManagementC
 router.get('/staff/:id', requirePermission('staff_management:view'), userManagementController.getStaffById);
 router.post('/staff', requirePermission('staff_management:create'), userManagementController.createStaff);
 router.put('/staff/:id', requirePermission('staff_management:edit'), userManagementController.updateStaff);
-router.put('/staff/:id/status', requirePermission('staff_management:edit'), userManagementController.updateStaffStatus);
+router.put('/staff/:id/status', requirePermission('staff_management:suspend'), userManagementController.updateStaffStatus);
 router.delete('/staff/:id', requirePermission('staff_management:delete'), userManagementController.deleteStaff);
 
 module.exports = router;

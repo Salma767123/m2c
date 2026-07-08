@@ -13,6 +13,7 @@ import { zipPlaceLabel } from "@/lib/zipLookup";
 import type { ZipPlace } from "@/lib/zipLookup";
 import { ZipAreaSelect } from "@/components/VendorHub/ZipAreaSelect";
 import { scrollToFirstError } from "@/lib/formErrorScroll";
+import { openDoc } from "@/lib/docViewerBus";
 
 interface CompanyDetailsProps {
   onNext: () => void;
@@ -2946,7 +2947,7 @@ export default function CompanyDetails({
                           <button
                             type="button"
                             title="View"
-                            onClick={() => window.open(img.url, '_blank')}
+                            onClick={() => openDoc(img.url, img.name || slot.label || 'Image')}
                             className="flex items-center justify-center w-8 h-8 rounded-full bg-white/90 text-slate-700 hover:bg-white transition-colors"
                           >
                             <Eye className="w-4 h-4" aria-hidden="true" />

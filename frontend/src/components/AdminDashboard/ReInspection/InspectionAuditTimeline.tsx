@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AuditLogEntry } from '@/services/reinspectionService';
 import { Badge } from '@/components/UI/Badge';
+import { openDoc } from '@/lib/docViewerBus';
 import {
   IconCheck,
   IconX,
@@ -183,13 +184,13 @@ export default function InspectionAuditTimeline({ logs, loading }: InspectionAud
                       </span>
                       <div className="flex gap-2 mt-1 flex-wrap">
                         {log.attachments.map((url, i) => (
-                          <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                          <button key={i} type="button" onClick={() => openDoc(url, `Attachment ${i + 1}`)}>
                             <img
                               src={url}
                               alt={`Attachment ${i + 1}`}
                               className="w-16 h-16 object-cover rounded border hover:ring-2 ring-blue-300 transition-all"
                             />
-                          </a>
+                          </button>
                         ))}
                       </div>
                     </div>
