@@ -498,7 +498,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
             badge={<StepBadge prefixes={["vt_"]} vf={vf} />}>
             <SubHead title="Vendor Classification" />
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <VCard label="Vendor Types" value={vendor.vendorTypes} k="vt_vendorTypes" vf={vf} />
+              <VCard label="Vendor Types" value={Array.isArray(vendor.vendorTypes) ? vendor.vendorTypes.map((s: any) => (typeof s === 'string' && s ? s.charAt(0).toUpperCase() + s.slice(1) : s)) : vendor.vendorTypes} k="vt_vendorTypes" vf={vf} />
               <VCard label="Product Categories" value={vendor.productCategories} k="vt_productCategories" vf={vf} />
               {vendor.categoryRemarks && <VCard label="Category Remarks" value={vendor.categoryRemarks} k="vt_categoryRemarks" vf={vf} />}
               {vendor.qualityControl && <VCard label="Quality Control Measures" value={vendor.qualityControl} k="vt_qualityControl" vf={vf} />}

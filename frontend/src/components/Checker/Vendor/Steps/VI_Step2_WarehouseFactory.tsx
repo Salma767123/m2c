@@ -57,7 +57,9 @@ function EvidenceUpload({
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">{label} — Inspector Evidence Photo</p>
+      <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+        {label} — Inspector Evidence Photo <span className="text-red-500" aria-hidden="true">*</span>
+      </p>
       {value ? (
         <div className="relative w-fit">
           <img src={value.url} alt={label} className="w-32 h-32 object-cover rounded-xl border border-emerald-200" />
@@ -264,10 +266,10 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
       {/* Inspector Evidence Photos */}
       <div id="inspector-evidence-photos">
         <SectionBlock title="Inspector Evidence Photos" icon={<Camera className="w-4 h-4" />}>
-          <p className="text-xs text-slate-500 mb-4">Upload photos taken during the factory visit to serve as inspection evidence.</p>
+          <p className="text-xs text-slate-500 mb-4">Upload photos taken during the factory visit to serve as inspection evidence. All three photos are required.</p>
           {evidenceError && (
             <p className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
-              At least one evidence photo is required before continuing.
+              All three evidence photos are required before continuing.
             </p>
           )}
           <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 ${evidenceError ? 'ring-2 ring-red-300 ring-offset-2 rounded-xl p-2' : ''}`}>

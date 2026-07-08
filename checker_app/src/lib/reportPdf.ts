@@ -327,7 +327,7 @@ function buildFactoryHtml(report: any, variant: ReportVariant, checkerName?: str
     sections += kvSection(
       'D. Vendor Classification',
       [
-        ['Vendor Types', v.vendorTypes],
+        ['Vendor Types', Array.isArray(v.vendorTypes) ? v.vendorTypes.map((s: any) => (typeof s === 'string' && s ? s.charAt(0).toUpperCase() + s.slice(1) : s)) : v.vendorTypes],
         ['Product Categories', v.productCategories],
         ['Category Remarks', blank(v.categoryRemarks) ? undefined : v.categoryRemarks],
         ['Quality Control Measures', blank(v.qualityControl) ? undefined : v.qualityControl],

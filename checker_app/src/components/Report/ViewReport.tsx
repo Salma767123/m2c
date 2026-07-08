@@ -471,7 +471,7 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
               badge={<StepBadge prefixes={['vt_']} vf={vf} />}>
               <SubHead title="Vendor Classification" />
               <CardGrid>
-                <VCard label="Vendor Types" value={vendor.vendorTypes} k="vt_vendorTypes" vf={vf} />
+                <VCard label="Vendor Types" value={Array.isArray(vendor.vendorTypes) ? vendor.vendorTypes.map((s: any) => (typeof s === 'string' && s ? s.charAt(0).toUpperCase() + s.slice(1) : s)) : vendor.vendorTypes} k="vt_vendorTypes" vf={vf} />
                 <VCard label="Product Categories" value={vendor.productCategories} k="vt_productCategories" vf={vf} />
                 {vendor.categoryRemarks ? <VCard label="Category Remarks" value={vendor.categoryRemarks} k="vt_categoryRemarks" vf={vf} /> : null}
                 {vendor.qualityControl ? <VCard label="Quality Control Measures" value={vendor.qualityControl} k="vt_qualityControl" vf={vf} /> : null}

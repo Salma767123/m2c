@@ -288,11 +288,12 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
   // ── Navigation ─────────────────────────────────────────────────────────────
   const goNext = () => {
     if (step === 2) {
-      const hasEvidence = factoryEvidence.frontView || factoryEvidence.nameBoard || factoryEvidence.routeMap
-      if (!hasEvidence) {
+      // Every evidence slot is mandatory — Front View, Name Board AND Route Map.
+      const hasAllEvidence = factoryEvidence.frontView && factoryEvidence.nameBoard && factoryEvidence.routeMap
+      if (!hasAllEvidence) {
         setEvidenceError(true)
         document.getElementById('inspector-evidence-photos')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        showErrorToast('Evidence photo required', 'Please upload at least one inspector evidence photo before continuing.')
+        showErrorToast('Evidence photos required', 'Please upload all three inspector evidence photos (Factory Front View, Factory Name Board, Route Map) before continuing.')
         return
       }
       setEvidenceError(false)

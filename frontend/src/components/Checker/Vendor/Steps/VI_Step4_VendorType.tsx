@@ -16,6 +16,9 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
     <VerifyField key={key} fieldKey={key} label={label} value={value} type={type} verifications={verifications} onChange={onChange} />
   )
 
+  const capFirst = (s: any) => (typeof s === 'string' && s.length > 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s)
+  const vendorTypesDisplay = Array.isArray(v.vendorTypes) ? v.vendorTypes.map(capFirst) : v.vendorTypes
+
   // Collect all category product photos
   const categoryPhotos: Array<{ label: string; url: string; catKey: string; idx: number }> = []
   if (v.categoryProducts && typeof v.categoryProducts === 'object') {
@@ -106,7 +109,7 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
       {/* Vendor Classification */}
       <SectionBlock title="Vendor Classification" icon={<Tags className="w-4 h-4" />}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {vf('vt_vendorTypes', 'Vendor Types', v.vendorTypes, 'list')}
+          {vf('vt_vendorTypes', 'Vendor Types', vendorTypesDisplay, 'list')}
           {vf('vt_productCategories', 'Product Categories', v.productCategories, 'list')}
         </div>
         {v.categoryRemarks && (

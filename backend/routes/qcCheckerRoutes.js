@@ -20,7 +20,8 @@ const {
     startProductInspectionByQc,
     approveProductByQc,
     rejectProductByQc,
-    updateCheckerProfile
+    updateCheckerProfile,
+    sendContactTestEmail
 } = require('../controllers/qcCheckerController');
 
 const { authenticateToken, requireAdminRole, requirePermission } = require('../middleware/auth');
@@ -44,6 +45,9 @@ router.get('/vendors/:vendorId/active-inspection', authenticateToken, getActiveI
 router.post('/vendors/:vendorId/begin-inspection', authenticateToken, beginVendorInspection);
 router.post('/vendors/:vendorId/approve', authenticateToken, approveVendorByQc);
 router.post('/vendors/:vendorId/reject', authenticateToken, rejectVendorByQc);
+// Verification helper — send a test email to a vendor contact address so the
+// checker can confirm it's reachable before marking the field verified.
+router.post('/send-test-email', authenticateToken, sendContactTestEmail);
 
 // QC Products
 router.get('/products', authenticateToken, getAssignedProducts);

@@ -246,30 +246,46 @@ export default function ScheduledInspectionDetail({
                   <h3 className="text-lg font-semibold text-slate-900">{item.itemName}</h3>
                   <p className="text-slate-600 mt-1">{item.description}</p>
                 </div>
-                <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full">
-                  AQL {item.aqlLevel}
-                </span>
+                {/* Quantities / specs / AQL are optional — assignments only
+                    carry the category since the hardcoded placeholder values
+                    (0 / TBD / Standard QC / 2.5) were removed from creation.
+                    Older records that still have them render as before. */}
+                {item.aqlLevel && (
+                  <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full">
+                    AQL {item.aqlLevel}
+                  </span>
+                )}
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <label className="text-sm font-medium text-slate-600">Total Quantity</label>
-                  <p className="text-slate-900 font-semibold">{item.quantity.toLocaleString()} pcs</p>
+
+              {(item.quantity != null || item.inspectionQuantity != null) && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  {item.quantity != null && (
+                    <div>
+                      <label className="text-sm font-medium text-slate-600">Total Quantity</label>
+                      <p className="text-slate-900 font-semibold">{item.quantity.toLocaleString()} pcs</p>
+                    </div>
+                  )}
+                  {item.inspectionQuantity != null && (
+                    <div>
+                      <label className="text-sm font-medium text-slate-600">Inspection Quantity</label>
+                      <p className="text-slate-900 font-semibold">{item.inspectionQuantity} pcs</p>
+                    </div>
+                  )}
+                  {Number(item.inspectionQuantity) > 0 && Number(item.quantity) > 0 && (
+                    <div>
+                      <label className="text-sm font-medium text-slate-600">Sample Size</label>
+                      <p className="text-slate-900 font-semibold">{Math.round((Number(item.inspectionQuantity) / Number(item.quantity)) * 100)}%</p>
+                    </div>
+                  )}
                 </div>
+              )}
+
+              {item.specifications && (
                 <div>
-                  <label className="text-sm font-medium text-slate-600">Inspection Quantity</label>
-                  <p className="text-slate-900 font-semibold">{item.inspectionQuantity} pcs</p>
+                  <label className="text-sm font-medium text-slate-600">Specifications</label>
+                  <p className="text-slate-700 bg-slate-50 p-3 rounded-lg mt-1">{item.specifications}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-600">Sample Size</label>
-                  <p className="text-slate-900 font-semibold">{Math.round((item.inspectionQuantity / item.quantity) * 100)}%</p>
-                </div>
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium text-slate-600">Specifications</label>
-                <p className="text-slate-700 bg-slate-50 p-3 rounded-lg mt-1">{item.specifications}</p>
-              </div>
+              )}
             </div>
           ))}
         </div>

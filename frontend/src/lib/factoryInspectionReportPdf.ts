@@ -80,13 +80,16 @@ const EMPLOYEE_COUNT: Record<string, string> = {
   "100+": "More than 100 employees",
 }
 
+// Labels mirror the Manufacturing Facilities form (ManufacturingFacilities.tsx)
+// exactly — `loomCount` is a legacy field key, the form calls it "Number of
+// Machines"; capacities are per-day, not monthly.
 const FACILITY_META: Record<string, { label: string; detailFields: Array<{ key: string; label: string; unit?: string }> }> = {
-  spinning:  { label: "Spinning",  detailFields: [{ key: "spinningMachines", label: "Number of Machines", unit: "Machines" }, { key: "spinningCapacity", label: "Monthly Capacity", unit: "Kg / Day" }, { key: "remarks", label: "Remarks" }] },
-  weaving:   { label: "Weaving",   detailFields: [{ key: "loomCount", label: "Loom Count", unit: "Looms" }, { key: "weavingCapacity", label: "Monthly Capacity", unit: "Kg / Day" }, { key: "remarks", label: "Remarks" }] },
-  dyeing:    { label: "Dyeing",    detailFields: [{ key: "dyeingMachines", label: "Number of Machines", unit: "Machines" }, { key: "dyeingCapacity", label: "Monthly Capacity", unit: "Kg / Day" }, { key: "remarks", label: "Remarks" }] },
-  printing:  { label: "Printing",  detailFields: [{ key: "printingMachines", label: "Number of Machines", unit: "Machines" }, { key: "printingCapacity", label: "Monthly Capacity", unit: "Kg / Day" }, { key: "remarks", label: "Remarks" }] },
-  stitching: { label: "Stitching", detailFields: [{ key: "stitchingMachines", label: "Number of Machines", unit: "Machines" }, { key: "stitchingCapacity", label: "Monthly Capacity", unit: "Pieces / Day" }, { key: "remarks", label: "Remarks" }] },
-  finishing: { label: "Finishing", detailFields: [{ key: "finishingCapacity", label: "Monthly Capacity", unit: "Pieces / Day" }, { key: "remarks", label: "Remarks" }] },
+  spinning:  { label: "Spinning",  detailFields: [{ key: "spinningMachines", label: "Number of Machines", unit: "Machines" }, { key: "spinningCapacity", label: "Daily Capacity", unit: "Kg / Day" }, { key: "remarks", label: "Remarks" }] },
+  weaving:   { label: "Weaving",   detailFields: [{ key: "loomCount", label: "Number of Machines", unit: "Machines" }, { key: "weavingCapacity", label: "Daily Capacity", unit: "Kg / Day" }, { key: "remarks", label: "Remarks" }] },
+  dyeing:    { label: "Dyeing",    detailFields: [{ key: "dyeingMachines", label: "Number of Machines", unit: "Machines" }, { key: "dyeingCapacity", label: "Daily Capacity", unit: "Kg / Day" }, { key: "remarks", label: "Remarks" }] },
+  printing:  { label: "Printing",  detailFields: [{ key: "printingMachines", label: "Number of Machines", unit: "Machines" }, { key: "printingCapacity", label: "Daily Capacity", unit: "Kg / Day" }, { key: "remarks", label: "Remarks" }] },
+  stitching: { label: "Stitching", detailFields: [{ key: "stitchingMachines", label: "Number of Machines", unit: "Machines" }, { key: "stitchingCapacity", label: "Daily Capacity", unit: "Pieces / Day" }, { key: "remarks", label: "Remarks" }] },
+  finishing: { label: "Final Packing and Dispatch", detailFields: [{ key: "finishingCapacity", label: "Daily Capacity", unit: "Pieces / Day" }, { key: "remarks", label: "Remarks" }] },
 }
 
 // ── Step-key → step label (for Issues section) ────────────────────────────────
@@ -408,7 +411,7 @@ export function generateFactoryInspectionPdf(
   // ── D. Vendor Classification ────────────────────────────────────────────────
   sectionTitle("D. Vendor Classification", sectionStatus(['vt_']))
   const classRows: string[][] = [
-    ["Vendor Types", val(v.vendorTypes)],
+    ["Vendor Types", val(Array.isArray(v.vendorTypes) ? v.vendorTypes.map((s: any) => (typeof s === 'string' && s ? s.charAt(0).toUpperCase() + s.slice(1) : s)) : v.vendorTypes)],
     ["Product Categories", val(v.productCategories)],
   ]
   if (!blank(v.categoryRemarks)) classRows.push(["Category Remarks", val(v.categoryRemarks)])

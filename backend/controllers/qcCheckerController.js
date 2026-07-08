@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { prisma } = require('../config/database');
-const { sendQCCheckerCredentialsEmail } = require('../utils/emailService');
+const { sendQCCheckerCredentialsEmail, sendTestEmail } = require('../utils/emailService');
 const { resolveBase64InValue } = require('../config/cloudinary');
 
 // Generate a random password
@@ -1966,6 +1966,39 @@ const rejectProductByQc = async (req, res) => {
     }
 };
 
+// Send a verification test email to a vendor contact address. Used by the
+// checker's vendor-inspection form to confirm an address is reachable
+// before marking the email field as verified.
+const sendContactTestEmail = async (req, res) => {
+    try {
+        const { email, vendorName } = req.body || {};
+
+        if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            return res.status(400).json({
+                success: false,
+                message: 'A valid email address is required'
+            });
+        }
+
+        await sendTestEmail({
+            to: email.trim(),
+            checkerName: req.user?.name || null,
+            vendorName: typeof vendorName === 'string' ? vendorName : null
+        });
+
+        res.status(200).json({
+            success: true,
+            message: `Test email sent to ${email.trim()}`
+        });
+    } catch (error) {
+        console.error('Error sending test email:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to send test email. Check SMTP configuration.'
+        });
+    }
+};
+
 module.exports = {
     createQCChecker,
     getAllQCCheckers,
@@ -1987,5 +2020,6 @@ module.exports = {
     startProductInspectionByQc,
     approveProductByQc,
     rejectProductByQc,
-    updateCheckerProfile
+    updateCheckerProfile,
+    sendContactTestEmail
 };

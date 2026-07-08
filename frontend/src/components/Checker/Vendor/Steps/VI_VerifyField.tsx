@@ -1,9 +1,10 @@
 'use client'
 
 import React, { useContext, createContext, useState } from 'react'
-import { FileText, ExternalLink, Eye } from 'lucide-react'
+import { FileText, ExternalLink, Eye, Phone, Mail, Send, Check, Loader2 } from 'lucide-react'
 import DocViewerModal from '@/components/UI/DocViewerModal'
 import { openDoc } from '@/lib/docViewerBus'
+import qcCheckerService from '@/services/qcCheckerService'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type FieldVerification = { ok: boolean | null; remarks: string }
@@ -40,9 +41,97 @@ function docFilename(url: string): string {
   }
 }
 
-export function renderValue(value: any, type?: string): React.ReactNode {
+// ── Phone / Email values ──────────────────────────────────────────────────────
+// Labels that identify a field as a phone number / email address. Used to
+// auto-upgrade plain-text values everywhere in the inspection form without
+// each step having to opt in field-by-field.
+const PHONE_LABEL_RE = /\b(phone|mobile|landline|whatsapp)\b/i
+const EMAIL_LABEL_RE = /e-?mail/i
+
+// Tappable phone number — opens the device dialer via tel: so the checker
+// can call the vendor straight from the inspection form.
+function PhoneValue({ value }: { value: string }) {
+  const dial = value.replace(/[^\d+]/g, '')
+  return (
+    <a
+      href={`tel:${dial}`}
+      className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline"
+      title={`Call ${value}`}
+    >
+      <Phone className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+      {value}
+    </a>
+  )
+}
+
+// Email address with a mailto: link plus a "Test" button that sends a real
+// test email through the backend so the checker can confirm the address is
+// reachable before marking it verified.
+function EmailValue({ value }: { value: string }) {
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
+
+  const sendTest = async () => {
+    if (status === 'sending') return
+    setStatus('sending')
+    try {
+      await qcCheckerService.sendTestEmail(value)
+      setStatus('sent')
+    } catch {
+      setStatus('failed')
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <a
+        href={`mailto:${value}`}
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline break-all"
+        title={`Email ${value}`}
+      >
+        <Mail className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+        {value}
+      </a>
+      <button
+        type="button"
+        onClick={sendTest}
+        disabled={status === 'sending'}
+        className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors shrink-0 ${
+          status === 'sent'
+            ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+            : status === 'failed'
+              ? 'text-red-700 bg-red-50 border-red-200 hover:bg-red-100'
+              : 'text-brand-700 bg-brand-50 border-brand-200 hover:bg-brand-100'
+        } disabled:opacity-60 disabled:cursor-not-allowed`}
+        title="Send a test email to confirm this address is reachable"
+      >
+        {status === 'sending' ? (
+          <><Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> Sending…</>
+        ) : status === 'sent' ? (
+          <><Check className="w-3 h-3" aria-hidden="true" /> Test Sent</>
+        ) : status === 'failed' ? (
+          <><Send className="w-3 h-3" aria-hidden="true" /> Retry Test</>
+        ) : (
+          <><Send className="w-3 h-3" aria-hidden="true" /> Test</>
+        )}
+      </button>
+      {status === 'failed' && (
+        <span className="text-xs text-red-600">Failed to send — check SMTP config.</span>
+      )}
+    </div>
+  )
+}
+
+export function renderValue(value: any, type?: string, label?: string): React.ReactNode {
   if (value === null || value === undefined || value === '') {
     return <span className="text-slate-400 italic text-sm">Not provided</span>
+  }
+  // Explicit phone/email types, or auto-detected from the field label so
+  // every phone/email in the form is tappable without per-step changes.
+  if (typeof value === 'string') {
+    const isEmail = type === 'email' || (!type && label && EMAIL_LABEL_RE.test(label) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()))
+    if (isEmail) return <EmailValue value={value.trim()} />
+    const isPhone = type === 'phone' || (!type && label && PHONE_LABEL_RE.test(label) && /\d{5,}/.test(value.replace(/[^\d]/g, '')))
+    if (isPhone) return <PhoneValue value={value.trim()} />
   }
   if (type === 'image' || (type !== 'document' && typeof value === 'string' && isImageUrl(value))) {
     return (
@@ -119,7 +208,7 @@ interface VerifyFieldProps {
   value: any
   verifications: Verifications
   onChange: (key: string, ok: boolean | null, remarks: string) => void
-  type?: 'text' | 'image' | 'document' | 'list' | 'date' | 'url' | 'badge'
+  type?: 'text' | 'image' | 'document' | 'list' | 'date' | 'url' | 'badge' | 'phone' | 'email'
   /** Optional action rendered in the top-right of the card, beside the label */
   headerAction?: React.ReactNode
 }
@@ -154,7 +243,7 @@ export default function VerifyField({ fieldKey, label, value, verifications, onC
         <div className="min-h-[1.5rem]">
           {isEmpty
             ? <span className="text-slate-400 italic text-sm">Not provided</span>
-            : renderValue(value, type)
+            : renderValue(value, type, label)
           }
         </div>
       </div>
@@ -224,7 +313,7 @@ export function InfoRow({ label, value, type }: { label: string; value: any; typ
     <div className="flex justify-between items-start py-1.5 border-b border-slate-100 last:border-0 gap-4">
       <span className="text-sm text-slate-500 shrink-0 font-medium">{label}</span>
       <span className="text-sm text-slate-800 text-right font-medium">
-        {isEmpty ? <span className="text-slate-400 italic">—</span> : renderValue(value, type)}
+        {isEmpty ? <span className="text-slate-400 italic">—</span> : renderValue(value, type, label)}
       </span>
     </div>
   )

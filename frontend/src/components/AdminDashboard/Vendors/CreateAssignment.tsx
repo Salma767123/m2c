@@ -34,16 +34,6 @@ interface QCChecker {
   assignedVendors: number;
 }
 
-interface InspectionItem {
-  id: number;
-  itemName: string;
-  description: string;
-  quantity: number;
-  inspectionQuantity: number;
-  specifications: string;
-  aqlLevel: string;
-}
-
 export default function CreateAssignment() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -161,10 +151,6 @@ export default function CreateAssignment() {
         id: `category-${idx}`,
         itemName: category,
         description: `Category Selected during Registration: ${category}`,
-        quantity: 0,
-        inspectionQuantity: 'TBD',
-        specifications: "Standard QC",
-        aqlLevel: "2.5",
       }))
     : [];
 
@@ -229,9 +215,6 @@ export default function CreateAssignment() {
           id: item.id,
           itemName: item.itemName,
           description: item.description,
-          inspectionQuantity: item.inspectionQuantity,
-          specifications: item.specifications,
-          aqlLevel: item.aqlLevel
         }));
 
       const vendor = vendors.find((v) => v.id === formData.vendorId);
@@ -457,25 +440,7 @@ export default function CreateAssignment() {
                           <Package className="h-4 w-4 text-slate-400" />
                           <span className="text-sm font-semibold text-slate-900">{item.itemName}</span>
                         </div>
-                        <p className="text-xs text-slate-500 mb-2">{item.description}</p>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div>
-                            <span className="text-slate-500">Quantity:</span>{" "}
-                            <span className="font-medium text-slate-900">{item.quantity.toLocaleString()}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-500">Inspection Qty:</span>{" "}
-                            <span className="font-medium text-slate-900">{item.inspectionQuantity}</span>
-                          </div>
-                          <div className="col-span-2">
-                            <span className="text-slate-500">Specifications:</span>{" "}
-                            <span className="text-slate-700">{item.specifications}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-500">AQL Level:</span>{" "}
-                            <span className="font-medium text-blue-600">{item.aqlLevel}</span>
-                          </div>
-                        </div>
+                        <p className="text-xs text-slate-500">{item.description}</p>
                       </div>
                     </label>
                   ))}

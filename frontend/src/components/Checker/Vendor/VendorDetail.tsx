@@ -368,7 +368,7 @@ export default function VendorDetail({
         title: "Vendor Type & Products",
         icon: <Package className="w-5 h-5 text-brand-600" />,
         fields: [
-          { key: "vendorTypes", label: "Vendor Type", type: "list" },
+          { key: "vendorTypes", label: "Vendor Type", type: "list", transform: (arr: any) => (Array.isArray(arr) ? arr.map((s: any) => (typeof s === 'string' && s ? s.charAt(0).toUpperCase() + s.slice(1) : s)) : arr) },
           { key: "productCategories", label: "Product Categories", type: "list" },
           { key: "categoryRemarks", label: "General Remarks" }
         ]

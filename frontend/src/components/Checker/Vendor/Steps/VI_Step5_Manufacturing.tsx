@@ -16,7 +16,9 @@ export const FACILITY_META: Record<string, { label: string; detailFields: Array<
   weaving: {
     label: 'Weaving',
     detailFields: [
-      { key: 'loomCount', label: 'Number of Looms', unit: 'Looms' },
+      // `loomCount` is a legacy field key — the form labels it "Number of
+      // Machines" like every other facility; don't surface "looms" wording.
+      { key: 'loomCount', label: 'Number of Machines', unit: 'Machines' },
       { key: 'weavingCapacity', label: 'Daily Capacity', unit: 'Kg / Day' },
       { key: 'remarks', label: 'Remarks' },
     ],
@@ -46,7 +48,9 @@ export const FACILITY_META: Record<string, { label: string; detailFields: Array<
     ],
   },
   finishing: {
-    label: 'Finishing',
+    // Form name for this stage — "Finishing" alone doesn't match what the
+    // vendor selected on the Manufacturing Facilities step.
+    label: 'Final Packing and Dispatch',
     detailFields: [
       { key: 'finishingCapacity', label: 'Daily Capacity', unit: 'Pieces / Day' },
       { key: 'remarks', label: 'Remarks' },
