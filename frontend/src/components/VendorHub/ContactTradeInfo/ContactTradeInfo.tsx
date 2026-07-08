@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/UI/Button';
 import { Phone, Mail, User, Plus, Trash2, Globe, MapPin, Camera, X, ArrowLeft, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
@@ -249,6 +249,43 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
   const [contactPhoto, setContactPhoto] = useState<string | null>(data?.mainContact?.photo || null);
   const [contactPhotoFile, setContactPhotoFile] = useState<File | null>(null);
+
+  // Builds the payload persisted to VendorPanel — joins contact name parts,
+  // attaches the photo, and assembles alternate-contact landlines. Shared by
+  // handleNext (Save & Continue) and the unmount sync below so both paths
+  // store an identical shape.
+  const buildPersistPayload = () => ({
+    ...formData,
+    mainContact: {
+      ...formData.mainContact,
+      name: [formData.mainContact.title, formData.mainContact.firstName, formData.mainContact.middleName, formData.mainContact.lastName].filter(Boolean).join(' '),
+      photo: contactPhoto,
+      photoFile: contactPhotoFile,
+    },
+    alternateContacts: formData.alternateContacts.map((c: Contact) => {
+      const localLandline = (c.localLandlineStd + c.localLandline).trim();
+      const intlLandline = (c.intlLandlineCountryCode + c.intlLandlineStd + c.intlLandlineNumber).replace(/^\+?$/, '');
+      return {
+        ...c,
+        name: [c.title, c.firstName, c.middleName, c.lastName].filter(Boolean).join(' '),
+        localLandline: localLandline || undefined,
+        localLandlineStd: c.localLandlineStd || undefined,
+        intlLandline: intlLandline || undefined,
+        intlLandlineCountryCode: c.intlLandlineCountryCode || undefined,
+        intlLandlineStd: c.intlLandlineStd || undefined,
+        intlLandlineNumber: c.intlLandlineNumber || undefined,
+      };
+    }),
+  });
+
+  // Push the latest local state up whenever this step unmounts (Back
+  // button, sidebar jump, edit-from-review) — not only on Save & Continue —
+  // so the Review step always reflects the latest edits.
+  const persistRef = useRef<any>(null);
+  persistRef.current = buildPersistPayload();
+  const onUpdateDataRef = useRef(onUpdateData);
+  onUpdateDataRef.current = onUpdateData;
+  useEffect(() => () => onUpdateDataRef.current(persistRef.current), []);
   // Selected image awaiting crop (1:1). Saved only after the user crops & confirms.
   // target: 'main' for the primary contact, or an alt contact id string.
   const [cropState, setCropState] = useState<{ src: string; name: string; target: 'main' | string } | null>(null);
@@ -688,34 +725,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       return;
     }
 
-    // Transform for storage
-    const transformedMainContact = {
-      ...formData.mainContact,
-      name: [formData.mainContact.title, formData.mainContact.firstName, formData.mainContact.middleName, formData.mainContact.lastName].filter(Boolean).join(' '),
-      photo: contactPhoto,
-      photoFile: contactPhotoFile,
-    };
-
-    const transformedAlternateContacts = formData.alternateContacts.map((c: Contact) => {
-      const localLandline = (c.localLandlineStd + c.localLandline).trim();
-      const intlLandline = (c.intlLandlineCountryCode + c.intlLandlineStd + c.intlLandlineNumber).replace(/^\+?$/, '');
-      return {
-        ...c,
-        name: [c.title, c.firstName, c.middleName, c.lastName].filter(Boolean).join(' '),
-        localLandline: localLandline || undefined,
-        localLandlineStd: c.localLandlineStd || undefined,
-        intlLandline: intlLandline || undefined,
-        intlLandlineCountryCode: c.intlLandlineCountryCode || undefined,
-        intlLandlineStd: c.intlLandlineStd || undefined,
-        intlLandlineNumber: c.intlLandlineNumber || undefined,
-      };
-    });
-
-    onUpdateData({
-      ...formData,
-      mainContact: transformedMainContact,
-      alternateContacts: transformedAlternateContacts
-    });
+    onUpdateData(persistRef.current);
     onNext();
   };
 

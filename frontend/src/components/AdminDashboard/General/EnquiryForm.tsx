@@ -33,8 +33,9 @@ import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { hasPermission } from '@/lib/auth';
 
 const EnquiryForm = () => {
-  const canView = hasPermission('view_enquiries') || hasPermission('manage_enquiries');
-  const canManage = hasPermission('manage_enquiries');
+  const canView = hasPermission('vendor_enquiries:view');
+  const canManage = hasPermission('vendor_enquiries:edit');
+  const canDelete = hasPermission('vendor_enquiries:delete');
   const [enquiries, setEnquiries] = useState<VendorEnquiry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -463,7 +464,7 @@ const EnquiryForm = () => {
             {/* Modal Footer */}
             <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
               {/* Delete button on left */}
-              {canManage ? (
+              {canDelete ? (
                 <button
                   onClick={() => handleDeleteClick(selectedEnquiry.id, selectedEnquiry.name)}
                   disabled={!!deletingId}

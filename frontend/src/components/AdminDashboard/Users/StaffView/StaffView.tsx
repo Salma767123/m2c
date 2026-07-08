@@ -145,7 +145,7 @@ export default function StaffView() {
           </div>
         </div>
 
-        {hasPermission('edit_users') && (
+        {hasPermission('staff_management:edit') && (
           <Button
             onClick={() => router.push(`/admin/dashboard/users/edit/${userId}`)}
             className="bg-gray-900 hover:bg-gray-800 text-white flex items-center gap-2"

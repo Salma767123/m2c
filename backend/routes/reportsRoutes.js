@@ -16,7 +16,7 @@ const { authenticateToken, requireAdminRole, requirePermission } = require('../m
 
 router.use(authenticateToken);
 router.use(requireAdminRole);
-router.use(requirePermission('view_reports'));
+router.use(requirePermission('reports:view'));
 
 router.get('/overview', getOverviewReport);
 router.get('/sales', getSalesReport);

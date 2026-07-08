@@ -16,19 +16,19 @@ router.use(authenticateToken);
 // ADMIN SHIPMENT ROUTES (/api/orders/admin/shipments/*)
 // These must come BEFORE /admin/:id so "shipments" isn't treated as an ID.
 // ============================================
-router.get('/admin/shipments', requireAdminRole, adminOrderController.getAllShipmentsAdmin);
-router.get('/admin/shipments/:id', requireAdminRole, adminOrderController.getShipmentByIdAdmin);
-router.put('/admin/shipments/:id/status', requireAdminRole, adminOrderController.updateShipmentStatusAdmin);
+router.get('/admin/shipments', requireAdminRole, requirePermission('vendor_to_hub:view'), adminOrderController.getAllShipmentsAdmin);
+router.get('/admin/shipments/:id', requireAdminRole, requirePermission('vendor_to_hub:view'), adminOrderController.getShipmentByIdAdmin);
+router.put('/admin/shipments/:id/status', requireAdminRole, requirePermission('vendor_to_hub:edit'), adminOrderController.updateShipmentStatusAdmin);
 
 // ============================================
 // ADMIN ORDER ROUTES (/api/orders/admin/*)
 // ============================================
-router.get('/admin', requireAdminRole, requirePermission('view_orders'), adminOrderController.getAllOrdersAdmin);
-router.get('/admin/:id', requireAdminRole, requirePermission('view_orders'), adminOrderController.getAdminOrderById);
-router.put('/admin/:id/status', requireAdminRole, requirePermission('edit_orders'), adminOrderController.updateAdminOrderStatus);
+router.get('/admin', requireAdminRole, requirePermission(['hub_to_customer:view', 'invoices:view']), adminOrderController.getAllOrdersAdmin);
+router.get('/admin/:id', requireAdminRole, requirePermission(['hub_to_customer:view', 'invoices:view']), adminOrderController.getAdminOrderById);
+router.put('/admin/:id/status', requireAdminRole, requirePermission('hub_to_customer:edit'), adminOrderController.updateAdminOrderStatus);
 
 // Admin: Get invoice HTML for an order — part of the Billing module
-router.get('/admin/:id/invoice', requireAdminRole, requirePermission(['view_billing', 'view_orders']), async (req, res) => {
+router.get('/admin/:id/invoice', requireAdminRole, requirePermission(['invoices:view', 'hub_to_customer:view']), async (req, res) => {
     try {
         const { id } = req.params;
         const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
@@ -61,14 +61,14 @@ router.get('/admin/:id/invoice', requireAdminRole, requirePermission(['view_bill
 // ============================================
 // ADMIN REVIEW ROUTES (/api/orders/admin-reviews/*)
 // ============================================
-router.get('/admin-reviews', requireAdminRole, requirePermission('view_orders'), adminReviewController.getAllAdminReviews);
+router.get('/admin-reviews', requireAdminRole, requirePermission(['vendor_to_hub:view', 'hub_to_customer:view']), adminReviewController.getAllAdminReviews);
 // Shipment-based review routes (primary path for new orders)
-router.get('/admin-reviews/shipment/:shipmentId', requireAdminRole, requirePermission('view_orders'), adminReviewController.getAdminReviewByShipment);
-router.post('/admin-reviews/shipment/:shipmentId', requireAdminRole, requirePermission('edit_orders'), adminReviewController.createOrUpdateShipmentReview);
+router.get('/admin-reviews/shipment/:shipmentId', requireAdminRole, requirePermission(['vendor_to_hub:view', 'hub_to_customer:view']), adminReviewController.getAdminReviewByShipment);
+router.post('/admin-reviews/shipment/:shipmentId', requireAdminRole, requirePermission(['vendor_to_hub:edit', 'hub_to_customer:edit']), adminReviewController.createOrUpdateShipmentReview);
 // Order-based review routes (backward compat for legacy orders)
-router.get('/admin-reviews/order/:orderId', requireAdminRole, requirePermission('view_orders'), adminReviewController.getAdminReviewByOrder);
-router.post('/admin-reviews/order/:orderId', requireAdminRole, requirePermission('edit_orders'), adminReviewController.createOrUpdateAdminReview);
-router.delete('/admin-reviews/:id', requireAdminRole, requirePermission('delete_orders'), adminReviewController.deleteAdminReview);
+router.get('/admin-reviews/order/:orderId', requireAdminRole, requirePermission(['vendor_to_hub:view', 'hub_to_customer:view']), adminReviewController.getAdminReviewByOrder);
+router.post('/admin-reviews/order/:orderId', requireAdminRole, requirePermission(['vendor_to_hub:edit', 'hub_to_customer:edit']), adminReviewController.createOrUpdateAdminReview);
+router.delete('/admin-reviews/:id', requireAdminRole, requirePermission(['vendor_to_hub:edit', 'hub_to_customer:edit']), adminReviewController.deleteAdminReview);
 
 // ============================================
 // VENDOR ROUTES (/api/orders/vendor/*)

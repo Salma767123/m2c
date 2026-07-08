@@ -16,7 +16,7 @@ export default function EditProductPage({ params }: EditProductPageProps) {
   const [productName, setProductName] = useState<string>('')
 
   return (
-    <PermissionGuard permission="edit_products">
+    <PermissionGuard permission="all_products:edit">
       <div className="space-y-6">
         <Breadcrumb customLabels={{ [id]: productName || 'Edit Product' }} />
         <AddEditProduct productId={id} isEdit={true} onProductNameLoad={setProductName} />

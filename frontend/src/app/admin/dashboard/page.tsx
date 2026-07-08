@@ -14,7 +14,6 @@ import { storeAuth } from '@/lib/auth'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import AdminDashboardService, { DashboardStats as IDashboardStats } from '@/services/adminDashboardService'
 import { LoadingSpinner } from '@/components/UI/LoadingSpinner'
-import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 function DashboardContent() {
   const router = useRouter()
@@ -140,17 +139,15 @@ function DashboardContent() {
 
 export default function DashboardPage() {
   return (
-    <PermissionGuard permission="view_dashboard">
-      <Suspense fallback={
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading dashboard...</p>
-          </div>
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
         </div>
-      }>
-        <DashboardContent />
-      </Suspense>
-    </PermissionGuard>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   )
 }

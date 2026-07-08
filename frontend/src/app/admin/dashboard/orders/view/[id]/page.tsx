@@ -10,7 +10,7 @@ interface PageProps {
 export default async function OrderDetailPage({ params }: PageProps) {
   const { id } = await params;
   return (
-    <PermissionGuard permission="view_orders">
+    <PermissionGuard permission="hub_to_customer:view">
       <div className="p-6">
         <OrderDetail orderId={id} />
       </div>

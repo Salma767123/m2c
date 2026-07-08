@@ -11,7 +11,7 @@ export default async function SettlementDetailPage({ params }: PageProps) {
   const { id } = await params;
 
   return (
-    <PermissionGuard permission="view_billing">
+    <PermissionGuard permission="settlement:view">
       <div className="p-6">
         <SettlementDetail settlementId={id} />
       </div>

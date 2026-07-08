@@ -6,13 +6,15 @@ const { authenticateToken, requireAdminRole, requirePermission } = require('../m
 // All role routes require authentication and admin role
 router.use(authenticateToken, requireAdminRole);
 
-// Get available permissions (requires view_roles or manage_settings)
-router.get('/permissions', requirePermission(['view_roles', 'edit_roles', 'manage_settings']), roleController.getPermissions);
+// Get available permissions (requires roles_permissions:view)
+router.get('/permissions', requirePermission('roles_permissions:view'), roleController.getPermissions);
 
 // Role CRUD operations
-router.get('/', requirePermission(['view_roles', 'edit_roles', 'manage_settings']), roleController.getRoles);
-router.post('/', requirePermission(['create_roles', 'manage_settings']), roleController.createRole);
-router.put('/:id', requirePermission(['edit_roles', 'manage_settings']), roleController.updateRole);
-router.delete('/:id', requirePermission(['delete_roles', 'manage_settings']), roleController.deleteRole);
+// staff_management:view is accepted too — the staff create/edit form needs the
+// role list for its role dropdown.
+router.get('/', requirePermission(['roles_permissions:view', 'staff_management:view']), roleController.getRoles);
+router.post('/', requirePermission('roles_permissions:create'), roleController.createRole);
+router.put('/:id', requirePermission('roles_permissions:edit'), roleController.updateRole);
+router.delete('/:id', requirePermission('roles_permissions:delete'), roleController.deleteRole);
 
 module.exports = router;

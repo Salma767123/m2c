@@ -3,7 +3,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function InvoicesPage() {
   return (
-    <PermissionGuard permission="view_billing">
+    <PermissionGuard permission="invoices:view">
       <div className="p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Invoice Management</h1>

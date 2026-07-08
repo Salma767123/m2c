@@ -13,7 +13,7 @@ import { useEffect } from "react";
 import { hasPermission } from "@/lib/auth";
 
 export default function TicketDetail({ ticketId }: { ticketId: string }) {
-  const canManage = hasPermission("manage_support");
+  const canManage = hasPermission("support:edit");
   const [replyMessage, setReplyMessage] = useState("");
   const [ticketStatus, setTicketStatus] = useState("in-progress");
   const [isSubmitting, setIsSubmitting] = useState(false);

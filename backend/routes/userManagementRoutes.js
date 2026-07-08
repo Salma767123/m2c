@@ -9,19 +9,19 @@ router.use(authenticateToken, requireAdminRole);
 // ------------------------------------
 // CUSTOMER MANAGEMENT ROUTES
 // ------------------------------------
-router.get('/customers', requirePermission('view_users'), userManagementController.getCustomers);
-router.get('/customers/:id', requirePermission('view_users'), userManagementController.getCustomerById);
-router.put('/customers/:id/status', requirePermission('edit_users'), userManagementController.updateCustomerStatus);
-router.delete('/customers/:id', requirePermission('delete_users'), userManagementController.deleteCustomer);
+router.get('/customers', requirePermission('customer_management:view'), userManagementController.getCustomers);
+router.get('/customers/:id', requirePermission('customer_management:view'), userManagementController.getCustomerById);
+router.put('/customers/:id/status', requirePermission('customer_management:edit'), userManagementController.updateCustomerStatus);
+router.delete('/customers/:id', requirePermission('customer_management:delete'), userManagementController.deleteCustomer);
 
 // ------------------------------------
 // INTERNAL STAFF ROUTES
 // ------------------------------------
-router.get('/staff', requirePermission('view_users'), userManagementController.getStaff);
-router.get('/staff/:id', requirePermission('view_users'), userManagementController.getStaffById);
-router.post('/staff', requirePermission('create_users'), userManagementController.createStaff);
-router.put('/staff/:id', requirePermission('edit_users'), userManagementController.updateStaff);
-router.put('/staff/:id/status', requirePermission('edit_users'), userManagementController.updateStaffStatus);
-router.delete('/staff/:id', requirePermission('delete_users'), userManagementController.deleteStaff);
+router.get('/staff', requirePermission('staff_management:view'), userManagementController.getStaff);
+router.get('/staff/:id', requirePermission('staff_management:view'), userManagementController.getStaffById);
+router.post('/staff', requirePermission('staff_management:create'), userManagementController.createStaff);
+router.put('/staff/:id', requirePermission('staff_management:edit'), userManagementController.updateStaff);
+router.put('/staff/:id/status', requirePermission('staff_management:edit'), userManagementController.updateStaffStatus);
+router.delete('/staff/:id', requirePermission('staff_management:delete'), userManagementController.deleteStaff);
 
 module.exports = router;

@@ -1,10 +1,31 @@
 import axiosInstance from '../lib/axios';
 
+export type PermissionAction = 'view' | 'create' | 'edit' | 'delete';
+
+export const PERMISSION_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete'];
+
 export interface Permission {
     id: string;
+    /** `<submodule_key>:<action>`, e.g. "vendor_management:view" */
     name: string;
     description: string;
     module: string;
+    submodule?: string;
+}
+
+/** One sidebar submodule and the subset of view/create/edit/delete it supports. */
+export interface PermissionSubmodule {
+    key: string;
+    name: string;
+    description: string;
+    actions: Record<PermissionAction, boolean>;
+}
+
+/** Top-level sidebar module (Vendors / Customers / Admin). */
+export interface PermissionModule {
+    key: string;
+    name: string;
+    submodules: PermissionSubmodule[];
 }
 
 export interface Role {
@@ -24,7 +45,7 @@ export const roleService = {
         return response.data;
     },
 
-    getPermissions: async (): Promise<{ success: boolean; data: Permission[] }> => {
+    getPermissions: async (): Promise<{ success: boolean; data: Permission[]; modules: PermissionModule[] }> => {
         const response = await axiosInstance.get('/roles/permissions');
         return response.data;
     },

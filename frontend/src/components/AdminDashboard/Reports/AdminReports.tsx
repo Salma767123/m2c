@@ -222,13 +222,13 @@ export default function AdminReports() {
               onChange={(v) => setPeriod(v as ReportPeriod)}
             />
           </div>
-          {hasPermission('export_reports') && (
+          {hasPermission('reports:view') && (
             <Button variant="outline" className="gap-2" onClick={exportToPDF} disabled={loading || !data}>
               <FileText className="w-4 h-4" />
               PDF
             </Button>
           )}
-          {hasPermission('export_reports') && (
+          {hasPermission('reports:view') && (
             <Button variant="outline" className="gap-2" onClick={exportToExcel} disabled={loading || !data}>
               <Download className="w-4 h-4" />
               Excel

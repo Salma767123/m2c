@@ -3,7 +3,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function CustomerReviewsPage() {
   return (
-    <PermissionGuard permission="view_reviews">
+    <PermissionGuard permission="customer_reviews:view">
       <CustomerReviews />
     </PermissionGuard>
   );

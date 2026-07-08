@@ -3,7 +3,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function AddUserPage() {
   return (
-    <PermissionGuard permission="create_users">
+    <PermissionGuard permission="staff_management:create">
       <AddEditUser />
     </PermissionGuard>
   )

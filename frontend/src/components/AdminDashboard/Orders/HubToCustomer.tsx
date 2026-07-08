@@ -236,7 +236,7 @@ export default function HubToCustomer() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      {hasPermission('view_orders') && (
+                      {hasPermission('hub_to_customer:view') && (
                         <button
                           onClick={() => handleViewOrder(order.id)}
                           className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"

@@ -4,7 +4,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function AddInventoryPage() {
   return (
-    <PermissionGuard permission="create_inventory">
+    <PermissionGuard permission="inventory:create">
       <div className="space-y-4">
         <Breadcrumb />
         <AddEditInventory isEdit={false} />

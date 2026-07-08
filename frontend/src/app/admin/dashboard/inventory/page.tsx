@@ -3,7 +3,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function InventoryPage() {
   return (
-    <PermissionGuard permission="view_inventory">
+    <PermissionGuard permission="inventory:view">
       <Inventory />
     </PermissionGuard>
   )

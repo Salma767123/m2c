@@ -211,7 +211,7 @@ export default function InvoiceSettings() {
                     <h2 className="text-xl font-bold text-gray-900">Invoice Settings</h2>
                     <p className="text-gray-600 mt-1">Configure how invoice numbers are generated</p>
                 </div>
-                {hasPermission("manage_billing") && (
+                {hasPermission("settings:edit") && (
                     <button
                         onClick={handleSave}
                         disabled={saving}

@@ -4,7 +4,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function RolesPermissionsPage() {
   return (
-    <PermissionGuard permission={["view_roles", "edit_roles", "manage_settings"]}>
+    <PermissionGuard permission="roles_permissions:view">
       <div className="space-y-6">
         <Breadcrumb />
         <RolesPermissions />

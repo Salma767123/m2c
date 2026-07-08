@@ -98,6 +98,11 @@ export default function VendorDocumentation({ vendor, verifications, meta, docDa
   const [confirmRemoveReport, setConfirmRemoveReport] = useState(false)
 
   useEffect(() => {
+    // Skip the location request (and its browser prompt) — geofencing is off
+    // everywhere by default (mirrors VendorInspectionForm / the backend). Set
+    // NEXT_PUBLIC_ENABLE_GEOFENCE=true to re-enable.
+    const geofenceDisabled = process.env.NEXT_PUBLIC_ENABLE_GEOFENCE !== "true"
+    if (geofenceDisabled) return
     if (typeof navigator === "undefined" || !navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(
       (pos) => setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),

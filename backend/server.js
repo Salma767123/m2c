@@ -123,6 +123,28 @@ app.get("/health", (req, res) => {
   });
 });
 
+// Vercel Cron entry point — node-cron never fires on serverless (no
+// long-running process), so vercel.json schedules a daily GET here instead.
+// Vercel sends "Authorization: Bearer <CRON_SECRET>"; local/manual calls must
+// supply the same secret. Without CRON_SECRET set, the endpoint is disabled.
+app.get("/api/jobs/overdue-settlements", async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return res.status(503).json({ success: false, error: "CRON_SECRET is not configured" });
+  }
+  if (req.headers.authorization !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+  try {
+    const { checkOverdueSettlements } = require("./jobs/overdueSettlements");
+    const result = await checkOverdueSettlements();
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    console.error("Overdue settlement cron run failed:", error);
+    res.status(500).json({ success: false, error: "Overdue settlement check failed" });
+  }
+});
+
 // Import routes
 const authRoutes = require("./routes/auth/authRoutes");
 const vendorRoutes = require("./routes/vendorRoutes");

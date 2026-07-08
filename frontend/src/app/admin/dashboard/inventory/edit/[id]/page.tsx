@@ -10,7 +10,7 @@ interface EditInventoryPageProps {
 export default async function EditInventoryPage({ params }: EditInventoryPageProps) {
   const { id } = await params
   return (
-    <PermissionGuard permission="edit_inventory">
+    <PermissionGuard permission="inventory:edit">
       <AddEditInventory inventoryId={id} isEdit={true} />
     </PermissionGuard>
   )

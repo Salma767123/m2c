@@ -8,7 +8,7 @@ const {
     deleteBagType,
     reorderBagTypes,
 } = require('../controllers/bagTypeController');
-const { authenticateToken, requireAdminRole } = require('../middleware/auth');
+const { authenticateToken, requireAdminRole, requirePermission } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -16,11 +16,11 @@ const router = express.Router();
 router.get('/active', getActiveBagTypes);
 
 // Admin routes
-router.post('/', authenticateToken, requireAdminRole, createBagType);
-router.get('/', authenticateToken, requireAdminRole, getBagTypes);
-router.patch('/reorder', authenticateToken, requireAdminRole, reorderBagTypes);
-router.get('/:id', authenticateToken, requireAdminRole, getBagType);
-router.put('/:id', authenticateToken, requireAdminRole, updateBagType);
-router.delete('/:id', authenticateToken, requireAdminRole, deleteBagType);
+router.post('/', authenticateToken, requireAdminRole, requirePermission('bag_types:create'), createBagType);
+router.get('/', authenticateToken, requireAdminRole, requirePermission('bag_types:view'), getBagTypes);
+router.patch('/reorder', authenticateToken, requireAdminRole, requirePermission('bag_types:edit'), reorderBagTypes);
+router.get('/:id', authenticateToken, requireAdminRole, requirePermission('bag_types:view'), getBagType);
+router.put('/:id', authenticateToken, requireAdminRole, requirePermission('bag_types:edit'), updateBagType);
+router.delete('/:id', authenticateToken, requireAdminRole, requirePermission('bag_types:delete'), deleteBagType);
 
 module.exports = router;

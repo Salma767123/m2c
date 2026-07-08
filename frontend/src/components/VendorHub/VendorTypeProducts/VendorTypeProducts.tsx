@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/UI/Button";
 import {
   Package,
@@ -248,6 +248,16 @@ export default function VendorTypeProducts({
   const [additionalCategories, setAdditionalCategories] = useState<
     AdditionalCategory[]
   >(data.additionalCategories || []);
+
+  // Push the latest local state up whenever this step unmounts (Back
+  // button, sidebar jump, edit-from-review) — not only on Save & Continue —
+  // so the Review step always reflects the latest edits. handleNext pushes
+  // the same ref so both paths persist an identical shape.
+  const persistRef = useRef<any>(null);
+  persistRef.current = { ...formData, categoryProducts, additionalCategories };
+  const onUpdateDataRef = useRef(onUpdateData);
+  onUpdateDataRef.current = onUpdateData;
+  useEffect(() => () => onUpdateDataRef.current(persistRef.current), []);
 
   const addAdditionalCategory = () => {
     setAdditionalCategories((prev) => [
@@ -734,7 +744,7 @@ export default function VendorTypeProducts({
       return;
     }
 
-    onUpdateData({ ...formData, categoryProducts, additionalCategories });
+    onUpdateData(persistRef.current);
     onNext();
   };
 

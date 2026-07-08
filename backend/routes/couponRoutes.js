@@ -29,17 +29,17 @@ router.get('/promotional', getPromotionalCoupons); // Public endpoint for promot
 router.get('/popup', getPopupCoupons); // Public endpoint for category/product popup modals
 
 // Free shipping offer routes (Admin only) - MUST come before /:id route
-router.post('/free-shipping', authenticateToken, requireAdminRole, requirePermission('create_coupons'), createFreeShippingOffer);
-router.get('/free-shipping', authenticateToken, requireAdminRole, requirePermission('view_coupons'), getFreeShippingOffers);
-router.get('/free-shipping/:id', authenticateToken, requireAdminRole, requirePermission('view_coupons'), getFreeShippingOffer);
-router.put('/free-shipping/:id', authenticateToken, requireAdminRole, requirePermission('edit_coupons'), updateFreeShippingOffer);
-router.delete('/free-shipping/:id', authenticateToken, requireAdminRole, requirePermission('delete_coupons'), deleteFreeShippingOffer);
+router.post('/free-shipping', authenticateToken, requireAdminRole, requirePermission('coupons:create'), createFreeShippingOffer);
+router.get('/free-shipping', authenticateToken, requireAdminRole, requirePermission('coupons:view'), getFreeShippingOffers);
+router.get('/free-shipping/:id', authenticateToken, requireAdminRole, requirePermission('coupons:view'), getFreeShippingOffer);
+router.put('/free-shipping/:id', authenticateToken, requireAdminRole, requirePermission('coupons:edit'), updateFreeShippingOffer);
+router.delete('/free-shipping/:id', authenticateToken, requireAdminRole, requirePermission('coupons:delete'), deleteFreeShippingOffer);
 
 // Admin routes (require admin authentication) - /:id route MUST come after specific routes
-router.post('/', authenticateToken, requireAdminRole, requirePermission('create_coupons'), createCoupon);
-router.get('/', authenticateToken, requireAdminRole, requirePermission('view_coupons'), getCoupons);
-router.get('/:id', authenticateToken, requireAdminRole, requirePermission('view_coupons'), getCoupon);
-router.put('/:id', authenticateToken, requireAdminRole, requirePermission('edit_coupons'), updateCoupon);
-router.delete('/:id', authenticateToken, requireAdminRole, requirePermission('delete_coupons'), deleteCoupon);
+router.post('/', authenticateToken, requireAdminRole, requirePermission('coupons:create'), createCoupon);
+router.get('/', authenticateToken, requireAdminRole, requirePermission('coupons:view'), getCoupons);
+router.get('/:id', authenticateToken, requireAdminRole, requirePermission('coupons:view'), getCoupon);
+router.put('/:id', authenticateToken, requireAdminRole, requirePermission('coupons:edit'), updateCoupon);
+router.delete('/:id', authenticateToken, requireAdminRole, requirePermission('coupons:delete'), deleteCoupon);
 
 module.exports = router;

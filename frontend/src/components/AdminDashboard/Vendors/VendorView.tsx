@@ -53,13 +53,12 @@ import DocViewerModal from '@/components/UI/DocViewerModal'
 import { FACILITY_META, withUnit } from '@/components/Checker/Vendor/Steps/VI_Step5_Manufacturing'
 import { Country } from 'country-state-city'
 
-const COUNTRY_FLAG: Record<string, string> = {}
-Country.getAllCountries().forEach((c) => { if (c.flag) COUNTRY_FLAG[c.name] = c.flag })
-function withFlags(countries: string[]): string[] {
-  return countries.map((name) => {
-    const flag = COUNTRY_FLAG[name]
-    return flag ? `${flag} ${name}` : name
-  })
+// Map country name → ISO code so we can render flag *images* (via flagcdn).
+// Flag emoji don't render on Windows, which shows the bare ISO letters instead.
+const COUNTRY_ISO: Record<string, string> = {}
+Country.getAllCountries().forEach((c) => { COUNTRY_ISO[c.name] = c.isoCode })
+function withFlags(countries: string[]): { flagIso: string; label: string }[] {
+  return countries.map((name) => ({ flagIso: COUNTRY_ISO[name] || "", label: name }))
 }
 
 interface VendorViewProps {
@@ -248,6 +247,8 @@ export default function VendorView({ vendorId }: VendorViewProps) {
         return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">Approved</Badge>
       case 'PENDING':
         return <Badge className="bg-amber-50 text-amber-700 border border-amber-200 font-bold">Pending</Badge>
+      case 'UNDER_REVIEW':
+        return <Badge className="bg-blue-50 text-blue-700 border border-blue-200 font-bold">Under Review</Badge>
       case 'SUSPENDED':
         return <Badge className="bg-red-50 text-red-700 border border-red-200 font-bold">Suspended</Badge>
       case 'REJECTED':
@@ -256,6 +257,8 @@ export default function VendorView({ vendorId }: VendorViewProps) {
         return <Badge className="bg-cyan-50 text-cyan-700 border border-cyan-200 font-bold">Approval Pending</Badge>
       case 'REJECTION_PENDING':
         return <Badge className="bg-orange-50 text-orange-700 border border-orange-200 font-bold">Rejection Pending</Badge>
+      case 'REINSPECTION':
+        return <Badge className="bg-orange-50 text-orange-700 border border-orange-200 font-bold">Re-Inspection</Badge>
       default:
         return <Badge className="bg-slate-100 text-slate-600 border border-slate-200 font-bold">Unknown</Badge>
     }
@@ -317,7 +320,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
               )}
 
               {/* Action Buttons */}
-              {vendor.status === 'PENDING' && hasPermission('edit_vendors') && (
+              {vendor.status === 'PENDING' && hasPermission('vendor_management:edit') && (
                 <>
                   <Button
                     onClick={handleApprove}
@@ -351,7 +354,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                 </>
               )}
 
-              {vendor.status === 'APPROVED' && hasPermission('edit_vendors') && (
+              {vendor.status === 'APPROVED' && hasPermission('vendor_management:edit') && (
                 <Button
                   onClick={handleSuspend}
                   disabled={actionLoading === 'suspend'}
@@ -461,7 +464,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                 </>
               )}
 
-              {hasPermission('edit_vendors') && (
+              {hasPermission('vendor_management:edit') && (
                 <Button
                   onClick={() => router.push(`/admin/dashboard/vendors/edit/${vendor.id}`)}
                   className="bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white rounded-xl"
@@ -1760,7 +1763,7 @@ function BankDetailsTab({ vendor, onVerify, loading }: { vendor: VendorProfile, 
               ) : (
                 <div className="flex items-center gap-4">
                   <Badge className="bg-yellow-100 text-yellow-800">Pending Verification</Badge>
-                  {onVerify && hasPermission('edit_vendors') && (
+                  {onVerify && hasPermission('vendor_management:edit') && (
                     <Button
                       size="sm"
                       onClick={onVerify}
@@ -1994,8 +1997,11 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                   <div className="mt-2">
                     <p className="text-xs text-slate-500 mb-1">Import Countries</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {withFlags((vendor as any).importCountries).map((c: string) => (
-                        <Badge key={c} className="bg-blue-50 text-blue-700 border border-blue-200">{c}</Badge>
+                      {withFlags((vendor as any).importCountries).map((c) => (
+                        <Badge key={c.label} className="bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1.5">
+                          {c.flagIso && <img src={`https://flagcdn.com/w20/${c.flagIso.toLowerCase()}.png`} alt="" className="w-4 h-auto rounded-[2px] shrink-0" loading="lazy" />}
+                          {c.label}
+                        </Badge>
                       ))}
                     </div>
                   </div>
@@ -2008,8 +2014,11 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                   <div className="mt-2">
                     <p className="text-xs text-slate-500 mb-1">Export Countries</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {withFlags((vendor as any).exportCountries).map((c: string) => (
-                        <Badge key={c} className="bg-emerald-50 text-emerald-700 border border-emerald-200">{c}</Badge>
+                      {withFlags((vendor as any).exportCountries).map((c) => (
+                        <Badge key={c.label} className="bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1.5">
+                          {c.flagIso && <img src={`https://flagcdn.com/w20/${c.flagIso.toLowerCase()}.png`} alt="" className="w-4 h-auto rounded-[2px] shrink-0" loading="lazy" />}
+                          {c.label}
+                        </Badge>
                       ))}
                     </div>
                   </div>

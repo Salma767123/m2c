@@ -3,7 +3,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 const CouponsPage = () => {
   return (
-    <PermissionGuard permission="view_coupons">
+    <PermissionGuard permission="coupons:view">
       <CouponManagement />
     </PermissionGuard>
   );

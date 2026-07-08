@@ -13,7 +13,7 @@ export default async function QCReportDetailPage({
   const { type } = await searchParams;
 
   return (
-    <PermissionGuard permission="view_reports">
+    <PermissionGuard permission="qc_reports:view">
       {type === 'product' ? (
         <ProductInspectionDetail productId={id} />
       ) : (

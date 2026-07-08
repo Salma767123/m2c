@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/UI/Button';
 import { Factory, Settings, Palette, Printer, Scissors, Shirt, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Grid3, Field, Input, Textarea, AccordionSection } from '../FormUI';
@@ -222,6 +222,15 @@ export default function ManufacturingFacilities({ onNext, onPrev, onUpdateData, 
       facilityDetails: data.facilityDetails || {},
     });
   }
+
+  // Push the latest local state up whenever this step unmounts (Back
+  // button, sidebar jump, edit-from-review) — not only on Save & Continue —
+  // so the Review step always reflects the latest edits.
+  const persistRef = useRef(formData);
+  persistRef.current = formData;
+  const onUpdateDataRef = useRef(onUpdateData);
+  onUpdateDataRef.current = onUpdateData;
+  useEffect(() => () => onUpdateDataRef.current(persistRef.current), []);
 
   // Resolve the field config for a given key — used by the live
   // validator and by the blur handler so we don't duplicate the lookup.

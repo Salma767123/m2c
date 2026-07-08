@@ -366,7 +366,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
           <Badge className={getStatusColor(product.approvalStatus)}>
             {product.approvalStatus.replace('_', ' ').charAt(0).toUpperCase() + product.approvalStatus.replace('_', ' ').slice(1).toLowerCase()}
           </Badge>
-          {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED' || product.approvalStatus === 'REINSPECTION' || product.approvalStatus === 'REJECTED') && hasPermission('edit_products') && (
+          {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED' || product.approvalStatus === 'REINSPECTION' || product.approvalStatus === 'REJECTED') && hasPermission('vendor_product_requests:edit') && (
             <>
               {product.approvalStatus === 'QC_APPROVED' ? (
                 <Button

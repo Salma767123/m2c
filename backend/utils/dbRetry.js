@@ -27,4 +27,25 @@ async function withWriteRetry(fn, { retries = 3, baseDelayMs = 60 } = {}) {
   }
 }
 
-module.exports = { withWriteRetry, isWriteConflict };
+// Retries ANY failure (not just write conflicts) with exponential backoff.
+// For fire-and-forget side effects (audit logs, notifications) that run after
+// a committed transaction: the data is already saved, so a transient network
+// blip should not silently drop the audit record.
+async function withRetry(fn, { retries = 3, baseDelayMs = 200 } = {}) {
+  let attempt = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt < retries) {
+        attempt += 1;
+        await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** (attempt - 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+module.exports = { withWriteRetry, isWriteConflict, withRetry };

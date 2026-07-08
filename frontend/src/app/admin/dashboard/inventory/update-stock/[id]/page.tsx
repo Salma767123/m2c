@@ -9,7 +9,7 @@ export default function UpdateStock() {
   const inventoryId = params.id as string
 
   return (
-    <PermissionGuard permission="edit_inventory">
+    <PermissionGuard permission="inventory:edit">
       <UpdateStockPage inventoryId={inventoryId} />
     </PermissionGuard>
   )

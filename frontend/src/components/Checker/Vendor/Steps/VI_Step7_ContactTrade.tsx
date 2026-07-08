@@ -6,15 +6,13 @@ import VerifyField, { SectionBlock, Verifications } from './VI_VerifyField'
 import { buildFullName } from '@/lib/utils'
 import { Country } from 'country-state-city'
 
-// Build name → flag emoji map once at module level
-const COUNTRY_FLAG: Record<string, string> = {}
-Country.getAllCountries().forEach(c => { if (c.flag) COUNTRY_FLAG[c.name] = c.flag })
+// Build name → ISO-code map once at module level. We render flag *images*
+// (via flagcdn) rather than flag emoji, which don't display on Windows.
+const COUNTRY_ISO: Record<string, string> = {}
+Country.getAllCountries().forEach(c => { COUNTRY_ISO[c.name] = c.isoCode })
 
-function withFlags(countries: string[]): string[] {
-  return countries.map(name => {
-    const flag = COUNTRY_FLAG[name]
-    return flag ? `${flag} ${name}` : name
-  })
+function withFlags(countries: string[]): { flagIso: string; label: string }[] {
+  return countries.map(name => ({ flagIso: COUNTRY_ISO[name] || '', label: name }))
 }
 
 interface Props {

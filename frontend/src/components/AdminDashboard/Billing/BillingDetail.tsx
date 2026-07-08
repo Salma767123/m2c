@@ -169,7 +169,7 @@ export default function BillingDetail({ billingId }: BillingDetailProps) {
             <p className="text-sm text-gray-600 mt-1">Billing: {billing.billingNumber}</p>
           </div>
         </div>
-        {hasPermission('view_billing') && (
+        {hasPermission('settlement:view') && (
           <div className="flex gap-3">
             <button
               onClick={handleDownload}

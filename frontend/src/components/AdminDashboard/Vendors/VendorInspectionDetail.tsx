@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Building2, User, Mail, Phone, MapPin, Calendar, CheckCircle, XCircle, FileText, ClipboardCheck, Clock, Factory, Shield, Wrench, Camera, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Building2, User, Mail, Phone, MapPin, Calendar, CheckCircle, XCircle, FileText, ClipboardCheck, Clock, Factory, Shield, Wrench, Camera, AlertTriangle, Eye, Download, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
@@ -11,6 +11,48 @@ import vendorService from "@/services/vendorService";
 import { hasPermission } from "@/lib/auth";
 import reinspectionService, { AuditLogEntry } from "@/services/reinspectionService";
 import InspectionAuditTimeline from "../ReInspection/InspectionAuditTimeline";
+import { generateFactoryInspectionPdf, pdfFileName } from "@/lib/factoryInspectionReportPdf";
+import VendorInspectionData from "./VendorInspectionData";
+import InspectionChecklist from "./InspectionChecklist";
+
+// Fetch a remote (e.g. Cloudinary) image and convert to a data URL so jsPDF can
+// embed it — mirrors the helper the checker's sign-off screen uses.
+async function fetchImgDataUrl(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+function openDataUriInTab(dataUri: string, mimeType: string) {
+  try {
+    const b64 = dataUri.split(",")[1];
+    const bytes = atob(b64);
+    const ab = new ArrayBuffer(bytes.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < bytes.length; i++) ia[i] = bytes.charCodeAt(i);
+    const blob = new Blob([ab], { type: mimeType });
+    window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
+  } catch { /* ignore */ }
+}
+
+// Turn a field key into a readable label: strip the step prefix, split
+// snake_case / camelCase, and title-case. e.g. "ct_mainContact_name" → "Main Contact Name".
+function humanizeFieldKey(key: string): string {
+  const stripped = key.replace(/^(certDoc_|cert_|c_|w_|o_|vt_|mf_|ct_)/, "");
+  const spaced = stripped.replace(/_/g, " ").replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+  const label = spaced.replace(/\b\w/g, (ch) => ch.toUpperCase()).trim();
+  return label || key;
+}
 
 interface InspectionData {
   vendorName?: string;
@@ -48,6 +90,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
   const [inspection, setInspection] = useState<any>(null);
   const [vendor, setVendor] = useState<any>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [reportBusy, setReportBusy] = useState<null | "view" | "download">(null);
 
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -121,9 +164,103 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
   // Detect new 9-step form format
   const isNewFormat = typeof (formData as any).verifications === 'object' && (formData as any).verifications !== null;
   const vf: Record<string, { ok: boolean | null; remarks: string }> = isNewFormat ? (formData as any).verifications : {};
-  const v = inspection?.vendor || {};
+  // Prefer the fully-fetched vendor record (getVendorById) — the one nested on
+  // the inspection is a thin projection missing company/owner/contact fields,
+  // which is why the info cards were showing N/A.
+  const v = { ...(inspection?.vendor || {}), ...(vendor || {}) };
 
   const factoryPhotos = Array.isArray(formData.factoryPhotos) ? formData.factoryPhotos : [];
+
+  const hasSignature = !!(formData as any).clientSignature;
+
+  // Rebuild the same signed factory-inspection report the checker generated at
+  // sign-off, from the persisted inspection data. The signed PDF itself is not
+  // stored, but every input to it is (vendor record, verifications, inspector
+  // meta and the captured client signature), so we regenerate it on demand.
+  const buildReport = async () => {
+    const vendorObj = vendor || v;
+
+    // Client signature — stored as a Cloudinary URL (or inline data URL) in the
+    // inspection payload. jsPDF needs a data URL to embed it.
+    let signatureDataUrl: string | null = null;
+    const rawSig = (formData as any).clientSignature;
+    if (rawSig) signatureDataUrl = String(rawSig).startsWith("data:") ? rawSig : await fetchImgDataUrl(rawSig);
+
+    // Factory images uploaded against the vendor (type OTHER), plus profile photos.
+    const vendorDocs: any[] = Array.isArray(vendorObj?.documents) ? vendorObj.documents : [];
+    const otherDocs = vendorDocs.filter((d: any) => d?.type === "OTHER" && d?.documentUrl);
+    const vendorFactoryImages = (
+      await Promise.all(
+        otherDocs.map(async (d: any) => {
+          const dataUrl = await fetchImgDataUrl(d.documentUrl);
+          return dataUrl ? { label: d.name || "Factory Image", dataUrl } : null;
+        })
+      )
+    ).filter((x): x is { label: string; dataUrl: string } => x !== null);
+
+    const [companyLogoDataUrl, ownerPhotoDataUrl, mainContactPhotoDataUrl] = await Promise.all([
+      vendorObj?.companyLogo ? fetchImgDataUrl(vendorObj.companyLogo) : Promise.resolve(null),
+      vendorObj?.ownerPhoto ? fetchImgDataUrl(vendorObj.ownerPhoto) : Promise.resolve(null),
+      vendorObj?.mainContact?.photo ? fetchImgDataUrl(vendorObj.mainContact.photo) : Promise.resolve(null),
+    ]);
+
+    const qc = vendorObj?.assignedQc || null;
+    const reportMeta = {
+      inspectorName: (formData as any).inspectorName || "",
+      inspectionDate: (formData as any).inspectionDate,
+      overallResult: (formData as any).inspectionStatus,
+      inspectorRemarks: (formData as any).inspectorRemarks || inspection?.notes,
+      checker: qc
+        ? { name: qc.name, checkerId: qc.checkerId, email: qc.email, phone: qc.phone || qc.mobile }
+        : ((formData as any).inspectorName ? { name: (formData as any).inspectorName } : null),
+      location:
+        inspection?.checkerLatitude != null && inspection?.checkerLongitude != null
+          ? { latitude: inspection.checkerLatitude, longitude: inspection.checkerLongitude }
+          : null,
+      // Stamp the report with when it was actually signed/submitted, not "now",
+      // so re-opening it always shows a stable date.
+      generatedAt: inspection?.submittedAt
+        ? new Date(inspection.submittedAt)
+        : inspection?.completedAt
+          ? new Date(inspection.completedAt)
+          : new Date(),
+    };
+
+    const doc = generateFactoryInspectionPdf(vendorObj, vf as any, reportMeta, {
+      clientSignatureDataUrl: signatureDataUrl,
+      vendorFactoryImages: vendorFactoryImages.length > 0 ? vendorFactoryImages : null,
+      companyLogoDataUrl,
+      ownerPhotoDataUrl,
+      mainContactPhotoDataUrl,
+    });
+    return { doc, reportMeta };
+  };
+
+  const viewSignedReport = async () => {
+    setReportBusy("view");
+    try {
+      const { doc } = await buildReport();
+      openDataUriInTab(doc.output("datauristring"), "application/pdf");
+    } catch (err: any) {
+      console.error("Failed to generate inspection report:", err);
+      showErrorToast("Report Error", "Could not generate the inspection report. Please try again.");
+    } finally {
+      setReportBusy(null);
+    }
+  };
+
+  const downloadSignedReport = async () => {
+    setReportBusy("download");
+    try {
+      const { doc, reportMeta } = await buildReport();
+      doc.save(pdfFileName(reportMeta, hasSignature));
+    } catch (err: any) {
+      console.error("Failed to download inspection report:", err);
+      showErrorToast("Report Error", "Could not generate the inspection report. Please try again.");
+    } finally {
+      setReportBusy(null);
+    }
+  };
 
   const getResultBadge = (result: string | null) => {
     switch (result) {
@@ -191,7 +328,11 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
     );
   }
 
-  const isCompleted = inspection.status === 'COMPLETED';
+  // The checker submits the inspection as SUBMITTED (→ UNDER_ADMIN_REVIEW);
+  // it only becomes COMPLETED after the admin approves. Gating the approve
+  // button on COMPLETED alone made it unreachable at exactly the moment the
+  // admin needs it.
+  const isAwaitingAdminAction = ['SUBMITTED', 'UNDER_ADMIN_REVIEW', 'COMPLETED'].includes(inspection.status);
   const vendorStatus = vendor?.status;
 
   return (
@@ -207,7 +348,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
             <p className="text-slate-500 mt-1">{vendor?.companyName || formData.vendorName || "Vendor"}</p>
           </div>
         </div>
-        {isCompleted && vendorStatus === 'UNDER_REVIEW' && hasPermission('edit_vendors') && (
+        {isAwaitingAdminAction && vendorStatus === 'UNDER_REVIEW' && hasPermission('vendor_management:edit') && (
           <button
             onClick={handleApprove}
             disabled={approving}
@@ -263,6 +404,45 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
         </Card>
       </div>
 
+      {/* Signed Inspection Report — vendor-driven, available for new and legacy inspections */}
+      {inspection && (
+        <Card className="mb-6 border border-slate-200/80 rounded-2xl shadow-xs">
+          <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">Inspection Report</h3>
+                <p className="text-sm text-slate-600">
+                  {hasSignature
+                    ? "Full report with the client signature captured during the inspection."
+                    : "Full factory inspection report generated from the submitted data."}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={viewSignedReport}
+                disabled={reportBusy !== null}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white transition-colors shadow-sm shadow-brand-500/10 disabled:opacity-60"
+              >
+                {reportBusy === "view" ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing…</> : <><Eye className="w-4 h-4" /> View Report</>}
+              </button>
+              <button
+                type="button"
+                onClick={downloadSignedReport}
+                disabled={reportBusy !== null}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold border border-brand-200 bg-brand-50 hover:bg-brand-100 text-brand-700 transition-colors disabled:opacity-60"
+              >
+                {reportBusy === "download" ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing…</> : <><Download className="w-4 h-4" /> Download</>}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Inspector Remarks */}
       {((isNewFormat ? (formData as any).inspectorRemarks : formData.inspectorRemarks) || inspection.notes) && (
         <Card className="mb-6">
@@ -276,6 +456,12 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
           </CardContent>
         </Card>
       )}
+
+      {/* Full vendor registration data — values + images. Vendor-driven, so it
+          renders for both new (9-step) and legacy inspections. */}
+      <div className="mb-6">
+        <VendorInspectionData vendor={v} />
+      </div>
 
       {/* ── NEW FORMAT: 9-step inspection summary ── */}
       {isNewFormat && (() => {
@@ -307,42 +493,6 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
               </CardContent></Card>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Vendor Info */}
-              <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-blue-600" /> Company Info
-                  </h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between"><span className="text-slate-500">Company Name</span><span className="font-medium text-slate-900">{v.companyName || "N/A"}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">GST Number</span><span className="font-medium font-mono text-slate-900">{v.gstNumber || (v.businessType === 'unregistered' ? 'Unregistered' : 'N/A')}</span></div>
-                    {v.panNumber && <div className="flex justify-between"><span className="text-slate-500">PAN Number</span><span className="font-medium font-mono text-slate-900">{v.panNumber}</span></div>}
-                    {v.iecCode && <div className="flex justify-between"><span className="text-slate-500">IEC Code</span><span className="font-medium font-mono text-slate-900">{v.iecCode}</span></div>}
-                    {v.website && <div className="flex justify-between"><span className="text-slate-500">Website</span><span className="font-medium text-slate-900">{v.website}</span></div>}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Owner / Contact */}
-              <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                    <User className="h-5 w-5 text-blue-600" /> Owner / Contact
-                  </h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between"><span className="text-slate-500">Owner Name</span><span className="font-medium text-slate-900">{v.ownerName || [v.ownerFirstName, v.ownerLastName].filter(Boolean).join(' ') || "N/A"}</span></div>
-                    {v.designation && <div className="flex justify-between"><span className="text-slate-500">Designation</span><span className="font-medium text-slate-900">{v.designation}</span></div>}
-                    <div className="flex justify-between"><span className="text-slate-500">Phone</span><span className="font-medium text-slate-900">{v.ownerPhone || v.businessPhone || "N/A"}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Email</span><span className="font-medium text-slate-900">{v.ownerEmail || v.businessEmail || "N/A"}</span></div>
-                    {(v.warehouseCity || v.warehouseState) && (
-                      <div className="flex justify-between"><span className="text-slate-500">Location</span><span className="font-medium text-slate-900">{[v.warehouseCity, v.warehouseState].filter(Boolean).join(', ')}</span></div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
             {/* Issues */}
             {issues.length > 0 && (
               <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
@@ -355,7 +505,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
                       <div key={key} className="flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
                         <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-xs font-bold text-red-700 font-mono">{key}</p>
+                          <p className="text-sm font-bold text-red-700">{humanizeFieldKey(key)}</p>
                           {val.remarks
                             ? <p className="text-sm text-red-800 mt-0.5">{val.remarks}</p>
                             : <p className="text-sm text-red-500 italic mt-0.5">No remarks.</p>
@@ -367,6 +517,9 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
                 </CardContent>
               </Card>
             )}
+
+            {/* Full checklist — collapsible accordion, one step open at a time */}
+            <InspectionChecklist verifications={vf} />
           </div>
         );
       })()}
@@ -492,7 +645,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
       )}
 
       {/* Approve Action at Bottom */}
-      {isCompleted && vendorStatus === 'UNDER_REVIEW' && hasPermission('edit_vendors') && (
+      {isAwaitingAdminAction && vendorStatus === 'UNDER_REVIEW' && hasPermission('vendor_management:edit') && (
         <Card className="border-2 border-emerald-200 bg-emerald-50">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">

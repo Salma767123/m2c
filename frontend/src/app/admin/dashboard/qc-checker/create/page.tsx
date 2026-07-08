@@ -3,7 +3,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function CreateQCCheckerPage() {
   return (
-    <PermissionGuard permission={["create_qc_checkers", "create_users"]}>
+    <PermissionGuard permission="qc_checker_management:create">
       <CreateQCChecker />
     </PermissionGuard>
   );

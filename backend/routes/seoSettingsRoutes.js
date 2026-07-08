@@ -8,16 +8,16 @@ const { upload } = require('../middleware/upload');
 router.get('/public/:page', getPublicSEOSettings);
 
 // Get all SEO settings (for page management)
-router.get('/', authenticateToken, requireRole('admin'), requirePermission(['view_settings', 'manage_settings']), getAllSEOSettings);
+router.get('/', authenticateToken, requireRole('admin'), requirePermission('settings:view'), getAllSEOSettings);
 
 // Get SEO settings for a specific page
-router.get('/:page', authenticateToken, requireRole('admin'), requirePermission(['view_settings', 'manage_settings']), getSEOSettings);
+router.get('/:page', authenticateToken, requireRole('admin'), requirePermission('settings:view'), getSEOSettings);
 
 // Update SEO settings for a specific page (with optional image upload)
 router.put('/:page',
     authenticateToken,
     requireRole('admin'),
-    requirePermission('manage_settings'),
+    requirePermission('settings:edit'),
     upload.single('ogImage'),
     updateSEOSettings
 );

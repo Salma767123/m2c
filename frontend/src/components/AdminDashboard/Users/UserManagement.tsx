@@ -240,7 +240,7 @@ export default function UserManagement() {
           <p className="text-gray-600">Manage internal staff and their access levels (Ready for Add Staff)</p>
         </div>
         <div className="flex items-center gap-3">
-          {hasPermission('create_users') && (
+          {hasPermission('staff_management:create') && (
             <Button
               onClick={handleAddStaff}
               className="bg-primary hover:bg-primary/90 text-white shadow-lg px-6 py-2 rounded-lg font-semibold flex items-center transition-all hover:scale-105 active:scale-95"
@@ -475,7 +475,7 @@ export default function UserManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {hasPermission('view_users') && (
+                        {hasPermission('staff_management:view') && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -486,7 +486,7 @@ export default function UserManagement() {
                             <Eye className="h-4 w-4" />
                           </Button>
                         )}
-                        {hasPermission('edit_users') && (
+                        {hasPermission('staff_management:edit') && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -497,7 +497,7 @@ export default function UserManagement() {
                             <Edit className="h-4 w-4" />
                           </Button>
                         )}
-                        {hasPermission('edit_users') && user.status === 'active' ? (
+                        {hasPermission('staff_management:edit') && user.status === 'active' ? (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -507,7 +507,7 @@ export default function UserManagement() {
                           >
                             <UserX className="h-4 w-4" />
                           </Button>
-                        ) : hasPermission('edit_users') ? (
+                        ) : hasPermission('staff_management:edit') ? (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -518,7 +518,7 @@ export default function UserManagement() {
                             <UserCheck className="h-4 w-4" />
                           </Button>
                         ) : null}
-                        {hasPermission('delete_users') && (
+                        {hasPermission('staff_management:delete') && (
                           <Button
                             variant="ghost"
                             size="sm"

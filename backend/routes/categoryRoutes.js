@@ -38,19 +38,19 @@ router.get('/:parentId/subcategories/:subcategoryId', getSubcategoryById); // Ge
 router.use(authenticateToken); // All routes below require authentication
 
 // Admin-only routes for category management
-router.post('/', requireRole('admin'), requirePermission('create_categories'), createCategory);
-router.put('/:id', requireRole('admin'), requirePermission('edit_categories'), updateCategory);
-router.delete('/:id', requireRole('admin'), requirePermission('delete_categories'), deleteCategory);
-router.post('/:id/duplicate', requireRole('admin'), requirePermission('create_categories'), duplicateCategory);
-router.patch('/bulk-status', requireRole('admin'), requirePermission('edit_categories'), bulkUpdateStatus);
-router.patch('/reorder', requireRole('admin'), requirePermission('edit_categories'), reorderCategories);
+router.post('/', requireRole('admin'), requirePermission('categories:create'), createCategory);
+router.put('/:id', requireRole('admin'), requirePermission('categories:edit'), updateCategory);
+router.delete('/:id', requireRole('admin'), requirePermission('categories:delete'), deleteCategory);
+router.post('/:id/duplicate', requireRole('admin'), requirePermission('categories:create'), duplicateCategory);
+router.patch('/bulk-status', requireRole('admin'), requirePermission('categories:edit'), bulkUpdateStatus);
+router.patch('/reorder', requireRole('admin'), requirePermission('categories:edit'), reorderCategories);
 
 // Subcategory management routes
-router.post('/:parentId/subcategories', requireRole('admin'), requirePermission('create_categories'), createSubcategory);
-router.put('/:parentId/subcategories/:subcategoryId', requireRole('admin'), requirePermission('edit_categories'), updateSubcategory);
-router.delete('/:parentId/subcategories/:subcategoryId', requireRole('admin'), requirePermission('delete_categories'), deleteSubcategory);
-router.patch('/:parentId/subcategories/bulk-status', requireRole('admin'), requirePermission('edit_categories'), bulkUpdateSubcategoryStatus);
-router.patch('/:parentId/subcategories/reorder', requireRole('admin'), requirePermission('edit_categories'), reorderSubcategories);
-router.patch('/:parentId/subcategories/:subcategoryId/move', requireRole('admin'), requirePermission('edit_categories'), moveSubcategory);
+router.post('/:parentId/subcategories', requireRole('admin'), requirePermission('categories:create'), createSubcategory);
+router.put('/:parentId/subcategories/:subcategoryId', requireRole('admin'), requirePermission('categories:edit'), updateSubcategory);
+router.delete('/:parentId/subcategories/:subcategoryId', requireRole('admin'), requirePermission('categories:delete'), deleteSubcategory);
+router.patch('/:parentId/subcategories/bulk-status', requireRole('admin'), requirePermission('categories:edit'), bulkUpdateSubcategoryStatus);
+router.patch('/:parentId/subcategories/reorder', requireRole('admin'), requirePermission('categories:edit'), reorderSubcategories);
+router.patch('/:parentId/subcategories/:subcategoryId/move', requireRole('admin'), requirePermission('categories:edit'), moveSubcategory);
 
 module.exports = router;

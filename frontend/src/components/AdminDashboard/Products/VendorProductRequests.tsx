@@ -535,7 +535,7 @@ export default function VendorProductRequests() {
                       {/* Actions */}
                       <TableCell className="py-3 px-3 align-middle">
                         <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-                          {hasPermission('view_products') && (
+                          {hasPermission('vendor_product_requests:view') && (
                             <button
                               title="View Details"
                               onClick={() => handleViewDetails(request)}
@@ -544,7 +544,7 @@ export default function VendorProductRequests() {
                               <Eye className="h-4 w-4" />
                             </button>
                           )}
-                          {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'REINSPECTION') && hasPermission('edit_products') && (
+                          {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'REINSPECTION') && hasPermission('vendor_product_requests:edit') && (
                             <>
                               {request.approvalStatus === 'QC_APPROVED' && (
                                 <button

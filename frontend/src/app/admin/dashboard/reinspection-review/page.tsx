@@ -3,7 +3,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard';
 
 export default function ReinspectionReviewPage() {
   return (
-    <PermissionGuard permission="view_reports">
+    <PermissionGuard permission="reinspection_review:view">
       <ReinspectionReviewDashboard />
     </PermissionGuard>
   );

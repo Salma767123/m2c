@@ -10,7 +10,7 @@ interface PageProps {
 export default async function BillingDetailPage({ params }: PageProps) {
   const { id } = await params;
   return (
-    <PermissionGuard permission="view_billing">
+    <PermissionGuard permission="settlement:view">
       <div className="p-6">
         <BillingDetail billingId={id} />
       </div>

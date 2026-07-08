@@ -11,7 +11,7 @@ interface ViewVendorPageProps {
 export default function ViewVendorPage({ params }: ViewVendorPageProps) {
   const { id } = use(params)
   return (
-    <PermissionGuard permission="view_vendors">
+    <PermissionGuard permission="vendor_management:view">
       <VendorView vendorId={id} />
     </PermissionGuard>
   )

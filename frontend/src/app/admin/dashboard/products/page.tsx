@@ -4,7 +4,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function ProductsPage() {
   return (
-    <PermissionGuard permission="view_products">
+    <PermissionGuard permission="all_products:view">
       <div className="space-y-4">
         <Breadcrumb />
         <ProductsTable />

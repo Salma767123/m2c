@@ -188,7 +188,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           </div>
         </div>
         <div className="flex gap-3">
-          {showOutForDeliveryButton && hasPermission('edit_orders') && (
+          {showOutForDeliveryButton && hasPermission('hub_to_customer:edit') && (
             <button
               onClick={handleMarkOutForDelivery}
               disabled={!canMarkOutForDelivery}
@@ -201,7 +201,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
               Mark Out for Delivery
             </button>
           )}
-          {status === "SHIPPED_TO_CUSTOMER" && hasPermission('edit_orders') && (
+          {status === "SHIPPED_TO_CUSTOMER" && hasPermission('hub_to_customer:edit') && (
             <button
               onClick={handleMarkAsDelivered}
               className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"

@@ -9,7 +9,7 @@ export default function VendorProductRequestViewPage({ params }: { params: Promi
   // Extract MongoDB ID from slug format: "product-name--mongoId"
   const requestId = slug.includes('--') ? slug.split('--').pop()! : slug
   return (
-    <PermissionGuard permission="view_products">
+    <PermissionGuard permission="vendor_product_requests:view">
       <VendorProductRequestView requestId={requestId} />
     </PermissionGuard>
   )

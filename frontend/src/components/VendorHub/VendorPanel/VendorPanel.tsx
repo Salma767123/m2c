@@ -212,26 +212,6 @@ export default function VendorPanel() {
     }
   };
 
-  // Progress reflects work-in-progress, not just saved steps:
-  //   - Skipped steps are excluded from both numerator and denominator.
-  //   - The current (in-progress) step earns a partial credit so the bar
-  //     moves as the vendor advances through the wizard, instead of sitting
-  //     at 0% until they hit Save & Continue.
-  const visibleStepCount = steps.filter((_, i) => !isStepSkipped(i)).length;
-  const completedVisibleCount = completedSteps.filter(
-    (i) => !isStepSkipped(i),
-  ).length;
-  const inProgressCredit =
-    !isStepSkipped(currentStep) && !completedSteps.includes(currentStep)
-      ? 0.4
-      : 0;
-  const progressPercent = Math.min(
-    100,
-    Math.round(
-      ((completedVisibleCount + inProgressCredit) / visibleStepCount) * 100,
-    ),
-  );
-
   return (
     <div className="min-h-screen bg-linear-to-b from-gray-100 to-slate-100 font-sans">
       {/* Center-screen success/error/warning/info notices for the registration flow */}
@@ -373,36 +353,6 @@ export default function VendorPanel() {
             </ul>
           </nav>
 
-          {/* Progress Summary Pinned to Bottom */}
-          <div className="p-5 border-t border-gray-100 shrink-0 bg-gray-50/50">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                Overall Progress
-              </span>
-              <span className="text-xs font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-full tabular-nums">
-                {progressPercent}%
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="h-1.5 rounded-full bg-linear-to-r from-brand-500 to-brand-600 transition-[width] duration-500 ease-out shadow-[0_0_8px_rgba(224,26,27,0.15)]"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            <div className="flex justify-between items-center mt-2.5">
-              <span className="text-[10px] text-gray-400 font-medium tabular-nums">
-                {completedVisibleCount} of {visibleStepCount} completed
-              </span>
-              {progressPercent === 100 && (
-                <span className="text-[10px] text-success-500 font-bold flex items-center gap-0.5 animate-bounce">
-                  <svg className="w-3.5 h-3.5 fill-success-500" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  Ready!
-                </span>
-              )}
-            </div>
-          </div>
         </aside>
 
         {/* Right Content Area (responsive width) */}
@@ -421,17 +371,6 @@ export default function VendorPanel() {
                   <h2 className="text-xs font-bold text-gray-900 truncate">
                     {steps[currentStep]}
                   </h2>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5 shrink-0 bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
-                <span className="text-[10px] font-bold text-gray-800 tabular-nums">
-                  {progressPercent}%
-                </span>
-                <div className="w-12 bg-gray-200 rounded-full h-1 overflow-hidden">
-                  <div
-                    className="bg-brand-500 h-1 rounded-full transition-[width] duration-500 ease-out"
-                    style={{ width: `${progressPercent}%` }}
-                  />
                 </div>
               </div>
             </div>
@@ -459,13 +398,7 @@ export default function VendorPanel() {
                   </div>
                 </div>
                 {/* Segmented progress — per-step visual feedback */}
-                <div
-                  className="flex gap-1.5"
-                  role="progressbar"
-                  aria-valuenow={progressPercent}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                >
+                <div className="flex gap-1.5">
                   {steps.map((_, i) => {
                     const skipped = isStepSkipped(i);
                     return (

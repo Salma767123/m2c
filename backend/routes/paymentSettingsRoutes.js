@@ -15,10 +15,10 @@ router.get('/public', getPublicPaymentSettings);
 router.use(authenticateToken);
 
 // Get payment settings — view_settings or manage_settings
-router.get('/', requireRole('admin'), requirePermission(['view_settings', 'manage_settings']), getPaymentSettings);
+router.get('/', requireRole('admin'), requirePermission('settings:view'), getPaymentSettings);
 
 // Mutating routes — manage_settings only
-router.put('/razorpay', requireRole('admin'), requirePermission('manage_settings'), updateRazorpaySettings);
-router.put('/payu', requireRole('admin'), requirePermission('manage_settings'), updatePayUSettings);
+router.put('/razorpay', requireRole('admin'), requirePermission('settings:edit'), updateRazorpaySettings);
+router.put('/payu', requireRole('admin'), requirePermission('settings:edit'), updatePayUSettings);
 
 module.exports = router;

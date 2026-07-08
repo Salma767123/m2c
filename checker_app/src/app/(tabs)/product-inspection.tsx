@@ -30,22 +30,7 @@ export default function ProductInspectionScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      {/* Header */}
-      <View className="px-4 pt-4 pb-2 flex-row items-center border-b border-gray-200 bg-white">
-        <TouchableOpacity onPress={() => router.back()} className="mr-3">
-          <ArrowLeft size={22} color="#111827" />
-        </TouchableOpacity>
-        <View className="flex-1">
-          <Text className="text-lg font-bold text-gray-900" numberOfLines={1}>
-            Product Inspection
-          </Text>
-          <Text className="text-xs text-gray-500" numberOfLines={1}>
-            {productName}
-          </Text>
-        </View>
-      </View>
-
-      {/* Form */}
+      {/* Form (renders its own header with exit-guard-aware back button) */}
       <ProductInspectionForm
         productId={productId}
         productName={productName}

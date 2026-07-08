@@ -325,7 +325,7 @@ export default function ProductsTable() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Products Management</CardTitle>
-          {hasPermission('create_products') && (
+          {hasPermission('all_products:create') && (
             <Link href="/admin/dashboard/products/add">
               <Button className="bg-[#313131] text-white hover:bg-[#222222]">
                 Add Product
@@ -512,7 +512,7 @@ export default function ProductsTable() {
                 <TableCell>{formatDate(new Date(product.createdAt))}</TableCell>
                 <TableCell>
                   <div className="flex items-center space-x-2">
-                    {hasPermission('view_products') && (
+                    {hasPermission('all_products:view') && (
                       <Link href={`/admin/dashboard/products/vendor-requests/view/${product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}--${product.id}`}>
                         <Button variant="ghost" size="sm" className="hover:bg-gray-50">
                           <Eye className="h-4 w-4" />
@@ -520,7 +520,7 @@ export default function ProductsTable() {
                       </Link>
                     )}
 
-                    {product.approvalStatus === 'QC_APPROVED' && hasPermission('edit_products') && (
+                    {product.approvalStatus === 'QC_APPROVED' && hasPermission('all_products:edit') && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -532,7 +532,7 @@ export default function ProductsTable() {
                       </Button>
                     )}
 
-                    {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED') && hasPermission('edit_products') && (
+                    {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED') && hasPermission('all_products:edit') && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -544,14 +544,14 @@ export default function ProductsTable() {
                       </Button>
                     )}
 
-                    {hasPermission('edit_products') && (
+                    {hasPermission('all_products:edit') && (
                       <Link href={`/admin/dashboard/products/edit/${product.id}`}>
                         <Button variant="ghost" size="sm" className="hover:bg-gray-50">
                           <Edit className="h-4 w-4" />
                         </Button>
                       </Link>
                     )}
-                    {hasPermission('delete_products') && (
+                    {hasPermission('all_products:delete') && (
                       <Button
                         variant="ghost"
                         size="sm"

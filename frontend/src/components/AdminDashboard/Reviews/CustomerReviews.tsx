@@ -356,7 +356,7 @@ export default function CustomerReviews() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        {hasPermission('view_reviews') && (
+                        {hasPermission('customer_reviews:view') && (
                           <button
                             onClick={() => setSelectedReview(review)}
                             className="inline-flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -365,7 +365,7 @@ export default function CustomerReviews() {
                             <Eye className="h-4 w-4" />
                           </button>
                         )}
-                        {hasPermission('moderate_reviews') && (
+                        {hasPermission('customer_reviews:edit') && (
                           review.isApproved ? (
                             <button
                               onClick={() => handleReject(review.id)}
@@ -386,7 +386,7 @@ export default function CustomerReviews() {
                             </button>
                           )
                         )}
-                        {hasPermission('delete_reviews') && (
+                        {hasPermission('customer_reviews:delete') && (
                           <button
                             onClick={() => handleDeleteClick(review)}
                             disabled={actionLoading === review.id}

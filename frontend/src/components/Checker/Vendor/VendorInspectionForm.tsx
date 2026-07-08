@@ -39,6 +39,12 @@ const STEPS = [
   { id: 9, label: 'Documentation',   short: '9' },
 ]
 
+// Geofencing is disabled everywhere by default — dev AND production — so
+// inspections never require GPS or the browser location prompt. Set
+// NEXT_PUBLIC_ENABLE_GEOFENCE=true to turn it back on. The backend applies the
+// same rule (see utils/locationUtils.isGeofenceDisabled).
+const GEOFENCE_DISABLED = process.env.NEXT_PUBLIC_ENABLE_GEOFENCE !== 'true'
+
 function getCurrentCoords(): Promise<{ checkerLatitude: number; checkerLongitude: number }> {
   return new Promise((resolve, reject) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -178,6 +184,11 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
 
     async function autoStart(inspId: string) {
       try {
+        // Dev/non-production: start without GPS so the browser never prompts.
+        if (GEOFENCE_DISABLED) {
+          await qcCheckerService.startInspection(inspId, { checkerLatitude: null, checkerLongitude: null } as any)
+          return
+        }
         const coords = await getCurrentCoords()
         if (cancelled) return
         setCheckerCoords(coords)
@@ -373,8 +384,9 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
     setSubmitting(true)
 
     // Use GPS captured at inspection start; re-fetch only if not available.
+    // Skipped entirely outside production — no location prompt, no requirement.
     let coords = checkerCoords
-    if (!coords) {
+    if (!coords && !GEOFENCE_DISABLED) {
       try {
         coords = await getCurrentCoords()
         setCheckerCoords(coords)
@@ -393,8 +405,8 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
         inspectionStatus: meta.overallResult,
         inspectorRemarks: meta.inspectorRemarks,
         cycleNumber,
-        checkerLatitude: coords.checkerLatitude,
-        checkerLongitude: coords.checkerLongitude,
+        checkerLatitude: coords?.checkerLatitude ?? null,
+        checkerLongitude: coords?.checkerLongitude ?? null,
         clientSignature: docData.clientSignature || null,
       }
       const res = await qcCheckerService.completeInspection(inspection.id, payload)

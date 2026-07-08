@@ -20,9 +20,9 @@ interface FreeShippingModalProps {
 }
 
 const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps) => {
-  const canEdit = hasPermission('edit_coupons');
-  const canCreate = hasPermission('create_coupons');
-  const canDelete = hasPermission('delete_coupons');
+  const canEdit = hasPermission('coupons:edit');
+  const canCreate = hasPermission('coupons:create');
+  const canDelete = hasPermission('coupons:delete');
   const [freeShippingOffers, setFreeShippingOffers] = useState<FreeShippingOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

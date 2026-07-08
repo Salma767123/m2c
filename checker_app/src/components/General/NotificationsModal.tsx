@@ -19,11 +19,14 @@ import {
   CalendarClock,
   RefreshCw,
   CheckCircle2,
+  Check,
+  Undo2,
 } from 'lucide-react-native';
 import {
   AppNotification,
   fetchNotifications,
   markNotificationRead,
+  markNotificationUnread,
   markAllNotificationsRead,
 } from '@/services/notificationService';
 
@@ -95,8 +98,9 @@ export default function NotificationsModal({
     setRefreshing(false);
   }, [load]);
 
-  const handleItemPress = async (n: AppNotification) => {
+  const handleMarkRead = async (n: AppNotification) => {
     if (n.isRead) return;
+    // Optimistic update, then persist (mirrors web read/unread toggle).
     setItems((prev) =>
       prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x))
     );
@@ -106,6 +110,24 @@ export default function NotificationsModal({
       return next;
     });
     await markNotificationRead(n.id);
+  };
+
+  const handleMarkUnread = async (n: AppNotification) => {
+    if (!n.isRead) return;
+    setItems((prev) =>
+      prev.map((x) => (x.id === n.id ? { ...x, isRead: false } : x))
+    );
+    setUnread((prev) => {
+      const next = prev + 1;
+      onUnreadChange?.(next);
+      return next;
+    });
+    await markNotificationUnread(n.id);
+  };
+
+  // Tapping the item body marks it read (only if currently unread) — same as web.
+  const handleItemPress = (n: AppNotification) => {
+    if (!n.isRead) handleMarkRead(n);
   };
 
   const handleMarkAll = async () => {
@@ -237,9 +259,35 @@ export default function NotificationsModal({
                     >
                       {item.message}
                     </Text>
-                    <Text className="text-[10px] text-gray-400 mt-1">
-                      {timeAgo(item.createdAt)}
-                    </Text>
+                    <View className="flex-row items-center justify-between mt-1">
+                      <Text className="text-[10px] text-gray-400">
+                        {timeAgo(item.createdAt)}
+                      </Text>
+                      {/* Per-item read/unread toggle — mirrors web NotificationDropdown */}
+                      {item.isRead ? (
+                        <TouchableOpacity
+                          onPress={() => handleMarkUnread(item)}
+                          hitSlop={8}
+                          className="flex-row items-center px-2 py-1 rounded-full border border-gray-200"
+                        >
+                          <Undo2 size={11} color="#6b7280" />
+                          <Text className="text-[10px] font-semibold text-gray-500 ml-1">
+                            Mark as unread
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => handleMarkRead(item)}
+                          hitSlop={8}
+                          className="flex-row items-center px-2 py-1 rounded-full border border-blue-200 bg-blue-50"
+                        >
+                          <Check size={11} color="#2563eb" />
+                          <Text className="text-[10px] font-semibold text-blue-700 ml-1">
+                            Mark as read
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 </TouchableOpacity>
               );

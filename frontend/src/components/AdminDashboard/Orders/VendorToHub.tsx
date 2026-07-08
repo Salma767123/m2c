@@ -440,7 +440,7 @@ export default function VendorToHub() {
                             </span>
                           </TableCell>
                           <TableCell>
-                            {hasPermission('view_orders') && (
+                            {hasPermission('vendor_to_hub:view') && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();

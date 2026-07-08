@@ -3,7 +3,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function AddVendorPage() {
   return (
-    <PermissionGuard permission="create_vendors">
+    <PermissionGuard permission="vendor_management:create">
       <AddEditVendor mode="add" />
     </PermissionGuard>
   )

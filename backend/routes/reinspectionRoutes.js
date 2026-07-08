@@ -23,7 +23,7 @@ router.post(
     '/factory/:inspectionId/review',
     authenticateToken,
     requireAdminRole,
-    requirePermission(['edit_vendors']),
+    requirePermission('reinspection_review:edit'),
     adminReviewFactoryInspection
 );
 
@@ -32,7 +32,7 @@ router.post(
     '/product/:productId/review',
     authenticateToken,
     requireAdminRole,
-    requirePermission(['edit_products']),
+    requirePermission('reinspection_review:edit'),
     adminReviewProductInspection
 );
 

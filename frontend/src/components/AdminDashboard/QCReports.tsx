@@ -417,7 +417,7 @@ export default function QCReports() {
                                                     {formatDate(report.completedAt || report.createdAt)}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {hasPermission('view_reports') && (
+                                                    {hasPermission('qc_reports:view') && (
                                                     <div className="flex items-center gap-2">
                                                         <button
                                                             onClick={() => router.push(`/admin/dashboard/qc-reports/${report.id}?type=factory&download=true`)}
@@ -624,7 +624,7 @@ export default function QCReports() {
                                                         {formatDate(product.updatedAt)}
                                                     </TableCell>
                                                     <TableCell>
-                                                        {hasPermission('view_reports') && (
+                                                        {hasPermission('qc_reports:view') && (
                                                         <div className="flex items-center gap-2">
                                                             <button
                                                                 onClick={() => router.push(`/admin/dashboard/qc-reports/${product.id}?type=product&download=true`)}

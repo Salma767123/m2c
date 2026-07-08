@@ -40,7 +40,7 @@ export default function EditRolePage() {
   }, [roleId])
 
   return (
-    <PermissionGuard permission={["edit_roles", "manage_settings"]}>
+    <PermissionGuard permission="roles_permissions:edit">
       <div className="space-y-6">
         <Breadcrumb />
         {isLoading ? (

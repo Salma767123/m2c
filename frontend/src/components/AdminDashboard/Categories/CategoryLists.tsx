@@ -277,21 +277,21 @@ export default function CategoryLists() {
           </TableCell>
           <TableCell className="text-right">
             <div className="flex items-center justify-end space-x-2">
-              {hasPermission('view_categories') && (
+              {hasPermission('categories:view') && (
                 <Link href={`/admin/dashboard/categories/view/${category.id}`}>
                   <Button variant="ghost" size="sm">
                     <Eye className="h-4 w-4" />
                   </Button>
                 </Link>
               )}
-              {hasPermission('edit_categories') && (
+              {hasPermission('categories:edit') && (
                 <Link href={`/admin/dashboard/categories/edit/${category.id}`}>
                   <Button variant="ghost" size="sm">
                     <Edit className="h-4 w-4" />
                   </Button>
                 </Link>
               )}
-              {hasPermission('delete_categories') && (
+              {hasPermission('categories:delete') && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -318,7 +318,7 @@ export default function CategoryLists() {
           <h1 className="text-2xl font-bold text-gray-900">Categories</h1>
           <p className="text-gray-600">Manage your product categories and subcategories</p>
         </div>
-        {hasPermission('create_categories') && (
+        {hasPermission('categories:create') && (
           <Link href="/admin/dashboard/categories/add">
             <Button className="bg-[#313131] text-white hover:bg-[#222222]">
               <Plus className="h-4 w-4 mr-2" />
@@ -587,21 +587,21 @@ function SortableCategoryRow({ category, toggleExpanded, expandedCategories, han
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end space-x-2">
-          {hasPermission('view_categories') && (
+          {hasPermission('categories:view') && (
             <Link href={`/admin/dashboard/categories/view/${category.id}`}>
               <Button variant="ghost" size="sm">
                 <Eye className="h-4 w-4" />
               </Button>
             </Link>
           )}
-          {hasPermission('edit_categories') && (
+          {hasPermission('categories:edit') && (
             <Link href={`/admin/dashboard/categories/edit/${category.id}`}>
               <Button variant="ghost" size="sm">
                 <Edit className="h-4 w-4" />
               </Button>
             </Link>
           )}
-          {hasPermission('delete_categories') && (
+          {hasPermission('categories:delete') && (
             <Button
               variant="ghost"
               size="sm"

@@ -24,13 +24,14 @@ const {
 } = require('../controllers/qcCheckerController');
 
 const { authenticateToken, requireAdminRole, requirePermission } = require('../middleware/auth');
+const { loginLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
 // ============================================
 // QC CHECKER AUTH (Public)
 // ============================================
-router.post('/login', qcCheckerLogin);
+router.post('/login', loginLimiter, qcCheckerLogin);
 
 // ============================================
 // QC CHECKER SELF ROUTES (Authenticated QC Checker)
@@ -55,11 +56,11 @@ router.post('/products/:productId/reject', authenticateToken, rejectProductByQc)
 // ============================================
 // ADMIN ROUTES (Requires Admin Auth)
 // ============================================
-router.post('/', authenticateToken, requireAdminRole, requirePermission(['create_qc_checkers', 'create_users']), createQCChecker);
-router.get('/', authenticateToken, requireAdminRole, requirePermission(['view_qc_checkers', 'view_users']), getAllQCCheckers);
-router.get('/:id', authenticateToken, requireAdminRole, requirePermission(['view_qc_checkers', 'view_users']), getQCCheckerById);
-router.put('/:id', authenticateToken, requireAdminRole, requirePermission(['edit_qc_checkers', 'edit_users']), updateQCChecker);
-router.delete('/:id', authenticateToken, requireAdminRole, requirePermission(['delete_qc_checkers', 'delete_users']), deleteQCChecker);
-router.post('/:id/resend-credentials', authenticateToken, requireAdminRole, requirePermission(['edit_qc_checkers', 'edit_users']), resendCredentials);
+router.post('/', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:create'), createQCChecker);
+router.get('/', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:view'), getAllQCCheckers);
+router.get('/:id', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:view'), getQCCheckerById);
+router.put('/:id', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:edit'), updateQCChecker);
+router.delete('/:id', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:delete'), deleteQCChecker);
+router.post('/:id/resend-credentials', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:edit'), resendCredentials);
 
 module.exports = router;

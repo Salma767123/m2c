@@ -238,7 +238,7 @@ export default function BillingManagement() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      {hasPermission('view_billing') && (
+                      {hasPermission('settlement:view') && (
                         <button
                           onClick={() => handleViewBilling(billing.id)}
                           className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"

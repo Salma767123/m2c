@@ -3,7 +3,7 @@ import PermissionGuard from "@/components/AdminDashboard/PermissionGuard";
 
 export default function EditQCCheckerPage() {
   return (
-    <PermissionGuard permission={["edit_qc_checkers"]}>
+    <PermissionGuard permission="qc_checker_management:edit">
       <EditQCChecker />
     </PermissionGuard>
   );

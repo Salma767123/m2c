@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/UI/Button';
 import {
@@ -211,6 +211,15 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
       complianceStandards: data.complianceStandards || '',
     });
   }
+
+  // Push the latest local state up whenever this step unmounts (Back
+  // button, sidebar jump, edit-from-review) — not only on Save & Continue —
+  // so the Review step always reflects the latest edits.
+  const persistRef = useRef(formData);
+  persistRef.current = formData;
+  const onUpdateDataRef = useRef(onUpdateData);
+  onUpdateDataRef.current = onUpdateData;
+  useEffect(() => () => onUpdateDataRef.current(persistRef.current), []);
 
   // ── Accordion Section State ────────────────────────────────────────
   type SectionKey = 'certifications' | 'quality';

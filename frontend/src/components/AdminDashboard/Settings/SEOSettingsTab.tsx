@@ -6,7 +6,7 @@ import { seoSettingsService, SEOSettings } from '@/services/seoSettingsService';
 import { hasPermission } from '@/lib/auth';
 
 export default function SEOSettingsTab() {
-    const canManage = hasPermission('manage_settings');
+    const canManage = hasPermission('settings:edit');
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
     const [allSettings, setAllSettings] = useState<SEOSettings[]>([]);

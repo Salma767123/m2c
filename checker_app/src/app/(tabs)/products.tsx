@@ -24,7 +24,8 @@ import {
 } from 'lucide-react-native';
 import qcCheckerService from '../../services/qcCheckerService';
 import { useDebounce } from '../../hooks/useDebounce';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import DateRangeCalendar, { fmtDate } from '../../components/General/DateRangeCalendar';
 
 const PAGE_SIZE = 12;
 const DEFAULT_SORT = 'createdAt:desc';
@@ -74,16 +75,38 @@ interface Product {
   totalStock: number;
   status: string;
   approvalStatus: string;
+  createdAt?: string;
   images?: Array<{ url: string; isPrimary: boolean }>;
   vendor: { companyName: string; ownerName: string };
 }
 
 export default function ProductsTab() {
-  const [searchInput, setSearchInput] = useState('');
-  const [status, setStatus] = useState('');
-  const [sort, setSort] = useState(DEFAULT_SORT);
+  // Incoming filter params from dashboard KPI navigation.
+  const incoming = useLocalSearchParams<{
+    status?: string;
+    sort?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }>();
+
+  const [searchInput, setSearchInput] = useState(incoming.search ?? '');
+  const [status, setStatus] = useState(incoming.status ?? '');
+  const [sort, setSort] = useState(incoming.sort ?? DEFAULT_SORT);
+  const [dateFrom, setDateFrom] = useState(incoming.dateFrom ?? '');
+  const [dateTo, setDateTo] = useState(incoming.dateTo ?? '');
   const [page, setPage] = useState(1);
   const debouncedSearch = useDebounce(searchInput, 300);
+
+  // Apply incoming params when they change (deep-link from dashboard).
+  useEffect(() => {
+    if (incoming.status !== undefined) setStatus(incoming.status ?? '');
+    if (incoming.sort !== undefined) setSort(incoming.sort ?? DEFAULT_SORT);
+    if (incoming.search !== undefined) setSearchInput(incoming.search ?? '');
+    if (incoming.dateFrom !== undefined) setDateFrom(incoming.dateFrom ?? '');
+    if (incoming.dateTo !== undefined) setDateTo(incoming.dateTo ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incoming.status, incoming.sort, incoming.search, incoming.dateFrom, incoming.dateTo]);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 1 });
@@ -97,7 +120,7 @@ export default function ProductsTab() {
   useEffect(() => {
     if (!didMountRef.current) { didMountRef.current = true; return; }
     setPage(1);
-  }, [debouncedSearch, status, sort]);
+  }, [debouncedSearch, status, sort, dateFrom, dateTo]);
 
   const [sortBy, sortOrder] = useMemo(() => {
     const [by, ord] = sort.split(':');
@@ -149,10 +172,35 @@ export default function ProductsTab() {
     loadProducts();
   }, [loadProducts]);
 
-  const hasActiveFilters = Boolean(debouncedSearch || status || sort !== DEFAULT_SORT || page !== 1);
-  const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1;
-  const rangeEnd = Math.min(pagination.page * pagination.limit, pagination.total);
-  const clearFilters = () => { setSearchInput(''); setStatus(''); setSort(DEFAULT_SORT); setPage(1); };
+  // Client-side date-range filter on createdAt (mirrors web Products).
+  const filteredProducts = useMemo(() => {
+    if (!dateFrom) return products;
+    return products.filter((p) => {
+      if (!p.createdAt) return false;
+      const d = new Date(p.createdAt);
+      if (Number.isNaN(d.getTime())) return false;
+      const raw = fmtDate(d);
+      if (dateTo) return raw >= dateFrom && raw <= dateTo;
+      return raw === dateFrom;
+    });
+  }, [products, dateFrom, dateTo]);
+
+  const hasActiveFilters = Boolean(
+    debouncedSearch || status || dateFrom || dateTo || sort !== DEFAULT_SORT || page !== 1,
+  );
+  // When a client-side date filter is active, counts reflect the filtered set.
+  const displayTotal = dateFrom ? filteredProducts.length : pagination.total;
+  const rangeStart = displayTotal === 0
+    ? 0
+    : dateFrom
+      ? 1
+      : (pagination.page - 1) * pagination.limit + 1;
+  const rangeEnd = dateFrom
+    ? filteredProducts.length
+    : Math.min(pagination.page * pagination.limit, pagination.total);
+  const clearFilters = () => {
+    setSearchInput(''); setStatus(''); setSort(DEFAULT_SORT); setDateFrom(''); setDateTo(''); setPage(1);
+  };
 
   const statusLabel = STATUS_OPTIONS.find((o) => o.value === status)?.label || 'All statuses';
   const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label || 'Newest first';
@@ -201,7 +249,7 @@ export default function ProductsTab() {
       </View>
 
       {/* Filter + Sort */}
-      <View className="flex-row mb-4" style={{ columnGap: 8 }}>
+      <View className="flex-row mb-3" style={{ columnGap: 8 }}>
         <TouchableOpacity
           onPress={() => setShowStatusModal(true)}
           className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
@@ -218,14 +266,24 @@ export default function ProductsTab() {
         </TouchableOpacity>
       </View>
 
+      {/* Date range */}
+      <View className="mb-4">
+        <DateRangeCalendar
+          from={dateFrom}
+          to={dateTo}
+          onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
+          placeholder="Filter by date"
+        />
+      </View>
+
       {/* Summary + Clear */}
       <View className="flex-row items-center justify-between mb-4">
         <Text className="text-xs text-slate-600">
           {loading && products.length === 0
             ? ''
-            : pagination.total === 0
+            : displayTotal === 0
               ? '0 products'
-              : `Showing ${rangeStart}–${rangeEnd} of ${pagination.total}`}
+              : `Showing ${rangeStart}–${rangeEnd} of ${displayTotal}`}
         </Text>
         {hasActiveFilters ? (
           <TouchableOpacity onPress={clearFilters}>
@@ -275,9 +333,9 @@ export default function ProductsTab() {
       ) : null}
 
       {/* Product cards */}
-      {!error && products.length > 0 ? (
+      {!error && filteredProducts.length > 0 ? (
         <View style={{ rowGap: 12 }}>
-          {products.map((p) => {
+          {filteredProducts.map((p) => {
             const badge = APPROVAL_STYLE[p.approvalStatus] || { bg: 'bg-slate-100', text: 'text-slate-800' };
             const canInspect = p.approvalStatus === 'PENDING' || p.approvalStatus === 'REINSPECTION';
             const primaryImage = p.images?.find((img) => img.isPrimary) || p.images?.[0];
@@ -343,7 +401,7 @@ export default function ProductsTab() {
       ) : null}
 
       {/* Empty */}
-      {!loading && !error && products.length === 0 ? (
+      {!loading && !error && filteredProducts.length === 0 ? (
         <View className="py-12 items-center">
           <View className="w-20 h-20 rounded-2xl bg-slate-100 items-center justify-center mb-4">
             <AlertCircle size={36} color="#94a3b8" strokeWidth={1.75} />
@@ -364,8 +422,8 @@ export default function ProductsTab() {
         </View>
       ) : null}
 
-      {/* Pagination */}
-      {pagination.totalPages > 1 ? (
+      {/* Pagination — server-side; hidden while a client-side date filter narrows the set */}
+      {!dateFrom && pagination.totalPages > 1 ? (
         <Pagination page={pagination.page} totalPages={pagination.totalPages} onChange={setPage} disabled={loading} />
       ) : null}
 

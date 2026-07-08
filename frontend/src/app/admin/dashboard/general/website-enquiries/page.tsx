@@ -5,7 +5,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard';
 
 const WebsiteEnquiriesPage = () => {
   return (
-    <PermissionGuard permission={["view_enquiries", "manage_enquiries"]}>
+    <PermissionGuard permission="website_enquiries:view">
       <WebsiteEnquiryManagement />
     </PermissionGuard>
   );

@@ -241,7 +241,7 @@ const CouponManagement = () => {
           <p className="text-gray-600">Create and manage discount coupons</p>
         </div>
         <div className="flex items-center gap-3">
-          {hasPermission(['edit_coupons', 'create_coupons']) && (
+          {hasPermission(['coupons:edit', 'coupons:create']) && (
             <button
               onClick={() => setShowFreeShippingModal(true)}
               className="px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 transition-colors flex items-center gap-2"
@@ -250,7 +250,7 @@ const CouponManagement = () => {
               Free Shipping Offers
             </button>
           )}
-          {hasPermission('create_coupons') && (
+          {hasPermission('coupons:create') && (
             <button
               onClick={handleCreate}
               className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-2"
@@ -438,7 +438,7 @@ const CouponManagement = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {hasPermission('view_coupons') && (
+                        {hasPermission('coupons:view') && (
                           <button
                             onClick={() => handleView(coupon)}
                             className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
@@ -447,7 +447,7 @@ const CouponManagement = () => {
                             <Eye className="w-4 h-4" />
                           </button>
                         )}
-                        {hasPermission('edit_coupons') && (
+                        {hasPermission('coupons:edit') && (
                           <button
                             onClick={() => handleEdit(coupon)}
                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
@@ -456,7 +456,7 @@ const CouponManagement = () => {
                             <Edit className="w-4 h-4" />
                           </button>
                         )}
-                        {hasPermission('delete_coupons') && (
+                        {hasPermission('coupons:delete') && (
                           <button
                             onClick={() => handleDeleteClick(coupon)}
                             className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"

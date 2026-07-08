@@ -226,7 +226,7 @@ export default function Inventory() {
           <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
           <p className="text-gray-600">Track and manage your product inventory</p>
         </div>
-        {hasPermission('create_inventory') && (
+        {hasPermission('inventory:create') && (
           <Link href="/admin/dashboard/inventory/add">
             <Button className="bg-[#313131] text-white hover:bg-[#222222]">
               <Plus className="h-4 w-4 mr-2" />
@@ -406,7 +406,7 @@ export default function Inventory() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
-                            {hasPermission('edit_inventory') && (
+                            {hasPermission('inventory:edit') && (
                               item.hasProductCreated && item.productApprovalStatus === 'APPROVED' ? (
                                 <Button
                                   variant="outline"
@@ -427,7 +427,7 @@ export default function Inventory() {
                                 </Button>
                               )
                             )}
-                            {hasPermission('view_inventory') && (
+                            {hasPermission('inventory:view') && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -436,14 +436,14 @@ export default function Inventory() {
                                 <History className="h-4 w-4" />
                               </Button>
                             )}
-                            {hasPermission('edit_inventory') && (
+                            {hasPermission('inventory:edit') && (
                               <Link href={`/admin/dashboard/inventory/edit/${item.id}`}>
                                 <Button variant="outline" size="sm">
                                   <Edit className="h-4 w-4" />
                                 </Button>
                               </Link>
                             )}
-                            {hasPermission('delete_inventory') && (
+                            {hasPermission('inventory:delete') && (
                               <Button
                                 variant="outline"
                                 size="sm"

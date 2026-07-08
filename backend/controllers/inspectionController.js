@@ -208,6 +208,28 @@ const startInspection = async (req, res) => {
             return res.status(400).json({ error: `Cannot start an inspection that is currently ${inspection.status}` });
         }
 
+        // Dev/non-production: skip the geofence and start the inspection without GPS.
+        const { isGeofenceDisabled } = require('../utils/locationUtils');
+        if (isGeofenceDisabled()) {
+            console.log(`[Geofence] startInspection ${id} — DISABLED (${process.env.NODE_ENV || 'no NODE_ENV'}) — skipping location check.`);
+            const hasCoords = checkerLatitude != null && checkerLongitude != null;
+            const updatedInspection = await prisma.inspection.update({
+                where: { id },
+                data: {
+                    ...(hasCoords ? { checkerLatitude: parseFloat(checkerLatitude), checkerLongitude: parseFloat(checkerLongitude) } : {}),
+                    locationVerified: false,
+                    ...(inspection.status === 'SCHEDULED' ? { status: 'IN_PROGRESS', startedAt: new Date() } : {}),
+                },
+                include: { vendor: true },
+            });
+            return res.json({
+                success: true,
+                message: 'Inspection started (geofence disabled)',
+                inspection: updatedInspection,
+                locationVerification: { verified: false, reason: 'Geofence disabled' },
+            });
+        }
+
         // ── Location verification ──────────────────────────────────────
         if (checkerLatitude == null || checkerLongitude == null) {
             return res.status(400).json({
@@ -490,12 +512,16 @@ const completeInspection = async (req, res) => {
             locationDetails: formData.factoryAddress || formData.locationDetails || null,
         } : {};
 
-        const updatedInspection = await prisma.inspection.update({
-            where: { id },
-            data: {
-                status: 'SUBMITTED',
-                startedAt: inspection.startedAt || new Date(),
-                submittedAt: new Date(),
+        // Location snapshot — only persisted when the geofence actually ran and
+        // GPS was supplied. When the geofence is skipped (dev, or vendor without
+        // a configured location), coords may be null; don't write NaN/locationVerified.
+        const hasCoords = checkerLatitude != null && checkerLongitude != null;
+        const locationFields = geo.skipped
+            ? {
+                ...(hasCoords ? { checkerLatitude: parseFloat(checkerLatitude), checkerLongitude: parseFloat(checkerLongitude) } : {}),
+                locationVerified: false,
+            }
+            : {
                 // Refresh location snapshot to the SUBMIT-time GPS (overwriting
                 // the start-time values) so the audit trail reflects where the
                 // checker was when finalising the inspection.
@@ -505,6 +531,15 @@ const completeInspection = async (req, res) => {
                 vendorLongitude: geo.vendorLng,
                 locationVerified: true,
                 locationDistanceM: Math.round(geo.distanceM),
+            };
+
+        const updatedInspection = await prisma.inspection.update({
+            where: { id },
+            data: {
+                status: 'SUBMITTED',
+                startedAt: inspection.startedAt || new Date(),
+                submittedAt: new Date(),
+                ...locationFields,
                 result: resultStatus,
                 notes: formData.inspectorRemarks || '',
                 itemsToInspect: persistedFormData,

@@ -1,38 +1,62 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Badge } from '@/components/UI/Badge'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Store, Users, Shield, Minus, Check } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 
-import { roleService, Role, Permission } from '@/services/roleService'
+import {
+  roleService,
+  Role,
+  PermissionModule,
+  PermissionSubmodule,
+  PermissionAction,
+  PERMISSION_ACTIONS,
+} from '@/services/roleService'
 
 interface AddEditRoleProps {
   role?: Role | null
   isEdit?: boolean
 }
 
+const MODULE_ICONS: Record<string, any> = {
+  vendors: Store,
+  customers: Users,
+  admin: Shield,
+}
+
+const ACTION_LABELS: Record<PermissionAction, string> = {
+  view: 'View',
+  create: 'Create',
+  edit: 'Edit',
+  delete: 'Delete',
+}
+
+const permName = (submoduleKey: string, action: PermissionAction) => `${submoduleKey}:${action}`
 
 export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) {
   const router = useRouter()
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    selectedPermissions: [] as string[]
+    selectedPermissions: [] as string[],
   })
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
   const [isLoading, setIsLoading] = useState(false)
-  const [availablePermissions, setAvailablePermissions] = useState<Permission[]>([])
+  const [modules, setModules] = useState<PermissionModule[]>([])
+  const [activeModuleKey, setActiveModuleKey] = useState<string>('')
 
   useEffect(() => {
     const fetchPermissions = async () => {
       try {
         const res = await roleService.getPermissions()
-        if (res.success) {
-          setAvailablePermissions(res.data)
+        if (res.success && res.modules) {
+          setModules(res.modules)
+          // Step 1 default: first module pre-selected so the matrix is visible
+          if (res.modules.length > 0) setActiveModuleKey(res.modules[0].key)
         }
       } catch (error) {
         showErrorToast('Failed to load permissions')
@@ -46,53 +70,86 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
       setFormData({
         name: role.name,
         description: role.description,
-        selectedPermissions: role.permissions.map(p => p.name)
+        selectedPermissions: role.permissions.map(p => p.name),
       })
     }
   }, [role, isEdit])
 
-  const groupedPermissions = availablePermissions.reduce((acc, permission) => {
-    if (!acc[permission.module]) {
-      acc[permission.module] = []
-    }
-    acc[permission.module].push(permission)
-    return acc
-  }, {} as Record<string, Permission[]>)
+  const selected = useMemo(() => new Set(formData.selectedPermissions), [formData.selectedPermissions])
+
+  const allPermissionNames = useMemo(
+    () =>
+      modules.flatMap(m =>
+        m.submodules.flatMap(s => PERMISSION_ACTIONS.filter(a => s.actions[a]).map(a => permName(s.key, a)))
+      ),
+    [modules]
+  )
+
+  const activeModule = modules.find(m => m.key === activeModuleKey)
+
+  const setSelection = (updater: (next: Set<string>) => void) => {
+    setFormData(prev => {
+      const next = new Set(prev.selectedPermissions)
+      updater(next)
+      return { ...prev, selectedPermissions: [...next] }
+    })
+    if (errors.permissions) setErrors(prev => ({ ...prev, permissions: '' }))
+  }
+
+  // Toggling create/edit/delete implies view; removing view clears the row.
+  const toggleAction = (sub: PermissionSubmodule, action: PermissionAction) => {
+    const name = permName(sub.key, action)
+    setSelection(next => {
+      if (next.has(name)) {
+        next.delete(name)
+        if (action === 'view') {
+          PERMISSION_ACTIONS.forEach(a => next.delete(permName(sub.key, a)))
+        }
+      } else {
+        next.add(name)
+        if (action !== 'view' && sub.actions.view) {
+          next.add(permName(sub.key, 'view'))
+        }
+      }
+    })
+  }
+
+  const submodulePerms = (sub: PermissionSubmodule) =>
+    PERMISSION_ACTIONS.filter(a => sub.actions[a]).map(a => permName(sub.key, a))
+
+  const toggleSubmoduleAll = (sub: PermissionSubmodule) => {
+    const perms = submodulePerms(sub)
+    const allOn = perms.every(p => selected.has(p))
+    setSelection(next => {
+      perms.forEach(p => (allOn ? next.delete(p) : next.add(p)))
+    })
+  }
+
+  const moduleSelectedCount = (mod: PermissionModule) =>
+    mod.submodules.reduce((sum, s) => sum + submodulePerms(s).filter(p => selected.has(p)).length, 0)
+
+  const moduleTotalCount = (mod: PermissionModule) =>
+    mod.submodules.reduce((sum, s) => sum + submodulePerms(s).length, 0)
+
+  // Column select-all within the active module (e.g. every "view" it supports)
+  const toggleColumn = (mod: PermissionModule, action: PermissionAction) => {
+    const perms = mod.submodules.filter(s => s.actions[action]).map(s => permName(s.key, action))
+    const allOn = perms.every(p => selected.has(p))
+    setSelection(next => {
+      perms.forEach(p => (allOn ? next.delete(p) : next.add(p)))
+      if (!allOn && action !== 'view') {
+        // keep the view-implied invariant
+        mod.submodules
+          .filter(s => s.actions[action] && s.actions.view)
+          .forEach(s => next.add(permName(s.key, 'view')))
+      }
+    })
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }))
-    }
-  }
-
-  const handlePermissionToggle = (permissionName: string) => {
-    setFormData(prev => ({
-      ...prev,
-      selectedPermissions: prev.selectedPermissions.includes(permissionName)
-        ? prev.selectedPermissions.filter(name => name !== permissionName)
-        : [...prev.selectedPermissions, permissionName]
-    }))
-  }
-
-  const handleModuleToggle = (modulePermissions: Permission[]) => {
-    const modulePermissionNames = modulePermissions.map(p => p.name)
-    const allSelected = modulePermissionNames.every(name => formData.selectedPermissions.includes(name))
-
-    setFormData(prev => ({
-      ...prev,
-      selectedPermissions: allSelected
-        ? prev.selectedPermissions.filter(name => !modulePermissionNames.includes(name))
-        : [...new Set([...prev.selectedPermissions, ...modulePermissionNames])]
-    }))
+    setFormData(prev => ({ ...prev, [name]: value }))
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }))
   }
 
   const validateForm = () => {
@@ -259,7 +316,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg font-semibold text-black">Permissions</CardTitle>
                 <Badge className="bg-gray-200 text-gray-800">
-                  {formData.selectedPermissions.length} of {availablePermissions.length} selected
+                  {formData.selectedPermissions.length} of {allPermissionNames.length} selected
                 </Badge>
               </div>
               {errors.permissions && (
@@ -275,10 +332,12 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setFormData(prev => ({
-                    ...prev,
-                    selectedPermissions: availablePermissions.filter(p => p.name.startsWith('view_')).map(p => p.name)
-                  }))}
+                  onClick={() =>
+                    setFormData(prev => ({
+                      ...prev,
+                      selectedPermissions: allPermissionNames.filter(p => p.endsWith(':view')),
+                    }))
+                  }
                   disabled={isLoading}
                   className="border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
@@ -288,12 +347,12 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setFormData(prev => ({
-                    ...prev,
-                    selectedPermissions: availablePermissions.filter(p =>
-                      p.name.startsWith('view_') || p.name.startsWith('create_') || p.name.startsWith('edit_')
-                    ).map(p => p.name)
-                  }))}
+                  onClick={() =>
+                    setFormData(prev => ({
+                      ...prev,
+                      selectedPermissions: allPermissionNames.filter(p => !p.endsWith(':delete')),
+                    }))
+                  }
                   disabled={isLoading}
                   className="border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
@@ -303,10 +362,9 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setFormData(prev => ({
-                    ...prev,
-                    selectedPermissions: availablePermissions.map(p => p.name)
-                  }))}
+                  onClick={() =>
+                    setFormData(prev => ({ ...prev, selectedPermissions: [...allPermissionNames] }))
+                  }
                   disabled={isLoading}
                   className="border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
@@ -316,10 +374,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setFormData(prev => ({
-                    ...prev,
-                    selectedPermissions: []
-                  }))}
+                  onClick={() => setFormData(prev => ({ ...prev, selectedPermissions: [] }))}
                   disabled={isLoading}
                   className="border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
@@ -328,78 +383,162 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
               </div>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="space-y-6">
-                {Object.entries(groupedPermissions).map(([module, modulePermissions]) => {
-                  const allSelected = modulePermissions.every(p => formData.selectedPermissions.includes(p.name))
-                  const someSelected = modulePermissions.some(p => formData.selectedPermissions.includes(p.name))
-
-                  return (
-                    <div key={module} className="border border-gray-200 rounded-lg bg-white">
-                      <div className="bg-gray-50 p-4 border-b border-gray-200">
-                        <div className="flex items-center justify-between">
-                          <label className="flex items-center space-x-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={allSelected}
-                              onChange={() => handleModuleToggle(modulePermissions)}
-                              className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black"
-                              disabled={isLoading}
-                            />
-                            <div>
-                              <span className="font-semibold text-lg text-black">{module}</span>
-                              <p className="text-sm text-gray-600">
-                                {modulePermissions.length} permissions available
-                              </p>
+              {modules.length === 0 ? (
+                <div className="text-center py-10 text-gray-500 text-sm">Loading permission modules…</div>
+              ) : (
+                <div className="space-y-5">
+                  {/* Step 1 — pick a module */}
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                      Step 1 — Select a module
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {modules.map(mod => {
+                        const Icon = MODULE_ICONS[mod.key] || Shield
+                        const count = moduleSelectedCount(mod)
+                        const total = moduleTotalCount(mod)
+                        const isActive = mod.key === activeModuleKey
+                        return (
+                          <button
+                            key={mod.key}
+                            type="button"
+                            onClick={() => setActiveModuleKey(mod.key)}
+                            disabled={isLoading}
+                            className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all text-left ${isActive
+                              ? 'border-black bg-gray-50 shadow-sm'
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                              }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isActive ? 'bg-black text-white' : 'bg-gray-100 text-gray-500'
+                                }`}>
+                                <Icon className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <span className="font-semibold text-black block">{mod.name}</span>
+                                <span className="text-xs text-gray-500">
+                                  {mod.submodules.length} submodules
+                                </span>
+                              </div>
                             </div>
-                          </label>
-                          <Badge className={`${allSelected
-                            ? 'bg-black text-white'
-                            : someSelected
-                              ? 'bg-gray-600 text-white'
-                              : 'bg-gray-200 text-gray-600'
-                            }`}>
-                            {modulePermissions.filter(p => formData.selectedPermissions.includes(p.name)).length} / {modulePermissions.length}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <div className="p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                          {modulePermissions.map((permission) => {
-                            const isSelected = formData.selectedPermissions.includes(permission.name)
-
-                            return (
-                              <label
-                                key={permission.id}
-                                className={`flex items-start space-x-3 cursor-pointer p-3 rounded-lg border transition-all ${isSelected
-                                  ? 'bg-gray-50 border-gray-300'
-                                  : 'border-gray-200 hover:bg-gray-50'
-                                  }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => handlePermissionToggle(permission.name)}
-                                  className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black mt-0.5"
-                                  disabled={isLoading}
-                                />
-                                <div className="flex-1">
-                                  <div className="font-medium text-sm text-black">
-                                    {permission.name}
-                                  </div>
-                                  <div className="text-xs text-gray-600 mt-1">
-                                    {permission.description}
-                                  </div>
-                                </div>
-                              </label>
-                            )
-                          })}
-                        </div>
-                      </div>
+                            <Badge className={count > 0 ? 'bg-black text-white' : 'bg-gray-200 text-gray-600'}>
+                              {count}/{total}
+                            </Badge>
+                          </button>
+                        )
+                      })}
                     </div>
-                  )
-                })}
-              </div>
+                  </div>
+
+                  {/* Step 2 — submodule matrix */}
+                  {activeModule && (
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                        Step 2 — Set access for each submodule
+                      </p>
+                      <div className="border border-gray-200 rounded-lg overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-200">
+                              <th className="text-left font-semibold text-gray-700 px-4 py-3 min-w-[220px]">
+                                Submodule
+                              </th>
+                              {PERMISSION_ACTIONS.map(action => {
+                                const colPerms = activeModule.submodules
+                                  .filter(s => s.actions[action])
+                                  .map(s => permName(s.key, action))
+                                const colAllOn = colPerms.length > 0 && colPerms.every(p => selected.has(p))
+                                return (
+                                  <th key={action} className="px-3 py-3 text-center w-24">
+                                    <div className="flex flex-col items-center gap-1">
+                                      <span className="font-semibold text-gray-700">{ACTION_LABELS[action]}</span>
+                                      {colPerms.length > 0 ? (
+                                        <input
+                                          type="checkbox"
+                                          checked={colAllOn}
+                                          onChange={() => toggleColumn(activeModule, action)}
+                                          disabled={isLoading}
+                                          title={`Toggle ${ACTION_LABELS[action]} for all submodules`}
+                                          className="w-3.5 h-3.5 text-black border-gray-300 rounded focus:ring-black"
+                                        />
+                                      ) : (
+                                        <span className="text-gray-300 text-xs">—</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                )
+                              })}
+                              <th className="px-3 py-3 text-center w-20">
+                                <span className="font-semibold text-gray-700">All</span>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {activeModule.submodules.map((sub, idx) => {
+                              const perms = submodulePerms(sub)
+                              const rowAllOn = perms.every(p => selected.has(p))
+                              const rowSomeOn = perms.some(p => selected.has(p))
+                              return (
+                                <tr
+                                  key={sub.key}
+                                  className={`border-b border-gray-100 last:border-b-0 ${idx % 2 === 1 ? 'bg-gray-50/50' : 'bg-white'
+                                    } ${rowSomeOn ? '' : ''}`}
+                                >
+                                  <td className="px-4 py-3">
+                                    <div className="font-medium text-black">{sub.name}</div>
+                                    <div className="text-xs text-gray-500 mt-0.5">{sub.description}</div>
+                                  </td>
+                                  {PERMISSION_ACTIONS.map(action => (
+                                    <td key={action} className="px-3 py-3 text-center">
+                                      {sub.actions[action] ? (
+                                        <input
+                                          type="checkbox"
+                                          checked={selected.has(permName(sub.key, action))}
+                                          onChange={() => toggleAction(sub, action)}
+                                          disabled={isLoading}
+                                          className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black cursor-pointer"
+                                        />
+                                      ) : (
+                                        // This submodule has no such action — shown as a hyphen by design
+                                        <span
+                                          className="inline-flex items-center justify-center text-gray-300 select-none"
+                                          title={`${ACTION_LABELS[action]} is not applicable for ${sub.name}`}
+                                        >
+                                          <Minus className="w-4 h-4" />
+                                        </span>
+                                      )}
+                                    </td>
+                                  ))}
+                                  <td className="px-3 py-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleSubmoduleAll(sub)}
+                                      disabled={isLoading}
+                                      title={rowAllOn ? 'Clear all access for this submodule' : 'Grant all available access for this submodule'}
+                                      className={`inline-flex items-center justify-center h-6 w-6 rounded border transition-colors ${rowAllOn
+                                        ? 'bg-black border-black text-white'
+                                        : rowSomeOn
+                                          ? 'bg-gray-200 border-gray-300 text-gray-600'
+                                          : 'bg-white border-gray-300 text-gray-400 hover:border-gray-400'
+                                        }`}
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2 flex items-center gap-1.5">
+                        <Minus className="w-3.5 h-3.5 text-gray-400" />
+                        means the action does not exist for that submodule. Granting Create, Edit or Delete automatically grants View.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 

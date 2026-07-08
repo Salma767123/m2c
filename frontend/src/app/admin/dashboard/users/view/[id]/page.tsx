@@ -3,7 +3,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function ViewUserPage() {
   return (
-    <PermissionGuard permission="view_users">
+    <PermissionGuard permission="staff_management:view">
       <StaffView />
     </PermissionGuard>
   )

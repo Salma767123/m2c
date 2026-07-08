@@ -3,7 +3,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function QCReportsPage() {
   return (
-    <PermissionGuard permission="view_reports">
+    <PermissionGuard permission="qc_reports:view">
       <QCReports />
     </PermissionGuard>
   );

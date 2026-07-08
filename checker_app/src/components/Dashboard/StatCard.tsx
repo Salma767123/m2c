@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 // Removed LucideIcon import
 
 interface StatCardProps {
@@ -8,9 +8,10 @@ interface StatCardProps {
   icon: any;
   trend: string;
   color: 'blue' | 'amber' | 'emerald' | 'red';
+  onPress?: () => void;
 }
 
-export default function StatCard({ label, value, icon: Icon, trend, color }: StatCardProps) {
+export default function StatCard({ label, value, icon: Icon, trend, color, onPress }: StatCardProps) {
   const colorClasses = {
     blue: {
       bg: 'bg-blue-50',
@@ -48,8 +49,8 @@ export default function StatCard({ label, value, icon: Icon, trend, color }: Sta
 
   const colors = colorClasses[color];
 
-  return (
-    <View className={`w-[48%] mb-4 ${colors.bg} ${colors.border} border rounded-2xl p-4 shadow-sm`}>
+  const inner = (
+    <>
       <View className="flex-row items-start justify-between mb-3">
         <View className="flex-1 mr-2">
           <Text className="text-gray-600 text-xs font-medium mb-1">{label}</Text>
@@ -60,6 +61,26 @@ export default function StatCard({ label, value, icon: Icon, trend, color }: Sta
         </View>
       </View>
       <Text className={`${colors.trendText} text-[10px] font-medium`} numberOfLines={1}>{trend}</Text>
+    </>
+  );
+
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`${label}: ${value}`}
+        style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+        className={`w-[48%] mb-4 ${colors.bg} ${colors.border} border rounded-2xl p-4 shadow-sm`}
+      >
+        {inner}
+      </Pressable>
+    );
+  }
+
+  return (
+    <View className={`w-[48%] mb-4 ${colors.bg} ${colors.border} border rounded-2xl p-4 shadow-sm`}>
+      {inner}
     </View>
   );
 }

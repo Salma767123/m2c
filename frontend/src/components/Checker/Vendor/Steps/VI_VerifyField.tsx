@@ -77,11 +77,26 @@ export function renderValue(value: any, type?: string): React.ReactNode {
     if (items.length === 0) return <span className="text-slate-400 italic text-sm">None</span>
     return (
       <div className="flex flex-wrap gap-1.5 mt-0.5">
-        {items.map((item, i) => (
-          <span key={i} className="px-2.5 py-0.5 bg-slate-100 text-slate-700 rounded-full text-xs font-medium border border-slate-200">
-            {String(item)}
-          </span>
-        ))}
+        {items.map((item, i) => {
+          // Items may be a plain string, or a { flagIso, label } object for
+          // countries — the latter renders a real flag image (flag emoji don't
+          // render on Windows, which shows the bare ISO letters instead).
+          const iso = item && typeof item === 'object' ? item.flagIso : undefined
+          const label = item && typeof item === 'object' ? item.label : String(item)
+          return (
+            <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-slate-100 text-slate-700 rounded-full text-xs font-medium border border-slate-200">
+              {iso && (
+                <img
+                  src={`https://flagcdn.com/w20/${String(iso).toLowerCase()}.png`}
+                  alt=""
+                  className="w-4 h-auto rounded-[2px] shrink-0"
+                  loading="lazy"
+                />
+              )}
+              {label}
+            </span>
+          )
+        })}
       </div>
     )
   }

@@ -144,7 +144,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 </div>
                 <div className="flex gap-3 items-center">
                     {/* Print Invoice Button */}
-                    {hasPermission('view_billing') && (
+                    {hasPermission('invoices:view') && (
                         <button
                             onClick={handlePrintInvoice}
                             disabled={invoiceLoading}
@@ -448,7 +448,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                                 </p>
                                 <p className="text-xs text-teal-700 mt-1 italic">Vendor can now pack and ship this order.</p>
                             </div>
-                        ) : hasPermission('edit_orders') ? (
+                        ) : hasPermission('hub_to_customer:edit') ? (
                             <div className="space-y-4">
                                 <p className="text-sm text-gray-600 italic">Assign a hub to allow the vendor to process this order.</p>
                                 <select

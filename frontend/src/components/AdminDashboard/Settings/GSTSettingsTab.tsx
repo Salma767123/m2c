@@ -9,7 +9,7 @@ import { gstSettingsService, GSTSetting } from "@/services/gstSettingsService";
 import { hasPermission } from "@/lib/auth";
 
 export default function GSTSettingsTab() {
-    const canManage = hasPermission("manage_settings");
+    const canManage = hasPermission("settings:edit");
     const [settings, setSettings] = useState<GSTSetting[]>([]);
     const [loading, setLoading] = useState(false);
     const [creating, setCreating] = useState(false);

@@ -11,5 +11,11 @@
       "src": "/(.*)",
       "dest": "/api/index.js"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/jobs/overdue-settlements",
+      "schedule": "30 3 * * *"
+    }
   ]
 }

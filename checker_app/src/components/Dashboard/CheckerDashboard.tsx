@@ -14,7 +14,6 @@ import {
   CalendarDays,
   Factory,
   Package,
-  ArrowRight,
   Calendar,
   RefreshCw,
   Inbox,
@@ -23,107 +22,128 @@ import StatCard from './StatCard';
 import qcCheckerService from '../../services/qcCheckerService';
 import { router } from 'expo-router';
 
-const STATUS_LABELS: Record<string, string> = {
+// ── Product status labels + badge colours (mirrors web CheckerDashboard) ──────
+const PRODUCT_STATUS_LABELS: Record<string, string> = {
   APPROVED: 'Approved by Admin',
   QC_APPROVED: 'Approved by QC',
   REJECTED: 'Rejected',
-  REINSPECTION: 'Re-Inspection',
-  UNDER_ADMIN_REVIEW: 'Under Admin Review',
-  SUBMITTED: 'Submitted for Review',
+  REINSPECTION: 'Reinspection',
   PENDING: 'Pending',
   UNDER_REVIEW: 'Under Review by Admin',
   SUSPENDED: 'Suspended',
 };
 
-const formatStatus = (status: string) =>
-  STATUS_LABELS[status] || status.replace(/_/g, ' ');
+const formatProductStatus = (status: string) =>
+  PRODUCT_STATUS_LABELS[status] ||
+  status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+const PRODUCT_BADGE: Record<string, { bg: string; text: string; border: string }> = {
+  APPROVED: { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200' },
+  QC_APPROVED: { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200' },
+  REJECTED: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200' },
+  REINSPECTION: { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' },
+  PENDING: { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200' },
+  UNDER_REVIEW: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
+};
+const productBadge = (status: string) => PRODUCT_BADGE[status] || PRODUCT_BADGE.PENDING;
+
+// ── Vendor "main status" derivation + colours (mirrors web CheckerDashboard) ──
+const VENDOR_STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  'New Assignment': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+  'Under Review by Admin': { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
+  'Re-Inspection': { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+  'Re-Inspection Under Review by Admin': { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+  'Re-Inspection Under Review': { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+  Approved: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+  Rejected: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
+};
+const vendorBadge = (status: string) =>
+  VENDOR_STATUS_COLORS[status] || { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' };
+
+function getVendorMainStatus(
+  dbStatus: string,
+  latestInspection?: { status?: string | null; result?: string | null; cycleNumber?: number | null } | null,
+): string {
+  const status = dbStatus?.toUpperCase() || 'PENDING';
+  if (status === 'APPROVED') return 'Approved';
+  if (status === 'REJECTED') return 'Rejected';
+  if (status === 'REINSPECTION') return 'Re-Inspection';
+  if (status === 'UNDER_REVIEW') {
+    if (latestInspection) {
+      const inspStatus = latestInspection.status?.toUpperCase();
+      const cycle = latestInspection.cycleNumber ?? 1;
+      if (inspStatus === 'SCHEDULED' || inspStatus === 'IN_PROGRESS') {
+        return cycle > 1 ? 'Re-Inspection' : 'New Assignment';
+      }
+      if (inspStatus === 'SUBMITTED' || inspStatus === 'UNDER_ADMIN_REVIEW') {
+        return cycle > 1 ? 'Re-Inspection Under Review by Admin' : 'Under Review by Admin';
+      }
+    }
+    return 'Under Review by Admin';
+  }
+  if (status === 'PENDING') return 'New Assignment';
+  return status.replace(/_/g, ' ').toLowerCase();
+}
 
 const pl = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-type StatusKey =
-  | 'APPROVED'
-  | 'QC_APPROVED'
-  | 'REJECTED'
-  | 'REINSPECTION'
-  | 'PENDING'
-  | 'UNDER_REVIEW';
-
-const getStatusBadgeStyle = (status: string) => {
-  const map: Record<StatusKey, { bg: string; text: string; border: string }> = {
-    APPROVED: {
-      bg: 'bg-emerald-100',
-      text: 'text-emerald-800',
-      border: 'border-emerald-200',
-    },
-    QC_APPROVED: {
-      bg: 'bg-emerald-100',
-      text: 'text-emerald-800',
-      border: 'border-emerald-200',
-    },
-    REJECTED: {
-      bg: 'bg-red-100',
-      text: 'text-red-800',
-      border: 'border-red-200',
-    },
-    REINSPECTION: {
-      bg: 'bg-orange-100',
-      text: 'text-orange-800',
-      border: 'border-orange-200',
-    },
-    PENDING: {
-      bg: 'bg-amber-100',
-      text: 'text-amber-800',
-      border: 'border-amber-200',
-    },
-    UNDER_REVIEW: {
-      bg: 'bg-blue-100',
-      text: 'text-blue-800',
-      border: 'border-blue-200',
-    },
-  };
-  return map[(status as StatusKey)] || map.PENDING;
-};
-
-const formattedDate = () =>
-  new Date().toLocaleDateString('en-US', {
+const formattedDate = (d: Date) =>
+  d.toLocaleDateString('en-US', {
     weekday: 'long',
-    year: 'numeric',
-    month: 'long',
     day: 'numeric',
+    month: 'long',
+    year: 'numeric',
   });
+
+const formattedTime = (d: Date) =>
+  d.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+
+type DomainTab = 'vendor' | 'product';
 
 export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
   const [assignedProducts, setAssignedProducts] = useState<any[]>([]);
   const [assignedVendors, setAssignedVendors] = useState<any[]>([]);
+  const [completedInspections, setCompletedInspections] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<DomainTab>('vendor');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(new Date());
+
+  // Real-time clock — tick once a second (matches web).
+  useEffect(() => {
+    const tick = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(tick);
+  }, []);
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      // Skip fetch if not authenticated
       const token = await qcCheckerService.getCheckerToken();
       if (!token) return;
 
       setError(null);
-      const [productsRes, vendorsRes] = await Promise.all([
+      const [productsRes, vendorsRes, inspectionsRes] = await Promise.all([
         qcCheckerService.getAssignedProducts(),
         qcCheckerService.getAssignedVendors(),
+        qcCheckerService.getInspections({ limit: 50 }).catch(() => ({ success: false, inspections: [] })),
       ]);
       if (productsRes.success) {
         const raw: any = productsRes.data;
-        const list = Array.isArray(raw) ? raw : (raw?.products || raw?.items || []);
-        setAssignedProducts(list);
+        setAssignedProducts(Array.isArray(raw) ? raw : raw?.products || raw?.items || []);
       }
       if (vendorsRes.success) {
-        // Service now returns { data: { vendors, pagination } } for the list page,
-        // but some callers (dashboard) just want the array. Handle both shapes.
         const raw: any = vendorsRes.data;
-        const list = Array.isArray(raw) ? raw : (raw?.vendors || []);
-        setAssignedVendors(list);
+        setAssignedVendors(Array.isArray(raw) ? raw : raw?.vendors || []);
+      }
+      if ((inspectionsRes as any).success) {
+        setCompletedInspections((inspectionsRes as any).inspections ?? []);
       }
     } catch (err: any) {
-      // 401 = token expired/invalid — don't show error, axios interceptor handles redirect
       if (err?.status === 401) return;
       console.error('Dashboard fetch failed:', err);
       setError(err?.message || 'Could not fetch dashboard data');
@@ -142,58 +162,100 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
+  // ── Counts (mirror web) ──────────────────────────────────────────────────
   const pendingProducts = assignedProducts.filter(
-    (p) =>
-      p.approvalStatus === 'PENDING' ||
-      p.approvalStatus === 'REINSPECTION' ||
-      p.approvalStatus === 'UNDER_REVIEW',
+    (p) => p.approvalStatus === 'PENDING' || p.approvalStatus === 'REINSPECTION',
   ).length;
+  const passedProducts = assignedProducts.filter(
+    (p) => p.approvalStatus === 'QC_APPROVED' || p.approvalStatus === 'APPROVED',
+  ).length;
+  const failedProducts = assignedProducts.filter((p) => p.approvalStatus === 'REJECTED').length;
 
   const pendingVendors = assignedVendors.filter(
     (v) => v.status === 'UNDER_REVIEW' || v.status === 'PENDING' || v.status === 'REINSPECTION',
   ).length;
+  const passedVendors = completedInspections.filter((i) => i.result === 'PASSED').length;
+  const failedVendors = completedInspections.filter((i) => i.result === 'FAILED').length;
 
-  const passedProducts = assignedProducts.filter(
-    (p) =>
-      p.approvalStatus === 'QC_APPROVED' || p.approvalStatus === 'APPROVED',
-  ).length;
+  const isVendor = activeTab === 'vendor';
 
-  const failedProducts = assignedProducts.filter(
-    (p) => p.approvalStatus === 'REJECTED',
-  ).length;
+  // ── KPI navigation (mirror web query params) ─────────────────────────────
+  const goVendors = (params: Record<string, string>) =>
+    router.push({ pathname: '/(tabs)/vendors' as any, params });
+  const goProducts = (params: Record<string, string>) =>
+    router.push({ pathname: '/(tabs)/products' as any, params });
 
-  const totalAssignments = assignedProducts.length + assignedVendors.length;
+  const stats = isVendor
+    ? [
+        {
+          label: 'Total Assignments',
+          value: assignedVendors.length.toString(),
+          icon: TrendingUp,
+          trend: pl(assignedVendors.length, 'Vendor'),
+          color: 'blue' as const,
+          onPress: () => goVendors({}),
+        },
+        {
+          label: 'Pending Action',
+          value: pendingVendors.toString(),
+          icon: Clock,
+          trend: pl(pendingVendors, 'Vendor'),
+          color: 'amber' as const,
+          onPress: () => goVendors({ inspectionStatus: 'Pending' }),
+        },
+        {
+          label: 'Completed',
+          value: passedVendors.toString(),
+          icon: CheckCircle2,
+          trend: pl(passedVendors, 'Vendor'),
+          color: 'emerald' as const,
+          onPress: () => goVendors({ inspectionStatus: 'Completed' }),
+        },
+        {
+          label: 'Rejected',
+          value: failedVendors.toString(),
+          icon: AlertCircle,
+          trend: pl(failedVendors, 'Vendor'),
+          color: 'red' as const,
+          onPress: () => goVendors({ status: 'Rejected' }),
+        },
+      ]
+    : [
+        {
+          label: 'Total Assignments',
+          value: assignedProducts.length.toString(),
+          icon: TrendingUp,
+          trend: pl(assignedProducts.length, 'Product'),
+          color: 'blue' as const,
+          onPress: () => goProducts({}),
+        },
+        {
+          label: 'Pending Action',
+          value: pendingProducts.toString(),
+          icon: Clock,
+          trend: pl(pendingProducts, 'Product'),
+          color: 'amber' as const,
+          onPress: () => goProducts({ status: 'PENDING' }),
+        },
+        {
+          label: 'Completed',
+          value: passedProducts.toString(),
+          icon: CheckCircle2,
+          trend: pl(passedProducts, 'Product'),
+          color: 'emerald' as const,
+          onPress: () => goProducts({ status: 'QC_APPROVED' }),
+        },
+        {
+          label: 'Rejected',
+          value: failedProducts.toString(),
+          icon: AlertCircle,
+          trend: pl(failedProducts, 'Product'),
+          color: 'red' as const,
+          onPress: () => goProducts({ status: 'REJECTED' }),
+        },
+      ];
 
-  const stats = [
-    {
-      label: 'Total Assignments',
-      value: totalAssignments.toString(),
-      icon: TrendingUp,
-      trend: `${pl(assignedProducts.length, 'Product')} · ${pl(assignedVendors.length, 'Vendor')}`,
-      color: 'blue' as const,
-    },
-    {
-      label: 'Pending Action',
-      value: (pendingProducts + pendingVendors).toString(),
-      icon: Clock,
-      trend: `${pl(pendingProducts, 'Product')} · ${pl(pendingVendors, 'Vendor')}`,
-      color: 'amber' as const,
-    },
-    {
-      label: 'Passed',
-      value: passedProducts.toString(),
-      icon: CheckCircle2,
-      trend: `${pl(passedProducts, 'Product')} approved`,
-      color: 'emerald' as const,
-    },
-    {
-      label: 'Rejected',
-      value: failedProducts.toString(),
-      icon: AlertCircle,
-      trend: `${pl(failedProducts, 'Product')} rejected`,
-      color: 'red' as const,
-    },
-  ];
+  const recentCount = isVendor ? assignedVendors.length : assignedProducts.length;
 
   if (loading) {
     return <DashboardSkeleton checkerId={checkerId} />;
@@ -208,9 +270,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
         <Text className="text-xl font-bold text-slate-900 mb-2 text-center">
           Something went wrong
         </Text>
-        <Text className="text-base text-slate-600 text-center mb-6">
-          {error}
-        </Text>
+        <Text className="text-base text-slate-600 text-center mb-6">{error}</Text>
         <Pressable
           onPress={fetchDashboardData}
           accessibilityLabel="Retry loading dashboard"
@@ -249,19 +309,49 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
     >
       {/* Header */}
       <View className="mb-6">
-        <Text className="text-3xl font-extrabold text-slate-900 mb-1">
-          Dashboard
-        </Text>
+        <Text className="text-3xl font-extrabold text-slate-900 mb-1">Dashboard</Text>
         <Text className="text-slate-600 text-sm mb-3">
-          Welcome back,{' '}
-          <Text className="font-bold text-blue-600">{checkerId}</Text>
+          Welcome back, <Text className="font-bold text-blue-600">{checkerId}</Text>
         </Text>
-        <View className="flex-row items-center">
-          <Calendar size={14} color="#64748b" />
-          <Text className="text-xs font-medium text-slate-500 ml-1.5">
-            {formattedDate()}
-          </Text>
+        <View className="flex-row items-center flex-wrap" style={{ columnGap: 8, rowGap: 4 }}>
+          <View className="flex-row items-center">
+            <Calendar size={14} color="#64748b" />
+            <Text className="text-xs font-medium text-slate-500 ml-1.5">{formattedDate(now)}</Text>
+          </View>
+          <Text className="text-slate-300">|</Text>
+          <View className="flex-row items-center">
+            <Clock size={13} color="#64748b" />
+            <Text className="text-xs font-medium text-slate-500 ml-1.5" style={{ fontVariant: ['tabular-nums'] }}>
+              {formattedTime(now)}
+            </Text>
+          </View>
         </View>
+      </View>
+
+      {/* Domain toggle */}
+      <View className="flex-row mb-6" style={{ columnGap: 12 }}>
+        <Pressable
+          onPress={() => setActiveTab('vendor')}
+          className={`flex-1 flex-row items-center justify-center rounded-xl border py-3 ${
+            isVendor ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'
+          }`}
+        >
+          <Factory size={18} color={isVendor ? '#1d4ed8' : '#64748b'} />
+          <Text className={`ml-2 text-sm font-bold ${isVendor ? 'text-blue-700' : 'text-slate-500'}`}>
+            Vendor Inspection
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setActiveTab('product')}
+          className={`flex-1 flex-row items-center justify-center rounded-xl border py-3 ${
+            !isVendor ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'
+          }`}
+        >
+          <Package size={18} color={!isVendor ? '#1d4ed8' : '#64748b'} />
+          <Text className={`ml-2 text-sm font-bold ${!isVendor ? 'text-blue-700' : 'text-slate-500'}`}>
+            Product Inspection
+          </Text>
+        </Pressable>
       </View>
 
       {/* Stats Grid */}
@@ -272,229 +362,156 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
       </View>
 
       {/* Recent Assignments */}
-      <View 
-        className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-6"
-        
-      >
-        <View className="px-5 py-4 border-b border-slate-100" style={{ gap: 12 }}>
+      <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-6">
+        <View className="px-5 py-4 border-b border-slate-100">
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center" style={{ gap: 12 }}>
-              <View 
-                className="w-10 h-10 bg-blue-100 rounded-xl items-center justify-center"
-                
-              >
+              <View className="w-10 h-10 bg-blue-100 rounded-xl items-center justify-center">
                 <CalendarDays size={20} color="#2563eb" strokeWidth={2} />
               </View>
               <View style={{ gap: 2 }}>
-                <Text className="text-base font-semibold text-slate-900">
-                  Recent Assignments
-                </Text>
+                <Text className="text-base font-semibold text-slate-900">Recent Assignments</Text>
                 <Text className="text-xs text-slate-600">
-                  Products and Vendors awaiting action
+                  {isVendor ? 'Vendors awaiting action' : 'Products awaiting action'}
                 </Text>
               </View>
             </View>
-            <View 
-              className="bg-blue-100 px-3 py-1.5 rounded-full"
-              
-            >
-              <Text className="text-xs font-bold text-blue-800">
-                {totalAssignments}
-              </Text>
+            <View className="bg-blue-100 px-3 py-1.5 rounded-full">
+              <Text className="text-xs font-bold text-blue-800">{recentCount} total</Text>
             </View>
           </View>
         </View>
 
         <View className="p-5">
-          {totalAssignments === 0 ? (
+          {recentCount === 0 ? (
             <View className="items-center py-12" style={{ gap: 12 }}>
-              <View 
-                className="w-20 h-20 rounded-2xl bg-slate-100 items-center justify-center"
-                
-              >
+              <View className="w-20 h-20 rounded-2xl bg-slate-100 items-center justify-center">
                 <Inbox size={32} color="#64748b" strokeWidth={1.75} />
               </View>
               <View style={{ gap: 4 }}>
                 <Text className="text-base font-semibold text-slate-900 text-center">
-                  No active assignments
+                  No active assignments found.
                 </Text>
                 <Text className="text-sm text-slate-600 text-center">
                   New assignments will appear here
                 </Text>
               </View>
             </View>
+          ) : isVendor ? (
+            <View style={{ gap: 10 }}>
+              {[...assignedVendors]
+                .sort(
+                  (a, b) =>
+                    new Date(b.createdAt || b.submittedAt || 0).getTime() -
+                    new Date(a.createdAt || a.submittedAt || 0).getTime(),
+                )
+                .map((vendor) => {
+                  const vendorStatus = getVendorMainStatus(vendor.status, vendor.inspections?.[0] ?? null);
+                  const badge = vendorBadge(vendorStatus);
+                  const assignedDate = vendor.createdAt || vendor.submittedAt;
+                  return (
+                    <Pressable
+                      key={`v-${vendor.id}`}
+                      onPress={() =>
+                        router.push({ pathname: '/vendors/[id]' as any, params: { id: vendor.id, name: vendor.companyName } })
+                      }
+                      style={({ pressed }) => [
+                        {
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: '#e2e8f0',
+                          padding: 14,
+                          backgroundColor: pressed ? '#f8fafc' : '#ffffff',
+                        },
+                      ]}
+                    >
+                      <View className="flex-row items-center" style={{ gap: 12 }}>
+                        <View className="w-11 h-11 bg-blue-50 rounded-xl items-center justify-center">
+                          <Factory size={18} color="#2563eb" strokeWidth={2} />
+                        </View>
+                        <View className="flex-1" style={{ gap: 4 }}>
+                          <Text className="font-semibold text-slate-900" numberOfLines={1}>
+                            {vendor.companyName}
+                          </Text>
+                          <Text className="text-xs text-slate-500">Factory Onboarding</Text>
+                          {assignedDate ? (
+                            <View className="flex-row items-center" style={{ gap: 4 }}>
+                              <CalendarDays size={11} color="#94a3b8" />
+                              <Text className="text-[11px] text-slate-400">
+                                {new Date(assignedDate).toLocaleDateString('en-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                        <View className={`px-2.5 py-1 rounded-full border ${badge.bg} ${badge.border}`}>
+                          <Text className={`text-[10px] font-bold ${badge.text}`} numberOfLines={1}>
+                            {vendorStatus}
+                          </Text>
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+            </View>
           ) : (
-            <View style={{ gap: 24 }}>
-              {/* Products Section */}
-              {assignedProducts.length > 0 && (
-                <View style={{ gap: 12 }}>
-                  <View className="flex-row items-center" style={{ gap: 8 }}>
-                    <View 
-                      className="w-6 h-6 bg-blue-100 rounded-lg items-center justify-center"
-                      
+            <View style={{ gap: 10 }}>
+              {[...assignedProducts]
+                .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+                .map((product) => {
+                  const badge = productBadge(product.approvalStatus);
+                  return (
+                    <Pressable
+                      key={`p-${product.id}`}
+                      onPress={() =>
+                        router.push({ pathname: '/products/[id]' as any, params: { id: product.id, name: product.name } })
+                      }
+                      style={({ pressed }) => [
+                        {
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: '#e2e8f0',
+                          padding: 14,
+                          backgroundColor: pressed ? '#f8fafc' : '#ffffff',
+                        },
+                      ]}
                     >
-                      <Package size={14} color="#2563eb" strokeWidth={2.5} />
-                    </View>
-                    <Text className="text-sm font-semibold text-slate-700 uppercase tracking-wider">
-                      Products
-                    </Text>
-                    <View 
-                      className="bg-slate-100 px-2 py-0.5 rounded-full"
-                      
-                    >
-                      <Text className="text-[10px] font-bold text-slate-600">
-                        {assignedProducts.length}
-                      </Text>
-                    </View>
-                  </View>
-                  <ScrollView
-                    style={{ maxHeight: 300 }}
-                    contentContainerStyle={{ gap: 10, paddingBottom: 4 }}
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator={false}
-                  >
-                    {[...assignedProducts]
-                      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-                      .map((product) => {
-                        const badge = getStatusBadgeStyle(product.approvalStatus);
-                        return (
-                          <Pressable
-                            key={`p-${product.id}`}
-                            onPress={() => router.push('/products' as any)}
-                            style={({ pressed }) => [
-                              {
-                                borderRadius: 12,
-                                borderWidth: 1,
-                                borderColor: '#e2e8f0',
-                                padding: 14,
-                                backgroundColor: pressed ? '#f8fafc' : '#ffffff',
-                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-                              },
-                            ]}
-                          >
-                            <View className="flex-row items-center" style={{ gap: 12 }}>
-                              <View 
-                                className="w-12 h-12 bg-blue-50 rounded-xl items-center justify-center"
-                                
-                              >
-                                <Package size={18} color="#2563eb" strokeWidth={2} />
-                              </View>
-                              <View className="flex-1" style={{ gap: 4 }}>
-                                <Text
-                                  className="font-semibold text-slate-900"
-                                  numberOfLines={1}
-                                >
-                                  {product.name}
-                                </Text>
-                                <Text
-                                  className="text-xs text-slate-600"
-                                  numberOfLines={1}
-                                >
-                                  {product.baseSku}
-                                </Text>
-                              </View>
-                              <View
-                                className={`px-2.5 py-1 rounded-lg border ${badge.bg} ${badge.border}`}
-                                
-                              >
-                                <Text
-                                  className={`text-[10px] font-bold ${badge.text}`}
-                                  numberOfLines={1}
-                                >
-                                  {formatStatus(product.approvalStatus)}
-                                </Text>
-                              </View>
+                      <View className="flex-row items-center" style={{ gap: 12 }}>
+                        <View className="w-11 h-11 bg-blue-50 rounded-xl items-center justify-center">
+                          <Package size={18} color="#2563eb" strokeWidth={2} />
+                        </View>
+                        <View className="flex-1" style={{ gap: 4 }}>
+                          <Text className="font-semibold text-slate-900" numberOfLines={1}>
+                            {product.name}
+                          </Text>
+                          {product.baseSku ? (
+                            <Text className="text-xs text-slate-500">SKU: {product.baseSku}</Text>
+                          ) : null}
+                          {product.createdAt ? (
+                            <View className="flex-row items-center" style={{ gap: 4 }}>
+                              <CalendarDays size={11} color="#94a3b8" />
+                              <Text className="text-[11px] text-slate-400">
+                                {new Date(product.createdAt).toLocaleDateString('en-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })}
+                              </Text>
                             </View>
-                          </Pressable>
-                        );
-                      })}
-                  </ScrollView>
-                </View>
-              )}
-
-              {/* Vendors Section */}
-              {assignedVendors.length > 0 && (
-                <View style={{ gap: 12 }}>
-                  <View className="flex-row items-center" style={{ gap: 8 }}>
-                    <View 
-                      className="w-6 h-6 bg-emerald-100 rounded-lg items-center justify-center"
-                      
-                    >
-                      <Factory size={14} color="#059669" strokeWidth={2.5} />
-                    </View>
-                    <Text className="text-sm font-semibold text-slate-700 uppercase tracking-wider">
-                      Vendors
-                    </Text>
-                    <View 
-                      className="bg-slate-100 px-2 py-0.5 rounded-full"
-                      
-                    >
-                      <Text className="text-[10px] font-bold text-slate-600">
-                        {assignedVendors.length}
-                      </Text>
-                    </View>
-                  </View>
-                  <ScrollView
-                    style={{ maxHeight: 300 }}
-                    contentContainerStyle={{ gap: 10, paddingBottom: 4 }}
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator={false}
-                  >
-                    {[...assignedVendors]
-                      .sort((a, b) => new Date(b.createdAt || b.submittedAt || 0).getTime() - new Date(a.createdAt || a.submittedAt || 0).getTime())
-                      .map((vendor) => {
-                        const badge = getStatusBadgeStyle(vendor.status);
-                        return (
-                          <Pressable
-                            key={`v-${vendor.id}`}
-                            onPress={() => router.push('/vendors' as any)}
-                            style={({ pressed }) => [
-                              {
-                                borderRadius: 12,
-                                borderWidth: 1,
-                                borderColor: '#e2e8f0',
-                                padding: 14,
-                                backgroundColor: pressed ? '#f8fafc' : '#ffffff',
-                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-                              },
-                            ]}
-                          >
-                            <View className="flex-row items-center" style={{ gap: 12 }}>
-                              <View 
-                                className="w-12 h-12 bg-emerald-50 rounded-xl items-center justify-center"
-                                
-                              >
-                                <Factory size={18} color="#059669" strokeWidth={2} />
-                              </View>
-                              <View className="flex-1" style={{ gap: 4 }}>
-                                <Text
-                                  className="font-semibold text-slate-900"
-                                  numberOfLines={1}
-                                >
-                                  {vendor.companyName}
-                                </Text>
-                                <Text className="text-xs text-slate-600">
-                                  Factory Onboarding
-                                </Text>
-                              </View>
-                              <View
-                                className={`px-2.5 py-1 rounded-lg border ${badge.bg} ${badge.border}`}
-                                
-                              >
-                                <Text
-                                  className={`text-[10px] font-bold ${badge.text}`}
-                                  numberOfLines={1}
-                                >
-                                  {formatStatus(vendor.status)}
-                                </Text>
-                              </View>
-                            </View>
-                          </Pressable>
-                        );
-                      })}
-                  </ScrollView>
-                </View>
-              )}
+                          ) : null}
+                        </View>
+                        <View className={`px-2.5 py-1 rounded-full border ${badge.bg} ${badge.border}`}>
+                          <Text className={`text-[10px] font-bold ${badge.text}`} numberOfLines={1}>
+                            {formatProductStatus(product.approvalStatus)}
+                          </Text>
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
             </View>
           )}
         </View>
@@ -568,8 +585,7 @@ function DashboardSkeleton({ checkerId }: { checkerId: string | null }) {
       <View className="mb-6">
         <Text className="text-3xl font-extrabold text-slate-900 mb-1">Dashboard</Text>
         <Text className="text-slate-600 text-sm mb-3">
-          Welcome back,{' '}
-          <Text className="font-bold text-blue-600">{checkerId || '...'}</Text>
+          Welcome back, <Text className="font-bold text-blue-600">{checkerId || '...'}</Text>
         </Text>
         <SkeletonBlock width={220} height={14} rounded="md" />
       </View>
@@ -603,4 +619,3 @@ function DashboardSkeleton({ checkerId }: { checkerId: string | null }) {
     </ScrollView>
   );
 }
-

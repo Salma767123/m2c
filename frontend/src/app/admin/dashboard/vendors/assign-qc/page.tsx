@@ -3,7 +3,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function AssignQCCheckerPage() {
   return (
-    <PermissionGuard permission={["edit_vendors", "edit_qc_checkers"]}>
+    <PermissionGuard permission="assign_qc_checker:view">
       <AssignQCChecker />
     </PermissionGuard>
   )

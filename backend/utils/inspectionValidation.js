@@ -47,7 +47,48 @@ const REQUIRED_PHOTO_SLOTS = [
     { id: 'frontView', label: 'Front View' },
 ];
 
+// ── New 9-step "verifications" format ─────────────────────────────────────
+// The current checker flow submits a `verifications` map ({ fieldKey: { ok,
+// remarks } }) plus inspector meta — NOT the flat factory-detail fields the
+// legacy validator below expects. Validate it on its own terms, mirroring the
+// guarantees the frontend enforces at submit time (inspector name, a valid
+// non-future date, a decided overall result, and remarks when rejecting).
+function validateVerificationPayload(d) {
+    const errors = {};
+
+    if (isBlank(d.inspectorName)) errors.inspectorName = 'Inspector name is required';
+
+    if (isBlank(d.inspectionDate)) {
+        errors.inspectionDate = 'Inspection date is required';
+    } else if (!isValidDateString(d.inspectionDate)) {
+        errors.inspectionDate = 'Invalid date';
+    } else if (isFutureDate(d.inspectionDate)) {
+        errors.inspectionDate = 'Inspection date cannot be in the future';
+    }
+
+    if (d.inspectionStatus !== 'Approved' && d.inspectionStatus !== 'Rejected') {
+        errors.inspectionStatus = 'Invalid inspection status';
+    }
+    if (d.inspectionStatus === 'Rejected' && isBlank(d.inspectorRemarks)) {
+        errors.inspectorRemarks = 'Remarks are required when rejecting';
+    }
+
+    if (!d.verifications || typeof d.verifications !== 'object' || Array.isArray(d.verifications) || Object.keys(d.verifications).length === 0) {
+        errors.verifications = 'Inspection verifications are required';
+    }
+
+    return errors;
+}
+
+function isNewFormatPayload(d) {
+    return !!d && typeof d.verifications === 'object' && d.verifications !== null && !Array.isArray(d.verifications);
+}
+
 function validateInspectionPayload(d = {}) {
+    if (isNewFormatPayload(d)) {
+        return validateVerificationPayload(d);
+    }
+
     const errors = {};
 
     // Factory Details

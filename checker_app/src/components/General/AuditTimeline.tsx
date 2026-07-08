@@ -26,7 +26,7 @@ interface AuditTimelineProps {
 // ── Action config with distinct icons and semantic colors ───────────────────
 const ACTION_CONFIG: Record<
   string,
-  { label: string; color: string; bgLight: string; icon: (props: any) => JSX.Element }
+  { label: string; color: string; bgLight: string; icon: (props: any) => React.ReactElement }
 > = {
   SUBMITTED: {
     label: 'Submitted for Review',

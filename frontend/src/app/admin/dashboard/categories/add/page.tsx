@@ -4,7 +4,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function AddCategoryPage() {
   return (
-    <PermissionGuard permission="create_categories">
+    <PermissionGuard permission="categories:create">
       <div className="space-y-4">
         <Breadcrumb />
         <AddEditCategory />

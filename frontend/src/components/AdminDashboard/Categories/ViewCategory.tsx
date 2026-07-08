@@ -100,7 +100,7 @@ export default function ViewCategory({ categoryId }: ViewCategoryProps) {
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          {hasPermission('edit_categories') && (
+          {hasPermission('categories:edit') && (
             <Link href={`/admin/dashboard/categories/edit/${category.id}`}>
               <Button variant="outline">
                 <Edit className="h-4 w-4 mr-2" />
@@ -108,7 +108,7 @@ export default function ViewCategory({ categoryId }: ViewCategoryProps) {
               </Button>
             </Link>
           )}
-          {hasPermission('delete_categories') && (
+          {hasPermission('categories:delete') && (
             <Button variant="outline" onClick={handleDelete} className="text-red-600 hover:text-red-800">
               <Trash2 className="h-4 w-4 mr-2" />
               Delete

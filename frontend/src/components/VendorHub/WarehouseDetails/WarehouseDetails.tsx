@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import ImageCropModal from "@/components/UI/ImageCropModal";
 
 import { Button } from "@/components/UI/Button";
@@ -176,6 +176,16 @@ export default function WarehouseDetails({
       factoryImages: normaliseFactoryImages(data.factoryImages),
     });
   }
+
+  // Push the latest local state up whenever this step unmounts (Back
+  // button, sidebar jump, edit-from-review) — not only on Save & Continue.
+  // Without this, anything typed here was lost unless the user exited via
+  // handleNext, so the Review step showed stale/missing data.
+  const persistRef = useRef(formData);
+  persistRef.current = formData;
+  const onUpdateDataRef = useRef(onUpdateData);
+  onUpdateDataRef.current = onUpdateData;
+  useEffect(() => () => onUpdateDataRef.current(persistRef.current), []);
 
   // ── "Same as warehouse address" link state ──────────────────────────
   // CompanyDetails sets `data.sameAsWarehouse` and streams the address +

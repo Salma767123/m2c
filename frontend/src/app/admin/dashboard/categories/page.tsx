@@ -4,7 +4,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function CategoriesPage() {
   return (
-    <PermissionGuard permission="view_categories">
+    <PermissionGuard permission="categories:view">
       <div className="space-y-6">
         <Breadcrumb />
         <CategoryLists />

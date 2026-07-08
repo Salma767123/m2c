@@ -3,7 +3,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function AdminSupportPage() {
   return (
-    <PermissionGuard permission={["view_support", "manage_support"]}>
+    <PermissionGuard permission="support:view">
       <AdminSupport />
     </PermissionGuard>
   );

@@ -265,6 +265,15 @@ export async function markNotificationRead(id: string): Promise<void> {
   }
 }
 
+/** Mark a single notification back as unread. */
+export async function markNotificationUnread(id: string): Promise<void> {
+  try {
+    await axios.put(`/notifications/${id}/unread`);
+  } catch (error) {
+    console.error('Failed to mark notification unread:', error);
+  }
+}
+
 /** Mark every notification as read. */
 export async function markAllNotificationsRead(): Promise<void> {
   try {

@@ -714,6 +714,10 @@ class VendorService {
         // each File instance under its own field name).
         'panCardDocument', 'typeCertDocument',
         'sameAsWarehouse', 'expandedCategories', 'factoryImages',
+        // Company Details step mirror of the factory photo slots — the
+        // canonical copy is `factoryImages` (appended below); stringifying
+        // this map would just send `{}` per File on the wire.
+        'factorySiteImages',
         'existingProductPhotos',
         // Per-Business-Type stash maps used to preserve dynamic values
         // across chip switches. Form-runtime only; the active type's
@@ -841,6 +845,7 @@ class VendorService {
         'certificationFiles', 'logoFile', 'gstFile', 'contactPhotoFile',
         'productPhotos', 'contactPhoto', 'logo', 'gstDocument',
         'sameAsWarehouse', 'expandedCategories', 'factoryImages',
+        'factorySiteImages',
         'existingProductPhotos', 'approvalStatus'
       ];
 
@@ -875,12 +880,26 @@ class VendorService {
         });
       }
 
-      if (vendorData.factoryImages && vendorData.factoryImages.length > 0) {
-        vendorData.factoryImages.forEach((image: any) => {
-          if (image.file instanceof File) {
-            formData.append('factoryImages', image.file);
+      // Factory photos arrive slot-keyed (`{ nameBoard: {file,url,name}, ... }`)
+      // from the Company Details step; legacy callers may still pass an array.
+      // Tag each file with its slot id so registerVendor stores the
+      // descriptive document name (same wire format as updateVendorByAdmin).
+      if (vendorData.factoryImages) {
+        let newFileIndex = 0;
+        const emitSlot = (slotId: string | null, slot: any) => {
+          if (slot?.file instanceof File) {
+            formData.append('factoryImages', slot.file);
+            if (slotId) formData.append(`factoryImageSlot_${newFileIndex}`, slotId);
+            newFileIndex++;
           }
-        });
+        };
+        if (Array.isArray(vendorData.factoryImages)) {
+          vendorData.factoryImages.forEach((image: any) => emitSlot(null, image));
+        } else if (typeof vendorData.factoryImages === 'object') {
+          Object.entries(vendorData.factoryImages).forEach(([slotId, slot]) =>
+            emitSlot(slotId, slot),
+          );
+        }
       }
 
       if (vendorData.productPhotos && vendorData.productPhotos.length > 0) {

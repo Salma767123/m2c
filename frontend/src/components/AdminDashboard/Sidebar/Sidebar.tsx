@@ -37,7 +37,9 @@ interface SubMenuItem {
   permission?: string | string[];
 }
 
-interface NavigationItem {
+// Second-level entry inside a grouped module (e.g. everything under "Admin"):
+// either a direct link (href) or a collapsible group of leaf links (subItems).
+interface NavigationChild {
   title: string;
   icon: any;
   href?: string;
@@ -45,27 +47,33 @@ interface NavigationItem {
   permission?: string | string[];
 }
 
+interface NavigationItem extends NavigationChild {
+  /** Third nesting level — used by the "Admin" module to host whole sub-modules. */
+  children?: NavigationChild[];
+}
+
+// Permission strings follow the RBAC catalog: `<submodule_key>:<action>`.
+// Groups carry no permission of their own — they disappear automatically when
+// every child link is filtered out.
 const navigation: NavigationItem[] = [
-  // ── 1. Dashboard ──────────────────────────────────────────────────────────
+  // ── 1. Dashboard — visible to every admin ─────────────────────────────────
   {
     title: "Dashboard",
     icon: LayoutDashboard,
     href: "/admin/dashboard",
-    permission: "view_dashboard",
   },
 
   // ── 2. Vendors ────────────────────────────────────────────────────────────
   {
     title: "Vendors",
     icon: Store,
-    permission: "view_vendors",
     subItems: [
-      { title: "Vendor Management", href: "/admin/dashboard/vendors", permission: "view_vendors" },
-      { title: "Assign QC Checker", href: "/admin/dashboard/vendors/assign-qc", permission: "edit_vendors" },
-      { title: "Vendor Product Requests", href: "/admin/dashboard/products/vendor-requests", permission: "view_products" },
-      { title: "Vendor to Hub", href: "/admin/dashboard/orders/vendor-to-hub", permission: "view_orders" },
-      { title: "Settlement", href: "/admin/dashboard/billing/settlement", permission: ["view_billing", "manage_billing"] },
-      { title: "Vendor Product Reviews", href: "/admin/dashboard/reviews/vendor-products", permission: "view_reviews" },
+      { title: "Vendor Management", href: "/admin/dashboard/vendors", permission: "vendor_management:view" },
+      { title: "Assign QC Checker", href: "/admin/dashboard/vendors/assign-qc", permission: "assign_qc_checker:view" },
+      { title: "Vendor Product Requests", href: "/admin/dashboard/products/vendor-requests", permission: "vendor_product_requests:view" },
+      { title: "Vendor to Hub", href: "/admin/dashboard/orders/vendor-to-hub", permission: "vendor_to_hub:view" },
+      { title: "Settlement", href: "/admin/dashboard/billing/settlement", permission: "settlement:view" },
+      { title: "Vendor Product Reviews", href: "/admin/dashboard/reviews/vendor-products", permission: "vendor_product_reviews:view" },
     ],
   },
 
@@ -73,100 +81,87 @@ const navigation: NavigationItem[] = [
   {
     title: "Customers",
     icon: Users,
-    permission: "view_users",
     subItems: [
-      { title: "Customer Management", href: "/admin/dashboard/users/customer-management", permission: "view_users" },
-      { title: "Hub to Customer", href: "/admin/dashboard/orders/hub-to-customer", permission: "view_orders" },
-      { title: "Invoices", href: "/admin/dashboard/billing/invoices", permission: ["view_billing", "manage_billing"] },
-      { title: "Customer Reviews", href: "/admin/dashboard/reviews/customer", permission: "view_reviews" },
+      { title: "Customer Management", href: "/admin/dashboard/users/customer-management", permission: "customer_management:view" },
+      { title: "Hub to Customer", href: "/admin/dashboard/orders/hub-to-customer", permission: "hub_to_customer:view" },
+      { title: "Invoices", href: "/admin/dashboard/billing/invoices", permission: "invoices:view" },
+      { title: "Customer Reviews", href: "/admin/dashboard/reviews/customer", permission: "customer_reviews:view" },
     ],
   },
 
-  // ── 4. QC Checker ─────────────────────────────────────────────────────────
+  // ── 4. Admin — every remaining module grouped under one entry ─────────────
   {
-    title: "QC Checker",
-    icon: ClipboardCheck,
-    permission: ["view_qc_checkers", "view_users"],
-    subItems: [
-      { title: "QC Checker Management", href: "/admin/dashboard/qc-checker", permission: ["view_qc_checkers", "view_users"] },
-      { title: "QC Reports", href: "/admin/dashboard/qc-reports", permission: "view_reports" },
-      { title: "Re-Inspection Review", href: "/admin/dashboard/reinspection-review", permission: "view_reports" },
+    title: "Admin",
+    icon: Shield,
+    children: [
+      {
+        title: "QC Checker",
+        icon: ClipboardCheck,
+        subItems: [
+          { title: "QC Checker Management", href: "/admin/dashboard/qc-checker", permission: "qc_checker_management:view" },
+          { title: "QC Reports", href: "/admin/dashboard/qc-reports", permission: "qc_reports:view" },
+          { title: "Re-Inspection Review", href: "/admin/dashboard/reinspection-review", permission: "reinspection_review:view" },
+        ],
+      },
+      {
+        title: "Products",
+        icon: Package,
+        subItems: [
+          { title: "All Products", href: "/admin/dashboard/products", permission: "all_products:view" },
+          { title: "Bag Types", href: "/admin/dashboard/bag-types", permission: "bag_types:view" },
+        ],
+      },
+      {
+        title: "Catalog",
+        icon: BookOpen,
+        subItems: [
+          { title: "Categories", href: "/admin/dashboard/categories", permission: "categories:view" },
+          { title: "Inventory", href: "/admin/dashboard/inventory", permission: "inventory:view" },
+        ],
+      },
+      {
+        title: "Coupons",
+        icon: Ticket,
+        href: "/admin/dashboard/coupons",
+        permission: "coupons:view",
+      },
+      {
+        title: "User Management",
+        icon: Users,
+        subItems: [
+          { title: "User Management", href: "/admin/dashboard/users/user-management", permission: "staff_management:view" },
+          { title: "Roles & Permissions", href: "/admin/dashboard/roles-permissions", permission: "roles_permissions:view" },
+        ],
+      },
+      {
+        title: "Analytics & Reports",
+        icon: FileBarChart,
+        subItems: [
+          { title: "Analytics", href: "/admin/dashboard/analytics", permission: "analytics:view" },
+          { title: "Reports", href: "/admin/dashboard/reports", permission: "reports:view" },
+        ],
+      },
+      {
+        title: "Support",
+        icon: Headphones,
+        href: "/admin/dashboard/support",
+        permission: "support:view",
+      },
+      {
+        title: "General",
+        icon: Layers,
+        subItems: [
+          { title: "Vendor Enquiries", href: "/admin/dashboard/general/enquiry-form", permission: "vendor_enquiries:view" },
+          { title: "Website Enquiries", href: "/admin/dashboard/general/website-enquiries", permission: "website_enquiries:view" },
+        ],
+      },
+      {
+        title: "Settings",
+        icon: Settings,
+        href: "/admin/dashboard/settings",
+        permission: "settings:view",
+      },
     ],
-  },
-
-  // ── 5. Products ───────────────────────────────────────────────────────────
-  {
-    title: "Products",
-    icon: Package,
-    permission: "view_products",
-    subItems: [
-      { title: "All Products", href: "/admin/dashboard/products", permission: "view_products" },
-      { title: "Bag Types", href: "/admin/dashboard/bag-types" },
-    ],
-  },
-
-  // ── 6. Catalog (Categories + Inventory) ───────────────────────────────────
-  {
-    title: "Catalog",
-    icon: BookOpen,
-    permission: ["view_categories", "view_inventory"],
-    subItems: [
-      { title: "Categories", href: "/admin/dashboard/categories", permission: "view_categories" },
-      { title: "Inventory", href: "/admin/dashboard/inventory", permission: "view_inventory" },
-    ],
-  },
-
-  // ── 7. Coupons ────────────────────────────────────────────────────────────
-  {
-    title: "Coupons",
-    icon: Ticket,
-    href: "/admin/dashboard/coupons",
-    permission: "view_coupons",
-  },
-
-  // ── 8. User Management ────────────────────────────────────────────────────
-  {
-    title: "User Management",
-    icon: Users,
-    permission: "view_users",
-    subItems: [
-      { title: "User Management", href: "/admin/dashboard/users/user-management", permission: "view_users" },
-      { title: "Roles & Permissions", href: "/admin/dashboard/roles-permissions", permission: ["view_roles", "edit_roles", "manage_settings"] },
-    ],
-  },
-
-  // ── 9. Analytics & Reports ────────────────────────────────────────────────
-  {
-    title: "Analytics & Reports",
-    icon: FileBarChart,
-    permission: ["view_analytics", "view_reports"],
-    subItems: [
-      { title: "Analytics", href: "/admin/dashboard/analytics", permission: "view_analytics" },
-      { title: "Reports", href: "/admin/dashboard/reports", permission: "view_reports" },
-    ],
-  },
-
-  // ── Remaining modules ─────────────────────────────────────────────────────
-  {
-    title: "Support",
-    icon: Headphones,
-    href: "/admin/dashboard/support",
-    permission: ["view_support", "manage_support"],
-  },
-  {
-    title: "General",
-    icon: Layers,
-    permission: ["view_enquiries", "manage_enquiries"],
-    subItems: [
-      { title: "Vendor Enquiries", href: "/admin/dashboard/general/enquiry-form", permission: ["view_enquiries", "manage_enquiries"] },
-      { title: "Website Enquiries", href: "/admin/dashboard/general/website-enquiries", permission: ["view_enquiries", "manage_enquiries"] },
-    ],
-  },
-  {
-    title: "Settings",
-    icon: Settings,
-    href: "/admin/dashboard/settings",
-    permission: ["view_settings", "manage_settings"],
   },
 ];
 
@@ -184,16 +179,28 @@ export default function AdminSidebar({ isCollapsed = false, onToggleCollapse }: 
     }
   }, []);
 
+  const filterSubItems = (subItems: SubMenuItem[]) =>
+    subItems.filter((sub) => (sub.permission ? hasPermission(sub.permission) : true));
+
   const visibleNavigation = navigation
     .filter((item) => (item.permission ? hasPermission(item.permission) : true))
     .map((item) => {
+      if (item.children) {
+        const children = item.children
+          .filter((child) => (child.permission ? hasPermission(child.permission) : true))
+          .map((child) =>
+            child.subItems ? { ...child, subItems: filterSubItems(child.subItems) } : child
+          )
+          .filter((child) => !child.subItems || child.subItems.length > 0);
+        return { ...item, children };
+      }
       if (!item.subItems) return item;
-      const visibleSubItems = item.subItems.filter((sub) =>
-        sub.permission ? hasPermission(sub.permission) : true
-      );
-      return { ...item, subItems: visibleSubItems };
+      return { ...item, subItems: filterSubItems(item.subItems) };
     })
-    .filter((item) => !item.subItems || item.subItems.length > 0);
+    .filter((item) => {
+      if (item.children) return item.children.length > 0;
+      return !item.subItems || item.subItems.length > 0;
+    });
 
   const isMainItemActive = (href: string) => {
     if (href === "/admin/dashboard") {
@@ -229,11 +236,33 @@ export default function AdminSidebar({ isCollapsed = false, onToggleCollapse }: 
     return getActiveSubItems(subItems).length > 0;
   };
 
+  // A second-level child (link or group) counts as active when its own href
+  // matches or any of its leaf links do.
+  const isChildActive = (child: NavigationChild) => {
+    if (child.href) return isMainItemActive(child.href);
+    if (child.subItems) return hasAnyActiveChild(child.subItems);
+    return false;
+  };
+
+  const hasAnyActiveDescendant = (item: NavigationItem) => {
+    if (item.children) return item.children.some(isChildActive);
+    if (item.subItems) return hasAnyActiveChild(item.subItems);
+    return false;
+  };
+
   useEffect(() => {
     const activeParents: string[] = [];
     navigation.forEach((item) => {
       if (item.subItems && hasAnyActiveChild(item.subItems)) {
         activeParents.push(item.title);
+      }
+      if (item.children) {
+        item.children.forEach((child) => {
+          if (isChildActive(child)) {
+            activeParents.push(item.title);
+            if (child.subItems) activeParents.push(child.title);
+          }
+        });
       }
     });
     if (activeParents.length > 0) {
@@ -331,7 +360,7 @@ export default function AdminSidebar({ isCollapsed = false, onToggleCollapse }: 
 
           // Collapsed mode: show only icon
           if (isCollapsed) {
-            const parentHasActiveChild = item.subItems ? hasAnyActiveChild(item.subItems) : false;
+            const parentHasActiveChild = hasAnyActiveDescendant(item);
             return (
               <div
                 key={item.title}
@@ -353,7 +382,7 @@ export default function AdminSidebar({ isCollapsed = false, onToggleCollapse }: 
             );
           }
 
-          const parentHasActiveChild = item.subItems ? hasAnyActiveChild(item.subItems) : false;
+          const parentHasActiveChild = hasAnyActiveDescendant(item);
 
           return (
             <div key={item.title} className="space-y-1">
@@ -419,6 +448,97 @@ export default function AdminSidebar({ isCollapsed = false, onToggleCollapse }: 
                         )}
                         <span>{subItem.title}</span>
                       </Link>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Nested module groups (the "Admin" entry) */}
+              {isExpanded && item.children && (
+                <div className="ml-4 space-y-1 border-l-2 border-slate-100 pl-2 py-1">
+                  {item.children.map((child) => {
+                    const ChildIcon = child.icon;
+                    const childActive = isChildActive(child);
+
+                    // Direct link (Coupons / Support / Settings)
+                    if (child.href) {
+                      return (
+                        <Link
+                          key={child.title}
+                          href={child.href}
+                          className={cn(
+                            "w-full flex items-center px-3 py-2 text-sm rounded-lg transition-all duration-200 group",
+                            childActive
+                              ? "bg-brand-50/60 text-brand-700 font-semibold"
+                              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+                          )}
+                        >
+                          <ChildIcon
+                            className={cn(
+                              "mr-3 h-4 w-4 transition-colors",
+                              childActive ? "text-brand-500" : "text-slate-400 group-hover:text-slate-600"
+                            )}
+                          />
+                          <span className="font-medium">{child.title}</span>
+                        </Link>
+                      );
+                    }
+
+                    // Collapsible sub-module with its own leaf links
+                    const childExpanded = expandedItems.includes(child.title);
+                    return (
+                      <div key={child.title} className="space-y-1">
+                        <button
+                          onClick={() => toggleExpanded(child.title)}
+                          className={cn(
+                            "w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-all duration-200 group",
+                            childActive
+                              ? "bg-brand-50/60 text-brand-700 font-semibold"
+                              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+                            "focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2",
+                          )}
+                        >
+                          <div className="flex items-center">
+                            <ChildIcon
+                              className={cn(
+                                "mr-3 h-4 w-4 transition-colors",
+                                childActive ? "text-brand-500" : "text-slate-400 group-hover:text-slate-600"
+                              )}
+                            />
+                            <span className="font-medium">{child.title}</span>
+                          </div>
+                          {childExpanded ? (
+                            <ChevronDown className={cn("h-4 w-4", childActive ? "text-brand-500" : "text-slate-400")} />
+                          ) : (
+                            <ChevronRight className={cn("h-4 w-4", childActive ? "text-brand-500" : "text-slate-400")} />
+                          )}
+                        </button>
+
+                        {childExpanded && child.subItems && (
+                          <div className="ml-5 space-y-1 border-l-2 border-slate-100 pl-4 py-1">
+                            {child.subItems.map((subItem) => {
+                              const subItemIsActive = isSubItemActive(subItem.href);
+                              return (
+                                <Link
+                                  key={subItem.href}
+                                  href={subItem.href}
+                                  className={cn(
+                                    "flex items-center px-3 py-2 text-sm rounded-lg transition-all duration-200 group relative",
+                                    subItemIsActive
+                                      ? "bg-brand-50/60 text-brand-700 font-semibold"
+                                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+                                  )}
+                                >
+                                  {subItemIsActive && (
+                                    <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-brand-500 rounded-r-full -ml-4" />
+                                  )}
+                                  <span>{subItem.title}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>

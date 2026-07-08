@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/UI/Button';
 import { User, Calendar, Users, Mail, Plus, Trash2, ArrowLeft, ArrowRight, IdCard, Phone as PhoneIcon, Image as ImageIcon } from 'lucide-react';
 import { ToggleButton, PhoneInput, validatePhoneE164, AccordionSection, LocalLandlineInput, parsePhone, TitleSelect, type LocalLandlineValue } from '@/components/VendorHub/FormUI';
@@ -231,6 +231,52 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Builds the payload persisted to VendorPanel — filters empty additional
+  // owners, joins the owner name parts, and assembles landline strings.
+  // Shared by handleNext (Save & Continue) and the unmount sync below so
+  // both paths store an identical shape.
+  const buildPersistPayload = () => {
+    const filledOwners = additionalOwners
+      .filter((o) => o.firstName || o.email || o.phone)
+      .map((o) => {
+        const ownerLocalLandline = (o.localLandlineStd + o.localLandline).trim();
+        const ownerIntlLandline = (o.intlLandlineCountryCode + o.intlLandlineStd + o.intlLandlineNumber).replace(/^\+?$/, '');
+        return {
+          ...o,
+          name: [o.title, o.firstName, o.middleName, o.lastName].filter(Boolean).join(' '),
+          localLandline: ownerLocalLandline || undefined,
+          localLandlineStd: o.localLandlineStd || undefined,
+          intlLandline: ownerIntlLandline || undefined,
+          intlLandlineCountryCode: o.intlLandlineCountryCode || undefined,
+          intlLandlineStd: o.intlLandlineStd || undefined,
+          intlLandlineNumber: o.intlLandlineNumber || undefined,
+        };
+      });
+    const localLandline = (formData.ownerLocalLandlineStd + formData.ownerLocalLandlineNumber).trim();
+    const intlLandline = (formData.ownerIntlLandlineCountryCode + formData.ownerIntlLandlineStd + formData.ownerIntlLandlineNumber).replace(/^\+?$/, '');
+    return {
+      ...formData,
+      ownerName: [formData.ownerTitle, formData.ownerFirstName, formData.ownerMiddleName, formData.ownerLastName].filter(Boolean).join(' '),
+      ownerLandline: localLandline || undefined,
+      ownerLocalLandlineStd: formData.ownerLocalLandlineStd || undefined,
+      ownerLocalLandlineNumber: formData.ownerLocalLandlineNumber || undefined,
+      ownerIntlLandline: intlLandline || undefined,
+      ownerIntlLandlineCountryCode: formData.ownerIntlLandlineCountryCode || undefined,
+      ownerIntlLandlineStd: formData.ownerIntlLandlineStd || undefined,
+      ownerIntlLandlineNumber: formData.ownerIntlLandlineNumber || undefined,
+      additionalOwners: filledOwners.length > 0 ? filledOwners : undefined,
+    };
+  };
+
+  // Push the latest local state up whenever this step unmounts (Back
+  // button, sidebar jump, edit-from-review) — not only on Save & Continue —
+  // so the Review step always reflects the latest edits.
+  const persistRef = useRef<any>(null);
+  persistRef.current = buildPersistPayload();
+  const onUpdateDataRef = useRef(onUpdateData);
+  onUpdateDataRef.current = onUpdateData;
+  useEffect(() => () => onUpdateDataRef.current(persistRef.current), []);
 
   // Accordion: single-active-section pattern matching Step 1
   // (CompanyDetails.tsx → AccordionSection). One section open at a time;
@@ -615,37 +661,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       return;
     }
 
-    // Filter out empty additional owners and assemble their landlines
-    const filledOwners = additionalOwners
-      .filter((o) => o.firstName || o.email || o.phone)
-      .map((o) => {
-        const ownerLocalLandline = (o.localLandlineStd + o.localLandline).trim();
-        const ownerIntlLandline = (o.intlLandlineCountryCode + o.intlLandlineStd + o.intlLandlineNumber).replace(/^\+?$/, '');
-        return {
-          ...o,
-          name: [o.title, o.firstName, o.middleName, o.lastName].filter(Boolean).join(' '),
-          localLandline: ownerLocalLandline || undefined,
-          localLandlineStd: o.localLandlineStd || undefined,
-          intlLandline: ownerIntlLandline || undefined,
-          intlLandlineCountryCode: o.intlLandlineCountryCode || undefined,
-          intlLandlineStd: o.intlLandlineStd || undefined,
-          intlLandlineNumber: o.intlLandlineNumber || undefined,
-        };
-      });
-    const localLandline = (formData.ownerLocalLandlineStd + formData.ownerLocalLandlineNumber).trim();
-    const intlLandline = (formData.ownerIntlLandlineCountryCode + formData.ownerIntlLandlineStd + formData.ownerIntlLandlineNumber).replace(/^\+?$/, '');
-    onUpdateData({
-      ...formData,
-      ownerName: [formData.ownerTitle, formData.ownerFirstName, formData.ownerMiddleName, formData.ownerLastName].filter(Boolean).join(' '),
-      ownerLandline: localLandline || undefined,
-      ownerLocalLandlineStd: formData.ownerLocalLandlineStd || undefined,
-      ownerLocalLandlineNumber: formData.ownerLocalLandlineNumber || undefined,
-      ownerIntlLandline: intlLandline || undefined,
-      ownerIntlLandlineCountryCode: formData.ownerIntlLandlineCountryCode || undefined,
-      ownerIntlLandlineStd: formData.ownerIntlLandlineStd || undefined,
-      ownerIntlLandlineNumber: formData.ownerIntlLandlineNumber || undefined,
-      additionalOwners: filledOwners.length > 0 ? filledOwners : undefined,
-    });
+    onUpdateData(persistRef.current);
     onNext();
   }, [formData, additionalOwners, data.businessType, onUpdateData, onNext]);
 
@@ -857,19 +873,23 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                     onDrop={handleOwnerPhotoDrop}
                     data-field="ownerPhoto"
                   >
-                    <div className="w-10 h-10 shrink-0 bg-white rounded-full border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
+                    <div className="w-16 h-16 shrink-0 bg-white rounded-full border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
                       {formData.ownerPhoto ? (
                         <img src={formData.ownerPhoto as string} alt="Owner Profile" className="w-full h-full object-cover" />
                       ) : (
-                        <ImageIcon className="w-4 h-4 text-slate-300" aria-hidden="true" />
+                        <ImageIcon className="w-5 h-5 text-slate-300" aria-hidden="true" />
                       )}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs text-slate-500 truncate">
-                        {formData.ownerPhoto ? (formData.ownerPhotoFile?.name || 'photo.png') : 'Drag & drop or browse'}
+                    {/* Once a photo is uploaded the thumbnail says it all — no
+                        filename/hint text, just the Browse/Remove actions. */}
+                    {formData.ownerPhoto ? (
+                      <div className="flex-1" />
+                    ) : (
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs text-slate-500 truncate">Drag &amp; drop or browse</div>
+                        <p className="text-[11px] text-slate-400 mt-0.5 truncate">PNG, JPG, WEBP — max 2 MB</p>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-0.5">PNG, JPG, WEBP — max 2 MB</p>
-                    </div>
+                    )}
                     <input id="ownerPhotoUpload" type="file" accept="image/*" onChange={handleOwnerPhotoChange} className="hidden" />
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg transition-colors duration-200">

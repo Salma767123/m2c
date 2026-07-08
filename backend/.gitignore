@@ -11,6 +11,12 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Local debug dumps (never commit — may contain secrets)
+debug_ps.json
+out.json
+outhub.json
+output.json
+
 # Logs
 logs
 *.log

@@ -3,7 +3,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function CMSPage() {
   return (
-    <PermissionGuard permission="manage_settings">
+    <PermissionGuard permission="settings:edit">
       <div className="space-y-6">
         <Breadcrumb />
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">

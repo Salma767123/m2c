@@ -17,7 +17,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function BillingsPage() {
   return (
-    <PermissionGuard permission="view_billing">
+    <PermissionGuard permission="settlement:view">
       {null}
     </PermissionGuard>
   );

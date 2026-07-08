@@ -147,7 +147,7 @@ export default function QCCheckerList() {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          {hasPermission('create_qc_checkers') && (
+          {hasPermission('qc_checker_management:create') && (
             <Link
               href="/admin/dashboard/qc-checker/create"
               className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
@@ -288,7 +288,7 @@ export default function QCCheckerList() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        {hasPermission('view_qc_checkers') && (
+                        {hasPermission('qc_checker_management:view') && (
                           <Link
                             href={`/admin/dashboard/qc-checker/${checker.id}`}
                             className="p-2 text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
@@ -297,7 +297,7 @@ export default function QCCheckerList() {
                             <Eye className="h-4 w-4" />
                           </Link>
                         )}
-                        {hasPermission('edit_qc_checkers') && (
+                        {hasPermission('qc_checker_management:edit') && (
                           <Link
                             href={`/admin/dashboard/qc-checker/${checker.id}/edit`}
                             className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
@@ -306,7 +306,7 @@ export default function QCCheckerList() {
                             <Edit className="h-4 w-4" />
                           </Link>
                         )}
-                        {hasPermission('edit_qc_checkers') && (
+                        {hasPermission('qc_checker_management:edit') && (
                           <button
                             onClick={() => handleResendClick(checker.id, checker.email)}
                             disabled={resendingId === checker.id}
@@ -316,7 +316,7 @@ export default function QCCheckerList() {
                             <Send className={`h-4 w-4 ${resendingId === checker.id ? 'animate-pulse' : ''}`} />
                           </button>
                         )}
-                        {hasPermission('delete_qc_checkers') && (
+                        {hasPermission('qc_checker_management:delete') && (
                           <button
                             onClick={() => handleDeleteClick(checker.id, formatCheckerName(checker))}
                             disabled={deletingId === checker.id}
@@ -335,7 +335,7 @@ export default function QCCheckerList() {
                   <TableCell colSpan={8}>
                     <div className="p-12 text-center">
                       <p className="text-gray-500">No QC checkers found</p>
-                      {hasPermission('create_qc_checkers') && (
+                      {hasPermission('qc_checker_management:create') && (
                         <Link
                           href="/admin/dashboard/qc-checker/create"
                           className="inline-flex items-center gap-2 mt-4 text-sm text-blue-600 hover:text-blue-800 font-medium"

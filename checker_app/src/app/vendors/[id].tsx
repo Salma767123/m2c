@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -8,8 +8,13 @@ import {
   RefreshControl,
   Linking,
   StatusBar,
+  Image,
+  Modal,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as WebBrowser from 'expo-web-browser';
 import { useLocalSearchParams, router } from 'expo-router';
 import {
   ArrowLeft,
@@ -32,17 +37,67 @@ import {
   AlertCircle,
   RefreshCw,
   ShieldCheck,
+  Eye,
+  Download,
+  X as XIcon,
+  ExternalLink,
 } from 'lucide-react-native';
 import qcCheckerService, { AuditLogEntry } from '../../services/qcCheckerService';
 import AuditTimeline from '../../components/General/AuditTimeline';
+import { downloadFactoryReportPdf } from '../../lib/reportPdf';
 
-type TabId = 'overview' | 'history' | 'upcoming' | 'performance';
+type TabId = 'overview' | 'documents' | 'history' | 'upcoming' | 'performance';
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
+  { id: 'documents', label: 'Documents' },
   { id: 'history', label: 'History' },
   { id: 'upcoming', label: 'Upcoming' },
   { id: 'performance', label: 'Stats' },
 ];
+
+// ── Document helpers (mirror web docDownload) ────────────────────────────────
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i;
+const DOC_EXT = /\.(pdf|docx?|xlsx?|pptx?|txt|csv|rtf|zip)(\?|$)/i;
+
+// Decide whether a document URL points at an image (mirrors web isImageUrl).
+const isImageDoc = (url?: string | null, name?: string | null): boolean => {
+  const n = (name || '').toLowerCase();
+  if (DOC_EXT.test(n)) return false;
+  if (IMAGE_EXT.test(n)) return true;
+  const u = (url || '').toLowerCase();
+  if (DOC_EXT.test(u)) return false;
+  if (IMAGE_EXT.test(u)) return true;
+  if (u.includes('/raw/upload/')) return false;
+  if (u.includes('/image/upload/')) return true;
+  return false;
+};
+
+// Build the backend document-proxy URL for Cloudinary-hosted files (mirrors web
+// cloudinaryProxyUrl), so PDFs open through our API rather than hitting
+// Cloudinary directly. Non-Cloudinary URLs are returned untouched.
+const proxiedDocUrl = (url: string): string => {
+  try {
+    const host = new URL(url).hostname;
+    if (/^res\.cloudinary\.com$/i.test(host)) {
+      const base = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/+$/, '');
+      return `${base}/document-proxy?url=${encodeURIComponent(url)}`;
+    }
+  } catch {
+    /* non-URL string: return as-is */
+  }
+  return url;
+};
+
+// Registration document types shown in the Documents tab (mirror web).
+const COMPANY_DOC_TYPES = ['GST_CERTIFICATE', 'PAN_CARD', 'COMPANY_REGISTRATION', 'AADHAAR_CARD'];
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  GST_CERTIFICATE: 'GST Certificate',
+  PAN_CARD: 'PAN Card',
+  COMPANY_REGISTRATION: 'Company Registration',
+  AADHAAR_CARD: 'Aadhaar Card',
+  OTHER: 'Factory Image',
+};
 
 const statusStyle = (status: string) => {
   const key = (status || '').toLowerCase();
@@ -103,6 +158,9 @@ export default function VendorDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  // Fullscreen image lightbox (registered document images).
+  const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
+  const [downloadingReport, setDownloadingReport] = useState(false);
 
   const loadAll = useCallback(async (limitOverride?: number) => {
     if (!id) return;
@@ -191,6 +249,54 @@ export default function VendorDetailScreen() {
       params: { id: id!, name: fullVendor?.companyName || name || '' },
     });
   };
+
+  // ── Registered documents (mirror web VendorDetail Documents grouping) ──────
+  const allDocs: any[] = Array.isArray(fullVendor?.documents) ? fullVendor.documents : [];
+  const companyDocs = allDocs.filter((d) => COMPANY_DOC_TYPES.includes(d.type));
+  const factoryImages = allDocs
+    .filter((d) => d.type === 'OTHER')
+    .map((d) => ({ label: d.name || 'Factory Image', url: d.documentUrl }));
+  const companyLogo = fullVendor?.companyLogo || null;
+
+  // Open a registered document: images go to the in-app lightbox, everything
+  // else (PDFs/docs) opens through the document-proxy in the system browser
+  // (mirrors web: images → lightbox, PDFs → open in browser).
+  const openDoc = useCallback(async (url?: string | null, docName?: string | null) => {
+    if (!url) return;
+    if (isImageDoc(url, docName)) {
+      setLightbox({ url, name: docName || 'Document' });
+      return;
+    }
+    try {
+      await WebBrowser.openBrowserAsync(proxiedDocUrl(url));
+    } catch {
+      Alert.alert('Unable to open', 'Could not open this document.');
+    }
+  }, []);
+
+  // Download Report is available once at least one inspection has been
+  // completed / submitted for this vendor (mirrors web's report availability).
+  const reportInspection = useMemo(() => {
+    const done = recentInspections.filter((i) =>
+      ['COMPLETED', 'SUBMITTED', 'UNDER_ADMIN_REVIEW'].includes(
+        (i.status || '').toUpperCase(),
+      ) || i.result,
+    );
+    return done[0] || null;
+  }, [recentInspections]);
+
+  const handleDownloadReport = useCallback(async () => {
+    if (!reportInspection) return;
+    setDownloadingReport(true);
+    try {
+      const checkerName = fullVendor?.assignedQc?.name || undefined;
+      await downloadFactoryReportPdf(reportInspection, { variant: 'canonical', checkerName });
+    } catch (err: any) {
+      Alert.alert('Download failed', err?.message || 'Could not generate the report.');
+    } finally {
+      setDownloadingReport(false);
+    }
+  }, [reportInspection, fullVendor]);
 
   // Skeleton only on initial load
   if (loading && !fullVendor) {
@@ -549,6 +655,105 @@ export default function VendorDetailScreen() {
           </View>
         ) : null}
 
+        {activeTab === 'documents' ? (
+          <View className="mx-4" style={{ rowGap: 14 }}>
+            {/* Download Report */}
+            <Card icon={<Download size={18} color="#2563eb" />} title="Inspection Report">
+              {reportInspection ? (
+                <>
+                  <Text className="text-sm text-slate-600 mb-3" style={{ lineHeight: 20 }}>
+                    Download the factory inspection report for this vendor.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={handleDownloadReport}
+                    disabled={downloadingReport}
+                    activeOpacity={0.85}
+                    className="flex-row items-center justify-center bg-blue-600 rounded-xl py-3"
+                    style={{ opacity: downloadingReport ? 0.6 : 1 }}
+                  >
+                    {downloadingReport ? (
+                      <ActivityIndicator size="small" color="#ffffff" />
+                    ) : (
+                      <Download size={16} color="#ffffff" strokeWidth={2.25} />
+                    )}
+                    <Text className="text-white font-bold text-sm ml-2">
+                      {downloadingReport ? 'Preparing…' : 'Download Report'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <Text className="text-sm text-slate-400">
+                  Report unavailable — no completed inspection yet.
+                </Text>
+              )}
+            </Card>
+
+            {/* Company logo */}
+            {companyLogo ? (
+              <Card icon={<FileText size={18} color="#2563eb" />} title="Company Logo">
+                <TouchableOpacity
+                  onPress={() => openDoc(companyLogo, 'Company Logo')}
+                  activeOpacity={0.85}
+                >
+                  <Image
+                    source={{ uri: companyLogo }}
+                    style={{ width: 112, height: 112, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' }}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              </Card>
+            ) : null}
+
+            {/* Registration documents */}
+            {companyDocs.length > 0 ? (
+              <Card
+                icon={<FileText size={18} color="#2563eb" />}
+                title={`Registration Documents (${companyDocs.length})`}
+              >
+                <View className="flex-row flex-wrap" style={{ columnGap: 10, rowGap: 12 }}>
+                  {companyDocs.map((doc: any, idx: number) => (
+                    <DocTile
+                      key={doc.id || idx}
+                      url={doc.documentUrl}
+                      name={doc.name || DOC_TYPE_LABELS[doc.type] || 'Document'}
+                      typeLabel={DOC_TYPE_LABELS[doc.type] || doc.type}
+                      onOpen={() => openDoc(doc.documentUrl, doc.name)}
+                    />
+                  ))}
+                </View>
+              </Card>
+            ) : null}
+
+            {/* Factory images */}
+            {factoryImages.length > 0 ? (
+              <Card
+                icon={<Factory size={18} color="#2563eb" />}
+                title={`Factory Images (${factoryImages.length})`}
+              >
+                <View className="flex-row flex-wrap" style={{ columnGap: 10, rowGap: 12 }}>
+                  {factoryImages.map((m: any, i: number) => (
+                    <DocTile
+                      key={`${m.label}-${i}`}
+                      url={m.url}
+                      name={m.label}
+                      onOpen={() => openDoc(m.url, m.label)}
+                    />
+                  ))}
+                </View>
+              </Card>
+            ) : null}
+
+            {/* Empty */}
+            {!companyLogo && companyDocs.length === 0 && factoryImages.length === 0 ? (
+              <EmptyCard
+                icon={<FileText size={26} color="#94a3b8" />}
+                title="No documents uploaded"
+                sub="Registered documents will appear here."
+              />
+            ) : null}
+          </View>
+        ) : null}
+
         {activeTab === 'history' ? (
           <View className="mx-4" style={{ rowGap: 16 }}>
             {/* ── Inspection History ────────────────────────────────────── */}
@@ -891,11 +1096,90 @@ export default function VendorDetailScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      {/* Fullscreen image lightbox for registered document images */}
+      <Modal
+        visible={!!lightbox}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLightbox(null)}
+      >
+        <View className="flex-1 bg-black/95">
+          <View
+            className="flex-row items-center justify-between px-4"
+            style={{ paddingTop: insets.top + 8, paddingBottom: 8 }}
+          >
+            <Text className="text-white text-sm font-semibold flex-1 mr-3" numberOfLines={1}>
+              {lightbox?.name}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setLightbox(null)}
+              hitSlop={10}
+              className="w-9 h-9 items-center justify-center rounded-full bg-white/15"
+            >
+              <XIcon size={20} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+          <View className="flex-1 items-center justify-center px-4 pb-8">
+            {lightbox ? (
+              <Image
+                source={{ uri: lightbox.url }}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="contain"
+              />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 // ─── Reusable bits ───────────────────────────────────────────────────────────
+
+function DocTile({
+  url,
+  name,
+  typeLabel,
+  onOpen,
+}: {
+  url?: string | null;
+  name: string;
+  typeLabel?: string;
+  onOpen: () => void;
+}) {
+  const isImg = isImageDoc(url, name);
+  return (
+    <TouchableOpacity
+      onPress={onOpen}
+      activeOpacity={0.85}
+      className="rounded-xl border border-slate-200 bg-slate-50 p-2"
+      style={{ width: 112 }}
+    >
+      <View
+        className="rounded-lg overflow-hidden items-center justify-center bg-white border border-slate-200"
+        style={{ width: 96, height: 96 }}
+      >
+        {isImg && url ? (
+          <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        ) : (
+          <FileText size={34} color="#cbd5e1" />
+        )}
+      </View>
+      {typeLabel ? (
+        <Text className="text-[9px] font-bold uppercase text-slate-400 mt-1.5" numberOfLines={1}>
+          {typeLabel}
+        </Text>
+      ) : null}
+      <View className="flex-row items-center mt-0.5">
+        {isImg ? <Eye size={11} color="#2563eb" /> : <ExternalLink size={11} color="#2563eb" />}
+        <Text className="text-[11px] font-semibold text-slate-700 ml-1 flex-1" numberOfLines={1}>
+          {name}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 function Header({
   onBack,

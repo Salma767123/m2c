@@ -37,13 +37,12 @@ import DocViewerModal from "@/components/UI/DocViewerModal"
 import { FACILITY_META, withUnit } from "./Steps/VI_Step5_Manufacturing"
 import { Country } from "country-state-city"
 
-const COUNTRY_FLAG: Record<string, string> = {}
-Country.getAllCountries().forEach((c) => { if (c.flag) COUNTRY_FLAG[c.name] = c.flag })
-function withFlags(countries: string[]): string[] {
-  return countries.map((name) => {
-    const flag = COUNTRY_FLAG[name]
-    return flag ? `${flag} ${name}` : name
-  })
+// Map country name → ISO code so we can render flag *images* (via flagcdn).
+// Flag emoji don't render on Windows, which shows the bare ISO letters instead.
+const COUNTRY_ISO: Record<string, string> = {}
+Country.getAllCountries().forEach((c) => { COUNTRY_ISO[c.name] = c.isoCode })
+function withFlags(countries: string[]): { flagIso: string; label: string }[] {
+  return countries.map((name) => ({ flagIso: COUNTRY_ISO[name] || "", label: name }))
 }
 const MAIN_STATUS_COLORS: Record<string, string> = {
   "New Assignment": "bg-blue-50 text-blue-700 border-blue-200/85",
@@ -877,9 +876,16 @@ export default function VendorDetail({
               <div className="text-sm font-semibold text-slate-900 leading-relaxed">
                 {field.type === 'list' && Array.isArray(field.value) ? (
                   <div className="flex flex-wrap gap-1.5 mt-1">
-                    {field.value.map((item: string, idx: number) => (
-                      <span key={idx} className="px-2.5 py-0.5 bg-slate-100 text-slate-800 text-xs font-bold rounded-lg border border-slate-200">{item}</span>
-                    ))}
+                    {field.value.map((item: any, idx: number) => {
+                      const iso = item && typeof item === 'object' ? item.flagIso : undefined
+                      const label = item && typeof item === 'object' ? item.label : String(item)
+                      return (
+                        <span key={idx} className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-slate-100 text-slate-800 text-xs font-bold rounded-lg border border-slate-200">
+                          {iso && <img src={`https://flagcdn.com/w20/${String(iso).toLowerCase()}.png`} alt="" className="w-4 h-auto rounded-[2px] shrink-0" loading="lazy" />}
+                          {label}
+                        </span>
+                      )
+                    })}
                   </div>
                 ) : field.type === 'badge' ? (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-50 text-brand-700 border border-brand-100 capitalize mt-1">

@@ -705,6 +705,76 @@ export default function CompanyDetails({
   // Ref-based callback stability pattern (Vercel §8.2)
   const formDataRef = useRef(formData);
   formDataRef.current = formData;
+  const dataRef = useRef(data);
+  dataRef.current = data;
+
+  // Builds the payload persisted to VendorPanel — assembles the landline
+  // strings and mirrors (or wipes) the linked warehouse fields. Shared by
+  // handleNext (Save & Continue) and the unmount sync below so both paths
+  // store an identical shape.
+  const buildPersistPayload = useCallback((currentFormData: FormData): FormData & { [key: string]: any } => {
+    const updatedData: FormData & { [key: string]: any } = { ...currentFormData };
+
+    // Assemble landline strings for backend/ReviewSubmit consumption.
+    // These assembled keys are not in FormData so they flow through the
+    // [key:string]:any index.
+    const localLandline = (currentFormData.localLandlineStd + currentFormData.localLandlineNumber).trim();
+    const intlLandline = (currentFormData.intlLandlineCountryCode + currentFormData.intlLandlineStd + currentFormData.intlLandlineNumber).replace(/^\+?$/, '');
+    updatedData.landlineNumber = localLandline || '';
+    updatedData.intlLandline = intlLandline || '';
+
+    if (currentFormData.sameAsWarehouse) {
+      // "Same as warehouse address" is on — propagate the full address
+      // (including the optional lines + landmark) and the factory ownership
+      // type into the warehouse fields so WarehouseDetails picks them up
+      // via its `data` prop.
+      updatedData.warehouseAddress = currentFormData.address;
+      updatedData.warehouseAddressLine2 = currentFormData.addressLine2;
+      updatedData.warehouseAddressLine3 = currentFormData.addressLine3;
+      updatedData.warehouseLandmark = currentFormData.landmark;
+      updatedData.warehouseCity = currentFormData.city;
+      updatedData.warehouseState = currentFormData.state;
+      updatedData.warehouseZip = currentFormData.zipCode;
+      updatedData.warehouseCountry = currentFormData.country;
+      // WarehouseDetails reads `data.ownershipType` (the field is shared,
+      // not prefixed). Mirror factory ownership to it.
+      updatedData.ownershipType = currentFormData.factoryOwnershipType;
+      // Mirror warehousing capacity so the Warehouse step shows the same value.
+      updatedData.warehousingCapacity = currentFormData.factorySiteCapacity;
+      // Sync factory photos to warehouse — WarehouseDetails displays them
+      // as read-only when isLinked=true.
+      updatedData.factoryImages = currentFormData.factorySiteImages;
+    } else if (dataRef.current.sameAsWarehouse) {
+      // Checkbox was JUST unchecked (the parent state still has it on) —
+      // wipe the previously-synced warehouse fields so Step 2 opens as a
+      // fresh empty form. Guarding on the parent flag keeps a plain revisit
+      // of this step from erasing warehouse data the vendor entered
+      // independently on Step 2.
+      updatedData.warehouseAddress = '';
+      updatedData.warehouseAddressLine2 = '';
+      updatedData.warehouseAddressLine3 = '';
+      updatedData.warehouseLandmark = '';
+      updatedData.warehouseCity = '';
+      updatedData.warehouseState = '';
+      updatedData.warehouseZip = '';
+      updatedData.warehouseCountry = '';
+      updatedData.ownershipType = '';
+      updatedData.warehousingCapacity = '';
+      updatedData.factoryImages = {};
+    }
+
+    return updatedData;
+  }, []);
+
+  // Push the latest local state up whenever this step unmounts (Back
+  // button, sidebar jump, edit-from-review) — not only on Save & Continue —
+  // so the Review step always reflects the latest edits.
+  const onUpdateDataRef = useRef(onUpdateData);
+  onUpdateDataRef.current = onUpdateData;
+  useEffect(
+    () => () => onUpdateDataRef.current(buildPersistPayload(formDataRef.current)),
+    [buildPersistPayload],
+  );
 
   const handleInputChange = useCallback((field: string, value: any) => {
     setFormData((prev) => {
@@ -1444,14 +1514,31 @@ export default function CompanyDetails({
       if (!currentFormData.aadhaarDocument) {
         newErrors.aadhaarDocument = 'Aadhaar Card upload is required';
       }
+      // Optional numbers, once entered, must be backed by their document —
+      // a number without proof is unverifiable.
+      if (currentFormData.gstNumber && !currentFormData.gstDocument) {
+        newErrors.gstDocument = 'GST Certificate upload is required when a GST Number is entered';
+      }
+      if (currentFormData.panNumber && !currentFormData.panCardDocument) {
+        newErrors.panCardDocument = 'PAN Card upload is required when a PAN Number is entered';
+      }
     } else {
       if (!currentFormData.gstDocument) {
         newErrors.gstDocument = 'GST Certificate upload is required';
       }
       // Company PAN Card upload stays mandatory for the four registered types,
-      // but is OPTIONAL for custom "Others" vendors (no typeMeta).
+      // but is OPTIONAL for custom "Others" vendors (no typeMeta) — unless a
+      // PAN Number was entered, in which case the card must back it up.
       if (typeMeta && !currentFormData.panCardDocument) {
         newErrors.panCardDocument = `${currentFormData.businessType === 'proprietorship' ? 'Proprietor PAN Card' : 'Company PAN Card'} upload is required`;
+      }
+      if (!typeMeta && currentFormData.panNumber && !currentFormData.panCardDocument) {
+        newErrors.panCardDocument = 'PAN Card upload is required when a PAN Number is entered';
+      }
+      // Others Registration Number entered → its supporting document becomes
+      // mandatory (mirror of the existing doc-without-number rule above).
+      if (!typeMeta && currentFormData.companyIdNumber && !currentFormData.typeCertDocument) {
+        newErrors.typeCertDocument = 'Supporting document upload is required when a registration number is entered';
       }
       // The IEC Certificate (Proprietorship) is optional; every other
       // type-specific certificate (CIN / Deed / LLPIN) stays mandatory.
@@ -1547,57 +1634,9 @@ export default function CompanyDetails({
       return;
     }
 
-    // If "Same as warehouse address" is checked, propagate the full
-    // address (including the new optional lines + landmark) *and* the
-    // factory ownership type into the warehouse fields so WarehouseDetails
-    // picks them up via its `data` prop. See also the real-time sync
-    // effect below — handleNext is the "final commit"; the effect handles
-    // the live updates while the user is still in this step.
-    const updatedData: FormData & { [key: string]: any } = { ...currentFormData };
-
-    // Assemble landline strings for backend/ReviewSubmit consumption
-    const localLandline = (currentFormData.localLandlineStd + currentFormData.localLandlineNumber).trim();
-    const intlLandline = (currentFormData.intlLandlineCountryCode + currentFormData.intlLandlineStd + currentFormData.intlLandlineNumber).replace(/^\+?$/, '');
-    // These assembled keys are not in FormData so they flow through the [key:string]:any index
-    updatedData.landlineNumber = localLandline || '';
-    updatedData.intlLandline = intlLandline || '';
-
-    if (currentFormData.sameAsWarehouse) {
-      updatedData.warehouseAddress = currentFormData.address;
-      updatedData.warehouseAddressLine2 = currentFormData.addressLine2;
-      updatedData.warehouseAddressLine3 = currentFormData.addressLine3;
-      updatedData.warehouseLandmark = currentFormData.landmark;
-      updatedData.warehouseCity = currentFormData.city;
-      updatedData.warehouseState = currentFormData.state;
-      updatedData.warehouseZip = currentFormData.zipCode;
-      updatedData.warehouseCountry = currentFormData.country;
-      // WarehouseDetails reads `data.ownershipType` (the field is shared,
-      // not prefixed). Mirror factory ownership to it.
-      updatedData.ownershipType = currentFormData.factoryOwnershipType;
-      // Mirror warehousing capacity so the Warehouse step shows the same value.
-      updatedData.warehousingCapacity = currentFormData.factorySiteCapacity;
-      // Sync factory photos to warehouse — WarehouseDetails displays them
-      // as read-only when isLinked=true.
-      updatedData.factoryImages = currentFormData.factorySiteImages;
-    } else {
-      // Checkbox was unchecked — wipe every previously-synced warehouse field
-      // so Step 2 opens as a fresh empty form with no stale linked values.
-      updatedData.warehouseAddress = '';
-      updatedData.warehouseAddressLine2 = '';
-      updatedData.warehouseAddressLine3 = '';
-      updatedData.warehouseLandmark = '';
-      updatedData.warehouseCity = '';
-      updatedData.warehouseState = '';
-      updatedData.warehouseZip = '';
-      updatedData.warehouseCountry = '';
-      updatedData.ownershipType = '';
-      updatedData.warehousingCapacity = '';
-      updatedData.factoryImages = {};
-    }
-    
-    onUpdateData(updatedData);
+    onUpdateData(buildPersistPayload(currentFormData));
     onNext();
-  }, [onNext, onUpdateData]);
+  }, [buildPersistPayload, onNext, onUpdateData]);
 
   // ── Section Completion Status Helpers ────────────────────────────
   // Returns 'complete' | 'partial' | 'empty' for each section.
@@ -1887,7 +1926,7 @@ export default function CompanyDetails({
                     </div>
                     <DocUpload
                       title="GST Certificate"
-                      requiredMark={isUnreg ? 'optional' : 'required'}
+                      requiredMark={isUnreg ? (formData.gstNumber ? 'required' : 'optional') : 'required'}
                       inputId="gstUpload"
                       accept="application/pdf,image/*,.doc,.docx"
                       file={formData.gstFile}
@@ -2160,7 +2199,7 @@ export default function CompanyDetails({
                         </div>
                         <DocUpload
                           title={panCardLabel}
-                          requiredMark="none"
+                          requiredMark={formData.panNumber ? 'required' : 'none'}
                           inputId="panCardUpload"
                           accept="application/pdf,image/*,.doc,.docx"
                           file={formData.panCardFile}
@@ -2205,14 +2244,16 @@ export default function CompanyDetails({
                         </div>
                         <DocUpload
                           title="Other Supporting Document"
-                          requiredMark="none"
+                          requiredMark={formData.companyIdNumber ? 'required' : 'none'}
                           hint="Trust / Society / NGO / Section 8 / other registration proof"
                           inputId="typeCertUpload"
                           accept="application/pdf,image/*,.doc,.docx"
                           file={formData.typeCertFile}
                           documentUrl={formData.typeCertDocument}
                           fallbackName="supporting_document.pdf"
-                          error={typeCertError}
+                          error={typeCertError || errors.typeCertDocument}
+                          invalid={!!errors.typeCertDocument}
+                          dataField="typeCertDocument"
                           onChange={handleTypeCertChange}
                           onDrop={handleTypeCertDrop}
                           onDragOver={handleDragOver}
@@ -2304,7 +2345,7 @@ export default function CompanyDetails({
                         </div>
                         <DocUpload
                           title={panCardLabel}
-                          requiredMark="none"
+                          requiredMark={formData.panNumber ? 'required' : 'none'}
                           inputId="panCardUpload"
                           accept="application/pdf,image/*,.doc,.docx"
                           file={formData.panCardFile}

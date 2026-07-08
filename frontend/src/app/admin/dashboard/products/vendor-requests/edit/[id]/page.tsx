@@ -15,7 +15,7 @@ export default function EditVendorProductRequestPage({ params }: EditVendorProdu
   const { id } = use(params)
 
   return (
-    <PermissionGuard permission="edit_products">
+    <PermissionGuard permission="vendor_product_requests:edit">
       <div className="space-y-6">
         <Breadcrumb />
         <AddEditProduct productId={id} isEdit={true} />

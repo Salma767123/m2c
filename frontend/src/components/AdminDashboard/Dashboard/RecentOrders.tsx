@@ -31,7 +31,7 @@ const getStatusBadge = (status: string) => {
 
 export default function RecentOrders({ orders }: { orders: any[] }) {
   const router = useRouter()
-  const canViewOrders = hasPermission('view_orders')
+  const canViewOrders = hasPermission('hub_to_customer:view')
 
   return (
     <Card>

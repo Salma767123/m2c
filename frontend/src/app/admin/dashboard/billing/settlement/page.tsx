@@ -3,7 +3,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function SettlementPage() {
   return (
-    <PermissionGuard permission="view_billing">
+    <PermissionGuard permission="settlement:view">
       <div className="p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Settlement Management</h1>

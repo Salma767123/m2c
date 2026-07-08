@@ -25,7 +25,7 @@ export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState('heatmap');
 
   return (
-    <PermissionGuard permission="view_analytics">
+    <PermissionGuard permission="analytics:view">
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">

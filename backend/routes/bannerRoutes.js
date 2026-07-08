@@ -8,10 +8,10 @@ const { upload } = require('../middleware/upload');
 router.get('/public', getActiveBanners);
 
 // Admin endpoints
-router.get('/', authenticateToken, requireRole('admin'), requirePermission(['view_settings', 'manage_settings']), getAllBanners);
-router.post('/', authenticateToken, requireRole('admin'), requirePermission('manage_settings'), upload.single('image'), addBanner);
-router.put('/:id', authenticateToken, requireRole('admin'), requirePermission('manage_settings'), upload.single('image'), updateBanner);
-router.delete('/:id', authenticateToken, requireRole('admin'), requirePermission('manage_settings'), deleteBanner);
-router.put('/reorder/update', authenticateToken, requireRole('admin'), requirePermission('manage_settings'), reorderBanners);
+router.get('/', authenticateToken, requireRole('admin'), requirePermission('settings:view'), getAllBanners);
+router.post('/', authenticateToken, requireRole('admin'), requirePermission('settings:edit'), upload.single('image'), addBanner);
+router.put('/:id', authenticateToken, requireRole('admin'), requirePermission('settings:edit'), upload.single('image'), updateBanner);
+router.delete('/:id', authenticateToken, requireRole('admin'), requirePermission('settings:edit'), deleteBanner);
+router.put('/reorder/update', authenticateToken, requireRole('admin'), requirePermission('settings:edit'), reorderBanners);
 
 module.exports = router;

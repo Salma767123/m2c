@@ -32,7 +32,7 @@ interface UserProfile {
 }
 
 export default function Settings() {
-  const canManageSettings = hasPermission("manage_settings");
+  const canManageSettings = hasPermission("settings:edit");
   // Simulate getting current user role - replace with actual auth
   const [currentUser] = useState<UserProfile>({
     id: "1",

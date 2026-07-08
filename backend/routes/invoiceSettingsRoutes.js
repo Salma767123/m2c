@@ -8,7 +8,7 @@ const { authenticateToken, requireAdminRole, requirePermission } = require('../m
 const router = express.Router();
 
 // Admin Routes for Invoice Settings
-router.get('/', authenticateToken, requireAdminRole, requirePermission(['view_billing', 'manage_billing']), getInvoiceSettings);
-router.put('/', authenticateToken, requireAdminRole, requirePermission('manage_billing'), updateInvoiceSettings);
+router.get('/', authenticateToken, requireAdminRole, requirePermission('settings:view'), getInvoiceSettings);
+router.put('/', authenticateToken, requireAdminRole, requirePermission('settings:edit'), updateInvoiceSettings);
 
 module.exports = router;

@@ -43,7 +43,7 @@ function checkBannerDimensions(file: File, dataUrl: string): Promise<void> {
 }
 
 export default function BannerSettingsTab() {
-    const canManage = hasPermission('manage_settings');
+    const canManage = hasPermission('settings:edit');
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
     const [banners, setBanners] = useState<BannerImage[]>([]);

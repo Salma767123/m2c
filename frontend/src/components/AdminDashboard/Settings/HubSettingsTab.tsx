@@ -9,7 +9,7 @@ import hubService, { Hub } from "@/services/hubService";
 import { hasPermission } from "@/lib/auth";
 
 export default function HubSettingsTab() {
-  const canManage = hasPermission("manage_settings");
+  const canManage = hasPermission("settings:edit");
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);

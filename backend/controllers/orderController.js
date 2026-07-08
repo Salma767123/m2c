@@ -4,6 +4,7 @@ const { generateInvoiceNo } = require('../utils/invoiceGenerator');
 const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
 const { notifications } = require('../utils/notificationService');
 const { checkAndAlertLowStock } = require('../utils/lowStockAlert');
+const { withRetry } = require('../utils/dbRetry');
 
 // Create new order
 const createOrder = async (req, res) => {
@@ -44,14 +45,33 @@ const createOrder = async (req, res) => {
         // passes (otherwise a rejected request would burn an invoice number).
         const needsRazorpayVerification = Boolean(razorpayOrderId && razorpaySignature && paymentId);
 
-        const [cart, user, bagType, paymentSettings] = await Promise.all([
+        const [cart, user, bagType, paymentSettings, existingOrderForPayment] = await Promise.all([
             prisma.cart.findFirst({ where: { userId }, include: { items: true } }),
             prisma.user.findUnique({ where: { id: userId } }),
             bagTypeId ? prisma.bagType.findUnique({ where: { id: bagTypeId } }) : Promise.resolve(null),
             needsRazorpayVerification
                 ? prisma.paymentSettings.findFirst({ select: { razorpayKeySecret: true } })
                 : Promise.resolve(null),
+            // Idempotency guard: a gateway payment id can only ever produce one
+            // order. If the client retries after a network failure (response
+            // lost but the first attempt committed), return the existing order
+            // instead of charging stock/settlements twice.
+            paymentId
+                ? prisma.order.findFirst({
+                    where: { paymentId, customerId: userId },
+                    include: { items: ACTIVE_ITEMS_FILTER },
+                })
+                : Promise.resolve(null),
         ]);
+
+        if (existingOrderForPayment) {
+            return res.status(200).json({
+                success: true,
+                message: 'Order already placed for this payment',
+                data: existingOrderForPayment,
+                duplicate: true,
+            });
+        }
 
         // Verify Razorpay signature inline (server-side check is mandatory —
         // we never trust a payment id that has not been HMAC-verified).
@@ -481,8 +501,8 @@ const createOrder = async (req, res) => {
         // forget — the order is already committed, so a log-write failure must
         // not block (or fail) the response to the customer.
         if (stockHistoryRecords.length > 0) {
-            prisma.stockChangeHistory.createMany({ data: stockHistoryRecords })
-                .catch((err) => console.error('stockChangeHistory backfill failed:', err));
+            withRetry(() => prisma.stockChangeHistory.createMany({ data: stockHistoryRecords }))
+                .catch((err) => console.error('stockChangeHistory backfill failed after retries:', err));
         }
 
         // Send low stock / out of stock alerts (outside transaction)

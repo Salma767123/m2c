@@ -116,6 +116,19 @@ function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
 const LOCATION_THRESHOLD_METERS = 500;
 
 /**
+ * Whether the checker→vendor geofence is disabled.
+ *
+ * Disabled everywhere by default — dev AND production — so inspections never
+ * require GPS or the browser location prompt. To turn the geofence back on,
+ * set `ENABLE_GEOFENCE=true` in the environment.
+ *
+ * @returns {boolean}
+ */
+function isGeofenceDisabled() {
+  return process.env.ENABLE_GEOFENCE !== "true";
+}
+
+/**
  * Geofence guard used by every "checker → vendor factory" action.
  *
  * Mirrors the inline check in `inspectionController.startInspection` so the
@@ -140,6 +153,13 @@ async function verifyCheckerAtVendor({
   label,
 }) {
   const prefix = label ? `${label} — ` : "";
+
+  // Dev/non-production: skip the geofence entirely so inspections can be run
+  // without GPS. Never trips in production (see isGeofenceDisabled).
+  if (isGeofenceDisabled()) {
+    console.log(`[Geofence] ${prefix}DISABLED (${process.env.NODE_ENV || "no NODE_ENV"}) — skipping location check.`);
+    return { ok: true, vendorLat: null, vendorLng: null, distanceM: 0, skipped: true };
+  }
 
   if (checkerLatitude == null || checkerLongitude == null) {
     console.log(
@@ -242,5 +262,6 @@ module.exports = {
   parseMapLinkCoordinates,
   haversineDistanceMeters,
   LOCATION_THRESHOLD_METERS,
+  isGeofenceDisabled,
   verifyCheckerAtVendor,
 };

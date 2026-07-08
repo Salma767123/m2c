@@ -240,7 +240,7 @@ export default function WebsiteEnquiryManagement() {
                       <td className="px-6 py-4">{getStatusBadge(enquiry.status)}</td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
-                          {hasPermission(['view_enquiries', 'manage_enquiries']) && (
+                          {hasPermission('website_enquiries:view') && (
                             <Button
                               size="sm"
                               variant="ghost"
@@ -250,7 +250,7 @@ export default function WebsiteEnquiryManagement() {
                               <Eye className="w-4 h-4" />
                             </Button>
                           )}
-                          {hasPermission('manage_enquiries') && (
+                          {hasPermission('website_enquiries:delete') && (
                             <Button
                               size="sm"
                               variant="ghost"
@@ -334,7 +334,7 @@ export default function WebsiteEnquiryManagement() {
                   <div>{getStatusBadge(selectedEnquiry.status)}</div>
                 </div>
 
-                {hasPermission('manage_enquiries') && selectedEnquiry.status !== 'closed' && (
+                {hasPermission('website_enquiries:edit') && selectedEnquiry.status !== 'closed' && (
                   <div className="flex gap-2 pt-4 border-t">
                     {selectedEnquiry.status !== 'replied' && (
                       <Button onClick={() => handleUpdateStatus('replied')} className="flex-1">

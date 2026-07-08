@@ -229,7 +229,7 @@ export default function VendorEnquiryManagement() {
                       <td className="px-6 py-4">{getStatusBadge(enquiry.status)}</td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
-                          {hasPermission(['view_enquiries', 'manage_enquiries']) && (
+                          {hasPermission('vendor_enquiries:view') && (
                             <Button
                               size="sm"
                               variant="ghost"
@@ -239,7 +239,7 @@ export default function VendorEnquiryManagement() {
                               <Eye className="w-4 h-4" />
                             </Button>
                           )}
-                          {enquiry.status === 'pending' && hasPermission('manage_enquiries') && (
+                          {enquiry.status === 'pending' && hasPermission('vendor_enquiries:edit') && (
                             <>
                               <Button
                                 size="sm"
@@ -261,7 +261,7 @@ export default function VendorEnquiryManagement() {
                               </Button>
                             </>
                           )}
-                          {hasPermission('manage_enquiries') && (
+                          {hasPermission('vendor_enquiries:delete') && (
                             <Button
                               size="sm"
                               variant="ghost"

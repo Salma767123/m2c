@@ -8,6 +8,7 @@ import Dropdown from '@/components/UI/Dropdown';
 import BagTypeModal from './BagTypeModal';
 import bagTypeService, { BagType } from '@/services/bagTypeService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { hasPermission } from '@/lib/auth';
 import { Breadcrumb } from '../Breadcrumb/Breadcrumb';
 import {
   DndContext,
@@ -106,12 +107,16 @@ function SortableBagTypeRow({
           <button onClick={() => handleView(bagType)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View">
             <Eye className="h-4 w-4" />
           </button>
-          <button onClick={() => handleEdit(bagType)} className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Edit">
-            <Edit className="h-4 w-4" />
-          </button>
-          <button onClick={() => handleDelete(bagType)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {hasPermission('bag_types:edit') && (
+            <button onClick={() => handleEdit(bagType)} className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Edit">
+              <Edit className="h-4 w-4" />
+            </button>
+          )}
+          {hasPermission('bag_types:delete') && (
+            <button onClick={() => handleDelete(bagType)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </TableCell>
     </TableRow>
@@ -313,13 +318,15 @@ export default function BagTypeManagement() {
           <h1 className="text-2xl font-bold text-gray-900">Bag Types</h1>
           <p className="text-gray-600 mt-1">Manage bag add-ons that customers can purchase with their orders</p>
         </div>
-        <button
-          onClick={handleCreate}
-          className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
-        >
-          <Plus className="h-5 w-5" />
-          Add Bag Type
-        </button>
+        {hasPermission('bag_types:create') && (
+          <button
+            onClick={handleCreate}
+            className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+          >
+            <Plus className="h-5 w-5" />
+            Add Bag Type
+          </button>
+        )}
       </div>
 
       {/* Stats */}

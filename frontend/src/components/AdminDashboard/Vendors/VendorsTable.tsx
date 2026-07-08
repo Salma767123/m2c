@@ -71,7 +71,7 @@ const getInspectionBadge = (vendorStatus: string, latestInspection?: VendorProfi
     case 'SCHEDULED':
       return <Badge className="bg-slate-50 text-slate-600 border border-slate-200">QC Scheduled</Badge>
     case 'IN_PROGRESS':
-      return <Badge className="bg-blue-50 text-blue-700 border border-blue-200">QC In Progress</Badge>
+      return <Badge className="bg-amber-50 text-amber-700 border border-amber-200">QC In Progress</Badge>
     case 'UNDER_ADMIN_REVIEW':
       return <Badge className="bg-purple-50 text-purple-700 border border-purple-200">Under Admin Review</Badge>
     default:
@@ -369,7 +369,7 @@ export default function VendorsTable() {
           <h1 className="text-2xl font-bold text-slate-900">Vendors Management</h1>
           <p className="text-slate-500 mt-0.5">Manage registered vendors and their approval workflow.</p>
         </div>
-        {hasPermission('create_vendors') && (
+        {hasPermission('vendor_management:create') && (
           <Link href="/admin/dashboard/vendors/add" className="shrink-0">
             <button className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold py-2 px-4 rounded-xl transition-colors shadow-xs shadow-brand-500/10 text-sm whitespace-nowrap">
               <Plus className="h-4 w-4" />
@@ -573,7 +573,7 @@ export default function VendorsTable() {
                       {/* Actions */}
                       <TableCell className="py-3 px-3 align-middle">
                         <div className="flex items-center justify-end gap-0.5 whitespace-nowrap">
-                          {hasPermission('view_vendors') && (
+                          {hasPermission('vendor_management:view') && (
                             <Link href={`/admin/dashboard/vendors/view/${vendor.id}`}>
                               <button
                                 title="View Details"
@@ -583,7 +583,7 @@ export default function VendorsTable() {
                               </button>
                             </Link>
                           )}
-                          {hasPermission('edit_vendors') && (
+                          {hasPermission('vendor_management:edit') && (
                             <Link href={`/admin/dashboard/vendors/edit/${vendor.id}`}>
                               <button
                                 title="Edit Vendor"
@@ -593,7 +593,7 @@ export default function VendorsTable() {
                               </button>
                             </Link>
                           )}
-                          {(vendor.status === 'PENDING' || vendor.status === 'UNDER_REVIEW') && hasPermission('edit_vendors') && (
+                          {(vendor.status === 'PENDING' || vendor.status === 'UNDER_REVIEW') && hasPermission('vendor_management:edit') && (
                             <>
                               <button
                                 title="Approve Vendor"
@@ -615,7 +615,7 @@ export default function VendorsTable() {
                               </button>
                             </>
                           )}
-                          {vendor.status === 'APPROVED' && hasPermission('edit_vendors') && (
+                          {vendor.status === 'APPROVED' && hasPermission('vendor_management:edit') && (
                             <button
                               title="Suspend Vendor"
                               onClick={() => handleSuspendVendor(vendor)}

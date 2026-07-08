@@ -14,10 +14,10 @@ const { authenticateToken, requireRole, requirePermission } = require('../middle
 router.post('/submit', submitContactEnquiry);
 
 // Admin routes — gated by the Enquiries module permissions
-router.get('/', authenticateToken, requireRole('admin'), requirePermission(['view_enquiries', 'manage_enquiries']), getAllContactEnquiries);
-router.get('/stats', authenticateToken, requireRole('admin'), requirePermission(['view_enquiries', 'manage_enquiries']), getContactEnquiryStats);
-router.get('/:id', authenticateToken, requireRole('admin'), requirePermission(['view_enquiries', 'manage_enquiries']), getContactEnquiryById);
-router.put('/:id/status', authenticateToken, requireRole('admin'), requirePermission('manage_enquiries'), updateContactEnquiryStatus);
-router.delete('/:id', authenticateToken, requireRole('admin'), requirePermission('manage_enquiries'), deleteContactEnquiry);
+router.get('/', authenticateToken, requireRole('admin'), requirePermission('website_enquiries:view'), getAllContactEnquiries);
+router.get('/stats', authenticateToken, requireRole('admin'), requirePermission('website_enquiries:view'), getContactEnquiryStats);
+router.get('/:id', authenticateToken, requireRole('admin'), requirePermission('website_enquiries:view'), getContactEnquiryById);
+router.put('/:id/status', authenticateToken, requireRole('admin'), requirePermission('website_enquiries:edit'), updateContactEnquiryStatus);
+router.delete('/:id', authenticateToken, requireRole('admin'), requirePermission('website_enquiries:delete'), deleteContactEnquiry);
 
 module.exports = router;

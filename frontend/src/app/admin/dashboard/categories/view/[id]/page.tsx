@@ -15,7 +15,7 @@ export default function ViewCategoryPage({ params }: ViewCategoryPageProps) {
   const { id } = use(params)
 
   return (
-    <PermissionGuard permission="view_categories">
+    <PermissionGuard permission="categories:view">
       <div className="space-y-6">
         <Breadcrumb />
         <ViewCategory categoryId={id} />

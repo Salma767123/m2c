@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, Modal, Image } from 'react-native';
 import {
   ArrowLeft,
   User,
@@ -13,11 +13,20 @@ import {
   Shield,
   Award,
   CheckCircle2,
+  FileText,
+  ExternalLink,
+  Clock,
+  X as XIcon,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import * as WebBrowser from 'expo-web-browser';
 
 import qcCheckerService from '../../services/qcCheckerService';
+
+// Decide whether an ID-proof reference is a PDF (mirrors web CheckerSettings).
+const isPdfIdProof = (v?: string | null) =>
+  !!v && (v.startsWith('data:application/pdf') || v.toLowerCase().endsWith('.pdf'));
 
 type ViewProfileProps = {
   onClose: () => void;
@@ -43,6 +52,8 @@ type CheckerInfo = {
   certifications: string;
   totalInspections: number;
   location: string;
+  idProof: string;
+  lastLogin: string;
 };
 
 const EMPTY_INFO: CheckerInfo = {
@@ -65,6 +76,8 @@ const EMPTY_INFO: CheckerInfo = {
   certifications: '',
   totalInspections: 0,
   location: '',
+  idProof: '',
+  lastLogin: '',
 };
 
 function getInitials(name: string): string {
@@ -79,6 +92,14 @@ function formatDate(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// Last login uses the web's locale date/time format (en-IN).
+function formatDateTime(iso: string): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-IN');
 }
 
 function tenure(joinIso: string): string {
@@ -179,6 +200,7 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
   const [checkerInfo, setCheckerInfo] = useState<CheckerInfo>(EMPTY_INFO);
   const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [idProofLightbox, setIdProofLightbox] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
     email: '',
@@ -202,6 +224,7 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
     try {
       const res = await qcCheckerService.getCheckerProfile();
       if (res.success && res.data) {
+        const raw = res.data as any;
         const next: CheckerInfo = {
           id: res.data.checkerId || '',
           name: res.data.name || '',
@@ -222,6 +245,8 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
           certifications: res.data.certifications || '',
           totalInspections: res.data.completedInspections || 0,
           location: [res.data.city, res.data.state].filter(Boolean).join(', '),
+          idProof: raw.idProof || '',
+          lastLogin: res.data.lastLoginAt || '',
         };
         setCheckerInfo(next);
         setEditForm({
@@ -281,6 +306,21 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
       Alert.alert('Error', 'Failed to update profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Open the ID proof: images go to an in-app lightbox, PDFs open in the
+  // system browser (mirrors web's viewer behaviour).
+  const openIdProof = async () => {
+    if (!checkerInfo.idProof) return;
+    if (isPdfIdProof(checkerInfo.idProof)) {
+      try {
+        await WebBrowser.openBrowserAsync(checkerInfo.idProof);
+      } catch {
+        Alert.alert('Unable to open', 'Could not open the ID proof.');
+      }
+    } else {
+      setIdProofLightbox(true);
     }
   };
 
@@ -452,6 +492,49 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
             </View>
           </View>
 
+          {/* Security & ID section */}
+          <View className="px-4 mt-6">
+            <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">
+              Security &amp; ID
+            </Text>
+            <View className="bg-white rounded-2xl border border-slate-200 px-4 divide-y divide-slate-100">
+              {/* Last login */}
+              <InfoRow
+                icon={<Clock size={18} color="#2563eb" strokeWidth={2} />}
+                label="Last Login"
+                value={checkerInfo.lastLogin ? formatDateTime(checkerInfo.lastLogin) : '—'}
+              />
+              {/* ID proof */}
+              <View className="flex-row items-center py-4">
+                <View className="w-10 h-10 rounded-xl bg-slate-100 items-center justify-center mr-4">
+                  <Shield size={18} color="#2563eb" strokeWidth={2} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                    ID Proof
+                  </Text>
+                  {checkerInfo.idProof ? (
+                    <TouchableOpacity
+                      onPress={openIdProof}
+                      activeOpacity={0.8}
+                      className="flex-row items-center self-start bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 mt-1"
+                    >
+                      <FileText size={14} color="#1d4ed8" />
+                      <Text className="text-sm font-semibold text-blue-700 mx-1.5">
+                        View ID Proof{isPdfIdProof(checkerInfo.idProof) ? ' (PDF)' : ''}
+                      </Text>
+                      <ExternalLink size={13} color="#1d4ed8" />
+                    </TouchableOpacity>
+                  ) : (
+                    <Text className="text-base font-medium text-slate-400 leading-6">
+                      No ID proof uploaded
+                    </Text>
+                  )}
+                </View>
+              </View>
+            </View>
+          </View>
+
           {/* Personal section */}
           <View className="px-4 mt-6">
             <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">
@@ -505,6 +588,41 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        {/* ID proof image lightbox */}
+        <Modal
+          visible={idProofLightbox}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setIdProofLightbox(false)}
+        >
+          <View className="flex-1 bg-black/95">
+            <View
+              className="flex-row items-center justify-between px-4"
+              style={{ paddingTop: insets.top + 8, paddingBottom: 8 }}
+            >
+              <Text className="text-white text-sm font-semibold flex-1 mr-3" numberOfLines={1}>
+                ID Proof
+              </Text>
+              <TouchableOpacity
+                onPress={() => setIdProofLightbox(false)}
+                hitSlop={10}
+                className="w-9 h-9 items-center justify-center rounded-full bg-white/15"
+              >
+                <XIcon size={20} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+            <View className="flex-1 items-center justify-center px-4 pb-8">
+              {checkerInfo.idProof ? (
+                <Image
+                  source={{ uri: checkerInfo.idProof }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="contain"
+                />
+              ) : null}
+            </View>
+          </View>
+        </Modal>
 
         {/* Edit Modal */}
         <Modal

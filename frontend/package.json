@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "NODE_OPTIONS='--max-old-space-size=4096' next dev --turbopack",
+    "dev": "cross-env NODE_OPTIONS=--max-old-space-size=4096 next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -49,6 +49,7 @@
     "@types/react-dom": "^19",
     "@types/react-select-country-list": "^2.2.3",
     "@types/react-signature-canvas": "^1.0.7",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.0",
     "tailwindcss": "^4",

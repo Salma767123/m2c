@@ -20,17 +20,17 @@ router.get('/public', getPublicCompanyInfo);
 router.use(authenticateToken);
 
 // Get company info - accessible by anyone with view_settings or manage_settings
-router.get('/', requireRole('admin'), requirePermission(['view_settings', 'manage_settings']), getCompanyInfo);
+router.get('/', requireRole('admin'), requirePermission('settings:view'), getCompanyInfo);
 
 // Update routes - require manage_settings
-router.put('/basic', requireRole('admin'), requirePermission('manage_settings'), updateBasicInfo);
-router.put('/legal', requireRole('admin'), requirePermission('manage_settings'), updateLegalInfo);
-router.put('/address', requireRole('admin'), requirePermission('manage_settings'), updateAddress);
-router.put('/bank', requireRole('admin'), requirePermission('manage_settings'), updateBankDetails);
-router.put('/logo', requireRole('admin'), requirePermission('manage_settings'), updateLogo);
+router.put('/basic', requireRole('admin'), requirePermission('settings:edit'), updateBasicInfo);
+router.put('/legal', requireRole('admin'), requirePermission('settings:edit'), updateLegalInfo);
+router.put('/address', requireRole('admin'), requirePermission('settings:edit'), updateAddress);
+router.put('/bank', requireRole('admin'), requirePermission('settings:edit'), updateBankDetails);
+router.put('/logo', requireRole('admin'), requirePermission('settings:edit'), updateLogo);
 
 // Vendor notification email settings (Super Admin only — checked inside controller)
-router.get('/vendor-notifications', requireRole('admin'), requirePermission('manage_settings'), getVendorNotificationSettings);
-router.put('/vendor-notifications', requireRole('admin'), requirePermission('manage_settings'), updateVendorNotificationSettings);
+router.get('/vendor-notifications', requireRole('admin'), requirePermission('settings:view'), getVendorNotificationSettings);
+router.put('/vendor-notifications', requireRole('admin'), requirePermission('settings:edit'), updateVendorNotificationSettings);
 
 module.exports = router;

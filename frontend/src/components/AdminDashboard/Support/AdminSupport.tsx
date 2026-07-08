@@ -301,7 +301,7 @@ export default function AdminSupport() {
                     <span className="text-sm text-gray-900">{ticket.messages?.length || 0}</span>
                   </TableCell>
                   <TableCell>
-                    {hasPermission(['view_support', 'manage_support']) && (
+                    {hasPermission('support:view') && (
                       <Link
                         href={`/admin/dashboard/support/${ticket.id}`}
                         className="inline-flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium"

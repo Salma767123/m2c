@@ -13,7 +13,7 @@ export default function EditCategoryPage({ params }: EditCategoryPageProps) {
   const { id } = use(params)
 
   return (
-    <PermissionGuard permission="edit_categories">
+    <PermissionGuard permission="categories:edit">
       <div className="space-y-6">
         <Breadcrumb />
         <AddEditCategory categoryId={id} isEdit={true} />

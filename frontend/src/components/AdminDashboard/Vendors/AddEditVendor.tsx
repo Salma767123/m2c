@@ -105,6 +105,16 @@ interface VendorFormData {
         { file: File | null; url: string; name: string; isExisting?: boolean }
       >
     | any[];
+  // Company Details step reads/writes `factorySiteImages` (the canonical
+  // factory photo slots) and mirrors them into `factoryImages` on Save &
+  // Continue. Both must be seeded on reload or the Company Details slots
+  // render empty and a subsequent save wipes the stored photos.
+  factorySiteImages: Record<
+    string,
+    { file: File | null; url: string; name: string; isExisting?: boolean }
+  >;
+  /** Factory total floor area (sq ft) — persisted via `warehousingCapacity`. */
+  factorySiteCapacity: string;
 
   // Owner Profile
   ownerName: string;
@@ -264,6 +274,8 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     warehouseZip: "",
     warehouseCountry: "India",
     factoryImages: {},
+    factorySiteImages: {},
+    factorySiteCapacity: "",
 
     // Owner Profile
     ownerName: "",
@@ -530,6 +542,53 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         },
       );
 
+      // Reverse map: descriptive document name → slot id. Mirrors
+      // FACTORY_SLOT_LABEL_MAP in backend/controllers/vendorController.js
+      // and FACTORY_IMAGE_SLOTS in CompanyDetails/WarehouseDetails; keep them
+      // in sync if new slots are added. Legacy rows named "Factory Image N"
+      // (pre-slot era) collapse into the `others` slot so they remain
+      // visible and replaceable.
+      const reloadedFactoryImages = (() => {
+        const slotByName: Record<string, string> = {
+          "Factory Name Board": "nameBoard",
+          "Factory Front View": "frontView",
+          "Factory Back View": "backView",
+          "Factory Left View": "leftView",
+          "Factory Right View": "rightView",
+          "Factory Road View": "roadView",
+          "Factory Interior": "insideFactory",
+          "Factory Image (Other)": "others",
+        };
+        const record: Record<
+          string,
+          {
+            file: File | null;
+            url: string;
+            name: string;
+            isExisting: boolean;
+          }
+        > = {};
+        const factoryDocs =
+          vendor.documents?.filter(
+            (doc: any) =>
+              doc.type === "OTHER" && doc.name?.includes("Factory"),
+          ) || [];
+        factoryDocs.forEach((doc: any) => {
+          const slotId = slotByName[doc.name] || "others";
+          // Don't overwrite a slot that already has a more-specific match;
+          // legacy fallback into `others` only fills if `others` is empty.
+          if (!record[slotId]) {
+            record[slotId] = {
+              file: null,
+              url: doc.documentUrl,
+              name: doc.name,
+              isExisting: true,
+            };
+          }
+        });
+        return record;
+      })();
+
       // Map vendor data to form structure
       setFormData({
         // Company Details
@@ -612,54 +671,18 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         warehouseState: vendor.warehouseState || "",
         warehouseZip: vendor.warehouseZipCode || "",
         warehouseCountry: vendor.warehouseCountry || "India",
-        // Reverse map: descriptive document name → slot id. Mirrors
-        // FACTORY_SLOT_LABEL_MAP in backend/controllers/vendorController.js
-        // and FACTORY_IMAGE_SLOTS in WarehouseDetails.tsx; keep all three in
-        // sync if new slots are added.
-        // Build slot-keyed Record so WarehouseDetails renders existing photos
-        // back into their original slots. Legacy rows named "Factory Image N"
-        // (pre-slot era) collapse into the `others` slot so they remain
-        // visible and replaceable.
-        factoryImages: (() => {
-          const slotByName: Record<string, string> = {
-            "Factory Name Board": "nameBoard",
-            "Factory Front View": "frontView",
-            "Factory Back View": "backView",
-            "Factory Left View": "leftView",
-            "Factory Right View": "rightView",
-            "Factory Road View": "roadView",
-            "Factory Interior": "insideFactory",
-            "Factory Image (Other)": "others",
-          };
-          const record: Record<
-            string,
-            {
-              file: File | null;
-              url: string;
-              name: string;
-              isExisting: boolean;
-            }
-          > = {};
-          const factoryDocs =
-            vendor.documents?.filter(
-              (doc: any) =>
-                doc.type === "OTHER" && doc.name?.includes("Factory"),
-            ) || [];
-          factoryDocs.forEach((doc: any) => {
-            const slotId = slotByName[doc.name] || "others";
-            // Don't overwrite a slot that already has a more-specific match;
-            // legacy fallback into `others` only fills if `others` is empty.
-            if (!record[slotId]) {
-              record[slotId] = {
-                file: null,
-                url: doc.documentUrl,
-                name: doc.name,
-                isExisting: true,
-              };
-            }
-          });
-          return record;
-        })(),
+        // Same slot-keyed Record feeds both steps: WarehouseDetails reads
+        // `factoryImages`, CompanyDetails reads `factorySiteImages`. Seeding
+        // only one of them left the Company Details photo slots empty in edit
+        // mode — and since CompanyDetails overwrites `factoryImages` from
+        // `factorySiteImages` on Save & Continue, it also wiped the stored
+        // photos on the next save.
+        factoryImages: reloadedFactoryImages,
+        factorySiteImages: reloadedFactoryImages,
+        // CompanyDetails' "Total floor area" field — round-trips through
+        // `warehousingCapacity` (vendor.storageCapacity), same as the
+        // Warehouse step's capacity field.
+        factorySiteCapacity: vendor.storageCapacity || "",
         // Owner Profile
         ownerName: vendor.ownerName || "",
         ownerTitle: (vendor as any).ownerTitle || "",

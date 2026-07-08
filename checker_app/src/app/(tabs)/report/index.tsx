@@ -8,13 +8,13 @@ import {
   TouchableOpacity,
   RefreshControl,
   Modal,
+  Alert,
 } from 'react-native';
 import {
   Search,
   Eye,
   CheckCircle,
   XCircle,
-  AlertCircle,
   RefreshCw,
   X,
   ChevronDown,
@@ -22,11 +22,13 @@ import {
   ChevronRight,
   Factory,
   Package,
-  FileText,
+  Download,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import qcCheckerService from '../../../services/qcCheckerService';
 import { useDebounce } from '../../../hooks/useDebounce';
+import DateRangeCalendar, { fmtDate } from '@/components/General/DateRangeCalendar';
+import { downloadFactoryReportPdf, downloadProductReportPdf } from '@/lib/reportPdf';
 
 type Tab = 'factory' | 'product';
 const PAGE_SIZE = 12;
@@ -50,6 +52,13 @@ const PRODUCT_SORT_OPTIONS = [
   { value: 'updatedAt:asc', label: 'Oldest first' },
   { value: 'name:asc', label: 'Name A–Z' },
   { value: 'name:desc', label: 'Name Z–A' },
+];
+
+// Product status filter — labels match the web ProductReportsTab exactly.
+const PRODUCT_STATUS_OPTIONS = [
+  { value: '', label: 'All results' },
+  { value: 'APPROVED', label: 'Approved' },
+  { value: 'REJECTED', label: 'Rejected' },
 ];
 
 export default function ReportsScreen() {
@@ -107,6 +116,8 @@ function FactoryReportsTab() {
   const [searchInput, setSearchInput] = useState('');
   const [resultFilter, setResultFilter] = useState('');
   const [sort, setSort] = useState(DEFAULT_SORT);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const debouncedSearch = useDebounce(searchInput, 300);
 
@@ -117,12 +128,18 @@ function FactoryReportsTab() {
   const [error, setError] = useState<string | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
   const [showSortModal, setShowSortModal] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [checkerName, setCheckerName] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    qcCheckerService.getCheckerData().then((d) => { if (d?.name) setCheckerName(d.name); }).catch(() => {});
+  }, []);
 
   const didMountRef = useRef(false);
   useEffect(() => {
     if (!didMountRef.current) { didMountRef.current = true; return; }
     setPage(1);
-  }, [debouncedSearch, resultFilter, sort]);
+  }, [debouncedSearch, resultFilter, sort, dateFrom, dateTo]);
 
   const [sortBy, sortOrder] = useMemo(() => {
     const [by, ord] = sort.split(':');
@@ -160,10 +177,39 @@ function FactoryReportsTab() {
   // Refetch on focus so freshly-submitted inspections appear immediately.
   useFocusEffect(useCallback(() => { loadReports(); }, [loadReports]));
 
-  const hasActiveFilters = Boolean(debouncedSearch || resultFilter || sort !== DEFAULT_SORT || page !== 1);
+  // Client-side date filter — filters within the current server page, on the
+  // same field the web filters (completion date, falling back to scheduled).
+  const filteredInspections = useMemo(() => {
+    if (!dateFrom) return inspections;
+    return inspections.filter((insp) => {
+      const src = insp.completedAt || insp.scheduledDate;
+      if (!src) return false;
+      const d = new Date(src);
+      if (Number.isNaN(d.getTime())) return false;
+      const raw = fmtDate(d);
+      if (dateTo) return raw >= dateFrom && raw <= dateTo;
+      return raw === dateFrom;
+    });
+  }, [inspections, dateFrom, dateTo]);
+
+  const hasActiveFilters = Boolean(debouncedSearch || resultFilter || sort !== DEFAULT_SORT || dateFrom || page !== 1);
   const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1;
-  const rangeEnd = Math.min(pagination.page * pagination.limit, pagination.total);
-  const clearFilters = () => { setSearchInput(''); setResultFilter(''); setSort(DEFAULT_SORT); setPage(1); };
+  const rangeEnd = dateFrom
+    ? rangeStart + filteredInspections.length - 1
+    : Math.min(pagination.page * pagination.limit, pagination.total);
+  const totalShown = dateFrom ? filteredInspections.length : pagination.total;
+  const clearFilters = () => { setSearchInput(''); setResultFilter(''); setSort(DEFAULT_SORT); setDateFrom(''); setDateTo(''); setPage(1); };
+
+  const handleDownload = async (insp: any) => {
+    setDownloadingId(insp.id);
+    try {
+      await downloadFactoryReportPdf(insp, { variant: 'canonical', checkerName });
+    } catch (e: any) {
+      Alert.alert('PDF Error', e?.message || 'Failed to generate PDF');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const buildRow = (insp: any) => {
     const fd = insp.itemsToInspect && !Array.isArray(insp.itemsToInspect) ? insp.itemsToInspect : {};
@@ -206,6 +252,16 @@ function FactoryReportsTab() {
         ) : null}
       </View>
 
+      {/* Date range filter */}
+      <View className="mb-3">
+        <DateRangeCalendar
+          from={dateFrom}
+          to={dateTo}
+          onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
+          placeholder="Filter by date"
+        />
+      </View>
+
       {/* Filter + Sort */}
       <View className="flex-row mb-3" style={{ columnGap: 8 }}>
         <TouchableOpacity onPress={() => setShowResultModal(true)}
@@ -225,7 +281,7 @@ function FactoryReportsTab() {
       {/* Summary */}
       <View className="flex-row items-center justify-between mb-3">
         <Text className="text-xs text-slate-600">
-          {loading && inspections.length === 0 ? '' : pagination.total === 0 ? '0 reports' : `Showing ${rangeStart}–${rangeEnd} of ${pagination.total}`}
+          {loading && inspections.length === 0 ? '' : totalShown === 0 ? '0 reports' : `Showing ${rangeStart}–${rangeEnd} of ${totalShown}`}
         </Text>
         {hasActiveFilters ? (
           <TouchableOpacity onPress={clearFilters}>
@@ -265,10 +321,11 @@ function FactoryReportsTab() {
       ) : null}
 
       {/* Cards */}
-      {!error && inspections.length > 0 ? (
+      {!error && filteredInspections.length > 0 ? (
         <View style={{ rowGap: 10 }}>
-          {inspections.map((insp) => {
+          {filteredInspections.map((insp) => {
             const row = buildRow(insp);
+            const isDownloading = downloadingId === insp.id;
             return (
               <View key={insp.id} className="bg-white rounded-2xl border border-slate-200 p-4">
                 <View className="flex-row items-start justify-between mb-3">
@@ -288,14 +345,26 @@ function FactoryReportsTab() {
                     <Text className="text-xs text-slate-700 font-medium">{row.inspectionDate}</Text>
                   </View>
                 </View>
-                <TouchableOpacity
-                  onPress={() => router.push({ pathname: '/factory-report/[id]' as any, params: { id: insp.id } })}
-                  activeOpacity={0.8}
-                  className="flex-row items-center justify-center bg-slate-100 rounded-lg py-2.5"
-                >
-                  <Eye size={14} color="#475569" />
-                  <Text className="text-slate-700 font-semibold text-sm ml-2">View Report</Text>
-                </TouchableOpacity>
+                <View className="flex-row" style={{ columnGap: 8 }}>
+                  <TouchableOpacity
+                    onPress={() => router.push({ pathname: '/factory-report/[id]' as any, params: { id: insp.id } })}
+                    activeOpacity={0.8}
+                    className="flex-1 flex-row items-center justify-center bg-slate-100 rounded-lg py-2.5"
+                  >
+                    <Eye size={14} color="#475569" />
+                    <Text className="text-slate-700 font-semibold text-sm ml-2">View Report</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDownload(insp)}
+                    disabled={isDownloading}
+                    activeOpacity={0.8}
+                    className="flex-row items-center justify-center rounded-lg py-2.5 px-3"
+                    style={{ backgroundColor: '#222', opacity: isDownloading ? 0.6 : 1 }}
+                    accessibilityLabel="Download PDF"
+                  >
+                    <Download size={14} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               </View>
             );
           })}
@@ -303,7 +372,7 @@ function FactoryReportsTab() {
       ) : null}
 
       {/* Empty */}
-      {!loading && !error && inspections.length === 0 ? (
+      {!loading && !error && filteredInspections.length === 0 ? (
         <View className="py-12 items-center">
           <View className="w-20 h-20 rounded-2xl bg-slate-100 items-center justify-center mb-4">
             <Factory size={36} color="#94a3b8" />
@@ -338,6 +407,9 @@ function FactoryReportsTab() {
 function ProductReportsTab() {
   const [searchInput, setSearchInput] = useState('');
   const [sort, setSort] = useState('updatedAt:desc');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const debouncedSearch = useDebounce(searchInput, 300);
 
@@ -346,12 +418,19 @@ function ProductReportsTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSortModal, setShowSortModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [checkerName, setCheckerName] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    qcCheckerService.getCheckerData().then((d) => { if (d?.name) setCheckerName(d.name); }).catch(() => {});
+  }, []);
 
   const didMountRef = useRef(false);
   useEffect(() => {
     if (!didMountRef.current) { didMountRef.current = true; return; }
     setPage(1);
-  }, [debouncedSearch, sort]);
+  }, [debouncedSearch, sort, statusFilter, dateFrom, dateTo]);
 
   const [sortBy, sortOrder] = useMemo(() => {
     const [by, ord] = sort.split(':');
@@ -387,9 +466,44 @@ function ProductReportsTab() {
 
   useFocusEffect(useCallback(() => { loadProducts(); }, [loadProducts]));
 
-  const hasActiveFilters = Boolean(debouncedSearch || sort !== 'updatedAt:desc' || page !== 1);
-  const clearFilters = () => { setSearchInput(''); setSort('updatedAt:desc'); setPage(1); };
+  // Client-side status + date filters (within the current server page),
+  // mirroring the web ProductReportsTab.
+  const filteredProducts = useMemo(() => {
+    let list = products;
+    if (statusFilter === 'APPROVED') {
+      list = list.filter((p) => p.approvalStatus === 'QC_APPROVED' || p.approvalStatus === 'APPROVED');
+    } else if (statusFilter === 'REJECTED') {
+      list = list.filter((p) => p.approvalStatus === 'REJECTED');
+    }
+    if (dateFrom) {
+      list = list.filter((p) => {
+        if (!p.updatedAt) return false;
+        const d = new Date(p.updatedAt);
+        if (Number.isNaN(d.getTime())) return false;
+        const raw = fmtDate(d);
+        if (dateTo) return raw >= dateFrom && raw <= dateTo;
+        return raw === dateFrom;
+      });
+    }
+    return list;
+  }, [products, statusFilter, dateFrom, dateTo]);
+
+  const isClientFiltered = Boolean(statusFilter || dateFrom);
+  const hasActiveFilters = Boolean(debouncedSearch || sort !== 'updatedAt:desc' || statusFilter || dateFrom || page !== 1);
+  const clearFilters = () => { setSearchInput(''); setSort('updatedAt:desc'); setStatusFilter(''); setDateFrom(''); setDateTo(''); setPage(1); };
   const sortLabel = PRODUCT_SORT_OPTIONS.find((o) => o.value === sort)?.label || 'Latest first';
+  const statusLabel = PRODUCT_STATUS_OPTIONS.find((o) => o.value === statusFilter)?.label || 'All results';
+
+  const handleDownload = async (product: any) => {
+    setDownloadingId(product.id);
+    try {
+      await downloadProductReportPdf(product, { variant: 'canonical', checkerName });
+    } catch (e: any) {
+      Alert.alert('PDF Error', e?.message || 'Failed to generate PDF');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const APPROVAL_STYLE: Record<string, { bg: string; text: string }> = {
     QC_APPROVED: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
@@ -420,15 +534,42 @@ function ProductReportsTab() {
         ) : null}
       </View>
 
-      {/* Sort */}
-      <View className="flex-row mb-3">
+      {/* Date range filter */}
+      <View className="mb-3">
+        <DateRangeCalendar
+          from={dateFrom}
+          to={dateTo}
+          onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
+          placeholder="Filter by date"
+        />
+      </View>
+
+      {/* Status + Sort */}
+      <View className="flex-row mb-3" style={{ columnGap: 8 }}>
+        <TouchableOpacity onPress={() => setShowStatusModal(true)}
+          className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
+        >
+          <Text className="text-sm text-slate-900" numberOfLines={1}>{statusLabel}</Text>
+          <ChevronDown size={16} color="#64748b" />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => setShowSortModal(true)}
-          className="flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
-          style={{ width: '50%' }}
+          className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
         >
           <Text className="text-sm text-slate-900" numberOfLines={1}>{sortLabel}</Text>
           <ChevronDown size={16} color="#64748b" />
         </TouchableOpacity>
+      </View>
+
+      {/* Summary */}
+      <View className="flex-row items-center justify-between mb-3">
+        <Text className="text-xs text-slate-600">
+          {loading && products.length === 0 ? '' : filteredProducts.length === 0 ? '0 reports' : `${filteredProducts.length} report${filteredProducts.length === 1 ? '' : 's'}`}
+        </Text>
+        {hasActiveFilters ? (
+          <TouchableOpacity onPress={clearFilters}>
+            <Text className="text-xs font-semibold text-blue-600 underline">Clear filters</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       {/* Cards */}
@@ -446,20 +587,21 @@ function ProductReportsTab() {
         <View className="bg-red-50 border border-red-200 rounded-xl p-4">
           <Text className="text-sm text-red-700">{error}</Text>
         </View>
-      ) : products.length === 0 ? (
+      ) : filteredProducts.length === 0 ? (
         <View className="py-12 items-center">
           <View className="w-20 h-20 rounded-2xl bg-slate-100 items-center justify-center mb-4">
             <Package size={36} color="#94a3b8" />
           </View>
           <Text className="text-base font-bold text-slate-900 mb-1">{hasActiveFilters ? 'No matches' : 'No product reports'}</Text>
           <Text className="text-sm text-slate-500 text-center">
-            {hasActiveFilters ? 'Try adjusting your search.' : 'QC approved products will appear here.'}
+            {hasActiveFilters ? 'Try adjusting your search or filters.' : 'QC approved products will appear here.'}
           </Text>
         </View>
       ) : (
         <View style={{ rowGap: 10 }}>
-          {products.map((p: any) => {
+          {filteredProducts.map((p: any) => {
             const badge = APPROVAL_STYLE[p.approvalStatus] || { bg: 'bg-slate-100', text: 'text-slate-700' };
+            const isDownloading = downloadingId === p.id;
             return (
               <View key={p.id} className="bg-white rounded-2xl border border-slate-200 p-4">
                 <View className="flex-row items-start justify-between mb-2">
@@ -474,24 +616,38 @@ function ProductReportsTab() {
                 <Text className="text-xs text-slate-600 mb-3">
                   {p.vendor?.companyName || '—'} · {p.category}
                 </Text>
-                <TouchableOpacity
-                  onPress={() => router.push({ pathname: '/product-report/[id]' as any, params: { id: p.id } })}
-                  activeOpacity={0.8}
-                  className="flex-row items-center justify-center bg-slate-100 rounded-lg py-2.5"
-                >
-                  <Eye size={14} color="#475569" />
-                  <Text className="text-slate-700 font-semibold text-sm ml-2">View Report</Text>
-                </TouchableOpacity>
+                <View className="flex-row" style={{ columnGap: 8 }}>
+                  <TouchableOpacity
+                    onPress={() => router.push({ pathname: '/product-report/[id]' as any, params: { id: p.id } })}
+                    activeOpacity={0.8}
+                    className="flex-1 flex-row items-center justify-center bg-slate-100 rounded-lg py-2.5"
+                  >
+                    <Eye size={14} color="#475569" />
+                    <Text className="text-slate-700 font-semibold text-sm ml-2">View Report</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDownload(p)}
+                    disabled={isDownloading}
+                    activeOpacity={0.8}
+                    className="flex-row items-center justify-center rounded-lg py-2.5 px-3"
+                    style={{ backgroundColor: '#222', opacity: isDownloading ? 0.6 : 1 }}
+                    accessibilityLabel="Download PDF"
+                  >
+                    <Download size={14} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               </View>
             );
           })}
         </View>
       )}
 
-      {pagination.totalPages > 1 ? (
+      {pagination.totalPages > 1 && !isClientFiltered ? (
         <Pagination page={pagination.page} totalPages={pagination.totalPages} onChange={setPage} disabled={loading} />
       ) : null}
 
+      <OptionModal visible={showStatusModal} title="Filter by result" options={PRODUCT_STATUS_OPTIONS} value={statusFilter}
+        onSelect={(v) => { setStatusFilter(v); setShowStatusModal(false); }} onClose={() => setShowStatusModal(false)} />
       <OptionModal visible={showSortModal} title="Sort by" options={PRODUCT_SORT_OPTIONS} value={sort}
         onSelect={(v) => { setSort(v); setShowSortModal(false); }} onClose={() => setShowSortModal(false)} />
     </ScrollView>

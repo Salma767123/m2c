@@ -11,7 +11,7 @@ interface EditVendorPageProps {
 export default function EditVendorPage({ params }: EditVendorPageProps) {
   const { id } = use(params)
   return (
-    <PermissionGuard permission="edit_vendors">
+    <PermissionGuard permission="vendor_management:edit">
       <AddEditVendor vendorId={id} mode="edit" />
     </PermissionGuard>
   )

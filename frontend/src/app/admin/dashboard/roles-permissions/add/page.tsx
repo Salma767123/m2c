@@ -4,7 +4,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function AddRolePage() {
   return (
-    <PermissionGuard permission={["create_roles", "manage_settings"]}>
+    <PermissionGuard permission="roles_permissions:create">
       <div className="space-y-6">
         <Breadcrumb />
         <AddEditRole />

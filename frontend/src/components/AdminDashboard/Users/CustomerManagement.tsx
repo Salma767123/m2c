@@ -431,7 +431,7 @@ export default function CustomerManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {hasPermission('view_users') && (
+                        {hasPermission('customer_management:view') && (
                           <Button
                             variant="ghost"
                             size="sm"

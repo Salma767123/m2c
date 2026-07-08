@@ -1,139 +1,390 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Image } from 'react-native';
-import { Upload, X } from 'lucide-react-native';
-import { showImagePickerOptions, ImagePickerResult } from '@/utils/imagePicker';
-import { FieldError, fieldBorder } from '../FormFields';
+import React, { useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, ActivityIndicator } from 'react-native';
+import {
+  FileText,
+  PenLine,
+  CheckCircle2,
+  Download,
+  Upload,
+  Eye,
+  Trash2,
+  X,
+} from 'lucide-react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
+import { StepHeader } from './piShared';
+import { pickPhotos, Photo } from './piShared';
+import SignaturePad from '@/components/General/SignaturePad';
+import { generateReportPdfDataUri, reportFileName, ReportMeta } from './piReportHtml';
+import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 
-interface DocumentationProps {
-  formData: {
-    inspectorSignature: string;
-    documentationPhotos: any[];
-    photocopyDocuments: any[];
-    companyIdCards: any[];
-  };
+interface Props {
+  formData: any;
   setFormData: (data: any) => void;
   errors?: Record<string, string>;
 }
 
-export default function Documentation({ formData, setFormData, errors = {} }: DocumentationProps) {
-  const errorCount = Object.keys(errors).length;
-  const makePhotoHandler = (field: string) => (images: ImagePickerResult[]) => {
-    const newPhotos = images.map((img) => ({
-      name: img.name,
-      uri: img.uri,
-      data: img.data || img.uri,
-      id: Date.now() + Math.random(),
-    }));
-    setFormData({ ...formData, [field]: [...(formData as any)[field], ...newPhotos] });
+// Share a PDF data URI via the OS share sheet (open / print / save).
+async function shareDataUri(dataUri: string, fileName: string) {
+  try {
+    const base64 = dataUri.split(',')[1];
+    const path = `${FileSystem.cacheDirectory}${fileName}`;
+    await FileSystem.writeAsStringAsync(path, base64, { encoding: FileSystem.EncodingType.Base64 });
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(path, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+export default function Documentation({ formData, setFormData, errors = {} }: Props) {
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [showSignModal, setShowSignModal] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [hasDownloaded, setHasDownloaded] = useState(false);
+  const [confirmRemoveDoc, setConfirmRemoveDoc] = useState(false);
+  const [confirmRemoveReport, setConfirmRemoveReport] = useState(false);
+  const [drawnSignature, setDrawnSignature] = useState<string | null>(null);
+
+  const signedDocs: Photo[] = formData.signedDocuments || [];
+  const signedReport: any[] = formData.signedReport || [];
+  const hasSignedDoc = signedDocs.length > 0;
+  const hasSignedReport = signedReport.length > 0;
+
+  const buildMeta = (): ReportMeta => ({
+    productName: formData?.productData?.name || formData?.items?.[0]?.itemName || formData?.vendor || 'Product',
+    vendorName: formData?.vendorData?.companyName || formData?.vendor || '',
+    inspectorName: formData?.inspectorSignature || '',
+    location: null,
+    generatedAt: new Date(),
+  });
+
+  const handleDownloadReport = async () => {
+    setDownloading(true);
+    try {
+      const meta = buildMeta();
+      const dataUri = await generateReportPdfDataUri(formData, meta, null);
+      await shareDataUri(dataUri, reportFileName(meta, false));
+      setHasDownloaded(true);
+    } catch (e: any) {
+      showErrorToast('Report Error', e?.message || 'Failed to generate report.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
-  const makeRemoveHandler = (field: string) => (index: number) => {
-    setFormData({ ...formData, [field]: (formData as any)[field].filter((_: any, i: number) => i !== index) });
+  const handleUploadSignedCopy = () => {
+    pickPhotos((photos) => {
+      if (photos.length === 0) return;
+      setFormData({
+        ...formData,
+        signedDocuments: [{ name: photos[0].name, data: photos[0].data }],
+      });
+      setShowDocModal(false);
+      setHasDownloaded(false);
+      showSuccessToast('Uploaded', 'Signed document uploaded successfully.');
+    }, false);
   };
 
-  const renderPhotoSection = (
-    title: string,
-    subtitle: string,
-    field: string,
-    borderColor: string,
-    bgColor: string,
-    iconColor: string,
-    required: boolean
-  ) => {
-    const photos = (formData as any)[field] || [];
-    const err = errors[field];
-    return (
-      <View className="mb-4">
-        <View className="flex-row items-center mb-2">
-          <Text className="text-sm font-bold text-gray-900">{title}</Text>
-          {required && <Text className="text-red-500 ml-1">*</Text>}
-        </View>
-        <Text className="text-xs text-gray-500 mb-2">{subtitle}</Text>
+  const viewManualDoc = async () => {
+    const doc = signedDocs[0] as any;
+    if (!doc?.data) return;
+    // Scanned signed copies are images — share so the user can view them.
+    try {
+      const base64 = doc.data.split(',')[1];
+      const path = `${FileSystem.cacheDirectory}${doc.name || 'signed-doc.jpg'}`;
+      await FileSystem.writeAsStringAsync(path, base64, { encoding: FileSystem.EncodingType.Base64 });
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(path);
+    } catch {
+      /* ignore */
+    }
+  };
 
-        <TouchableOpacity
-          className={`border-2 border-dashed rounded-xl py-5 items-center ${
-            err ? 'border-red-400 bg-red-50' : `${borderColor} ${bgColor}`
-          }`}
-          onPress={() => showImagePickerOptions(makePhotoHandler(field))}
-        >
-          <Upload size={20} color={err ? '#ef4444' : iconColor} />
-          <Text className="text-xs text-gray-500 mt-1">Tap to add photos</Text>
-        </TouchableOpacity>
-        <FieldError msg={err} />
+  const removeManualDoc = () => {
+    setFormData({ ...formData, signedDocuments: [] });
+    setConfirmRemoveDoc(false);
+  };
 
-        {photos.length > 0 && (
-          <View className="flex-row flex-wrap mt-2 gap-2">
-            {photos.map((photo: any, idx: number) => (
-              <View key={idx} className="w-20 h-20 rounded-lg overflow-hidden relative">
-                <Image source={{ uri: photo.uri || photo.data }} className="w-full h-full" />
-                <TouchableOpacity
-                  className="absolute top-0 right-0 bg-red-500 rounded-full p-0.5"
-                  onPress={() => makeRemoveHandler(field)(idx)}
-                >
-                  <X size={12} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-    );
+  const handleConfirmSignature = useCallback(async () => {
+    if (!drawnSignature) return;
+    setGenerating(true);
+    try {
+      const meta = buildMeta();
+      const pdfDataUri = await generateReportPdfDataUri(formData, meta, drawnSignature);
+      setFormData({
+        ...formData,
+        clientSignature: drawnSignature,
+        signedReport: [{ name: reportFileName(meta, true), data: pdfDataUri }],
+      });
+      setShowSignModal(false);
+      setDrawnSignature(null);
+    } catch (e: any) {
+      showErrorToast('Report Error', e?.message || 'Failed to generate signed report.');
+    } finally {
+      setGenerating(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawnSignature, formData]);
+
+  const viewSignedReport = async () => {
+    const report = signedReport[0];
+    if (!report?.data) return;
+    await shareDataUri(report.data, report.name || 'signed-report.pdf');
+  };
+
+  const removeSignedReport = () => {
+    setFormData({ ...formData, clientSignature: '', signedReport: [] });
+    setConfirmRemoveReport(false);
   };
 
   return (
-    <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-      <View className="mb-6">
-        <Text className="text-xl font-bold text-gray-900 mb-1">Documentation</Text>
-        <Text className="text-sm text-gray-500">Upload documents and provide inspector details</Text>
+    <ScrollView showsVerticalScrollIndicator={false}>
+      <StepHeader
+        title="Final Documentation & Sign-off"
+        subtitle="Generate the inspection report, capture the client's signature, and submit."
+      />
+
+      {/* ── Manual Signed Document ── */}
+      <View className={`rounded-2xl border border-slate-200 bg-white p-4 mb-4 ${hasSignedReport ? 'opacity-40' : ''}`} pointerEvents={hasSignedReport ? 'none' : 'auto'}>
+        <View className="flex-row items-start mb-3">
+          <View className="w-10 h-10 rounded-xl bg-blue-50 items-center justify-center mr-3">
+            <FileText size={18} color="#2563eb" />
+          </View>
+          <View className="flex-1">
+            <Text className="font-bold text-slate-900">Manual Signed Document</Text>
+            <Text className="text-sm text-slate-600">Download the report, get it signed, then upload the scanned copy.</Text>
+          </View>
+        </View>
+
+        {hasSignedDoc ? (
+          <View>
+            <View className="flex-row items-center p-3 bg-emerald-50 border border-emerald-200 rounded-xl mb-3">
+              <CheckCircle2 size={16} color="#059669" />
+              <Text className="text-sm font-bold text-emerald-800 ml-2">Final Signed Document Uploaded</Text>
+            </View>
+            {confirmRemoveDoc ? (
+              <View className="rounded-xl border border-red-200 bg-red-50 p-3">
+                <Text className="text-sm font-semibold text-red-700 mb-2">Remove this document?</Text>
+                <View className="flex-row" style={{ columnGap: 8 }}>
+                  <TouchableOpacity onPress={removeManualDoc} className="flex-1 py-2.5 rounded-lg bg-red-600 items-center">
+                    <Text className="text-white text-sm font-semibold">Yes, Remove</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setConfirmRemoveDoc(false)} className="flex-1 py-2.5 rounded-lg border border-slate-200 bg-white items-center">
+                    <Text className="text-slate-700 text-sm font-semibold">Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View className="flex-row" style={{ columnGap: 8 }}>
+                <TouchableOpacity onPress={viewManualDoc} className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl bg-blue-600">
+                  <Eye size={16} color="#fff" />
+                  <Text className="text-white font-semibold text-sm ml-1.5">View</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setConfirmRemoveDoc(true)} className="px-3 py-2.5 rounded-xl border border-red-200 bg-red-50">
+                  <Trash2 size={16} color="#dc2626" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        ) : (
+          <TouchableOpacity onPress={() => setShowDocModal(true)} className="flex-row items-center justify-center py-2.5 rounded-xl bg-blue-600">
+            <FileText size={16} color="#fff" />
+            <Text className="text-white font-semibold text-sm ml-1.5">Open Document Center</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      
+      {/* ── Digital Signed Report ── */}
+      <View className={`rounded-2xl border border-slate-200 bg-white p-4 mb-4 ${hasSignedDoc ? 'opacity-40' : ''}`} pointerEvents={hasSignedDoc ? 'none' : 'auto'}>
+        <View className="flex-row items-start mb-3">
+          <View className="w-10 h-10 rounded-xl bg-blue-50 items-center justify-center mr-3">
+            <PenLine size={18} color="#2563eb" />
+          </View>
+          <View className="flex-1">
+            <Text className="font-bold text-slate-900">Digital Signed Report</Text>
+            <Text className="text-sm text-slate-600">Draw the client's signature on-screen to auto-generate a digitally-signed report.</Text>
+          </View>
+        </View>
 
-      {/* Inspector Signature */}
-      <View className="mb-5">
-        <Text className="text-sm font-semibold text-gray-700 mb-1">
-          Inspector Signature / Initials <Text className="text-red-500">*</Text>
+        {hasSignedReport ? (
+          <View>
+            <View className="flex-row items-center mb-3">
+              <CheckCircle2 size={16} color="#059669" />
+              <Text className="text-sm font-semibold text-emerald-600 ml-2">Signed report generated</Text>
+            </View>
+            {confirmRemoveReport ? (
+              <View className="rounded-xl border border-red-200 bg-red-50 p-3">
+                <Text className="text-sm font-semibold text-red-700 mb-2">Remove signed report and signature?</Text>
+                <View className="flex-row" style={{ columnGap: 8 }}>
+                  <TouchableOpacity onPress={removeSignedReport} className="flex-1 py-2.5 rounded-lg bg-red-600 items-center">
+                    <Text className="text-white text-sm font-semibold">Yes, Remove</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setConfirmRemoveReport(false)} className="flex-1 py-2.5 rounded-lg border border-slate-200 bg-white items-center">
+                    <Text className="text-slate-700 text-sm font-semibold">Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View className="flex-row" style={{ columnGap: 8 }}>
+                <TouchableOpacity onPress={viewSignedReport} className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl bg-blue-600">
+                  <Eye size={16} color="#fff" />
+                  <Text className="text-white font-semibold text-sm ml-1.5">View Signed Report</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setConfirmRemoveReport(true)} className="px-3 py-2.5 rounded-xl border border-red-200 bg-red-50">
+                  <Trash2 size={16} color="#dc2626" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        ) : (
+          <TouchableOpacity onPress={() => setShowSignModal(true)} className="flex-row items-center justify-center py-2.5 rounded-xl border border-blue-200 bg-blue-50">
+            <PenLine size={16} color="#1d4ed8" />
+            <Text className="text-blue-700 font-semibold text-sm ml-1.5">Open Signature Center</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Status hint */}
+      <View
+        className={`rounded-xl px-4 py-3 border ${
+          hasSignedDoc || hasSignedReport
+            ? 'bg-emerald-50 border-emerald-200'
+            : errors.signedDocuments
+            ? 'bg-red-50 border-red-300'
+            : 'bg-amber-50 border-amber-200'
+        }`}
+      >
+        <Text
+          className={`text-sm ${
+            hasSignedDoc || hasSignedReport ? 'text-emerald-700' : errors.signedDocuments ? 'text-red-700' : 'text-amber-700'
+          }`}
+        >
+          {hasSignedDoc || hasSignedReport
+            ? 'A signed document is attached. You can submit the inspection.'
+            : errors.signedDocuments ||
+              'At least one signed document is required — upload a signed copy or generate the digitally-signed report.'}
         </Text>
-        <TextInput
-          className={`${fieldBorder(errors.inspectorSignature)} text-gray-900`}
-          value={formData.inspectorSignature}
-          onChangeText={(val) => setFormData({ ...formData, inspectorSignature: val })}
-          placeholder="Enter your signature or initials"
-        />
-        <FieldError msg={errors.inspectorSignature} />
       </View>
 
-      {renderPhotoSection(
-        'General Documentation',
-        'Signed draft report, packing list, etc.',
-        'documentationPhotos',
-        'border-gray-300',
-        'bg-gray-50',
-        '#9ca3af',
-        false
-      )}
+      <View className="h-6" />
 
-      {renderPhotoSection(
-        'Photocopy Documents',
-        'Photocopy of relevant documents',
-        'photocopyDocuments',
-        'border-blue-300',
-        'bg-blue-50',
-        '#3b82f6',
-        true
-      )}
+      {/* ── Document Center modal ── */}
+      <Modal visible={showDocModal} transparent animationType="fade" onRequestClose={() => setShowDocModal(false)}>
+        <Pressable className="flex-1 bg-black/50 justify-center px-5" onPress={() => setShowDocModal(false)}>
+          <Pressable className="bg-white rounded-2xl overflow-hidden" onPress={(e) => e.stopPropagation()}>
+            <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-100">
+              <Text className="font-bold text-slate-900">Document Center</Text>
+              <TouchableOpacity onPress={() => setShowDocModal(false)}>
+                <X size={18} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            <View className="p-5">
+              {/* Step 1 */}
+              <View className="flex-row items-center mb-2">
+                <View className="w-6 h-6 rounded-full bg-blue-600 items-center justify-center mr-2">
+                  <Text className="text-white text-xs font-bold">1</Text>
+                </View>
+                <Text className="text-sm font-bold text-slate-800">Download Inspection Report</Text>
+              </View>
+              <Text className="text-xs text-slate-500 mb-2 ml-8">
+                Download the report, print it, have it signed by the client, then scan it.
+              </Text>
+              <View className="ml-8 mb-4">
+                <TouchableOpacity
+                  onPress={handleDownloadReport}
+                  disabled={downloading}
+                  className="flex-row items-center self-start px-4 py-2.5 rounded-xl bg-blue-600"
+                  style={{ opacity: downloading ? 0.6 : 1 }}
+                >
+                  {downloading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Download size={16} color="#fff" />
+                      <Text className="text-white font-semibold text-sm ml-1.5">Download Report</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                {hasDownloaded && (
+                  <View className="flex-row items-center mt-2">
+                    <CheckCircle2 size={13} color="#059669" />
+                    <Text className="text-xs text-emerald-600 font-semibold ml-1">Report downloaded</Text>
+                  </View>
+                )}
+              </View>
 
-      {renderPhotoSection(
-        'Company ID Card',
-        'ID identification card',
-        'companyIdCards',
-        'border-green-300',
-        'bg-green-50',
-        '#22c55e',
-        true
-      )}
+              {/* Step 2 */}
+              {hasDownloaded && (
+                <View className="border-t border-slate-100 pt-4">
+                  <View className="flex-row items-center mb-2">
+                    <View className="w-6 h-6 rounded-full bg-blue-600 items-center justify-center mr-2">
+                      <Text className="text-white text-xs font-bold">2</Text>
+                    </View>
+                    <Text className="text-sm font-bold text-slate-800">Upload Signed Copy</Text>
+                  </View>
+                  <Text className="text-xs text-slate-500 mb-2 ml-8">
+                    Upload a photo / scan of the signed copy.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={handleUploadSignedCopy}
+                    className="ml-8 border-2 border-dashed border-blue-300 rounded-xl p-5 items-center"
+                  >
+                    <Upload size={22} color="#60a5fa" />
+                    <Text className="text-slate-700 font-medium text-sm mt-1.5">Tap to upload signed copy</Text>
+                    <Text className="text-slate-400 text-xs mt-0.5">PNG, JPG</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
-      <View className="mb-6" />
+      {/* ── Signature Center modal ── */}
+      <Modal visible={showSignModal} transparent animationType="fade" onRequestClose={() => setShowSignModal(false)}>
+        <Pressable className="flex-1 bg-black/50 justify-center px-5" onPress={() => setShowSignModal(false)}>
+          <Pressable className="bg-white rounded-2xl overflow-hidden" onPress={(e) => e.stopPropagation()}>
+            <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-100">
+              <View>
+                <Text className="font-bold text-slate-900">Signature Center</Text>
+                <Text className="text-xs text-slate-500 mt-0.5">Draw signature using finger or stylus</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowSignModal(false)}>
+                <X size={18} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            <View className="p-5">
+              <SignaturePad value={drawnSignature} onChange={setDrawnSignature} height={200} label="Sign below" />
+            </View>
+            <View className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex-row" style={{ columnGap: 8 }}>
+              <TouchableOpacity
+                onPress={() => setShowSignModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white items-center"
+              >
+                <Text className="text-slate-700 font-semibold text-sm">Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleConfirmSignature}
+                disabled={generating || !drawnSignature}
+                className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl bg-blue-600"
+                style={{ opacity: generating || !drawnSignature ? 0.6 : 1 }}
+              >
+                {generating ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} color="#fff" />
+                    <Text className="text-white font-semibold text-sm ml-1.5">Confirm & Generate</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }

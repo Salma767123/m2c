@@ -330,7 +330,7 @@ export default function VendorProductReviews() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {hasPermission('view_reviews') && (
+                      {hasPermission('vendor_product_reviews:view') && (
                         <button
                           onClick={() => setSelectedReview(review)}
                           className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"

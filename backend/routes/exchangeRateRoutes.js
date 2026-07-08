@@ -10,6 +10,6 @@ const { authenticateToken, requireAdminRole, requirePermission } = require('../m
 router.get('/', getExchangeRate);
 
 // Admin only — update exchange rate + auto-recalculate all USD prices
-router.put('/', authenticateToken, requireAdminRole, requirePermission('manage_settings'), updateExchangeRate);
+router.put('/', authenticateToken, requireAdminRole, requirePermission('settings:edit'), updateExchangeRate);
 
 module.exports = router;

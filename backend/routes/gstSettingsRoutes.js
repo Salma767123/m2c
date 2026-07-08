@@ -15,8 +15,8 @@ router.use(authenticateToken);
 router.get('/', requireRole(['admin', 'vendor']), getGSTSettings);
 
 // Mutating endpoints — admins with manage_settings only
-router.post('/', requireRole('admin'), requirePermission('manage_settings'), createGSTSetting);
-router.put('/:id', requireRole('admin'), requirePermission('manage_settings'), updateGSTSetting);
-router.delete('/:id', requireRole('admin'), requirePermission('manage_settings'), deleteGSTSetting);
+router.post('/', requireRole('admin'), requirePermission('settings:edit'), createGSTSetting);
+router.put('/:id', requireRole('admin'), requirePermission('settings:edit'), updateGSTSetting);
+router.delete('/:id', requireRole('admin'), requirePermission('settings:edit'), deleteGSTSetting);
 
 module.exports = router;

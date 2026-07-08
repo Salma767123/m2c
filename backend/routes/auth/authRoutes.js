@@ -24,6 +24,7 @@ const {
 } = require('../../controllers/auth/authController');
 
 const { authenticateToken } = require('../../middleware/auth');
+const { loginLimiter, passwordResetLimiter, registerLimiter } = require('../../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -32,13 +33,13 @@ const router = express.Router();
 // ============================================
 
 // Public routes
-router.post('/register', register);
-router.post('/login', login);
-router.post('/admin/login', superAdminLogin); // Dedicated super admin login
+router.post('/register', registerLimiter, register);
+router.post('/login', loginLimiter, login);
+router.post('/admin/login', loginLimiter, superAdminLogin); // Dedicated super admin login
 router.post('/google-callback', googleCallback); // Keep for backward compatibility
 router.post('/verify-email', verifyEmail);
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password', resetPassword);
+router.post('/forgot-password', passwordResetLimiter, forgotPassword);
+router.post('/reset-password', passwordResetLimiter, resetPassword);
 
 // Google OAuth routes
 router.get('/google',

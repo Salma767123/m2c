@@ -21,17 +21,17 @@ const { authenticateToken, requireVendorRole, requireRole, requirePermission } =
 const router = express.Router();
 
 // Admin routes (must come before vendor routes)
-router.get('/admin/all', authenticateToken, requireRole('admin'), requirePermission('view_inventory'), getAllInventory);
-router.get('/admin/stats', authenticateToken, requireRole('admin'), requirePermission('view_inventory'), getAllInventoryStats);
-router.get('/admin/vendor/:vendorId', authenticateToken, requireRole('admin'), requirePermission('view_inventory'), getInventoryByVendor);
-router.get('/admin/vendor/:vendorId/categories', authenticateToken, requireRole('admin'), requirePermission('view_inventory'), getVendorCategoriesByVendorId);
-router.get('/admin/:id', authenticateToken, requireRole('admin'), requirePermission('view_inventory'), getInventoryItem);
-router.post('/admin', authenticateToken, requireRole('admin'), requirePermission('create_inventory'), createInventoryItem);
-router.put('/admin/:id', authenticateToken, requireRole('admin'), requirePermission('edit_inventory'), updateInventoryItem);
-router.delete('/admin/:id', authenticateToken, requireRole('admin'), requirePermission('delete_inventory'), deleteInventoryItem);
-router.get('/admin/:id/history', authenticateToken, requireRole('admin'), requirePermission('view_inventory'), getStockHistory);
-router.patch('/admin/:id/stock', authenticateToken, requireRole('admin'), requirePermission('edit_inventory'), updateStock);
-router.post('/admin/recalculate-stock', authenticateToken, requireRole('admin'), requirePermission('edit_inventory'), recalculateAllStock);
+router.get('/admin/all', authenticateToken, requireRole('admin'), requirePermission('inventory:view'), getAllInventory);
+router.get('/admin/stats', authenticateToken, requireRole('admin'), requirePermission('inventory:view'), getAllInventoryStats);
+router.get('/admin/vendor/:vendorId', authenticateToken, requireRole('admin'), requirePermission('inventory:view'), getInventoryByVendor);
+router.get('/admin/vendor/:vendorId/categories', authenticateToken, requireRole('admin'), requirePermission('inventory:view'), getVendorCategoriesByVendorId);
+router.get('/admin/:id', authenticateToken, requireRole('admin'), requirePermission('inventory:view'), getInventoryItem);
+router.post('/admin', authenticateToken, requireRole('admin'), requirePermission('inventory:create'), createInventoryItem);
+router.put('/admin/:id', authenticateToken, requireRole('admin'), requirePermission('inventory:edit'), updateInventoryItem);
+router.delete('/admin/:id', authenticateToken, requireRole('admin'), requirePermission('inventory:delete'), deleteInventoryItem);
+router.get('/admin/:id/history', authenticateToken, requireRole('admin'), requirePermission('inventory:view'), getStockHistory);
+router.patch('/admin/:id/stock', authenticateToken, requireRole('admin'), requirePermission('inventory:edit'), updateStock);
+router.post('/admin/recalculate-stock', authenticateToken, requireRole('admin'), requirePermission('inventory:edit'), recalculateAllStock);
 
 // All vendor routes require vendor authentication
 router.use(authenticateToken);

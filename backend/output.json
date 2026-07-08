@@ -1,12 +1,77 @@
 [
   {
-    "id": "6998171ef67deb7e575ad755",
-    "c": "Apron",
-    "sc": "Kitchen Apron"
+    "id": "6a3ced82a90cb703cce1886f",
+    "c": "TERRY TOWELS",
+    "sc": "CHECKET TERRY TOWEL"
   },
   {
-    "id": "69a526055951943f06d0a9b4",
-    "c": "Apron",
-    "sc": "Kitchen Apron"
+    "id": "6a3e2d34e07423d32cd417c2",
+    "c": "Sarees",
+    "sc": "Cotton"
+  },
+  {
+    "id": "6a3e2d38d13c7dd3d3057aa8",
+    "c": "Sarees",
+    "sc": "Silk"
+  },
+  {
+    "id": "6a42390580081ad180a0b635",
+    "c": "TERRY TOWELS",
+    "sc": "CHECKET TERRY TOWEL"
+  },
+  {
+    "id": "6a4272777a55bdb6653c5312",
+    "c": "Sarees",
+    "sc": "Banarasi Silk"
+  },
+  {
+    "id": "6a4272777a55bdb6653c531b",
+    "c": "Sarees",
+    "sc": "Handloom Cotton"
+  },
+  {
+    "id": "6a4272787a55bdb6653c5323",
+    "c": "Bed Linen",
+    "sc": "Bedsheet Sets"
+  },
+  {
+    "id": "6a4272797a55bdb6653c532b",
+    "c": "Fabrics",
+    "sc": "Suiting Fabric"
+  },
+  {
+    "id": "6a435f6ca5801ab8fc520b23",
+    "c": "T-Shirts",
+    "sc": "Polo T-Shirts"
+  },
+  {
+    "id": "6a435f6ca5801ab8fc520b31",
+    "c": "Kurtis",
+    "sc": "Kurti Sets"
+  },
+  {
+    "id": "6a435f6da5801ab8fc520b3c",
+    "c": "Shirts",
+    "sc": "Formal Shirts"
+  },
+  {
+    "id": "6a435f6ea5801ab8fc520b49",
+    "c": "Track Pants",
+    "sc": "Joggers"
+  },
+  {
+    "id": "6a435f6ea5801ab8fc520b55",
+    "c": "Ethnic Wear",
+    "sc": "Kurta Sets"
+  },
+  {
+    "id": "6a435f6fa5801ab8fc520b60",
+    "c": "Fabrics",
+    "sc": "Shirting Fabric"
+  },
+  {
+    "id": "6a43cc1c5c5552f1877dfb2f",
+    "c": "TERRY TOWELS",
+    "sc": "CHECKET TERRY TOWEL"
   }
 ]

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { roleService, Role, Permission } from '@/services/roleService'
+import { roleService, Role, Permission, PermissionModule, PERMISSION_ACTIONS } from '@/services/roleService'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Badge } from '@/components/UI/Badge'
@@ -37,13 +37,14 @@ function getPageRange(current: number, total: number): Array<number | '…'> {
 }
 
 export default function RolesPermissions() {
-  const canCreate = hasPermission('create_roles') || hasPermission('manage_settings')
-  const canEdit = hasPermission('edit_roles') || hasPermission('manage_settings')
-  const canDelete = hasPermission('delete_roles') || hasPermission('manage_settings')
+  const canCreate = hasPermission('roles_permissions:create')
+  const canEdit = hasPermission('roles_permissions:edit')
+  const canDelete = hasPermission('roles_permissions:delete')
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'roles' | 'permissions' | 'users'>('roles')
   const [roles, setRoles] = useState<Role[]>([])
   const [permissions, setPermissions] = useState<Permission[]>([])
+  const [permissionModules, setPermissionModules] = useState<PermissionModule[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
@@ -59,7 +60,10 @@ export default function RolesPermissions() {
           roleService.getPermissions()
         ])
         if (rolesRes.success) setRoles(rolesRes.data)
-        if (permsRes.success) setPermissions(permsRes.data)
+        if (permsRes.success) {
+          setPermissions(permsRes.data)
+          setPermissionModules(permsRes.modules || [])
+        }
       } catch (error) {
         showErrorToast('Failed to load roles and permissions')
       } finally {
@@ -83,14 +87,6 @@ export default function RolesPermissions() {
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE
   )
-
-  const groupedPermissions = permissions.reduce((acc, permission) => {
-    if (!acc[permission.module]) {
-      acc[permission.module] = []
-    }
-    acc[permission.module].push(permission)
-    return acc
-  }, {} as Record<string, Permission[]>)
 
   const handleCreateRole = () => {
     router.push('/admin/dashboard/roles-permissions/add')
@@ -331,23 +327,48 @@ export default function RolesPermissions() {
 
           {activeTab === 'permissions' && (
             <div className="space-y-4">
-              {Object.entries(groupedPermissions).map(([module, modulePermissions]) => (
-                <Card key={module} className="border-gray-200">
+              {permissionModules.map((mod) => (
+                <Card key={mod.key} className="border-gray-200">
                   <CardHeader className="bg-gray-50 border-b border-gray-200">
                     <CardTitle className="text-lg font-semibold text-black">
-                      {module} ({modulePermissions.length})
+                      {mod.name} ({mod.submodules.length} submodules)
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {modulePermissions.map((permission) => (
-                        <div key={permission.id} className="flex items-center justify-between p-3 border border-gray-200 rounded">
-                          <div>
-                            <h4 className="font-medium text-black">{permission.name}</h4>
-                            <p className="text-sm text-gray-600">{permission.description}</p>
-                          </div>
-                        </div>
-                      ))}
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-200 bg-gray-50/60">
+                            <th className="text-left font-semibold text-gray-700 px-4 py-2.5 min-w-[220px]">Submodule</th>
+                            {PERMISSION_ACTIONS.map((action) => (
+                              <th key={action} className="text-center font-semibold text-gray-700 px-3 py-2.5 w-24 capitalize">
+                                {action}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {mod.submodules.map((sub) => (
+                            <tr key={sub.key} className="border-b border-gray-100 last:border-b-0">
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-black">{sub.name}</div>
+                                <div className="text-xs text-gray-500 mt-0.5">{sub.description}</div>
+                              </td>
+                              {PERMISSION_ACTIONS.map((action) => (
+                                <td key={action} className="px-3 py-3 text-center">
+                                  {sub.actions[action] ? (
+                                    <Badge className="bg-gray-100 text-gray-700 text-xs font-mono">
+                                      {sub.key}:{action}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-gray-300" title={`Not applicable for ${sub.name}`}>—</span>
+                                  )}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </CardContent>
                 </Card>
