@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { toExternalUrl } from '@/lib/utils';
 import {
   Search,
   Eye,
@@ -424,9 +425,9 @@ const EnquiryForm = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Website</label>
-                    {selectedEnquiry.website ? (
+                    {toExternalUrl(selectedEnquiry.website) ? (
                       <a
-                        href={selectedEnquiry.website}
+                        href={toExternalUrl(selectedEnquiry.website)!}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 text-blue-600 hover:text-blue-800"

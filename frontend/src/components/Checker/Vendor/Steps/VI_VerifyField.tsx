@@ -4,6 +4,7 @@ import React, { useContext, createContext, useState } from 'react'
 import { FileText, ExternalLink, Eye, Phone, Mail, Send, Check, Loader2 } from 'lucide-react'
 import DocViewerModal from '@/components/UI/DocViewerModal'
 import qcCheckerService from '@/services/qcCheckerService'
+import { toExternalUrl } from '@/lib/utils'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type FieldVerification = { ok: boolean | null; remarks: string }
@@ -147,10 +148,13 @@ export function renderValue(value: any, type?: string, label?: string): React.Re
     )
   }
   if (type === 'url' && typeof value === 'string') {
-    return (
-      <a href={value} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline text-sm break-all">
+    const href = toExternalUrl(value)
+    return href ? (
+      <a href={href} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline text-sm break-all">
         {value}
       </a>
+    ) : (
+      <span className="text-slate-900 text-sm break-all">{value}</span>
     )
   }
   if (type === 'date' && value) {

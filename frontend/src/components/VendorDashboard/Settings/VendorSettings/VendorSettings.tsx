@@ -29,7 +29,7 @@ import {
   Upload,
 } from "lucide-react";
 import VendorService, { VendorProfile } from "@/services/vendorService";
-import { buildFullName } from "@/lib/utils";
+import { buildFullName, toExternalUrl } from "@/lib/utils";
 import ResultModal from "@/components/UI/ResultModal";
 import { PhoneInput, LocalLandlineInput, getLandlineDisplay } from "@/components/VendorHub/FormUI";
 import { downloadDoc, isDocImageUrl } from "@/lib/docDownload";
@@ -50,12 +50,11 @@ const isCertificateEditable = (expiryDate?: string | null): boolean => {
 
 const isImageUrl = isDocImageUrl;
 
-// Only allow http(s) URLs to prevent javascript:/data: XSS injection via vendor-supplied links.
-function safeExternalUrl(url?: string | null): string | null {
-  if (!url) return null;
-  const trimmed = url.trim();
-  return /^https?:\/\//i.test(trimmed) ? trimmed : null;
-}
+// Only allow http(s) URLs to prevent javascript:/data: XSS injection via
+// vendor-supplied links. Delegates to the shared normalizer, which also
+// prepends https:// for scheme-less values ("www.company.com") so they
+// stay clickable instead of resolving as relative paths.
+const safeExternalUrl = toExternalUrl;
 
 function formatDate(input?: string | Date | null): string {
   if (!input) return "";

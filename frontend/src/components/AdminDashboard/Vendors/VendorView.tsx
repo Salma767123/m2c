@@ -47,7 +47,7 @@ import SuspensionModal from './SuspensionModal'
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 import { hasPermission } from '@/lib/auth'
 import { getLandlineDisplay, formatLocalLandline, formatIntlLandline } from '@/components/VendorHub/FormUI'
-import { buildFullName } from '@/lib/utils'
+import { buildFullName, toExternalUrl } from '@/lib/utils'
 import { downloadDoc, isDocImageUrl } from '@/lib/docDownload'
 import DocViewerModal from '@/components/UI/DocViewerModal'
 import { FACILITY_META, withUnit } from '@/components/Checker/Vendor/Steps/VI_Step5_Manufacturing'
@@ -685,9 +685,13 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                     <Globe className="h-4 w-4 text-slate-400" />
                     <div>
                       <p className="text-sm text-slate-500">Website</p>
-                      <a href={vendor.website} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">
-                        {vendor.website}
-                      </a>
+                      {toExternalUrl(vendor.website) ? (
+                        <a href={toExternalUrl(vendor.website)!} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">
+                          {vendor.website}
+                        </a>
+                      ) : (
+                        <p className="font-medium text-slate-900">{vendor.website}</p>
+                      )}
                     </div>
                   </div>
                 )}

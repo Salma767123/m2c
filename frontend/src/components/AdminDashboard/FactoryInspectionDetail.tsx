@@ -13,6 +13,7 @@ import vendorService from '@/services/vendorService'
 import { generateFactoryInspectionPdf } from '@/lib/factoryInspectionReportPdf'
 import type { FactoryImageEntry, FactoryReportMeta } from '@/lib/factoryInspectionReportPdf'
 import { formatCheckerName } from '@/lib/checkerUtils'
+import { toExternalUrl } from '@/lib/utils'
 
 async function fetchImgDataUrl(url: string): Promise<string | null> {
     try {
@@ -84,16 +85,23 @@ function VerBadge({ k, vf }: { k: string; vf: VF }) {
     return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-400 shrink-0">Pending</span>
 }
 
-function VCard({ label, value, k, vf }: { label: string; value?: string | string[] | null; k?: string; vf?: VF }) {
+function VCard({ label, value, k, vf, link }: { label: string; value?: string | string[] | null; k?: string; vf?: VF; link?: boolean }) {
     const ver = k && vf ? vf[k] : null
     const display = Array.isArray(value) ? (value.length === 0 ? '—' : value.join(', ')) : (value || '—')
+    const href = link && typeof value === 'string' ? toExternalUrl(value) : null
     return (
         <div className="flex flex-col gap-1 bg-slate-50 rounded-xl p-3 border border-slate-100">
             <div className="flex items-start justify-between gap-2">
                 <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider leading-tight">{label}</span>
                 {k && vf && <VerBadge k={k} vf={vf} />}
             </div>
-            <span className="text-sm font-semibold text-slate-900 break-words">{display}</span>
+            {href ? (
+                <a href={href} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-brand-600 hover:text-brand-700 hover:underline break-all">
+                    {display}
+                </a>
+            ) : (
+                <span className="text-sm font-semibold text-slate-900 break-words">{display}</span>
+            )}
             {ver?.ok === false && ver.remarks && (
                 <p className="text-xs text-red-600 mt-0.5 italic">{ver.remarks}</p>
             )}
@@ -447,7 +455,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                             {vendor.companyIdNumber && <VCard label="Company ID Number" value={vendor.companyIdNumber} k="c_companyIdNumber" vf={vf} />}
                             {vendor.iecCode && <VCard label="IEC Code" value={vendor.iecCode} k="c_iecCode" vf={vf} />}
                             {vendor.aadhaarNumber && <VCard label="Aadhaar Number" value={vendor.aadhaarNumber} k="c_aadhaarNumber" vf={vf} />}
-                            {vendor.website && <VCard label="Website" value={vendor.website} k="c_website" vf={vf} />}
+                            {vendor.website && <VCard label="Website" value={vendor.website} k="c_website" vf={vf} link />}
                         </div>
                         {(() => {
                             const COMPANY_DOC_TYPES = ['GST_CERTIFICATE', 'PAN_CARD', 'COMPANY_REGISTRATION', 'AADHAAR_CARD', 'TRADE_LICENSE', 'EXPORT_LICENSE']

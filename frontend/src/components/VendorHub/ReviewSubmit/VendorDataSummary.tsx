@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { SquarePen, Calendar, Building2, Warehouse, UserCircle, Tags, Factory, ShieldCheck, Briefcase, Globe, FileText } from 'lucide-react';
 import { AccordionSection, getLandlineDisplay } from '../FormUI';
-import { buildFullName, calculateDuration } from '@/lib/utils';
+import { buildFullName, calculateDuration, toExternalUrl } from '@/lib/utils';
 
 /**
  * Read-only summary of a vendor's collected registration data. Shared by
@@ -460,7 +460,19 @@ export default function VendorDataSummary({
           {data.phoneNumber2 && <InfoRow label="Secondary Phone" value={data.phoneNumber2} />}
           {data.landlineNumber && <InfoRow label="Local Landline" value={data.landlineNumber} />}
           {data.intlLandline && <InfoRow label="International Landline" value={data.intlLandline} />}
-          <InfoRow label="Website" value={data.website} />
+          <InfoRow
+            label="Website"
+            value={(() => {
+              const href = toExternalUrl(data.website);
+              return href ? (
+                <a href={href} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-brand-700 hover:underline break-all">
+                  {data.website}
+                </a>
+              ) : (
+                data.website
+              );
+            })()}
+          />
 
           {/* ── Legal Address & Factory Site ────────────────────────── */}
           <SubHeader>Legal Address &amp; Factory Site</SubHeader>

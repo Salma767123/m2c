@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toExternalUrl } from '@/lib/utils';
 import { enquiryService, VendorEnquiry } from '@/services/enquiryService';
 import { Card, CardContent } from '@/components/UI/Card';
 import { Badge } from '@/components/UI/Badge';
@@ -357,9 +358,13 @@ export default function VendorEnquiryManagement() {
                     <label className="text-sm font-semibold text-gray-600">Website</label>
                     <div className="text-gray-900 flex items-center gap-2">
                       <Globe className="w-4 h-4 text-gray-500" />
-                      <a href={selectedEnquiry.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                        {selectedEnquiry.website}
-                      </a>
+                      {toExternalUrl(selectedEnquiry.website) ? (
+                        <a href={toExternalUrl(selectedEnquiry.website)!} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                          {selectedEnquiry.website}
+                        </a>
+                      ) : (
+                        <span>{selectedEnquiry.website}</span>
+                      )}
                     </div>
                   </div>
                 )}

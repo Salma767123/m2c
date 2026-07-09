@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
 import { Badge } from "../../UI/Badge";
-import { buildFullName } from "@/lib/utils";
+import { buildFullName, toExternalUrl } from "@/lib/utils";
 import { openDoc } from "@/lib/docViewerBus";
 import { Country } from "country-state-city";
 
@@ -37,12 +37,19 @@ function humanize(key: string): string {
 }
 
 // ── Small presentational helpers ──────────────────────────────────────────────
-function Row({ label, value, mono }: { label: string; value: any; mono?: boolean }) {
+function Row({ label, value, mono, link }: { label: string; value: any; mono?: boolean; link?: boolean }) {
   if (blank(value)) return null;
+  const href = link ? toExternalUrl(String(value)) : null;
   return (
     <div className="flex justify-between gap-4 py-1.5 border-b border-slate-100 last:border-0">
       <span className="text-sm text-slate-500 shrink-0">{label}</span>
-      <span className={`text-sm font-medium text-slate-900 text-right break-words ${mono ? "font-mono" : ""}`}>{String(value)}</span>
+      {href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline text-right break-all">
+          {String(value)}
+        </a>
+      ) : (
+        <span className={`text-sm font-medium text-slate-900 text-right break-words ${mono ? "font-mono" : ""}`}>{String(value)}</span>
+      )}
     </div>
   );
 }
@@ -177,7 +184,7 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
             <Row label="IEC Code" value={v.iecCode} mono />
             <Row label="Company ID / CIN" value={v.companyIdNumber} mono />
             <Row label="Aadhaar Number" value={v.aadhaarNumber} mono />
-            <Row label="Website" value={v.website} />
+            <Row label="Website" value={v.website} link />
             <Row label="Established Year" value={v.establishedYear} />
             <Row label="Employee Count" value={v.employeeCount} />
             <Row label="Annual Turnover" value={v.annualTurnover} />

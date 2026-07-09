@@ -31,7 +31,7 @@ import {
 import { Vendor } from "@/types/inspection"
 import qcCheckerService from "@/services/qcCheckerService"
 import { formatLocalLandline, formatIntlLandline } from "@/components/VendorHub/FormUI"
-import { buildFullName } from "@/lib/utils"
+import { buildFullName, toExternalUrl } from "@/lib/utils"
 import { isDocImageUrl } from "@/lib/docDownload"
 import DocViewerModal from "@/components/UI/DocViewerModal"
 import { FACILITY_META, withUnit } from "./Steps/VI_Step5_Manufacturing"
@@ -1475,12 +1475,11 @@ function VendorDetailSkeleton() {
   )
 }
 
-// Only allow http(s) URLs to prevent javascript:/data: XSS injection via vendor-supplied links.
-function safeExternalUrl(url?: string | null): string | null {
-  if (!url) return null
-  const trimmed = url.trim()
-  return /^https?:\/\//i.test(trimmed) ? trimmed : null
-}
+// Only allow http(s) URLs to prevent javascript:/data: XSS injection via
+// vendor-supplied links. Delegates to the shared normalizer, which also
+// prepends https:// for scheme-less values ("www.company.com") so they
+// stay clickable instead of resolving as relative paths.
+const safeExternalUrl = toExternalUrl
 
 function formatDate(input?: string | Date | null): string {
   if (!input) return ""

@@ -24,6 +24,26 @@ export function formatDate(date: Date | string): string {
 }
 
 /**
+ * Normalize a user-entered website/link value into a safe, absolute,
+ * clickable href. Vendors type URLs in every shape — "www.company.com",
+ * "company.com", "https://company.com" — and a bare host in an <a href>
+ * resolves as a relative path (localhost:3000/www.company.com), so a
+ * scheme-less value gets "https://" prepended. Explicit non-http schemes
+ * (javascript:, data:, etc.) are rejected to block XSS via vendor-supplied
+ * links. Returns null when the value can't be made into a safe link.
+ */
+export function toExternalUrl(url?: string | null): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return null;
+  // Require at least a dot so junk like "N/A" doesn't become a link.
+  if (!/^[^\s/]+\.[^\s]+$/.test(trimmed)) return null;
+  return `https://${trimmed}`;
+}
+
+/**
  * Human-readable elapsed time since `startDate` (e.g. "13 Years / 6 Months /
  * 12 Days"). Returns '' when the date is empty/invalid/in the future so the
  * caller can show a placeholder. Shared by the OwnerProfile form (Total
