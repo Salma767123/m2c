@@ -1052,8 +1052,11 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
         </Card>
       )}
 
-      {/* Legal Address & Factory Site — stored in factoryAddress* columns */}
-      {(vendor as any).factoryAddress && (
+      {/* Legal Address & Factory Site — always read from businessAddress* columns,
+          which are set from CompanyDetails on every save (old and new vendors).
+          factoryAddress* was historically mirrored from warehouseAddress on old
+          registrations, making it unreliable for pre-fix vendors. */}
+      {vendor.businessAddress && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -1070,11 +1073,18 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
                 </div>
               )}
               <div>
-                <p className="font-medium">{(vendor as any).factoryAddress}</p>
+                <p className="font-medium">{vendor.businessAddress}</p>
+                {(vendor as any).addressLine2 && <p className="font-medium">{(vendor as any).addressLine2}</p>}
+                {(vendor as any).addressLine3 && <p className="font-medium">{(vendor as any).addressLine3}</p>}
+                {(vendor as any).landmark && (
+                  <p className="text-sm text-slate-500">
+                    <span className="font-semibold">Landmark:</span> {(vendor as any).landmark}
+                  </p>
+                )}
                 <p className="font-medium">
-                  {(vendor as any).factoryCity}{(vendor as any).factoryState ? `, ${(vendor as any).factoryState}` : ''}{(vendor as any).factoryZipCode ? ` ${(vendor as any).factoryZipCode}` : ''}
+                  {vendor.businessCity}{vendor.businessState ? `, ${vendor.businessState}` : ''}{vendor.businessZipCode ? ` ${vendor.businessZipCode}` : ''}
                 </p>
-                {(vendor as any).factoryCountry && <p className="font-medium">{(vendor as any).factoryCountry}</p>}
+                {vendor.businessCountry && <p className="font-medium">{vendor.businessCountry}</p>}
               </div>
               {(vendor as any).factorySize && (
                 <div>
@@ -1087,18 +1097,20 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
         </Card>
       )}
 
-      {/* Warehouse Address — stored in warehouseAddress* columns */}
+      {/* Warehouse Address — compare against businessAddress (always correct) so
+          old vendors whose factoryAddress was mirrored from warehouseAddress
+          still show the correct "same as" or separate address. */}
       {(() => {
         const v = vendor as any
         const eq = (a: any, b: any) => (a || '').trim() === (b || '').trim()
         const isSameAsLegal = (
           !vendor.warehouseAddress && !vendor.warehouseCity
         ) || (
-          eq(vendor.warehouseAddress, v.factoryAddress) &&
-          eq(vendor.warehouseCity, v.factoryCity) &&
-          eq(vendor.warehouseState, v.factoryState) &&
-          eq(vendor.warehouseZipCode, v.factoryZipCode) &&
-          eq(vendor.warehouseCountry, v.factoryCountry)
+          eq(vendor.warehouseAddress, vendor.businessAddress) &&
+          eq(vendor.warehouseCity, vendor.businessCity) &&
+          eq(vendor.warehouseState, vendor.businessState) &&
+          eq(vendor.warehouseZipCode, vendor.businessZipCode) &&
+          eq(vendor.warehouseCountry, vendor.businessCountry)
         )
         return (
           <Card>

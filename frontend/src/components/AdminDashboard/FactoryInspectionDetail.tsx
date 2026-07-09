@@ -491,22 +491,23 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                             <VCard label="Ownership Type" value={OWN_TYPE[(vendor as any).factoryOwnershipType] || (vendor as any).factoryOwnershipType} k="w_factoryOwnershipType" vf={vf} />
                             {(vendor as any).factorySize && <VCard label="Factory Site Area" value={(vendor as any).factorySize} k="w_factorySize" vf={vf} />}
-                            {(vendor as any).factoryAddress && <VCard label="Address Line 1" value={(vendor as any).factoryAddress} k="w_factoryAddress" vf={vf} />}
-                            {(vendor as any).factoryCity && <VCard label="City" value={(vendor as any).factoryCity} k="w_factoryCity" vf={vf} />}
-                            {(vendor as any).factoryState && <VCard label="State" value={(vendor as any).factoryState} k="w_factoryState" vf={vf} />}
-                            {(vendor as any).factoryZipCode && <VCard label="ZIP / Postal Code" value={(vendor as any).factoryZipCode} k="w_factoryZipCode" vf={vf} />}
-                            {(vendor as any).factoryCountry && <VCard label="Country" value={(vendor as any).factoryCountry} k="w_factoryCountry" vf={vf} />}
+                            {vendor.businessAddress && <VCard label="Address Line 1" value={vendor.businessAddress} k="w_businessAddress" vf={vf} />}
+                            {(vendor as any).addressLine2 && <VCard label="Address Line 2" value={(vendor as any).addressLine2} k="w_addressLine2" vf={vf} />}
+                            {vendor.businessCity && <VCard label="City" value={vendor.businessCity} k="w_businessCity" vf={vf} />}
+                            {vendor.businessState && <VCard label="State" value={vendor.businessState} k="w_businessState" vf={vf} />}
+                            {vendor.businessZipCode && <VCard label="ZIP / Postal Code" value={vendor.businessZipCode} k="w_businessZipCode" vf={vf} />}
+                            {vendor.businessCountry && <VCard label="Country" value={vendor.businessCountry} k="w_businessCountry" vf={vf} />}
                         </div>
                         {(() => {
                             const eq = (a: any, b: any) => (a || '').trim() === (b || '').trim()
                             const isSameAsLegal = (
                               !vendor.warehouseAddress && !vendor.warehouseCity
                             ) || (
-                              eq(vendor.warehouseAddress, (vendor as any).factoryAddress) &&
-                              eq(vendor.warehouseCity, (vendor as any).factoryCity) &&
-                              eq(vendor.warehouseState, (vendor as any).factoryState) &&
-                              eq(vendor.warehouseZipCode, (vendor as any).factoryZipCode) &&
-                              eq(vendor.warehouseCountry, (vendor as any).factoryCountry)
+                              eq(vendor.warehouseAddress, vendor.businessAddress) &&
+                              eq(vendor.warehouseCity, vendor.businessCity) &&
+                              eq(vendor.warehouseState, vendor.businessState) &&
+                              eq(vendor.warehouseZipCode, vendor.businessZipCode) &&
+                              eq(vendor.warehouseCountry, vendor.businessCountry)
                             )
                             return (
                                 <>
