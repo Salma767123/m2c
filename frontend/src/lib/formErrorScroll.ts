@@ -48,8 +48,12 @@ function findTarget(field: string, opts: ScrollToFirstErrorOptions): HTMLElement
     : defaultSelectorsFor(field);
 
   for (const sel of selectors) {
-    const el = document.querySelector<HTMLElement>(sel);
-    if (el) return el;
+    try {
+      const el = document.querySelector<HTMLElement>(sel);
+      if (el) return el;
+    } catch {
+      // Selector may be invalid (e.g. field names containing ':' used as '#id')
+    }
   }
   return null;
 }

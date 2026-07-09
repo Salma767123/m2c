@@ -2933,7 +2933,7 @@ export default function CompanyDetails({
                 const hasErr = !!(errors[errKey] && (touched[errKey] || errors[errKey]));
 
                 return (
-                  <div key={slot.id} className="flex flex-col gap-2">
+                  <div key={slot.id} data-field={errKey} className="flex flex-col gap-2">
                     <p className="text-xs font-semibold text-slate-700 truncate">
                       {slot.label}
                       {slot.required && <span className="text-red-500 ml-0.5">*</span>}

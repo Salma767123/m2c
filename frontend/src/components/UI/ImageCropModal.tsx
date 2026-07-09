@@ -129,12 +129,16 @@ export default function ImageCropModal({
   }, [src]);
 
   // Lock body scroll while the modal is visible; restore on close / unmount.
+  // Save and restore scrollY because toggling overflow on the body causes
+  // Chrome to reset scroll position when the container is the scroll root.
   React.useEffect(() => {
     if (!src) return;
     const prev = document.body.style.overflow;
+    const scrollY = window.scrollY;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
+      window.scrollTo({ top: scrollY, behavior: "instant" });
     };
   }, [src]);
 
