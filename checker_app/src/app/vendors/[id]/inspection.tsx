@@ -261,6 +261,18 @@ export default function VendorInspectionScreen() {
       Alert.alert('Verification incomplete', result.message || 'Please verify all fields before continuing.');
       return;
     }
+    if (step === 8) {
+      // Final Review: overall result and overall remarks are both mandatory
+      // before advancing to the Documentation step.
+      if (!meta.overallResult) {
+        Alert.alert('Overall result required', 'Please select an overall inspection result before continuing.');
+        return;
+      }
+      if (!meta.inspectorRemarks.trim()) {
+        Alert.alert('Overall remarks required', 'Please enter your overall inspector remarks before continuing.');
+        return;
+      }
+    }
     setEvidenceError(false);
     setHighlightedKeys(new Set());
     if (step < STEPS.length) setStep((s) => s + 1);

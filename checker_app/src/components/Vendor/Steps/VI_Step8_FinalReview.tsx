@@ -160,7 +160,7 @@ export default function VI_Step8_FinalReview({ verifications, meta, onMetaChange
           <View>
             <View className="flex-row items-center mb-1.5" style={{ columnGap: 4 }}>
               <MessageSquare size={12} color="#475569" />
-              <Text className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Overall Inspector Remarks</Text>
+              <Text className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Overall Inspector Remarks <Text className="text-red-500">*</Text></Text>
             </View>
             <TextInput
               value={meta.inspectorRemarks}

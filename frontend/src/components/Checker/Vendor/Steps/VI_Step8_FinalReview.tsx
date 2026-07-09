@@ -201,9 +201,10 @@ export default function VI_Step8_FinalReview({ vendor: v, inspection, verificati
           {/* Overall Remarks */}
           <div>
             <label className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-              <MessageSquare className="w-3 h-3" /> Overall Inspector Remarks
+              <MessageSquare className="w-3 h-3" /> Overall Inspector Remarks <span className="text-red-500">*</span>
             </label>
             <textarea
+              id="inspector-overall-remarks"
               value={meta.inspectorRemarks}
               onChange={e => onMetaChange({ inspectorRemarks: e.target.value })}
               placeholder="Summary notes about the inspection visit, any notable observations, or context for the admin reviewing this report…"

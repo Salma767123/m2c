@@ -74,5 +74,8 @@ export function validateForSubmit(meta: InspectorMeta): SubmitValidationResult {
   if (!meta.overallResult) {
     return { ok: false, jumpToStep: 8, message: 'Please select an overall result before submitting.' };
   }
+  if (!meta.inspectorRemarks.trim()) {
+    return { ok: false, jumpToStep: 8, message: 'Please enter your overall inspector remarks before submitting.' };
+  }
   return { ok: true };
 }

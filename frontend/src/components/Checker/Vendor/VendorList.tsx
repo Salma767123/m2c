@@ -718,11 +718,19 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
             <TableBody>
               {filteredVendors.map((vendor) => {
                 const isSelected = selectedVendor === vendor.id
+                // A checker-rejected inspection ('Rejected' + Under Review by
+                // Admin) is submitted work like 'Submitted' — the checker
+                // can't start again unless the admin orders a re-inspection
+                // (which resets inspectionStatus to 'Pending').
                 const isInspectionDone =
                   vendor.inspectionStatus === 'Completed' ||
                   vendor.inspectionStatus === 'Submitted' ||
+                  vendor.inspectionStatus === 'Rejected' ||
                   vendor.status === 'Approved' ||
                   vendor.status === 'Rejected'
+                const isAwaitingAdmin =
+                  vendor.status === 'Under Review by Admin' ||
+                  vendor.status === 'Re-Inspection Under Review by Admin'
                 return (
                   <TableRow
                     key={vendor.id}
@@ -803,7 +811,13 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
                           onClick={() => handleStartInspection(vendor)}
                           disabled={isInspectionDone}
                           aria-label={`Start inspection for ${vendor.name}`}
-                          title={isInspectionDone ? "Inspection has already been completed for this vendor." : undefined}
+                          title={
+                            isInspectionDone
+                              ? isAwaitingAdmin
+                                ? "Inspection already submitted — awaiting admin review."
+                                : "Inspection has already been completed for this vendor."
+                              : undefined
+                          }
                           className="flex items-center gap-1 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs shadow-brand-500/10 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                         >
                           <ArrowRight className="w-3.5 h-3.5" />

@@ -299,6 +299,20 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
       setEvidenceError(false)
     }
 
+    if (step === 8) {
+      // Final Review: overall result and overall remarks are both mandatory
+      // before advancing to the Documentation step.
+      if (!meta.overallResult) {
+        showErrorToast('Overall result required', 'Please select an overall inspection result before continuing.')
+        return
+      }
+      if (!meta.inspectorRemarks.trim()) {
+        document.getElementById('inspector-overall-remarks')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        showErrorToast('Overall remarks required', 'Please enter your overall inspector remarks before continuing.')
+        return
+      }
+    }
+
     if (step >= 1 && step <= 8) {
       const keys = registeredFieldsRef.current
       if (keys.length > 0) {
@@ -372,6 +386,11 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
     if (!meta.overallResult) {
       setStep(8)
       showErrorToast('Overall result required', 'Please select an overall result before submitting.')
+      return
+    }
+    if (!meta.inspectorRemarks.trim()) {
+      setStep(8)
+      showErrorToast('Overall remarks required', 'Please enter your overall inspector remarks before submitting.')
       return
     }
 
