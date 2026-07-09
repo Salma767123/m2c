@@ -17,6 +17,7 @@
 
 import jsPDF from "jspdf"
 import { formatCheckerName } from "@/lib/checkerUtils"
+import { resolveOwnerDesignation } from "@/lib/utils"
 import autoTable from "jspdf-autotable"
 import type { Verifications } from "@/components/Checker/Vendor/Steps/VI_VerifyField"
 export interface FactoryReportChecker {
@@ -29,6 +30,7 @@ export interface FactoryReportChecker {
 export interface FactoryReportMeta {
   inspectorName?: string
   inspectionDate?: string
+  inspectionStartedAt?: string
   overallResult?: string
   inspectorRemarks?: string
   checker?: FactoryReportChecker | null
@@ -371,7 +373,7 @@ export function generateFactoryInspectionPdf(
   const ownerIntlLine = hasIntlLandline(v.ownerIntlLandline) ? val(v.ownerIntlLandline) : null
   const ownerRows: string[][] = [
     ["Owner Full Name", val(ownerFullName)],
-    ["Designation", val(v.designation)],
+    ["Designation", val(resolveOwnerDesignation(v.designation))],
     ["Primary Phone", val(v.ownerPhone)],
   ]
   if (!blank(v.ownerPhone2)) ownerRows.push(["Secondary Phone", val(v.ownerPhone2)])
@@ -402,7 +404,7 @@ export function generateFactoryInspectionPdf(
       [["Name", "Designation", "Primary Email", "Primary Phone"]],
       additionalOwners.map((o: any) => [
         val(buildName(o.title, o.firstName, o.middleName, o.lastName) || o.firstName),
-        val(o.designation),
+        val(resolveOwnerDesignation(o.designation)),
         val(o.email),
         val(o.phone),
       ])
@@ -612,11 +614,12 @@ export function generateFactoryInspectionPdf(
       ["Checker ID",       val(meta.checker?.checkerId)],
       ["Inspector Email",  val(meta.checker?.email)],
       ["Inspector Phone",  val(meta.checker?.phone)],
-      ["Inspection Date",  fmtDate(meta.inspectionDate)],
-      ["Overall Result",   val(meta.overallResult)],
-      ["GPS Location",     loc ? `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}` : "Not available"],
-      ["Inspector Remarks", val(meta.inspectorRemarks)],
-      ["Report Generated", fmtDateTime(generatedAt)],
+      ["Inspection Date",          fmtDate(meta.inspectionDate)],
+      ["Inspection Start Time",    meta.inspectionStartedAt ? new Date(meta.inspectionStartedAt).toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "—"],
+      ["Inspection Complete Time", generatedAt.toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })],
+      ["Overall Result",           val(meta.overallResult)],
+      ["GPS Location",             loc ? `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}` : "Not available"],
+      ["Inspector Remarks",        val(meta.inspectorRemarks)],
     ]
   )
 
@@ -670,20 +673,25 @@ export function generateFactoryInspectionPdf(
     hour: "2-digit", minute: "2-digit", hour12: true,
   })
 
-  // Left: Inspector Name + Inspection Date + Inspection Time
+  // Left: Inspector Name + Inspection Date + Start Time + Complete Time
   doc.setFontSize(9)
+  const startTime = meta.inspectionStartedAt
+    ? new Date(meta.inspectionStartedAt).toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+    : '—'
   const leftLines: Array<{ label: string; value: string }> = [
     { label: "Inspector:", value: val(meta.inspectorName || formatCheckerName(meta.checker)) },
     { label: "Inspection Date:", value: fmtDate(meta.inspectionDate) },
-    { label: "Inspection Time:", value: inspectionTime },
+    { label: "Inspection Start Time:", value: startTime },
+    { label: "Inspection Complete Time:", value: inspectionTime },
   ]
   let lineY = y
+  const valueColX = margin + 135
   for (const { label, value } of leftLines) {
     doc.setFont("helvetica", "bold")
     doc.setTextColor(...SLATE)
     doc.text(label, margin, lineY)
     doc.setFont("helvetica", "normal")
-    doc.text(value, margin + 95, lineY)
+    doc.text(value, valueColX, lineY)
     lineY += 14
   }
 

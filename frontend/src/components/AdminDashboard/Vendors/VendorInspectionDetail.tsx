@@ -270,6 +270,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
     const reportMeta = {
       inspectorName: (formData as any).inspectorName || "",
       inspectionDate: (formData as any).inspectionDate,
+      inspectionStartedAt: inspection?.startedAt ?? undefined,
       overallResult: (formData as any).inspectionStatus,
       inspectorRemarks: (formData as any).inspectorRemarks || inspection?.notes,
       checker: qc

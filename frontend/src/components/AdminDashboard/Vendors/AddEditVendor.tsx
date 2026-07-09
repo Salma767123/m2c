@@ -543,11 +543,13 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
       );
 
       // Reverse map: descriptive document name → slot id. Mirrors
-      // FACTORY_SLOT_LABEL_MAP in backend/controllers/vendorController.js
-      // and FACTORY_IMAGE_SLOTS in CompanyDetails/WarehouseDetails; keep them
-      // in sync if new slots are added. Legacy rows named "Factory Image N"
-      // (pre-slot era) collapse into the `others` slot so they remain
-      // visible and replaceable.
+      // FACTORY_SLOT_LABEL_MAP / FACTORY_SITE_SLOT_LABEL_MAP in
+      // backend/controllers/vendorController.js and FACTORY_IMAGE_SLOTS in
+      // CompanyDetails/WarehouseDetails; keep them in sync if new slots are added.
+      // "Factory Name Board" etc. = warehouse photos (WarehouseDetails step).
+      // "Factory Site Name Board" etc. = factory site photos (CompanyDetails step).
+      type SlotRecord = Record<string, { file: File | null; url: string; name: string; isExisting: boolean }>;
+
       const reloadedFactoryImages = (() => {
         const slotByName: Record<string, string> = {
           "Factory Name Board": "nameBoard",
@@ -559,31 +561,41 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
           "Factory Interior": "insideFactory",
           "Factory Image (Other)": "others",
         };
-        const record: Record<
-          string,
-          {
-            file: File | null;
-            url: string;
-            name: string;
-            isExisting: boolean;
-          }
-        > = {};
-        const factoryDocs =
-          vendor.documents?.filter(
-            (doc: any) =>
-              doc.type === "OTHER" && doc.name?.includes("Factory"),
-          ) || [];
-        factoryDocs.forEach((doc: any) => {
+        const record: SlotRecord = {};
+        const docs = vendor.documents?.filter(
+          (doc: any) =>
+            doc.type === "OTHER" &&
+            doc.name?.startsWith("Factory") &&
+            !doc.name?.startsWith("Factory Site"),
+        ) || [];
+        docs.forEach((doc: any) => {
           const slotId = slotByName[doc.name] || "others";
-          // Don't overwrite a slot that already has a more-specific match;
-          // legacy fallback into `others` only fills if `others` is empty.
           if (!record[slotId]) {
-            record[slotId] = {
-              file: null,
-              url: doc.documentUrl,
-              name: doc.name,
-              isExisting: true,
-            };
+            record[slotId] = { file: null, url: doc.documentUrl, name: doc.name, isExisting: true };
+          }
+        });
+        return record;
+      })();
+
+      const reloadedFactorySiteImages = (() => {
+        const slotByName: Record<string, string> = {
+          "Factory Site Name Board": "nameBoard",
+          "Factory Site Front View": "frontView",
+          "Factory Site Back View": "backView",
+          "Factory Site Left View": "leftView",
+          "Factory Site Right View": "rightView",
+          "Factory Site Road View": "roadView",
+          "Factory Site Interior": "insideFactory",
+          "Factory Site Image (Other)": "others",
+        };
+        const record: SlotRecord = {};
+        const docs = vendor.documents?.filter(
+          (doc: any) => doc.type === "OTHER" && doc.name?.startsWith("Factory Site"),
+        ) || [];
+        docs.forEach((doc: any) => {
+          const slotId = slotByName[doc.name] || "others";
+          if (!record[slotId]) {
+            record[slotId] = { file: null, url: doc.documentUrl, name: doc.name, isExisting: true };
           }
         });
         return record;
@@ -677,12 +689,15 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         // mode — and since CompanyDetails overwrites `factoryImages` from
         // `factorySiteImages` on Save & Continue, it also wiped the stored
         // photos on the next save.
+        // Warehouse photos (WarehouseDetails step) — "Factory Name Board" etc.
         factoryImages: reloadedFactoryImages,
-        factorySiteImages: reloadedFactoryImages,
-        // CompanyDetails' "Total floor area" field — round-trips through
-        // `warehousingCapacity` (vendor.storageCapacity), same as the
-        // Warehouse step's capacity field.
-        factorySiteCapacity: vendor.storageCapacity || "",
+        // Factory site photos (CompanyDetails step) — "Factory Site Name Board" etc.
+        factorySiteImages: reloadedFactorySiteImages,
+        // CompanyDetails "Total floor area" — stored in factorySize ("N sq ft");
+        // strip the unit suffix so the input shows the raw number.
+        factorySiteCapacity: (vendor as any).factorySize
+          ? String((vendor as any).factorySize).replace(/\s*sq\s*ft\.?$/i, "").trim()
+          : (vendor.storageCapacity || ""),
         // Owner Profile
         ownerName: vendor.ownerName || "",
         ownerTitle: (vendor as any).ownerTitle || "",

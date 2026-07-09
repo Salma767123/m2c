@@ -187,13 +187,15 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
       try {
         // Dev/non-production: start without GPS so the browser never prompts.
         if (GEOFENCE_DISABLED) {
-          await qcCheckerService.startInspection(inspId, { checkerLatitude: null, checkerLongitude: null } as any)
+          const res = await qcCheckerService.startInspection(inspId, { checkerLatitude: null, checkerLongitude: null } as any)
+          if (res?.inspection && !cancelled) setInspection(res.inspection)
           return
         }
         const coords = await getCurrentCoords()
         if (cancelled) return
         setCheckerCoords(coords)
-        await qcCheckerService.startInspection(inspId, coords)
+        const res = await qcCheckerService.startInspection(inspId, coords)
+        if (res?.inspection && !cancelled) setInspection(res.inspection)
       } catch (err: any) {
         if (cancelled) return
         const msg: string = err?.message || ''
@@ -498,6 +500,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
           docData={docData}
           onDocDataChange={(patch) => setDocData(prev => ({ ...prev, ...patch }))}
           factoryEvidence={factoryEvidence}
+          inspectionStartedAt={inspection?.startedAt ?? null}
         />
       )
       default: return null

@@ -109,7 +109,11 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
           phone2: c.phone2 || '',
           landline: c.landline || '',
           localLandlineStd: c.localLandlineStd || '',
-          localLandline: c.localLandline || (c.landline ? parsePhone(c.landline).national : ''),
+          localLandline: (() => {
+            const std = (c.localLandlineStd || '').trim();
+            const raw = c.localLandline || (c.landline ? parsePhone(c.landline).national : '');
+            return std && raw.startsWith(std) ? raw.slice(std.length) : raw;
+          })(),
           intlLandlineCountryCode: c.intlLandlineCountryCode || parseIntlLandline(c.intlLandline || '').countryCode,
           intlLandlineStd: c.intlLandlineStd || '',
           intlLandlineNumber: c.intlLandlineNumber || parseIntlLandline(c.intlLandline || '').number,
@@ -232,7 +236,11 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
           phone2: c.phone2 || '',
           landline: c.landline || '',
           localLandlineStd: c.localLandlineStd || '',
-          localLandline: c.localLandline || (c.landline ? parsePhone(c.landline).national : ''),
+          localLandline: (() => {
+            const std = (c.localLandlineStd || '').trim();
+            const raw = c.localLandline || (c.landline ? parsePhone(c.landline).national : '');
+            return std && raw.startsWith(std) ? raw.slice(std.length) : raw;
+          })(),
           intlLandlineCountryCode: c.intlLandlineCountryCode || parseIntlLandline(c.intlLandline || '').countryCode,
           intlLandlineStd: c.intlLandlineStd || '',
           intlLandlineNumber: c.intlLandlineNumber || parseIntlLandline(c.intlLandline || '').number,
@@ -540,8 +548,6 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
     if (!main.lastName?.trim()) {
       newErrors['mainContact.lastName'] = 'Last Name is required';
-    } else if (main.lastName.trim().length < 2) {
-      newErrors['mainContact.lastName'] = 'Last Name must be at least 2 characters';
     } else if (!nameRegex.test(main.lastName)) {
       newErrors['mainContact.lastName'] = 'Invalid characters';
     }
@@ -562,22 +568,32 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       newErrors['mainContact.email2'] = 'Valid email is required';
     }
 
-    // Set up global uniqueness tracker for email validation
-    const seenEmails = new Map<string, { label: string; fieldKey: string }>();
+    // Global uniqueness trackers for email and phone across all contact persons
+    const seenEmails = new Map<string, string>();
+    const seenPhones = new Map<string, string>();
 
-    const checkEmailUniqueness = (emailVal: string | undefined, fieldKey: string, fieldLabel: string) => {
+    const checkEmailUniqueness = (emailVal: string | undefined, fieldKey: string, personLabel: string) => {
       if (!emailVal || !emailVal.trim() || !emailRegex.test(emailVal)) return;
       const normalized = emailVal.trim().toLowerCase();
       if (seenEmails.has(normalized)) {
-        const existing = seenEmails.get(normalized)!;
-        newErrors[fieldKey] = `Email is already used by ${existing.label}`;
+        newErrors[fieldKey] = `This email is already used by ${seenEmails.get(normalized)}.`;
       } else {
-        seenEmails.set(normalized, { label: fieldLabel, fieldKey });
+        seenEmails.set(normalized, personLabel);
       }
     };
 
-    checkEmailUniqueness(main.email1, 'mainContact.email1', 'Main Contact (Primary Email)');
-    checkEmailUniqueness(main.email2, 'mainContact.email2', 'Main Contact (Secondary Email)');
+    const checkPhoneUniqueness = (phoneVal: string | undefined, fieldKey: string, personLabel: string) => {
+      if (!phoneVal?.trim() || validatePhoneE164(phoneVal, { required: true, label: '' })) return;
+      if (seenPhones.has(phoneVal)) {
+        newErrors[fieldKey] = `This phone number is already used by ${seenPhones.get(phoneVal)}.`;
+      } else {
+        seenPhones.set(phoneVal, personLabel);
+      }
+    };
+
+    checkEmailUniqueness(main.email1, 'mainContact.email1', 'Contact Person 1');
+    checkEmailUniqueness(main.email2, 'mainContact.email2', 'Contact Person 1');
+    checkPhoneUniqueness(main.phone1, 'mainContact.phone1', 'Contact Person 1');
 
     const phone1Err = validatePhoneE164(main.phone1, { required: true, label: 'Primary Phone' });
     if (phone1Err) {
@@ -636,8 +652,6 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
       if (!alt.lastName?.trim()) {
         newErrors[`${prefix}_lastName`] = 'Last Name is required';
-      } else if (alt.lastName.trim().length < 2) {
-        newErrors[`${prefix}_lastName`] = 'Last Name must be at least 2 characters';
       } else if (!nameRegex.test(alt.lastName)) {
         newErrors[`${prefix}_lastName`] = 'Invalid characters';
       }
@@ -658,13 +672,14 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
         newErrors[`${prefix}_email2`] = 'Valid email is required';
       }
 
-      checkEmailUniqueness(alt.email1, `${prefix}_email1`, `Contact Person ${idx + 2} (Primary Email)`);
-      checkEmailUniqueness(alt.email2, `${prefix}_email2`, `Contact Person ${idx + 2} (Secondary Email)`);
+      checkEmailUniqueness(alt.email1, `${prefix}_email1`, `Contact Person ${idx + 2}`);
+      checkEmailUniqueness(alt.email2, `${prefix}_email2`, `Contact Person ${idx + 2}`);
 
       const altPhone1Err = validatePhoneE164(alt.phone1, { required: true, label: 'Primary Phone' });
       if (altPhone1Err) {
         newErrors[`${prefix}_phone1`] = altPhone1Err;
       }
+      checkPhoneUniqueness(alt.phone1, `${prefix}_phone1`, `Contact Person ${idx + 2}`);
 
       if (alt.phone2) {
         const phoneErr = validatePhoneE164(alt.phone2, { label: 'Secondary Phone' });

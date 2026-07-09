@@ -2,6 +2,7 @@
 
 import { Image as ImageIcon, User, MapPin, ExternalLink, Building2, Users } from "lucide-react"
 import { openDoc } from "@/lib/docViewerBus"
+import { resolveOwnerDesignation } from "@/lib/utils"
 import type { StepErrors } from "../validation"
 import {
     READONLY_CLS,
@@ -452,7 +453,7 @@ function VendorContactDetails({ contact }: { contact?: Record<string, any> | nul
                         label="Owner 1"
                         isPrimary
                         name={contact.ownerName}
-                        designation={contact.ownerDesignation}
+                        designation={resolveOwnerDesignation(contact.ownerDesignation)}
                         phone={contact.ownerPhone}
                         phone2={contact.ownerPhone2}
                         email={contact.ownerEmail}
@@ -482,7 +483,7 @@ function VendorContactDetails({ contact }: { contact?: Record<string, any> | nul
                                     key={idx}
                                     label={`Owner ${idx + 2}`}
                                     name={owner.name || [owner.firstName, owner.lastName].filter(Boolean).join(" ")}
-                                    designation={owner.designation}
+                                    designation={resolveOwnerDesignation(owner.designation)}
                                     phone={owner.phone || owner.phone1}
                                     phone2={owner.phone2}
                                     email={owner.email || owner.email1}

@@ -238,6 +238,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
             const meta: FactoryReportMeta = {
                 inspectorName: fd.inspectorName || formatCheckerName(inspection.checker),
                 inspectionDate: fd.inspectionDate,
+                inspectionStartedAt: inspection.startedAt ?? undefined,
                 overallResult: fd.inspectionStatus,
                 inspectorRemarks: fd.inspectorRemarks || inspection.notes,
                 checker: inspection.checker || null,
@@ -310,6 +311,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
             const meta: FactoryReportMeta = {
                 inspectorName: fd.inspectorName || formatCheckerName(inspection.checker),
                 inspectionDate: fd.inspectionDate,
+                inspectionStartedAt: inspection.startedAt ?? undefined,
                 overallResult: fd.inspectionStatus,
                 inspectorRemarks: fd.inspectorRemarks || inspection.notes,
                 checker: inspection.checker || null,
@@ -487,27 +489,24 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                         badge={<StepBadge prefixes={['w_']} vf={vf} />}>
                         <SubHead title="Legal Address & Factory Site" />
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            <VCard label="Ownership Type" value={OWN_TYPE[vendor.ownershipType] || vendor.ownershipType} k="w_ownershipType" vf={vf} />
-                            <VCard label="Warehousing Capacity" value={vendor.warehouseSize} k="w_warehouseSize" vf={vf} />
-                            {vendor.warehouseAddress && <VCard label="Address Line 1" value={vendor.warehouseAddress} k="w_warehouseAddress" vf={vf} />}
-                            {vendor.warehouseAddressLine2 && <VCard label="Address Line 2" value={vendor.warehouseAddressLine2} k="w_warehouseAddressLine2" vf={vf} />}
-                            {vendor.warehouseAddressLine3 && <VCard label="Address Line 3" value={vendor.warehouseAddressLine3} k="w_warehouseAddressLine3" vf={vf} />}
-                            {vendor.warehouseLandmark && <VCard label="Landmark" value={vendor.warehouseLandmark} k="w_warehouseLandmark" vf={vf} />}
-                            {vendor.warehouseCity && <VCard label="City" value={vendor.warehouseCity} k="w_warehouseCity" vf={vf} />}
-                            {vendor.warehouseState && <VCard label="State" value={vendor.warehouseState} k="w_warehouseState" vf={vf} />}
-                            {vendor.warehouseZipCode && <VCard label="ZIP / Postal Code" value={vendor.warehouseZipCode} k="w_warehouseZipCode" vf={vf} />}
-                            {vendor.warehouseCountry && <VCard label="Country" value={vendor.warehouseCountry} k="w_warehouseCountry" vf={vf} />}
+                            <VCard label="Ownership Type" value={OWN_TYPE[(vendor as any).factoryOwnershipType] || (vendor as any).factoryOwnershipType} k="w_factoryOwnershipType" vf={vf} />
+                            {(vendor as any).factorySize && <VCard label="Factory Site Area" value={(vendor as any).factorySize} k="w_factorySize" vf={vf} />}
+                            {(vendor as any).factoryAddress && <VCard label="Address Line 1" value={(vendor as any).factoryAddress} k="w_factoryAddress" vf={vf} />}
+                            {(vendor as any).factoryCity && <VCard label="City" value={(vendor as any).factoryCity} k="w_factoryCity" vf={vf} />}
+                            {(vendor as any).factoryState && <VCard label="State" value={(vendor as any).factoryState} k="w_factoryState" vf={vf} />}
+                            {(vendor as any).factoryZipCode && <VCard label="ZIP / Postal Code" value={(vendor as any).factoryZipCode} k="w_factoryZipCode" vf={vf} />}
+                            {(vendor as any).factoryCountry && <VCard label="Country" value={(vendor as any).factoryCountry} k="w_factoryCountry" vf={vf} />}
                         </div>
                         {(() => {
                             const eq = (a: any, b: any) => (a || '').trim() === (b || '').trim()
                             const isSameAsLegal = (
-                              !vendor.factoryAddress && !vendor.factoryCity
+                              !vendor.warehouseAddress && !vendor.warehouseCity
                             ) || (
-                              eq(vendor.factoryAddress, vendor.warehouseAddress) &&
-                              eq(vendor.factoryCity, vendor.warehouseCity) &&
-                              eq(vendor.factoryState, vendor.warehouseState) &&
-                              eq(vendor.factoryZipCode, vendor.warehouseZipCode) &&
-                              eq(vendor.factoryCountry, vendor.warehouseCountry)
+                              eq(vendor.warehouseAddress, (vendor as any).factoryAddress) &&
+                              eq(vendor.warehouseCity, (vendor as any).factoryCity) &&
+                              eq(vendor.warehouseState, (vendor as any).factoryState) &&
+                              eq(vendor.warehouseZipCode, (vendor as any).factoryZipCode) &&
+                              eq(vendor.warehouseCountry, (vendor as any).factoryCountry)
                             )
                             return (
                                 <>
@@ -519,11 +518,16 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                            {vendor.factoryAddress && <VCard label="Address Line 1" value={vendor.factoryAddress} k="w_factoryAddress" vf={vf} />}
-                                            {vendor.factoryCity && <VCard label="City" value={vendor.factoryCity} k="w_factoryCity" vf={vf} />}
-                                            {vendor.factoryState && <VCard label="State" value={vendor.factoryState} k="w_factoryState" vf={vf} />}
-                                            {vendor.factoryZipCode && <VCard label="ZIP Code" value={vendor.factoryZipCode} k="w_factoryZipCode" vf={vf} />}
-                                            {vendor.factoryCountry && <VCard label="Country" value={vendor.factoryCountry} k="w_factoryCountry" vf={vf} />}
+                                            <VCard label="Ownership Type" value={OWN_TYPE[vendor.ownershipType] || vendor.ownershipType} k="w_ownershipType" vf={vf} />
+                                            <VCard label="Warehousing Capacity" value={vendor.warehouseSize} k="w_warehouseSize" vf={vf} />
+                                            {vendor.warehouseAddress && <VCard label="Address Line 1" value={vendor.warehouseAddress} k="w_warehouseAddress" vf={vf} />}
+                                            {vendor.warehouseAddressLine2 && <VCard label="Address Line 2" value={vendor.warehouseAddressLine2} k="w_warehouseAddressLine2" vf={vf} />}
+                                            {vendor.warehouseAddressLine3 && <VCard label="Address Line 3" value={vendor.warehouseAddressLine3} k="w_warehouseAddressLine3" vf={vf} />}
+                                            {vendor.warehouseLandmark && <VCard label="Landmark" value={vendor.warehouseLandmark} k="w_warehouseLandmark" vf={vf} />}
+                                            {vendor.warehouseCity && <VCard label="City" value={vendor.warehouseCity} k="w_warehouseCity" vf={vf} />}
+                                            {vendor.warehouseState && <VCard label="State" value={vendor.warehouseState} k="w_warehouseState" vf={vf} />}
+                                            {vendor.warehouseZipCode && <VCard label="ZIP Code" value={vendor.warehouseZipCode} k="w_warehouseZipCode" vf={vf} />}
+                                            {vendor.warehouseCountry && <VCard label="Country" value={vendor.warehouseCountry} k="w_warehouseCountry" vf={vf} />}
                                             {vendor.mapLink && <VCard label="Map / Location Link" value={vendor.mapLink} k="w_mapLink" vf={vf} />}
                                         </div>
                                     )}

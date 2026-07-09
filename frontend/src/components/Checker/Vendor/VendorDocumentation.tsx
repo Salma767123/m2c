@@ -80,9 +80,10 @@ interface Props {
   onDocDataChange: (patch: Partial<VendorDocData>) => void
   errors?: Record<string, string>
   factoryEvidence?: FactoryEvidenceState | null
+  inspectionStartedAt?: string | null
 }
 
-export default function VendorDocumentation({ vendor, verifications, meta, docData, onDocDataChange, errors = {}, factoryEvidence }: Props) {
+export default function VendorDocumentation({ vendor, verifications, meta, docData, onDocDataChange, errors = {}, factoryEvidence, inspectionStartedAt }: Props) {
   const signedDocInputRef = useRef<HTMLInputElement | null>(null)
   const sigPadRef = useRef<SignatureCanvasType | null>(null)
   const sigCanvasContainerRef = useRef<HTMLDivElement | null>(null)
@@ -133,6 +134,7 @@ export default function VendorDocumentation({ vendor, verifications, meta, docDa
   const buildMeta = () => ({
     inspectorName: meta.inspectorName || formatCheckerName(checker) || "",
     inspectionDate: meta.inspectionDate,
+    inspectionStartedAt: inspectionStartedAt ?? undefined,
     overallResult: meta.overallResult,
     inspectorRemarks: meta.inspectorRemarks,
     checker: checker ? { name: formatCheckerName(checker), checkerId: checker.checkerId, email: checker.email, phone: checker.phone || (checker as any).mobile } : null,

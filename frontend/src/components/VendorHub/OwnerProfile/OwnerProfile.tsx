@@ -191,7 +191,11 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       middleName: o.middleName || '',
       lastName: o.lastName || (o.name && o.name.includes(' ') ? o.name.split(' ').slice(1).join(' ') : ''),
       localLandlineStd: o.localLandlineStd || '',
-      localLandline: o.localLandline || (o.landline ? parsePhone(o.landline).national : ''),
+      localLandline: (() => {
+        const std = (o.localLandlineStd || '').trim();
+        const raw = o.localLandline || (o.landline ? parsePhone(o.landline).national : '');
+        return std && raw.startsWith(std) ? raw.slice(std.length) : raw;
+      })(),
       intlLandlineCountryCode: o.intlLandlineCountryCode || parsePhone(o.intlLandline || '').dial,
       intlLandlineStd: o.intlLandlineStd || '',
       intlLandlineNumber: o.intlLandlineNumber || parsePhone(o.intlLandline || '').national,
@@ -316,7 +320,11 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
             middleName: o.middleName || '',
             lastName: o.lastName || (o.name && o.name.includes(' ') ? o.name.split(' ').slice(1).join(' ') : ''),
             localLandlineStd: o.localLandlineStd || '',
-            localLandline: o.localLandline || (o.landline ? parsePhone(o.landline).national : ''),
+            localLandline: (() => {
+              const std = (o.localLandlineStd || '').trim();
+              const raw = o.localLandline || (o.landline ? parsePhone(o.landline).national : '');
+              return std && raw.startsWith(std) ? raw.slice(std.length) : raw;
+            })(),
             intlLandlineCountryCode: o.intlLandlineCountryCode || parsePhone(o.intlLandline || '').dial,
             intlLandlineStd: o.intlLandlineStd || '',
             intlLandlineNumber: o.intlLandlineNumber || parsePhone(o.intlLandline || '').national,
@@ -566,6 +574,29 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       newErrors.designation = 'Please type your designation';
     }
 
+    // Duplicate-across-owners trackers (primary email + phone only).
+    const seenOwnerEmails = new Map<string, string>();
+    const seenOwnerPhones = new Map<string, string>();
+
+    const checkOwnerEmailUnique = (val: string | undefined, fieldKey: string, ownerLabel: string) => {
+      if (!val?.trim() || !EMAIL_RE.test(val)) return;
+      const key = val.trim().toLowerCase();
+      if (seenOwnerEmails.has(key)) {
+        newErrors[fieldKey] = `This email is already used by ${seenOwnerEmails.get(key)}.`;
+      } else {
+        seenOwnerEmails.set(key, ownerLabel);
+      }
+    };
+
+    const checkOwnerPhoneUnique = (val: string | undefined, fieldKey: string, ownerLabel: string) => {
+      if (!val?.trim() || validatePhoneE164(val, { required: true, label: '' })) return;
+      if (seenOwnerPhones.has(val)) {
+        newErrors[fieldKey] = `This phone number is already used by ${seenOwnerPhones.get(val)}.`;
+      } else {
+        seenOwnerPhones.set(val, ownerLabel);
+      }
+    };
+
     // Primary email (required)
     if (!formData.ownerEmail) {
       newErrors.ownerEmail = 'Primary Email is required';
@@ -594,6 +625,11 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       label: 'Secondary Phone',
     });
     if (phone2Err) newErrors.ownerPhone2 = phone2Err;
+
+    // Register primary owner for cross-owner duplicate checks
+    checkOwnerEmailUnique(formData.ownerEmail, 'ownerEmail', 'Owner 1');
+    checkOwnerPhoneUnique(formData.ownerPhone, 'ownerPhone', 'Owner 1');
+
     if (!formData.businessStartDate) newErrors.businessStartDate = 'Start date is required';
     if (!formData.employeeCount) newErrors.employeeCount = 'Please pick an employee range';
 
@@ -615,6 +651,10 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
           label: 'Phone',
         });
         if (ownerPhoneErr) newErrors[`additionalOwner_${index}_phone`] = ownerPhoneErr;
+
+        // Cross-owner duplicate checks
+        checkOwnerEmailUnique(owner.email, `additionalOwner_${index}_email`, `Owner ${index + 2}`);
+        checkOwnerPhoneUnique(owner.phone, `additionalOwner_${index}_phone`, `Owner ${index + 2}`);
       }
     });
 

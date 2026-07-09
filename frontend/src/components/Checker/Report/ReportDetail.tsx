@@ -12,7 +12,7 @@ import { Badge } from "@/components/UI/Badge"
 import { openDoc } from "@/lib/docViewerBus"
 import qcCheckerService from "@/services/qcCheckerService"
 import { formatCheckerName } from "@/lib/checkerUtils"
-import { toExternalUrl } from "@/lib/utils"
+import { toExternalUrl, resolveOwnerDesignation } from "@/lib/utils"
 
 interface ReportDetailProps {
   reportId: string
@@ -443,7 +443,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
               <VCard label="Owner Full Name"
                 value={buildName(vendor.ownerTitle, vendor.ownerFirstName, vendor.ownerMiddleName, vendor.ownerLastName) || vendor.ownerName}
                 k="o_ownerName" vf={vf} />
-              <VCard label="Designation" value={vendor.designation} k="o_designation" vf={vf} />
+              <VCard label="Designation" value={resolveOwnerDesignation(vendor.designation)} k="o_designation" vf={vf} />
               {vendor.designation === 'Others' && vendor.customDesignation && <VCard label="Custom Designation" value={vendor.customDesignation} k="o_customDesignation" vf={vf} />}
               <VCard label="Primary Phone" value={vendor.ownerPhone} k="o_ownerPhone" vf={vf} />
               {vendor.ownerPhone2 && <VCard label="Secondary Phone" value={vendor.ownerPhone2} k="o_ownerPhone2" vf={vf} />}
@@ -487,7 +487,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         <VCard label="Full Name" value={buildName(owner.title, owner.firstName, owner.middleName, owner.lastName)} k={`o_add_${idx}_name`} vf={vf} />
-                        <VCard label="Designation" value={owner.designation} k={`o_add_${idx}_designation`} vf={vf} />
+                        <VCard label="Designation" value={resolveOwnerDesignation(owner.designation)} k={`o_add_${idx}_designation`} vf={vf} />
                         {owner.designation === 'Others' && owner.customDesignation && <VCard label="Custom Designation" value={owner.customDesignation} k={`o_add_${idx}_customDesignation`} vf={vf} />}
                         {owner.email && <VCard label="Email" value={owner.email} k={`o_add_${idx}_email`} vf={vf} />}
                         {owner.email2 && <VCard label="Secondary Email" value={owner.email2} k={`o_add_${idx}_email2`} vf={vf} />}

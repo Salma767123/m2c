@@ -82,6 +82,22 @@ export function calculateDuration(startDate: string): string {
   ].filter(Boolean).join(' / ') || '0 Days';
 }
 
+// Maps owner designation chip IDs (stored in DB) to their display labels.
+// Falls through to the raw value for custom/unknown strings so old data or
+// free-typed entries still render as-is.
+const OWNER_DESIGNATION_LABEL: Record<string, string> = {
+  'proprietor': 'Proprietor',
+  'ceo': 'CEO',
+  'director': 'Director',
+  'managing-director': 'Managing Director',
+  'founder': 'Founder',
+  'other': 'Other',
+};
+export function resolveOwnerDesignation(value?: string | null): string {
+  if (!value) return '';
+  return OWNER_DESIGNATION_LABEL[value] ?? value;
+}
+
 export function buildFullName(
   title?: string | null,
   firstName?: string | null,

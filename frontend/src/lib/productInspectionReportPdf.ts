@@ -18,6 +18,7 @@
 
 import jsPDF from "jspdf"
 import { formatCheckerName } from "@/lib/checkerUtils"
+import { resolveOwnerDesignation } from "@/lib/utils"
 import autoTable from "jspdf-autotable"
 
 export interface ReportChecker {
@@ -174,7 +175,7 @@ export function generateProductInspectionPdf(
     const mc = v.mainContact && typeof v.mainContact === "object" ? v.mainContact : null
     const contactRows: [string, string][] = [
         ["Full Name", resolveContactName(v)],
-        ["Designation", val(mc ? mc.customDesignation || mc.designation : v.designation)],
+        ["Designation", val(mc ? mc.customDesignation || mc.designation : resolveOwnerDesignation(v.designation))],
         ["Department", val(mc ? mc.customDepartment || mc.department : undefined)],
         ["Primary Phone", val(mc ? mc.phone1 || mc.phone : v.ownerPhone)],
         ["Secondary Phone", val(mc ? mc.phone2 : v.ownerPhone2)],

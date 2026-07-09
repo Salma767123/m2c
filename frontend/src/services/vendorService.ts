@@ -120,6 +120,8 @@ export interface VendorRegistrationData {
   complianceStandards?: string;
   packagingCapabilities?: string;
   warehousingCapacity?: string;
+  /** Factory site area in sq ft (CompanyDetails step). Separate from warehousingCapacity. */
+  factorySiteCapacity?: string;
   logisticsPartners?: string;
   shippingMethods: string[];
 
@@ -199,13 +201,11 @@ export interface VendorFiles {
   /** IEC Certificate — optional for all business types. */
   iecCertFile?: File;
   ownerPhoto?: File;
-  /** Factory images keyed by slot ID (nameBoard / frontView / backView /
-   *  leftView / rightView / roadView / insideFactory / others). Each slot
-   *  is uploaded under the shared `factoryImages` field with the slot ID
-   *  carried in a side-channel `factoryImageSlot_<index>` body field so the
-   *  backend can store descriptive document names ("Factory Front View"
-   *  etc.) instead of "Factory Image N". */
+  /** Warehouse photos (WarehouseDetails step) keyed by slot ID. */
   factoryImages?: Record<string, File>;
+  /** Factory site photos (CompanyDetails step) keyed by slot ID.
+   *  Only sent when sameAsWarehouse = false; stored under "Factory Site …" names. */
+  factorySiteImages?: Record<string, File>;
   certificationFiles?: Record<string, File>;
 }
 
@@ -542,6 +542,13 @@ class VendorService {
         factoryImageUrls.push({ url, slotId });
       }
     }
+    const factorySiteImageUrls: Array<{ url: string; slotId: string }> = [];
+    if (files.factorySiteImages) {
+      for (const [slotId, file] of Object.entries(files.factorySiteImages)) {
+        const { url } = await uploadFileToCloudinary(file as File, 'vendor-factory-sites');
+        factorySiteImageUrls.push({ url, slotId });
+      }
+    }
     const certificationFileUrls: Record<string, string> = {};
     if (files.certificationFiles) {
       for (const [certId, file] of Object.entries(files.certificationFiles)) {
@@ -575,6 +582,7 @@ class VendorService {
     // URL fields — backend uses these when the matching multipart file is absent.
     Object.entries(docUrls).forEach(([k, v]) => form.append(k, v));
     if (factoryImageUrls.length) form.append('factoryImageUrls', JSON.stringify(factoryImageUrls));
+    if (factorySiteImageUrls.length) form.append('factorySiteImageUrls', JSON.stringify(factorySiteImageUrls));
     if (Object.keys(certificationFileUrls).length) {
       form.append('certificationFileUrls', JSON.stringify(certificationFileUrls));
     }
@@ -829,6 +837,38 @@ class VendorService {
         formData.append('existingFactoryImages', JSON.stringify(existingImageUrls));
         existingSlotIds.forEach((slotId, i) => {
           if (slotId) formData.append(`existingFactoryImageSlot_${i}`, slotId);
+        });
+      }
+
+      // Handle factory SITE images (CompanyDetails step) — same protocol as factoryImages.
+      if (vendorData.factorySiteImages) {
+        const existingSiteImageUrls: string[] = [];
+        const existingSiteSlotIds: string[] = [];
+        let newSiteFileIndex = 0;
+
+        const emitSiteSlot = (slotId: string | null, slot: any) => {
+          if (!slot) return;
+          if (slot.file instanceof File) {
+            formData.append('factorySiteImages', slot.file);
+            if (slotId) formData.append(`factorySiteImageSlot_${newSiteFileIndex}`, slotId);
+            newSiteFileIndex++;
+          } else if (slot.url) {
+            existingSiteImageUrls.push(slot.url);
+            existingSiteSlotIds.push(slotId || '');
+          }
+        };
+
+        if (Array.isArray(vendorData.factorySiteImages)) {
+          vendorData.factorySiteImages.forEach((image: any) => emitSiteSlot(null, image));
+        } else if (typeof vendorData.factorySiteImages === 'object') {
+          Object.entries(vendorData.factorySiteImages).forEach(([slotId, slot]) =>
+            emitSiteSlot(slotId, slot),
+          );
+        }
+
+        formData.append('existingFactorySiteImages', JSON.stringify(existingSiteImageUrls));
+        existingSiteSlotIds.forEach((slotId, i) => {
+          if (slotId) formData.append(`existingFactorySiteImageSlot_${i}`, slotId);
         });
       }
 

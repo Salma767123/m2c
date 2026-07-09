@@ -218,6 +218,7 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         complianceStandards: data.complianceStandards || '',
         packagingCapabilities: data.packagingCapabilities || '',
         warehousingCapacity: data.warehousingCapacity || '',
+        factorySiteCapacity: (data as any).factorySiteCapacity || '',
         logisticsPartners: data.logisticsPartners || '',
         shippingMethods: data.shippingMethods || [],
         
@@ -265,6 +266,18 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         // backend stores descriptive document names per slot.
         factoryImages: data.factoryImages
           ? Object.entries(data.factoryImages).reduce(
+              (acc: Record<string, File>, [slotId, slotData]: [string, any]) => {
+                if (slotData && slotData.file instanceof File) {
+                  acc[slotId] = slotData.file;
+                }
+                return acc;
+              },
+              {},
+            )
+          : {},
+        // Factory site photos (CompanyDetails step) — only when sameAsWarehouse = false.
+        factorySiteImages: !(data as any).sameAsWarehouse && (data as any).factorySiteImages
+          ? Object.entries((data as any).factorySiteImages).reduce(
               (acc: Record<string, File>, [slotId, slotData]: [string, any]) => {
                 if (slotData && slotData.file instanceof File) {
                   acc[slotId] = slotData.file;

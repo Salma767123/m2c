@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import { SquarePen, Calendar, Building2, Warehouse, UserCircle, Tags, Factory, ShieldCheck, Briefcase, Globe, FileText } from 'lucide-react';
-import { AccordionSection, getLandlineDisplay } from '../FormUI';
-import { buildFullName, calculateDuration, toExternalUrl } from '@/lib/utils';
+import { AccordionSection, getLandlineDisplay, formatLocalLandline, formatIntlLandline } from '../FormUI';
+import { buildFullName, calculateDuration, toExternalUrl, resolveOwnerDesignation } from '@/lib/utils';
 
 /**
  * Read-only summary of a vendor's collected registration data. Shared by
@@ -467,11 +467,22 @@ export default function VendorDataSummary({
           {data.email2 && <InfoRow label="Secondary Email" value={data.email2} />}
           <InfoRow label="Primary Phone" value={data.phone} />
           {data.phoneNumber2 && <InfoRow label="Secondary Phone" value={data.phoneNumber2} />}
-          {data.landlineNumber && <InfoRow label="Local Landline" value={`+91 ${data.landlineNumber}`} />}
-          <InfoRow
-            label="International Landline"
-            value={data.intlLandline && data.intlLandline.replace(/\D/g, '').length > 4 ? data.intlLandline : undefined}
-          />
+          {(() => {
+            const ll = getLandlineDisplay({
+              localLandlineCountryCode: '+91',
+              localLandlineStd: data.localLandlineStd,
+              localLandline: data.localLandlineNumber,
+              intlLandline: data.intlLandline,
+              landline: data.landlineNumber,
+            });
+            return (
+              <>
+                {ll.local && <InfoRow label="Local Landline" value={ll.local} />}
+                {ll.intl && <InfoRow label="International Landline" value={ll.intl} />}
+                {!ll.hasNew && ll.legacy && <InfoRow label="Landline" value={ll.legacy} />}
+              </>
+            );
+          })()}
           <InfoRow
             label="Website"
             value={(() => {
@@ -568,7 +579,7 @@ export default function VendorDataSummary({
           {data.designation && (
             <InfoRow
               label="Designation"
-              value={<span className="capitalize">{data.designation}</span>}
+              value={resolveOwnerDesignation(data.designation)}
             />
           )}
           {data.designation === 'Others' && data.customDesignation && (
@@ -578,8 +589,22 @@ export default function VendorDataSummary({
           {data.ownerEmail2 && <InfoRow label="Secondary Email" value={data.ownerEmail2} />}
           <InfoRow label="Primary Phone" value={data.ownerPhone} />
           {data.ownerPhone2 && <InfoRow label="Secondary Phone" value={data.ownerPhone2} />}
-          {data.ownerLandline && <InfoRow label="Local Landline" value={data.ownerLandline} />}
-          {data.ownerIntlLandline && <InfoRow label="International Landline" value={data.ownerIntlLandline} />}
+          {(() => {
+            const ll = getLandlineDisplay({
+              localLandlineCountryCode: '+91',
+              localLandlineStd: data.ownerLocalLandlineStd,
+              localLandline: data.ownerLocalLandlineNumber,
+              intlLandline: data.ownerIntlLandline,
+              landline: data.ownerLandline,
+            });
+            return (
+              <>
+                {ll.local && <InfoRow label="Local Landline" value={ll.local} />}
+                {ll.intl && <InfoRow label="International Landline" value={ll.intl} />}
+                {!ll.hasNew && ll.legacy && <InfoRow label="Landline" value={ll.legacy} />}
+              </>
+            );
+          })()}
           {data.businessStartDate ? (
             <InfoRow
               label="Start Business Date"
@@ -615,7 +640,7 @@ export default function VendorDataSummary({
                   ) : null;
                 })()}
                 <InfoRow inset label="Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />
-                {owner.designation && <InfoRow inset label="Designation" value={owner.designation} />}
+                {owner.designation && <InfoRow inset label="Designation" value={resolveOwnerDesignation(owner.designation)} />}
                 {owner.designation === 'Others' && owner.customDesignation && (
                   <InfoRow inset label="Custom Designation" value={owner.customDesignation} />
                 )}
@@ -623,11 +648,22 @@ export default function VendorDataSummary({
                 {owner.email2 && <InfoRow inset label="Secondary Email" value={owner.email2} />}
                 <InfoRow inset label="Primary Phone" value={owner.phone} />
                 {owner.phone2 && <InfoRow inset label="Secondary Phone" value={owner.phone2} />}
-                {owner.localLandline && <InfoRow inset label="Local Landline" value={owner.localLandline} />}
-                {owner.intlLandline && <InfoRow inset label="International Landline" value={owner.intlLandline} />}
-                {!owner.localLandline && !owner.intlLandline && owner.landline && (
-                  <InfoRow inset label="Landline" value={owner.landline} />
-                )}
+                {(() => {
+                  // localLandline is saved as STD+number assembled; strip STD to get subscriber.
+                  const std = owner.localLandlineStd || '';
+                  const assembled = owner.localLandline || '';
+                  const subscriber = std && assembled.startsWith(std) ? assembled.slice(std.length).trim() : assembled;
+                  const localDisplay = formatLocalLandline({ countryCode: '+91', std, number: subscriber });
+                  const intlDisplay = formatIntlLandline(owner.intlLandline);
+                  const legacyDisplay = !localDisplay && !intlDisplay ? (owner.landline || '') : '';
+                  return (
+                    <>
+                      {localDisplay && <InfoRow inset label="Local Landline" value={localDisplay} />}
+                      {intlDisplay && <InfoRow inset label="International Landline" value={intlDisplay} />}
+                      {legacyDisplay && <InfoRow inset label="Landline" value={legacyDisplay} />}
+                    </>
+                  );
+                })()}
               </SubCard>
             ))}
         </div>
@@ -938,12 +974,17 @@ export default function VendorDataSummary({
               <InfoRow inset label="Primary Phone" value={contact.phone1 || contact.phone || 'Not provided'} />
               {contact.phone2 && <InfoRow inset label="Secondary Phone" value={contact.phone2} />}
               {(() => {
-                const ll = getLandlineDisplay(contact);
+                const std = (contact.localLandlineStd || '').trim();
+                const assembled = contact.localLandline || '';
+                const subscriber = std && assembled.startsWith(std) ? assembled.slice(std.length).trim() : assembled;
+                const localDisplay = formatLocalLandline({ countryCode: '+91', std, number: subscriber });
+                const intlDisplay = formatIntlLandline(contact.intlLandline);
+                const legacyDisplay = !localDisplay && !intlDisplay ? (contact.landline || '') : '';
                 return (
                   <>
-                    {ll.local && <InfoRow inset label="Local Landline" value={ll.local} />}
-                    {ll.intl && <InfoRow inset label="International Landline" value={ll.intl} />}
-                    {!ll.hasNew && ll.legacy && <InfoRow inset label="Landline" value={ll.legacy} />}
+                    {localDisplay && <InfoRow inset label="Local Landline" value={localDisplay} />}
+                    {intlDisplay && <InfoRow inset label="International Landline" value={intlDisplay} />}
+                    {legacyDisplay && <InfoRow inset label="Landline" value={legacyDisplay} />}
                   </>
                 );
               })()}

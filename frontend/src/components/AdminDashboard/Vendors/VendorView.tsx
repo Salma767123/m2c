@@ -47,7 +47,7 @@ import SuspensionModal from './SuspensionModal'
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 import { hasPermission } from '@/lib/auth'
 import { getLandlineDisplay, formatLocalLandline, formatIntlLandline } from '@/components/VendorHub/FormUI'
-import { buildFullName, toExternalUrl } from '@/lib/utils'
+import { buildFullName, toExternalUrl, resolveOwnerDesignation } from '@/lib/utils'
 import { downloadDoc, isDocImageUrl } from '@/lib/docDownload'
 import DocViewerModal from '@/components/UI/DocViewerModal'
 import { FACILITY_META, withUnit } from '@/components/Checker/Vendor/Steps/VI_Step5_Manufacturing'
@@ -764,7 +764,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                 {(vendor as any).designation && (
                   <div>
                     <p className="text-sm text-slate-500">Designation</p>
-                    <p className="font-medium capitalize">{(vendor as any).designation}</p>
+                    <p className="font-medium">{resolveOwnerDesignation((vendor as any).designation)}</p>
                   </div>
                 )}
                 {(vendor as any).designation === 'Others' && (vendor as any).customDesignation && (
@@ -854,7 +854,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                           {owner.designation && (
                             <div>
                               <p className="text-slate-500">Designation</p>
-                              <p className="font-medium capitalize">{owner.designation}</p>
+                              <p className="font-medium">{resolveOwnerDesignation(owner.designation)}</p>
                             </div>
                           )}
                           {owner.designation === 'Others' && owner.customDesignation && (
@@ -1052,8 +1052,8 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
         </Card>
       )}
 
-      {/* Legal Address & Factory Site */}
-      {vendor.warehouseAddress && (
+      {/* Legal Address & Factory Site — stored in factoryAddress* columns */}
+      {(vendor as any).factoryAddress && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -1063,34 +1063,23 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {(vendor as any).ownershipType && (
+              {(vendor as any).factoryOwnershipType && (
                 <div>
                   <p className="text-sm text-slate-500 font-semibold mb-1">Ownership Type</p>
-                  <p className="font-medium capitalize">{(vendor as any).ownershipType}</p>
+                  <p className="font-medium capitalize">{(vendor as any).factoryOwnershipType}</p>
                 </div>
               )}
               <div>
-                <p className="font-medium">{vendor.warehouseAddress}</p>
-                {(vendor as any).warehouseAddressLine2 && (
-                  <p className="font-medium">{(vendor as any).warehouseAddressLine2}</p>
-                )}
-                {(vendor as any).warehouseAddressLine3 && (
-                  <p className="font-medium">{(vendor as any).warehouseAddressLine3}</p>
-                )}
-                {(vendor as any).warehouseLandmark && (
-                  <p className="text-sm text-slate-500">
-                    <span className="font-semibold">Landmark:</span> {(vendor as any).warehouseLandmark}
-                  </p>
-                )}
+                <p className="font-medium">{(vendor as any).factoryAddress}</p>
                 <p className="font-medium">
-                  {vendor.warehouseCity}, {vendor.warehouseState} {vendor.warehouseZipCode}
+                  {(vendor as any).factoryCity}{(vendor as any).factoryState ? `, ${(vendor as any).factoryState}` : ''}{(vendor as any).factoryZipCode ? ` ${(vendor as any).factoryZipCode}` : ''}
                 </p>
-                {vendor.warehouseCountry && <p className="font-medium">{vendor.warehouseCountry}</p>}
+                {(vendor as any).factoryCountry && <p className="font-medium">{(vendor as any).factoryCountry}</p>}
               </div>
-              {vendor.warehouseSize && (
+              {(vendor as any).factorySize && (
                 <div>
-                  <p className="text-sm text-slate-500">Warehousing Capacity</p>
-                  <p className="font-medium">{vendor.warehouseSize}</p>
+                  <p className="text-sm text-slate-500">Factory Site Area</p>
+                  <p className="font-medium">{(vendor as any).factorySize}</p>
                 </div>
               )}
             </div>
@@ -1098,18 +1087,18 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
         </Card>
       )}
 
-      {/* Warehouse Address (separate from legal address, if provided) */}
+      {/* Warehouse Address — stored in warehouseAddress* columns */}
       {(() => {
         const v = vendor as any
         const eq = (a: any, b: any) => (a || '').trim() === (b || '').trim()
         const isSameAsLegal = (
-          !v.factoryAddress && !v.factoryCity
+          !vendor.warehouseAddress && !vendor.warehouseCity
         ) || (
-          eq(v.factoryAddress, vendor.warehouseAddress) &&
-          eq(v.factoryCity, vendor.warehouseCity) &&
-          eq(v.factoryState, vendor.warehouseState) &&
-          eq(v.factoryZipCode, vendor.warehouseZipCode) &&
-          eq(v.factoryCountry, vendor.warehouseCountry)
+          eq(vendor.warehouseAddress, v.factoryAddress) &&
+          eq(vendor.warehouseCity, v.factoryCity) &&
+          eq(vendor.warehouseState, v.factoryState) &&
+          eq(vendor.warehouseZipCode, v.factoryZipCode) &&
+          eq(vendor.warehouseCountry, v.factoryCountry)
         )
         return (
           <Card>
@@ -1120,19 +1109,38 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {v.ownershipType && (
+                <div className="mb-3">
+                  <p className="text-sm text-slate-500 font-semibold mb-1">Ownership Type</p>
+                  <p className="font-medium capitalize">{v.ownershipType}</p>
+                </div>
+              )}
               {isSameAsLegal ? (
                 <div className="p-3 bg-blue-50 text-blue-800 rounded-lg text-sm border border-blue-200 font-medium">
                   Warehouse Address is the same as the Legal Address &amp; Factory Site above.
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {v.factoryAddress && <p className="font-medium">{v.factoryAddress}</p>}
-                  {v.factoryCity && (
-                    <p className="font-medium">
-                      {v.factoryCity}{v.factoryState ? `, ${v.factoryState}` : ''}{v.factoryZipCode ? ` ${v.factoryZipCode}` : ''}
+                  {vendor.warehouseAddress && <p className="font-medium">{vendor.warehouseAddress}</p>}
+                  {v.warehouseAddressLine2 && <p className="font-medium">{v.warehouseAddressLine2}</p>}
+                  {v.warehouseAddressLine3 && <p className="font-medium">{v.warehouseAddressLine3}</p>}
+                  {v.warehouseLandmark && (
+                    <p className="text-sm text-slate-500">
+                      <span className="font-semibold">Landmark:</span> {v.warehouseLandmark}
                     </p>
                   )}
-                  {v.factoryCountry && <p className="font-medium">{v.factoryCountry}</p>}
+                  {vendor.warehouseCity && (
+                    <p className="font-medium">
+                      {vendor.warehouseCity}{vendor.warehouseState ? `, ${vendor.warehouseState}` : ''}{vendor.warehouseZipCode ? ` ${vendor.warehouseZipCode}` : ''}
+                    </p>
+                  )}
+                  {vendor.warehouseCountry && <p className="font-medium">{vendor.warehouseCountry}</p>}
+                </div>
+              )}
+              {vendor.warehouseSize && (
+                <div className="mt-3">
+                  <p className="text-sm text-slate-500">Warehousing Capacity</p>
+                  <p className="font-medium">{vendor.warehouseSize}</p>
                 </div>
               )}
               {v.mapLink && (

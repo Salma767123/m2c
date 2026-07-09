@@ -31,7 +31,7 @@ import {
 import { Vendor } from "@/types/inspection"
 import qcCheckerService from "@/services/qcCheckerService"
 import { formatLocalLandline, formatIntlLandline } from "@/components/VendorHub/FormUI"
-import { buildFullName, toExternalUrl } from "@/lib/utils"
+import { buildFullName, toExternalUrl, resolveOwnerDesignation } from "@/lib/utils"
 import { isDocImageUrl } from "@/lib/docDownload"
 import DocViewerModal from "@/components/UI/DocViewerModal"
 import { FACILITY_META, withUnit } from "./Steps/VI_Step5_Manufacturing"
@@ -988,7 +988,7 @@ export default function VendorDetail({
                               <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
                             </div>
                             {(owner.name || owner.firstName) && <Field label="Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />}
-                            {owner.designation && <Field label="Designation" value={owner.designation} />}
+                            {owner.designation && <Field label="Designation" value={resolveOwnerDesignation(owner.designation)} />}
                             {owner.email && <Field label="Primary Email" value={owner.email} />}
                             {owner.email2 && <Field label="Secondary Email" value={owner.email2} />}
                             {owner.phone && <Field label="Primary Phone" value={owner.phone} />}

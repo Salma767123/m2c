@@ -115,6 +115,20 @@ const FACTORY_SLOT_LABEL_MAP = {
   others: 'Factory Image (Other)',
 };
 
+// Factory SITE photos (CompanyDetails step) — stored separately from the
+// Warehouse photos (WarehouseDetails step / FACTORY_SLOT_LABEL_MAP above)
+// so the two sets remain distinguishable in the document list.
+const FACTORY_SITE_SLOT_LABEL_MAP = {
+  nameBoard: 'Factory Site Name Board',
+  frontView: 'Factory Site Front View',
+  backView: 'Factory Site Back View',
+  leftView: 'Factory Site Left View',
+  rightView: 'Factory Site Right View',
+  roadView: 'Factory Site Road View',
+  insideFactory: 'Factory Site Interior',
+  others: 'Factory Site Image (Other)',
+};
+
 const getCompanyTypeEnum = (vendorTypes) => {
   const first = Array.isArray(vendorTypes) ? vendorTypes[0] : vendorTypes;
   const mapping = {
@@ -260,6 +274,7 @@ const registerVendor = async (req, res) => {
       complianceStandards,
       packagingCapabilities,
       warehousingCapacity,
+      factorySiteCapacity,         // Factory site sq-ft — different from warehouse capacity
       logisticsPartners,
       shippingMethods,
 
@@ -372,6 +387,7 @@ const registerVendor = async (req, res) => {
     // generic "Factory Image N". Slot IDs arrive in side-channel body fields
     // (`factoryImageSlot_<index>`) — same pattern as `certificationId_<index>`.
     let factoryImageUploads = [];
+    let factorySiteImageUploads = [];
     let certificationFileUrls = {};
 
     try {
@@ -462,6 +478,23 @@ const registerVendor = async (req, res) => {
         const parsed = safeJsonParse(req.body.factoryImageUrls);
         if (Array.isArray(parsed)) {
           factoryImageUploads = parsed
+            .filter((f) => f && f.url)
+            .map((f) => ({ url: f.url, slotId: f.slotId || null }));
+        }
+      }
+
+      // Upload factory SITE images (CompanyDetails step — separate from warehouse photos above)
+      if (req.files?.factorySiteImages) {
+        const siteResults = await uploadFiles(req.files.factorySiteImages, 'vendor-factory-sites');
+        factorySiteImageUploads = siteResults.map((result, index) => ({
+          url: result.cloudinaryUrl,
+          slotId: req.body[`factorySiteImageSlot_${index}`] || null,
+        }));
+        siteResults.forEach((r) => { if (r.publicId) uploadedPublicIds.push(r.publicId); });
+      } else if (req.body.factorySiteImageUrls) {
+        const parsed = safeJsonParse(req.body.factorySiteImageUrls);
+        if (Array.isArray(parsed)) {
+          factorySiteImageUploads = parsed
             .filter((f) => f && f.url)
             .map((f) => ({ url: f.url, slotId: f.slotId || null }));
         }
@@ -693,17 +726,17 @@ const registerVendor = async (req, res) => {
       // Manufacturing Facilities
       enabledFacilities: parsedEnabledFacilities || null,
       facilityDetails: parsedFacilityDetails || null,
-      // Factory address mirrors warehouse address — the registration form
-      // treats them as the same physical location. The QC checker app
-      // (qcCheckerController, checker_app) reads these `factory*` columns
-      // directly, so they must be populated even though no separate factory
-      // address input exists on the form.
-      factoryAddress: warehouseAddress || null,
-      factoryCity: warehouseCity || null,
-      factoryState: warehouseState || null,
-      factoryZipCode: warehouseZip || null,
-      factoryCountry: warehouseCountry || 'India',
-      factorySize: warehousingCapacity ? `${warehousingCapacity} sq ft` : null,
+      // Factory / Legal Address & Factory Site — from CompanyDetails (address, city, state, etc.)
+      // Warehouse Address — from WarehouseDetails (warehouseAddress, warehouseCity, etc.)
+      // These are stored in separate DB columns; the QC checker app reads `factory*` directly.
+      factoryAddress: address || null,
+      factoryCity: city || null,
+      factoryState: state || null,
+      factoryZipCode: zipCode || null,
+      factoryCountry: country || 'India',
+      factorySize: factorySiteCapacity
+        ? `${factorySiteCapacity} sq ft`
+        : (warehousingCapacity ? `${warehousingCapacity} sq ft` : null),
       productionCapacity: productionCapacitySummary,
       // Quality control measures — collected on Step 6 (Certifications &
       // Logistics) but persisted under Manufacturing since the schema column
@@ -922,6 +955,17 @@ const registerVendor = async (req, res) => {
           vendorId: vendor.id,
           type: 'OTHER',
           name: FACTORY_SLOT_LABEL_MAP[slotId] || `Factory Image ${index + 1}`,
+          documentUrl: url,
+        });
+      });
+    }
+
+    if (factorySiteImageUploads.length > 0) {
+      factorySiteImageUploads.forEach(({ url, slotId }, index) => {
+        documents.push({
+          vendorId: vendor.id,
+          type: 'OTHER',
+          name: FACTORY_SITE_SLOT_LABEL_MAP[slotId] || `Factory Site Image ${index + 1}`,
           documentUrl: url,
         });
       });
@@ -1742,15 +1786,15 @@ const updateVendorById = async (req, res) => {
       warehouseZipCode: updateData.warehouseZip || null,
       warehouseCountry: updateData.warehouseCountry || 'India',
       warehouseSize: updateData.warehousingCapacity ? `${updateData.warehousingCapacity} sq ft` : null,
-      // Mirror to the `factory*` columns the checker app reads from —
-      // the CREATE flow mirrors these, the UPDATE flow used to forget,
-      // so changing a vendor's address in admin left the checker app
-      // showing the old one.
-      factoryAddress: updateData.warehouseAddress,
-      factoryCity: updateData.warehouseCity,
-      factoryState: updateData.warehouseState,
-      factoryZipCode: updateData.warehouseZip || null,
-      factorySize: updateData.warehousingCapacity ? `${updateData.warehousingCapacity} sq ft` : null,
+      // Store the Legal Address & Factory Site (CompanyDetails `address`) in
+      // factory* columns — the checker app reads these directly.
+      factoryAddress: updateData.address || null,
+      factoryCity: updateData.city || null,
+      factoryState: updateData.state || null,
+      factoryZipCode: updateData.zipCode || null,
+      factorySize: updateData.factorySiteCapacity
+        ? `${updateData.factorySiteCapacity} sq ft`
+        : (updateData.warehousingCapacity ? `${updateData.warehousingCapacity} sq ft` : null),
       productionCapacity: updateProductionCapacity,
       storageCapacity: updateData.warehousingCapacity,
       mapLink: updateData.mapLink || null,
@@ -1897,13 +1941,18 @@ const updateVendorById = async (req, res) => {
         }
       }
 
-      // Delete factory image documents that are no longer in the preserved list.
+      // Delete warehouse-photo documents that are no longer in the preserved list.
+      // Use startsWith + NOT startsWith "Factory Site" to avoid touching the
+      // factory site photo rows that live under the same type='OTHER'.
       const currentFactoryDocs = await prisma.vendorDocument.findMany({
         where: {
           vendorId,
           type: 'OTHER',
-          name: { contains: 'Factory' }
-        }
+          AND: [
+            { name: { startsWith: 'Factory' } },
+            { NOT: { name: { startsWith: 'Factory Site' } } },
+          ],
+        },
       });
 
       const docsToDelete = currentFactoryDocs.filter(
@@ -1942,6 +1991,78 @@ const updateVendorById = async (req, res) => {
           vendorId,
           type: 'OTHER',
           name: FACTORY_SLOT_LABEL_MAP[slotId] || `Factory Image ${index + 1}`,
+          documentUrl: url,
+        }));
+        await prisma.vendorDocument.createMany({ data: newDocs });
+      }
+    }
+
+    // ── Factory SITE images update ─────────────────────────────────────────
+    // Same protocol as factory images above but for CompanyDetails photos.
+    // Frontend sends existingFactorySiteImages + factorySiteImages files.
+    const factorySiteImagesTouched = Object.prototype.hasOwnProperty.call(
+      updateData,
+      'existingFactorySiteImages',
+    ) || !!req.files?.factorySiteImages;
+
+    if (factorySiteImagesTouched) {
+      const existingFactorySiteImages = updateData.existingFactorySiteImages
+        ? (typeof updateData.existingFactorySiteImages === 'string'
+            ? JSON.parse(updateData.existingFactorySiteImages)
+            : updateData.existingFactorySiteImages)
+        : [];
+
+      let newFactorySiteImageUploads = [];
+      if (req.files?.factorySiteImages) {
+        try {
+          const siteResults = await uploadFiles(req.files.factorySiteImages, 'vendor-factory-sites');
+          newFactorySiteImageUploads = siteResults.map((result, index) => ({
+            url: result.cloudinaryUrl,
+            slotId: req.body[`factorySiteImageSlot_${index}`] || null,
+          }));
+        } catch (uploadError) {
+          console.error('Factory site image upload error:', uploadError);
+          return res.status(500).json({ error: 'Failed to upload factory site images: ' + uploadError.message });
+        }
+      }
+
+      const currentFactorySiteDocs = await prisma.vendorDocument.findMany({
+        where: { vendorId, type: 'OTHER', name: { startsWith: 'Factory Site' } },
+      });
+
+      const siteDocsToDelete = currentFactorySiteDocs.filter(
+        doc => !existingFactorySiteImages.includes(doc.documentUrl),
+      );
+      if (siteDocsToDelete.length > 0) {
+        for (const doc of siteDocsToDelete) {
+          try {
+            const publicId = doc.documentUrl.split('/').pop().split('.')[0];
+            await deleteFromCloudinary(`vendor-factory-sites/${publicId}`);
+          } catch (deleteError) {
+            console.warn('Failed to delete factory site image from Cloudinary:', deleteError.message);
+          }
+        }
+        await prisma.vendorDocument.deleteMany({
+          where: { id: { in: siteDocsToDelete.map(d => d.id) } },
+        });
+      }
+
+      for (let i = 0; i < existingFactorySiteImages.length; i++) {
+        const url = existingFactorySiteImages[i];
+        const slotId = req.body[`existingFactorySiteImageSlot_${i}`];
+        const desiredName = FACTORY_SITE_SLOT_LABEL_MAP[slotId];
+        if (!desiredName) continue;
+        await prisma.vendorDocument.updateMany({
+          where: { vendorId, documentUrl: url, type: 'OTHER' },
+          data: { name: desiredName },
+        });
+      }
+
+      if (newFactorySiteImageUploads.length > 0) {
+        const newDocs = newFactorySiteImageUploads.map(({ url, slotId }, index) => ({
+          vendorId,
+          type: 'OTHER',
+          name: FACTORY_SITE_SLOT_LABEL_MAP[slotId] || `Factory Site Image ${index + 1}`,
           documentUrl: url,
         }));
         await prisma.vendorDocument.createMany({ data: newDocs });

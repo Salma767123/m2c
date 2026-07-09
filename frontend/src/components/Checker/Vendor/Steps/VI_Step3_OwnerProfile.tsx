@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { UserCircle, Users, Image as ImageIcon } from 'lucide-react'
 import VerifyField, { SectionBlock, Verifications } from './VI_VerifyField'
 import { formatLocalLandline, formatIntlLandline } from '@/components/VendorHub/FormUI'
-import { buildFullName } from '@/lib/utils'
+import { buildFullName, resolveOwnerDesignation } from '@/lib/utils'
 
 function getEmployeeCountLabel(val: string) {
   const map: Record<string, string> = {
@@ -94,7 +94,7 @@ export default function VI_Step3_OwnerProfile({ vendor: v, verifications, onChan
       <SectionBlock title="Owner Identity" icon={<UserCircle className="w-4 h-4" />}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {vf('o_ownerName', 'Owner Full Name', ownerFullName)}
-          {vf('o_designation', 'Designation', v.designation)}
+          {vf('o_designation', 'Designation', resolveOwnerDesignation(v.designation))}
           {v.designation === 'Others' && v.customDesignation && vf('o_customDesignation', 'Custom Designation', v.customDesignation)}
           {vf('o_ownerPhone', 'Primary Phone', v.ownerPhone)}
           {v.ownerPhone2 && vf('o_ownerPhone2', 'Secondary Phone', v.ownerPhone2)}
@@ -136,7 +136,7 @@ export default function VI_Step3_OwnerProfile({ vendor: v, verifications, onChan
                 {owner.photo && vf(`o_add_${idx}_photo`, 'Owner Photo', owner.photo, 'image')}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {vf(`o_add_${idx}_name`, 'Full Name', name)}
-                  {vf(`o_add_${idx}_designation`, 'Designation', owner.designation)}
+                  {vf(`o_add_${idx}_designation`, 'Designation', resolveOwnerDesignation(owner.designation))}
                   {owner.designation === 'Others' && owner.customDesignation && vf(`o_add_${idx}_customDesignation`, 'Custom Designation', owner.customDesignation)}
                   {owner.email && vf(`o_add_${idx}_email`, 'Primary Email', owner.email)}
                   {owner.email2 && vf(`o_add_${idx}_email2`, 'Secondary Email', owner.email2)}
