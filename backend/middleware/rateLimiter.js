@@ -89,9 +89,19 @@ const registerLimiter = createRateLimiter({
   message: 'Too many registration attempts. Please try again later.',
 });
 
+// Direct-to-Cloudinary upload signatures. One registration needs a signature per
+// distinct folder (up to ~12), so this must be far more generous than the
+// registration limiter while still bounding abuse of the signing endpoint.
+const uploadSignatureLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 300,
+  message: 'Too many upload requests. Please try again later.',
+});
+
 module.exports = {
   createRateLimiter,
   loginLimiter,
   passwordResetLimiter,
   registerLimiter,
+  uploadSignatureLimiter,
 };

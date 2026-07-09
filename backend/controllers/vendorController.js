@@ -375,11 +375,21 @@ const registerVendor = async (req, res) => {
     let certificationFileUrls = {};
 
     try {
+      // Each document can arrive one of two ways:
+      //   1. As a multipart file (req.files.*) — legacy path; the server uploads
+      //      it to Cloudinary here.
+      //   2. As a Cloudinary URL in the body (req.body.*Url) — the browser has
+      //      already uploaded it directly to Cloudinary (production path that
+      //      avoids Vercel's 4.5 MB serverless request-body cap). We just keep
+      //      the URL; nothing new is pushed to uploadedPublicIds because those
+      //      assets aren't owned by this request's rollback.
       // Upload company logo
       if (req.files?.logo?.[0]) {
         const logoResult = await uploadFiles([req.files.logo[0]], 'vendor-logos');
         logoUrl = logoResult[0].cloudinaryUrl;
         if (logoResult[0].publicId) uploadedPublicIds.push(logoResult[0].publicId);
+      } else if (req.body.logoUrl) {
+        logoUrl = req.body.logoUrl;
       }
 
       // Upload GST document
@@ -387,6 +397,8 @@ const registerVendor = async (req, res) => {
         const gstResult = await uploadFiles([req.files.gstDocument[0]], 'vendor-documents/gst');
         gstDocumentUrl = gstResult[0].cloudinaryUrl;
         if (gstResult[0].publicId) uploadedPublicIds.push(gstResult[0].publicId);
+      } else if (req.body.gstDocumentUrl) {
+        gstDocumentUrl = req.body.gstDocumentUrl;
       }
 
       // Upload PAN Card document
@@ -394,6 +406,8 @@ const registerVendor = async (req, res) => {
         const panResult = await uploadFiles([req.files.panCardFile[0]], 'vendor-documents/pan');
         panCardUrl = panResult[0].cloudinaryUrl;
         if (panResult[0].publicId) uploadedPublicIds.push(panResult[0].publicId);
+      } else if (req.body.panCardUrl) {
+        panCardUrl = req.body.panCardUrl;
       }
 
       // Upload type-specific business registration certificate
@@ -403,6 +417,8 @@ const registerVendor = async (req, res) => {
         const typeCertResult = await uploadFiles([req.files.typeCertFile[0]], 'vendor-documents/business-cert');
         typeCertUrl = typeCertResult[0].cloudinaryUrl;
         if (typeCertResult[0].publicId) uploadedPublicIds.push(typeCertResult[0].publicId);
+      } else if (req.body.typeCertUrl) {
+        typeCertUrl = req.body.typeCertUrl;
       }
 
       // Upload Aadhaar card (Unregistered Vendor identity proof).
@@ -411,6 +427,8 @@ const registerVendor = async (req, res) => {
         const aadhaarResult = await uploadFiles([req.files.aadhaarFile[0]], 'vendor-documents/aadhaar');
         aadhaarUrl = aadhaarResult[0].cloudinaryUrl;
         if (aadhaarResult[0].publicId) uploadedPublicIds.push(aadhaarResult[0].publicId);
+      } else if (req.body.aadhaarUrl) {
+        aadhaarUrl = req.body.aadhaarUrl;
       }
 
       // Upload IEC certificate (optional for all business types)
@@ -418,6 +436,8 @@ const registerVendor = async (req, res) => {
         const iecCertResult = await uploadFiles([req.files.iecCertFile[0]], 'vendor-documents/iec');
         iecCertUrl = iecCertResult[0].cloudinaryUrl;
         if (iecCertResult[0].publicId) uploadedPublicIds.push(iecCertResult[0].publicId);
+      } else if (req.body.iecCertUrl) {
+        iecCertUrl = req.body.iecCertUrl;
       }
 
       // Upload owner photo
@@ -425,6 +445,8 @@ const registerVendor = async (req, res) => {
         const ownerPhotoResult = await uploadFiles([req.files.ownerPhoto[0]], 'vendor-owners');
         ownerPhotoUrl = ownerPhotoResult[0].cloudinaryUrl;
         if (ownerPhotoResult[0].publicId) uploadedPublicIds.push(ownerPhotoResult[0].publicId);
+      } else if (req.body.ownerPhotoUrl) {
+        ownerPhotoUrl = req.body.ownerPhotoUrl;
       }
 
       // Upload factory images
@@ -435,6 +457,14 @@ const registerVendor = async (req, res) => {
           slotId: req.body[`factoryImageSlot_${index}`] || null,
         }));
         factoryResults.forEach((r) => { if (r.publicId) uploadedPublicIds.push(r.publicId); });
+      } else if (req.body.factoryImageUrls) {
+        // Browser-uploaded: [{ url, slotId }]
+        const parsed = safeJsonParse(req.body.factoryImageUrls);
+        if (Array.isArray(parsed)) {
+          factoryImageUploads = parsed
+            .filter((f) => f && f.url)
+            .map((f) => ({ url: f.url, slotId: f.slotId || null }));
+        }
       }
 
       // Upload certification files
@@ -448,6 +478,14 @@ const registerVendor = async (req, res) => {
           }
           if (result.publicId) uploadedPublicIds.push(result.publicId);
         });
+      } else if (req.body.certificationFileUrls) {
+        // Browser-uploaded: { [certId]: url }
+        const parsed = safeJsonParse(req.body.certificationFileUrls);
+        if (parsed && typeof parsed === 'object') {
+          Object.entries(parsed).forEach(([certId, url]) => {
+            if (certId && url) certificationFileUrls[certId] = url;
+          });
+        }
       }
     } catch (uploadError) {
       console.error('File upload error:', uploadError);

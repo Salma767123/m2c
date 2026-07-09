@@ -1,6 +1,7 @@
 import { getStoredAuth, authenticatedFetch } from '@/lib/auth'
 import axiosInstance from '@/lib/axios'
 import { dispatchAuthChange } from '@/lib/authEvents'
+import { uploadFileToCloudinary, uploadDataUri, resolveBase64Deep } from '@/lib/cloudinaryUpload'
 
 // Vendor Service for API integration
 
@@ -507,51 +508,75 @@ class VendorService {
 
   // Register vendor with form data and files
   static async registerVendor(formData: VendorRegistrationData, files: VendorFiles) {
-    const form = new FormData();
+    // Images are uploaded straight from the browser to Cloudinary FIRST, so the
+    // /vendors/register request carries only URLs. This keeps the request tiny
+    // and avoids Vercel's ~4.5 MB serverless request-body cap (which surfaced as
+    // a "network error" in production even though it worked locally, where
+    // Express allows 50 MB). See lib/cloudinaryUpload.ts.
 
-    // Add all form fields
-    Object.keys(formData).forEach(key => {
+    // 1) Fixed single-file documents/photos → Cloudinary URLs (sent as *Url body
+    //    fields the backend reads when no multipart file is present).
+    const fileFieldMap: Array<[keyof VendorFiles, string, string]> = [
+      ['logo', 'logoUrl', 'vendor-logos'],
+      ['gstDocument', 'gstDocumentUrl', 'vendor-documents/gst'],
+      ['panCardFile', 'panCardUrl', 'vendor-documents/pan'],
+      ['typeCertFile', 'typeCertUrl', 'vendor-documents/business-cert'],
+      ['aadhaarFile', 'aadhaarUrl', 'vendor-documents/aadhaar'],
+      ['iecCertFile', 'iecCertUrl', 'vendor-documents/iec'],
+      ['ownerPhoto', 'ownerPhotoUrl', 'vendor-owners'],
+    ];
+    const docUrls: Record<string, string> = {};
+    for (const [fileKey, bodyKey, folder] of fileFieldMap) {
+      const file = (files as any)[fileKey] as File | undefined;
+      if (file) {
+        const { url } = await uploadFileToCloudinary(file, folder);
+        docUrls[bodyKey] = url;
+      }
+    }
+
+    // 2) Factory images (keep slot identity) and certification files (keep cert id).
+    const factoryImageUrls: Array<{ url: string; slotId: string }> = [];
+    if (files.factoryImages) {
+      for (const [slotId, file] of Object.entries(files.factoryImages)) {
+        const { url } = await uploadFileToCloudinary(file as File, 'vendor-factories');
+        factoryImageUrls.push({ url, slotId });
+      }
+    }
+    const certificationFileUrls: Record<string, string> = {};
+    if (files.certificationFiles) {
+      for (const [certId, file] of Object.entries(files.certificationFiles)) {
+        const { url } = await uploadFileToCloudinary(file as File, 'vendor-certifications');
+        certificationFileUrls[certId] = url;
+      }
+    }
+
+    // 3) Build the request in the same FormData shape the backend already parses
+    //    (safeJsonParse on stringified object fields), but resolve any base64
+    //    data URIs nested inside (product / contact / owner photos) to URLs too.
+    const form = new FormData();
+    for (const key of Object.keys(formData)) {
       const value = (formData as any)[key];
-      if (typeof value === 'object' && value !== null) {
-        form.append(key, JSON.stringify(value));
+      if (value !== null && typeof value === 'object') {
+        const folder =
+          key === 'mainContact' || key === 'alternateContacts'
+            ? 'vendor-contact-photos'
+            : key === 'additionalOwners'
+              ? 'vendor-owner-photos'
+              : 'products';
+        const resolved = await resolveBase64Deep(value, folder);
+        form.append(key, JSON.stringify(resolved));
+      } else if (typeof value === 'string' && value.startsWith('data:')) {
+        form.append(key, await uploadDataUri(value, 'products'));
       } else {
         form.append(key, value || '');
       }
-    });
+    }
 
-    // Add files
-    if (files.logo) {
-      form.append('logo', files.logo);
-    }
-    if (files.gstDocument) {
-      form.append('gstDocument', files.gstDocument);
-    }
-    if (files.panCardFile) {
-      form.append('panCardFile', files.panCardFile);
-    }
-    if (files.typeCertFile) {
-      form.append('typeCertFile', files.typeCertFile);
-    }
-    if (files.aadhaarFile) {
-      form.append('aadhaarFile', files.aadhaarFile);
-    }
-    if (files.iecCertFile) {
-      form.append('iecCertFile', files.iecCertFile);
-    }
-    if (files.ownerPhoto) {
-      form.append('ownerPhoto', files.ownerPhoto);
-    }
-    if (files.factoryImages) {
-      Object.entries(files.factoryImages).forEach(([slotId, file], index) => {
-        form.append('factoryImages', file);
-        form.append(`factoryImageSlot_${index}`, slotId);
-      });
-    }
-    if (files.certificationFiles) {
-      Object.entries(files.certificationFiles).forEach(([certId, file], index) => {
-        form.append('certificationFiles', file);
-        form.append(`certificationId_${index}`, certId);
-      });
+    // URL fields — backend uses these when the matching multipart file is absent.
+    Object.entries(docUrls).forEach(([k, v]) => form.append(k, v));
+    if (factoryImageUrls.length) form.append('factoryImageUrls', JSON.stringify(factoryImageUrls));
+    if (Object.keys(certificationFileUrls).length) {
+      form.append('certificationFileUrls', JSON.stringify(certificationFileUrls));
     }
 
     try {

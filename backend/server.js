@@ -184,6 +184,7 @@ const bagTypeRoutes = require("./routes/bagTypeRoutes");
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/uploads", require("./routes/uploadRoutes"));
 app.use("/api/vendors", vendorRoutes);
 app.use("/api/vendor-settings", vendorSettingsRoutes);
 app.use("/api/categories", categoryRoutes);
