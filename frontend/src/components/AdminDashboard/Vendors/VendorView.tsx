@@ -694,11 +694,20 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
               </div>
 
               <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <MapPin className="h-4 w-4 text-slate-400" />
+                <div className="flex items-start space-x-3">
+                  <MapPin className="h-4 w-4 text-slate-400 mt-1 shrink-0" />
                   <div>
-                    <p className="text-sm text-slate-500">Location</p>
-                    <p className="font-medium">{vendor.businessCity}, {vendor.businessState}</p>
+                    <p className="text-sm text-slate-500">Address</p>
+                    <div className="font-medium leading-relaxed">
+                      {vendor.businessAddress && <p>{vendor.businessAddress}</p>}
+                      {(vendor as any).businessAddressLine2 && <p>{(vendor as any).businessAddressLine2}</p>}
+                      {(vendor as any).businessAddressLine3 && <p>{(vendor as any).businessAddressLine3}</p>}
+                      {(vendor as any).businessLandmark && <p className="text-slate-500 text-sm">Near: {(vendor as any).businessLandmark}</p>}
+                      {(vendor.businessCity || vendor.businessState || vendor.businessZipCode) && (
+                        <p>{[vendor.businessCity, vendor.businessState, vendor.businessZipCode].filter(Boolean).join(', ')}</p>
+                      )}
+                      {vendor.businessCountry && <p>{vendor.businessCountry}</p>}
+                    </div>
                   </div>
                 </div>
 
@@ -999,7 +1008,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <FileText className="h-5 w-5" />
-              <span>Identification &amp; Compliance</span>
+              <span>Regulatory IDs &amp; Documents</span>
             </CardTitle>
           </CardHeader>
           <CardContent>

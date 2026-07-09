@@ -274,14 +274,14 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
           )}
           <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 ${evidenceError ? 'ring-2 ring-red-300 ring-offset-2 rounded-xl p-2' : ''}`}>
             <EvidenceUpload
-              label="Factory Front View"
-              value={factoryEvidence.frontView}
-              onChange={(photo) => onEvidenceChange('frontView', photo)}
-            />
-            <EvidenceUpload
               label="Factory Name Board"
               value={factoryEvidence.nameBoard}
               onChange={(photo) => onEvidenceChange('nameBoard', photo)}
+            />
+            <EvidenceUpload
+              label="Factory Front View"
+              value={factoryEvidence.frontView}
+              onChange={(photo) => onEvidenceChange('frontView', photo)}
             />
             <EvidenceUpload
               label="Route Map Photo"

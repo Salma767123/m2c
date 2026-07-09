@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
-import { Tags, Globe, Image as ImageIcon, ShoppingBag } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Tags, Globe, Image as ImageIcon, ShoppingBag, Eye } from 'lucide-react'
 import VerifyField, { SectionBlock, Verifications } from './VI_VerifyField'
+import DocViewerModal from '@/components/UI/DocViewerModal'
 
 interface Props {
   vendor: any
@@ -12,6 +13,8 @@ interface Props {
 }
 
 export default function VI_Step4_VendorType({ vendor: v, verifications, onChange, onRegisterFields }: Props) {
+  const [viewerImg, setViewerImg] = useState<{ url: string; name: string } | null>(null)
+
   const vf = (key: string, label: string, value: any, type?: any) => (
     <VerifyField key={key} fieldKey={key} label={label} value={value} type={type} verifications={verifications} onChange={onChange} />
   )
@@ -124,8 +127,8 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
       <SectionBlock title="Market Focus" icon={<Globe className="w-4 h-4" />}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {v.marketFocus && vf('vt_marketFocus', 'Market Focus', v.marketFocus)}
-          {v.primaryMarkets?.length > 0 && vf('vt_primaryMarkets', 'Primary Markets', v.primaryMarkets, 'list')}
-          {v.domesticMarkets?.length > 0 && vf('vt_domesticMarkets', 'Domestic Markets', v.domesticMarkets, 'list')}
+          {v.primaryMarkets?.length > 0 && vf('vt_primaryMarkets', 'Primary Markets', v.primaryMarkets.map(capFirst), 'list')}
+          {v.domesticMarkets?.length > 0 && vf('vt_domesticMarkets', 'Domestic Markets', v.domesticMarkets.map(capFirst), 'list')}
         </div>
       </SectionBlock>
 
@@ -142,6 +145,15 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
                 type="image"
                 verifications={verifications}
                 onChange={onChange}
+                headerAction={photo.url ? (
+                  <button
+                    type="button"
+                    onClick={() => setViewerImg({ url: photo.url, name: photo.label })}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors shrink-0"
+                  >
+                    <Eye className="w-3 h-3" /> View
+                  </button>
+                ) : undefined}
               />
             ))}
           </div>
@@ -206,17 +218,29 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
                     <div>
                       <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Product Images</p>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {images.map((img: any, iIdx: number) => (
-                          <VerifyField
-                            key={iIdx}
-                            fieldKey={`${prefix}_img_${iIdx}`}
-                            label={img.alt || `Image ${iIdx + 1}${img.isPrimary ? ' (Cover)' : ''}`}
-                            value={img.url}
-                            type="image"
-                            verifications={verifications}
-                            onChange={onChange}
-                          />
-                        ))}
+                        {images.map((img: any, iIdx: number) => {
+                          const imgLabel = img.alt || `Image ${iIdx + 1}${img.isPrimary ? ' (Cover)' : ''}`
+                          return (
+                            <VerifyField
+                              key={iIdx}
+                              fieldKey={`${prefix}_img_${iIdx}`}
+                              label={imgLabel}
+                              value={img.url}
+                              type="image"
+                              verifications={verifications}
+                              onChange={onChange}
+                              headerAction={img.url ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setViewerImg({ url: img.url, name: imgLabel })}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors shrink-0"
+                                >
+                                  <Eye className="w-3 h-3" /> View
+                                </button>
+                              ) : undefined}
+                            />
+                          )
+                        })}
                       </div>
                     </div>
                   )}
@@ -246,6 +270,14 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
             })}
           </div>
         </SectionBlock>
+      )}
+      {viewerImg && (
+        <DocViewerModal
+          url={viewerImg.url}
+          name={viewerImg.name}
+          readOnly
+          onClose={() => setViewerImg(null)}
+        />
       )}
     </div>
   )

@@ -138,9 +138,9 @@ export default function VI_Step3_OwnerProfile({ vendor: v, verifications, onChan
                   {vf(`o_add_${idx}_name`, 'Full Name', name)}
                   {vf(`o_add_${idx}_designation`, 'Designation', owner.designation)}
                   {owner.designation === 'Others' && owner.customDesignation && vf(`o_add_${idx}_customDesignation`, 'Custom Designation', owner.customDesignation)}
-                  {owner.email && vf(`o_add_${idx}_email`, 'Email', owner.email)}
+                  {owner.email && vf(`o_add_${idx}_email`, 'Primary Email', owner.email)}
                   {owner.email2 && vf(`o_add_${idx}_email2`, 'Secondary Email', owner.email2)}
-                  {owner.phone && vf(`o_add_${idx}_phone`, 'Phone', owner.phone)}
+                  {owner.phone && vf(`o_add_${idx}_phone`, 'Primary Phone', owner.phone)}
                   {owner.phone2 && vf(`o_add_${idx}_phone2`, 'Secondary Phone', owner.phone2)}
                   {ll && vf(`o_add_${idx}_landline`, 'Local Landline', ll)}
                   {il && vf(`o_add_${idx}_intl`, 'International Landline', il)}

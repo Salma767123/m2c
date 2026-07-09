@@ -3,7 +3,6 @@
 import React, { useContext, createContext, useState } from 'react'
 import { FileText, ExternalLink, Eye, Phone, Mail, Send, Check, Loader2 } from 'lucide-react'
 import DocViewerModal from '@/components/UI/DocViewerModal'
-import { openDoc } from '@/lib/docViewerBus'
 import qcCheckerService from '@/services/qcCheckerService'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -135,9 +134,7 @@ export function renderValue(value: any, type?: string, label?: string): React.Re
   }
   if (type === 'image' || (type !== 'document' && typeof value === 'string' && isImageUrl(value))) {
     return (
-      <button type="button" onClick={() => openDoc(value, 'Uploaded Image')} className="block w-fit">
-        <img src={value} alt="Uploaded" className="w-32 h-32 object-cover rounded-lg border border-slate-200 hover:border-brand-300 transition-colors" />
-      </button>
+      <img src={value} alt="Uploaded" className="w-32 h-32 object-cover rounded-lg border border-slate-200" />
     )
   }
   if (type === 'document' && typeof value === 'string') {
@@ -166,7 +163,7 @@ export function renderValue(value: any, type?: string, label?: string): React.Re
     const items = Array.isArray(value) ? value : [value]
     if (items.length === 0) return <span className="text-slate-400 italic text-sm">None</span>
     return (
-      <div className="flex flex-wrap gap-1.5 mt-0.5">
+      <div className="flex flex-wrap gap-2 mt-1">
         {items.map((item, i) => {
           // Items may be a plain string, or a { flagIso, label } object for
           // countries — the latter renders a real flag image (flag emoji don't
@@ -174,7 +171,7 @@ export function renderValue(value: any, type?: string, label?: string): React.Re
           const iso = item && typeof item === 'object' ? item.flagIso : undefined
           const label = item && typeof item === 'object' ? item.label : String(item)
           return (
-            <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-slate-100 text-slate-700 rounded-full text-xs font-medium border border-slate-200">
+            <span key={i} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-brand-50 text-brand-700 rounded-full text-sm font-semibold border border-brand-200">
               {iso && (
                 <img
                   src={`https://flagcdn.com/w20/${String(iso).toLowerCase()}.png`}

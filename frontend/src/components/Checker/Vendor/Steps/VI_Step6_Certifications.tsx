@@ -21,7 +21,7 @@ export default function VI_Step6_Certifications({ vendor: v, verifications, onCh
 
   const certifications: any[] = Array.isArray(v.certifications) ? v.certifications : []
 
-  const CERT_DOC_TYPES = ['EXPORT_LICENSE', 'FACTORY_LICENSE', 'POLLUTION_CERTIFICATE', 'FIRE_SAFETY_CERTIFICATE', 'BANK_STATEMENT', 'AUDITED_FINANCIALS']
+  const CERT_DOC_TYPES = ['FACTORY_LICENSE', 'POLLUTION_CERTIFICATE', 'FIRE_SAFETY_CERTIFICATE', 'BANK_STATEMENT', 'AUDITED_FINANCIALS']
   const certDocs = Array.isArray(v.documents)
     ? v.documents.filter((d: any) => CERT_DOC_TYPES.includes(d.type))
     : []

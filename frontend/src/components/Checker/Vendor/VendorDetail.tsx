@@ -244,9 +244,17 @@ export default function VendorDetail({
   ]
 
   const companyName = fullVendor?.companyName || vendor.name
-  const location = fullVendor
-    ? formatAddress(fullVendor.factoryCity, fullVendor.factoryState) || vendor.location
-    : vendor.location
+  const locationLines: string[] = fullVendor
+    ? [
+        fullVendor.warehouseAddress,
+        (fullVendor as any).warehouseAddressLine2,
+        (fullVendor as any).warehouseAddressLine3,
+        (fullVendor as any).warehouseLandmark,
+        [fullVendor.warehouseCity, fullVendor.warehouseState, (fullVendor as any).warehouseZipCode].filter(Boolean).join(', '),
+        fullVendor.warehouseCountry,
+      ].filter(Boolean) as string[]
+    : [vendor.location].filter(Boolean) as string[]
+  const location = locationLines.join(', ') || vendor.location
   const productCategories: string[] = fullVendor?.productCategories || []
   const certifications: any[] = fullVendor?.certifications || []
 
@@ -956,7 +964,7 @@ export default function VendorDetail({
                   {Array.isArray(fullVendor.additionalOwners) && fullVendor.additionalOwners.length > 0 && (
                     <div className="border-t border-slate-100 pt-6">
                       <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-1.5">
-                        <UserCircle className="w-4 h-4 text-slate-400" /> Additional Owners ({fullVendor.additionalOwners.length})
+                        <UserCircle className="w-4 h-4 text-slate-400" /> Additional Owners
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {fullVendor.additionalOwners.map((owner: any, idx: number) => (
@@ -1107,7 +1115,15 @@ export default function VendorDetail({
               </div>
               <div className="min-w-0">
                 <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Location</p>
-                <p className="font-bold text-slate-900 truncate">{location || "—"}</p>
+                {locationLines.length > 0 ? (
+                  <div className="font-bold text-slate-900 leading-snug">
+                    {locationLines.map((line, i) => (
+                      <p key={i}>{line}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="font-bold text-slate-900">—</p>
+                )}
               </div>
             </div>
 
@@ -1173,13 +1189,19 @@ export default function VendorDetail({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-brand-100/80 text-brand-700 rounded-lg">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-brand-100/80 text-brand-700 rounded-lg shrink-0">
               <MapPin className="w-5 h-5" />
             </div>
             <div>
               <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Location</p>
-              <p className="font-semibold text-slate-900">{location}</p>
+              {locationLines.length > 0 ? (
+                <div className="font-semibold text-slate-900 leading-snug">
+                  {locationLines.map((line, i) => <p key={i}>{line}</p>)}
+                </div>
+              ) : (
+                <p className="font-semibold text-slate-900">—</p>
+              )}
             </div>
           </div>
 

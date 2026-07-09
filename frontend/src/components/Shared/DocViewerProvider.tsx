@@ -10,10 +10,10 @@ import DocViewerModal from '@/components/UI/DocViewerModal'
  * in the app opens the in-app viewer instead of a new browser tab.
  */
 export default function DocViewerProvider() {
-  const [doc, setDoc] = useState<{ url: string; name: string } | null>(null)
+  const [doc, setDoc] = useState<{ url: string; name: string; readOnly?: boolean } | null>(null)
 
   useEffect(() => {
-    docViewerBus.register((url, name) => setDoc({ url, name }))
+    docViewerBus.register((url, name, readOnly) => setDoc({ url, name, readOnly }))
     return () => docViewerBus.unregister()
   }, [])
 
@@ -22,6 +22,7 @@ export default function DocViewerProvider() {
     <DocViewerModal
       url={doc.url}
       name={doc.name}
+      readOnly={doc.readOnly}
       onClose={() => setDoc(null)}
     />
   )
