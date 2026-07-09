@@ -63,6 +63,10 @@ const getStatusBadge = (status: string) => {
       return <Badge className="bg-amber-50 text-amber-700 border border-amber-200 font-bold">Pending</Badge>;
     case "UNDER_REVIEW":
       return <Badge className="bg-blue-50 text-blue-700 border border-blue-200 font-bold">Under Review</Badge>;
+    case "APPROVAL_PENDING":
+      return <Badge className="bg-teal-50 text-teal-700 border border-teal-200 font-bold">Approval Pending</Badge>;
+    case "REJECTION_PENDING":
+      return <Badge className="bg-rose-50 text-rose-700 border border-rose-200 font-bold">Rejection Pending</Badge>;
     case "REJECTED":
       return <Badge className="bg-red-50 text-red-700 border border-red-200 font-bold">Rejected</Badge>;
     case "REINSPECTION":
@@ -76,21 +80,24 @@ const getStatusBadge = (status: string) => {
 
 const getInspectionBadge = (vendorStatus: string, status: string | null, result: string | null) => {
   if (!status) return <span className="text-sm text-slate-400 italic">No Inspection</span>;
-  if (
-    ["APPROVED", "REJECTED", "SUSPENDED"].includes(vendorStatus) &&
-    (status === "SUBMITTED" || status === "UNDER_ADMIN_REVIEW")
-  ) {
+  // Once the vendor decision is finalized, the QC cycle that led to it is
+  // concluded — reflect the outcome rather than a lingering inspection state
+  // (an Approved vendor must never read "In Progress"). The vendor status is
+  // authoritative here: APPROVED → passed, REJECTED/SUSPENDED → failed.
+  // A genuinely cancelled inspection is left to fall through to its own label.
+  if (["APPROVED", "REJECTED", "SUSPENDED"].includes(vendorStatus) && status !== "CANCELLED") {
+    const failed = vendorStatus !== "APPROVED";
     return (
-      <Badge className={result === "FAILED" ? "bg-red-50 text-red-700 border border-red-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200"}>
-        {result === "FAILED" ? "Completed – Failed" : "Completed"}
+      <Badge className={failed ? "bg-red-50 text-red-700 border border-red-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200"}>
+        {failed ? "Completed – Failed" : "Completed"}
       </Badge>
     );
   }
   const configs: Record<string, { label: string; className: string }> = {
     SCHEDULED:          { label: "Scheduled",           className: "bg-slate-100 text-slate-600 border border-slate-200" },
     IN_PROGRESS:        { label: "In Progress",          className: "bg-amber-50 text-amber-700 border border-amber-200" },
-    SUBMITTED:          { label: result === "FAILED" ? "Submitted – Failed" : "Submitted",
-                          className: result === "FAILED" ? "bg-red-50 text-red-700 border border-red-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200" },
+    SUBMITTED:          { label: result === "FAILED" ? "Awaiting Review · Fail" : result === "PASSED" ? "Awaiting Review · Pass" : "Awaiting Review",
+                          className: result === "FAILED" ? "bg-red-50 text-red-700 border border-red-200" : result === "PASSED" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200" },
     UNDER_ADMIN_REVIEW: { label: "Under Admin Review",   className: "bg-blue-50 text-blue-700 border border-blue-200" },
     COMPLETED:          { label: result === "FAILED" ? "Completed – Failed" : "Completed",
                           className: result === "FAILED" ? "bg-red-50 text-red-700 border border-red-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200" },
@@ -481,17 +488,14 @@ export default function AssignQCChecker() {
                       {/* Actions */}
                       <TableCell className="py-3 px-3 align-middle">
                         <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-                          <Link
-                            href={`/admin/dashboard/vendors/inspection/${vendor.id}`}
-                            title="View Inspection Details"
-                            className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Link>
                           {(() => {
                             const s = vendor.inspectionStatus;
                             const vs = vendor.status;
                             const vendorFinalized = ["APPROVED", "REJECTED", "SUSPENDED"].includes(vs);
+                            // Report/Review already open the inspection detail page,
+                            // so a separate eye icon on those rows is a duplicate link.
+                            // Only show the eye when the primary action goes elsewhere
+                            // (the Assign/Update form) yet an inspection exists to view.
                             if (s === "COMPLETED" || (vendorFinalized && s)) {
                               return (
                                 <Link
@@ -515,13 +519,24 @@ export default function AssignQCChecker() {
                               );
                             }
                             return (
-                              <Link
-                                href={`/admin/dashboard/vendors/assign-qc-checker/add?vendorId=${vendor.id}`}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold rounded-lg transition-colors"
-                              >
-                                <UserCheck className="h-3.5 w-3.5" />
-                                {vendor.assignedChecker ? "Update" : "Assign"}
-                              </Link>
+                              <>
+                                {s && (
+                                  <Link
+                                    href={`/admin/dashboard/vendors/inspection/${vendor.id}`}
+                                    title="View Inspection Details"
+                                    className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Link>
+                                )}
+                                <Link
+                                  href={`/admin/dashboard/vendors/assign-qc-checker/add?vendorId=${vendor.id}`}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold rounded-lg transition-colors"
+                                >
+                                  <UserCheck className="h-3.5 w-3.5" />
+                                  {vendor.assignedChecker ? "Update" : "Assign"}
+                                </Link>
+                              </>
                             );
                           })()}
                         </div>

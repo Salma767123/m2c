@@ -87,7 +87,7 @@ function DocThumb({ url, name }: { url?: string; name?: string }) {
   if (!url) return null;
   const img = isImageUrl(url);
   return (
-    <button type="button" onClick={() => openDoc(url, name || "Image")} className="block border border-slate-200 rounded-xl overflow-hidden hover:border-brand-300 transition-colors">
+    <button type="button" onClick={() => openDoc(url, name || "Image")} className="block w-full border border-slate-200 rounded-xl overflow-hidden hover:border-brand-300 transition-colors">
       {img ? (
         <img src={url} alt={name || "Image"} className="w-full h-32 object-cover" loading="lazy" />
       ) : (
@@ -336,15 +336,39 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
         <Section title={`Certifications (${certifications.length})`} icon={<ShieldCheck className="h-5 w-5" />}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {certifications.map((c, i) => (
-              <div key={i} className="border border-slate-200 rounded-xl p-3 space-y-2">
+              <div key={i} className="border border-slate-200 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-bold text-slate-800">{c.name}</p>
                   {c.isCustom && <Badge className="bg-amber-50 text-amber-700 border border-amber-200">Custom</Badge>}
                 </div>
-                <Row label="Issued By" value={c.issuedBy} />
-                <Row label="Expiry Date" value={c.expiryDate ? new Date(c.expiryDate).toLocaleDateString() : undefined} />
-                <Row label="Description" value={c.description} />
-                {c.documentUrl && <DocThumb url={c.documentUrl} name="Certificate" />}
+                {/* Label-over-value pairs — the full-width justify-between Row
+                    pushed values against the card's right edge with a large
+                    dead gap in the middle. */}
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                  {!blank(c.issuedBy) && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-0.5">Issued By</p>
+                      <p className="text-sm font-medium text-slate-900">{c.issuedBy}</p>
+                    </div>
+                  )}
+                  {c.expiryDate && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-0.5">Expiry Date</p>
+                      <p className="text-sm font-medium text-slate-900">{new Date(c.expiryDate).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                  {!blank(c.description) && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-slate-500 mb-0.5">Description</p>
+                      <p className="text-sm font-medium text-slate-900 break-words">{c.description}</p>
+                    </div>
+                  )}
+                </div>
+                {c.documentUrl && (
+                  <div className="w-40">
+                    <DocThumb url={c.documentUrl} name="Certificate" />
+                  </div>
+                )}
               </div>
             ))}
           </div>
