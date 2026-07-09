@@ -20,6 +20,7 @@ interface Props {
   meta: InspectorMeta
   onMetaChange: (patch: Partial<InspectorMeta>) => void
   onGoToStep?: (step: number, fieldKey?: string) => void
+  fieldErrors?: { overallResult?: boolean; inspectorRemarks?: boolean }
 }
 
 const RESULT_OPTIONS: InspectorMeta['overallResult'][] = ['Approved', 'Rejected', 'On Hold', 'Re-inspection Required']
@@ -47,7 +48,7 @@ function buildIssues(verifications: Verifications) {
   return Object.entries(verifications).filter(([, v]) => v.ok === false)
 }
 
-export default function VI_Step8_FinalReview({ vendor: v, inspection, verifications, meta, onMetaChange, onGoToStep }: Props) {
+export default function VI_Step8_FinalReview({ vendor: v, inspection, verifications, meta, onMetaChange, onGoToStep, fieldErrors }: Props) {
   const rejected = buildIssues(verifications)
 
   const [showDropdown, setShowDropdown] = useState(false)
@@ -155,8 +156,8 @@ export default function VI_Step8_FinalReview({ vendor: v, inspection, verificati
             </div>
 
             {/* Overall Result — dropdown */}
-            <div>
-              <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5">
+            <div id="overall-inspection-result">
+              <p className={`text-xs font-bold uppercase tracking-wide mb-1.5 ${fieldErrors?.overallResult && !meta.overallResult ? 'text-red-600' : 'text-slate-600'}`}>
                 Overall Inspection Result <span className="text-red-500">*</span>
               </p>
               <button
@@ -166,12 +167,17 @@ export default function VI_Step8_FinalReview({ vendor: v, inspection, verificati
                 className={`w-full px-4 py-2.5 rounded-xl border text-left flex items-center justify-between text-sm transition-all duration-200 font-semibold ${
                   meta.overallResult
                     ? `${selectedColor} border`
-                    : 'border-slate-300 bg-white text-slate-400 hover:border-slate-400'
+                    : fieldErrors?.overallResult
+                      ? 'border-red-500 bg-red-50 text-slate-400 ring-2 ring-red-400/30'
+                      : 'border-slate-300 bg-white text-slate-400 hover:border-slate-400'
                 }`}
               >
                 <span>{meta.overallResult || 'Select result…'}</span>
                 <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
               </button>
+              {fieldErrors?.overallResult && !meta.overallResult && (
+                <p className="text-xs text-red-600 font-medium mt-1.5">Please select an overall inspection result.</p>
+              )}
               {showDropdown && dropdownPos && typeof document !== 'undefined' && createPortal(
                 <div
                   ref={menuRef}
@@ -200,7 +206,7 @@ export default function VI_Step8_FinalReview({ vendor: v, inspection, verificati
 
           {/* Overall Remarks */}
           <div>
-            <label className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+            <label className={`text-xs font-bold uppercase tracking-wide mb-1.5 flex items-center gap-1 ${fieldErrors?.inspectorRemarks && !meta.inspectorRemarks.trim() ? 'text-red-600' : 'text-slate-600'}`}>
               <MessageSquare className="w-3 h-3" /> Overall Inspector Remarks <span className="text-red-500">*</span>
             </label>
             <textarea
@@ -209,8 +215,15 @@ export default function VI_Step8_FinalReview({ vendor: v, inspection, verificati
               onChange={e => onMetaChange({ inspectorRemarks: e.target.value })}
               placeholder="Summary notes about the inspection visit, any notable observations, or context for the admin reviewing this report…"
               rows={4}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"
+              className={`w-full rounded-xl border px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none resize-none transition-colors ${
+                fieldErrors?.inspectorRemarks && !meta.inspectorRemarks.trim()
+                  ? 'border-red-500 bg-red-50 focus:border-red-500 focus:ring-2 focus:ring-red-400/30'
+                  : 'border-slate-200 bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20'
+              }`}
             />
+            {fieldErrors?.inspectorRemarks && !meta.inspectorRemarks.trim() && (
+              <p className="text-xs text-red-600 font-medium mt-1.5">Please enter your overall inspector remarks.</p>
+            )}
           </div>
         </div>
       </div>

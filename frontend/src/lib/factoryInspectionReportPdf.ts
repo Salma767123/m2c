@@ -260,12 +260,19 @@ export function generateFactoryInspectionPdf(
   }
 
   // ── Cover header ────────────────────────────────────────────────────────────
-  doc.setFillColor(...BRAND)
+  doc.setFillColor(255, 245, 245)
   doc.rect(0, 0, pageW, 72, "F")
-  doc.setTextColor(255, 255, 255)
+  // Red accent line along the bottom of the header
+  doc.setDrawColor(...BRAND)
+  doc.setLineWidth(2)
+  doc.line(0, 72, pageW, 72)
+  // Title in brand red
+  doc.setTextColor(...BRAND)
   doc.setFont("helvetica", "bold")
   doc.setFontSize(18)
   doc.text("Factory Inspection Report", margin, 34)
+  // Subtitle and date in slate
+  doc.setTextColor(...SLATE)
   doc.setFont("helvetica", "normal")
   doc.setFontSize(10)
   const subtitle = [

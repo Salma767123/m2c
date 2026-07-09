@@ -132,8 +132,23 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
     <VerifyField key={key} fieldKey={key} label={label} value={value} type={type} verifications={verifications} onChange={onChange} />
   )
 
+  // Canonical slot order matching the vendor registration form (WarehouseDetails).
+  // Backend stores names via FACTORY_SLOT_LABEL_MAP so we sort by name.
+  const FACTORY_PHOTO_ORDER: Record<string, number> = {
+    'Factory Name Board': 0,
+    'Factory Front View': 1,
+    'Factory Back View': 2,
+    'Factory Left View': 3,
+    'Factory Right View': 4,
+    'Factory Road View': 5,
+    'Factory Interior': 6,
+    'Factory Image (Other)': 7,
+  }
   const factoryImages = Array.isArray(v.documents)
-    ? v.documents.filter((d: any) => d.type === 'OTHER').map((d: any) => ({ label: d.name || 'Factory Image', url: d.documentUrl }))
+    ? v.documents
+        .filter((d: any) => d.type === 'OTHER')
+        .map((d: any) => ({ label: d.name || 'Factory Image', url: d.documentUrl }))
+        .sort((a: any, b: any) => (FACTORY_PHOTO_ORDER[a.label] ?? 99) - (FACTORY_PHOTO_ORDER[b.label] ?? 99))
     : []
 
   const isSameAsLegal = detectSameAsLegal(v)

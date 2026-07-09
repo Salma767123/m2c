@@ -84,6 +84,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
     overallResult: '',
     inspectorRemarks: '',
   })
+  const [finalReviewErrors, setFinalReviewErrors] = useState<{ overallResult?: boolean; inspectorRemarks?: boolean }>({})
   const [factoryEvidence, setFactoryEvidence] = useState<FactoryEvidenceState>({
     frontView: null,
     nameBoard: null,
@@ -303,10 +304,13 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
       // Final Review: overall result and overall remarks are both mandatory
       // before advancing to the Documentation step.
       if (!meta.overallResult) {
+        setFinalReviewErrors(prev => ({ ...prev, overallResult: true }))
+        document.getElementById('overall-inspection-result')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
         showErrorToast('Overall result required', 'Please select an overall inspection result before continuing.')
         return
       }
       if (!meta.inspectorRemarks.trim()) {
+        setFinalReviewErrors(prev => ({ ...prev, inspectorRemarks: true }))
         document.getElementById('inspector-overall-remarks')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
         showErrorToast('Overall remarks required', 'Please enter your overall inspector remarks before continuing.')
         return
@@ -477,7 +481,12 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
           inspection={inspection}
           verifications={verifications}
           meta={meta}
-          onMetaChange={(patch) => setMeta(prev => ({ ...prev, ...patch }))}
+          onMetaChange={(patch) => {
+            setMeta(prev => ({ ...prev, ...patch }))
+            if ('overallResult' in patch) setFinalReviewErrors(prev => ({ ...prev, overallResult: false }))
+            if ('inspectorRemarks' in patch) setFinalReviewErrors(prev => ({ ...prev, inspectorRemarks: false }))
+          }}
+          fieldErrors={finalReviewErrors}
           onGoToStep={handleGoToStep}
         />
       )
