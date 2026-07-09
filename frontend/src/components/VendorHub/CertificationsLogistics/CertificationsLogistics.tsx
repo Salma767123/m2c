@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { handleUpload } from '@/lib/toast-utils';
 import { AccordionSection } from '@/components/VendorHub/FormUI';
+import { centerNotice } from '@/components/UI/CenterNotice';
 
 interface CertificationsLogisticsProps {
   onNext: () => void;
@@ -570,6 +571,12 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
         allTouched[key] = true;
       });
       setTouched(allTouched);
+
+      const errorCount = Object.keys(newErrors).length;
+      centerNotice.warning(
+        errorCount === 1 ? '1 field needs your attention' : `${errorCount} fields need your attention`,
+        'Scroll down to the highlighted field and fix it to continue.',
+      );
 
       // Auto-expand the first failing section
       if (Object.keys(newErrors).some(k => k.startsWith('certFile_') || k.startsWith('certExpiry_') || k.startsWith('otherCert'))) {

@@ -21,6 +21,7 @@ import Image from "next/image";
 import { categoryService, Category } from "@/services/categoryService";
 import { AccordionSection } from "@/components/VendorHub/FormUI";
 import { validateUpload, notifyUploadError, notifyUploadSuccess } from "@/lib/toast-utils";
+import { centerNotice } from "@/components/UI/CenterNotice";
 
 interface VendorTypeProductsProps {
   onNext: () => void;
@@ -727,6 +728,12 @@ export default function VendorTypeProducts({
         allTouched[key] = true;
       });
       setTouched(allTouched);
+
+      const errorCount = Object.keys(newErrors).length;
+      centerNotice.warning(
+        errorCount === 1 ? '1 field needs your attention' : `${errorCount} fields need your attention`,
+        'Scroll down to the highlighted field and fix it to continue.',
+      );
 
       // Auto-open the section containing the first error so the user
       // lands inside the failing accordion section (Step 1 / Step 3 parity).

@@ -8,6 +8,7 @@ import Dropdown from '@/components/UI/Dropdown';
 import { PhoneInput, LocalLandlineInput, parsePhone, CountryMultiSelect, validatePhoneE164, AccordionSection, TitleSelect, type LocalLandlineValue } from '@/components/VendorHub/FormUI';
 import { handleUpload } from '@/lib/toast-utils';
 import ImageCropModal from '@/components/UI/ImageCropModal';
+import { centerNotice } from '@/components/UI/CenterNotice';
 
 interface ContactTradeInfoProps {
   onNext: () => void;
@@ -693,6 +694,12 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
         allTouched[key] = true;
       });
       setTouched(allTouched);
+
+      const errorCount = Object.keys(newErrors).length;
+      centerNotice.warning(
+        errorCount === 1 ? '1 field needs your attention' : `${errorCount} fields need your attention`,
+        'Scroll down to the highlighted field and fix it to continue.',
+      );
 
       // Auto-open the section containing the first error so the user can
       // actually SEE the failing fields. Without this, errors on a closed

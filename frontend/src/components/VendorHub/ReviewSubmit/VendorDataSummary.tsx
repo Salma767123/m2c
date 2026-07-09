@@ -436,8 +436,8 @@ export default function VendorDataSummary({
           {(data.aadhaarFile || data.aadhaarDocument) && (
             <InfoRow label="Aadhaar Card" value={<DocValue src={data.aadhaarFile || data.aadhaarDocument} alt="Aadhaar card" />} />
           )}
-          {/* Type-specific regulatory ID (CIN / Deed / LLPIN / Others reg. no.)
-              paired with its certificate, labelled exactly as the form. */}
+          {/* Type-specific regulatory ID (CIN / Deed / LLPIN / IEC Code for
+              proprietorship) paired with its certificate. */}
           {data.companyIdNumber && (
             <InfoRow
               label={getCompanyIdLabel(data.businessType)}
@@ -447,6 +447,15 @@ export default function VendorDataSummary({
           {(data.typeCertFile || data.typeCertDocument) && (
             <InfoRow label={getTypeCertLabel(data.businessType)} value={<DocValue src={data.typeCertFile || data.typeCertDocument} alt={getTypeCertLabel(data.businessType)} />} />
           )}
+          {/* Import/Export IEC Code & Certificate — mandatory for all business
+              types when hasImportExport = yes. For proprietorship their
+              companyIdNumber already is the IEC Code, so skip the duplicate. */}
+          {data.hasImportExport === 'yes' && data.businessType !== 'proprietorship' && data.iecCode && (
+            <InfoRow label="IEC Code" value={data.iecCode} />
+          )}
+          {data.hasImportExport === 'yes' && data.businessType !== 'proprietorship' && (data.iecCertFile || data.iecCertDocument) && (
+            <InfoRow label="IEC Certificate" value={<DocValue src={data.iecCertFile || data.iecCertDocument} alt="IEC Certificate" />} />
+          )}
           {data.panNumber && <InfoRow label={data.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number'} value={data.panNumber} />}
           {(data.panCardFile || data.panCardDocument) && (
             <InfoRow label={data.businessType === 'proprietorship' ? 'Proprietor PAN Card' : 'Company PAN Card'} value={<DocValue src={data.panCardFile || data.panCardDocument} alt="PAN card" />} />
@@ -454,12 +463,15 @@ export default function VendorDataSummary({
 
           {/* ── Contact & Communication ────────────────────────────── */}
           <SubHeader>Contact &amp; Communication</SubHeader>
-          <InfoRow label="Business Email" value={data.email} />
+          <InfoRow label="Primary Email" value={data.email} />
           {data.email2 && <InfoRow label="Secondary Email" value={data.email2} />}
           <InfoRow label="Primary Phone" value={data.phone} />
           {data.phoneNumber2 && <InfoRow label="Secondary Phone" value={data.phoneNumber2} />}
-          {data.landlineNumber && <InfoRow label="Local Landline" value={data.landlineNumber} />}
-          {data.intlLandline && <InfoRow label="International Landline" value={data.intlLandline} />}
+          {data.landlineNumber && <InfoRow label="Local Landline" value={`+91 ${data.landlineNumber}`} />}
+          <InfoRow
+            label="International Landline"
+            value={data.intlLandline && data.intlLandline.replace(/\D/g, '').length > 4 ? data.intlLandline : undefined}
+          />
           <InfoRow
             label="Website"
             value={(() => {
@@ -957,10 +969,6 @@ export default function VendorDataSummary({
           />
           {data.hasImportExport === 'yes' && (
             <>
-              {data.iecCode && <InfoRow label="IEC Code" value={data.iecCode} />}
-              {(data.iecCertFile || data.iecCertDocument) && (
-                <InfoRow label="IEC Certificate" value={<DocValue src={data.iecCertFile || data.iecCertDocument} alt="IEC certificate" />} />
-              )}
               <InfoRow label="Import Countries" value={(data.importCountries || []).join(', ') || 'None'} />
               <InfoRow label="Export Countries" value={(data.exportCountries || []).join(', ') || 'None'} />
             </>

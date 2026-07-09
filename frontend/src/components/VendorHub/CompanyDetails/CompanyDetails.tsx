@@ -720,7 +720,9 @@ export default function CompanyDetails({
     // These assembled keys are not in FormData so they flow through the
     // [key:string]:any index.
     const localLandline = (currentFormData.localLandlineStd + currentFormData.localLandlineNumber).trim();
-    const intlLandline = (currentFormData.intlLandlineCountryCode + currentFormData.intlLandlineStd + currentFormData.intlLandlineNumber).replace(/^\+?$/, '');
+    const intlLandline = (currentFormData.intlLandlineStd && currentFormData.intlLandlineNumber)
+      ? (currentFormData.intlLandlineCountryCode + currentFormData.intlLandlineStd + currentFormData.intlLandlineNumber)
+      : '';
     updatedData.landlineNumber = localLandline || '';
     updatedData.intlLandline = intlLandline || '';
 
@@ -2433,7 +2435,7 @@ export default function CompanyDetails({
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span>Business Email</span>
+                <span>Primary Email</span>
                 <span className="text-brand-500" aria-hidden="true">*</span>
               </label>
               <input

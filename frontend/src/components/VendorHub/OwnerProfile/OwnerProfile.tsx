@@ -458,6 +458,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
   // Selected image awaiting crop (1:1). The image is only saved after the user
   // crops & confirms — never uploaded directly.
   const [cropState, setCropState] = useState<{ src: string; name: string } | null>(null);
+  const [additionalCropState, setAdditionalCropState] = useState<{ src: string; name: string; index: number } | null>(null);
 
   const openOwnerPhotoCropper = useCallback((file: File) => {
     // Non-images can't be cropped — route through the normal validator so the
@@ -472,6 +473,22 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
 
   const closeCropper = useCallback(() => {
     setCropState((prev) => {
+      if (prev?.src.startsWith('blob:')) URL.revokeObjectURL(prev.src);
+      return null;
+    });
+  }, []);
+
+  const openAdditionalOwnerPhotoCropper = useCallback((index: number, file: File) => {
+    if (!file.type.startsWith('image/')) {
+      handleAdditionalOwnerPhoto(index, file);
+      return;
+    }
+    setAdditionalCropState({ src: URL.createObjectURL(file), name: file.name, index });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const closeAdditionalCropper = useCallback(() => {
+    setAdditionalCropState((prev) => {
       if (prev?.src.startsWith('blob:')) URL.revokeObjectURL(prev.src);
       return null;
     });
@@ -743,6 +760,16 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
         onCropped={(file) => {
           handleOwnerPhotoFile(file);
           closeCropper();
+        }}
+      />
+      <ImageCropModal
+        src={additionalCropState?.src ?? null}
+        fileName={additionalCropState?.name}
+        title="Crop Owner Photo"
+        onCancel={closeAdditionalCropper}
+        onCropped={(file) => {
+          if (additionalCropState !== null) handleAdditionalOwnerPhoto(additionalCropState.index, file);
+          closeAdditionalCropper();
         }}
       />
       {/* Header */}
@@ -1158,246 +1185,324 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
               {' '}to get started.
             </p>
           ) : (
-            additionalOwners.map((owner, index) => (
-              <div key={index} className="p-4 border border-gray-200 rounded-lg bg-gray-50/40 relative">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-semibold text-gray-800">
-                    Owner {index + 2}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveOwner(index)}
-                    aria-label={`Remove Owner ${index + 2}`}
-                    className="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 rounded"
-                  >
-                    <Trash2 className="w-4 h-4" aria-hidden="true" />
-                    Remove
-                  </button>
-                </div>
-                {/* 2-col grid throughout — matches the primary owner section
-                    above. Required + optional fields pair up naturally:
-                      row 1: Full Name * | Designation
-                      row 2: Email *     | Email 2
-                      row 3: Phone *     | Phone 2
-                      row 4: Landline    (full-width, max-md so it doesn't
-                                          stretch wider than the input above)
-                    The earlier 3-col grid left empty placeholder columns on
-                    rows 1 and 2 which read as awkward visual gaps. */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Owner profile photo — same requirement as the primary
-                      owner; stored as base64 on the owner row. */}
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Owner Profile Photo <span className="text-red-500" aria-hidden="true">*</span>
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-16 h-16 shrink-0 bg-white rounded-full border overflow-hidden flex items-center justify-center shadow-sm ${errors[`additionalOwner_${index}_photo`] ? 'border-red-300' : 'border-slate-200'}`}>
-                        {owner.photo ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={owner.photo} alt={`Owner ${index + 2} profile`} className="w-full h-full object-cover" />
-                        ) : (
-                          <ImageIcon className="w-5 h-5 text-slate-300" aria-hidden="true" />
-                        )}
+            additionalOwners.map((owner, index) => {
+              const d = owner.designation || '';
+              const isOtherTyped = !!d && d !== DESIGNATION_OTHER && !DESIGNATION_IDS.has(d);
+              const otherSelected = d === DESIGNATION_OTHER || isOtherTyped;
+              const otherValue = isOtherTyped ? d : '';
+              return (
+                <div key={index} className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+                  {/* Card header */}
+                  <div className="flex items-center justify-between px-5 py-3 bg-gray-50/70 border-b border-gray-200">
+                    <span className="text-sm font-semibold text-gray-800">
+                      {ownerStructure.contactLabel} {index + 2}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveOwner(index)}
+                      aria-label={`Remove ${ownerStructure.contactLabel} ${index + 2}`}
+                      className="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 rounded"
+                    >
+                      <Trash2 className="w-4 h-4" aria-hidden="true" />
+                      Remove
+                    </button>
+                  </div>
+
+                  <div className="p-5 space-y-6">
+                    {/* ── Owner Identity ─────────────────────────────────── */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                        <IdCard className="w-4 h-4 text-brand-500" aria-hidden="true" />
+                        <h4 className="text-sm font-bold text-slate-700">Owner Identity</h4>
                       </div>
-                      <label className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg transition-colors duration-200 cursor-pointer">
-                        {owner.photo ? 'Change' : 'Browse'}
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) handleAdditionalOwnerPhoto(index, f);
-                            e.target.value = '';
-                          }}
-                        />
-                      </label>
-                      {owner.photo && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveAdditionalOwnerPhoto(index)}
-                          className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-red-500 hover:bg-red-50 transition-colors duration-200"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                    {errors[`additionalOwner_${index}_photo`] && (
-                      <p className="text-red-600 text-xs mt-1 font-medium">{errors[`additionalOwner_${index}_photo`]}</p>
-                    )}
-                  </div>
-                  {/* Name row: Title | First | Middle | Last — single line */}
-                  <div className="sm:col-span-2 grid grid-cols-[100px_1fr_1fr_1fr] gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Title</label>
-                      <TitleSelect
-                        value={owner.title || ''}
-                        onChange={(v) => handleOwnerFieldChange(index, 'title', v)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        First Name <span className="text-red-500" aria-hidden="true">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={owner.firstName || ''}
-                        onChange={(e) => handleOwnerFieldChange(index, 'firstName', e.target.value)}
-                        className={`w-full h-10 px-3 border rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 ${errors[`additionalOwner_${index}_firstName`] ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:border-slate-300'}`}
-                        placeholder="First name"
-                      />
-                      {errors[`additionalOwner_${index}_firstName`] && (
-                        <p className="text-red-600 text-xs mt-1 font-medium">{errors[`additionalOwner_${index}_firstName`]}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Middle Name <span className="text-gray-400">(optional)</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={owner.middleName || ''}
-                        onChange={(e) => handleOwnerFieldChange(index, 'middleName', e.target.value)}
-                        className="w-full h-10 px-3 border border-slate-200 hover:border-slate-300 rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500"
-                        placeholder="Middle name"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Last Name <span className="text-red-500" aria-hidden="true">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={owner.lastName || ''}
-                        onChange={(e) => handleOwnerFieldChange(index, 'lastName', e.target.value)}
-                        className={`w-full h-10 px-3 border rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 ${errors[`additionalOwner_${index}_lastName`] ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:border-slate-300'}`}
-                        placeholder="Last name"
-                      />
-                      {errors[`additionalOwner_${index}_lastName`] && (
-                        <p className="text-red-600 text-xs mt-1 font-medium">{errors[`additionalOwner_${index}_lastName`]}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Designation <span className="text-gray-400">(optional)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={owner.designation || ''}
-                      onChange={(e) => handleOwnerFieldChange(index, 'designation', e.target.value)}
-                      autoComplete="off"
-                      className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
-                      placeholder={`e.g. ${ownerStructure.contactLabel}`}
-                    />
-                  </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Primary Email <span className="text-red-500" aria-hidden="true">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      value={owner.email}
-                      onChange={(e) => handleOwnerFieldChange(index, 'email', e.target.value)}
-                      autoComplete="off"
-                      inputMode="email"
-                      spellCheck={false}
-                      className={`w-full px-3 py-2 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm ${
-                        errors[`additionalOwner_${index}_email`]
-                          ? 'border-red-500 bg-red-50'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                      placeholder="contact@email.com"
-                    />
-                    {errors[`additionalOwner_${index}_email`] && (
-                      <p className="text-red-600 text-xs mt-1 font-medium" role="alert">
-                        {errors[`additionalOwner_${index}_email`]}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Secondary Email <span className="text-gray-400">(optional)</span>
-                    </label>
-                    <input
-                      type="email"
-                      value={owner.email2 || ''}
-                      onChange={(e) => handleOwnerFieldChange(index, 'email2', e.target.value)}
-                      autoComplete="off"
-                      inputMode="email"
-                      spellCheck={false}
-                      className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
-                      placeholder="optional secondary email"
-                    />
-                  </div>
+                      {/* Designation chip group + Photo — side by side */}
+                      <div className="grid grid-cols-[1fr_auto] gap-5 items-start">
+                        {/* Designation */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            Designation <span className="text-slate-400 text-xs font-normal">(optional)</span>
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {designationOptions.map((opt) => (
+                              <ToggleButton
+                                key={opt.id}
+                                selected={d === opt.id}
+                                onClick={() => handleOwnerFieldChange(index, 'designation', d === opt.id ? '' : opt.id)}
+                              >
+                                {opt.label}
+                              </ToggleButton>
+                            ))}
+                            <ToggleButton
+                              selected={otherSelected}
+                              onClick={() => handleOwnerFieldChange(index, 'designation', otherSelected ? '' : DESIGNATION_OTHER)}
+                            >
+                              Other
+                            </ToggleButton>
+                          </div>
+                          {otherSelected && (
+                            <div className="mt-3 max-w-sm">
+                              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                Specify your designation
+                                <span className="text-slate-400 text-xs font-normal ml-1">(optional)</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={otherValue}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  handleOwnerFieldChange(index, 'designation', v.trim() === '' ? DESIGNATION_OTHER : v);
+                                }}
+                                placeholder="e.g. Partner, Co-Founder, Head of Operations…"
+                                autoComplete="off"
+                                className="w-full px-4 py-2.5 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
+                              />
+                            </div>
+                          )}
+                        </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Primary Phone <span className="text-red-500" aria-hidden="true">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      value={owner.phone}
-                      onChange={(e) => handleOwnerFieldChange(index, 'phone', e.target.value)}
-                      autoComplete="off"
-                      inputMode="tel"
-                      className={`w-full px-3 py-2 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm ${
-                        errors[`additionalOwner_${index}_phone`]
-                          ? 'border-red-500 bg-red-50'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                      placeholder="+91 98765 43210"
-                    />
-                    {errors[`additionalOwner_${index}_phone`] && (
-                      <p className="text-red-500 text-xs mt-1">{errors[`additionalOwner_${index}_phone`]}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Secondary Phone <span className="text-gray-400">(optional)</span>
-                    </label>
-                    <input
-                      type="tel"
-                      value={owner.phone2 || ''}
-                      onChange={(e) => handleOwnerFieldChange(index, 'phone2', e.target.value)}
-                      autoComplete="off"
-                      inputMode="tel"
-                      className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
-                      placeholder="optional secondary phone"
-                    />
-                  </div>
+                        {/* Owner Profile Photo — same dashed-border style as Owner 1 */}
+                        {(() => {
+                          const photoError = errors[`additionalOwner_${index}_photo`];
+                          return (
+                            <div className="w-64 shrink-0">
+                              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                Owner Profile Photo <span className="text-red-500" aria-hidden="true">*</span>
+                              </label>
+                              <label
+                                className={`flex items-center gap-3 border-2 border-dashed rounded-lg p-3 transition-all duration-200 cursor-pointer focus-visible:outline-none ${
+                                  photoError ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
+                                }`}
+                              >
+                                <div className="w-16 h-16 shrink-0 bg-white rounded-full border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
+                                  {owner.photo ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={owner.photo} alt={`Owner ${index + 2} profile`} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <ImageIcon className="w-5 h-5 text-slate-300" aria-hidden="true" />
+                                  )}
+                                </div>
+                                {owner.photo ? (
+                                  <div className="flex-1" />
+                                ) : (
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-xs text-slate-500 truncate">Drag &amp; drop or browse</div>
+                                    <p className="text-[11px] text-slate-400 mt-0.5 truncate">PNG, JPG, WEBP — max 2 MB</p>
+                                  </div>
+                                )}
+                                <input
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/webp"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    if (f) openAdditionalOwnerPhotoCropper(index, f);
+                                    e.target.value = '';
+                                  }}
+                                />
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg transition-colors duration-200">
+                                    {owner.photo ? 'Change' : 'Browse'}
+                                  </span>
+                                  {owner.photo && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.preventDefault(); handleRemoveAdditionalOwnerPhoto(index); }}
+                                      className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-red-500 hover:bg-red-50 transition-colors duration-200"
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
+                                </div>
+                              </label>
+                              {photoError && (
+                                <p className="text-red-500 text-xs mt-1">{photoError}</p>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Local Landline <span className="text-gray-400">(optional)</span>
-                    </label>
-                    <LocalLandlineInput
-                      locked
-                      value={{ countryCode: '+91', std: owner.localLandlineStd, number: owner.localLandline }}
-                      onChange={(v: LocalLandlineValue) => {
-                        setAdditionalOwners(prev => prev.map((o, i) =>
-                          i === index ? { ...o, localLandlineStd: v.std, localLandline: v.number } : o
-                        ));
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      International Landline <span className="text-gray-400">(optional)</span>
-                    </label>
-                    <LocalLandlineInput
-                      value={{ countryCode: owner.intlLandlineCountryCode, std: owner.intlLandlineStd, number: owner.intlLandlineNumber }}
-                      onChange={(v: LocalLandlineValue) => {
-                        setAdditionalOwners(prev => prev.map((o, i) =>
-                          i === index ? { ...o, intlLandlineCountryCode: v.countryCode, intlLandlineStd: v.std, intlLandlineNumber: v.number } : o
-                        ));
-                      }}
-                    />
+                      {/* Name row: Title | First | Middle | Last */}
+                      <div className="grid grid-cols-[130px_1fr_1fr_1fr] gap-4 items-start">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Title</label>
+                          <TitleSelect
+                            value={owner.title || ''}
+                            onChange={(v) => handleOwnerFieldChange(index, 'title', v)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            First Name <span className="text-red-500" aria-hidden="true">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={owner.firstName || ''}
+                            onChange={(e) => handleOwnerFieldChange(index, 'firstName', e.target.value)}
+                            className={`w-full h-10 px-3 border rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 ${
+                              errors[`additionalOwner_${index}_firstName`] ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                            placeholder="First name"
+                          />
+                          {errors[`additionalOwner_${index}_firstName`] && (
+                            <p className="text-red-600 text-xs mt-1 font-medium">{errors[`additionalOwner_${index}_firstName`]}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            Middle Name <span className="text-slate-400 text-xs font-normal">(optional)</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={owner.middleName || ''}
+                            onChange={(e) => handleOwnerFieldChange(index, 'middleName', e.target.value)}
+                            className="w-full h-10 px-3 border border-slate-200 hover:border-slate-300 rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500"
+                            placeholder="Middle name"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            Last Name <span className="text-red-500" aria-hidden="true">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={owner.lastName || ''}
+                            onChange={(e) => handleOwnerFieldChange(index, 'lastName', e.target.value)}
+                            className={`w-full h-10 px-3 border rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 ${
+                              errors[`additionalOwner_${index}_lastName`] ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                            placeholder="Last name"
+                          />
+                          {errors[`additionalOwner_${index}_lastName`] && (
+                            <p className="text-red-600 text-xs mt-1 font-medium">{errors[`additionalOwner_${index}_lastName`]}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ── Owner Contact ───────────────────────────────────── */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                        <PhoneIcon className="w-4 h-4 text-brand-500" aria-hidden="true" />
+                        <h4 className="text-sm font-bold text-slate-700">Owner Contact</h4>
+                      </div>
+
+                      {/* Emails */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                            <span>Primary Email</span>
+                            <span className="text-brand-500" aria-hidden="true">*</span>
+                          </label>
+                          <input
+                            type="email"
+                            value={owner.email}
+                            onChange={(e) => handleOwnerFieldChange(index, 'email', e.target.value)}
+                            autoComplete="off"
+                            inputMode="email"
+                            spellCheck={false}
+                            className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                              errors[`additionalOwner_${index}_email`] ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                            }`}
+                            placeholder="owner@company.com"
+                          />
+                          {errors[`additionalOwner_${index}_email`] && (
+                            <p className="text-red-500 text-xs mt-1">{errors[`additionalOwner_${index}_email`]}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                            <span>Secondary Email</span>
+                            <span className="text-slate-400 text-xs font-normal">(Optional)</span>
+                          </label>
+                          <input
+                            type="email"
+                            value={owner.email2 || ''}
+                            onChange={(e) => handleOwnerFieldChange(index, 'email2', e.target.value)}
+                            autoComplete="off"
+                            inputMode="email"
+                            spellCheck={false}
+                            className="w-full text-sm font-medium px-4 py-2.5 border border-slate-300 hover:border-slate-400 rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
+                            placeholder="alternate@company.com"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Phones + Landlines */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                            <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                            <span>Primary Phone</span>
+                            <span className="text-brand-500" aria-hidden="true">*</span>
+                          </label>
+                          <PhoneInput
+                            name={`additionalOwner_${index}_phone`}
+                            value={owner.phone}
+                            onChange={(v) => handleOwnerFieldChange(index, 'phone', v)}
+                            invalid={!!errors[`additionalOwner_${index}_phone`]}
+                            placeholder="9876543210"
+                            autoComplete="off"
+                          />
+                          {errors[`additionalOwner_${index}_phone`] && (
+                            <p className="text-red-500 text-xs mt-1">{errors[`additionalOwner_${index}_phone`]}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                            <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                            <span>Secondary Phone</span>
+                            <span className="text-slate-400 text-xs font-normal">(Optional)</span>
+                          </label>
+                          <PhoneInput
+                            name={`additionalOwner_${index}_phone2`}
+                            value={owner.phone2 || ''}
+                            onChange={(v) => handleOwnerFieldChange(index, 'phone2', v)}
+                            invalid={false}
+                            placeholder="9876543210"
+                            autoComplete="off"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                            <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                            <span>Local Landline</span>
+                            <span className="text-slate-400 text-xs font-normal">(Optional)</span>
+                          </label>
+                          <LocalLandlineInput
+                            locked
+                            value={{ countryCode: '+91', std: owner.localLandlineStd, number: owner.localLandline }}
+                            onChange={(v: LocalLandlineValue) => {
+                              setAdditionalOwners(prev => prev.map((o, i) =>
+                                i === index ? { ...o, localLandlineStd: v.std, localLandline: v.number } : o
+                              ));
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                            <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                            <span>International Landline</span>
+                            <span className="text-slate-400 text-xs font-normal">(Optional)</span>
+                          </label>
+                          <LocalLandlineInput
+                            value={{ countryCode: owner.intlLandlineCountryCode, std: owner.intlLandlineStd, number: owner.intlLandlineNumber }}
+                            onChange={(v: LocalLandlineValue) => {
+                              setAdditionalOwners(prev => prev.map((o, i) =>
+                                i === index ? { ...o, intlLandlineCountryCode: v.countryCode, intlLandlineStd: v.std, intlLandlineNumber: v.number } : o
+                              ));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
 
           {/* "+ Add another" tile — sits inside the section body, after the
