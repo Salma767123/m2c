@@ -20,10 +20,11 @@ const fileFilter = (req, file, cb) => {
   };
 
   // Check file type based on field name
-  if (file.fieldname === 'logo' || 
-      file.fieldname === 'ownerPhoto' || 
+  if (file.fieldname === 'logo' ||
+      file.fieldname === 'ownerPhoto' ||
       file.fieldname === 'ogImage' ||
-      file.fieldname.includes('factoryImages')) {
+      file.fieldname.includes('factoryImages') ||
+      file.fieldname.includes('factorySiteImages')) {
     if (allowedTypes.images.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -60,6 +61,7 @@ const vendorUploadFields = upload.fields([
   { name: 'iecCertFile', maxCount: 1 },
   { name: 'ownerPhoto', maxCount: 1 },
   { name: 'factoryImages', maxCount: 10 },
+  { name: 'factorySiteImages', maxCount: 10 },
   { name: 'productPhotos', maxCount: 10 },
   { name: 'certificationFiles', maxCount: 10 },
   { name: 'otherDocuments', maxCount: 5 }
@@ -83,6 +85,7 @@ const handleUploadError = (error, req, res, next) => {
       'iecCertFile': 'IEC Certificate',
       'ownerPhoto': 'Owner/Contact Photo',
       'factoryImages': 'Factory Images',
+      'factorySiteImages': 'Factory Site Images',
       'productPhotos': 'Product Photos',
       'certificationFiles': 'Certification Files',
       'otherDocuments': 'Other Documents'

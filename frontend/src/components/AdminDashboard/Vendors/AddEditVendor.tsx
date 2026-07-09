@@ -1090,7 +1090,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
             ),
           );
           return (
-            <aside className="hidden md:flex flex-col w-68 bg-white border-r border-slate-100 sticky top-0 self-start h-screen shrink-0 z-(--z-sticky) shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
+            <aside className="hidden md:flex flex-col w-68 bg-white border-r border-slate-100 sticky top-0 self-start shrink-0 z-(--z-sticky) shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
               {/* Header — admin-specific Back button + Add/Edit title.
               Sits above the steps in the same chrome as VendorPanel's
               "Registration Progress" header for visual parity. */}
