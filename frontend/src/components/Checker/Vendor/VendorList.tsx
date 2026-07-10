@@ -45,8 +45,6 @@ const STATUS_TABS = [
 const SORT_OPTIONS = [
   { value: "assignedQcAt:desc", label: "Newest assignment" },
   { value: "assignedQcAt:asc", label: "Oldest assignment" },
-  { value: "submittedAt:desc", label: "Newest submission" },
-  { value: "submittedAt:asc", label: "Oldest submission" },
 ]
 
 const MAIN_STATUS_COLORS: Record<string, string> = {
