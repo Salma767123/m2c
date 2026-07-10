@@ -413,7 +413,7 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
 
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6 space-y-5 font-sans animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="mx-auto max-w-5xl px-4 pt-4 sm:px-6 sm:pt-6 space-y-5 font-sans animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex items-center gap-3 pb-2">
         <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-brand-50 text-brand-600 shrink-0">

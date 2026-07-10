@@ -791,7 +791,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6 space-y-5 font-sans animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="mx-auto max-w-5xl px-4 pt-4 sm:px-6 sm:pt-6 space-y-5 font-sans animate-in fade-in duration-300">
       <ImageCropModal
         src={cropState?.src ?? null}
         fileName={cropState?.name}

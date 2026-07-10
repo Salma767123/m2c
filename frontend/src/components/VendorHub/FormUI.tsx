@@ -975,6 +975,8 @@ export function CountryPickerModal({
   useEffect(() => {
     if (!open) return;
     const prevOverflow = document.body.style.overflow;
+    const mainEl = document.querySelector<HTMLElement>('main');
+    const mainScrollTop = mainEl?.scrollTop ?? 0;
     document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') requestClose();
@@ -982,6 +984,7 @@ export function CountryPickerModal({
     window.addEventListener('keydown', onKey);
     return () => {
       document.body.style.overflow = prevOverflow;
+      if (mainEl) mainEl.scrollTop = mainScrollTop;
       window.removeEventListener('keydown', onKey);
     };
   }, [open, requestClose]);

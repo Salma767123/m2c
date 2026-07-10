@@ -135,10 +135,13 @@ export default function ImageCropModal({
     if (!src) return;
     const prev = document.body.style.overflow;
     const scrollY = window.scrollY;
+    const mainEl = document.querySelector<HTMLElement>('main');
+    const mainScrollTop = mainEl?.scrollTop ?? 0;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
       window.scrollTo({ top: scrollY, behavior: "instant" });
+      if (mainEl) mainEl.scrollTop = mainScrollTop;
     };
   }, [src]);
 
