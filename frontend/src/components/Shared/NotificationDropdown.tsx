@@ -6,7 +6,10 @@ import { notificationService, AppNotification } from '@/services/notificationSer
 import { onForegroundMessage } from '@/services/webNotificationService';
 import NotificationModal, { CategoryDef } from './NotificationModal';
 
-const POLL_INTERVAL = 5000; // 5 seconds — fast polling for near-real-time feel
+// 30 seconds — a lightweight fallback only. Near-real-time updates arrive via
+// FCM push (onForegroundMessage below), so aggressive polling isn't needed;
+// 5s was ~720 req/hour/user against /notifications/unread-count.
+const POLL_INTERVAL = 30000;
 
 const ICON_MAP: Record<string, React.ReactNode> = {
   ORDER_RECEIVED: <ShoppingCart className="h-4 w-4 text-blue-600" />,
