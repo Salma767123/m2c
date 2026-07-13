@@ -42,6 +42,13 @@ export default function DocViewerModal({ url, name, onClose, readOnly = false }:
   const isImage = isDocImageUrl(url, name)
   const ext = extFromName(name) || extFromUrl(url)
   const isPdf = ext === '.pdf'
+  const isWord = ext === '.doc' || ext === '.docx'
+
+  // Microsoft Office Online can only fetch publicly accessible URLs — not local blob/data URIs
+  const isLocal = url.startsWith('data:') || url.startsWith('blob:')
+  const officeOnlineUrl = isWord && !isLocal
+    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
+    : null
 
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -60,7 +67,10 @@ export default function DocViewerModal({ url, name, onClose, readOnly = false }:
     // Images render via <img> — no blob fetch required
     if (isImage) return
 
-    // Non-PDF, non-image: nothing to embed — handled by the fallback UI
+    // Word docs are rendered via Office Online — no local fetch needed
+    if (isWord) return
+
+    // Non-PDF, non-image, non-Word: nothing to embed — handled by the fallback UI
     if (!isPdf) return
 
     // PDFs: fetch through proxy and create a local blob URL.
@@ -89,7 +99,7 @@ export default function DocViewerModal({ url, name, onClose, readOnly = false }:
     return () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [url, isImage, isPdf])
+  }, [url, isImage, isPdf, isWord])
 
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col">
@@ -150,8 +160,14 @@ export default function DocViewerModal({ url, name, onClose, readOnly = false }:
               title={name}
               className="w-full h-full rounded-lg bg-white shadow-xl border-0"
             />
+          ) : officeOnlineUrl ? (
+            <iframe
+              src={officeOnlineUrl}
+              title={name}
+              className="w-full h-full rounded-lg bg-white shadow-xl border-0"
+            />
           ) : (
-            /* Non-PDF / non-image / fetch error */
+            /* Non-PDF / non-image / non-Word / fetch error */
             <div className="bg-white rounded-2xl shadow-xl p-8 text-center space-y-4 max-w-sm w-full">
               <FileText className="w-14 h-14 text-slate-200 mx-auto" />
               <div>

@@ -342,6 +342,12 @@ export interface ValidatePhoneOptions {
    * from onChange handlers; leave false (default) for onBlur and submit.
    */
   isLive?: boolean;
+  /**
+   * Secondary phone relaxed mode: for non-Indian numbers (+91), skip
+   * country-specific libphonenumber validation and accept any well-formed
+   * E.164 value. Indian numbers (+91) still go through the full check.
+   */
+  isSecondaryPhone?: boolean;
 }
 
 export function validatePhoneE164(
@@ -351,6 +357,7 @@ export function validatePhoneE164(
   const label = opts.label ?? 'Phone number';
   const required = opts.required ?? false;
   const isLive = opts.isLive ?? false;
+  const isSecondaryPhone = opts.isSecondaryPhone ?? false;
   const trimmed = (value || '').replace(/\s/g, '');
 
   // Empty, or a bare dial code with no national digits ("+91")
@@ -363,6 +370,12 @@ export function validatePhoneE164(
   if (!/^\+\d{6,}$/.test(trimmed)) {
     // In live mode, "+918" is "still being typed", not "invalid"
     return isLive ? '' : `Please enter a valid ${label.toLowerCase()}`;
+  }
+
+  // Secondary phone for non-Indian numbers: E.164 format check above is
+  // sufficient — skip libphonenumber's country-specific rules.
+  if (isSecondaryPhone && !trimmed.startsWith('+91')) {
+    return '';
   }
 
   // In live mode, use length-only check first — let TOO_SHORT slide so we
@@ -484,15 +497,19 @@ function CountryDialPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Close portal on scroll/resize so it doesn't drift from the trigger
+  // Close portal on scroll/resize — but not when the scroll is inside the dropdown itself
   useEffect(() => {
     if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
+    const handleScroll = (e: Event) => {
+      if (popoverRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    const handleResize = () => setOpen(false);
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleResize);
     return () => {
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleResize);
     };
   }, [open]);
 
@@ -1363,15 +1380,19 @@ export function CountrySelect({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Close portal on scroll/resize so it doesn't drift from the trigger
+  // Close portal on scroll/resize — but not when the scroll is inside the dropdown itself
   useEffect(() => {
     if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
+    const handleScroll = (e: Event) => {
+      if (popoverRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    const handleResize = () => setOpen(false);
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleResize);
     return () => {
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleResize);
     };
   }, [open]);
 

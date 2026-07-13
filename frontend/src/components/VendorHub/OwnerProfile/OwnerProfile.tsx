@@ -430,6 +430,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
               required: field === 'ownerPhone',
               label: labelMap[field],
               isLive: true,
+              isSecondaryPhone: field === 'ownerPhone2',
             })
           : '';
         setErrors((prev) => (prev[field] === liveErr ? prev : { ...prev, [field]: liveErr }));
@@ -452,6 +453,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
         const err = validatePhoneE164(value, {
           required: field === 'ownerPhone',
           label: phoneLabels[field],
+          isSecondaryPhone: field === 'ownerPhone2',
         });
         setErrors((prev) => (prev[field] === err ? prev : { ...prev, [field]: err }));
       }
@@ -623,6 +625,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     const phone2Err = validatePhoneE164(formData.ownerPhone2, {
       required: false,
       label: 'Secondary Phone',
+      isSecondaryPhone: true,
     });
     if (phone2Err) newErrors.ownerPhone2 = phone2Err;
 

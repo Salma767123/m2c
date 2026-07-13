@@ -698,6 +698,21 @@ export default function VendorTypeProducts({
       if (hasEmptyProducts) {
         newErrors.selectedCategories =
           "Please ensure all added products have a name";
+      } else {
+        // Every named product must have at least one photo
+        const hasMissingPhotos = Object.keys(formData.selectedCategories).some(
+          (catId) => {
+            if (formData.selectedCategories[catId]) {
+              const prods = categoryProducts[catId];
+              return prods?.some((p) => !p.photos || p.photos.length === 0);
+            }
+            return false;
+          },
+        );
+        if (hasMissingPhotos) {
+          newErrors.selectedCategories =
+            "Please add at least one photo for each product";
+        }
       }
     }
 
@@ -716,6 +731,14 @@ export default function VendorTypeProducts({
         if (hasInvalidCustomProducts) {
           newErrors.additionalCategories =
             "Please ensure all custom products have a name";
+        } else {
+          const hasMissingCustomPhotos = additionalCategories.some((c) =>
+            c.products.some((p) => !p.photos || p.photos.length === 0),
+          );
+          if (hasMissingCustomPhotos) {
+            newErrors.additionalCategories =
+              "Please add at least one photo for each custom product";
+          }
         }
       }
     }
@@ -1055,6 +1078,7 @@ export default function VendorTypeProducts({
                                 <div>
                                   <label className="block text-sm font-medium text-slate-700 mb-2">
                                     Product Photo
+                                    <span className="text-brand-500 ml-0.5">*</span>
                                   </label>
                                   <div className="flex flex-wrap gap-3">
                                     {product.photos.map((photo, photoIndex) => (
@@ -1086,32 +1110,45 @@ export default function VendorTypeProducts({
                                     ))}
 
                                     {product.photos.length < 1 && (
-                                      <label
-                                        tabIndex={0}
-                                        role="button"
-                                        aria-label="Upload product photo"
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            e.currentTarget.click();
-                                          }
-                                        }}
-                                        className="w-20 h-20 rounded-md border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors bg-white outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 focus-visible:border-brand-500"
-                                      >
-                                        <Upload className="w-5 h-5 text-slate-400 mb-1" />
-                                        <input
-                                          type="file"
-                                          accept="image/jpeg,image/png,image/webp"
-                                          onChange={(e) =>
-                                            handleProductPhotoUpload(
-                                              category.id,
-                                              product.id,
-                                              e,
-                                            )
-                                          }
-                                          className="hidden"
-                                        />
-                                      </label>
+                                      <div className="flex flex-col items-start gap-1">
+                                        <label
+                                          tabIndex={0}
+                                          role="button"
+                                          aria-label="Upload product photo"
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                              e.preventDefault();
+                                              e.currentTarget.click();
+                                            }
+                                          }}
+                                          className={[
+                                            "w-20 h-20 rounded-md border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-colors bg-white outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
+                                            errors.selectedCategories && touched.selectedCategories
+                                              ? "border-red-400 bg-red-50 hover:border-red-500 focus-visible:ring-red-400 focus-visible:border-red-500"
+                                              : "border-slate-300 hover:border-brand-400 hover:bg-brand-50 focus-visible:ring-brand-500 focus-visible:border-brand-500",
+                                          ].join(' ')}
+                                        >
+                                          <Upload className={[
+                                            "w-5 h-5 mb-1",
+                                            errors.selectedCategories && touched.selectedCategories ? "text-red-400" : "text-slate-400",
+                                          ].join(' ')} />
+                                          <input
+                                            type="file"
+                                            accept="image/jpeg,image/png,image/webp"
+                                            onChange={(e) =>
+                                              handleProductPhotoUpload(
+                                                category.id,
+                                                product.id,
+                                                e,
+                                              )
+                                            }
+                                            className="hidden"
+                                          />
+                                        </label>
+                                        {errors.selectedCategories && touched.selectedCategories && (
+                                          <p className="text-red-500 text-[11px] font-medium">Required</p>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -1235,6 +1272,7 @@ export default function VendorTypeProducts({
                           <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">
                               Product Photo
+                              <span className="text-brand-500 ml-0.5">*</span>
                             </label>
                             <div className="flex flex-wrap gap-3">
                               {product.photos.map((photo, photoIndex) => (
@@ -1266,32 +1304,45 @@ export default function VendorTypeProducts({
                               ))}
 
                               {product.photos.length < 1 && (
-                                <label
-                                  tabIndex={0}
-                                  role="button"
-                                  aria-label="Upload product photo"
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.preventDefault();
-                                      e.currentTarget.click();
-                                    }
-                                  }}
-                                  className="w-20 h-20 rounded-md border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors bg-white outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 focus-visible:border-brand-500"
-                                >
-                                  <Upload className="w-5 h-5 text-slate-400 mb-1" />
-                                  <input
-                                    type="file"
-                                    accept="image/jpeg,image/png,image/webp"
-                                    onChange={(e) =>
-                                      handleAdditionalProductPhotoUpload(
-                                        category.id,
-                                        product.id,
-                                        e,
-                                      )
-                                    }
-                                    className="hidden"
-                                  />
-                                </label>
+                                <div className="flex flex-col items-start gap-1">
+                                  <label
+                                    tabIndex={0}
+                                    role="button"
+                                    aria-label="Upload product photo"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        e.currentTarget.click();
+                                      }
+                                    }}
+                                    className={[
+                                      "w-20 h-20 rounded-md border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-colors bg-white outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
+                                      errors.additionalCategories && touched.additionalCategories
+                                        ? "border-red-400 bg-red-50 hover:border-red-500 focus-visible:ring-red-400 focus-visible:border-red-500"
+                                        : "border-slate-300 hover:border-brand-400 hover:bg-brand-50 focus-visible:ring-brand-500 focus-visible:border-brand-500",
+                                    ].join(' ')}
+                                  >
+                                    <Upload className={[
+                                      "w-5 h-5 mb-1",
+                                      errors.additionalCategories && touched.additionalCategories ? "text-red-400" : "text-slate-400",
+                                    ].join(' ')} />
+                                    <input
+                                      type="file"
+                                      accept="image/jpeg,image/png,image/webp"
+                                      onChange={(e) =>
+                                        handleAdditionalProductPhotoUpload(
+                                          category.id,
+                                          product.id,
+                                          e,
+                                        )
+                                      }
+                                      className="hidden"
+                                    />
+                                  </label>
+                                  {errors.additionalCategories && touched.additionalCategories && (
+                                    <p className="text-red-500 text-[11px] font-medium">Required</p>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>

@@ -879,9 +879,8 @@ export default function CompanyDetails({
         ? validatePhoneE164(value, {
             required: field === 'phone',
             label: labelMap[field],
-            // Live-typing: don't flag "too short" — user is still typing.
-            // Only TOO_LONG or invalid-prefix errors surface mid-keystroke.
             isLive: true,
+            isSecondaryPhone: field === 'phoneNumber2',
           })
         : '';
       setErrors((prev) => {
@@ -935,6 +934,7 @@ export default function CompanyDetails({
       fieldError = validatePhoneE164(currentFormData.phoneNumber2, {
         required: false,
         label: 'Phone Number 2',
+        isSecondaryPhone: true,
       });
     }
 
@@ -1483,6 +1483,7 @@ export default function CompanyDetails({
     const phone2Err = validatePhoneE164(currentFormData.phoneNumber2, {
       required: false,
       label: 'Phone Number 2',
+      isSecondaryPhone: true,
     });
     if (phone2Err) newErrors.phoneNumber2 = phone2Err;
 

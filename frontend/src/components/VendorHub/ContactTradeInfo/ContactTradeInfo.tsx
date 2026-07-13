@@ -601,7 +601,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
     }
 
     if (main.phone2) {
-      const phoneErr = validatePhoneE164(main.phone2, { label: 'Secondary Phone' });
+      const phoneErr = validatePhoneE164(main.phone2, { label: 'Secondary Phone', isSecondaryPhone: true });
       if (phoneErr) newErrors['mainContact.phone2'] = phoneErr;
     }
 
@@ -682,7 +682,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       checkPhoneUniqueness(alt.phone1, `${prefix}_phone1`, `Contact Person ${idx + 2}`);
 
       if (alt.phone2) {
-        const phoneErr = validatePhoneE164(alt.phone2, { label: 'Secondary Phone' });
+        const phoneErr = validatePhoneE164(alt.phone2, { label: 'Secondary Phone', isSecondaryPhone: true });
         if (phoneErr) newErrors[`${prefix}_phone2`] = phoneErr;
       }
 
