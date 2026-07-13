@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
@@ -35,12 +35,12 @@ import {
   ChevronRight,
   AlertCircle,
   RotateCcw,
-  Camera,
 } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
 import VendorService, { VendorProfile } from '@/services/vendorService'
 import adminReviewService, { AdminOrderReview } from '@/services/adminReviewService'
+import { categoryService } from '@/services/categoryService'
 import { toast } from '@/hooks/use-toast'
 import RejectionModal from './RejectionModal'
 import SuspensionModal from './SuspensionModal'
@@ -48,7 +48,7 @@ import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 import { hasPermission } from '@/lib/auth'
 import { getLandlineDisplay, formatLocalLandline, formatIntlLandline } from '@/components/VendorHub/FormUI'
 import { buildFullName, toExternalUrl, resolveOwnerDesignation } from '@/lib/utils'
-import { downloadDoc, isDocImageUrl } from '@/lib/docDownload'
+import { downloadDoc } from '@/lib/docDownload'
 import DocViewerModal from '@/components/UI/DocViewerModal'
 import { FACILITY_META, withUnit } from '@/components/Checker/Vendor/Steps/VI_Step5_Manufacturing'
 import { Country } from 'country-state-city'
@@ -270,7 +270,6 @@ export default function VendorView({ vendorId }: VendorViewProps) {
     { id: 'contact-trade', label: 'Contact & Trade', icon: Phone },
     { id: 'products', label: 'Products & Services', icon: Package },
     { id: 'facilities', label: 'Facilities', icon: Factory },
-    { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'bank-details', label: 'Bank Details', icon: CreditCard },
     { id: 'reviews', label: 'Reviews', icon: MessageSquare }
   ]
@@ -505,7 +504,6 @@ export default function VendorView({ vendorId }: VendorViewProps) {
         {activeTab === 'contact-trade' && <ContactTradeTab vendor={vendor} />}
         {activeTab === 'products' && <ProductsTab vendor={vendor} />}
         {activeTab === 'facilities' && <FacilitiesTab vendor={vendor} />}
-        {activeTab === 'documents' && <DocumentsTab vendor={vendor} />}
         {activeTab === 'bank-details' && <BankDetailsTab vendor={vendor} onVerify={handleVerifyBankDetails} loading={actionLoading === 'verify-bank'} />}
         {activeTab === 'reviews' && <ReviewsTab vendor={vendor} />}
       </div>
@@ -989,26 +987,133 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
 }
 
 function DetailsTab({ vendor }: { vendor: VendorProfile }) {
-  // Resolve a friendly label for `companyIdNumber` based on the business
-  // entity type. The actual regulatory ID is IEC for proprietorships,
-  // CIN for Pvt Ltd, Deed details for partnerships, LLPIN for LLPs.
   const v = vendor as any;
-  const idLabelByType: Record<string, string> = {
-    'proprietorship': 'IEC Code',
-    'pvt-ltd': 'CIN Number',
-    'partnership-firm': 'Partnership Deed',
-    'llp': 'LLPIN Number',
+  const [viewerDoc, setViewerDoc] = useState<{ url: string; name: string } | null>(null);
+  const openViewer = (url: string, name: string) => setViewerDoc({ url, name });
+
+  const docs: any[] = Array.isArray(vendor.documents) ? vendor.documents : [];
+  const findDoc = (type: string) => docs.find((d: any) => d.type === type) ?? null;
+
+  // Factory site images (CompanyDetails → Legal Address & Factory Site section)
+  const factorySiteImgs = docs.filter((d: any) =>
+    typeof d.name === 'string' && d.name.startsWith('Factory Site ') && d.documentUrl
+  );
+  // Warehouse factory images (WarehouseDetails → Warehouse Address section)
+  const factoryImgs = docs.filter((d: any) =>
+    typeof d.name === 'string' && d.name.startsWith('Factory ') &&
+    !d.name.startsWith('Factory Site ') && d.documentUrl
+  );
+
+  const imageGallery = (images: any[], prefixToStrip: string) => {
+    if (!images.length) return null;
+    return (
+      <div className="mt-4 pt-4 border-t border-slate-100">
+        <p className="text-sm font-semibold text-slate-700 mb-3">
+          {prefixToStrip === 'Factory Site ' ? 'Factory Images' : 'Warehouse Images'}
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {images.map((img: any, idx: number) => (
+            <div key={img.id || idx} className="space-y-1.5">
+              <div
+                className="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50 aspect-square cursor-pointer group"
+                onClick={() => openViewer(img.documentUrl, img.name)}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={img.documentUrl}
+                  alt={img.name}
+                  className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/20 transition-opacity">
+                  <Eye className="w-5 h-5 text-white drop-shadow" />
+                </div>
+              </div>
+              <p className="text-xs font-medium text-slate-700 truncate" title={img.name}>
+                {img.name.replace(prefixToStrip, '')}
+              </p>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openViewer(img.documentUrl, img.name)}
+                  className="flex-1 h-6 px-1 text-[10px] font-medium transition-colors hover:bg-slate-100 hover:border-slate-300 hover:text-slate-800"
+                >
+                  <Eye className="w-2.5 h-2.5 mr-0.5" />View
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadDoc(img.documentUrl, img.name)}
+                  className="flex-1 h-6 px-1 text-[10px] font-medium transition-colors hover:bg-slate-100 hover:border-slate-300 hover:text-slate-800"
+                >
+                  <Download className="w-2.5 h-2.5 mr-0.5" />Download
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
-  const companyIdLabel = idLabelByType[v.businessType] || 'Business Registration ID';
-  const panLabel = v.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number';
+
+  const isProp  = v.businessType === 'proprietorship';
+  const isUnreg = v.businessType === 'unregistered';
+  const isMeta  = ['pvt-ltd', 'partnership-firm', 'llp'].includes(v.businessType);
+
+  const idLabelByType: Record<string, string> = {
+    'pvt-ltd':          'CIN Number',
+    'partnership-firm': 'Partnership Deed Details',
+    'llp':              'LLPIN Number',
+  };
+  const certLabelByType: Record<string, string> = {
+    'pvt-ltd':          'CIN Certificate',
+    'partnership-firm': 'Partnership Deed Certificate',
+    'llp':              'LLPIN Certificate',
+  };
+  const panLabel     = isProp ? 'Proprietor PAN Number' : isUnreg ? 'PAN Number' : 'Company PAN Number';
+  const panCardLabel = isProp ? 'Proprietor PAN Card'   : isUnreg ? 'PAN Card'   : 'Company PAN Card';
+
+  const hasAnyRegId = v.gstNumber || v.panNumber || v.iecCode || v.aadhaarNumber
+    || v.companyIdNumber || docs.some((d: any) => COMPANY_DOC_TYPES.includes(d.type));
+
+  const regRow = (label: string, value: string | undefined, docType: string, docLabel: string) => {
+    const doc = findDoc(docType);
+    if (!value && !doc) return null;
+    return (
+      <div className="space-y-2 pb-4 border-b border-slate-100 last:border-0 last:pb-0">
+        <div>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
+          <p className="font-medium text-slate-900 mt-0.5">{value || '—'}</p>
+        </div>
+        {doc && (
+          <DocFileCard doc={doc} docLabel={docLabel} onView={openViewer} />
+        )}
+      </div>
+    );
+  };
+
+  // Track which company doc types the explicit regRow calls cover so a
+  // catch-all can surface any remaining uploaded documents (e.g. a
+  // proprietorship who also uploads a separate IEC_CERTIFICATE).
+  const coveredDocTypes = new Set<string>(['GST_CERTIFICATE', 'PAN_CARD']);
+  if (isUnreg) coveredDocTypes.add('AADHAAR_CARD');
+  // Proprietorship: COMPANY_REGISTRATION is their IEC cert (typeCertDocument)
+  if (isProp) coveredDocTypes.add('COMPANY_REGISTRATION');
+  // Meta types (pvt-ltd/partnership/llp): COMPANY_REGISTRATION is CIN/deed/LLPIN
+  if (isMeta) coveredDocTypes.add('COMPANY_REGISTRATION');
+  // "Others" with a registration number
+  if (!isProp && !isUnreg && !isMeta && v.companyIdNumber) coveredDocTypes.add('COMPANY_REGISTRATION');
+  // Non-proprietorship IEC
+  if (!isProp && (v.hasImportExport === 'yes' || v.iecCode)) coveredDocTypes.add('IEC_CERTIFICATE');
+
+  const uncoveredDocs = docs.filter((d: any) =>
+    COMPANY_DOC_TYPES.includes(d.type) && !coveredDocTypes.has(d.type)
+  );
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Identification & Compliance — legal IDs collected on Step 1
-          (CompanyDetails). Surfaced here so admins can verify against
-          uploaded certificates during approval review. */}
-      {(v.companyIdNumber || v.panNumber || v.iecCode || v.aadhaarNumber || v.hasImportExport) && (
-        <Card>
+      {hasAnyRegId && (
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <FileText className="h-5 w-5" />
@@ -1016,37 +1121,36 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {v.companyIdNumber && (
-                <div>
-                  <p className="text-sm text-slate-500">{companyIdLabel}</p>
-                  <p className="font-medium">{v.companyIdNumber}</p>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+              {regRow('GST Number', v.gstNumber, 'GST_CERTIFICATE', 'GST Certificate')}
+              {isUnreg && regRow('Aadhaar Number', v.aadhaarNumber, 'AADHAAR_CARD', 'Aadhaar Card')}
+              {/* For proprietorship the typeCertDocument IS the IEC cert (stored as COMPANY_REGISTRATION).
+                  Always attempt to show it — regRow returns null if neither value nor doc exists. */}
+              {isProp && regRow('IEC Code', v.iecCode, 'COMPANY_REGISTRATION', 'IEC Certificate')}
+              {!isProp && (v.hasImportExport === 'yes' || v.iecCode) && regRow(
+                'IEC Code',
+                v.iecCode,
+                'IEC_CERTIFICATE',
+                'IEC Certificate',
               )}
-              {v.hasImportExport && (
-                <div>
-                  <p className="text-sm text-slate-500">Import/Export Activities</p>
-                  <p className="font-medium capitalize">{v.hasImportExport === 'yes' ? 'Yes' : v.hasImportExport === 'no' ? 'No' : v.hasImportExport}</p>
-                </div>
+              {isMeta && regRow(
+                idLabelByType[v.businessType] || 'Business Registration ID',
+                v.companyIdNumber,
+                'COMPANY_REGISTRATION',
+                certLabelByType[v.businessType] || 'Company Registration Certificate',
               )}
-              {v.iecCode && (
-                <div>
-                  <p className="text-sm text-slate-500">IEC Code</p>
-                  <p className="font-medium">{v.iecCode}</p>
-                </div>
+              {!isProp && !isUnreg && !isMeta && v.companyIdNumber && regRow(
+                'Others Registration Number',
+                v.companyIdNumber,
+                'COMPANY_REGISTRATION',
+                'Other Supporting Document',
               )}
-              {v.panNumber && (
-                <div>
-                  <p className="text-sm text-slate-500">{panLabel}</p>
-                  <p className="font-medium">{v.panNumber}</p>
+              {regRow(panLabel, v.panNumber, 'PAN_CARD', panCardLabel)}
+              {uncoveredDocs.map((doc: any) => (
+                <div key={doc.id || doc.type} className="space-y-2 pb-4 border-b border-slate-100 last:border-0 last:pb-0">
+                  <DocFileCard doc={doc} onView={openViewer} />
                 </div>
-              )}
-              {v.aadhaarNumber && (
-                <div>
-                  <p className="text-sm text-slate-500">Aadhaar Number</p>
-                  <p className="font-medium">{v.aadhaarNumber}</p>
-                </div>
-              )}
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -1068,7 +1172,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
             <div className="space-y-4">
               {(vendor as any).factoryOwnershipType && (
                 <div>
-                  <p className="text-sm text-slate-500 font-semibold mb-1">Ownership Type</p>
+                  <p className="text-sm text-slate-500 font-semibold mb-1">Factory Ownership</p>
                   <p className="font-medium capitalize">{(vendor as any).factoryOwnershipType}</p>
                 </div>
               )}
@@ -1088,10 +1192,11 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
               </div>
               {(vendor as any).factorySize && (
                 <div>
-                  <p className="text-sm text-slate-500">Factory Site Area</p>
-                  <p className="font-medium">{(vendor as any).factorySize}</p>
+                  <p className="text-sm text-slate-500">Warehousing Capacity</p>
+                  <p className="font-medium">{(vendor as any).factorySize} sq ft</p>
                 </div>
               )}
+              {imageGallery(factorySiteImgs, 'Factory Site ')}
             </div>
           </CardContent>
         </Card>
@@ -1152,7 +1257,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
               {vendor.warehouseSize && (
                 <div className="mt-3">
                   <p className="text-sm text-slate-500">Warehousing Capacity</p>
-                  <p className="font-medium">{vendor.warehouseSize}</p>
+                  <p className="font-medium">{vendor.warehouseSize} sq ft</p>
                 </div>
               )}
               {v.mapLink && (
@@ -1163,10 +1268,15 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
                   </a>
                 </div>
               )}
+              {imageGallery(factoryImgs, 'Factory ')}
             </CardContent>
           </Card>
         )
       })()}
+
+      {viewerDoc && (
+        <DocViewerModal url={viewerDoc.url} name={viewerDoc.name} onClose={() => setViewerDoc(null)} />
+      )}
     </div>
   )
 }
@@ -1176,155 +1286,199 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
   const vendorTypesArray: string[] = Array.isArray(v.vendorTypes) && v.vendorTypes.length > 0
     ? v.vendorTypes
     : [vendor.vendorType.replace(/_/g, ' ').toLowerCase()];
+  const marketTypeArray: string[] = (vendor as any).marketType
+    ? (Array.isArray((vendor as any).marketType) ? (vendor as any).marketType : [(vendor as any).marketType])
+    : [];
+
+  const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({});
+  const [viewerDoc, setViewerDoc] = useState<{ url: string; name: string } | null>(null);
+  const openViewer = (url: string, name: string) => setViewerDoc({ url, name });
+
+  useEffect(() => {
+    categoryService.getCategoryTree({ status: 'ACTIVE', includeInactive: false })
+      .then((res: any) => {
+        const map: Record<string, string> = {};
+        (res.data || []).forEach((cat: any) => { map[cat.id] = cat.name; });
+        setCategoryNameMap(map);
+      })
+      .catch(() => {});
+  }, []);
+
+  const renderProductCard = (p: any, i: number, prefix: string) => {
+    const firstPhoto = Array.isArray(p.photos) && p.photos.length > 0
+      ? (p.photos[0].preview || p.photos[0].url)
+      : null;
+    const productName = p.name || `Product ${i + 1}`;
+    return (
+      <div key={p.id || `${prefix}-${i}`} className="border border-slate-200 rounded-lg overflow-hidden bg-white hover:shadow-md hover:border-slate-300 transition-all flex flex-col">
+        <div className="h-28 bg-slate-50 overflow-hidden shrink-0">
+          {firstPhoto ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={firstPhoto} alt={productName} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Package className="w-6 h-6 text-slate-300" />
+            </div>
+          )}
+        </div>
+        <div className="px-2.5 pt-2 pb-2.5 border-t border-slate-100 flex flex-col gap-1.5 flex-1">
+          <p className="text-xs font-semibold text-slate-800 truncate leading-snug" title={productName}>
+            {productName}
+          </p>
+          {p.description && (
+            <p className="text-[10px] text-slate-500 truncate leading-snug">{p.description}</p>
+          )}
+          {firstPhoto && (
+            <div className="flex gap-1.5 mt-auto pt-0.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openViewer(firstPhoto, productName)}
+                className="flex-1 h-6 px-1.5 text-[10px] font-medium transition-colors hover:bg-slate-100 hover:border-slate-300 hover:text-slate-800"
+              >
+                <Eye className="w-2.5 h-2.5 mr-1 shrink-0" />View
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => downloadDoc(firstPhoto, productName)}
+                className="flex-1 h-6 px-1.5 text-[10px] font-medium transition-colors hover:bg-slate-100 hover:border-slate-300 hover:text-slate-800"
+              >
+                <Download className="w-2.5 h-2.5 mr-1 shrink-0" />Download
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderCategorySection = (catName: string, catKey: string, products: any[], isCustom?: boolean) => (
+    <div key={catKey}>
+      <div className="flex items-center gap-3 mb-3">
+        <p className="text-xs font-bold text-slate-600 uppercase tracking-widest shrink-0">{catName}</p>
+        {isCustom && (
+          <Badge className="bg-orange-50 text-orange-700 border border-orange-200 text-[10px] px-1.5 py-0 shrink-0">Custom</Badge>
+        )}
+        <div className="flex-1 h-px bg-slate-100" />
+        <span className="text-xs text-slate-400 shrink-0">
+          {products.length} product{products.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {products.map((p: any, i: number) => renderProductCard(p, i, catKey))}
+      </div>
+    </div>
+  );
+
+  const hasCategoryProducts = v.categoryProducts && typeof v.categoryProducts === 'object'
+    && Object.keys(v.categoryProducts).length > 0;
+  const hasAdditionalCategories = Array.isArray(v.additionalCategories) && v.additionalCategories.length > 0;
+  const hasCategories = vendor.productCategories && vendor.productCategories.length > 0;
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Vendor Type</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {vendorTypesArray.map((t) => (
-              <Badge key={t} className="bg-blue-100 text-blue-800 capitalize">{t}</Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Market Type */}
-      {(vendor as any).marketType && (
+      {/* Compact meta row: Vendor Type | Market Type | Product Categories */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle>Market Type</CardTitle>
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm font-semibold text-slate-700">Vendor Type</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {(Array.isArray((vendor as any).marketType) ? (vendor as any).marketType : [(vendor as any).marketType]).map((type: string, index: number) => (
-                <Badge key={index} className="bg-orange-100 text-orange-800 capitalize">{type}</Badge>
+          <CardContent className="px-4 pb-4">
+            <div className="flex flex-wrap gap-1.5">
+              {vendorTypesArray.map((t) => (
+                <Badge key={t} className="bg-blue-100 text-blue-800 capitalize text-xs font-medium">{t}</Badge>
               ))}
             </div>
           </CardContent>
         </Card>
-      )}
 
-      {vendor.productCategories && vendor.productCategories.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Categories</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {Array.from(new Set(vendor.productCategories)).map((category, index) => (
-                <Badge key={`${category}-${index}`} className="bg-green-100 text-green-800 capitalize">
-                  {category}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+        {marketTypeArray.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2 pt-4 px-4">
+              <CardTitle className="text-sm font-semibold text-slate-700">Market Type</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              <div className="flex flex-wrap gap-1.5">
+                {marketTypeArray.map((type: string, i: number) => (
+                  <Badge key={i} className="bg-orange-100 text-orange-800 capitalize text-xs font-medium">{type}</Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {hasCategories && (
+          <Card>
+            <CardHeader className="pb-2 pt-4 px-4">
+              <CardTitle className="text-sm font-semibold text-slate-700">Product Categories</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              <div className="flex flex-wrap gap-1.5">
+                {Array.from(new Set(vendor.productCategories)).map((category, i) => (
+                  <Badge key={`${category}-${i}`} className="bg-green-100 text-green-800 capitalize text-xs font-medium">
+                    {category}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* General Remarks */}
       {(vendor as any).categoryRemarks && (
         <Card>
-          <CardHeader>
-            <CardTitle>General Remarks</CardTitle>
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm font-semibold text-slate-700">General Remarks</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-slate-700 whitespace-pre-wrap">{(vendor as any).categoryRemarks}</p>
+          <CardContent className="px-4 pb-4">
+            <p className="text-sm text-slate-700 whitespace-pre-wrap">{(vendor as any).categoryRemarks}</p>
           </CardContent>
         </Card>
       )}
 
-      {/* Per-category Products — vendor-declared items under each selected
-          category, with photos uploaded to Cloudinary. Shape:
-          { [categoryId]: Array<{ id, name, photos: [{ preview, ... }] }> }. */}
-      {v.categoryProducts && typeof v.categoryProducts === 'object' && Object.keys(v.categoryProducts).length > 0 && (
+      {/* Per-category Products */}
+      {hasCategoryProducts && (
         <Card>
           <CardHeader>
             <CardTitle>Products by Category</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-5">
+            <div className="space-y-8">
               {Object.entries(v.categoryProducts).map(([catId, products]) => {
                 const list = Array.isArray(products) ? products : [];
                 if (list.length === 0) return null;
-                return (
-                  <div key={catId}>
-                    <p className="text-sm font-semibold text-slate-700 mb-2">{catId}</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {list.map((p: any, i: number) => (
-                        <div key={p.id || i} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
-                          <p className="font-medium text-slate-900 truncate">{p.name || `Product ${i + 1}`}</p>
-                          {Array.isArray(p.photos) && p.photos.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {p.photos.slice(0, 5).map((photo: any, j: number) => (
-                                <img
-                                  key={j}
-                                  src={photo.preview || photo.url}
-                                  alt={`${p.name || 'Product'} photo ${j + 1}`}
-                                  className="w-12 h-12 object-cover rounded border border-slate-200"
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
+                return renderCategorySection(categoryNameMap[catId] || 'Category', catId, list);
               })}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* User-defined custom categories — vendor created their own category
-          outside the master catalog. Same shape as categoryProducts but the
-          category itself is a free-text name. */}
-      {Array.isArray(v.additionalCategories) && v.additionalCategories.length > 0 && (
+      {/* User-defined custom categories */}
+      {hasAdditionalCategories && (
         <Card>
           <CardHeader>
             <CardTitle>Additional (Custom) Categories</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-5">
-              {v.additionalCategories.map((cat: any) => (
-                <div key={cat.id}>
-                  <div className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                    <span>{cat.name || 'Unnamed Category'}</span>
-                    <Badge className="bg-orange-50 text-orange-700 border border-orange-200">Custom</Badge>
-                  </div>
-                  {Array.isArray(cat.products) && cat.products.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {cat.products.map((p: any, i: number) => (
-                        <div key={p.id || i} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
-                          <p className="font-medium text-slate-900 truncate">{p.name || `Product ${i + 1}`}</p>
-                          {Array.isArray(p.photos) && p.photos.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {p.photos.slice(0, 5).map((photo: any, j: number) => (
-                                <img
-                                  key={j}
-                                  src={photo.preview || photo.url}
-                                  alt={`${p.name || 'Product'} photo ${j + 1}`}
-                                  className="w-12 h-12 object-cover rounded border border-slate-200"
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+            <div className="space-y-8">
+              {v.additionalCategories.map((cat: any) => {
+                const products = Array.isArray(cat.products) ? cat.products : [];
+                if (products.length === 0) return null;
+                return renderCategorySection(cat.name || 'Unnamed Category', cat.id || cat.name, products, true);
+              })}
             </div>
           </CardContent>
         </Card>
       )}
+
+      {viewerDoc && (
+        <DocViewerModal url={viewerDoc.url} name={viewerDoc.name} onClose={() => setViewerDoc(null)} />
+      )}
     </div>
-  )
+  );
 }
 
 function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
@@ -1542,8 +1696,8 @@ function DocFileIcon({ name }: { name?: string }) {
   )
 }
 
-function DocFileCard({ doc }: { doc: any }) {
-  const label    = docTypeLabel(doc.type || '')
+function DocFileCard({ doc, docLabel, onView }: { doc: any; docLabel?: string; onView?: (url: string, name: string) => void }) {
+  const label    = docLabel || docTypeLabel(doc.type || '')
   const fileName = doc.name || 'Document'
   const date     = doc.createdAt || doc.uploadDate
 
@@ -1560,137 +1714,28 @@ function DocFileCard({ doc }: { doc: any }) {
         )}
       </div>
       {doc.documentUrl && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => downloadDoc(doc.documentUrl, fileName)}
-          className="h-7 px-2.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 shrink-0"
-        >
-          <Download className="w-3 h-3 mr-1" />
-          Download
-        </Button>
-      )}
-    </div>
-  )
-}
-
-function DocSection({ title, docs, icon }: { title: string; docs: any[]; icon: ReactNode }) {
-  if (!docs.length) return null
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm font-bold text-slate-900">
-          {icon}
-          {title}
-          <Badge className="ml-auto bg-slate-100 text-slate-500 border-0 font-medium text-xs">{docs.length}</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {docs.map((doc, i) => <DocFileCard key={doc.id || i} doc={doc} />)}
+        <div className="flex gap-1.5 shrink-0">
+          {onView && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onView(doc.documentUrl, fileName)}
+              className="h-7 px-2.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+            >
+              <Eye className="w-3 h-3 mr-1" />
+              View
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => downloadDoc(doc.documentUrl, fileName)}
+            className="h-7 px-2.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 shrink-0"
+          >
+            <Download className="w-3 h-3 mr-1" />
+            Download
+          </Button>
         </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function ImageSection({ images }: { images: any[] }) {
-  if (!images.length) return null
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm font-bold text-slate-900">
-          <Camera className="w-4 h-4 text-brand-500" />
-          Factory &amp; Warehouse Images
-          <Badge className="ml-auto bg-slate-100 text-slate-500 border-0 font-medium text-xs">{images.length}</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {images.map((img, i) => {
-            const name = img.name || 'Factory Image'
-            const date = img.createdAt || img.uploadDate
-            return (
-              <div key={img.id || i} className="space-y-1.5">
-                <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50 aspect-square">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.documentUrl} alt={name} className="w-full h-full object-cover" />
-                </div>
-                <p className="text-xs font-semibold text-slate-700 truncate" title={name}>{name}</p>
-                {date && (
-                  <p className="text-[10px] text-slate-400">
-                    {new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                  </p>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => downloadDoc(img.documentUrl, name)}
-                  className="w-full h-6 px-1.5 text-[10px] font-medium"
-                >
-                  <Download className="w-3 h-3 mr-0.5" />
-                  Download
-                </Button>
-              </div>
-            )
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function DocumentsTab({ vendor }: { vendor: VendorProfile }) {
-  const docs: any[] = Array.isArray(vendor.documents) ? vendor.documents : []
-
-  const companyDocs    = docs.filter(d => COMPANY_DOC_TYPES.includes(d.type))
-  const complianceDocs = docs.filter(d => COMPLIANCE_DOC_TYPES.includes(d.type))
-  const bankDocs       = docs.filter(d => BANK_DOC_TYPES.includes(d.type))
-  const otherDocs      = docs.filter(d => d.type === 'OTHER')
-  const factoryImages  = otherDocs.filter(d => isDocImageUrl(d.documentUrl, d.name))
-  const factoryFiles   = otherDocs.filter(d => !isDocImageUrl(d.documentUrl, d.name))
-  const unknownDocs    = docs.filter(d => !ALL_KNOWN_TYPES.has(d.type))
-
-  if (!docs.length) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <FileText className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-          <p className="text-slate-500 font-medium">No documents uploaded yet.</p>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  return (
-    <div className="space-y-5">
-      <DocSection
-        title="Company Documents"
-        docs={companyDocs}
-        icon={<Building2 className="w-4 h-4 text-brand-500" />}
-      />
-      <ImageSection images={factoryImages} />
-      <DocSection
-        title="Factory & Warehouse Files"
-        docs={factoryFiles}
-        icon={<Factory className="w-4 h-4 text-amber-500" />}
-      />
-      <DocSection
-        title="Compliance Certificates"
-        docs={complianceDocs}
-        icon={<Award className="w-4 h-4 text-purple-500" />}
-      />
-      <DocSection
-        title="Bank & Financial Documents"
-        docs={bankDocs}
-        icon={<CreditCard className="w-4 h-4 text-emerald-600" />}
-      />
-      {unknownDocs.length > 0 && (
-        <DocSection
-          title="Other Documents"
-          docs={unknownDocs}
-          icon={<FileText className="w-4 h-4 text-slate-400" />}
-        />
       )}
     </div>
   )

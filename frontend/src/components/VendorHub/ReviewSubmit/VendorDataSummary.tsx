@@ -406,7 +406,7 @@ export default function VendorDataSummary({
     const categories = data.selectedCategories || {};
     const result: string[] = [];
     Object.entries(categories).forEach(([categoryId, value]) => {
-      const categoryName = categoryNameMap[categoryId] || categoryId;
+      const categoryName = categoryNameMap[categoryId] || 'Category';
       if (Array.isArray(value)) {
         if (value.length > 0) result.push(`${categoryName}: ${value.join(', ')}`);
       } else if (value) {
@@ -437,23 +437,26 @@ export default function VendorDataSummary({
             <InfoRow label="Aadhaar Card" value={<DocValue src={data.aadhaarFile || data.aadhaarDocument} alt="Aadhaar card" />} />
           )}
           {/* Type-specific regulatory ID (CIN / Deed / LLPIN / IEC Code for
-              proprietorship) paired with its certificate. */}
-          {data.companyIdNumber && (
+              proprietorship) paired with its certificate.
+              For proprietorship, their IEC Code is stored in `iecCode` (not
+              companyIdNumber which is a non-prop-only field), so fall back. */}
+          {(data.companyIdNumber || (data.businessType === 'proprietorship' && data.iecCode)) && (
             <InfoRow
               label={getCompanyIdLabel(data.businessType)}
-              value={data.companyIdNumber}
+              value={data.companyIdNumber || data.iecCode}
             />
           )}
           {(data.typeCertFile || data.typeCertDocument) && (
             <InfoRow label={getTypeCertLabel(data.businessType)} value={<DocValue src={data.typeCertFile || data.typeCertDocument} alt={getTypeCertLabel(data.businessType)} />} />
           )}
-          {/* Import/Export IEC Code & Certificate — mandatory for all business
-              types when hasImportExport = yes. For proprietorship their
-              companyIdNumber already is the IEC Code, so skip the duplicate. */}
-          {data.hasImportExport === 'yes' && data.businessType !== 'proprietorship' && data.iecCode && (
+          {/* Import/Export IEC Code & Certificate — for non-proprietorship
+              vendors. Proprietorship uses companyIdNumber + typeCertDocument
+              above. Show whenever data is present (hasImportExport may not be
+              persisted on legacy rows, but the cert/code still exist). */}
+          {data.businessType !== 'proprietorship' && data.iecCode && (
             <InfoRow label="IEC Code" value={data.iecCode} />
           )}
-          {data.hasImportExport === 'yes' && data.businessType !== 'proprietorship' && (data.iecCertFile || data.iecCertDocument) && (
+          {data.businessType !== 'proprietorship' && (data.iecCertFile || data.iecCertDocument) && (
             <InfoRow label="IEC Certificate" value={<DocValue src={data.iecCertFile || data.iecCertDocument} alt="IEC Certificate" />} />
           )}
           {data.panNumber && <InfoRow label={data.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number'} value={data.panNumber} />}
@@ -693,7 +696,7 @@ export default function VendorDataSummary({
             const groups: { name: string; products: any[] }[] = [];
             Object.entries(categoryProducts).forEach(([catId, products]) => {
               if (Array.isArray(products) && products.length > 0) {
-                groups.push({ name: categoryNameMap[catId] || catId, products });
+                groups.push({ name: categoryNameMap[catId] || 'Category', products });
               }
             });
             additionalCategories.forEach((cat) => {

@@ -1651,7 +1651,10 @@ export default function CompanyDetails({
         formData.businessType,
         formData.companyName,
         formData.gstNumber,
-        ...(typeMeta ? [formData.companyIdNumber, formData.panNumber] : []),
+        ...(typeMeta ? [
+          ...(typeMeta.optionalId ? [] : [formData.companyIdNumber]),
+          formData.panNumber,
+        ] : []),
       ];
       const optional = [formData.website];
       const filled = required.filter(Boolean).length;

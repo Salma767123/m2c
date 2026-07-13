@@ -129,6 +129,12 @@ interface VendorFormData {
   ownerPhone: string;
   ownerPhone2: string;
   ownerLandline: string;
+  ownerLocalLandlineStd?: string;
+  ownerLocalLandlineNumber?: string;
+  ownerIntlLandline?: string;
+  ownerIntlLandlineCountryCode?: string;
+  ownerIntlLandlineStd?: string;
+  ownerIntlLandlineNumber?: string;
   /** Full ISO date — preferred over legacy yearEstablished. */
   businessStartDate: string;
   yearEstablished: string;
@@ -289,6 +295,12 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     ownerPhone: "",
     ownerPhone2: "",
     ownerLandline: "",
+    ownerLocalLandlineStd: "",
+    ownerLocalLandlineNumber: "",
+    ownerIntlLandline: "",
+    ownerIntlLandlineCountryCode: "",
+    ownerIntlLandlineStd: "",
+    ownerIntlLandlineNumber: "",
     businessStartDate: "",
     yearEstablished: "",
     employeeCount: "",
@@ -710,6 +722,12 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         ownerPhone: vendor.ownerPhone || "",
         ownerPhone2: vendor.ownerPhone2 || "",
         ownerLandline: vendor.ownerLandline || "",
+        ownerLocalLandlineStd: (vendor as any).ownerLocalLandlineStd || "",
+        ownerLocalLandlineNumber: (vendor as any).ownerLocalLandlineNumber || "",
+        ownerIntlLandline: (vendor as any).ownerIntlLandline || "",
+        ownerIntlLandlineCountryCode: (vendor as any).ownerIntlLandlineCountryCode || "",
+        ownerIntlLandlineStd: (vendor as any).ownerIntlLandlineStd || "",
+        ownerIntlLandlineNumber: (vendor as any).ownerIntlLandlineNumber || "",
         businessStartDate: vendor.businessStartDate
           ? new Date(vendor.businessStartDate).toISOString().split("T")[0]
           : "",
