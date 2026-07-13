@@ -2965,7 +2965,7 @@ export default function CompanyDetails({
                             <input
                               type="file"
                               accept={SITE_IMAGE_ALLOWED_TYPES.join(',')}
-                              className="sr-only"
+                              className="hidden"
                               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFactorySlotUpload(slot.id as FactoryImageSlotId, f); e.target.value = ''; }}
                             />
                           </label>
@@ -2995,7 +2995,7 @@ export default function CompanyDetails({
                         <input
                           type="file"
                           accept={SITE_IMAGE_ALLOWED_TYPES.join(',')}
-                          className="sr-only"
+                          className="hidden"
                           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFactorySlotUpload(slot.id as FactoryImageSlotId, f); e.target.value = ''; }}
                         />
                       </label>

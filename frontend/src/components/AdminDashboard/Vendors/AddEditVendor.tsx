@@ -21,6 +21,8 @@ import {
   Truck,
   CheckCircle,
   AlertTriangle,
+  ChevronDown,
+  ShieldCheck,
 } from "lucide-react";
 
 // Import VendorHub components
@@ -454,6 +456,23 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
           }
         });
       }
+
+      // A category the vendor has products under is, by definition, selected —
+      // even if the legacy `productCategories` list wasn't persisted (older
+      // records save `categoryProducts` but not the id list). Seed those keys
+      // so the review summary's "Product Categories" matches the products shown
+      // below it instead of reading "None selected".
+      const loadedCategoryProducts =
+        (vendor.categoryProducts as { [key: string]: unknown[] }) || {};
+      Object.entries(loadedCategoryProducts).forEach(([catId, products]) => {
+        if (
+          Array.isArray(products) &&
+          products.length > 0 &&
+          !(catId in mappedSelectedCategories)
+        ) {
+          mappedSelectedCategories[catId] = [];
+        }
+      });
 
       // Parse mainContact from backend (stored as JSON)
       const mainContactData = vendor.mainContact || {};
@@ -1399,52 +1418,61 @@ function AdminReviewSubmitStep({
   return (
     <div className="space-y-6">
       {/* Admin Controls */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-blue-900 mb-4">
-          Admin Controls
-        </h3>
+      <div className="bg-slate-50/60 border border-slate-200 rounded-xl p-6">
+        <div className="flex items-center gap-2.5 mb-5">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-brand-50 border border-brand-100 shrink-0">
+            <ShieldCheck className="w-4 h-4 text-brand-500" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900">Admin Controls</h3>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
               Status
             </label>
-            <select
-              value={initialStatus}
-              onChange={(e) => setInitialStatus(e.target.value as any)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="pending">Pending</option>
-              <option value="active">Active</option>
-              <option value="suspended">Suspended</option>
-            </select>
+            <div className="relative">
+              <select
+                value={initialStatus}
+                onChange={(e) => setInitialStatus(e.target.value as any)}
+                className="w-full appearance-none px-3.5 py-2.5 pr-10 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white cursor-pointer focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 transition-colors"
+              >
+                <option value="pending">Pending</option>
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
               Approval Status
             </label>
-            <select
-              value={initialApprovalStatus}
-              onChange={(e) => setInitialApprovalStatus(e.target.value as any)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="pending">Pending Review</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
+            <div className="relative">
+              <select
+                value={initialApprovalStatus}
+                onChange={(e) => setInitialApprovalStatus(e.target.value as any)}
+                className="w-full appearance-none px-3.5 py-2.5 pr-10 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white cursor-pointer focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 transition-colors"
+              >
+                <option value="pending">Pending Review</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            </div>
           </div>
         </div>
 
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="mt-5">
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">
             Admin Notes
           </label>
           <textarea
             value={adminNotes}
             onChange={(e) => setAdminNotes(e.target.value)}
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 bg-white resize-y focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 transition-colors"
             placeholder="Add any notes about this vendor..."
           />
         </div>

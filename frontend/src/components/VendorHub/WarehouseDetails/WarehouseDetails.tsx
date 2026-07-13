@@ -990,7 +990,7 @@ export default function WarehouseDetails({
                         id={inputId}
                         type="file"
                         accept={FACTORY_IMAGE_ALLOWED_TYPES.join(',')}
-                        className="sr-only"
+                        className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) handleSlotUpload(slot.id, file);
