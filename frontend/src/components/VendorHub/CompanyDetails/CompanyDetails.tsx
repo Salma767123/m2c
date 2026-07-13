@@ -3051,7 +3051,7 @@ export default function CompanyDetails({
       />
 
       {/* ── Footer Navigation ─────────────────────────────────────────── */}
-      <div className="flex items-center justify-between pt-4 gap-3">
+      <div className="flex items-center justify-between py-4 gap-3">
         <p className="text-xs text-slate-400 hidden sm:block">
           All sections must be completed before proceeding.
         </p>

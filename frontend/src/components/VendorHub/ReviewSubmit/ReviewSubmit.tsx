@@ -553,7 +553,7 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
           </div>
         </div>  
 
-        <div className="flex items-center justify-between pt-6 gap-3">
+        <div className="flex items-center justify-between py-6 gap-3">
           <Button
             onClick={onPrev}
             className="inline-flex items-center gap-2 h-11 px-5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
