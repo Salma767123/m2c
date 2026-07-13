@@ -490,6 +490,11 @@ const completeInspection = async (req, res) => {
             switch (formStatus) {
                 case 'Approved': return 'PASSED';
                 case 'Rejected': return 'FAILED';
+                // "On Hold" and "Re-inspection Required" are non-approvals — the
+                // result enum only has PASSED/FAILED, so they map to FAILED while
+                // the exact choice stays in the stored form data for the admin.
+                case 'On Hold': return 'FAILED';
+                case 'Re-inspection Required': return 'FAILED';
                 default: return 'PASSED';
             }
         };

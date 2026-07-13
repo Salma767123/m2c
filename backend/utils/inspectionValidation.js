@@ -8,6 +8,12 @@ const PHONE_RE = /^\+?[\d][\d\s\-()]{6,14}\d$/;
 const isBlank = (v) =>
     v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
 
+// Overall result options the checker can pick on the Final Review step. Mirrors
+// the frontend RESULT_OPTIONS (VI_Step8_FinalReview) exactly. Any non-approval
+// maps to a FAILED result server-side (see mapStatusToResult in
+// inspectionController) while the exact choice is preserved in the stored form.
+const VALID_INSPECTION_STATUSES = ['Approved', 'Rejected', 'On Hold', 'Re-inspection Required'];
+
 const isPositiveIntegerString = (v) => {
     if (typeof v !== 'string' && typeof v !== 'number') return false;
     const s = String(v).replace(/[\s,]/g, '');
@@ -66,7 +72,7 @@ function validateVerificationPayload(d) {
         errors.inspectionDate = 'Inspection date cannot be in the future';
     }
 
-    if (d.inspectionStatus !== 'Approved' && d.inspectionStatus !== 'Rejected') {
+    if (!VALID_INSPECTION_STATUSES.includes(d.inspectionStatus)) {
         errors.inspectionStatus = 'Invalid inspection status';
     }
     if (d.inspectionStatus === 'Rejected' && isBlank(d.inspectorRemarks)) {
@@ -158,7 +164,7 @@ function validateInspectionPayload(d = {}) {
     } else if (isFutureDate(d.inspectionDate)) {
         errors.inspectionDate = 'Inspection date cannot be in the future';
     }
-    if (d.inspectionStatus !== 'Approved' && d.inspectionStatus !== 'Rejected') {
+    if (!VALID_INSPECTION_STATUSES.includes(d.inspectionStatus)) {
         errors.inspectionStatus = 'Invalid inspection status';
     }
     if (d.inspectionStatus === 'Rejected' && isBlank(d.inspectorRemarks)) {

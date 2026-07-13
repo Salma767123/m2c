@@ -668,7 +668,12 @@ const getQcFactoryReports = async (req, res) => {
         const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
         const skip = (page - 1) * limit;
 
-        const where = { status: { in: ['COMPLETED', 'SUBMITTED', 'UNDER_ADMIN_REVIEW', 'REJECTED'] } };
+        // Only inspections the admin has FINALISED belong in QC Reports. Both
+        // admin decisions land on COMPLETED (approve → result PASSED, final
+        // reject → result FAILED). SUBMITTED / UNDER_ADMIN_REVIEW / REJECTED are
+        // still in the Re-Inspection Review queue (pending admin action) and must
+        // not surface here until the admin acts.
+        const where = { status: 'COMPLETED' };
         if (result === 'PASSED' || result === 'FAILED') where.result = result;
         if (search) {
             where.OR = [
