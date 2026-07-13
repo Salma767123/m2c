@@ -2901,14 +2901,14 @@ export default function CompanyDetails({
             <div className="flex items-stretch border border-slate-300 hover:border-slate-400 rounded-lg overflow-hidden transition-colors focus-within:ring-2 focus-within:ring-brand-500/40 focus-within:border-brand-500">
               <input
                 id="factorySiteCapacity"
-                type="number"
+                type="text"
+                inputMode="numeric"
                 name="factorySiteCapacity"
                 value={formData.factorySiteCapacity || ''}
                 onChange={(e) => handleInputChange('factorySiteCapacity', e.target.value)}
                 onBlur={() => handleBlur('factorySiteCapacity')}
-                className="flex-1 min-w-0 text-sm font-medium pl-4 pr-2 py-2.5 border-0 outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="flex-1 min-w-0 text-sm font-medium pl-4 pr-2 py-2.5 border-0 outline-none bg-transparent"
                 placeholder="e.g. 50000"
-                min="0"
               />
               <span className="flex items-center px-3 text-sm font-semibold text-slate-500 bg-slate-50 border-l border-slate-200 select-none whitespace-nowrap">sq ft</span>
             </div>

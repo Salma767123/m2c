@@ -562,7 +562,8 @@ export default function WarehouseDetails({
                 <div className={`flex items-stretch border rounded-lg overflow-hidden transition-colors ${isLinked ? 'border-slate-200 bg-slate-50 cursor-not-allowed' : 'border-slate-300 hover:border-slate-400 focus-within:ring-2 focus-within:ring-brand-500/40 focus-within:border-brand-500'}`}>
                   <input
                     id="warehousingCapacity"
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     name="warehousingCapacity"
                     value={formData.warehousingCapacity || ''}
                     onChange={(e) => handleInputChange('warehousingCapacity', e.target.value)}
@@ -570,9 +571,8 @@ export default function WarehouseDetails({
                     disabled={isLinked}
                     readOnly={isLinked}
                     aria-readonly={isLinked}
-                    className={`flex-1 min-w-0 text-sm font-medium pl-4 pr-2 py-2.5 border-0 outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isLinked ? 'text-slate-500 cursor-not-allowed' : ''}`}
+                    className={`flex-1 min-w-0 text-sm font-medium pl-4 pr-2 py-2.5 border-0 outline-none bg-transparent ${isLinked ? 'text-slate-500 cursor-not-allowed' : ''}`}
                     placeholder="e.g. 50000"
-                    min="0"
                   />
                   <span className="flex items-center px-3 text-sm font-semibold text-slate-500 bg-slate-50 border-l border-slate-200 select-none whitespace-nowrap">
                     sq ft
