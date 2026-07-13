@@ -1438,7 +1438,7 @@ function AdminReviewSubmitStep({
       <VendorDataSummary data={formData} onGoToStep={onGoToStep} />
 
       {/* Admin Submit Button */}
-      <div className="flex justify-between pt-4">
+      <div className="flex items-center justify-between py-4 gap-3">
         <Button
           variant="outline"
           onClick={() => onGoToStep(6)}
