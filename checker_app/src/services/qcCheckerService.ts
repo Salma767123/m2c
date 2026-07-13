@@ -307,6 +307,19 @@ class QCCheckerService {
       throw new Error(error.message || 'Failed to reject vendor');
     }
   }
+
+  // Send a verification test email to a vendor contact address — lets the
+  // checker confirm the address is reachable during vendor inspection.
+  // Same endpoint/shape as web (POST /qc-checkers/send-test-email). The axios
+  // interceptor attaches the checker bearer token automatically.
+  async sendTestEmail(email: string, vendorName?: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await axios.post('/qc-checkers/send-test-email', { email, vendorName });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to send test email');
+    }
+  }
   // ============================
   // QC Checker: Products Operations
   // ============================

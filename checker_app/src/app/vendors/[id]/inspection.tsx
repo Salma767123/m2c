@@ -35,6 +35,7 @@ import VI_Step5_Manufacturing from '../../../components/Vendor/Steps/VI_Step5_Ma
 import VI_Step6_Certifications from '../../../components/Vendor/Steps/VI_Step6_Certifications';
 import VI_Step7_ContactTrade from '../../../components/Vendor/Steps/VI_Step7_ContactTrade';
 import VI_Step8_FinalReview, { InspectorMeta } from '../../../components/Vendor/Steps/VI_Step8_FinalReview';
+import VI_Step9_Documentation, { VendorDocData } from '../../../components/Vendor/Steps/VI_Step9_Documentation';
 import { validateStep, validateForSubmit } from '../../../components/Vendor/validation';
 import { formatCheckerName } from '../../../components/Vendor/Steps/fieldHelpers';
 
@@ -47,6 +48,7 @@ const STEPS = [
   { id: 6, label: 'Certifications' },
   { id: 7, label: 'Contact' },
   { id: 8, label: 'Final Review' },
+  { id: 9, label: 'Documentation' },
 ];
 
 const draftKey = (inspectionId: string) => `vendorInspectionDraft:${inspectionId}`;
@@ -80,6 +82,11 @@ export default function VendorInspectionScreen() {
     routeMap: null,
   });
   const [evidenceError, setEvidenceError] = useState(false);
+  const [docData, setDocData] = useState<VendorDocData>({
+    signedDocuments: [],
+    signedReport: [],
+    clientSignature: '',
+  });
 
   // Registered verification keys for the currently mounted step
   const registeredFieldsRef = useRef<string[]>([]);
@@ -178,6 +185,7 @@ export default function VendorInspectionScreen() {
               if (draft.verifications) setVerifications(draft.verifications);
               if (draft.meta) setMeta((prev) => ({ ...prev, ...draft.meta, inspectorName: prev.inspectorName || draft.meta.inspectorName }));
               if (draft.factoryEvidence) setFactoryEvidence(draft.factoryEvidence);
+              if (draft.docData) setDocData(draft.docData);
               if (typeof draft.step === 'number') setStep(draft.step);
             }
           } catch {
@@ -207,11 +215,11 @@ export default function VendorInspectionScreen() {
     const t = setTimeout(() => {
       AsyncStorage.setItem(
         draftKey(inspectionId),
-        JSON.stringify({ verifications, meta, factoryEvidence, step }),
+        JSON.stringify({ verifications, meta, factoryEvidence, docData, step }),
       ).catch(() => {});
     }, 400);
     return () => clearTimeout(t);
-  }, [inspectionId, verifications, meta, factoryEvidence, step, loading]);
+  }, [inspectionId, verifications, meta, factoryEvidence, docData, step, loading]);
 
   // ── Exit guard — navigation-away (beforeRemove) + Android hardware back ──
   useEffect(() => {
@@ -300,6 +308,18 @@ export default function VendorInspectionScreen() {
       return;
     }
 
+    // Sign-off gate — mirror web VendorInspectionForm: block submit until a
+    // signed document is uploaded OR a digitally-signed report is generated.
+    const hasSignOff = docData.signedDocuments.length > 0 || docData.signedReport.length > 0;
+    if (!hasSignOff) {
+      setStep(9);
+      Alert.alert(
+        'Sign-off Required',
+        'Please upload a manually signed document or generate a digitally signed report before submitting the inspection.',
+      );
+      return;
+    }
+
     // Require after-selfie + GPS before finalising.
     const resolvedAfterSelfie = afterSelfieOverride ?? afterSelfie;
     if (!resolvedAfterSelfie) {
@@ -319,7 +339,10 @@ export default function VendorInspectionScreen() {
         inspectionStatus: meta.overallResult,
         inspectorRemarks: meta.inspectorRemarks,
         cycleNumber,
-        clientSignature: null,
+        // Step 9 Documentation sign-off — payload keys match web exactly.
+        signedDocuments: docData.signedDocuments,
+        signedReport: docData.signedReport,
+        clientSignature: docData.clientSignature || null,
         // App-only additive keys (selfie evidence + factory evidence photos)
         factoryEvidence,
         beforeSelfieTakenAt: beforeSelfie?.takenAt,
@@ -413,6 +436,21 @@ export default function VendorInspectionScreen() {
               setMeta((prev) => ({ ...prev, ...patch }));
             }}
             onGoToStep={handleGoToStep}
+          />
+        );
+      case 9:
+        return (
+          <VI_Step9_Documentation
+            vendor={vendor ?? {}}
+            verifications={verifications}
+            meta={meta}
+            docData={docData}
+            checkerName={meta.inspectorName}
+            onDocDataChange={(patch) => {
+              dirtyRef.current = true;
+              setDocData((prev) => ({ ...prev, ...patch }));
+            }}
+            factoryEvidence={factoryEvidence}
           />
         );
       default:
@@ -593,10 +631,10 @@ export default function VendorInspectionScreen() {
         {step === STEPS.length ? (
           <TouchableOpacity
             onPress={() => handleSubmit()}
-            disabled={submitting}
+            disabled={submitting || !(docData.signedDocuments.length > 0 || docData.signedReport.length > 0)}
             activeOpacity={0.85}
             className="flex-1 flex-row items-center justify-center py-3 rounded-xl bg-emerald-600"
-            style={{ opacity: submitting ? 0.6 : 1 }}
+            style={{ opacity: submitting || !(docData.signedDocuments.length > 0 || docData.signedReport.length > 0) ? 0.6 : 1 }}
           >
             <Check size={16} color="#ffffff" strokeWidth={2.5} />
             <Text className="ml-2 font-bold text-sm text-white">{submitting ? 'Submitting…' : 'Submit Inspection Report'}</Text>

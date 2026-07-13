@@ -4,16 +4,82 @@
 // open-in-browser).
 
 import React, { createContext, useContext, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image, Modal, Linking } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Image, Modal, Linking, ActivityIndicator } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { FileText, Eye, X, ExternalLink, Check } from 'lucide-react-native';
+import { FileText, Eye, X, ExternalLink, Check, Mail, Send } from 'lucide-react-native';
 import { isImageUrl, docFilename, getProxyUrl } from './fieldHelpers';
+import qcCheckerService from '@/services/qcCheckerService';
+
+// Labels that identify a field as an email address (mirrors web EMAIL_LABEL_RE).
+const EMAIL_LABEL_RE = /e-?mail/i;
+const EMAIL_VALUE_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Email value with a mailto: link plus a "Test" button that sends a real test
+// email through the backend so the checker can confirm the address is
+// reachable before marking it verified. Mirrors web VI_VerifyField EmailValue.
+function EmailValue({ value }: { value: string }) {
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+
+  const sendTest = async () => {
+    if (status === 'sending') return;
+    setStatus('sending');
+    try {
+      await qcCheckerService.sendTestEmail(value);
+      setStatus('sent');
+    } catch {
+      setStatus('failed');
+    }
+  };
+
+  const btnCls =
+    status === 'sent'
+      ? 'border-emerald-200 bg-emerald-50'
+      : status === 'failed'
+        ? 'border-red-200 bg-red-50'
+        : 'border-blue-200 bg-blue-50';
+  const btnTextCls =
+    status === 'sent' ? 'text-emerald-700' : status === 'failed' ? 'text-red-700' : 'text-blue-700';
+  const iconColor = status === 'sent' ? '#047857' : status === 'failed' ? '#b91c1c' : '#1d4ed8';
+
+  return (
+    <View className="flex-row items-center flex-wrap" style={{ columnGap: 8, rowGap: 6 }}>
+      <TouchableOpacity
+        onPress={() => Linking.openURL(`mailto:${value}`).catch(() => {})}
+        className="flex-row items-center"
+        style={{ columnGap: 6 }}
+      >
+        <Mail size={14} color="#2563eb" />
+        <Text className="text-sm font-medium text-blue-600">{value}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={sendTest}
+        disabled={status === 'sending'}
+        className={`flex-row items-center px-2.5 py-1 rounded-lg border ${btnCls}`}
+        style={{ columnGap: 4, opacity: status === 'sending' ? 0.6 : 1 }}
+      >
+        {status === 'sending' ? (
+          <ActivityIndicator size="small" color="#1d4ed8" />
+        ) : status === 'sent' ? (
+          <Check size={12} color={iconColor} strokeWidth={3} />
+        ) : (
+          <Send size={12} color={iconColor} />
+        )}
+        <Text className={`text-xs font-semibold ${btnTextCls}`}>
+          {status === 'sending' ? 'Sending…' : status === 'sent' ? 'Test Sent' : status === 'failed' ? 'Retry Test' : 'Test'}
+        </Text>
+      </TouchableOpacity>
+      {status === 'failed' && (
+        <Text className="text-xs text-red-600 w-full">Failed to send — check SMTP config.</Text>
+      )}
+    </View>
+  );
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export type FieldVerification = { ok: boolean | null; remarks: string };
 export type Verifications = Record<string, FieldVerification>;
 
-export type ValueType = 'text' | 'image' | 'document' | 'list' | 'date' | 'url' | 'badge';
+export type ValueType = 'text' | 'image' | 'document' | 'list' | 'date' | 'url' | 'badge' | 'phone' | 'email';
 
 // ── Highlight context (set by the form on validation failure) ───────────────
 const HighlightedFieldsCtx = createContext<Set<string>>(new Set());
@@ -64,14 +130,24 @@ export async function openDocument(url: string) {
 export function RenderValue({
   value,
   type,
+  label,
   onImagePress,
 }: {
   value: any;
   type?: ValueType;
+  label?: string;
   onImagePress?: (url: string) => void;
 }) {
   if (value === null || value === undefined || value === '') {
     return <Text className="text-slate-400 italic text-sm">Not provided</Text>;
+  }
+
+  // Email — explicit type or auto-detected from the field label (mirrors web).
+  if (typeof value === 'string') {
+    const isEmail =
+      type === 'email' ||
+      (!type && !!label && EMAIL_LABEL_RE.test(label) && EMAIL_VALUE_RE.test(value.trim()));
+    if (isEmail) return <EmailValue value={value.trim()} />;
   }
 
   if (type === 'image' || (type !== 'document' && typeof value === 'string' && isImageUrl(value))) {
@@ -191,7 +267,7 @@ export default function VerifyField({
           {isEmpty ? (
             <Text className="text-slate-400 italic text-sm">Not provided</Text>
           ) : (
-            <RenderValue value={value} type={type} onImagePress={(u) => setLightbox(u)} />
+            <RenderValue value={value} type={type} label={label} onImagePress={(u) => setLightbox(u)} />
           )}
         </View>
       </View>
