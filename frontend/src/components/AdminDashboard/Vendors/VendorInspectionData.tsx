@@ -37,21 +37,32 @@ function humanize(key: string): string {
 }
 
 // ── Small presentational helpers ──────────────────────────────────────────────
-function Row({ label, value, mono, link }: { label: string; value: any; mono?: boolean; link?: boolean }) {
+// Compact label-over-value cell. Unlike Row (justify-between, which strands the
+// value against the far edge with a dead gap), this stacks a small caption over
+// the value so many fit neatly across a responsive grid. `wide` spans 2 grid
+// columns (for addresses / longer values); `full` spans the whole row.
+function Field({ label, value, mono, link, wide, full }: { label: string; value: any; mono?: boolean; link?: boolean; wide?: boolean; full?: boolean }) {
   if (blank(value)) return null;
   const href = link ? toExternalUrl(String(value)) : null;
+  const span = full ? "col-span-full" : wide ? "col-span-2" : "";
   return (
-    <div className="flex justify-between gap-4 py-1.5 border-b border-slate-100 last:border-0">
-      <span className="text-sm text-slate-500 shrink-0">{label}</span>
+    <div className={`min-w-0 ${span}`}>
+      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{label}</p>
       {href ? (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline text-right break-all">
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-brand-600 hover:text-brand-700 hover:underline break-all">
           {String(value)}
         </a>
       ) : (
-        <span className={`text-sm font-medium text-slate-900 text-right break-words ${mono ? "font-mono" : ""}`}>{String(value)}</span>
+        <p className={`text-sm font-semibold text-slate-900 break-words ${mono ? "font-mono" : ""}`}>{String(value)}</p>
       )}
     </div>
   );
+}
+
+// Responsive grid for Field cells. Default packs 2 → 3 → 4 across breakpoints so
+// wide sections stay dense with even spacing instead of one field per line.
+function FieldGrid({ children, cols }: { children: React.ReactNode; cols?: string }) {
+  return <div className={`grid ${cols || "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"} gap-x-6 gap-y-4`}>{children}</div>;
 }
 
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
@@ -111,15 +122,15 @@ function contactBlock(c: any) {
   return (
     <div className="space-y-3">
       {c.photo && <img src={c.photo} alt={name} className="w-20 h-20 rounded-full object-cover border border-slate-200" />}
-      <div>
-        <Row label="Name" value={name} />
-        <Row label="Designation" value={c.designation === "Others" ? c.customDesignation : titleCase(c.designation)} />
-        <Row label="Department" value={c.department === "Others" ? c.customDepartment : c.department} />
-        <Row label="Primary Email" value={c.email1 || c.email} />
-        <Row label="Secondary Email" value={c.email2} />
-        <Row label="Primary Phone" value={c.phone1 || c.phone} />
-        <Row label="Secondary Phone" value={c.phone2} />
-      </div>
+      <FieldGrid cols="grid-cols-2">
+        <Field label="Name" value={name} />
+        <Field label="Designation" value={c.designation === "Others" ? c.customDesignation : titleCase(c.designation)} />
+        <Field label="Department" value={c.department === "Others" ? c.customDepartment : c.department} />
+        <Field label="Primary Email" value={c.email1 || c.email} />
+        <Field label="Secondary Email" value={c.email2} />
+        <Field label="Primary Phone" value={c.phone1 || c.phone} />
+        <Field label="Secondary Phone" value={c.phone2} />
+      </FieldGrid>
     </div>
   );
 }
@@ -175,25 +186,27 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
     <div className="space-y-6">
       {/* Company Info */}
       <Section title="Company Information" icon={<Building2 className="h-5 w-5" />}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <Row label="Company Name" value={v.companyName} />
-            <Row label="Business Type" value={titleCase(v.businessType)} />
-            <Row label="GST Number" value={v.gstNumber || (v.businessType === "unregistered" ? "Unregistered" : undefined)} mono />
-            <Row label="PAN Number" value={v.panNumber} mono />
-            <Row label="IEC Code" value={v.iecCode} mono />
-            <Row label="Company ID / CIN" value={v.companyIdNumber} mono />
-            <Row label="Aadhaar Number" value={v.aadhaarNumber} mono />
-            <Row label="Website" value={v.website} link />
-            <Row label="Established Year" value={v.establishedYear} />
-            <Row label="Employee Count" value={v.employeeCount} />
-            <Row label="Annual Turnover" value={v.annualTurnover} />
-            <Row label="Description" value={v.companyDescription} />
+        <div className="flex flex-col-reverse lg:flex-row gap-6">
+          <div className="flex-1 min-w-0">
+            <FieldGrid>
+              <Field label="Company Name" value={v.companyName} />
+              <Field label="Business Type" value={titleCase(v.businessType)} />
+              <Field label="GST Number" value={v.gstNumber || (v.businessType === "unregistered" ? "Unregistered" : undefined)} mono />
+              <Field label="PAN Number" value={v.panNumber} mono />
+              <Field label="IEC Code" value={v.iecCode} mono />
+              <Field label="Company ID / CIN" value={v.companyIdNumber} mono />
+              <Field label="Aadhaar Number" value={v.aadhaarNumber} mono />
+              <Field label="Website" value={v.website} link />
+              <Field label="Established Year" value={v.establishedYear} />
+              <Field label="Employee Count" value={v.employeeCount} />
+              <Field label="Annual Turnover" value={v.annualTurnover} />
+              <Field label="Description" value={v.companyDescription} full />
+            </FieldGrid>
           </div>
           {v.companyLogo && (
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Company Logo</p>
-              <img src={v.companyLogo} alt="Company Logo" className="w-32 h-32 object-contain rounded-xl border border-slate-200 bg-white" />
+            <div className="shrink-0">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Company Logo</p>
+              <img src={v.companyLogo} alt="Company Logo" className="w-28 h-28 object-contain rounded-xl border border-slate-200 bg-white" />
             </div>
           )}
         </div>
@@ -201,41 +214,45 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
 
       {/* Owner Profile */}
       <Section title="Owner Profile" icon={<User className="h-5 w-5" />}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="flex flex-col sm:flex-row gap-6">
           {v.ownerPhoto && (
-            <div>
-              <img src={v.ownerPhoto} alt="Owner" className="w-28 h-28 object-cover rounded-xl border border-slate-200" />
+            <div className="shrink-0">
+              <img src={v.ownerPhoto} alt="Owner" className="w-24 h-24 object-cover rounded-xl border border-slate-200" />
             </div>
           )}
-          <div className="lg:col-span-2">
-            <Row label="Owner Name" value={buildFullName(v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName, v.ownerName)} />
-            <Row label="Designation" value={v.designation === "Others" ? v.customDesignation : titleCase(v.designation)} />
-            <Row label="Primary Email" value={v.ownerEmail} />
-            <Row label="Secondary Email" value={v.ownerEmail2} />
-            <Row label="Primary Phone" value={v.ownerPhone} />
-            <Row label="Secondary Phone" value={v.ownerPhone2} />
-            <Row label="Address" value={[v.ownerAddress, v.ownerCity, v.ownerState, v.ownerZipCode, v.ownerCountry].filter(Boolean).join(", ")} />
-            <Row label="Business Start Date" value={v.businessStartDate ? new Date(v.businessStartDate).toLocaleDateString() : undefined} />
+          <div className="flex-1 min-w-0">
+            <FieldGrid>
+              <Field label="Owner Name" value={buildFullName(v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName, v.ownerName)} />
+              <Field label="Designation" value={v.designation === "Others" ? v.customDesignation : titleCase(v.designation)} />
+              <Field label="Business Start Date" value={v.businessStartDate ? new Date(v.businessStartDate).toLocaleDateString() : undefined} />
+              <Field label="Primary Email" value={v.ownerEmail} />
+              <Field label="Secondary Email" value={v.ownerEmail2} />
+              <Field label="Primary Phone" value={v.ownerPhone} />
+              <Field label="Secondary Phone" value={v.ownerPhone2} />
+              <Field label="Address" value={[v.ownerAddress, v.ownerCity, v.ownerState, v.ownerZipCode, v.ownerCountry].filter(Boolean).join(", ")} wide />
+            </FieldGrid>
           </div>
         </div>
         {additionalOwners.length > 0 && (
-          <div className="mt-4">
-            <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Additional Owners ({additionalOwners.length})</p>
+          <div className="mt-6">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Additional Owners ({additionalOwners.length})</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {additionalOwners.map((o, i) => (
-                <div key={i} className="bg-slate-50/60 border border-slate-200 rounded-xl p-3">
+                <div key={i} className="bg-slate-50/60 border border-slate-200 rounded-xl p-4 flex gap-4">
                   {o.photo && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={o.photo}
                       alt={`Owner ${i + 2} profile`}
-                      className="w-14 h-14 rounded-full object-cover border border-slate-200 mb-2"
+                      className="w-14 h-14 rounded-full object-cover border border-slate-200 shrink-0"
                     />
                   )}
-                  <Row label="Name" value={buildFullName(o.title, o.firstName, o.middleName, o.lastName, o.name)} />
-                  <Row label="Designation" value={o.designation === "Others" ? o.customDesignation : titleCase(o.designation)} />
-                  <Row label="Email" value={o.email} />
-                  <Row label="Phone" value={o.phone} />
+                  <FieldGrid cols="grid-cols-2">
+                    <Field label="Name" value={buildFullName(o.title, o.firstName, o.middleName, o.lastName, o.name)} />
+                    <Field label="Designation" value={o.designation === "Others" ? o.customDesignation : titleCase(o.designation)} />
+                    <Field label="Email" value={o.email} />
+                    <Field label="Phone" value={o.phone} />
+                  </FieldGrid>
                 </div>
               ))}
             </div>
@@ -245,20 +262,16 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
 
       {/* Warehouse & Factory */}
       <Section title="Warehouse & Factory" icon={<Factory className="h-5 w-5" />}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-          <div>
-            <Row label="Ownership Type" value={titleCase(v.ownershipType || v.factoryOwnershipType)} />
-            <Row label="Warehouse Address" value={[v.warehouseAddress, v.warehouseAddressLine2, v.warehouseAddressLine3, v.warehouseLandmark].filter(Boolean).join(", ")} />
-            <Row label="Warehouse Location" value={[v.warehouseCity, v.warehouseState, v.warehouseZipCode, v.warehouseCountry].filter(Boolean).join(", ")} />
-            <Row label="Warehouse Size" value={v.warehouseSize} />
-            <Row label="Storage Capacity" value={v.storageCapacity} />
-          </div>
-          <div>
-            <Row label="Factory Address" value={[v.factoryAddress, v.factoryCity, v.factoryState, v.factoryZipCode, v.factoryCountry].filter(Boolean).join(", ")} />
-            <Row label="Factory Size" value={v.factorySize} />
-            <Row label="Production Capacity" value={v.productionCapacity} />
-          </div>
-        </div>
+        <FieldGrid>
+          <Field label="Ownership Type" value={titleCase(v.ownershipType || v.factoryOwnershipType)} />
+          <Field label="Warehouse Size" value={v.warehouseSize} />
+          <Field label="Storage Capacity" value={v.storageCapacity} />
+          <Field label="Factory Size" value={v.factorySize} />
+          <Field label="Production Capacity" value={v.productionCapacity} wide />
+          <Field label="Warehouse Address" value={[v.warehouseAddress, v.warehouseAddressLine2, v.warehouseAddressLine3, v.warehouseLandmark].filter(Boolean).join(", ")} wide />
+          <Field label="Warehouse Location" value={[v.warehouseCity, v.warehouseState, v.warehouseZipCode, v.warehouseCountry].filter(Boolean).join(", ")} wide />
+          <Field label="Factory Address" value={[v.factoryAddress, v.factoryCity, v.factoryState, v.factoryZipCode, v.factoryCountry].filter(Boolean).join(", ")} wide />
+        </FieldGrid>
         {v.mapLink && (
           <a href={v.mapLink.match(/src=["']([^"']+)["']/i)?.[1] || v.mapLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-3 text-sm text-brand-600 hover:underline">
             <MapPin className="w-4 h-4" /> View Map Location
@@ -290,7 +303,7 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
             {v.specializations?.length > 0 && (
               <div><p className="text-xs font-semibold text-slate-400 uppercase mb-2">Specializations</p><Badges items={v.specializations} /></div>
             )}
-            {v.categoryRemarks && <Row label="Remarks" value={v.categoryRemarks} />}
+            {v.categoryRemarks && <Field label="Remarks" value={v.categoryRemarks} />}
             {productPhotos.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Product Photos ({productPhotos.length})</p>
@@ -306,28 +319,34 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
       {/* Manufacturing Facilities */}
       {(activeFacilities.length > 0 || v.qualityControl || v.shippingMethods?.length) && (
         <Section title="Manufacturing & Logistics" icon={<Wrench className="h-5 w-5" />}>
-          {v.qualityControl && <Row label="Quality Control" value={v.qualityControl} />}
           {activeFacilities.length > 0 && (
-            <div className="mt-3 space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {activeFacilities.map((fid) => {
                 const details = facilityDetails[fid] || {};
                 return (
-                  <div key={fid} className="bg-slate-50/60 border border-slate-200 rounded-xl p-3">
-                    <p className="text-sm font-bold text-slate-800 mb-1">{FACILITY_LABELS[fid] || titleCase(fid)}</p>
-                    {Object.entries(details).filter(([, val]) => !blank(val)).map(([k, val]) => (
-                      <Row key={k} label={humanize(k.replace(fid, ""))} value={val as any} />
-                    ))}
+                  <div key={fid} className="bg-slate-50/60 border border-slate-200 rounded-xl p-4">
+                    <p className="text-sm font-bold text-slate-800 mb-3">{FACILITY_LABELS[fid] || titleCase(fid)}</p>
+                    <FieldGrid cols="grid-cols-2">
+                      {Object.entries(details).filter(([, val]) => !blank(val)).map(([k, val]) => (
+                        <Field key={k} label={humanize(k.replace(fid, ""))} value={val as any} />
+                      ))}
+                    </FieldGrid>
                   </div>
                 );
               })}
             </div>
           )}
           {v.shippingMethods?.length > 0 && (
-            <div className="mt-3"><p className="text-xs font-semibold text-slate-400 uppercase mb-2">Shipping Methods</p><Badges items={v.shippingMethods} /></div>
+            <div className="mt-4"><p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Shipping Methods</p><Badges items={v.shippingMethods} /></div>
           )}
-          <Row label="Packaging Capabilities" value={v.packagingCapabilities} />
-          <Row label="Logistics Partners" value={v.logisticsPartners} />
-          <Row label="Compliance Standards" value={v.complianceStandards} />
+          <div className="mt-4">
+            <FieldGrid>
+              <Field label="Quality Control" value={v.qualityControl} wide />
+              <Field label="Packaging Capabilities" value={v.packagingCapabilities} wide />
+              <Field label="Logistics Partners" value={v.logisticsPartners} wide />
+              <Field label="Compliance Standards" value={v.complianceStandards} wide />
+            </FieldGrid>
+          </div>
         </Section>
       )}
 
@@ -389,10 +408,12 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
               </div>
             )}
           </div>
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-8">
-            <Row label="Trade License Number" value={v.tradeLicenseNumber} mono />
-            <Row label="Business Registration Number" value={v.businessRegistrationNumber} mono />
-            <Row label="Tax Identification Number" value={v.taxIdentificationNumber} mono />
+          <div className="mt-4">
+            <FieldGrid cols="grid-cols-2 lg:grid-cols-3">
+              <Field label="Trade License Number" value={v.tradeLicenseNumber} mono />
+              <Field label="Business Registration Number" value={v.businessRegistrationNumber} mono />
+              <Field label="Tax Identification Number" value={v.taxIdentificationNumber} mono />
+            </FieldGrid>
           </div>
           {(v.importExperience || v.importCountries?.length > 0) && (
             <div className="mt-4">
@@ -412,20 +433,16 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
       {/* Bank Details */}
       {bank && (
         <Section title="Bank Details" icon={<Landmark className="h-5 w-5" />}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-            <div>
-              <Row label="Account Holder Name" value={bank.accountHolderName} />
-              <Row label="Bank Name" value={bank.bankName} />
-              <Row label="Account Number" value={bank.accountNumber} mono />
-              <Row label="Account Type" value={titleCase(bank.accountType)} />
-            </div>
-            <div>
-              <Row label="IFSC Code" value={bank.ifscCode} mono />
-              <Row label="SWIFT / BIC" value={bank.swiftCode} mono />
-              <Row label="IBAN" value={bank.iban} mono />
-              <Row label="Branch" value={[bank.branchName, bank.branchAddress].filter(Boolean).join(", ")} />
-            </div>
-          </div>
+          <FieldGrid>
+            <Field label="Account Holder Name" value={bank.accountHolderName} />
+            <Field label="Bank Name" value={bank.bankName} />
+            <Field label="Account Number" value={bank.accountNumber} mono />
+            <Field label="Account Type" value={titleCase(bank.accountType)} />
+            <Field label="IFSC Code" value={bank.ifscCode} mono />
+            <Field label="SWIFT / BIC" value={bank.swiftCode} mono />
+            <Field label="IBAN" value={bank.iban} mono />
+            <Field label="Branch" value={[bank.branchName, bank.branchAddress].filter(Boolean).join(", ")} wide />
+          </FieldGrid>
         </Section>
       )}
 

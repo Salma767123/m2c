@@ -29,6 +29,7 @@ import {
   Upload,
 } from "lucide-react";
 import VendorService, { VendorProfile } from "@/services/vendorService";
+import { categoryService } from "@/services/categoryService";
 import { buildFullName, toExternalUrl } from "@/lib/utils";
 import ResultModal from "@/components/UI/ResultModal";
 import { PhoneInput, LocalLandlineInput, getLandlineDisplay } from "@/components/VendorHub/FormUI";
@@ -865,9 +866,20 @@ export default function VendorSettings() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("company");
   const [result, setResult] = useState<SaveResult | null>(null);
+  const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadVendorProfile();
+  }, []);
+
+  useEffect(() => {
+    categoryService.getCategoryTree({ status: "ACTIVE", includeInactive: false })
+      .then((res: any) => {
+        const map: Record<string, string> = {};
+        (res.data || []).forEach((cat: any) => { map[cat.id] = cat.name; });
+        setCategoryNameMap(map);
+      })
+      .catch(() => {});
   }, []);
 
   const loadVendorProfile = async () => {
@@ -926,6 +938,10 @@ export default function VendorSettings() {
   const factoryImages = allDocs
     .filter((d) => d.type === "OTHER")
     .map((d) => ({ label: d.name || "Factory Image", url: d.documentUrl }));
+  // "Factory Site …" photos belong to the Legal Address & Factory Site;
+  // everything else is a Warehouse photo. Shown under separate headings.
+  const factorySiteImages = factoryImages.filter((m) => (m.label || "").startsWith("Factory Site"));
+  const warehouseImages = factoryImages.filter((m) => !(m.label || "").startsWith("Factory Site"));
 
   // ----- Product photos collected from category products -----
   const productPhotos: Array<{ label: string; url: string }> = [];
@@ -933,12 +949,13 @@ export default function VendorSettings() {
     (Array.isArray(products) ? products : []).forEach((p: any, i: number) => {
       (Array.isArray(p?.photos) ? p.photos : []).forEach((ph: any) => {
         const url = ph?.url || ph?.preview;
-        if (url) productPhotos.push({ label: `${catLabel} · ${p?.name || `Product ${i + 1}`}`, url });
+        const prodName = p?.name || `Product ${i + 1}`;
+        if (url) productPhotos.push({ label: catLabel ? `${catLabel} · ${prodName}` : prodName, url });
       });
     });
   };
   if (v.categoryProducts && typeof v.categoryProducts === "object") {
-    Object.entries(v.categoryProducts).forEach(([catId, products]: [string, any]) => collectProducts(catId, products));
+    Object.entries(v.categoryProducts).forEach(([catId, products]: [string, any]) => collectProducts(categoryNameMap[catId] || "", products));
   }
   if (Array.isArray(v.additionalCategories)) {
     v.additionalCategories.forEach((cat: any) => collectProducts(cat?.name || "Custom Category", cat?.products));
@@ -1284,7 +1301,14 @@ export default function VendorSettings() {
           )}
           {factoryImages.length > 0 && (
             <SubSection title="Factory & Facility Photos" icon={<ImageIcon className="w-4 h-4" />}>
-              <ImageStrip heading={`Factory Images (${factoryImages.length})`} icon={<ImageIcon className="w-4 h-4 text-slate-400" />} items={factoryImages} />
+              <div className="space-y-6">
+                {factorySiteImages.length > 0 && (
+                  <ImageStrip heading={`Factory Site Images (${factorySiteImages.length})`} icon={<ImageIcon className="w-4 h-4 text-slate-400" />} items={factorySiteImages} />
+                )}
+                {warehouseImages.length > 0 && (
+                  <ImageStrip heading={`Warehouse Images (${warehouseImages.length})`} icon={<ImageIcon className="w-4 h-4 text-slate-400" />} items={warehouseImages} />
+                )}
+              </div>
             </SubSection>
           )}
           {locationMap.length > 0 && (

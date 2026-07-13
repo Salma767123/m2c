@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/UI/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card";
 import { Badge } from "@/components/UI/Badge";
+import Dropdown from "@/components/UI/Dropdown";
 import {
   ArrowLeft,
   Building2,
@@ -21,7 +22,6 @@ import {
   Truck,
   CheckCircle,
   AlertTriangle,
-  ChevronDown,
   ShieldCheck,
 } from "lucide-react";
 
@@ -1422,36 +1422,32 @@ function AdminReviewSubmitStep({
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">
               Status
             </label>
-            <div className="relative">
-              <select
-                value={initialStatus}
-                onChange={(e) => setInitialStatus(e.target.value as any)}
-                className="w-full appearance-none px-3.5 py-2.5 pr-10 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white cursor-pointer focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 transition-colors"
-              >
-                <option value="pending">Pending</option>
-                <option value="active">Active</option>
-                <option value="suspended">Suspended</option>
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            </div>
+            <Dropdown
+              value={initialStatus}
+              options={[
+                { value: 'pending', label: 'Pending' },
+                { value: 'active', label: 'Active' },
+                { value: 'suspended', label: 'Suspended' },
+              ]}
+              onChange={(v) => setInitialStatus(v as any)}
+              buttonClassName="py-2.5 rounded-lg"
+            />
           </div>
 
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">
               Approval Status
             </label>
-            <div className="relative">
-              <select
-                value={initialApprovalStatus}
-                onChange={(e) => setInitialApprovalStatus(e.target.value as any)}
-                className="w-full appearance-none px-3.5 py-2.5 pr-10 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white cursor-pointer focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 transition-colors"
-              >
-                <option value="pending">Pending Review</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            </div>
+            <Dropdown
+              value={initialApprovalStatus}
+              options={[
+                { value: 'pending', label: 'Pending Review' },
+                { value: 'approved', label: 'Approved' },
+                { value: 'rejected', label: 'Rejected' },
+              ]}
+              onChange={(v) => setInitialApprovalStatus(v as any)}
+              buttonClassName="py-2.5 rounded-lg"
+            />
           </div>
         </div>
 

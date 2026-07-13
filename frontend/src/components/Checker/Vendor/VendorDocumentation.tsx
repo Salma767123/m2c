@@ -154,9 +154,14 @@ export default function VendorDocumentation({ vendor, verifications, meta, docDa
     const vendorFactoryImages = vendorResults.filter((x): x is { label: string; dataUrl: string } => x !== null)
 
     const inspectorEvidenceImages: Array<{ label: string; dataUrl: string }> = []
-    if (factoryEvidence?.frontView?.url) inspectorEvidenceImages.push({ label: "Front View", dataUrl: factoryEvidence.frontView.url })
-    if (factoryEvidence?.nameBoard?.url) inspectorEvidenceImages.push({ label: "Name Board", dataUrl: factoryEvidence.nameBoard.url })
-    if (factoryEvidence?.routeMap?.url) inspectorEvidenceImages.push({ label: "Route Map", dataUrl: factoryEvidence.routeMap.url })
+    // Legal Address & Factory Site evidence
+    if (factoryEvidence?.nameBoard?.url) inspectorEvidenceImages.push({ label: "Factory Site Name Board", dataUrl: factoryEvidence.nameBoard.url })
+    if (factoryEvidence?.frontView?.url) inspectorEvidenceImages.push({ label: "Factory Site Front View", dataUrl: factoryEvidence.frontView.url })
+    if (factoryEvidence?.routeMap?.url) inspectorEvidenceImages.push({ label: "Factory Site Route Map", dataUrl: factoryEvidence.routeMap.url })
+    // Warehouse evidence (only present when the warehouse address differs)
+    if (factoryEvidence?.warehouseNameBoard?.url) inspectorEvidenceImages.push({ label: "Warehouse Name Board", dataUrl: factoryEvidence.warehouseNameBoard.url })
+    if (factoryEvidence?.warehouseFrontView?.url) inspectorEvidenceImages.push({ label: "Warehouse Front View", dataUrl: factoryEvidence.warehouseFrontView.url })
+    if (factoryEvidence?.warehouseRouteMap?.url) inspectorEvidenceImages.push({ label: "Warehouse Route Map", dataUrl: factoryEvidence.warehouseRouteMap.url })
 
     const [companyLogoDataUrl, ownerPhotoDataUrl, mainContactPhotoDataUrl] = await Promise.all([
       vendor?.companyLogo ? fetchImgDataUrl(vendor.companyLogo) : Promise.resolve(null),

@@ -289,9 +289,27 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
           : new Date(),
     };
 
+    // Inspector evidence photos captured during the visit — persisted on the
+    // inspection form data as [{ label, dataUrl }] (dataUrl is a hosted URL).
+    // jsPDF needs a data URL, so fetch each one.
+    const rawEvidence = Array.isArray((formData as any).inspectorEvidenceImages)
+      ? (formData as any).inspectorEvidenceImages
+      : [];
+    const inspectorEvidenceImages = (
+      await Promise.all(
+        rawEvidence.map(async (e: any) => {
+          const src = e?.dataUrl || e?.url;
+          if (!src) return null;
+          const dataUrl = String(src).startsWith("data:") ? src : await fetchImgDataUrl(src);
+          return dataUrl ? { label: e?.label || "Inspector Evidence", dataUrl } : null;
+        })
+      )
+    ).filter((x): x is { label: string; dataUrl: string } => x !== null);
+
     const doc = generateFactoryInspectionPdf(vendorObj, vf as any, reportMeta, {
       clientSignatureDataUrl: signatureDataUrl,
       vendorFactoryImages: vendorFactoryImages.length > 0 ? vendorFactoryImages : null,
+      inspectorEvidenceImages: inspectorEvidenceImages.length > 0 ? inspectorEvidenceImages : null,
       companyLogoDataUrl,
       ownerPhotoDataUrl,
       mainContactPhotoDataUrl,

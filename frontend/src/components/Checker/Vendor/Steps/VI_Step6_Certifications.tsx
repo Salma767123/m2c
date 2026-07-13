@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Award, Eye, FileText, Package } from 'lucide-react'
-import VerifyField, { SectionBlock, DocCard, Verifications } from './VI_VerifyField'
+import { Award, Eye, ShieldCheck } from 'lucide-react'
+import VerifyField, { SectionBlock, Verifications } from './VI_VerifyField'
 import DocViewerModal from '@/components/UI/DocViewerModal'
 
 interface Props {
@@ -21,11 +21,6 @@ export default function VI_Step6_Certifications({ vendor: v, verifications, onCh
 
   const certifications: any[] = Array.isArray(v.certifications) ? v.certifications : []
 
-  const CERT_DOC_TYPES = ['FACTORY_LICENSE', 'POLLUTION_CERTIFICATE', 'FIRE_SAFETY_CERTIFICATE', 'BANK_STATEMENT', 'AUDITED_FINANCIALS']
-  const certDocs = Array.isArray(v.documents)
-    ? v.documents.filter((d: any) => CERT_DOC_TYPES.includes(d.type))
-    : []
-
   useEffect(() => {
     const keys: string[] = [
       ...certifications.flatMap((cert: any, idx: number) => {
@@ -36,9 +31,7 @@ export default function VI_Step6_Certifications({ vendor: v, verifications, onCh
           ...(cert.description ? [`${prefix}_description`] : []),
         ]
       }),
-      ...(v.complianceStandards ? ['cert_complianceStandards'] : []),
-      ...(v.packagingCapabilities ? ['cert_packagingCapabilities'] : []),
-      ...certDocs.map((doc: any, idx: number) => `certDoc_${doc.type || idx}`),
+      ...(v.qualityControl ? ['cert_qualityControlProcess'] : []),
     ]
     onRegisterFields(keys)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -48,7 +41,7 @@ export default function VI_Step6_Certifications({ vendor: v, verifications, onCh
     <div className="space-y-10">
       <div className="border-b border-slate-200 pb-6">
         <h2 className="text-2xl font-bold text-slate-900 mb-1">Certifications & Quality Control</h2>
-        <p className="text-slate-500 text-sm">Verify all quality certifications, compliance standards, and packaging details.</p>
+        <p className="text-slate-500 text-sm">Verify all quality certifications and the quality control process submitted by the vendor.</p>
       </div>
 
       {/* Quality Certifications */}
@@ -92,35 +85,10 @@ export default function VI_Step6_Certifications({ vendor: v, verifications, onCh
         </div>
       )}
 
-      {/* Compliance Standards */}
-      {v.complianceStandards && (
-        <SectionBlock title="Compliance Standards" icon={<FileText className="w-4 h-4" />}>
-          {vf('cert_complianceStandards', 'Compliance Standards', v.complianceStandards)}
-        </SectionBlock>
-      )}
-
-      {/* Packaging */}
-      {v.packagingCapabilities && (
-        <SectionBlock title="Packaging Capabilities" icon={<Package className="w-4 h-4" />}>
-          {vf('cert_packagingCapabilities', 'Packaging Capabilities', v.packagingCapabilities)}
-        </SectionBlock>
-      )}
-
-      {/* Certification-related documents */}
-      {certDocs.length > 0 && (
-        <SectionBlock title="Supporting Documents" icon={<FileText className="w-4 h-4" />}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {certDocs.map((doc: any, idx: number) => (
-              <DocCard
-                key={doc.id || idx}
-                doc={doc}
-                index={idx}
-                fieldKey={`certDoc_${doc.type || idx}`}
-                verifications={verifications}
-                onChange={onChange}
-              />
-            ))}
-          </div>
+      {/* Quality Control Process (registration: "Quality Control Process Description") */}
+      {v.qualityControl && (
+        <SectionBlock title="Quality Control Process" icon={<ShieldCheck className="w-4 h-4" />}>
+          {vf('cert_qualityControlProcess', 'Quality Control Process Description', v.qualityControl)}
         </SectionBlock>
       )}
     </div>

@@ -794,7 +794,13 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                 {(vendor as any).ownerLandline && (
                   <div>
                     <p className="text-sm text-slate-500">Local Landline</p>
-                    <p className="font-medium">{formatLocalLandline({ countryCode: '+91', std: (vendor as any).ownerLocalLandlineStd, number: (vendor as any).ownerLandline })}</p>
+                    <p className="font-medium">{(() => {
+                      const std = ((vendor as any).ownerLocalLandlineStd || '').trim();
+                      const assembled = ((vendor as any).ownerLandline || '').trim();
+                      // ownerLandline = STD + subscriber; strip the STD prefix so it isn't doubled
+                      const num = std && assembled.startsWith(std) ? assembled.slice(std.length) : assembled;
+                      return formatLocalLandline({ countryCode: '+91', std, number: num });
+                    })()}</p>
                   </div>
                 )}
                 {(() => {
@@ -881,12 +887,26 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                               <p className="font-medium">{owner.phone2}</p>
                             </div>
                           )}
-                          {owner.landline && (
+                          {(owner.localLandline || owner.landline) && (
                             <div>
                               <p className="text-slate-500">Local Landline</p>
-                              <p className="font-medium">{owner.landline}</p>
+                              <p className="font-medium">{(() => {
+                                const std = (owner.localLandlineStd || '').trim();
+                                const assembled = (owner.localLandline || owner.landline || '').trim();
+                                const num = std && assembled.startsWith(std) ? assembled.slice(std.length) : assembled;
+                                return formatLocalLandline({ countryCode: '+91', std, number: num });
+                              })()}</p>
                             </div>
                           )}
+                          {(() => {
+                            const intlLL = formatIntlLandline(owner.intlLandline);
+                            return intlLL ? (
+                              <div>
+                                <p className="text-slate-500">International Landline</p>
+                                <p className="font-medium">{intlLL}</p>
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
                     ))}
@@ -1103,8 +1123,8 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
   if (isMeta) coveredDocTypes.add('COMPANY_REGISTRATION');
   // "Others" with a registration number
   if (!isProp && !isUnreg && !isMeta && v.companyIdNumber) coveredDocTypes.add('COMPANY_REGISTRATION');
-  // Non-proprietorship IEC
-  if (!isProp && (v.hasImportExport === 'yes' || v.iecCode)) coveredDocTypes.add('IEC_CERTIFICATE');
+  // Non-proprietorship IEC (backend stores this as EXPORT_LICENSE, not IEC_CERTIFICATE)
+  if (!isProp && (v.hasImportExport === 'yes' || v.iecCode)) coveredDocTypes.add('EXPORT_LICENSE');
 
   const uncoveredDocs = docs.filter((d: any) =>
     COMPANY_DOC_TYPES.includes(d.type) && !coveredDocTypes.has(d.type)
@@ -1130,7 +1150,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
               {!isProp && (v.hasImportExport === 'yes' || v.iecCode) && regRow(
                 'IEC Code',
                 v.iecCode,
-                'IEC_CERTIFICATE',
+                'EXPORT_LICENSE',
                 'IEC Certificate',
               )}
               {isMeta && regRow(
@@ -1655,7 +1675,7 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   AADHAAR_CARD:         'Aadhaar Card',
   IEC_CERTIFICATE:      'IEC Certificate',
   TRADE_LICENSE:        'Trade License',
-  EXPORT_LICENSE:       'Export License',
+  EXPORT_LICENSE:       'IEC Certificate',
   FACTORY_LICENSE:      'Factory License',
   POLLUTION_CERTIFICATE:'Pollution Certificate',
   FIRE_SAFETY_CERTIFICATE: 'Fire Safety Certificate',
@@ -1663,8 +1683,8 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   AUDITED_FINANCIALS:   'Audited Financials',
 }
 
-const COMPANY_DOC_TYPES   = ['GST_CERTIFICATE', 'PAN_CARD', 'COMPANY_REGISTRATION', 'AADHAAR_CARD', 'IEC_CERTIFICATE', 'TRADE_LICENSE']
-const COMPLIANCE_DOC_TYPES = ['EXPORT_LICENSE', 'FACTORY_LICENSE', 'POLLUTION_CERTIFICATE', 'FIRE_SAFETY_CERTIFICATE']
+const COMPANY_DOC_TYPES   = ['GST_CERTIFICATE', 'PAN_CARD', 'COMPANY_REGISTRATION', 'AADHAAR_CARD', 'EXPORT_LICENSE', 'TRADE_LICENSE']
+const COMPLIANCE_DOC_TYPES = ['FACTORY_LICENSE', 'POLLUTION_CERTIFICATE', 'FIRE_SAFETY_CERTIFICATE']
 const BANK_DOC_TYPES      = ['BANK_STATEMENT', 'AUDITED_FINANCIALS']
 const ALL_KNOWN_TYPES     = new Set([...COMPANY_DOC_TYPES, ...COMPLIANCE_DOC_TYPES, ...BANK_DOC_TYPES, 'OTHER'])
 

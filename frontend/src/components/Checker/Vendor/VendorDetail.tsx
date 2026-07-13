@@ -221,10 +221,34 @@ export default function VendorDetail({
     return INSPECTION_STATUS_COLORS[s] || INSPECTION_STATUS_COLORS.Pending
   }
 
-  const getResultColor = (result: string) => {
-    if (result?.toUpperCase() === 'PASSED') return "bg-emerald-50 text-emerald-700 border-emerald-200/85"
-    if (result?.toUpperCase() === 'FAILED') return "bg-red-50 text-red-700 border-red-200/85"
-    return "bg-slate-50 text-slate-700 border-slate-200/85"
+  // Badge for an inspection-history row. The QC checker's Pass/Fail verdict
+  // (`insp.result`) is only final once the inspection is COMPLETED — while it
+  // is still SUBMITTED / under admin review the row must reflect that lifecycle
+  // status, not the proposed result. Uses only existing inspection statuses.
+  const getInspectionRowBadge = (insp: any): { label: string; color: string } => {
+    const status = (insp.status || '').toUpperCase()
+    const result = (insp.result || '').toUpperCase()
+    switch (status) {
+      case 'COMPLETED':
+        if (result === 'PASSED') return { label: 'Passed', color: 'bg-emerald-50 text-emerald-700 border-emerald-200/85' }
+        if (result === 'FAILED') return { label: 'Failed', color: 'bg-red-50 text-red-700 border-red-200/85' }
+        return { label: 'Completed', color: 'bg-emerald-50 text-emerald-700 border-emerald-200/85' }
+      case 'SUBMITTED':
+      case 'UNDER_ADMIN_REVIEW':
+        return { label: 'Under Review by Admin', color: 'bg-blue-50 text-blue-700 border-blue-200/85' }
+      case 'SCHEDULED':
+        return { label: 'Scheduled', color: 'bg-slate-50 text-slate-600 border-slate-200/85' }
+      case 'IN_PROGRESS':
+        return { label: 'In Progress', color: 'bg-amber-50 text-amber-700 border-amber-200/85' }
+      case 'REJECTED':
+        return { label: 'Rejected', color: 'bg-red-50 text-red-700 border-red-200/85' }
+      case 'REINSPECTION':
+        return { label: 'Re-Inspection', color: 'bg-amber-50 text-amber-700 border-amber-200/85' }
+      case 'CANCELLED':
+        return { label: 'Cancelled', color: 'bg-slate-50 text-slate-500 border-slate-200/85' }
+      default:
+        return { label: status ? status.replace(/_/g, ' ') : 'Pending', color: 'bg-slate-50 text-slate-600 border-slate-200/85' }
+    }
   }
 
   const getPriorityColor = (priority: string) => {
@@ -358,16 +382,16 @@ export default function VendorDetail({
         title: "Legal Address & Factory Site",
         icon: <Warehouse className="w-5 h-5 text-brand-600" />,
         fields: [
-          { key: "ownershipType", label: "Ownership Type", transform: (val: string) => getOwnershipTypeLabel(val) },
-          { key: "warehouseAddress", label: "Address Line 1", condition: fullVendor.warehouseAddress },
-          { key: "warehouseAddressLine2", label: "Address Line 2", condition: fullVendor.warehouseAddressLine2 },
-          { key: "warehouseAddressLine3", label: "Address Line 3", condition: fullVendor.warehouseAddressLine3 },
-          { key: "warehouseLandmark", label: "Landmark", condition: fullVendor.warehouseLandmark },
-          { key: "warehouseCity", label: "City", condition: fullVendor.warehouseCity },
-          { key: "warehouseState", label: "State", condition: fullVendor.warehouseState },
-          { key: "warehouseZipCode", label: "ZIP / Postal Code", condition: fullVendor.warehouseZipCode },
-          { key: "warehouseCountry", label: "Country", condition: fullVendor.warehouseCountry },
-          { key: "warehouseSize", label: "Warehousing Capacity" },
+          { key: "factoryOwnershipType", label: "Ownership Type", transform: (val: string) => getOwnershipTypeLabel(val) },
+          { key: "factorySize", label: "Warehousing Capacity" },
+          { key: "factoryAddress", label: "Address Line 1", condition: fullVendor.factoryAddress },
+          { key: "addressLine2", label: "Address Line 2", condition: fullVendor.addressLine2 },
+          { key: "addressLine3", label: "Address Line 3", condition: fullVendor.addressLine3 },
+          { key: "landmark", label: "Landmark", condition: fullVendor.landmark },
+          { key: "factoryCity", label: "City", condition: fullVendor.factoryCity },
+          { key: "factoryState", label: "State", condition: fullVendor.factoryState },
+          { key: "factoryZipCode", label: "ZIP / Postal Code", condition: fullVendor.factoryZipCode },
+          { key: "factoryCountry", label: "Country", condition: fullVendor.factoryCountry },
         ]
       },
       {
@@ -421,7 +445,10 @@ export default function VendorDetail({
     const isImageUrl = isDocImageUrl
 
     const allDocs: any[] = Array.isArray(fullVendor.documents) ? fullVendor.documents : []
-    const COMPANY_DOC_TYPES = ["GST_CERTIFICATE", "PAN_CARD", "COMPANY_REGISTRATION", "AADHAAR_CARD"]
+    // Mirror the checker inspection form's list — include EXPORT_LICENSE (IEC
+    // certificate) and TRADE_LICENSE so those uploads aren't silently dropped
+    // from the Registration Documents grid.
+    const COMPANY_DOC_TYPES = ["GST_CERTIFICATE", "PAN_CARD", "COMPANY_REGISTRATION", "AADHAAR_CARD", "TRADE_LICENSE", "EXPORT_LICENSE"]
     const companyDocs = allDocs.filter((d) => COMPANY_DOC_TYPES.includes(d.type))
     // Factory photos are persisted as DocumentType OTHER during registration.
     const factoryImages = allDocs
@@ -540,65 +567,130 @@ export default function VendorDetail({
               )
             }
           } else if (section.id === "warehouse") {
-            // Warehouse Address section (factoryAddress fields — separate from legal address)
+            // Warehouse Address section (warehouse* fields — separate from the
+            // Legal Address & Factory Site, which uses factory* fields above).
             const vd = fullVendor
             const vdEq = (a: any, b: any) => (a || '').trim() === (b || '').trim()
-            const vdSameAsLegal = (
-              !vd.factoryAddress && !vd.factoryCity
+            const vdSameAsWarehouse = (
+              !vd.warehouseAddress && !vd.warehouseCity
             ) || (
-              vdEq(vd.factoryAddress, vd.warehouseAddress) &&
-              vdEq(vd.factoryCity, vd.warehouseCity) &&
-              vdEq(vd.factoryState, vd.warehouseState) &&
-              vdEq(vd.factoryZipCode, vd.warehouseZipCode) &&
-              vdEq(vd.factoryCountry, vd.warehouseCountry)
+              vdEq(vd.warehouseAddress, vd.factoryAddress) &&
+              vdEq(vd.warehouseCity, vd.factoryCity) &&
+              vdEq(vd.warehouseState, vd.factoryState) &&
+              vdEq(vd.warehouseZipCode, vd.factoryZipCode) &&
+              vdEq(vd.warehouseCountry, vd.factoryCountry)
             )
             // Show warehouse sub-section only when legal address data exists
             const hasWarehouseSection = !!(vd.warehouseAddress || vd.warehouseCity || vd.factoryAddress || vd.factoryCity)
             const hasFactoryImgs = factoryImages.length > 0
+            // Split the photos the same way the inspection view does: "Factory
+            // Site …" documents belong to the Legal Address & Factory Site,
+            // everything else is a Warehouse photo. Show each set under its own
+            // heading instead of one combined "Factory Images" block.
+            const isFactorySiteImg = (label: string) => (label || '').startsWith('Factory Site')
+            const legalSiteImages = factoryImages.filter((m: any) => isFactorySiteImg(m.label))
+            const warehousePhotoImages = factoryImages.filter((m: any) => !isFactorySiteImg(m.label))
+            const renderFactoryImgGrid = (items: Array<{ label: string; url: string }>) => (
+              <div className="flex flex-wrap gap-4">
+                {items.map((m, i) => (
+                  <div key={`${m.label}-${i}`} className="group block">
+                    <div className="relative w-28 h-28 rounded-xl border border-slate-200 overflow-hidden bg-slate-50">
+                      <img src={m.url} alt={m.label} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setViewerDoc({ url: m.url, name: m.label })}
+                        className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors"
+                      >
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-black/50 backdrop-blur-sm rounded-lg">
+                          <Eye className="w-3 h-3" /> View
+                        </span>
+                      </button>
+                    </div>
+                    <p className="text-xs font-semibold text-slate-600 mt-1.5 text-center max-w-28 truncate" title={m.label}>{m.label}</p>
+                  </div>
+                ))}
+              </div>
+            )
             if (hasWarehouseSection || hasFactoryImgs) {
               hasCustomData = true
               customContent = (
                 <div className="col-span-full space-y-6 border-t border-slate-100 pt-6 mt-4">
+                  {/* Factory Site images — belong to the Legal Address & Factory Site */}
+                  {legalSiteImages.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+                        <ImageIcon className="w-4.5 h-4.5 text-slate-400" /> Factory Site Images ({legalSiteImages.length})
+                      </h4>
+                      {renderFactoryImgGrid(legalSiteImages)}
+                    </div>
+                  )}
+
                   {/* Warehouse Address sub-section */}
                   <div>
                     <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
                       <MapPin className="w-4.5 h-4.5 text-slate-400" /> Warehouse Address
                     </h4>
-                    {vdSameAsLegal ? (
+                    {vdSameAsWarehouse ? (
                       <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800 font-medium">
                         <MapPin className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                         Warehouse Address is the same as the Legal Address &amp; Factory Site above.
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-                        {vd.factoryAddress && (
+                        <div>
+                          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Ownership Type</label>
+                          <p className="text-sm font-semibold text-slate-800">{getOwnershipTypeLabel(vd.ownershipType) || '—'}</p>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Warehousing Capacity</label>
+                          <p className="text-sm font-semibold text-slate-800">{vd.warehouseSize || '—'}</p>
+                        </div>
+                        {vd.warehouseAddress && (
                           <div>
                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Address Line 1</label>
-                            <p className="text-sm font-semibold text-slate-800">{vd.factoryAddress}</p>
+                            <p className="text-sm font-semibold text-slate-800">{vd.warehouseAddress}</p>
                           </div>
                         )}
-                        {vd.factoryCity && (
+                        {vd.warehouseAddressLine2 && (
+                          <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Address Line 2</label>
+                            <p className="text-sm font-semibold text-slate-800">{vd.warehouseAddressLine2}</p>
+                          </div>
+                        )}
+                        {vd.warehouseAddressLine3 && (
+                          <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Address Line 3</label>
+                            <p className="text-sm font-semibold text-slate-800">{vd.warehouseAddressLine3}</p>
+                          </div>
+                        )}
+                        {vd.warehouseLandmark && (
+                          <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Landmark</label>
+                            <p className="text-sm font-semibold text-slate-800">{vd.warehouseLandmark}</p>
+                          </div>
+                        )}
+                        {vd.warehouseCity && (
                           <div>
                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">City</label>
-                            <p className="text-sm font-semibold text-slate-800">{vd.factoryCity}</p>
+                            <p className="text-sm font-semibold text-slate-800">{vd.warehouseCity}</p>
                           </div>
                         )}
-                        {vd.factoryState && (
+                        {vd.warehouseState && (
                           <div>
                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">State</label>
-                            <p className="text-sm font-semibold text-slate-800">{vd.factoryState}</p>
+                            <p className="text-sm font-semibold text-slate-800">{vd.warehouseState}</p>
                           </div>
                         )}
-                        {vd.factoryZipCode && (
+                        {vd.warehouseZipCode && (
                           <div>
                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">ZIP / Postal Code</label>
-                            <p className="text-sm font-semibold text-slate-800">{vd.factoryZipCode}</p>
+                            <p className="text-sm font-semibold text-slate-800">{vd.warehouseZipCode}</p>
                           </div>
                         )}
-                        {vd.factoryCountry && (
+                        {vd.warehouseCountry && (
                           <div>
                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Country</label>
-                            <p className="text-sm font-semibold text-slate-800">{vd.factoryCountry}</p>
+                            <p className="text-sm font-semibold text-slate-800">{vd.warehouseCountry}</p>
                           </div>
                         )}
                         {vd.mapLink && (
@@ -612,7 +704,7 @@ export default function VendorDetail({
                         )}
                       </div>
                     )}
-                    {vdSameAsLegal && vd.mapLink && (
+                    {vdSameAsWarehouse && vd.mapLink && (
                       <div className="mt-3">
                         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Map / Location Link</label>
                         <a href={vd.mapLink} target="_blank" rel="noopener noreferrer"
@@ -623,35 +715,14 @@ export default function VendorDetail({
                     )}
                   </div>
 
-                  {/* Factory images — view-only via DocViewerModal */}
-                  {hasFactoryImgs && (
+                  {/* Warehouse images — the non-"Factory Site" photos, shown
+                      under the Warehouse section. View-only via DocViewerModal. */}
+                  {warehousePhotoImages.length > 0 && (
                     <div>
                       <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
-                        <ImageIcon className="w-4.5 h-4.5 text-slate-400" /> Factory Images ({factoryImages.length})
+                        <ImageIcon className="w-4.5 h-4.5 text-slate-400" /> Warehouse Images ({warehousePhotoImages.length})
                       </h4>
-                      <div className="flex flex-wrap gap-4">
-                        {factoryImages.map((m: any, i: number) => (
-                          <div key={`${m.label}-${i}`} className="group block">
-                            <div className="relative w-28 h-28 rounded-xl border border-slate-200 overflow-hidden bg-slate-50">
-                              <img
-                                src={m.url}
-                                alt={m.label}
-                                className="w-full h-full object-cover"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setViewerDoc({ url: m.url, name: m.label })}
-                                className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors"
-                              >
-                                <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-black/50 backdrop-blur-sm rounded-lg">
-                                  <Eye className="w-3 h-3" /> View
-                                </span>
-                              </button>
-                            </div>
-                            <p className="text-xs font-semibold text-slate-600 mt-1.5 text-center max-w-28 truncate" title={m.label}>{m.label}</p>
-                          </div>
-                        ))}
-                      </div>
+                      {renderFactoryImgGrid(warehousePhotoImages)}
                     </div>
                   )}
                 </div>
@@ -882,7 +953,7 @@ export default function VendorDetail({
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">{field.label}</label>
               <div className="text-sm font-semibold text-slate-900 leading-relaxed">
                 {field.type === 'list' && Array.isArray(field.value) ? (
-                  <div className="flex flex-wrap gap-1.5 mt-1">
+                  <div className="flex flex-wrap gap-1.5">
                     {field.value.map((item: any, idx: number) => {
                       const iso = item && typeof item === 'object' ? item.flagIso : undefined
                       const label = item && typeof item === 'object' ? item.label : String(item)
@@ -895,18 +966,18 @@ export default function VendorDetail({
                     })}
                   </div>
                 ) : field.type === 'badge' ? (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-50 text-brand-700 border border-brand-100 capitalize mt-1">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-50 text-brand-700 border border-brand-100 capitalize">
                     {field.value.toString().replace(/_/g, " ").toLowerCase()}
                   </span>
                 ) : field.type === 'url' ? (
                   (() => {
                     const url = safeExternalUrl(field.value)
                     return url ? (
-                      <a href={url} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1 mt-1 break-all">
+                      <a href={url} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1 break-all">
                         <Globe className="w-4 h-4 shrink-0" /> {field.value}
                       </a>
                     ) : (
-                      <span className="text-slate-700 font-semibold flex items-center gap-1 mt-1 break-all">
+                      <span className="text-slate-700 font-semibold flex items-center gap-1 break-all">
                         <Globe className="w-4 h-4 shrink-0 text-slate-400" /> {field.value}
                       </span>
                     )
@@ -1165,8 +1236,8 @@ export default function VendorDetail({
       {/* Vendor Summary Card */}
       <div className="bg-brand-50/40 border border-brand-100/60 rounded-2xl p-6 mb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-brand-100/80 text-brand-700 rounded-lg">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-brand-100/80 text-brand-700 rounded-lg shrink-0">
               <Factory className="w-5 h-5" />
             </div>
             <div>
@@ -1191,8 +1262,8 @@ export default function VendorDetail({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-brand-100/80 text-brand-700 rounded-lg">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-brand-100/80 text-brand-700 rounded-lg shrink-0">
               <Calendar className="w-5 h-5" />
             </div>
             <div>
@@ -1203,8 +1274,8 @@ export default function VendorDetail({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-brand-100/80 text-brand-700 rounded-lg">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-brand-100/80 text-brand-700 rounded-lg shrink-0">
               <BarChart3 className="w-5 h-5" />
             </div>
             <div>
@@ -1260,17 +1331,24 @@ export default function VendorDetail({
                     </span>
                     <span className="font-medium text-slate-900">{insp.clientName}</span>
                   </div>
-                  {insp.result && (
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getResultColor(insp.result)}`}>
-                      {insp.result.replace(/_/g, " ")}
-                    </span>
-                  )}
+                  {(() => {
+                    const badge = getInspectionRowBadge(insp)
+                    return (
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${badge.color}`}>
+                        {badge.label}
+                      </span>
+                    )
+                  })()}
                 </div>
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-slate-600">
-                  <span>Scheduled: {insp.scheduledDate}</span>
-                  {insp.completedAt && (
-                    <span>Completed: {formatDate(insp.completedAt)}</span>
-                  )}
+                  <span>
+                    Scheduled: {insp.scheduledDate}
+                    {insp.scheduledTime ? ` at ${formatTime12(insp.scheduledTime)}` : ''}
+                  </span>
+                  <span>Started: {insp.startedAt ? formatDateTime(insp.startedAt) : '—'}</span>
+                  {/* Once the report is submitted it carries a submit/generate time;
+                      admin finalisation later sets completedAt. Show whichever exists. */}
+                  <span>Completed: {(insp.completedAt || insp.submittedAt) ? formatDateTime(insp.completedAt || insp.submittedAt) : '—'}</span>
                   {typeof insp.score === 'number' && (
                     <span>Score: <span className="font-semibold text-slate-900">{insp.score}/10</span></span>
                   )}
@@ -1472,6 +1550,17 @@ function formatDate(input?: string | Date | null): string {
   const d = typeof input === "string" ? new Date(input) : input
   if (isNaN(d.getTime())) return ""
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+}
+
+// Date + 12-hour time — used for the inspection's start / completed timestamps.
+function formatDateTime(input?: string | Date | null): string {
+  if (!input) return ""
+  const d = typeof input === "string" ? new Date(input) : input
+  if (isNaN(d.getTime())) return ""
+  return d.toLocaleString("en-IN", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: true,
+  })
 }
 
 // Joins address parts with ", " while trimming and dropping empty/whitespace-only segments.

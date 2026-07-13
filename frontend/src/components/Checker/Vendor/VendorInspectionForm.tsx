@@ -6,7 +6,7 @@ import { HighlightFieldsProvider } from './Steps/VI_VerifyField'
 import type { Verifications } from './Steps/VI_VerifyField'
 import type { InspectorMeta } from './Steps/VI_Step8_FinalReview'
 import VI_Step1_CompanyInfo from './Steps/VI_Step1_CompanyInfo'
-import VI_Step2_WarehouseFactory from './Steps/VI_Step2_WarehouseFactory'
+import VI_Step2_WarehouseFactory, { detectSameAsWarehouse } from './Steps/VI_Step2_WarehouseFactory'
 import type { FactoryEvidenceState } from './Steps/VI_Step2_WarehouseFactory'
 import VI_Step3_OwnerProfile from './Steps/VI_Step3_OwnerProfile'
 import VI_Step4_VendorType from './Steps/VI_Step4_VendorType'
@@ -89,6 +89,9 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
     frontView: null,
     nameBoard: null,
     routeMap: null,
+    warehouseFrontView: null,
+    warehouseNameBoard: null,
+    warehouseRouteMap: null,
   })
   const [evidenceError, setEvidenceError] = useState(false)
   const [docData, setDocData] = useState<VendorDocData>({
@@ -291,12 +294,23 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
   // ── Navigation ─────────────────────────────────────────────────────────────
   const goNext = () => {
     if (step === 2) {
-      // Every evidence slot is mandatory — Front View, Name Board AND Route Map.
-      const hasAllEvidence = factoryEvidence.frontView && factoryEvidence.nameBoard && factoryEvidence.routeMap
-      if (!hasAllEvidence) {
+      // Legal Address & Factory Site evidence is always mandatory — Name Board,
+      // Front View AND Route Map.
+      const hasFactoryEvidence = factoryEvidence.frontView && factoryEvidence.nameBoard && factoryEvidence.routeMap
+      // Warehouse evidence is only required when the warehouse address differs
+      // from the Legal Address & Factory Site (matches the extra upload group).
+      const isSameWarehouse = detectSameAsWarehouse(vendor || {})
+      const hasWarehouseEvidence = isSameWarehouse
+        || (factoryEvidence.warehouseFrontView && factoryEvidence.warehouseNameBoard && factoryEvidence.warehouseRouteMap)
+      if (!hasFactoryEvidence || !hasWarehouseEvidence) {
         setEvidenceError(true)
         document.getElementById('inspector-evidence-photos')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        showErrorToast('Evidence photos required', 'Please upload all three inspector evidence photos (Factory Front View, Factory Name Board, Route Map) before continuing.')
+        showErrorToast(
+          'Evidence photos required',
+          isSameWarehouse
+            ? 'Please upload all three Legal Address & Factory Site evidence photos (Name Board, Front View, Route Map) before continuing.'
+            : 'Please upload all six inspector evidence photos — Legal Address & Factory Site and Warehouse (Name Board, Front View, Route Map each) — before continuing.'
+        )
         return
       }
       setEvidenceError(false)
@@ -432,6 +446,18 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
     }
 
     try {
+      // Inspector evidence photos captured in Step 2. Sent as base64 data URLs;
+      // the backend uploads each to Cloudinary and stores the hosted URL under
+      // itemsToInspect.inspectorEvidenceImages, so admin/QC reports can show them.
+      const inspectorEvidenceImages = [
+        factoryEvidence.nameBoard && { label: 'Factory Site Name Board', dataUrl: factoryEvidence.nameBoard.url },
+        factoryEvidence.frontView && { label: 'Factory Site Front View', dataUrl: factoryEvidence.frontView.url },
+        factoryEvidence.routeMap && { label: 'Factory Site Route Map', dataUrl: factoryEvidence.routeMap.url },
+        factoryEvidence.warehouseNameBoard && { label: 'Warehouse Name Board', dataUrl: factoryEvidence.warehouseNameBoard.url },
+        factoryEvidence.warehouseFrontView && { label: 'Warehouse Front View', dataUrl: factoryEvidence.warehouseFrontView.url },
+        factoryEvidence.warehouseRouteMap && { label: 'Warehouse Route Map', dataUrl: factoryEvidence.warehouseRouteMap.url },
+      ].filter(Boolean)
+
       const payload = {
         verifications,
         inspectorName: meta.inspectorName,
@@ -442,6 +468,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
         checkerLatitude: coords?.checkerLatitude ?? null,
         checkerLongitude: coords?.checkerLongitude ?? null,
         clientSignature: docData.clientSignature || null,
+        inspectorEvidenceImages: inspectorEvidenceImages.length > 0 ? inspectorEvidenceImages : null,
       }
       const res = await qcCheckerService.completeInspection(inspection.id, payload)
       if (res.success) {

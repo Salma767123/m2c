@@ -48,11 +48,6 @@ export default function VI_Step3_OwnerProfile({ vendor: v, verifications, onChan
       ...(intlLandline ? ['o_ownerIntlLandline'] : []),
       'o_businessStartDate',
       'o_employeeCount',
-      ...(v.ownerAddress ? ['o_ownerAddress'] : []),
-      ...(v.ownerCity ? ['o_ownerCity'] : []),
-      ...(v.ownerState ? ['o_ownerState'] : []),
-      ...(v.ownerZipCode ? ['o_ownerZipCode'] : []),
-      ...(v.ownerCountry ? ['o_ownerCountry'] : []),
       ...additionalOwners.flatMap((owner: any, idx: number) => {
         const ll = formatLocalLandline({ countryCode: '+91', std: owner.localLandlineStd, number: owner.localLandlineNumber })
         const il = owner.intlLandlineCountryCode && owner.intlLandlineStd && owner.intlLandlineNumber
@@ -106,19 +101,6 @@ export default function VI_Step3_OwnerProfile({ vendor: v, verifications, onChan
           {vf('o_employeeCount', 'Number of Employees', getEmployeeCountLabel(v.employeeCount))}
         </div>
       </SectionBlock>
-
-      {/* Owner Address */}
-      {(v.ownerAddress || v.ownerCity || v.ownerState) && (
-        <SectionBlock title="Owner Address">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {v.ownerAddress && vf('o_ownerAddress', 'Address', v.ownerAddress)}
-            {v.ownerCity && vf('o_ownerCity', 'City', v.ownerCity)}
-            {v.ownerState && vf('o_ownerState', 'State', v.ownerState)}
-            {v.ownerZipCode && vf('o_ownerZipCode', 'ZIP Code', v.ownerZipCode)}
-            {v.ownerCountry && vf('o_ownerCountry', 'Country', v.ownerCountry)}
-          </div>
-        </SectionBlock>
-      )}
 
       {/* Additional Owners */}
       {additionalOwners.length > 0 && (

@@ -19,9 +19,15 @@ export interface FactoryEvidencePhoto {
 }
 
 export interface FactoryEvidenceState {
+  // Legal Address & Factory Site — inspector evidence photos
   frontView: FactoryEvidencePhoto | null
   nameBoard: FactoryEvidencePhoto | null
   routeMap: FactoryEvidencePhoto | null
+  // Warehouse — inspector evidence photos (only collected when the warehouse
+  // address differs from the Legal Address & Factory Site).
+  warehouseFrontView: FactoryEvidencePhoto | null
+  warehouseNameBoard: FactoryEvidencePhoto | null
+  warehouseRouteMap: FactoryEvidencePhoto | null
 }
 
 interface Props {
@@ -112,18 +118,49 @@ function EvidenceUpload({
 
 const eq = (a: any, b: any) => (a || '').trim() === (b || '').trim()
 
-function detectSameAsLegal(v: any): boolean {
+// The Warehouse Address counts as "same as" the Legal Address & Factory Site
+// when the vendor didn't enter a separate warehouse address, or entered one
+// that matches the legal/factory address field-for-field. (Registration mirrors
+// the legal/factory address into the warehouse columns when the vendor ticks
+// "Same as warehouse".)
+export function detectSameAsWarehouse(v: any): boolean {
   // No separate warehouse address was entered at all
-  if (!v.factoryAddress && !v.factoryCity) return true
-  // All provided warehouse (factory*) fields match the legal address (warehouse*)
+  if (!v.warehouseAddress && !v.warehouseCity) return true
+  // All provided warehouse fields match the legal/factory address
   return (
-    eq(v.factoryAddress, v.warehouseAddress) &&
-    eq(v.factoryCity, v.warehouseCity) &&
-    eq(v.factoryState, v.warehouseState) &&
-    eq(v.factoryZipCode, v.warehouseZipCode) &&
-    eq(v.factoryCountry, v.warehouseCountry)
+    eq(v.warehouseAddress, v.factoryAddress) &&
+    eq(v.warehouseCity, v.factoryCity) &&
+    eq(v.warehouseState, v.factoryState) &&
+    eq(v.warehouseZipCode, v.factoryZipCode) &&
+    eq(v.warehouseCountry, v.factoryCountry)
   )
 }
+
+// Vendor-uploaded photos are all stored as type='OTHER' documents. The two
+// upload sets are distinguished by their document name: the Legal Address &
+// Factory Site photos (CompanyDetails step) are prefixed "Factory Site …",
+// while the Warehouse photos (WarehouseDetails step) are named "Factory …".
+const FACTORY_SITE_PHOTO_ORDER: Record<string, number> = {
+  'Factory Site Name Board': 0,
+  'Factory Site Front View': 1,
+  'Factory Site Back View': 2,
+  'Factory Site Left View': 3,
+  'Factory Site Right View': 4,
+  'Factory Site Road View': 5,
+  'Factory Site Interior': 6,
+  'Factory Site Image (Other)': 7,
+}
+const WAREHOUSE_PHOTO_ORDER: Record<string, number> = {
+  'Factory Name Board': 0,
+  'Factory Front View': 1,
+  'Factory Back View': 2,
+  'Factory Left View': 3,
+  'Factory Right View': 4,
+  'Factory Road View': 5,
+  'Factory Interior': 6,
+  'Factory Image (Other)': 7,
+}
+const isFactorySiteDoc = (name: string) => (name || '').startsWith('Factory Site')
 
 export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, onChange, onRegisterFields, factoryEvidence, onEvidenceChange, evidenceError }: Props) {
   const [viewerImg, setViewerImg] = useState<{ url: string; name: string } | null>(null)
@@ -132,52 +169,55 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
     <VerifyField key={key} fieldKey={key} label={label} value={value} type={type} verifications={verifications} onChange={onChange} />
   )
 
-  // Canonical slot order matching the vendor registration form (WarehouseDetails).
-  // Backend stores names via FACTORY_SLOT_LABEL_MAP so we sort by name.
-  const FACTORY_PHOTO_ORDER: Record<string, number> = {
-    'Factory Name Board': 0,
-    'Factory Front View': 1,
-    'Factory Back View': 2,
-    'Factory Left View': 3,
-    'Factory Right View': 4,
-    'Factory Road View': 5,
-    'Factory Interior': 6,
-    'Factory Image (Other)': 7,
-  }
-  const factoryImages = Array.isArray(v.documents)
-    ? v.documents
-        .filter((d: any) => d.type === 'OTHER')
-        .map((d: any) => ({ label: d.name || 'Factory Image', url: d.documentUrl }))
-        .sort((a: any, b: any) => (FACTORY_PHOTO_ORDER[a.label] ?? 99) - (FACTORY_PHOTO_ORDER[b.label] ?? 99))
+  const otherDocs = Array.isArray(v.documents)
+    ? v.documents.filter((d: any) => d.type === 'OTHER')
     : []
+  // Legal Address & Factory Site images — "Factory Site …" documents.
+  const legalImages = otherDocs
+    .filter((d: any) => isFactorySiteDoc(d.name))
+    .map((d: any) => ({ label: d.name || 'Factory Site Image', url: d.documentUrl }))
+    .sort((a: any, b: any) => (FACTORY_SITE_PHOTO_ORDER[a.label] ?? 99) - (FACTORY_SITE_PHOTO_ORDER[b.label] ?? 99))
+  // Warehouse images — every other "Factory …" document.
+  const warehouseImages = otherDocs
+    .filter((d: any) => !isFactorySiteDoc(d.name))
+    .map((d: any) => ({ label: d.name || 'Warehouse Image', url: d.documentUrl }))
+    .sort((a: any, b: any) => (WAREHOUSE_PHOTO_ORDER[a.label] ?? 99) - (WAREHOUSE_PHOTO_ORDER[b.label] ?? 99))
 
-  const isSameAsLegal = detectSameAsLegal(v)
+  const isSameAsWarehouse = detectSameAsWarehouse(v)
 
   useEffect(() => {
     const keys: string[] = [
-      'w_ownershipType',
-      'w_warehouseSize',
-      ...(v.warehouseAddress ? ['w_warehouseAddress'] : []),
-      ...(v.warehouseAddressLine2 ? ['w_warehouseAddressLine2'] : []),
-      ...(v.warehouseAddressLine3 ? ['w_warehouseAddressLine3'] : []),
-      ...(v.warehouseLandmark ? ['w_warehouseLandmark'] : []),
-      ...(v.warehouseCity ? ['w_warehouseCity'] : []),
-      ...(v.warehouseState ? ['w_warehouseState'] : []),
-      ...(v.warehouseZipCode ? ['w_warehouseZipCode'] : []),
-      ...(v.warehouseCountry ? ['w_warehouseCountry'] : []),
-      // Warehouse Address section: one key if same as legal, individual fields if different
-      ...(isSameAsLegal
+      // ── Legal Address & Factory Site ──
+      'w_legalOwnershipType',
+      'w_legalCapacity',
+      ...(v.factoryAddress ? ['w_legalAddress'] : []),
+      ...(v.addressLine2 ? ['w_legalAddressLine2'] : []),
+      ...(v.addressLine3 ? ['w_legalAddressLine3'] : []),
+      ...(v.landmark ? ['w_legalLandmark'] : []),
+      ...(v.factoryCity ? ['w_legalCity'] : []),
+      ...(v.factoryState ? ['w_legalState'] : []),
+      ...(v.factoryZipCode ? ['w_legalZipCode'] : []),
+      ...(v.factoryCountry ? ['w_legalCountry'] : []),
+      ...(v.mapLink ? ['w_mapLink'] : []),
+      ...legalImages.map((_: any, idx: number) => `w_legalImg_${idx}`),
+      // ── Warehouse Address ──
+      // One key when it mirrors the legal/factory address, individual fields otherwise.
+      ...(isSameAsWarehouse
         ? ['w_sameWarehouse']
         : [
-            ...(v.factoryAddress ? ['w_factoryAddress'] : []),
-            ...(v.factoryCity ? ['w_factoryCity'] : []),
-            ...(v.factoryState ? ['w_factoryState'] : []),
-            ...(v.factoryZipCode ? ['w_factoryZipCode'] : []),
-            ...(v.factoryCountry ? ['w_factoryCountry'] : []),
+            'w_whOwnershipType',
+            'w_whCapacity',
+            ...(v.warehouseAddress ? ['w_whAddress'] : []),
+            ...(v.warehouseAddressLine2 ? ['w_whAddressLine2'] : []),
+            ...(v.warehouseAddressLine3 ? ['w_whAddressLine3'] : []),
+            ...(v.warehouseLandmark ? ['w_whLandmark'] : []),
+            ...(v.warehouseCity ? ['w_whCity'] : []),
+            ...(v.warehouseState ? ['w_whState'] : []),
+            ...(v.warehouseZipCode ? ['w_whZipCode'] : []),
+            ...(v.warehouseCountry ? ['w_whCountry'] : []),
           ]
       ),
-      ...(v.mapLink ? ['w_mapLink'] : []),
-      ...factoryImages.map((_: any, idx: number) => `w_factoryImg_${idx}`),
+      ...warehouseImages.map((_: any, idx: number) => `w_whImg_${idx}`),
     ]
     onRegisterFields(keys)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -193,24 +233,55 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
       {/* Section 1: Legal Address & Factory Site */}
       <SectionBlock title="Legal Address & Factory Site" icon={<Warehouse className="w-4 h-4" />}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {vf('w_ownershipType', 'Ownership Type', getOwnershipTypeLabel(v.ownershipType))}
-          {vf('w_warehouseSize', 'Warehousing Capacity', v.warehouseSize)}
+          {vf('w_legalOwnershipType', 'Ownership Type', getOwnershipTypeLabel(v.factoryOwnershipType))}
+          {vf('w_legalCapacity', 'Warehousing Capacity', v.factorySize)}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          {v.warehouseAddress && vf('w_warehouseAddress', 'Address Line 1', v.warehouseAddress)}
-          {v.warehouseAddressLine2 && vf('w_warehouseAddressLine2', 'Address Line 2', v.warehouseAddressLine2)}
-          {v.warehouseAddressLine3 && vf('w_warehouseAddressLine3', 'Address Line 3', v.warehouseAddressLine3)}
-          {v.warehouseLandmark && vf('w_warehouseLandmark', 'Landmark', v.warehouseLandmark)}
-          {v.warehouseCity && vf('w_warehouseCity', 'City', v.warehouseCity)}
-          {v.warehouseState && vf('w_warehouseState', 'State', v.warehouseState)}
-          {v.warehouseZipCode && vf('w_warehouseZipCode', 'ZIP / Postal Code', v.warehouseZipCode)}
-          {v.warehouseCountry && vf('w_warehouseCountry', 'Country', v.warehouseCountry)}
+          {v.factoryAddress && vf('w_legalAddress', 'Address Line 1', v.factoryAddress)}
+          {v.addressLine2 && vf('w_legalAddressLine2', 'Address Line 2', v.addressLine2)}
+          {v.addressLine3 && vf('w_legalAddressLine3', 'Address Line 3', v.addressLine3)}
+          {v.landmark && vf('w_legalLandmark', 'Landmark', v.landmark)}
+          {v.factoryCity && vf('w_legalCity', 'City', v.factoryCity)}
+          {v.factoryState && vf('w_legalState', 'State', v.factoryState)}
+          {v.factoryZipCode && vf('w_legalZipCode', 'ZIP / Postal Code', v.factoryZipCode)}
+          {v.factoryCountry && vf('w_legalCountry', 'Country', v.factoryCountry)}
+          {v.mapLink && vf('w_mapLink', 'Map / Location Link', v.mapLink, 'url')}
         </div>
+        {/* Factory Images — only the Legal Address & Factory Site photos */}
+        {legalImages.length > 0 && (
+          <div className="mt-6">
+            <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+              <ImageIcon className="w-3.5 h-3.5" /> Factory Images
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {legalImages.map((img: any, idx: number) => (
+                <VerifyField
+                  key={idx}
+                  fieldKey={`w_legalImg_${idx}`}
+                  label={img.label}
+                  value={img.url}
+                  type="image"
+                  verifications={verifications}
+                  onChange={onChange}
+                  headerAction={img.url ? (
+                    <button
+                      type="button"
+                      onClick={() => setViewerImg({ url: img.url, name: img.label })}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors shrink-0"
+                    >
+                      <Eye className="w-3 h-3" /> View
+                    </button>
+                  ) : undefined}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </SectionBlock>
 
       {/* Section 2: Warehouse Address */}
       <SectionBlock title="Warehouse Address" icon={<MapPin className="w-4 h-4" />}>
-        {isSameAsLegal ? (
+        {isSameAsWarehouse ? (
           <div className="space-y-4">
             <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
               <MapPin className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
@@ -227,82 +298,124 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
             />
           </div>
         ) : (
-          <div className="space-y-4">
+          <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {v.factoryAddress && vf('w_factoryAddress', 'Address Line 1', v.factoryAddress)}
-              {v.factoryCity && vf('w_factoryCity', 'City', v.factoryCity)}
-              {v.factoryState && vf('w_factoryState', 'State', v.factoryState)}
-              {v.factoryZipCode && vf('w_factoryZipCode', 'ZIP / Postal Code', v.factoryZipCode)}
-              {v.factoryCountry && vf('w_factoryCountry', 'Country', v.factoryCountry)}
+              {vf('w_whOwnershipType', 'Ownership Type', getOwnershipTypeLabel(v.ownershipType))}
+              {vf('w_whCapacity', 'Warehousing Capacity', v.warehouseSize)}
             </div>
-            {v.mapLink && (
-              <div className="mt-2">
-                {vf('w_mapLink', 'Map / Location Link', v.mapLink, 'url')}
-              </div>
-            )}
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              {v.warehouseAddress && vf('w_whAddress', 'Address Line 1', v.warehouseAddress)}
+              {v.warehouseAddressLine2 && vf('w_whAddressLine2', 'Address Line 2', v.warehouseAddressLine2)}
+              {v.warehouseAddressLine3 && vf('w_whAddressLine3', 'Address Line 3', v.warehouseAddressLine3)}
+              {v.warehouseLandmark && vf('w_whLandmark', 'Landmark', v.warehouseLandmark)}
+              {v.warehouseCity && vf('w_whCity', 'City', v.warehouseCity)}
+              {v.warehouseState && vf('w_whState', 'State', v.warehouseState)}
+              {v.warehouseZipCode && vf('w_whZipCode', 'ZIP / Postal Code', v.warehouseZipCode)}
+              {v.warehouseCountry && vf('w_whCountry', 'Country', v.warehouseCountry)}
+            </div>
+          </>
         )}
-        {/* Map link always shown if present and same-as-legal */}
-        {isSameAsLegal && v.mapLink && (
-          <div className="mt-4">
-            {vf('w_mapLink', 'Map / Location Link', v.mapLink, 'url')}
+        {/* Warehouse Images — only the Warehouse Address photos */}
+        {warehouseImages.length > 0 && (
+          <div className="mt-6">
+            <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+              <ImageIcon className="w-3.5 h-3.5" /> Warehouse Images
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {warehouseImages.map((img: any, idx: number) => (
+                <VerifyField
+                  key={idx}
+                  fieldKey={`w_whImg_${idx}`}
+                  label={img.label}
+                  value={img.url}
+                  type="image"
+                  verifications={verifications}
+                  onChange={onChange}
+                  headerAction={img.url ? (
+                    <button
+                      type="button"
+                      onClick={() => setViewerImg({ url: img.url, name: img.label })}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors shrink-0"
+                    >
+                      <Eye className="w-3 h-3" /> View
+                    </button>
+                  ) : undefined}
+                />
+              ))}
+            </div>
           </div>
         )}
       </SectionBlock>
 
-      {/* Vendor-uploaded Factory Photos — each with a View button in the card header */}
-      {factoryImages.length > 0 && (
-        <SectionBlock title="Factory Photos (Vendor-Uploaded)" icon={<ImageIcon className="w-4 h-4" />}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {factoryImages.map((img: any, idx: number) => (
-              <VerifyField
-                key={idx}
-                fieldKey={`w_factoryImg_${idx}`}
-                label={img.label}
-                value={img.url}
-                type="image"
-                verifications={verifications}
-                onChange={onChange}
-                headerAction={img.url ? (
-                  <button
-                    type="button"
-                    onClick={() => setViewerImg({ url: img.url, name: img.label })}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors shrink-0"
-                  >
-                    <Eye className="w-3 h-3" /> View
-                  </button>
-                ) : undefined}
-              />
-            ))}
-          </div>
-        </SectionBlock>
-      )}
-
       {/* Inspector Evidence Photos */}
       <div id="inspector-evidence-photos">
         <SectionBlock title="Inspector Evidence Photos" icon={<Camera className="w-4 h-4" />}>
-          <p className="text-xs text-slate-500 mb-4">Upload photos taken during the factory visit to serve as inspection evidence. All three photos are required.</p>
+          <p className="text-xs text-slate-500 mb-4">
+            Upload photos taken during the visit to serve as inspection evidence.{' '}
+            {isSameAsWarehouse
+              ? 'All three Legal Address & Factory Site photos are required.'
+              : 'All three Legal Address & Factory Site photos and all three Warehouse photos are required.'}
+          </p>
           {evidenceError && (
             <p className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
-              All three evidence photos are required before continuing.
+              {isSameAsWarehouse
+                ? 'All three evidence photos are required before continuing.'
+                : 'All six evidence photos (Legal Address & Factory Site and Warehouse) are required before continuing.'}
             </p>
           )}
-          <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 ${evidenceError ? 'ring-2 ring-red-300 ring-offset-2 rounded-xl p-2' : ''}`}>
-            <EvidenceUpload
-              label="Factory Name Board"
-              value={factoryEvidence.nameBoard}
-              onChange={(photo) => onEvidenceChange('nameBoard', photo)}
-            />
-            <EvidenceUpload
-              label="Factory Front View"
-              value={factoryEvidence.frontView}
-              onChange={(photo) => onEvidenceChange('frontView', photo)}
-            />
-            <EvidenceUpload
-              label="Route Map Photo"
-              value={factoryEvidence.routeMap}
-              onChange={(photo) => onEvidenceChange('routeMap', photo)}
-            />
+
+          <div className={evidenceError ? 'ring-2 ring-red-300 ring-offset-2 rounded-xl p-2 space-y-8' : 'space-y-8'}>
+            {/* Group 1: Legal Address & Factory Site */}
+            <div>
+              <p className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-1.5">
+                <Warehouse className="w-4 h-4 text-brand-500" /> Legal Address &amp; Factory Site — Photo Evidence
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <EvidenceUpload
+                  label="Factory Site Name Board"
+                  value={factoryEvidence.nameBoard}
+                  onChange={(photo) => onEvidenceChange('nameBoard', photo)}
+                />
+                <EvidenceUpload
+                  label="Factory Site Front View"
+                  value={factoryEvidence.frontView}
+                  onChange={(photo) => onEvidenceChange('frontView', photo)}
+                />
+                <EvidenceUpload
+                  label="Factory Site Route Map"
+                  value={factoryEvidence.routeMap}
+                  onChange={(photo) => onEvidenceChange('routeMap', photo)}
+                />
+              </div>
+            </div>
+
+            {/* Group 2: Warehouse — only when the warehouse address differs from
+                the Legal Address & Factory Site. When they're the same, the
+                factory-site photos above already cover the site. */}
+            {!isSameAsWarehouse && (
+              <div>
+                <p className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-brand-500" /> Warehouse — Photo Evidence
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <EvidenceUpload
+                    label="Warehouse Name Board"
+                    value={factoryEvidence.warehouseNameBoard}
+                    onChange={(photo) => onEvidenceChange('warehouseNameBoard', photo)}
+                  />
+                  <EvidenceUpload
+                    label="Warehouse Front View"
+                    value={factoryEvidence.warehouseFrontView}
+                    onChange={(photo) => onEvidenceChange('warehouseFrontView', photo)}
+                  />
+                  <EvidenceUpload
+                    label="Warehouse Route Map"
+                    value={factoryEvidence.warehouseRouteMap}
+                    onChange={(photo) => onEvidenceChange('warehouseRouteMap', photo)}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </SectionBlock>
       </div>

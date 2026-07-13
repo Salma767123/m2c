@@ -29,6 +29,24 @@ async function fetchImgDataUrl(url: string): Promise<string | null> {
     } catch { return null }
 }
 
+// Inspector evidence photos are persisted on the inspection form data as
+// [{ label, dataUrl }] where dataUrl is a hosted (Cloudinary) URL. jsPDF needs
+// a data URL to embed, so fetch each one. Returns null when there are none.
+async function loadInspectorEvidence(fd: Record<string, any>): Promise<FactoryImageEntry[] | null> {
+    const raw = Array.isArray(fd?.inspectorEvidenceImages) ? fd.inspectorEvidenceImages : []
+    if (raw.length === 0) return null
+    const entries = await Promise.all(
+        raw.map(async (e: any): Promise<FactoryImageEntry | null> => {
+            const src = e?.dataUrl || e?.url
+            if (!src) return null
+            const dataUrl = String(src).startsWith('data:') ? src : await fetchImgDataUrl(src)
+            return dataUrl ? { label: e?.label || 'Inspector Evidence', dataUrl } : null
+        })
+    )
+    const filtered = entries.filter((x): x is FactoryImageEntry => x !== null)
+    return filtered.length > 0 ? filtered : null
+}
+
 interface Props {
     inspectionId: string
 }
@@ -247,10 +265,11 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                     : null,
                 generatedAt: new Date(),
             }
+            const inspectorEvidenceImages = await loadInspectorEvidence(fd)
             const pdf = generateFactoryInspectionPdf(vendor, isNewFmt ? fd.verifications : {}, meta, {
                 clientSignatureDataUrl: fd.clientSignature || null,
                 vendorFactoryImages: vendorFactoryImages.length > 0 ? vendorFactoryImages : null,
-                inspectorEvidenceImages: null,
+                inspectorEvidenceImages,
                 companyLogoDataUrl,
                 ownerPhotoDataUrl,
                 mainContactPhotoDataUrl,
@@ -320,10 +339,11 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                     : null,
                 generatedAt: new Date(),
             }
+            const inspectorEvidenceImages = await loadInspectorEvidence(fd)
             const pdf = generateFactoryInspectionPdf(vendor, isNewFmt ? fd.verifications : {}, meta, {
                 clientSignatureDataUrl: fd.clientSignature || null,
                 vendorFactoryImages: vendorFactoryImages.length > 0 ? vendorFactoryImages : null,
-                inspectorEvidenceImages: null,
+                inspectorEvidenceImages,
                 companyLogoDataUrl,
                 ownerPhotoDataUrl,
                 mainContactPhotoDataUrl,
@@ -489,67 +509,29 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                         badge={<StepBadge prefixes={['w_']} vf={vf} />}>
                         <SubHead title="Legal Address & Factory Site" />
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            <VCard label="Ownership Type" value={OWN_TYPE[(vendor as any).factoryOwnershipType] || (vendor as any).factoryOwnershipType} k="w_factoryOwnershipType" vf={vf} />
-                            {(vendor as any).factorySize && <VCard label="Factory Site Area" value={(vendor as any).factorySize} k="w_factorySize" vf={vf} />}
-                            {vendor.businessAddress && <VCard label="Address Line 1" value={vendor.businessAddress} k="w_businessAddress" vf={vf} />}
-                            {(vendor as any).addressLine2 && <VCard label="Address Line 2" value={(vendor as any).addressLine2} k="w_addressLine2" vf={vf} />}
-                            {vendor.businessCity && <VCard label="City" value={vendor.businessCity} k="w_businessCity" vf={vf} />}
-                            {vendor.businessState && <VCard label="State" value={vendor.businessState} k="w_businessState" vf={vf} />}
-                            {vendor.businessZipCode && <VCard label="ZIP / Postal Code" value={vendor.businessZipCode} k="w_businessZipCode" vf={vf} />}
-                            {vendor.businessCountry && <VCard label="Country" value={vendor.businessCountry} k="w_businessCountry" vf={vf} />}
+                            <VCard label="Ownership Type" value={OWN_TYPE[(vendor as any).factoryOwnershipType] || (vendor as any).factoryOwnershipType} k="w_legalOwnershipType" vf={vf} />
+                            {(vendor as any).factorySize && <VCard label="Warehousing Capacity" value={(vendor as any).factorySize} k="w_legalCapacity" vf={vf} />}
+                            {(vendor as any).factoryAddress && <VCard label="Address Line 1" value={(vendor as any).factoryAddress} k="w_legalAddress" vf={vf} />}
+                            {(vendor as any).addressLine2 && <VCard label="Address Line 2" value={(vendor as any).addressLine2} k="w_legalAddressLine2" vf={vf} />}
+                            {(vendor as any).addressLine3 && <VCard label="Address Line 3" value={(vendor as any).addressLine3} k="w_legalAddressLine3" vf={vf} />}
+                            {(vendor as any).landmark && <VCard label="Landmark" value={(vendor as any).landmark} k="w_legalLandmark" vf={vf} />}
+                            {(vendor as any).factoryCity && <VCard label="City" value={(vendor as any).factoryCity} k="w_legalCity" vf={vf} />}
+                            {(vendor as any).factoryState && <VCard label="State" value={(vendor as any).factoryState} k="w_legalState" vf={vf} />}
+                            {(vendor as any).factoryZipCode && <VCard label="ZIP / Postal Code" value={(vendor as any).factoryZipCode} k="w_legalZipCode" vf={vf} />}
+                            {(vendor as any).factoryCountry && <VCard label="Country" value={(vendor as any).factoryCountry} k="w_legalCountry" vf={vf} />}
+                            {vendor.mapLink && <VCard label="Map / Location Link" value={vendor.mapLink} k="w_mapLink" vf={vf} />}
                         </div>
+                        {/* Factory Images — only the Legal Address & Factory Site photos ("Factory Site …") */}
                         {(() => {
-                            const eq = (a: any, b: any) => (a || '').trim() === (b || '').trim()
-                            const isSameAsLegal = (
-                              !vendor.warehouseAddress && !vendor.warehouseCity
-                            ) || (
-                              eq(vendor.warehouseAddress, vendor.businessAddress) &&
-                              eq(vendor.warehouseCity, vendor.businessCity) &&
-                              eq(vendor.warehouseState, vendor.businessState) &&
-                              eq(vendor.warehouseZipCode, vendor.businessZipCode) &&
-                              eq(vendor.warehouseCountry, vendor.businessCountry)
-                            )
-                            return (
-                                <>
-                                    <SubHead title="Warehouse Address" />
-                                    {isSameAsLegal ? (
-                                        <div className="col-span-full p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 font-medium">
-                                            Warehouse Address is the same as the Legal Address &amp; Factory Site provided above.
-                                            {vf['w_sameWarehouse'] && <span className="ml-2"><VerBadge k="w_sameWarehouse" vf={vf} /></span>}
-                                        </div>
-                                    ) : (
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                            <VCard label="Ownership Type" value={OWN_TYPE[vendor.ownershipType] || vendor.ownershipType} k="w_ownershipType" vf={vf} />
-                                            <VCard label="Warehousing Capacity" value={vendor.warehouseSize} k="w_warehouseSize" vf={vf} />
-                                            {vendor.warehouseAddress && <VCard label="Address Line 1" value={vendor.warehouseAddress} k="w_warehouseAddress" vf={vf} />}
-                                            {vendor.warehouseAddressLine2 && <VCard label="Address Line 2" value={vendor.warehouseAddressLine2} k="w_warehouseAddressLine2" vf={vf} />}
-                                            {vendor.warehouseAddressLine3 && <VCard label="Address Line 3" value={vendor.warehouseAddressLine3} k="w_warehouseAddressLine3" vf={vf} />}
-                                            {vendor.warehouseLandmark && <VCard label="Landmark" value={vendor.warehouseLandmark} k="w_warehouseLandmark" vf={vf} />}
-                                            {vendor.warehouseCity && <VCard label="City" value={vendor.warehouseCity} k="w_warehouseCity" vf={vf} />}
-                                            {vendor.warehouseState && <VCard label="State" value={vendor.warehouseState} k="w_warehouseState" vf={vf} />}
-                                            {vendor.warehouseZipCode && <VCard label="ZIP Code" value={vendor.warehouseZipCode} k="w_warehouseZipCode" vf={vf} />}
-                                            {vendor.warehouseCountry && <VCard label="Country" value={vendor.warehouseCountry} k="w_warehouseCountry" vf={vf} />}
-                                            {vendor.mapLink && <VCard label="Map / Location Link" value={vendor.mapLink} k="w_mapLink" vf={vf} />}
-                                        </div>
-                                    )}
-                                    {isSameAsLegal && vendor.mapLink && (
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
-                                            <VCard label="Map / Location Link" value={vendor.mapLink} k="w_mapLink" vf={vf} />
-                                        </div>
-                                    )}
-                                </>
-                            )
-                        })()}
-                        {(() => {
-                            const factoryImgs = Array.isArray(vendor.documents)
-                                ? vendor.documents.filter((d: any) => d.type === 'OTHER' && d.documentUrl)
+                            const imgs = Array.isArray(vendor.documents)
+                                ? vendor.documents.filter((d: any) => d.type === 'OTHER' && d.documentUrl && (d.name || '').startsWith('Factory Site'))
                                 : []
-                            if (!factoryImgs.length) return null
+                            if (!imgs.length) return null
                             return (
                                 <>
-                                    <SubHead title="Factory Photos (Vendor-Uploaded)" />
+                                    <SubHead title="Factory Images" />
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                        {factoryImgs.map((doc: any, idx: number) => {
+                                        {imgs.map((doc: any, idx: number) => {
                                             const src = doc.documentUrl
                                             const caption = doc.name || `Photo ${idx + 1}`
                                             const isImg = /\.(png|jpe?g|gif|webp)(\?|$)/i.test(src)
@@ -558,10 +540,75 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                                                     <img src={src} alt={caption} onError={(e) => { e.currentTarget.style.display = 'none' }}
                                                         className="w-full h-24 object-cover rounded-xl border border-slate-200 hover:scale-[1.02] transition-transform" />
                                                     <p className="mt-1 text-[11px] text-slate-600 truncate font-medium">{caption}</p>
-                                                    <div className="mt-0.5">{vf[`w_factoryImg_${idx}`] && <VerBadge k={`w_factoryImg_${idx}`} vf={vf} />}</div>
+                                                    <div className="mt-0.5">{vf[`w_legalImg_${idx}`] && <VerBadge k={`w_legalImg_${idx}`} vf={vf} />}</div>
                                                 </div>
                                             ) : (
-                                                <VCard key={idx} label={caption} value="Document on file" k={`w_factoryImg_${idx}`} vf={vf} />
+                                                <VCard key={idx} label={caption} value="Document on file" k={`w_legalImg_${idx}`} vf={vf} />
+                                            )
+                                        })}
+                                    </div>
+                                </>
+                            )
+                        })()}
+                        {(() => {
+                            const eq = (a: any, b: any) => (a || '').trim() === (b || '').trim()
+                            const isSameAsWarehouse = (
+                              !vendor.warehouseAddress && !vendor.warehouseCity
+                            ) || (
+                              eq(vendor.warehouseAddress, (vendor as any).factoryAddress) &&
+                              eq(vendor.warehouseCity, (vendor as any).factoryCity) &&
+                              eq(vendor.warehouseState, (vendor as any).factoryState) &&
+                              eq(vendor.warehouseZipCode, (vendor as any).factoryZipCode) &&
+                              eq(vendor.warehouseCountry, (vendor as any).factoryCountry)
+                            )
+                            return (
+                                <>
+                                    <SubHead title="Warehouse Address" />
+                                    {isSameAsWarehouse ? (
+                                        <div className="col-span-full p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 font-medium">
+                                            Warehouse Address is the same as the Legal Address &amp; Factory Site provided above.
+                                            {vf['w_sameWarehouse'] && <span className="ml-2"><VerBadge k="w_sameWarehouse" vf={vf} /></span>}
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                            <VCard label="Ownership Type" value={OWN_TYPE[vendor.ownershipType] || vendor.ownershipType} k="w_whOwnershipType" vf={vf} />
+                                            <VCard label="Warehousing Capacity" value={vendor.warehouseSize} k="w_whCapacity" vf={vf} />
+                                            {vendor.warehouseAddress && <VCard label="Address Line 1" value={vendor.warehouseAddress} k="w_whAddress" vf={vf} />}
+                                            {vendor.warehouseAddressLine2 && <VCard label="Address Line 2" value={vendor.warehouseAddressLine2} k="w_whAddressLine2" vf={vf} />}
+                                            {vendor.warehouseAddressLine3 && <VCard label="Address Line 3" value={vendor.warehouseAddressLine3} k="w_whAddressLine3" vf={vf} />}
+                                            {vendor.warehouseLandmark && <VCard label="Landmark" value={vendor.warehouseLandmark} k="w_whLandmark" vf={vf} />}
+                                            {vendor.warehouseCity && <VCard label="City" value={vendor.warehouseCity} k="w_whCity" vf={vf} />}
+                                            {vendor.warehouseState && <VCard label="State" value={vendor.warehouseState} k="w_whState" vf={vf} />}
+                                            {vendor.warehouseZipCode && <VCard label="ZIP Code" value={vendor.warehouseZipCode} k="w_whZipCode" vf={vf} />}
+                                            {vendor.warehouseCountry && <VCard label="Country" value={vendor.warehouseCountry} k="w_whCountry" vf={vf} />}
+                                        </div>
+                                    )}
+                                </>
+                            )
+                        })()}
+                        {/* Warehouse Images — every other "Factory …" (non-Site) photo */}
+                        {(() => {
+                            const imgs = Array.isArray(vendor.documents)
+                                ? vendor.documents.filter((d: any) => d.type === 'OTHER' && d.documentUrl && !(d.name || '').startsWith('Factory Site'))
+                                : []
+                            if (!imgs.length) return null
+                            return (
+                                <>
+                                    <SubHead title="Warehouse Images" />
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                        {imgs.map((doc: any, idx: number) => {
+                                            const src = doc.documentUrl
+                                            const caption = doc.name || `Photo ${idx + 1}`
+                                            const isImg = /\.(png|jpe?g|gif|webp)(\?|$)/i.test(src)
+                                            return isImg ? (
+                                                <div key={idx} className="cursor-pointer" onClick={() => setSelectedImage({ src, alt: caption })}>
+                                                    <img src={src} alt={caption} onError={(e) => { e.currentTarget.style.display = 'none' }}
+                                                        className="w-full h-24 object-cover rounded-xl border border-slate-200 hover:scale-[1.02] transition-transform" />
+                                                    <p className="mt-1 text-[11px] text-slate-600 truncate font-medium">{caption}</p>
+                                                    <div className="mt-0.5">{vf[`w_whImg_${idx}`] && <VerBadge k={`w_whImg_${idx}`} vf={vf} />}</div>
+                                                </div>
+                                            ) : (
+                                                <VCard key={idx} label={caption} value="Document on file" k={`w_whImg_${idx}`} vf={vf} />
                                             )
                                         })}
                                     </div>

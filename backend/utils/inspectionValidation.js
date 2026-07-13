@@ -77,6 +77,36 @@ function validateVerificationPayload(d) {
         errors.verifications = 'Inspection verifications are required';
     }
 
+    // Inspector evidence photos (optional). Sent as [{ label, dataUrl }]; each
+    // dataUrl is a base64 image (uploaded to Cloudinary post-validation by
+    // resolveBase64InValue) or an already-hosted https URL. Mirror the
+    // factoryPhotos size/count/format guards.
+    if (d.inspectorEvidenceImages != null) {
+        if (!Array.isArray(d.inspectorEvidenceImages)) {
+            errors.inspectorEvidenceImages = 'Invalid evidence photos';
+        } else if (d.inspectorEvidenceImages.length > MAX_PHOTOS) {
+            errors.inspectorEvidenceImages = `At most ${MAX_PHOTOS} evidence photos allowed`;
+        } else {
+            const DATA_URL_RE = /^data:image\/(png|jpe?g|webp|gif);base64,/i;
+            const HTTP_URL_RE = /^https?:\/\//i;
+            for (const item of d.inspectorEvidenceImages) {
+                const src = item && typeof item === 'object' ? item.dataUrl : null;
+                if (typeof src !== 'string' || src.length === 0) {
+                    errors.inspectorEvidenceImages = 'Invalid evidence photo data';
+                    break;
+                }
+                if (src.length > MAX_PHOTO_CHARS) {
+                    errors.inspectorEvidenceImages = 'Evidence photo exceeds maximum size (~6MB)';
+                    break;
+                }
+                if (!DATA_URL_RE.test(src) && !HTTP_URL_RE.test(src)) {
+                    errors.inspectorEvidenceImages = 'Evidence photo must be an image data URL or HTTPS URL';
+                    break;
+                }
+            }
+        }
+    }
+
     return errors;
 }
 

@@ -890,6 +890,8 @@ const getVendorDetails = async (req, res) => {
                     poNumber: true,
                     clientName: true,
                     scheduledDate: true,
+                    scheduledTime: true,
+                    startedAt: true,
                     completedAt: true,
                     submittedAt: true,
                     result: true,

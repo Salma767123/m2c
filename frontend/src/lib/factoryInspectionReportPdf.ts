@@ -246,6 +246,35 @@ export function generateFactoryInspectionPdf(
     return 'Pending'
   }
 
+  // Render a titled grid of images (3 per row). Used for factory/warehouse
+  // photos (shown under their address subsection) and for the inspector
+  // evidence photos at the end of the report.
+  const renderImageGroup = (heading: string, images: FactoryImageEntry[] | null | undefined) => {
+    const imgs = images || []
+    if (imgs.length === 0) return
+    const COLS = 3
+    const IMG_W = Math.floor((contentW - (COLS - 1) * 8) / COLS)
+    const IMG_H = Math.round(IMG_W * 0.75)  // 4:3 aspect — avoids huge squares
+    const LABEL_H = 14
+    const ROW_H = IMG_H + LABEL_H + 10
+    subTitle(heading)
+    for (let i = 0; i < imgs.length; i += COLS) {
+      ensureSpace(ROW_H)
+      const row = imgs.slice(i, i + COLS)
+      row.forEach((img, col) => {
+        const x = margin + col * (IMG_W + 8)
+        const fmt = /^data:image\/png/i.test(img.dataUrl) ? "PNG" : "JPEG"
+        try { doc.addImage(img.dataUrl, fmt, x, y, IMG_W, IMG_H, undefined, "FAST") } catch { /* skip broken image */ }
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(8)
+        doc.setTextColor(...MUTED)
+        doc.text(img.label, x + IMG_W / 2, y + IMG_H + 9, { align: "center" })
+      })
+      y += ROW_H
+    }
+    y += 6
+  }
+
   // Render a small inline thumbnail (photo / logo) at the current y position.
   const renderThumbnail = (dataUrl: string | null | undefined, caption: string, size = 60) => {
     if (blank(dataUrl)) return
@@ -324,45 +353,59 @@ export function generateFactoryInspectionPdf(
   // ── B. Warehouse & Factory Details ─────────────────────────────────────────
   sectionTitle("B. Warehouse & Factory Details", sectionStatus(['w_']))
 
+  // Factory photos are split by document label: "Factory Site …" belong to the
+  // Legal Address & Factory Site, everything else is a Warehouse photo. Each set
+  // is shown under its own address subsection below (not lumped at the end).
+  const vendorImgs = options.vendorFactoryImages || []
+  const factorySiteImgs = vendorImgs.filter((img) => (img.label || "").startsWith("Factory Site"))
+  const warehouseImgs = vendorImgs.filter((img) => !(img.label || "").startsWith("Factory Site"))
+
   subTitle("Legal Address & Factory Site")
-  const warehouseRows: string[][] = [
-    ["Ownership Type", val(OWNERSHIP_TYPE[v.ownershipType] || v.ownershipType)],
-    ["Warehousing Capacity", val(v.warehouseSize)],
+  const legalRows: string[][] = [
+    ["Ownership Type", val(OWNERSHIP_TYPE[v.factoryOwnershipType] || v.factoryOwnershipType)],
+    ["Warehousing Capacity", val(v.factorySize)],
   ]
-  if (!blank(v.warehouseAddress)) warehouseRows.push(["Address Line 1", val(v.warehouseAddress)])
-  if (!blank(v.warehouseAddressLine2)) warehouseRows.push(["Address Line 2", val(v.warehouseAddressLine2)])
-  if (!blank(v.warehouseAddressLine3)) warehouseRows.push(["Address Line 3", val(v.warehouseAddressLine3)])
-  if (!blank(v.warehouseLandmark)) warehouseRows.push(["Landmark", val(v.warehouseLandmark)])
-  if (!blank(v.warehouseCity)) warehouseRows.push(["City", val(v.warehouseCity)])
-  if (!blank(v.warehouseState)) warehouseRows.push(["State", val(v.warehouseState)])
-  if (!blank(v.warehouseZipCode)) warehouseRows.push(["ZIP / Postal Code", val(v.warehouseZipCode)])
-  if (!blank(v.warehouseCountry)) warehouseRows.push(["Country", val(v.warehouseCountry)])
-  runTable([["Field", "Value"]], warehouseRows)
+  if (!blank(v.factoryAddress)) legalRows.push(["Address Line 1", val(v.factoryAddress)])
+  if (!blank(v.addressLine2)) legalRows.push(["Address Line 2", val(v.addressLine2)])
+  if (!blank(v.addressLine3)) legalRows.push(["Address Line 3", val(v.addressLine3)])
+  if (!blank(v.landmark)) legalRows.push(["Landmark", val(v.landmark)])
+  if (!blank(v.factoryCity)) legalRows.push(["City", val(v.factoryCity)])
+  if (!blank(v.factoryState)) legalRows.push(["State", val(v.factoryState)])
+  if (!blank(v.factoryZipCode)) legalRows.push(["ZIP / Postal Code", val(v.factoryZipCode)])
+  if (!blank(v.factoryCountry)) legalRows.push(["Country", val(v.factoryCountry)])
+  if (!blank(v.mapLink)) legalRows.push(["Map / Location Link", val(v.mapLink)])
+  runTable([["Field", "Value"]], legalRows)
+  renderImageGroup("Factory Site Images", factorySiteImgs)
 
   subTitle("Warehouse Address")
   const pdfEq = (a: unknown, b: unknown) => (String(a || '').trim()) === (String(b || '').trim())
-  const pdfSameAsLegal = (
-    (blank(v.factoryAddress) && blank(v.factoryCity))
+  const pdfSameAsWarehouse = (
+    (blank(v.warehouseAddress) && blank(v.warehouseCity))
   ) || (
-    pdfEq(v.factoryAddress, v.warehouseAddress) &&
-    pdfEq(v.factoryCity, v.warehouseCity) &&
-    pdfEq(v.factoryState, v.warehouseState) &&
-    pdfEq(v.factoryZipCode, v.warehouseZipCode) &&
-    pdfEq(v.factoryCountry, v.warehouseCountry)
+    pdfEq(v.warehouseAddress, v.factoryAddress) &&
+    pdfEq(v.warehouseCity, v.factoryCity) &&
+    pdfEq(v.warehouseState, v.factoryState) &&
+    pdfEq(v.warehouseZipCode, v.factoryZipCode) &&
+    pdfEq(v.warehouseCountry, v.factoryCountry)
   )
-  if (pdfSameAsLegal) {
+  if (pdfSameAsWarehouse) {
     runTable([["Field", "Value"]], [["Warehouse Address", "Same as Legal Address & Factory Site above"]])
-    if (!blank(v.mapLink)) runTable([["Field", "Value"]], [["Map / Location Link", val(v.mapLink)]])
   } else {
-    const factoryRows: string[][] = []
-    if (!blank(v.factoryAddress)) factoryRows.push(["Address Line 1", val(v.factoryAddress)])
-    if (!blank(v.factoryCity)) factoryRows.push(["City", val(v.factoryCity)])
-    if (!blank(v.factoryState)) factoryRows.push(["State", val(v.factoryState)])
-    if (!blank(v.factoryZipCode)) factoryRows.push(["ZIP / Postal Code", val(v.factoryZipCode)])
-    if (!blank(v.factoryCountry)) factoryRows.push(["Country", val(v.factoryCountry)])
-    if (!blank(v.mapLink)) factoryRows.push(["Map / Location Link", val(v.mapLink)])
-    if (factoryRows.length > 0) runTable([["Field", "Value"]], factoryRows)
+    const warehouseRows: string[][] = [
+      ["Ownership Type", val(OWNERSHIP_TYPE[v.ownershipType] || v.ownershipType)],
+      ["Warehousing Capacity", val(v.warehouseSize)],
+    ]
+    if (!blank(v.warehouseAddress)) warehouseRows.push(["Address Line 1", val(v.warehouseAddress)])
+    if (!blank(v.warehouseAddressLine2)) warehouseRows.push(["Address Line 2", val(v.warehouseAddressLine2)])
+    if (!blank(v.warehouseAddressLine3)) warehouseRows.push(["Address Line 3", val(v.warehouseAddressLine3)])
+    if (!blank(v.warehouseLandmark)) warehouseRows.push(["Landmark", val(v.warehouseLandmark)])
+    if (!blank(v.warehouseCity)) warehouseRows.push(["City", val(v.warehouseCity)])
+    if (!blank(v.warehouseState)) warehouseRows.push(["State", val(v.warehouseState)])
+    if (!blank(v.warehouseZipCode)) warehouseRows.push(["ZIP / Postal Code", val(v.warehouseZipCode)])
+    if (!blank(v.warehouseCountry)) warehouseRows.push(["Country", val(v.warehouseCountry)])
+    runTable([["Field", "Value"]], warehouseRows)
   }
+  renderImageGroup("Warehouse Images", warehouseImgs)
 
   // ── C. Owner Profile ────────────────────────────────────────────────────────
   sectionTitle("C. Owner Profile", sectionStatus(['o_']))
@@ -623,40 +666,13 @@ export function generateFactoryInspectionPdf(
     ]
   )
 
-  // ── L. Factory Images ───────────────────────────────────────────────────────
-  const vendorImgs   = options.vendorFactoryImages   || []
+  // ── L. Inspector Evidence Photos ─────────────────────────────────────────────
+  // Vendor factory/warehouse photos now render under section B (their address
+  // subsection). The inspector's own on-site evidence photos stay attached at
+  // the end of the report.
   const inspectorImgs = options.inspectorEvidenceImages || []
-
-  if (vendorImgs.length > 0 || inspectorImgs.length > 0) {
-    sectionTitle("L. Factory Images")
-
-    const COLS     = 3
-    const IMG_W    = Math.floor((contentW - (COLS - 1) * 8) / COLS)
-    const IMG_H    = Math.round(IMG_W * 0.75)  // 4:3 aspect — avoids huge squares
-    const LABEL_H  = 14
-    const ROW_H    = IMG_H + LABEL_H + 10
-
-    const renderImageGroup = (heading: string, images: FactoryImageEntry[]) => {
-      if (images.length === 0) return
-      subTitle(heading)
-      for (let i = 0; i < images.length; i += COLS) {
-        ensureSpace(ROW_H)
-        const row = images.slice(i, i + COLS)
-        row.forEach((img, col) => {
-          const x = margin + col * (IMG_W + 8)
-          const fmt = /^data:image\/png/i.test(img.dataUrl) ? "PNG" : "JPEG"
-          try { doc.addImage(img.dataUrl, fmt, x, y, IMG_W, IMG_H, undefined, "FAST") } catch { /* skip broken image */ }
-          doc.setFont("helvetica", "normal")
-          doc.setFontSize(8)
-          doc.setTextColor(...MUTED)
-          doc.text(img.label, x + IMG_W / 2, y + IMG_H + 9, { align: "center" })
-        })
-        y += ROW_H
-      }
-      y += 6
-    }
-
-    renderImageGroup("Vendor Registration Photos", vendorImgs)
+  if (inspectorImgs.length > 0) {
+    sectionTitle("L. Inspector Evidence Photos")
     renderImageGroup("Inspector Evidence Photos", inspectorImgs)
   }
 
