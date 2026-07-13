@@ -561,7 +561,7 @@ export default function CompanyDetails({
   const handleZipResult = useCallback((place: ZipPlace) => {
     setFormData((prev) => ({
       ...prev,
-      city: place.area || place.city || prev.city,
+      city: zipPlaceLabel(place) || prev.city,
       state: place.state || prev.state,
     }));
     setErrors((prev) => ({ ...prev, city: '', state: '' }));
@@ -2785,7 +2785,7 @@ export default function CompanyDetails({
                   places={zipPlaces}
                   value={formData.city}
                   onChange={(p) => {
-                    handleInputChange("city", p.area || p.city);
+                    handleInputChange("city", zipPlaceLabel(p));
                     handleInputChange("state", p.state);
                   }}
                   onBlur={() => handleBlur("city")}

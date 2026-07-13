@@ -30,7 +30,7 @@ export function ZipAreaSelect({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listboxId = useId();
 
-  const selected = places.find((p) => p.area === value) ?? places[0];
+  const selected = places.find((p) => p.area === value || zipPlaceLabel(p) === value) ?? places[0];
 
   useEffect(() => {
     if (!open) return;
@@ -49,7 +49,7 @@ export function ZipAreaSelect({
     if (!open) {
       const rect = triggerRef.current?.getBoundingClientRect();
       if (rect) setFlipUp(window.innerHeight - rect.bottom < 220);
-      setHighlight(places.findIndex((p) => p.area === value));
+      setHighlight(places.findIndex((p) => p.area === value || zipPlaceLabel(p) === value));
     }
     setOpen((v) => !v);
   };
@@ -68,7 +68,7 @@ export function ZipAreaSelect({
       if (!open) {
         const rect = triggerRef.current?.getBoundingClientRect();
         if (rect) setFlipUp(window.innerHeight - rect.bottom < 220);
-        setHighlight(places.findIndex((p) => p.area === value));
+        setHighlight(places.findIndex((p) => p.area === value || zipPlaceLabel(p) === value));
         setOpen(true);
       } else {
         setHighlight((h) =>
@@ -130,7 +130,7 @@ export function ZipAreaSelect({
           style={{ maxHeight: "16rem", overscrollBehavior: "contain" }}
         >
           {places.map((p, i) => {
-            const isSel = p.area === value || (!value && i === 0);
+            const isSel = p.area === value || zipPlaceLabel(p) === value || (!value && i === 0);
             return (
               <li
                 key={i}

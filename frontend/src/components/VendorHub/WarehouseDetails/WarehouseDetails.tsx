@@ -215,7 +215,7 @@ export default function WarehouseDetails({
   const handleWarehouseZipResult = useCallback((place: ZipPlace) => {
     setFormData((prev) => ({
       ...prev,
-      warehouseCity: place.area || place.city || prev.warehouseCity,
+      warehouseCity: zipPlaceLabel(place) || prev.warehouseCity,
       warehouseState: place.state || prev.warehouseState,
     }));
     setErrors((prev) => ({ ...prev, warehouseCity: '', warehouseState: '' }));
@@ -703,7 +703,7 @@ export default function WarehouseDetails({
                   places={warehouseZipPlaces}
                   value={formData.warehouseCity}
                   onChange={(p) => {
-                    handleInputChange('warehouseCity', p.area || p.city);
+                    handleInputChange('warehouseCity', zipPlaceLabel(p));
                     handleInputChange('warehouseState', p.state);
                   }}
                   onBlur={() => handleBlur('warehouseCity')}

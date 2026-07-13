@@ -419,8 +419,10 @@ function CountryDialPicker({
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState(0);
   const [flipUp, setFlipUp] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const baseId = useId();
@@ -441,41 +443,57 @@ function CountryDialPicker({
     );
   }, [query]);
 
-  // Click-outside to close
+  // Click-outside to close — must check both the trigger container and the
+  // portaled dropdown panel since they are separate DOM trees.
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+      if (
+        !containerRef.current?.contains(e.target as Node) &&
+        !popoverRef.current?.contains(e.target as Node)
+      ) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  // On open: focus the search, highlight current selection, decide flip direction
+  // On open: focus search, highlight current selection, compute fixed portal position
   useEffect(() => {
     if (open) {
       requestAnimationFrame(() => searchRef.current?.focus());
       const idx = PHONE_COUNTRY_CODES.findIndex((c) => c.code === selected.code);
       setHighlight(idx >= 0 ? idx : 0);
 
-      // Flip up if the trigger is in the bottom half of the viewport
       const rect = triggerRef.current?.getBoundingClientRect();
       if (rect) {
         const spaceBelow = window.innerHeight - rect.bottom;
         const spaceAbove = rect.top;
-        // Prefer downward by default. The dropdown's max-height is ~360px
-        // but the page can scroll, so we only flip up when there's clearly
-        // insufficient room below (≤220px — fits search + ~3 list items)
-        // AND substantially more room above. Otherwise the page scroll
-        // takes care of any clipping.
         const MIN_BELOW = 220;
         const FLIP_MARGIN = 40;
-        setFlipUp(spaceBelow < MIN_BELOW && spaceAbove > spaceBelow + FLIP_MARGIN);
+        const shouldFlip = spaceBelow < MIN_BELOW && spaceAbove > spaceBelow + FLIP_MARGIN;
+        setFlipUp(shouldFlip);
+        setDropdownPos(shouldFlip
+          ? { bottom: window.innerHeight - rect.top + 6, left: rect.left, width: Math.min(320, window.innerWidth - 32) }
+          : { top: rect.bottom + 6, left: rect.left, width: Math.min(320, window.innerWidth - 32) }
+        );
       }
     } else {
       setQuery('');
+      setDropdownPos(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Close portal on scroll/resize so it doesn't drift from the trigger
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
   }, [open]);
 
   // Keep highlighted option scrolled into view
@@ -570,13 +588,17 @@ function CountryDialPicker({
         />
       </button>
 
-      {open && (
+      {open && dropdownPos && createPortal(
         <div
-          className={[
-            'absolute left-0 z-(--z-dropdown) w-[min(20rem,calc(100vw-2rem))]',
-            'overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5',
-            flipUp ? 'bottom-[calc(100%+6px)]' : 'top-[calc(100%+6px)]',
-          ].join(' ')}
+          ref={popoverRef}
+          style={{
+            position: 'fixed',
+            zIndex: 9999,
+            left: dropdownPos.left,
+            width: dropdownPos.width,
+            ...(dropdownPos.top !== undefined ? { top: dropdownPos.top } : { bottom: dropdownPos.bottom }),
+          }}
+          className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5"
           role="dialog"
           aria-label="Choose country code"
         >
@@ -715,7 +737,8 @@ function CountryDialPicker({
               Close
             </span>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -1273,8 +1296,10 @@ export function CountrySelect({
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState(0);
   const [flipUp, setFlipUp] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const baseId = useId();
@@ -1294,11 +1319,14 @@ export function CountrySelect({
     );
   }, [query]);
 
-  // Click-outside to close (and fire onBlur — react-select behavior parity)
+  // Click-outside to close — check both trigger container and portaled panel
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) {
+      if (
+        !containerRef.current?.contains(e.target as Node) &&
+        !popoverRef.current?.contains(e.target as Node)
+      ) {
         setOpen(false);
         onBlur?.();
       }
@@ -1307,6 +1335,7 @@ export function CountrySelect({
     return () => document.removeEventListener('mousedown', handler);
   }, [open, onBlur]);
 
+  // On open: focus search, highlight current, compute fixed portal position
   useEffect(() => {
     if (open) {
       requestAnimationFrame(() => searchRef.current?.focus());
@@ -1318,19 +1347,32 @@ export function CountrySelect({
       if (rect) {
         const spaceBelow = window.innerHeight - rect.bottom;
         const spaceAbove = rect.top;
-        // Prefer downward by default. The dropdown's max-height is ~360px
-        // but the page can scroll, so we only flip up when there's clearly
-        // insufficient room below (≤220px — fits search + ~3 list items)
-        // AND substantially more room above. Otherwise the page scroll
-        // takes care of any clipping.
         const MIN_BELOW = 220;
         const FLIP_MARGIN = 40;
-        setFlipUp(spaceBelow < MIN_BELOW && spaceAbove > spaceBelow + FLIP_MARGIN);
+        const shouldFlip = spaceBelow < MIN_BELOW && spaceAbove > spaceBelow + FLIP_MARGIN;
+        setFlipUp(shouldFlip);
+        setDropdownPos(shouldFlip
+          ? { bottom: window.innerHeight - rect.top + 6, left: rect.left, width: rect.width }
+          : { top: rect.bottom + 6, left: rect.left, width: rect.width }
+        );
       }
     } else {
       setQuery('');
+      setDropdownPos(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Close portal on scroll/resize so it doesn't drift from the trigger
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -1433,13 +1475,17 @@ export function CountrySelect({
         />
       </button>
 
-      {open && (
+      {open && dropdownPos && createPortal(
         <div
-          className={[
-            'absolute left-0 right-0 z-(--z-dropdown)',
-            'overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5',
-            flipUp ? 'bottom-[calc(100%+6px)]' : 'top-[calc(100%+6px)]',
-          ].join(' ')}
+          ref={popoverRef}
+          style={{
+            position: 'fixed',
+            zIndex: 9999,
+            left: dropdownPos.left,
+            width: dropdownPos.width,
+            ...(dropdownPos.top !== undefined ? { top: dropdownPos.top } : { bottom: dropdownPos.bottom }),
+          }}
+          className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5"
           role="dialog"
           aria-label="Choose country"
         >
@@ -1574,7 +1620,8 @@ export function CountrySelect({
               Close
             </span>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
