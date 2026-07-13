@@ -50,7 +50,7 @@ export default function PDFPreviewModal({ isOpen, onClose, reportData, reportId 
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900">PDF Preview</h2>
-              <p className="text-sm text-slate-600">Report ID: {reportId}</p>
+              <p className="text-sm text-slate-600">Inspection Report</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -79,7 +79,6 @@ export default function PDFPreviewModal({ isOpen, onClose, reportData, reportId 
               <h3 className="text-lg font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2">REPORT INFORMATION</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div className="space-y-2">
-                  <div><span className="font-semibold">Report ID:</span> {reportId}</div>
                   <div><span className="font-semibold">Inspection Date:</span> {reportData.inspectionDate}</div>
                   <div><span className="font-semibold">Inspector:</span> {reportData.inspector}</div>
                   <div><span className="font-semibold">Client:</span> {reportData.client}</div>

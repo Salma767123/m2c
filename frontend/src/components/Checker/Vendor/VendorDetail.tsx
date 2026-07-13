@@ -434,13 +434,13 @@ export default function VendorDetail({
       ;(Array.isArray(products) ? products : []).forEach((p: any, i: number) => {
         ;(Array.isArray(p?.photos) ? p.photos : []).forEach((ph: any) => {
           const url = ph?.url || ph?.preview
-          if (url) productPhotos.push({ label: `${catLabel} · ${p?.name || `Product ${i + 1}`}`, url })
+          if (url) productPhotos.push({ label: [catLabel, p?.name || `Product ${i + 1}`].filter(Boolean).join(' · '), url })
         })
       })
     }
     if (fullVendor.categoryProducts && typeof fullVendor.categoryProducts === "object") {
-      Object.entries(fullVendor.categoryProducts).forEach(([catId, products]: [string, any]) =>
-        collectProducts(catId, products),
+      Object.entries(fullVendor.categoryProducts).forEach(([, products]: [string, any]) =>
+        collectProducts('', products),
       )
     }
     if (Array.isArray(fullVendor.additionalCategories)) {
