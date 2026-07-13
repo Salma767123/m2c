@@ -13,7 +13,7 @@ import vendorService from '@/services/vendorService'
 import { generateFactoryInspectionPdf } from '@/lib/factoryInspectionReportPdf'
 import type { FactoryImageEntry, FactoryReportMeta } from '@/lib/factoryInspectionReportPdf'
 import { formatCheckerName } from '@/lib/checkerUtils'
-import { toExternalUrl } from '@/lib/utils'
+import { toExternalUrl, formatTime12 } from '@/lib/utils'
 
 async function fetchImgDataUrl(url: string): Promise<string | null> {
     try {
@@ -411,7 +411,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                     <div>
                         <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Scheduled</p>
                         <p className="font-semibold text-sm">{inspection.scheduledDate || '—'}</p>
-                        <p className="text-neutral-400 text-xs mt-0.5">{inspection.scheduledTime}</p>
+                        <p className="text-neutral-400 text-xs mt-0.5">{formatTime12(inspection.scheduledTime)}</p>
                     </div>
                     <div>
                         <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Client / Priority</p>

@@ -1291,7 +1291,6 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                   })}
                 </ul>
               </nav>
-
             </aside>
           );
         })()}
@@ -1362,6 +1361,29 @@ function AdminReviewSubmitStep({
     "approved" | "pending" | "rejected"
   >(formData.approvalStatus || "pending");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Category id → name map for the summary — without it the review shows
+  // raw "Category" placeholders and can't resolve selected category names.
+  // Mirrors the fetch the vendor-facing ReviewSubmit step does.
+  const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { categoryService } = await import("@/services/categoryService");
+        const response = await categoryService.getCategoryTree({
+          status: "ACTIVE",
+          includeInactive: false,
+        });
+        const map: Record<string, string> = {};
+        (response.data || []).forEach((cat: { id: string; name: string }) => {
+          map[cat.id] = cat.name;
+        });
+        setCategoryNameMap(map);
+      } catch {
+        // Silently fail — summary falls back to generic labels
+      }
+    })();
+  }, []);
 
   const handleAdminSubmit = async () => {
     if (isSubmitting) return; // Prevent double submission
@@ -1450,7 +1472,7 @@ function AdminReviewSubmitStep({
       {/* Shared read-only vendor summary — same component the public
           ReviewSubmit (Step 8) uses, so admin + vendor review surfaces
           stay field-identical by construction. */}
-      <VendorDataSummary data={formData} onGoToStep={onGoToStep} />
+      <VendorDataSummary data={formData} onGoToStep={onGoToStep} categoryNameMap={categoryNameMap} />
 
       {/* Admin Submit Button */}
       <div className="flex items-center justify-between py-4 gap-3">

@@ -2473,7 +2473,7 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm text-slate-900">{new Date(review.reviewedDate).toLocaleDateString()}</div>
-                      <div className="text-xs text-slate-500">{new Date(review.reviewedDate).toLocaleTimeString()}</div>
+                      <div className="text-xs text-slate-500">{new Date(review.reviewedDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</div>
                     </TableCell>
                     <TableCell>
                       <p className="text-sm text-slate-700 max-w-[180px] truncate">

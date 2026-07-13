@@ -326,7 +326,7 @@ export default function VendorProductReviews() {
                         {new Date(review.reviewedDate).toLocaleDateString()}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {new Date(review.reviewedDate).toLocaleTimeString()}
+                        {new Date(review.reviewedDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
                       </div>
                     </TableCell>
                     <TableCell>

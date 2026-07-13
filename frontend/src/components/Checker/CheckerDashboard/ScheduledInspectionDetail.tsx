@@ -18,6 +18,7 @@ import {
   Camera
 } from "lucide-react"
 import { ScheduledInspection } from "@/types/inspection"
+import { formatTime12 } from "@/lib/utils"
 
 interface ScheduledInspectionDetailProps {
   inspection: ScheduledInspection
@@ -126,7 +127,7 @@ export default function ScheduledInspectionDetail({
             </div>
             <div>
               <p className="text-blue-100 text-sm">Time & Duration</p>
-              <p className="font-semibold">{inspection.scheduledTime} ({inspection.estimatedDuration})</p>
+              <p className="font-semibold">{formatTime12(inspection.scheduledTime)} ({inspection.estimatedDuration})</p>
             </div>
           </div>
           

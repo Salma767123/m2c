@@ -322,14 +322,22 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
     if (step >= 1 && step <= 8) {
       const keys = registeredFieldsRef.current
       if (keys.length > 0) {
-        const unverified = keys.filter(k => (verifications[k]?.ok ?? null) === null)
-        if (unverified.length > 0) {
-          setHighlightedKeys(new Set(unverified))
-          const el = document.getElementById(`vf-${unverified[0]}`)
+        // A field is incomplete if it hasn't been verified yet, OR it was
+        // marked "No" without a reason — a reason is mandatory for every "No".
+        const incomplete = keys.filter(k => {
+          const fv = verifications[k]
+          const ok = fv?.ok ?? null
+          if (ok === null) return true
+          if (ok === false && !fv?.remarks?.trim()) return true
+          return false
+        })
+        if (incomplete.length > 0) {
+          setHighlightedKeys(new Set(incomplete))
+          const el = document.getElementById(`vf-${incomplete[0]}`)
           if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
           showErrorToast(
             'Verification incomplete',
-            `${unverified.length} field${unverified.length !== 1 ? 's' : ''} not yet verified. Please verify all fields before continuing.`
+            `${incomplete.length} field${incomplete.length !== 1 ? 's' : ''} need attention. Verify every field and add a reason for any marked "No".`
           )
           return
         }

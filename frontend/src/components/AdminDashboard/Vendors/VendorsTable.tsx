@@ -59,24 +59,38 @@ const getStatusBadge = (status: string) => {
   }
 }
 
+// Inspection badge shown in its own column (mirrors the Assign QC Checker
+// screen). Returns a muted "No Inspection" placeholder when the vendor has no
+// inspection yet, so the column never renders empty.
 const getInspectionBadge = (vendorStatus: string, latestInspection?: VendorProfile['latestInspection']) => {
-  if (!latestInspection) return null
-  if (['APPROVED', 'REJECTED', 'SUSPENDED'].includes(vendorStatus)) return null
-  const { status, result } = latestInspection
-  switch (status) {
-    case 'SUBMITTED':
-      return result === 'FAILED'
-        ? <Badge className="bg-red-50 text-red-700 border border-red-200">QC Failed - Awaiting Review</Badge>
-        : <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200">QC Passed - Awaiting Approval</Badge>
-    case 'SCHEDULED':
-      return <Badge className="bg-slate-50 text-slate-600 border border-slate-200">QC Scheduled</Badge>
-    case 'IN_PROGRESS':
-      return <Badge className="bg-amber-50 text-amber-700 border border-amber-200">QC In Progress</Badge>
-    case 'UNDER_ADMIN_REVIEW':
-      return <Badge className="bg-purple-50 text-purple-700 border border-purple-200">Under Admin Review</Badge>
-    default:
-      return null
+  const status = latestInspection?.status || null
+  const result = latestInspection?.result || null
+  if (!status) return <span className="text-sm text-slate-400 italic">No Inspection</span>
+  // Once the vendor decision is finalized, reflect the concluded outcome rather
+  // than a lingering inspection state (an Approved vendor must never read
+  // "In Progress"). A genuinely cancelled inspection falls through to its label.
+  if (['APPROVED', 'REJECTED', 'SUSPENDED'].includes(vendorStatus) && status !== 'CANCELLED') {
+    const failed = vendorStatus !== 'APPROVED'
+    return (
+      <Badge className={failed ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}>
+        {failed ? 'Completed – Failed' : 'Completed'}
+      </Badge>
+    )
   }
+  const configs: Record<string, { label: string; className: string }> = {
+    SCHEDULED:          { label: 'Scheduled',           className: 'bg-slate-100 text-slate-600 border border-slate-200' },
+    IN_PROGRESS:        { label: 'In Progress',          className: 'bg-amber-50 text-amber-700 border border-amber-200' },
+    SUBMITTED:          { label: result === 'FAILED' ? 'Awaiting Review · Fail' : result === 'PASSED' ? 'Awaiting Review · Pass' : 'Awaiting Review',
+                          className: result === 'FAILED' ? 'bg-red-50 text-red-700 border border-red-200' : result === 'PASSED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200' },
+    UNDER_ADMIN_REVIEW: { label: 'Under Admin Review',   className: 'bg-blue-50 text-blue-700 border border-blue-200' },
+    COMPLETED:          { label: result === 'FAILED' ? 'Completed – Failed' : 'Completed',
+                          className: result === 'FAILED' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+    REJECTED:           { label: 'Rejected',             className: 'bg-red-50 text-red-700 border border-red-200' },
+    REINSPECTION:       { label: 'Re-Inspection',        className: 'bg-amber-50 text-amber-700 border border-amber-200' },
+    CANCELLED:          { label: 'Cancelled',            className: 'bg-slate-100 text-slate-500 border border-slate-200' },
+  }
+  const cfg = configs[status] ?? { label: status, className: 'bg-slate-100 text-slate-600 border border-slate-200' }
+  return <Badge className={cfg.className}>{cfg.label}</Badge>
 }
 
 
@@ -104,6 +118,9 @@ export default function VendorsTable() {
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 0 })
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
+  // Inspection filter is applied client-side over the fetched page (the vendor
+  // list API has no inspection param) — same pattern as the Assign QC screen.
+  const [inspectionFilter, setInspectionFilter] = useState<string>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [statusCounts, setStatusCounts] = useState<StatusCounts>({
@@ -191,6 +208,15 @@ export default function VendorsTable() {
 
   const handlePageChange = (newPage: number) =>
     setFilters(prev => ({ ...prev, page: newPage }))
+
+  // Client-side inspection filter over the fetched page (the list API has no
+  // inspection param). "NONE" matches vendors with no inspection yet.
+  const displayedVendors = vendors.filter((vendor) => {
+    if (inspectionFilter === 'all') return true
+    const status = vendor.latestInspection?.status || null
+    if (inspectionFilter === 'NONE') return !status
+    return status === inspectionFilter
+  })
 
   // ── Action helpers ────────────────────────────────────────────────────────
   const refreshAll = () => { fetchVendors(); fetchStatusCounts() }
@@ -444,6 +470,25 @@ export default function VendorsTable() {
                 onChange={(value) => handleStatusFilter(value as string)}
               />
             </div>
+            <div className="w-44">
+              <Dropdown
+                value={inspectionFilter}
+                options={[
+                  { value: 'all', label: 'All Inspections' },
+                  { value: 'SCHEDULED', label: 'Scheduled' },
+                  { value: 'IN_PROGRESS', label: 'In Progress' },
+                  { value: 'SUBMITTED', label: 'Submitted' },
+                  { value: 'UNDER_ADMIN_REVIEW', label: 'Under Admin Review' },
+                  { value: 'COMPLETED', label: 'Completed' },
+                  { value: 'REINSPECTION', label: 'Re-Inspection' },
+                  { value: 'REJECTED', label: 'Rejected' },
+                  { value: 'CANCELLED', label: 'Cancelled' },
+                  { value: 'NONE', label: 'No Inspection' },
+                ]}
+                placeholder="All Inspections"
+                onChange={(value) => setInspectionFilter(value as string)}
+              />
+            </div>
             <DateRangeCalendar
               from={dateFrom}
               to={dateTo}
@@ -468,7 +513,7 @@ export default function VendorsTable() {
           <div className="flex items-center justify-center py-16">
             <LoadingSpinner />
           </div>
-        ) : vendors.length === 0 ? (
+        ) : displayedVendors.length === 0 ? (
           <div className="text-center py-16">
             <Building2 className="h-10 w-10 text-slate-300 mx-auto mb-3" />
             <p className="text-slate-500 font-medium">No vendors found</p>
@@ -480,17 +525,18 @@ export default function VendorsTable() {
               <Table className="table-fixed">
                 <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50">
                   <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
-                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider whitespace-nowrap">Vendor ID</TableHead>
-                    <TableHead className="w-[18%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Vendor</TableHead>
-                    <TableHead className="w-[14%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
-                    <TableHead className="w-[16%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact</TableHead>
-                    <TableHead className="w-[14%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Status</TableHead>
-                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center whitespace-nowrap">Join Date</TableHead>
-                    <TableHead className="w-[14%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-right whitespace-nowrap">Actions</TableHead>
+                    <TableHead className="w-[10%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider whitespace-nowrap">Vendor ID</TableHead>
+                    <TableHead className="w-[16%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                    <TableHead className="w-[13%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
+                    <TableHead className="w-[15%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact</TableHead>
+                    <TableHead className="w-[11%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Status</TableHead>
+                    <TableHead className="w-[13%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Inspection</TableHead>
+                    <TableHead className="w-[10%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center whitespace-nowrap">Join Date</TableHead>
+                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-right whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {vendors.map((vendor) => (
+                  {displayedVendors.map((vendor) => (
                     <TableRow
                       key={vendor.id}
                       className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0"
@@ -540,13 +586,19 @@ export default function VendorsTable() {
                       <TableCell className="py-3 px-3 align-middle">
                         <div className="flex flex-col items-center gap-1.5">
                           {getStatusBadge(vendor.status)}
-                          {getInspectionBadge(vendor.status, vendor.latestInspection)}
                           {vendor.status === 'APPROVAL_PENDING' && vendor.approvalRequestedByName && (
                             <p className="text-xs text-cyan-600">by {vendor.approvalRequestedByName}</p>
                           )}
                           {vendor.status === 'REJECTION_PENDING' && vendor.rejectionRequestedByName && (
                             <p className="text-xs text-orange-600">by {vendor.rejectionRequestedByName}</p>
                           )}
+                        </div>
+                      </TableCell>
+
+                      {/* Inspection */}
+                      <TableCell className="py-3 px-3 align-middle">
+                        <div className="flex justify-center">
+                          {getInspectionBadge(vendor.status, vendor.latestInspection)}
                         </div>
                       </TableCell>
 

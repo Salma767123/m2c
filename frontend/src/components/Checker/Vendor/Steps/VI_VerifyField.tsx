@@ -218,7 +218,9 @@ export default function VerifyField({ fieldKey, label, value, verifications, onC
   const highlightedKeys = useContext(HighlightedFieldsCtx)
   const v = verifications[fieldKey] ?? { ok: null, remarks: '' }
   const isEmpty = value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)
-  const needsHighlight = highlightedKeys.has(fieldKey) && v.ok === null
+  // A "No" answer requires a reason — flag it when the reason is still empty.
+  const missingRemarks = v.ok === false && !v.remarks.trim()
+  const needsHighlight = highlightedKeys.has(fieldKey) && (v.ok === null || missingRemarks)
 
   const setOk = (ok: boolean) => onChange(fieldKey, ok, v.remarks)
   const setRemarks = (remarks: string) => onChange(fieldKey, v.ok, remarks)
@@ -274,16 +276,29 @@ export default function VerifyField({ fieldKey, label, value, verifications, onC
           </label>
         </div>
         {needsHighlight && (
-          <p className="text-xs text-red-600 font-medium">Please complete this verification before continuing.</p>
+          <p className="text-xs text-red-600 font-medium">
+            {v.ok === null
+              ? 'Please complete this verification before continuing.'
+              : 'A reason is required when marking this "No".'}
+          </p>
         )}
         {v.ok === false && (
-          <textarea
-            value={v.remarks}
-            onChange={(e) => setRemarks(e.target.value)}
-            placeholder="Remarks for this field…"
-            rows={2}
-            className="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-200 resize-none"
-          />
+          <>
+            <label className="text-xs font-semibold text-slate-600">
+              Reason <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={v.remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Reason for marking No (required)…"
+              rows={2}
+              className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 resize-none ${
+                needsHighlight && missingRemarks
+                  ? 'border-red-400 ring-1 ring-red-300 focus:border-red-500 focus:ring-red-300'
+                  : 'border-red-200 focus:border-red-400 focus:ring-red-200'
+              }`}
+            />
+          </>
         )}
       </div>
     </div>

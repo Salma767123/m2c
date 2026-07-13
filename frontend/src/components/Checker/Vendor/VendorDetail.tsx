@@ -31,7 +31,7 @@ import {
 import { Vendor } from "@/types/inspection"
 import qcCheckerService from "@/services/qcCheckerService"
 import { formatLocalLandline, formatIntlLandline } from "@/components/VendorHub/FormUI"
-import { buildFullName, toExternalUrl, resolveOwnerDesignation } from "@/lib/utils"
+import { buildFullName, toExternalUrl, resolveOwnerDesignation, formatTime12 } from "@/lib/utils"
 import { isDocImageUrl } from "@/lib/docDownload"
 import DocViewerModal from "@/components/UI/DocViewerModal"
 import { FACILITY_META, withUnit } from "./Steps/VI_Step5_Manufacturing"
@@ -200,7 +200,6 @@ export default function VendorDetail({
   // Once the assignment is completed, the QC checker no longer needs the full
   // vendor profile — only a compact summary + a link to the inspection report.
   const isCompleted = currentInspectionStatus === 'Completed'
-  const reportInspectionId = recentInspections[0]?.id ?? null
 
   // Delegate to the parent, which mounts <InspectionForm />. InspectionForm
   // handles the SCHEDULED → IN_PROGRESS transition itself, so we must NOT call
@@ -1159,19 +1158,6 @@ export default function VendorDetail({
               </div>
             </div>
 
-            <div className="flex items-center">
-              {reportInspectionId ? (
-                <button
-                  onClick={() => router.push(`/checker/dashboard/report/${reportInspectionId}`)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-xs shadow-brand-500/20 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                >
-                  <FileText className="w-4 h-4" />
-                  Details View
-                </button>
-              ) : (
-                <span className="text-sm text-slate-400">Report unavailable</span>
-              )}
-            </div>
           </div>
         </div>
       ) : (
@@ -1338,7 +1324,7 @@ export default function VendorDetail({
                   </div>
                   <div className="flex items-center gap-1">
                     <Clock className="w-4 h-4" />
-                    <span>{inspection.scheduledTime}</span>
+                    <span>{formatTime12(inspection.scheduledTime)}</span>
                   </div>
                 </div>
               </div>

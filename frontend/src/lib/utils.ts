@@ -24,6 +24,44 @@ export function formatDate(date: Date | string): string {
 }
 
 /**
+ * Format a time for display in 12-hour clock with AM/PM (site-wide standard).
+ * Accepts a bare "HH:MM" / "HH:MM:SS" 24-hour string (as stored for scheduled
+ * inspections), a full ISO/date string, or a Date. Returns the input unchanged
+ * if it can't be parsed, and '' for empty input, so callers can drop it in
+ * place of a raw `{time}` render without extra guards.
+ *
+ * Examples: "14:45" → "2:45 PM", "09:00" → "9:00 AM".
+ */
+export function formatTime12(time?: string | Date | null): string {
+  if (!time) return '';
+  let hours: number;
+  let minutes: number;
+  if (time instanceof Date) {
+    hours = time.getHours();
+    minutes = time.getMinutes();
+  } else {
+    // Bare clock string "HH:MM" (optionally with seconds).
+    const clock = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(time.trim());
+    if (clock) {
+      hours = Number(clock[1]);
+      minutes = Number(clock[2]);
+    } else {
+      // Fall back to parsing a full date/ISO string.
+      const parsed = new Date(time);
+      if (Number.isNaN(parsed.getTime())) return time;
+      hours = parsed.getHours();
+      minutes = parsed.getMinutes();
+    }
+  }
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return typeof time === 'string' ? time : '';
+  }
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const h12 = hours % 12 === 0 ? 12 : hours % 12;
+  return `${h12}:${String(minutes).padStart(2, '0')} ${period}`;
+}
+
+/**
  * Normalize a user-entered website/link value into a safe, absolute,
  * clickable href. Vendors type URLs in every shape — "www.company.com",
  * "company.com", "https://company.com" — and a bare host in an <a href>

@@ -9,6 +9,7 @@ import AdminReviewModal from '@/components/AdminDashboard/ReInspection/AdminRevi
 import { Badge } from '@/components/UI/Badge';
 import { Button } from '@/components/UI/Button';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { formatTime12 } from '@/lib/utils';
 import { openDoc } from '@/lib/docViewerBus';
 import {
   IconArrowLeft,
@@ -200,7 +201,7 @@ export default function FactoryInspectionReviewPage() {
             <IconCalendar size={12} /> Timeline
           </div>
           <div className="space-y-1 text-xs">
-            <div>Scheduled: {inspection.scheduledDate} {inspection.scheduledTime}</div>
+            <div>Scheduled: {inspection.scheduledDate} {formatTime12(inspection.scheduledTime)}</div>
             {inspection.submittedAt && <div>Submitted: {new Date(inspection.submittedAt).toLocaleString()}</div>}
             {inspection.completedAt && <div>Completed: {new Date(inspection.completedAt).toLocaleString()}</div>}
           </div>

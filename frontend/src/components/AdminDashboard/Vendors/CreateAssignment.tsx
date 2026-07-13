@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Calendar, Clock, Factory, MapPin, Package, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Factory, MapPin, FileText, CheckCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import Dropdown from "../../UI/Dropdown";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
+import { formatTime12 } from "@/lib/utils";
 import vendorService from "@/services/vendorService";
 import qcCheckerService from "@/services/qcCheckerService";
 import { formatCheckerName } from "@/lib/checkerUtils";
@@ -146,14 +147,6 @@ export default function CreateAssignment() {
   // source from productCategories (not productTypes, which are subcategories).
   const selectedVendor = vendors.find((v) => v.id === formData.vendorId);
 
-  const displayItems = selectedVendor
-    ? Array.from(new Set(selectedVendor.productCategories || [])).map((category, idx) => ({
-        id: `category-${idx}`,
-        itemName: category,
-        description: `Category Selected during Registration: ${category}`,
-      }))
-    : [];
-
   const handleVendorChange = (value: string | string[]) => {
     const selectedId = value as string;
     const vendor = vendors.find(v => v.id === selectedId);
@@ -180,15 +173,6 @@ export default function CreateAssignment() {
     }));
   };
 
-  const handleItemToggle = (itemId: string | number) => {
-    setFormData((prev) => ({
-      ...prev,
-      selectedItems: prev.selectedItems.includes(itemId)
-        ? prev.selectedItems.filter((id) => id !== itemId)
-        : [...prev.selectedItems, itemId],
-    }));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -199,23 +183,18 @@ export default function CreateAssignment() {
       !formData.scheduledDate ||
       !formData.scheduledTime ||
       !formData.priority ||
-      !formData.estimatedDuration ||
-      formData.selectedItems.length === 0
+      !formData.estimatedDuration
     ) {
-      showErrorToast("Incomplete Form", "Please fill in all required fields and select at least one item.");
+      showErrorToast("Incomplete Form", "Please fill in all required fields.");
       return;
     }
 
     try {
       setLoading(true);
 
-      const itemsToInspect = displayItems
-        .filter(item => formData.selectedItems.includes(item.id))
-        .map(item => ({
-          id: item.id,
-          itemName: item.itemName,
-          description: item.description,
-        }));
+      // Category selection was removed from this form; the API still expects an
+      // itemsToInspect array, so send an empty list.
+      const itemsToInspect: { id: string; itemName: string; description: string }[] = [];
 
       const vendor = vendors.find((v) => v.id === formData.vendorId);
       const checker = qcCheckers.find((c) => c.id === formData.checkerId);
@@ -407,54 +386,6 @@ export default function CreateAssignment() {
               </CardContent>
             </Card>
 
-            {/* Items to Inspect */}
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                  Category to Inspect <span className="text-red-500">*</span>
-                </h3>
-                <p className="text-sm text-slate-500 mb-4">Select the categories that will be inspected</p>
-
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {formData.vendorId && displayItems.length === 0 && (
-                    <div className="p-6 text-center border border-dashed border-slate-300 rounded-xl">
-                      <p className="text-sm text-slate-500">
-                        This vendor has no product categories on record. Ask them to update their
-                        registration before scheduling an inspection.
-                      </p>
-                    </div>
-                  )}
-                  {displayItems.map((item) => (
-                    <label
-                      key={item.id}
-                      className="flex items-start p-4 border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formData.selectedItems.includes(item.id)}
-                        onChange={() => handleItemToggle(item.id)}
-                        className="h-4 w-4 accent-brand-500 border-slate-200 rounded mt-1"
-                      />
-                      <div className="ml-3 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Package className="h-4 w-4 text-slate-400" />
-                          <span className="text-sm font-semibold text-slate-900">{item.itemName}</span>
-                        </div>
-                        <p className="text-xs text-slate-500">{item.description}</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-
-                {formData.selectedItems.length > 0 && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-                    <p className="text-sm text-blue-800">
-                      <span className="font-semibold">{formData.selectedItems.length}</span> category(ies) selected for inspection
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </div>
 
           {/* Summary Sidebar */}
@@ -513,7 +444,7 @@ export default function CreateAssignment() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium text-slate-900">{formData.scheduledTime}</span>
+                      <span className="font-medium text-slate-900">{formatTime12(formData.scheduledTime)}</span>
                     </div>
                     {formData.estimatedDuration && (
                       <div className="flex items-center gap-2">
@@ -570,17 +501,6 @@ export default function CreateAssignment() {
                     <span className="text-slate-500">Schedule Set</span>
                     {formData.scheduledDate && formData.scheduledTime ? (
                       <CheckCircle className="h-5 w-5 text-green-600" />
-                    ) : (
-                      <AlertCircle className="h-5 w-5 text-gray-300" />
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Categories Selected</span>
-                    {formData.selectedItems.length > 0 ? (
-                      <span className="flex items-center gap-1">
-                        <span className="font-semibold text-slate-900">{formData.selectedItems.length}</span>
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </span>
                     ) : (
                       <AlertCircle className="h-5 w-5 text-gray-300" />
                     )}

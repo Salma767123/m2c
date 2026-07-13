@@ -401,14 +401,16 @@ export default function VendorDataSummary({
 
   // Selected product categories (IDs resolved to names via categoryNameMap).
   // The form stores `{ [categoryId]: boolean }`; legacy records may still
-  // carry the old `{ [categoryId]: string[] }` sub-category shape.
+  // carry the old `{ [categoryId]: string[] }` sub-category shape — where an
+  // EMPTY array still means "category selected, no sub-categories" (the admin
+  // edit flow maps loaded vendors this way), so it must not be skipped.
   const getSelectedCategories = (): string[] => {
     const categories = data.selectedCategories || {};
     const result: string[] = [];
     Object.entries(categories).forEach(([categoryId, value]) => {
       const categoryName = categoryNameMap[categoryId] || 'Category';
       if (Array.isArray(value)) {
-        if (value.length > 0) result.push(`${categoryName}: ${value.join(', ')}`);
+        result.push(value.length > 0 ? `${categoryName}: ${value.join(', ')}` : categoryName);
       } else if (value) {
         result.push(categoryName);
       }

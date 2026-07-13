@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import {
-  Eye, CheckCircle, XCircle, Download,
+  CheckCircle, XCircle,
   Factory, Package, Search, X, ChevronLeft, ChevronRight, RotateCw,
 } from "lucide-react"
 import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalendar"
@@ -180,15 +180,35 @@ export default function ReportsPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const buildRow = (insp: Record<string, any>) => {
+    const fmtDate = (d?: string | null) => {
+      if (!d) return "—"
+      const parsed = new Date(d)
+      return Number.isNaN(parsed.getTime()) ? d : parsed.toLocaleDateString("en-IN")
+    }
     return {
       id: insp.id,
       vendor: insp.vendor?.companyName || "—",
+      // Date the inspection was scheduled/assigned.
+      assignedDate: fmtDate(insp.scheduledDate),
       inspectionDate: insp.completedAt
         ? new Date(insp.completedAt).toLocaleDateString("en-IN")
         : insp.scheduledDate || "—",
+      priority: insp.priority || "—",
       result: insp.result || "—",
-      clientName: insp.clientName || "—",
     }
+  }
+
+  const getPriorityBadge = (priority: string) => {
+    const p = priority.toLowerCase()
+    const cls =
+      p === "high"
+        ? "bg-red-50 text-red-700 border border-red-200"
+        : p === "medium"
+          ? "bg-amber-50 text-amber-700 border border-amber-200"
+          : p === "low"
+            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+            : "bg-slate-100 text-slate-600 border border-slate-200"
+    return <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold capitalize ${cls}`}>{priority}</span>
   }
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
@@ -356,11 +376,11 @@ export default function ReportsPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="font-semibold w-[30%]">Vendor</TableHead>
-                    <TableHead className="font-semibold w-[20%]">Client</TableHead>
+                    <TableHead className="font-semibold w-[32%]">Vendor</TableHead>
+                    <TableHead className="font-semibold w-[18%]">Assigned Date</TableHead>
                     <TableHead className="font-semibold w-[18%]">Completed On</TableHead>
-                    <TableHead className="font-semibold w-[14%]">Result</TableHead>
-                    <TableHead className="font-semibold w-[18%]">Actions</TableHead>
+                    <TableHead className="font-semibold w-[16%]">Priority</TableHead>
+                    <TableHead className="font-semibold w-[16%]">Result</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -371,28 +391,10 @@ export default function ReportsPage() {
                         <TableCell>
                           <div className="font-medium text-slate-900">{row.vendor}</div>
                         </TableCell>
-                        <TableCell className="text-slate-600 text-sm">{row.clientName}</TableCell>
+                        <TableCell className="text-slate-600 text-sm">{row.assignedDate}</TableCell>
                         <TableCell className="text-slate-600 text-sm">{row.inspectionDate}</TableCell>
+                        <TableCell>{getPriorityBadge(row.priority)}</TableCell>
                         <TableCell>{getResultBadge(row.result)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => router.push(`/checker/dashboard/report/${insp.id}`)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
-                              title="View Report"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              View Report
-                            </button>
-                            <button
-                              onClick={() => router.push(`/checker/dashboard/report/${insp.id}?download=true`)}
-                              className="flex items-center justify-center w-8 h-8 text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
-                              title="Download PDF"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </TableCell>
                       </TableRow>
                     )
                   })}
