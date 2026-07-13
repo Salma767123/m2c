@@ -38,6 +38,14 @@ function getProxyUrl(url: string): string {
   return url
 }
 
+function isWordMime(mime: string): boolean {
+  return (
+    mime.includes('msword') ||
+    mime.includes('wordprocessingml') ||
+    mime === 'application/vnd.ms-word'
+  )
+}
+
 export default function DocViewerModal({ url, name, onClose, readOnly = false }: Props) {
   const isImage = isDocImageUrl(url, name)
   const ext = extFromName(name) || extFromUrl(url)
@@ -46,17 +54,27 @@ export default function DocViewerModal({ url, name, onClose, readOnly = false }:
 
   // Microsoft Office Online can only fetch publicly accessible URLs — not local blob/data URIs
   const isLocal = url.startsWith('data:') || url.startsWith('blob:')
-  const officeOnlineUrl = isWord && !isLocal
-    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
-    : null
 
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [fetchError, setFetchError] = useState(false)
+  // Set to true when a file that appeared to be a PDF turns out to be a Word
+  // document (fallbackName endings like "iec_certificate.pdf" can mask a .docx).
+  // Prevents putting a DOCX blob in a PDF iframe, which causes the browser to
+  // download it instead of displaying it.
+  const [actuallyIsWord, setActuallyIsWord] = useState(false)
+
+  // Effective word flag: either detected by name/URL extension, or confirmed
+  // at fetch time by inspecting the blob's MIME type.
+  const effectivelyWord = isWord || actuallyIsWord
+  const officeOnlineUrl = effectivelyWord && !isLocal
+    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
+    : null
 
   useEffect(() => {
     setBlobUrl(null)
     setFetchError(false)
+    setActuallyIsWord(false)
 
     // data URIs and blob URLs work directly in the iframe — no fetch needed
     if (url.startsWith('data:') || url.startsWith('blob:')) {
@@ -77,6 +95,12 @@ export default function DocViewerModal({ url, name, onClose, readOnly = false }:
     // Putting the proxy URL directly in an <iframe> triggers the backend's
     // frame-ancestors CSP header (which allows only same-origin framing).
     // A blob URL is same-origin to the frontend, so it is always allowed.
+    //
+    // After fetching we also check the actual MIME type: if the file turns out
+    // to be a Word document (fallback names like "iec_certificate.pdf" can mask
+    // a .docx), we set actuallyIsWord instead of creating a blob URL. This
+    // prevents the DOCX from landing in a PDF iframe, which would make the
+    // browser download the file instead of displaying it.
     setLoading(true)
     let objectUrl: string | null = null
 
@@ -86,6 +110,13 @@ export default function DocViewerModal({ url, name, onClose, readOnly = false }:
         return res.blob()
       })
       .then(blob => {
+        if (isWordMime(blob.type)) {
+          // Fetched file is actually a Word document — hand off to Office Online.
+          // Do NOT create a blob URL: putting a DOCX blob in a <pdf> iframe
+          // causes the browser to download it rather than display it.
+          setActuallyIsWord(true)
+          return
+        }
         objectUrl = URL.createObjectURL(blob)
         setBlobUrl(objectUrl)
       })
