@@ -766,10 +766,6 @@ export default function VendorDataSummary({
         <div className="flex flex-col">
           {isManufacturer || enabledFacilities.length > 0 ? (
             <>
-              <InfoRow
-                label="Active Facilities"
-                value={enabledFacilities.length > 0 ? enabledFacilities.join(', ') : 'None selected'}
-              />
               {Object.entries(data.facilityDetails || {}).map(([facilityId, details]: [string, any]) => {
                 if (!data.enabledFacilities?.[facilityId]) return null;
                 const facilityName = FACILITY_LABELS[facilityId] || facilityId;

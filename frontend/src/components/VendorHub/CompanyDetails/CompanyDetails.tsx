@@ -368,14 +368,13 @@ function DocUpload({
           </div>
           <div className="flex items-center gap-0.5 shrink-0">
             {documentUrl && (
-              <a
-                href={documentUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => openDoc(documentUrl!, name)}
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-slate-600 hover:bg-white hover:text-brand-600 transition-colors"
               >
                 <Eye className="w-3.5 h-3.5" /> View
-              </a>
+              </button>
             )}
             <label
               htmlFor={inputId}

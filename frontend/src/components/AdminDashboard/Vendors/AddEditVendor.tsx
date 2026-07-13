@@ -48,6 +48,8 @@ interface VendorFormData {
   email2: string;
   phone: string;
   landlineNumber: string;
+  localLandlineStd?: string;
+  localLandlineNumber?: string;
   phoneNumber2: string;
   website: string;
   address: string;
@@ -243,6 +245,8 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     email2: "",
     phone: "",
     landlineNumber: "",
+    localLandlineStd: "",
+    localLandlineNumber: "",
     phoneNumber2: "",
     website: "",
     address: "",
@@ -647,6 +651,8 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         email2: vendor.businessEmail2 || "",
         phone: vendor.businessPhone || "",
         landlineNumber: vendor.landlineNumber || "",
+        localLandlineStd: (vendor as any).localLandlineStd || "",
+        localLandlineNumber: (vendor as any).localLandlineNumber || "",
         phoneNumber2: vendor.phoneNumber2 || "",
         website: vendor.website || "",
         address: vendor.businessAddress || "",
@@ -1286,43 +1292,6 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                 </ul>
               </nav>
 
-              {/* Progress Summary Pinned to Bottom */}
-              <div className="p-5 border-t border-slate-100 shrink-0 bg-slate-50/50">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    Overall Progress
-                  </span>
-                  <span className="text-xs font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-full tabular-nums">
-                    {progressPercent}%
-                  </span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className="h-1.5 rounded-full bg-linear-to-r from-brand-500 to-brand-600 transition-[width] duration-500 ease-out shadow-[0_0_8px_rgba(224,26,27,0.15)]"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
-                <div className="flex justify-between items-center mt-2.5">
-                  <span className="text-[10px] text-slate-400 font-medium tabular-nums">
-                    {completedVisibleCount} of {visibleStepCount} completed
-                  </span>
-                  {progressPercent === 100 && (
-                    <span className="text-[10px] text-success-500 font-bold flex items-center gap-0.5">
-                      <svg
-                        className="w-3.5 h-3.5 fill-success-500"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      Ready!
-                    </span>
-                  )}
-                </div>
-              </div>
             </aside>
           );
         })()}
