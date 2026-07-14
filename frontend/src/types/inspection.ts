@@ -102,9 +102,14 @@ export interface ProductDetailVendor {
   ownerName?: string
   email?: string
   businessEmail?: string
+  businessEmail2?: string | null
   businessPhone?: string
+  phoneNumber2?: string | null
+  factoryAddress?: string | null
   factoryCity?: string | null
   factoryState?: string | null
+  factoryZipCode?: string | null
+  factoryCountry?: string | null
 }
 
 export interface AssignedQcSummary {

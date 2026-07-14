@@ -20,11 +20,14 @@ import {
   Image as ImageIcon,
   Layers,
   Warehouse,
-  UserCheck
+  UserCheck,
+  CheckCircle
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Image from 'next/image'
 import { adminProductService, type AdminProduct } from '@/services/adminProductService'
+import qcCheckerService from '@/services/qcCheckerService'
+import { formatCheckerName } from '@/lib/checkerUtils'
 import { hasPermission } from '@/lib/auth'
 
 // Hoisted static array — allocated once, not re-created every render (Rule 6.3)
@@ -63,6 +66,9 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
   const [variantOriginalPricesUSD, setVariantOriginalPricesUSD] = useState<Record<string, string>>({})
   const [variantVisibilities, setVariantVisibilities] = useState<Record<string, string>>({})
   const [actionLoading, setActionLoading] = useState(false)
+  const [qcCheckers, setQcCheckers] = useState<{ id: string; name: string }[]>([])
+  const [showAssignModal, setShowAssignModal] = useState(false)
+  const [selectedQcChecker, setSelectedQcChecker] = useState<string>('')
 
   // Fetch product data from backend
   useEffect(() => {
@@ -116,6 +122,42 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
       fetchProduct()
     }
   }, [requestId])
+
+  // Load active QC checkers for the assign/reassign dropdown.
+  useEffect(() => {
+    qcCheckerService.getAllQCCheckers({ status: 'ACTIVE' })
+      .then((res) => { if (res.success && res.data) setQcCheckers(res.data) })
+      .catch(() => { /* dropdown simply stays empty */ })
+  }, [])
+
+  const openAssignModal = () => {
+    setSelectedQcChecker(product?.assignedQcId ?? '')
+    setShowAssignModal(true)
+  }
+
+  const handleAssignQC = async () => {
+    if (!product || !selectedQcChecker) { showErrorToast('Validation Error', 'Please select a QC Checker'); return }
+    const wasReassign = Boolean(product.assignedQcId)
+    try {
+      setActionLoading(true)
+      const response = await adminProductService.assignQCChecker(product.id, selectedQcChecker)
+      if (response.success) {
+        showSuccessToast(
+          wasReassign ? 'QC Checker Reassigned' : 'QC Checker Assigned',
+          wasReassign ? 'The product has been reassigned to a new Quality Checker.' : 'The product has been assigned for inspection.'
+        )
+        setShowAssignModal(false)
+        setSelectedQcChecker('')
+        // Refresh so the assigned checker + status reflect the change.
+        const refreshed = await adminProductService.getProduct(requestId)
+        if (refreshed.success && refreshed.data) setProduct(refreshed.data)
+      }
+    } catch (error: any) {
+      showErrorToast(wasReassign ? 'Reassignment Failed' : 'Assignment Failed', error.message || 'Unable to assign QC Checker.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
 
   const handleApprove = async () => {
     if (!product) return
@@ -380,13 +422,23 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   </Button>
                 )
               ) : product.approvalStatus === 'REINSPECTION' ? (
-                <div className="flex flex-col items-end">
-                  <Badge variant="outline" className="text-orange-600 mb-1 border-orange-200">
+                <div className="flex flex-col items-end gap-1.5">
+                  <Badge variant="outline" className="text-orange-600 border-orange-200">
                     Awaiting QC Re-Inspection
                   </Badge>
-                  <span className="text-[10px] text-gray-400 italic">
-                    QC checker must complete re-inspection
-                  </span>
+                  {hasPermission('vendor_product_requests:assign_qc') ? (
+                    <Button
+                      onClick={openAssignModal}
+                      disabled={actionLoading}
+                      variant="outline"
+                      className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                    >
+                      <UserCheck className="h-4 w-4 mr-2" />
+                      {product.assignedQcId ? 'Reassign QC Checker' : 'Assign QC Checker'}
+                    </Button>
+                  ) : (
+                    <span className="text-[10px] text-gray-400 italic">QC checker must complete re-inspection</span>
+                  )}
                 </div>
               ) : product.approvalStatus === 'REJECTED' ? (
                 hasPermission('reinspection_review:view') && (
@@ -400,13 +452,22 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   </Button>
                 )
               ) : (
-                <div className="flex flex-col items-end">
-                  <Badge variant="outline" className="text-yellow-600 mb-1 border-yellow-200">
+                <div className="flex flex-col items-end gap-1.5">
+                  <Badge variant="outline" className="text-yellow-600 border-yellow-200">
                     Waiting for QC Approval
                   </Badge>
-                  <span className="text-[10px] text-gray-400 italic">
-                    QC must approve first
-                  </span>
+                  {hasPermission('vendor_product_requests:assign_qc') ? (
+                    <Button
+                      onClick={openAssignModal}
+                      disabled={actionLoading}
+                      className="bg-brand-500 hover:bg-brand-600 text-white"
+                    >
+                      <UserCheck className="h-4 w-4 mr-2" />
+                      {product.assignedQcId ? 'Reassign QC Checker' : 'Assign QC Checker'}
+                    </Button>
+                  ) : (
+                    <span className="text-[10px] text-gray-400 italic">QC must approve first</span>
+                  )}
                 </div>
               )}
               {product.approvalStatus === 'PENDING' && hasPermission('vendor_product_requests:approve') && (
@@ -1310,6 +1371,65 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
       )}
 
       {/* Rejection Modal */}
+      {/* Assign / Reassign QC Checker Modal */}
+      {showAssignModal && (() => {
+        const currentQcId = product?.assignedQcId ?? ''
+        const isReassign = Boolean(currentQcId)
+        const isUnchanged = isReassign && selectedQcChecker === currentQcId
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900">{isReassign ? 'Reassign QC Checker' : 'Assign QC Checker'}</h3>
+                <button type="button" onClick={() => { setShowAssignModal(false); setSelectedQcChecker('') }}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 mb-4">
+                {isReassign ? 'Select a different Quality Checker to take over inspection of this product.' : 'Select a Quality Checker to inspect this product before it can be approved.'}
+              </p>
+              {isReassign && product?.assignedQc?.name && (
+                <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="text-xs uppercase tracking-wide text-slate-400 mb-1">Currently assigned</div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-emerald-500" />
+                    <span className="text-sm font-medium text-slate-900">{product.assignedQc.name}</span>
+                    {product.assignedQc.checkerId && (
+                      <span className="text-xs font-mono text-slate-400">({product.assignedQc.checkerId})</span>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">QC Checker</label>
+                <select
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none text-sm"
+                  value={selectedQcChecker}
+                  onChange={(e) => setSelectedQcChecker(e.target.value)}
+                >
+                  <option value="">Select a QC Checker</option>
+                  {qcCheckers.map(qc => (
+                    <option key={qc.id} value={qc.id}>{formatCheckerName(qc)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => { setShowAssignModal(false); setSelectedQcChecker('') }}
+                  className="px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                  Cancel
+                </button>
+                <button type="button" onClick={handleAssignQC} disabled={!selectedQcChecker || isUnchanged || actionLoading}
+                  title={isUnchanged ? 'Select a different QC Checker to reassign' : undefined}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 rounded-xl transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed">
+                  {actionLoading ? 'Saving...' : isReassign ? 'Reassign' : 'Assign'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {showRejectionModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">

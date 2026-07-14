@@ -14,6 +14,19 @@ const ERROR_CLS =
 const FieldError = ({ message }: { message?: string }) =>
   message ? <p className="mt-1.5 text-xs text-red-600">{message}</p> : null
 
+// Mirrors the vendor registration form's business-type labels so the checker
+// sees "Private Limited Company" rather than the raw "pvt-ltd" value.
+function getBusinessTypeLabel(val?: string) {
+  const map: Record<string, string> = {
+    'proprietorship': 'Proprietorship',
+    'pvt-ltd': 'Private Limited Company',
+    'partnership-firm': 'Partnership Firm',
+    'llp': 'Limited Liability Partnership (LLP)',
+    'unregistered': 'Unregistered',
+  }
+  return val ? (map[val] || val) : val
+}
+
 const SERVICE_TYPES = [
   'Pre-Shipment Inspection',
   'During Production Inspection',
@@ -86,9 +99,9 @@ export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {
     }
   }, [showServiceTypeDropdown])
 
-  const factoryAddress = [v.factoryAddress, v.factoryCity, v.factoryState, v.factoryZipCode, v.factoryCountry]
+  const factoryAddress = [v.factoryAddress, v.addressLine2, v.addressLine3, v.landmark, v.factoryCity, v.factoryState, v.factoryZipCode, v.factoryCountry]
     .filter(Boolean).join(', ')
-  const warehouseAddress = [v.warehouseAddress, v.warehouseCity, v.warehouseState]
+  const warehouseAddress = [v.warehouseAddress, v.warehouseAddressLine2, v.warehouseAddressLine3, v.warehouseLandmark, v.warehouseCity, v.warehouseState, v.warehouseZipCode, v.warehouseCountry]
     .filter(Boolean).join(', ')
 
   return (
@@ -107,7 +120,7 @@ export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {
         </div>
         <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
           <InfoBlock label="Company Name" value={v.companyName} />
-          <InfoBlock label="Business Type" value={v.businessType} />
+          <InfoBlock label="Business Type" value={getBusinessTypeLabel(v.businessType)} />
           <InfoBlock label="Primary Phone" value={v.businessPhone} />
           {v.phoneNumber2 && <InfoBlock label="Secondary Phone" value={v.phoneNumber2} />}
           <InfoBlock label="Primary Email" value={v.businessEmail} />

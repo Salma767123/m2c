@@ -393,12 +393,14 @@ function OverviewTab({ product, primaryImage }: { product: ProductDetailData; pr
                 <Section title="Vendor">
                     <Row icon={<Factory className="w-4 h-4" />} label="Company" value={v.companyName} />
                     <Row icon={<Factory className="w-4 h-4" />} label="Owner" value={v.ownerName} />
-                    <Row icon={<Mail className="w-4 h-4" />} label="Email" value={v.businessEmail || v.email} />
-                    <Row icon={<Phone className="w-4 h-4" />} label="Phone" value={v.businessPhone} />
+                    <Row icon={<Mail className="w-4 h-4" />} label="Primary Email" value={v.businessEmail || v.email} />
+                    {v.businessEmail2 && <Row icon={<Mail className="w-4 h-4" />} label="Secondary Email" value={v.businessEmail2} />}
+                    <Row icon={<Phone className="w-4 h-4" />} label="Primary Phone" value={v.businessPhone} />
+                    {v.phoneNumber2 && <Row icon={<Phone className="w-4 h-4" />} label="Secondary Phone" value={v.phoneNumber2} />}
                     <Row
                         icon={<MapPin className="w-4 h-4" />}
                         label="Factory Location"
-                        value={[v.factoryCity, v.factoryState].filter(Boolean).join(", ")}
+                        value={[v.factoryAddress, v.factoryCity, v.factoryState, v.factoryZipCode, v.factoryCountry].filter(Boolean).join(", ")}
                     />
                 </Section>
 

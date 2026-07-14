@@ -7,6 +7,7 @@ import {
 import { Card, CardContent } from "../../UI/Card";
 import { Badge } from "../../UI/Badge";
 import { buildFullName, toExternalUrl } from "@/lib/utils";
+import { getLandlineDisplay } from "@/components/VendorHub/FormUI";
 import { openDoc } from "@/lib/docViewerBus";
 import { downloadDoc } from "@/lib/docDownload";
 import { Country } from "country-state-city";
@@ -149,21 +150,109 @@ const FACILITY_LABELS: Record<string, string> = {
   printing: "Printing", stitching: "Stitching", finishing: "Finishing",
 };
 
-function contactBlock(c: any) {
-  const name = buildFullName(c.title, c.firstName, c.middleName, c.lastName, c.name);
+// Units mirror the vendor registration form (ManufacturingFacilities.tsx):
+// machine counts → "Machines"; daily capacity → "kg" for spinning/weaving/
+// dyeing/printing and "Pieces" for stitching/finishing. Remarks etc. get none.
+const facilityFieldUnit = (fid: string, key: string): string => {
+  const k = key.toLowerCase();
+  if (k.includes("machine") || k === "loomcount") return "Machines";
+  if (k.includes("capacity")) return fid === "stitching" || fid === "finishing" ? "Pieces" : "kg";
+  return "";
+};
+// Append the unit only when the value is a plain number (never to remarks).
+const withFacilityUnit = (fid: string, key: string, value: any): string => {
+  const unit = facilityFieldUnit(fid, key);
+  const s = String(value);
+  return unit && /^[\d.,\s]+$/.test(s.trim()) ? `${s} ${unit}` : s;
+};
+
+// Resolves an owner's landline into display strings WITH country code.
+// Local landlines are +91-only (STD + number); the number may be stored as a
+// separate field or concatenated with the STD, so strip a duplicated STD
+// prefix. International landlines carry their own country code in `intl`.
+const resolveLandline = (parts: { std?: string | null; number?: string | null; concat?: string | null; intl?: string | null; legacy?: string | null }) => {
+  const std = (parts.std || "").trim();
+  let number = (parts.number || "").trim();
+  if (!number) {
+    const raw = (parts.concat || "").trim();
+    number = std && raw.startsWith(std) ? raw.slice(std.length) : raw;
+  }
+  return getLandlineDisplay({
+    localLandlineCountryCode: "+91",
+    localLandlineStd: std,
+    localLandline: number,
+    intlLandline: parts.intl,
+    landline: parts.legacy,
+  });
+};
+
+// One person card — shared UI for owners AND contacts. The heading is the
+// person's name, falling back to a generic label ("Owner 2", "Contact 2", …).
+// Department is optional (owners don't have one; contacts do).
+function PersonCard({
+  fallbackLabel, photo, name, designation, department, email, email2, phone, phone2, landline, businessStartDate,
+}: {
+  fallbackLabel: string;
+  photo?: string | null;
+  name?: string | null;
+  designation?: string | null;
+  department?: string | null;
+  email?: string | null;
+  email2?: string | null;
+  phone?: string | null;
+  phone2?: string | null;
+  landline: { local: string; intl: string; legacy: string; hasNew: boolean };
+  businessStartDate?: string | null;
+}) {
   return (
-    <div className="space-y-3">
-      {c.photo && <img src={c.photo} alt={name} className="w-20 h-20 rounded-full object-cover border border-slate-200" />}
-      <FieldGrid cols="grid-cols-2">
-        <Field label="Name" value={name} />
-        <Field label="Designation" value={c.designation === "Others" ? c.customDesignation : titleCase(c.designation)} />
-        <Field label="Department" value={c.department === "Others" ? c.customDepartment : c.department} />
-        <Field label="Primary Email" value={c.email1 || c.email} />
-        <Field label="Secondary Email" value={c.email2} />
-        <Field label="Primary Phone" value={c.phone1 || c.phone} />
-        <Field label="Secondary Phone" value={c.phone2} />
-      </FieldGrid>
+    <div className="bg-slate-50/60 border border-slate-200 rounded-xl p-4 flex gap-4">
+      {photo ? (
+        <img src={photo} alt={`${name || fallbackLabel} profile`} className="w-14 h-14 rounded-full object-cover border border-slate-200 shrink-0" loading="lazy" />
+      ) : (
+        <div className="w-14 h-14 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+          <User className="w-6 h-6 text-slate-300" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold text-slate-800 mb-2">{name || fallbackLabel}</p>
+        <FieldGrid cols="grid-cols-2">
+          <Field label="Designation" value={designation} />
+          <Field label="Department" value={department} />
+          <Field label="Primary Email" value={email} />
+          <Field label="Secondary Email" value={email2} />
+          <Field label="Primary Phone" value={phone} />
+          <Field label="Secondary Phone" value={phone2} />
+          <Field label="Local Landline" value={landline.local || (!landline.hasNew ? landline.legacy : undefined)} />
+          <Field label="International Landline" value={landline.intl} />
+          {businessStartDate && <Field label="Business Start Date" value={businessStartDate} />}
+        </FieldGrid>
+      </div>
     </div>
+  );
+}
+
+// A contact rendered in the SAME card format as the owner cards. Landlines are
+// resolved with the +91 country code, matching the owners.
+function contactCard(c: any, fallbackLabel: string) {
+  return (
+    <PersonCard
+      fallbackLabel={fallbackLabel}
+      photo={c.photo}
+      name={buildFullName(c.title, c.firstName, c.middleName, c.lastName, c.name)}
+      designation={c.designation === "Others" ? c.customDesignation : titleCase(c.designation)}
+      department={c.department === "Others" ? c.customDepartment : c.department}
+      email={c.email1 || c.email}
+      email2={c.email2}
+      phone={c.phone1 || c.phone}
+      phone2={c.phone2}
+      landline={resolveLandline({
+        std: c.localLandlineStd,
+        number: c.localLandline,
+        concat: c.localLandline,
+        intl: c.intlLandline,
+        legacy: c.landline,
+      })}
+    />
   );
 }
 
@@ -203,7 +292,8 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
   const bank = v.bankDetails || null;
   const mainContact = v.mainContact || null;
 
-  // Flatten every product photo across categoryProducts + additionalCategories.
+  // Standard product-category photos only — the additional custom categories
+  // are kept separate below so they render in their own section.
   const productPhotos: { name: string; url: string }[] = [];
   const pushPhotos = (name: string, photos: any[]) => {
     (photos || []).forEach((p) => {
@@ -216,9 +306,22 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
       (Array.isArray(list) ? list : []).forEach((prod: any) => pushPhotos(prod?.name || "Product", prod?.photos));
     });
   }
-  if (Array.isArray(v.additionalCategories)) {
-    v.additionalCategories.forEach((cat: any) => (cat?.products || []).forEach((prod: any) => pushPhotos(prod?.name || "Product", prod?.photos)));
-  }
+
+  // Additional / custom categories the vendor added — grouped by category so
+  // each shows its own name and its products' photos, separate from the
+  // standard categories above.
+  type CustomCat = { name: string; products: { name: string; photos: string[] }[] };
+  const customCategories: CustomCat[] = (Array.isArray(v.additionalCategories) ? v.additionalCategories : [])
+    .map((cat: any): CustomCat => ({
+      name: cat?.name || "Custom Category",
+      products: (Array.isArray(cat?.products) ? cat.products : []).map((prod: any) => ({
+        name: prod?.name || "Product",
+        photos: (Array.isArray(prod?.photos) ? prod.photos : [])
+          .map((p: any) => p?.preview || p?.url)
+          .filter(Boolean) as string[],
+      })),
+    }))
+    .filter((cat: CustomCat) => cat.products.length > 0);
 
   const countryChips = (arr: string[], color: string) => (
     <div className="flex flex-wrap gap-1.5">
@@ -264,56 +367,50 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
         </div>
       </Section>
 
-      {/* Owner Profile */}
+      {/* Owner Profile — primary + additional owners, one uniform card format */}
       <Section title="Owner Profile" icon={<User className="h-5 w-5" />}>
-        <div className="flex flex-col sm:flex-row gap-6">
-          {v.ownerPhoto && (
-            <div className="shrink-0">
-              <img src={v.ownerPhoto} alt="Owner" className="w-24 h-24 object-cover rounded-xl border border-slate-200" />
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <FieldGrid>
-              <Field label="Owner Name" value={buildFullName(v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName, v.ownerName)} />
-              <Field label="Designation" value={v.designation === "Others" ? v.customDesignation : titleCase(v.designation)} />
-              <Field label="Business Start Date" value={v.businessStartDate ? new Date(v.businessStartDate).toLocaleDateString() : undefined} />
-              <Field label="Primary Email" value={v.ownerEmail} />
-              <Field label="Secondary Email" value={v.ownerEmail2} />
-              <Field label="Primary Phone" value={v.ownerPhone} />
-              <Field label="Secondary Phone" value={v.ownerPhone2} />
-              <Field label="Address" value={[v.ownerAddress, v.ownerCity, v.ownerState, v.ownerZipCode, v.ownerCountry].filter(Boolean).join(", ")} wide />
-            </FieldGrid>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Owner 1 (primary) */}
+          <PersonCard
+            fallbackLabel="Owner 1"
+            photo={v.ownerPhoto}
+            name={buildFullName(v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName, v.ownerName)}
+            designation={v.designation === "Others" ? v.customDesignation : titleCase(v.designation)}
+            email={v.ownerEmail}
+            email2={v.ownerEmail2}
+            phone={v.ownerPhone}
+            phone2={v.ownerPhone2}
+            landline={resolveLandline({
+              std: v.ownerLocalLandlineStd,
+              number: v.ownerLocalLandlineNumber,
+              concat: v.ownerLandline,
+              intl: v.ownerIntlLandline,
+              legacy: v.ownerLandline,
+            })}
+            businessStartDate={v.businessStartDate ? new Date(v.businessStartDate).toLocaleDateString() : undefined}
+          />
+          {/* Owner 2, 3, … */}
+          {additionalOwners.map((o, i) => (
+            <PersonCard
+              key={i}
+              fallbackLabel={`Owner ${i + 2}`}
+              photo={o.photo}
+              name={buildFullName(o.title, o.firstName, o.middleName, o.lastName, o.name)}
+              designation={o.designation === "Others" ? o.customDesignation : titleCase(o.designation)}
+              email={o.email}
+              email2={o.email2}
+              phone={o.phone}
+              phone2={o.phone2}
+              landline={resolveLandline({
+                std: o.localLandlineStd,
+                number: o.localLandlineNumber,
+                concat: o.localLandline,
+                intl: o.intlLandline,
+                legacy: o.landline,
+              })}
+            />
+          ))}
         </div>
-        {additionalOwners.length > 0 && (
-          <div className="mt-6">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Additional Owners ({additionalOwners.length})</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {additionalOwners.map((o, i) => (
-                <div key={i} className="bg-slate-50/60 border border-slate-200 rounded-xl p-4 flex gap-4">
-                  {o.photo && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={o.photo}
-                      alt={`Owner ${i + 2} profile`}
-                      className="w-14 h-14 rounded-full object-cover border border-slate-200 shrink-0"
-                    />
-                  )}
-                  <FieldGrid cols="grid-cols-2">
-                    <Field label="Name" value={buildFullName(o.title, o.firstName, o.middleName, o.lastName, o.name)} />
-                    <Field label="Designation" value={o.designation === "Others" ? o.customDesignation : titleCase(o.designation)} />
-                    <Field label="Primary Email" value={o.email} />
-                    <Field label="Secondary Email" value={o.email2} />
-                    <Field label="Primary Phone" value={o.phone} />
-                    <Field label="Secondary Phone" value={o.phone2} />
-                    <Field label="Local Landline" value={o.localLandline} />
-                    <Field label="International Landline" value={o.intlLandline} />
-                  </FieldGrid>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </Section>
 
       {/* Legal Address & Factory Site — mirrors the vendor registration form */}
@@ -410,6 +507,40 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
         </Section>
       )}
 
+      {/* Additional Categories & Products — the vendor's custom categories,
+          shown separately from the standard product categories above. */}
+      {customCategories.length > 0 && (
+        <Section title="Additional Categories & Products" icon={<Package className="h-5 w-5" />}>
+          <div className="space-y-5">
+            {customCategories.map((cat, ci) => {
+              const photoCount = cat.products.reduce((n, p) => n + p.photos.length, 0);
+              return (
+                <div key={ci}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge className="bg-amber-50 text-amber-700 border border-amber-200 capitalize">{cat.name}</Badge>
+                    <span className="text-xs text-slate-400">
+                      {cat.products.length} product{cat.products.length !== 1 ? "s" : ""}
+                      {photoCount > 0 ? ` · ${photoCount} photo${photoCount !== 1 ? "s" : ""}` : ""}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {cat.products.flatMap((prod, pi) =>
+                      prod.photos.length > 0
+                        ? prod.photos.map((url, phi) => <DocThumb key={`${pi}-${phi}`} url={url} name={prod.name} />)
+                        : [
+                            <div key={`${pi}-noimg`} className="border border-slate-200 rounded-xl p-3 flex items-center gap-2 text-sm font-medium text-slate-600">
+                              <Package className="w-4 h-4 text-slate-300 shrink-0" /> {prod.name}
+                            </div>,
+                          ],
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+      )}
+
       {/* Manufacturing Facilities */}
       {(activeFacilities.length > 0 || v.qualityControl || v.shippingMethods?.length) && (
         <Section title="Manufacturing & Logistics" icon={<Wrench className="h-5 w-5" />}>
@@ -422,7 +553,7 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
                     <p className="text-sm font-bold text-slate-800 mb-3">{FACILITY_LABELS[fid] || titleCase(fid)}</p>
                     <FieldGrid cols="grid-cols-2">
                       {Object.entries(details).filter(([, val]) => !blank(val)).map(([k, val]) => (
-                        <Field key={k} label={humanize(k.replace(fid, ""))} value={val as any} />
+                        <Field key={k} label={humanize(k.replace(fid, ""))} value={withFacilityUnit(fid, k, val)} />
                       ))}
                     </FieldGrid>
                   </div>
@@ -491,12 +622,12 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
         <Section title="Contact & Trade" icon={<Phone className="h-5 w-5" />}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {mainContact && (
-              <div><p className="text-xs font-semibold text-slate-400 uppercase mb-2">Main Contact</p>{contactBlock(mainContact)}</div>
+              <div><p className="text-xs font-semibold text-slate-400 uppercase mb-2">Main Contact</p>{contactCard(mainContact, "Main Contact")}</div>
             )}
             {alternateContacts.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Additional Contacts ({alternateContacts.length})</p>
-                <div className="space-y-4">{alternateContacts.map((c, i) => <div key={i}>{contactBlock(c)}</div>)}</div>
+                <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Additional Contacts</p>
+                <div className="space-y-4">{alternateContacts.map((c, i) => <div key={i}>{contactCard(c, `Contact ${i + 2}`)}</div>)}</div>
               </div>
             )}
           </div>

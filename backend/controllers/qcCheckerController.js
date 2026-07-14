@@ -1574,6 +1574,7 @@ const getProductDetails = async (req, res) => {
                         businessPhone: true,
                         phoneNumber2: true,
                         businessEmail: true,
+                        businessEmail2: true,
                         factoryAddress: true,
                         factoryCity: true,
                         factoryState: true,

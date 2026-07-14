@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
 import { ArrowLeft, Save, X, Upload, Package, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react'
-import VariantImageModal from './VariantImageModal'
 import CareInstructionModal, { CareIcon, CARE_INSTRUCTIONS, CATEGORY_COLORS } from './CareInstructionModal'
 import ResultModal from '@/components/UI/ResultModal'
 import { centerNotice } from '@/components/UI/CenterNotice'
@@ -455,20 +454,40 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     stock: 0
   })
 
-  const [editingVariantId, setEditingVariantId] = useState<string | null>(null)
   // SKU duplicate highlighting: error on the "Add Variant" SKU box, and ids of
   // already-added variants whose SKU clashes (highlighted red in the table).
   const [newVariantSkuError, setNewVariantSkuError] = useState('')
   const [skuConflictIds, setSkuConflictIds] = useState<string[]>([])
 
   const handleVariantImageUpdate = (variantId: string, newImages: string[]) => {
-    // Custom logic to update variant images using the existing updateVariant helper if needed,
-    // but updateVariant updates a single field. Let's reuse updateVariant.
     updateVariant(variantId, 'images', newImages)
   }
 
-  const getEditingVariant = () => {
-    return formData.variants.find(v => v.id === editingVariantId)
+  // Variant image upload — the file picker opens directly from the table row
+  // (no intermediate modal); only a success/failure popup is shown afterwards.
+  const handleVariantImageFile = (variantId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      centerNotice.error('File Too Large', `${file.name} exceeds the 5MB limit.`)
+      e.target.value = ''
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        handleVariantImageUpdate(variantId, [event.target.result as string])
+        centerNotice.success('Image Uploaded', 'Variant image uploaded successfully.')
+      } else {
+        centerNotice.error('Upload Failed', `Could not read ${file.name}.`)
+      }
+      e.target.value = ''
+    }
+    reader.onerror = () => {
+      centerNotice.error('Upload Failed', `Failed to read ${file.name}.`)
+      e.target.value = ''
+    }
+    reader.readAsDataURL(file)
   }
 
   // Load available inventory items
@@ -2087,13 +2106,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                       />
                                     </TableCell>
                                     <TableCell className="text-center">
-                                      <button
-                                        type="button"
-                                        onClick={() => setEditingVariantId(variant.id || null)}
-                                        className="inline-flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                      <label
+                                        className={`inline-flex items-center gap-2 transition-colors ${variant.id ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
                                         title={variant.images && variant.images.length > 0 ? "Change image" : "Add image"}
-                                        disabled={!variant.id}
                                       >
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          disabled={!variant.id}
+                                          onChange={(e) => variant.id && handleVariantImageFile(variant.id, e)}
+                                        />
                                         {variant.images && variant.images.length > 0 ? (
                                           <>
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2110,7 +2133,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                             <span className="text-xs font-medium">Add</span>
                                           </span>
                                         )}
-                                      </button>
+                                      </label>
                                     </TableCell>
                                     <TableCell className="text-center">
                                       <button
@@ -3037,20 +3060,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         onAdd={handleAddCareInstructions}
         onClose={() => setCareModalOpen(false)}
       />
-
-      {editingVariantId && (
-        <VariantImageModal
-          isOpen={!!editingVariantId}
-          onClose={() => setEditingVariantId(null)}
-          variantData={{
-            id: editingVariantId,
-            size: getEditingVariant()?.size || '',
-            color: getEditingVariant()?.color || '',
-            images: getEditingVariant()?.images || []
-          }}
-          onUpdateImages={handleVariantImageUpdate}
-        />
-      )}
 
       <ResultModal
         show={uploadResult.show}

@@ -1408,9 +1408,8 @@ export default function VendorSettings() {
                           <UserCircle className="w-6 h-6 text-slate-300" />
                         </div>
                       )}
-                      <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
+                      <p className="text-sm font-bold text-slate-800">{buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name) || `Owner ${idx + 2}`}</p>
                     </div>
-                    {(owner.name || owner.firstName) && <Field label="Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />}
                     {owner.designation && <Field label="Designation" value={owner.designation} />}
                     {owner.email && <Field label="Primary Email" value={owner.email} />}
                     {owner.email2 && <Field label="Secondary Email" value={owner.email2} />}
