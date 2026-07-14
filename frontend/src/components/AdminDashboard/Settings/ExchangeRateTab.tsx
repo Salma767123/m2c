@@ -62,7 +62,7 @@ export default function ExchangeRateTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+        <RefreshCw className="h-6 w-6 animate-spin text-slate-400" />
       </div>
     );
   }
@@ -71,28 +71,28 @@ export default function ExchangeRateTab() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-lg font-bold text-gray-900">Currency Exchange Rate</h2>
-        <p className="text-sm text-gray-600 mt-1">
+        <h2 className="text-lg font-bold text-slate-900">Currency Exchange Rate</h2>
+        <p className="text-sm text-slate-600 mt-1">
           Set the INR to USD exchange rate. All product USD prices will be automatically recalculated.
         </p>
       </div>
 
       {/* Current Rate Card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-green-50 rounded-lg">
             <DollarSign className="h-5 w-5 text-green-600" />
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900">USD Exchange Rate</h3>
-            <p className="text-xs text-gray-500">1 USD = ₹{currentRate || '—'}</p>
+            <h3 className="font-semibold text-slate-900">USD Exchange Rate</h3>
+            <p className="text-xs text-slate-500">1 USD = ₹{currentRate || '—'}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Input */}
           <div>
-            <label htmlFor="exchange-rate" className="block text-sm font-semibold text-gray-700 mb-2">
+            <label htmlFor="exchange-rate" className="block text-sm font-semibold text-slate-700 mb-2">
               1 USD = ₹
             </label>
             <div className="flex gap-3">
@@ -103,13 +103,13 @@ export default function ExchangeRateTab() {
                 min="0.01"
                 value={rate}
                 onChange={(e) => setRate(e.target.value)}
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-lg font-semibold"
+                className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-lg font-semibold"
                 placeholder="83.50"
               />
               <button
                 onClick={handleSave}
                 disabled={saving || !rate || parseFloat(rate) <= 0}
-                className="flex items-center gap-2 px-6 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+                className="flex items-center gap-2 px-6 py-2.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
               >
                 {saving ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />
@@ -120,7 +120,7 @@ export default function ExchangeRateTab() {
               </button>
             </div>
             {lastUpdated && (
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-slate-500 mt-2">
                 Last updated: {new Date(lastUpdated).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </p>
             )}
@@ -128,12 +128,12 @@ export default function ExchangeRateTab() {
 
           {/* Preview */}
           <div>
-            <p className="text-sm font-semibold text-gray-700 mb-2">Price Preview</p>
-            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+            <p className="text-sm font-semibold text-slate-700 mb-2">Price Preview</p>
+            <div className="bg-slate-50 rounded-lg p-4 space-y-2">
               {[500, 1000, 2500, 5000, 10000].map((inr) => (
                 <div key={inr} className="flex justify-between text-sm">
-                  <span className="text-gray-600">₹{inr.toLocaleString('en-IN')}</span>
-                  <span className="font-semibold text-gray-900">${previewPrice(inr)}</span>
+                  <span className="text-slate-600">₹{inr.toLocaleString('en-IN')}</span>
+                  <span className="font-semibold text-slate-900">${previewPrice(inr)}</span>
                 </div>
               ))}
             </div>
@@ -157,12 +157,12 @@ export default function ExchangeRateTab() {
       </div>
 
       {/* Formula */}
-      <div className="bg-gray-50 rounded-xl border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-900 mb-3">Conversion Formula</h3>
-        <div className="bg-white rounded-lg p-4 border border-gray-100 font-mono text-sm text-center">
+      <div className="bg-slate-50 rounded-xl border border-slate-200 p-6">
+        <h3 className="font-semibold text-slate-900 mb-3">Conversion Formula</h3>
+        <div className="bg-white rounded-lg p-4 border border-slate-100 font-mono text-sm text-center">
           <span className="text-green-700">USD Price</span> = <span className="text-blue-700">INR Price</span> / <span className="text-orange-700">Exchange Rate</span>
         </div>
-        <p className="text-xs text-gray-500 mt-3 text-center">
+        <p className="text-xs text-slate-500 mt-3 text-center">
           Example: ₹2,499 / {rate || '83.50'} = ${previewPrice(2499)}
         </p>
       </div>

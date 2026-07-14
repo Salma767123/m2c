@@ -104,7 +104,7 @@ const CouponManagement = () => {
 
     if (isExpired) {
       return (
-        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
           <Clock className="w-3 h-3" />
           Expired
         </span>
@@ -113,7 +113,7 @@ const CouponManagement = () => {
 
     if (coupon.isActive) {
       return (
-        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
           <CheckCircle className="w-3 h-3" />
           Active
         </span>
@@ -121,7 +121,7 @@ const CouponManagement = () => {
     }
 
     return (
-      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200">
         <XCircle className="w-3 h-3" />
         Inactive
       </span>
@@ -233,12 +233,12 @@ const CouponManagement = () => {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-6 bg-slate-50 min-h-screen">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Coupon Management</h1>
-          <p className="text-gray-600">Create and manage discount coupons</p>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Coupon Management</h1>
+          <p className="text-slate-600">Create and manage discount coupons</p>
         </div>
         <div className="flex items-center gap-3">
           {hasPermission(['coupons:edit', 'coupons:create']) && (
@@ -253,7 +253,7 @@ const CouponManagement = () => {
           {hasPermission('coupons:create') && (
             <button
               onClick={handleCreate}
-              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors flex items-center gap-2"
             >
               <Plus className="w-5 h-5" />
               Create Coupon
@@ -264,22 +264,22 @@ const CouponManagement = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Coupons</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
+              <p className="text-sm text-slate-600 font-medium">Total Coupons</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{stats.total}</p>
             </div>
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-              <Tag className="w-6 h-6 text-gray-700" />
+            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
+              <Tag className="w-6 h-6 text-slate-700" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Active</p>
+              <p className="text-sm text-slate-600 font-medium">Active</p>
               <p className="text-2xl font-bold text-green-600 mt-1">{stats.active}</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
@@ -288,22 +288,22 @@ const CouponManagement = () => {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Inactive</p>
-              <p className="text-2xl font-bold text-gray-600 mt-1">{stats.inactive}</p>
+              <p className="text-sm text-slate-600 font-medium">Inactive</p>
+              <p className="text-2xl font-bold text-slate-600 mt-1">{stats.inactive}</p>
             </div>
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-              <XCircle className="w-6 h-6 text-gray-600" />
+            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
+              <XCircle className="w-6 h-6 text-slate-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Expired</p>
+              <p className="text-sm text-slate-600 font-medium">Expired</p>
               <p className="text-2xl font-bold text-red-600 mt-1">{stats.expired}</p>
             </div>
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
@@ -314,16 +314,16 @@ const CouponManagement = () => {
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
               type="text"
               placeholder="Search by coupon code or description..."
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
             />
           </div>
 
@@ -351,14 +351,14 @@ const CouponManagement = () => {
       )}
 
       {/* Coupons Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center p-12">
-            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+            <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
           </div>
         ) : (
           <Table>
-            <TableHeader>
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
               <TableRow>
                 <TableHead>Coupon Code</TableHead>
                 <TableHead>Discount</TableHead>
@@ -371,7 +371,7 @@ const CouponManagement = () => {
             <TableBody>
               {paginatedCoupons.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-gray-500">
+                  <TableCell colSpan={6} className="text-center py-12 text-slate-500">
                     No coupons found
                   </TableCell>
                 </TableRow>
@@ -380,16 +380,16 @@ const CouponManagement = () => {
                   <TableRow key={coupon.id}>
                     <TableCell>
                       <div>
-                        <div className="font-semibold text-gray-900">{coupon.code}</div>
-                        <div className="text-sm text-gray-500">{coupon.description}</div>
+                        <div className="font-semibold text-slate-900">{coupon.code}</div>
+                        <div className="text-sm text-slate-500">{coupon.description}</div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         {coupon.discountType === 'PERCENTAGE' ? (
-                          <Percent className="w-4 h-4 text-gray-500" />
+                          <Percent className="w-4 h-4 text-slate-500" />
                         ) : (
-                          <span className="text-gray-500 font-semibold">₹</span>
+                          <span className="text-slate-500 font-semibold">₹</span>
                         )}
                         <span className="font-medium">
                           {coupon.discountType === 'PERCENTAGE'
@@ -397,7 +397,7 @@ const CouponManagement = () => {
                             : `${coupon.discountValue}`}
                         </span>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs text-slate-500 mt-1">
                         Min: ₹{coupon.minPurchaseAmount || 0}
                         {coupon.maxDiscountAmount && ` | Max: ₹${coupon.maxDiscountAmount}`}
                       </div>
@@ -414,13 +414,13 @@ const CouponManagement = () => {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        <div className="font-medium text-gray-900">
+                        <div className="font-medium text-slate-900">
                           {coupon.usedCount || 0} / {coupon.usageLimit || '∞'}
                         </div>
                         {coupon.usageLimit && (
-                          <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                          <div className="w-full bg-slate-200 rounded-full h-2 mt-1">
                             <div
-                              className="bg-gray-900 h-2 rounded-full"
+                              className="bg-brand-500 h-2 rounded-full"
                               style={{ width: `${((coupon.usedCount || 0) / coupon.usageLimit) * 100}%` }}
                             />
                           </div>
@@ -429,8 +429,8 @@ const CouponManagement = () => {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        <div className="text-gray-700">{formatDate(coupon.startDate)}</div>
-                        <div className="text-gray-500">to {formatDate(coupon.expiryDate)}</div>
+                        <div className="text-slate-700">{formatDate(coupon.startDate)}</div>
+                        <div className="text-slate-500">to {formatDate(coupon.expiryDate)}</div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -441,7 +441,7 @@ const CouponManagement = () => {
                         {hasPermission('coupons:view') && (
                           <button
                             onClick={() => handleView(coupon)}
-                            className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                            className="p-1.5 text-slate-600 hover:bg-slate-100 rounded transition-colors"
                             title="View"
                           >
                             <Eye className="w-4 h-4" />
@@ -475,12 +475,12 @@ const CouponManagement = () => {
         )}
 
         {!loading && filteredCoupons.length > 0 && totalPages > 1 && (
-          <div className="flex items-center justify-end px-6 py-4 border-t border-gray-200">
+          <div className="flex items-center justify-end px-6 py-4 border-t border-slate-200">
             {totalPages > 1 && (
               <div className="flex items-center justify-end gap-3 text-sm">
                 <div className="flex items-center gap-1">
                   <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-                  {getPageRange(currentPage, totalPages).map((p, i) => p === '...' ? (<span key={`e-${i}`} className="px-2 text-slate-400">...</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                  {getPageRange(currentPage, totalPages).map((p, i) => p === '...' ? (<span key={`e-${i}`} className="px-2 text-slate-400">...</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
                   <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
                 </div>
               </div>

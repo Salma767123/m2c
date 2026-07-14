@@ -100,20 +100,20 @@ export default function AdminReviewModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
+      <div className="absolute inset-0 bg-slate-900/50" onClick={handleClose} />
 
       {/* Modal */}
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           {/* Header */}
           <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-slate-900">
               {lockedDecision === 'RAISE_REINSPECTION' ? 'Request Re-Inspection' : 'Review Inspection'}
             </h2>
-            <div className="text-sm text-gray-500 mt-1">
+            <div className="text-sm text-slate-500 mt-1">
               {entityType === 'factory' ? 'Factory' : 'Product'} Inspection: <strong>{entityName}</strong>
               {cycleNumber > 1 && (
-                <Badge className="ml-2 bg-indigo-100 text-indigo-800">Cycle #{cycleNumber}</Badge>
+                <Badge className="ml-2 bg-brand-50 text-brand-700 border border-brand-200">Cycle #{cycleNumber}</Badge>
               )}
             </div>
           </div>
@@ -122,7 +122,7 @@ export default function AdminReviewModal({
             {/* Decision Selection (hidden when the caller locks the decision) */}
             {!lockedDecision && (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Decision *</label>
+              <label className="text-sm font-medium text-slate-700">Decision *</label>
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
@@ -130,7 +130,7 @@ export default function AdminReviewModal({
                   className={`p-3 rounded-lg border text-center transition-all ${
                     decision === 'APPROVE'
                       ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
-                      : 'border-gray-200 hover:border-green-300'
+                      : 'border-slate-200 hover:border-green-300'
                   }`}
                 >
                   <IconCheck size={20} className="mx-auto text-green-600 mb-1" />
@@ -143,7 +143,7 @@ export default function AdminReviewModal({
                   className={`p-3 rounded-lg border text-center transition-all ${
                     decision === 'FINAL_REJECT'
                       ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
-                      : 'border-gray-200 hover:border-red-300'
+                      : 'border-slate-200 hover:border-red-300'
                   }`}
                 >
                   <IconX size={20} className="mx-auto text-red-600 mb-1" />
@@ -156,7 +156,7 @@ export default function AdminReviewModal({
                   className={`p-3 rounded-lg border text-center transition-all ${
                     decision === 'RAISE_REINSPECTION'
                       ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-200'
-                      : 'border-gray-200 hover:border-amber-300'
+                      : 'border-slate-200 hover:border-amber-300'
                   }`}
                 >
                   <IconRefresh size={20} className="mx-auto text-amber-600 mb-1" />
@@ -169,14 +169,14 @@ export default function AdminReviewModal({
             {/* Reason (required for FINAL_REJECT, optional for RAISE_REINSPECTION) */}
             {(decision === 'FINAL_REJECT' || decision === 'RAISE_REINSPECTION') && (
               <div>
-                <label className="text-sm font-medium text-gray-700">
+                <label className="text-sm font-medium text-slate-700">
                   Reason {decision === 'FINAL_REJECT' ? '*' : ''}
                 </label>
                 <textarea
                   value={reason}
                   onChange={e => setReason(e.target.value)}
                   rows={3}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 outline-none"
                   placeholder={decision === 'FINAL_REJECT' ? 'Detailed rejection reason (required)...' : 'Reason for re-inspection...'}
                 />
               </div>
@@ -185,12 +185,12 @@ export default function AdminReviewModal({
             {/* Remarks */}
             {decision && decision !== 'APPROVE' && (
               <div>
-                <label className="text-sm font-medium text-gray-700">Remarks / Observations</label>
+                <label className="text-sm font-medium text-slate-700">Remarks / Observations</label>
                 <textarea
                   value={remarks}
                   onChange={e => setRemarks(e.target.value)}
                   rows={2}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 outline-none"
                   placeholder="Additional observations..."
                 />
               </div>
@@ -199,12 +199,12 @@ export default function AdminReviewModal({
             {/* Notes */}
             {decision && decision !== 'APPROVE' && (
               <div>
-                <label className="text-sm font-medium text-gray-700">Supporting Notes</label>
+                <label className="text-sm font-medium text-slate-700">Supporting Notes</label>
                 <textarea
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
                   rows={2}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 outline-none"
                   placeholder="Internal notes..."
                 />
               </div>
@@ -216,13 +216,13 @@ export default function AdminReviewModal({
                 {/* Checker reassignment */}
                 {checkers && checkers.length > 0 && (
                   <div>
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-slate-700">
                       Assign to QC Checker (optional - defaults to same checker)
                     </label>
                     <select
                       value={newCheckerId}
                       onChange={e => setNewCheckerId(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 outline-none"
                     >
                       <option value="">Same checker (default)</option>
                       {checkers.map(c => (
@@ -236,22 +236,22 @@ export default function AdminReviewModal({
                 {entityType === 'factory' && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-sm font-medium text-gray-700">Scheduled Date</label>
+                      <label className="text-sm font-medium text-slate-700">Scheduled Date</label>
                       <input
                         type="date"
                         value={scheduledDate}
                         min={new Date().toISOString().slice(0, 10)}
                         onChange={e => setScheduledDate(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 outline-none"
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-700">Scheduled Time</label>
+                      <label className="text-sm font-medium text-slate-700">Scheduled Time</label>
                       <input
                         type="time"
                         value={scheduledTime}
                         onChange={e => setScheduledTime(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 outline-none"
                       />
                     </div>
                   </div>

@@ -428,18 +428,18 @@ export default function Settings() {
       <Breadcrumb />
 
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600 mt-1">Manage your profile and system settings</p>
+        <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+        <p className="text-slate-600 mt-1">Manage your profile and system settings</p>
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 border-b border-gray-200">
+      <div className="mb-6 border-b border-slate-200">
         <div className="flex gap-4">
           <button
             onClick={() => setActiveTab("profile")}
             className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "profile"
-              ? "border-gray-900 text-gray-900"
-              : "border-transparent text-gray-500 hover:text-gray-700"
+              ? "border-brand-500 text-brand-600"
+              : "border-transparent text-slate-500 hover:text-slate-700"
               }`}
           >
             <User className="h-4 w-4 inline mr-2" />
@@ -450,8 +450,8 @@ export default function Settings() {
               <button
                 onClick={() => setActiveTab("company")}
                 className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "company"
-                  ? "border-gray-900 text-gray-900"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-brand-500 text-brand-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
                   }`}
               >
                 <Building2 className="h-4 w-4 inline mr-2" />
@@ -460,8 +460,8 @@ export default function Settings() {
               <button
                 onClick={() => setActiveTab("payment")}
                 className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "payment"
-                  ? "border-gray-900 text-gray-900"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-brand-500 text-brand-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
                   }`}
               >
                 <DollarSign className="h-4 w-4 inline mr-2" />
@@ -470,8 +470,8 @@ export default function Settings() {
               <button
                 onClick={() => setActiveTab("gst")}
                 className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "gst"
-                  ? "border-gray-900 text-gray-900"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-brand-500 text-brand-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
                   }`}
               >
                 <Percent className="h-4 w-4 inline mr-2" />
@@ -480,8 +480,8 @@ export default function Settings() {
               <button
                 onClick={() => setActiveTab("hub")}
                 className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "hub"
-                  ? "border-gray-900 text-gray-900"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-brand-500 text-brand-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
                   }`}
               >
                 <Warehouse className="h-4 w-4 inline mr-2" />
@@ -490,8 +490,8 @@ export default function Settings() {
               <button
                 onClick={() => setActiveTab("invoice")}
                 className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "invoice"
-                  ? "border-gray-900 text-gray-900"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-brand-500 text-brand-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
                   }`}
               >
                 <FileText className="h-4 w-4 inline mr-2" />
@@ -500,8 +500,8 @@ export default function Settings() {
               <button
                 onClick={() => setActiveTab("seo")}
                 className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "seo"
-                  ? "border-gray-900 text-gray-900"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-brand-500 text-brand-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
                   }`}
               >
                 <Globe className="h-4 w-4 inline mr-2" />
@@ -510,8 +510,8 @@ export default function Settings() {
               <button
                 onClick={() => setActiveTab("banner")}
                 className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "banner"
-                  ? "border-gray-900 text-gray-900"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-brand-500 text-brand-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
                   }`}
               >
                 <ImageIcon className="h-4 w-4 inline mr-2" />
@@ -520,8 +520,8 @@ export default function Settings() {
               <button
                 onClick={() => setActiveTab("vendor-notif")}
                 className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "vendor-notif"
-                  ? "border-gray-900 text-gray-900"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-brand-500 text-brand-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
                   }`}
               >
                 <Mail className="h-4 w-4 inline mr-2" />
@@ -530,8 +530,8 @@ export default function Settings() {
               <button
                 onClick={() => setActiveTab("exchange-rate")}
                 className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "exchange-rate"
-                  ? "border-gray-900 text-gray-900"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-brand-500 text-brand-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
                   }`}
               >
                 <DollarSign className="h-4 w-4 inline mr-2" />
@@ -549,23 +549,23 @@ export default function Settings() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center">
+                <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center">
                   {currentUser.avatar ? (
                     <img src={currentUser.avatar} alt="Avatar" className="w-full h-full rounded-full object-cover" />
                   ) : (
-                    <User className="h-10 w-10 text-gray-400" />
+                    <User className="h-10 w-10 text-slate-400" />
                   )}
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">{profileData.name || currentUser.name}</h2>
-                  <p className="text-gray-600">{profileData.email || currentUser.email}</p>
+                  <h2 className="text-xl font-bold text-slate-900">{profileData.name || currentUser.name}</h2>
+                  <p className="text-slate-600">{profileData.email || currentUser.email}</p>
                   <div className="mt-2">
                     <span
                       className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${currentUser.role === "super_admin"
-                        ? "bg-purple-100 text-purple-800"
+                        ? "bg-purple-50 text-purple-700 border border-purple-200"
                         : currentUser.role === "admin"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-green-100 text-green-800"
+                          ? "bg-blue-50 text-blue-700 border border-blue-200"
+                          : "bg-green-50 text-green-700 border border-green-200"
                         }`}
                     >
                       <Shield className="h-3 w-3 mr-1" />
@@ -584,101 +584,101 @@ export default function Settings() {
           {/* Personal Information */}
           <Card>
             <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Personal Information</h3>
               <form onSubmit={handleProfileUpdate}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Full Name <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                       <input
                         type="text"
                         value={profileData.name}
                         onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
                         disabled={isReadOnly}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Email Address <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                       <input
                         type="email"
                         value={profileData.email}
                         onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
                         disabled={isReadOnly}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Phone Number <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                       <input
                         type="tel"
                         value={profileData.phone}
                         onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
                         disabled={isReadOnly}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                       />
                     </div>
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Address</label>
                     <div className="relative">
-                      <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                       <input
                         type="text"
                         value={profileData.address}
                         onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
                         disabled={isReadOnly}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">City</label>
                     <input
                       type="text"
                       value={profileData.city}
                       onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
                       disabled={isReadOnly}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">State</label>
                     <input
                       type="text"
                       value={profileData.state}
                       onChange={(e) => setProfileData({ ...profileData, state: e.target.value })}
                       disabled={isReadOnly}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">ZIP Code</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">ZIP Code</label>
                     <input
                       type="text"
                       value={profileData.zipCode}
                       onChange={(e) => setProfileData({ ...profileData, zipCode: e.target.value })}
                       disabled={isReadOnly}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
                 </div>
@@ -688,7 +688,7 @@ export default function Settings() {
                     <button
                       type="submit"
                       disabled={loadingProfile}
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="h-4 w-4" />
                       {loadingProfile ? 'Saving...' : 'Save Changes'}
@@ -719,10 +719,10 @@ export default function Settings() {
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <ImageIcon className="w-5 h-5 text-blue-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">Company Logo</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Company Logo</h3>
               </div>
               <div className="flex items-center gap-6">
-                <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
+                <div className="w-32 h-32 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center bg-slate-50">
                   {logoPreview || companyInfo.companyLogo ? (
                     <img
                       src={logoPreview || companyInfo.companyLogo}
@@ -731,13 +731,13 @@ export default function Settings() {
                     />
                   ) : (
                     <div className="text-center">
-                      <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                      <p className="text-xs text-gray-500">No logo</p>
+                      <ImageIcon className="h-12 w-12 text-slate-400 mx-auto mb-2" />
+                      <p className="text-xs text-slate-500">No logo</p>
                     </div>
                   )}
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 mb-3">Upload your company logo. Recommended size: 512x512px</p>
+                  <p className="text-sm text-slate-600 mb-3">Upload your company logo. Recommended size: 512x512px</p>
                   <input
                     type="file"
                     id="logo-upload"
@@ -749,7 +749,7 @@ export default function Settings() {
                   <div className="flex items-center gap-2">
                     <label
                       htmlFor="logo-upload"
-                      className={`flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer ${currentUser.role !== "super_admin" || uploadingLogo || logoPreview
+                      className={`flex items-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer ${currentUser.role !== "super_admin" || uploadingLogo || logoPreview
                         ? "opacity-50 cursor-not-allowed pointer-events-none"
                         : ""
                         }`}
@@ -762,7 +762,7 @@ export default function Settings() {
                         <button
                           onClick={handleSaveLogo}
                           disabled={uploadingLogo}
-                          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex items-center gap-2 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Save className="h-4 w-4" />
                           {uploadingLogo ? "Saving..." : "Save Logo"}
@@ -770,7 +770,7 @@ export default function Settings() {
                         <button
                           onClick={handleCancelLogo}
                           disabled={uploadingLogo}
-                          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Cancel
                         </button>
@@ -792,12 +792,12 @@ export default function Settings() {
                 <div className="p-2 bg-green-100 rounded-lg">
                   <Building2 className="w-5 h-5 text-green-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Basic Information</h3>
               </div>
               <form id="basic-info-form" onSubmit={handleCompanyInfoUpdate}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Company Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -805,85 +805,85 @@ export default function Settings() {
                       value={companyInfo.companyName}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, companyName: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Company Email</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Company Email</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                       <input
                         type="email"
                         value={companyInfo.companyEmail}
                         onChange={(e) => setCompanyInfo({ ...companyInfo, companyEmail: e.target.value })}
                         disabled={currentUser.role !== "super_admin"}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Company Phone</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Company Phone</label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                       <input
                         type="tel"
                         value={companyInfo.companyPhone}
                         onChange={(e) => setCompanyInfo({ ...companyInfo, companyPhone: e.target.value })}
                         disabled={currentUser.role !== "super_admin"}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                       />
                     </div>
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Company Website</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Company Website</label>
                     <input
                       type="url"
                       value={companyInfo.companyWebsite}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, companyWebsite: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
                       placeholder="https://www.example.com"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   {/* Social Media Links */}
                   <div className="md:col-span-2 pt-2">
-                    <p className="text-sm font-medium text-gray-700 mb-3">Social Media Links</p>
+                    <p className="text-sm font-medium text-slate-700 mb-3">Social Media Links</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Instagram URL</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Instagram URL</label>
                     <input
                       type="url"
                       value={companyInfo.socialInstagram}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, socialInstagram: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
                       placeholder="https://www.instagram.com/yourpage"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Facebook URL</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Facebook URL</label>
                     <input
                       type="url"
                       value={companyInfo.socialFacebook}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, socialFacebook: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
                       placeholder="https://www.facebook.com/yourpage"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">YouTube URL</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">YouTube URL</label>
                     <input
                       type="url"
                       value={companyInfo.socialYoutube}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, socialYoutube: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
                       placeholder="https://www.youtube.com/@yourchannel"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
                 </div>
@@ -893,7 +893,7 @@ export default function Settings() {
                     <button
                       type="submit"
                       disabled={loadingCompanyInfo}
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="h-4 w-4" />
                       {loadingCompanyInfo ? 'Saving...' : 'Save Basic Information'}
@@ -911,12 +911,12 @@ export default function Settings() {
                 <div className="p-2 bg-purple-100 rounded-lg">
                   <FileText className="w-5 h-5 text-purple-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">Legal & Tax Information</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Legal & Tax Information</h3>
               </div>
               <form id="legal-info-form" onSubmit={handleCompanyInfoUpdate}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       GST Number <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -925,12 +925,12 @@ export default function Settings() {
                       onChange={(e) => setCompanyInfo({ ...companyInfo, gstNumber: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
                       placeholder="29ABCDE1234F1Z5"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       PAN Number <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -939,43 +939,43 @@ export default function Settings() {
                       onChange={(e) => setCompanyInfo({ ...companyInfo, panNumber: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
                       placeholder="ABCDE1234F"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">CIN Number</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">CIN Number</label>
                     <input
                       type="text"
                       value={companyInfo.cinNumber}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, cinNumber: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
                       placeholder="U74999KA2020PTC123456"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Business Registration Number</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Business Registration Number</label>
                     <input
                       type="text"
                       value={companyInfo.businessRegistrationNumber}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, businessRegistrationNumber: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
                       placeholder="BRN123456789"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tax ID</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Tax ID</label>
                     <input
                       type="text"
                       value={companyInfo.taxId}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, taxId: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
                       placeholder="TAX123456"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
                 </div>
@@ -985,7 +985,7 @@ export default function Settings() {
                     <button
                       type="submit"
                       disabled={loadingCompanyInfo}
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="h-4 w-4" />
                       {loadingCompanyInfo ? 'Saving...' : 'Save Legal Information'}
@@ -1003,12 +1003,12 @@ export default function Settings() {
                 <div className="p-2 bg-orange-100 rounded-lg">
                   <MapPin className="w-5 h-5 text-orange-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">Registered Address</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Registered Address</h3>
               </div>
               <form id="address-form" onSubmit={handleCompanyInfoUpdate}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Street Address <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -1016,51 +1016,51 @@ export default function Settings() {
                       value={companyInfo.registeredAddress}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, registeredAddress: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">City</label>
                     <input
                       type="text"
                       value={companyInfo.city}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, city: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">State</label>
                     <input
                       type="text"
                       value={companyInfo.state}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, state: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Country</label>
                     <input
                       type="text"
                       value={companyInfo.country}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, country: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">ZIP Code</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">ZIP Code</label>
                     <input
                       type="text"
                       value={companyInfo.zipCode}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, zipCode: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
                 </div>
@@ -1070,7 +1070,7 @@ export default function Settings() {
                     <button
                       type="submit"
                       disabled={loadingCompanyInfo}
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="h-4 w-4" />
                       {loadingCompanyInfo ? 'Saving...' : 'Save Address'}
@@ -1088,52 +1088,52 @@ export default function Settings() {
                 <div className="p-2 bg-indigo-100 rounded-lg">
                   <CreditCard className="w-5 h-5 text-indigo-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">Bank Details</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Bank Details</h3>
               </div>
               <form id="bank-details-form" onSubmit={handleCompanyInfoUpdate}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Bank Name</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Bank Name</label>
                     <input
                       type="text"
                       value={companyInfo.bankName}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, bankName: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Account Number</label>
                     <input
                       type="text"
                       value={companyInfo.bankAccountNumber}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, bankAccountNumber: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">IFSC Code</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">IFSC Code</label>
                     <input
                       type="text"
                       value={companyInfo.bankIfscCode}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, bankIfscCode: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
                       placeholder="HDFC0001234"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Branch</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Branch</label>
                     <input
                       type="text"
                       value={companyInfo.bankBranch}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, bankBranch: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
                 </div>
@@ -1143,7 +1143,7 @@ export default function Settings() {
                     <button
                       type="submit"
                       disabled={loadingCompanyInfo}
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="h-4 w-4" />
                       {loadingCompanyInfo ? 'Saving...' : 'Save Bank Details'}
@@ -1172,8 +1172,8 @@ export default function Settings() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-center py-12">
                   <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading payment settings...</p>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
+                    <p className="text-slate-600">Loading payment settings...</p>
                   </div>
                 </div>
               </CardContent>
@@ -1192,20 +1192,20 @@ export default function Settings() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-gray-100 rounded-lg">
-                        <DollarSign className="w-5 h-5 text-gray-900" />
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <DollarSign className="w-5 h-5 text-slate-900" />
                       </div>
                       <div>
-                        <h3 className="text-2xl font-bold text-gray-900">Razorpay Payment Gateway</h3>
-                        <p className="text-sm text-gray-600 mt-1">Configure payment settings for customer transactions</p>
+                        <h3 className="text-2xl font-bold text-slate-900">Razorpay Payment Gateway</h3>
+                        <p className="text-sm text-slate-600 mt-1">Configure payment settings for customer transactions</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">Status:</span>
+                      <span className="text-sm text-slate-600">Status:</span>
                       <span
                         className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${razorpaySettings.enabled
-                          ? "bg-gray-900 text-white"
-                          : "bg-gray-200 text-gray-700"
+                          ? "bg-brand-500 text-white"
+                          : "bg-slate-200 text-slate-700"
                           }`}
                       >
                         {razorpaySettings.enabled ? "● Active" : "● Inactive"}
@@ -1215,11 +1215,11 @@ export default function Settings() {
 
                   <form onSubmit={handleRazorpaySettingsUpdate}>
                     {/* Enable/Disable Toggle */}
-                    <div className="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="mb-6 p-4 border border-slate-200 rounded-lg bg-slate-50">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium text-gray-900">Enable Razorpay Payments</p>
-                          <p className="text-sm text-gray-600">Allow customers to pay using Razorpay gateway</p>
+                          <p className="font-medium text-slate-900">Enable Razorpay Payments</p>
+                          <p className="text-sm text-slate-600">Allow customers to pay using Razorpay gateway</p>
                           {razorpaySettings.enabled && payuSettings.enabled && (
                             <p className="text-xs text-amber-600 mt-1">⚠ Enabling this will disable PayU</p>
                           )}
@@ -1229,7 +1229,7 @@ export default function Settings() {
                           checked={razorpaySettings.enabled}
                           onChange={(e) => setRazorpaySettings({ ...razorpaySettings, enabled: e.target.checked })}
                           disabled={currentUser.role !== "super_admin"}
-                          className="h-5 w-5 text-gray-900 border-gray-300 rounded focus:ring-gray-900 disabled:opacity-50"
+                          className="h-5 w-5 text-slate-900 border-slate-300 rounded focus:ring-brand-500/40 disabled:opacity-50"
                         />
                       </div>
                     </div>
@@ -1245,14 +1245,14 @@ export default function Settings() {
 
                     {/* API Credentials */}
                     <div className="space-y-4 mb-6">
-                      <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                      <h4 className="font-semibold text-slate-900 flex items-center gap-2">
                         <Key className="h-4 w-4" />
                         API Credentials
                       </h4>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <label className="block text-sm font-medium text-slate-700 mb-2">
                             Key ID <span className="text-red-500">*</span>
                           </label>
                           <input
@@ -1261,12 +1261,12 @@ export default function Settings() {
                             onChange={(e) => setRazorpaySettings({ ...razorpaySettings, keyId: e.target.value })}
                             disabled={currentUser.role !== "super_admin"}
                             placeholder="rzp_test_1234567890"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 font-mono text-sm"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100 font-mono text-sm"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <label className="block text-sm font-medium text-slate-700 mb-2">
                             Key Secret <span className="text-red-500">*</span>
                           </label>
                           <div className="relative">
@@ -1282,13 +1282,13 @@ export default function Settings() {
                               }}
                               disabled={currentUser.role !== "super_admin"}
                               placeholder="Enter key secret"
-                              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 font-mono text-sm ${!isRazorpaySecretMasked && razorpaySettings.keySecret ? 'pr-10' : ''}`}
+                              className={`w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100 font-mono text-sm ${!isRazorpaySecretMasked && razorpaySettings.keySecret ? 'pr-10' : ''}`}
                             />
                             {!isRazorpaySecretMasked && razorpaySettings.keySecret && (
                               <button
                                 type="button"
                                 onClick={() => setShowRazorpaySecret(!showRazorpaySecret)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
                                 title={showRazorpaySecret ? "Hide secret" : "Show secret"}
                               >
                                 {showRazorpaySecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -1296,12 +1296,12 @@ export default function Settings() {
                             )}
                           </div>
                           {isRazorpaySecretMasked && (
-                            <p className="text-xs text-gray-500 mt-1">Secret is hidden. Enter a new value to update.</p>
+                            <p className="text-xs text-slate-500 mt-1">Secret is hidden. Enter a new value to update.</p>
                           )}
                         </div>
 
                         <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Webhook Secret</label>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Webhook Secret</label>
                           <div className="relative">
                             <input
                               type={!isRazorpayWebhookMasked && showRazorpayWebhook ? "text" : "password"}
@@ -1315,13 +1315,13 @@ export default function Settings() {
                               }}
                               disabled={currentUser.role !== "super_admin"}
                               placeholder="Enter webhook secret"
-                              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 font-mono text-sm ${!isRazorpayWebhookMasked && razorpaySettings.webhookSecret ? 'pr-10' : ''}`}
+                              className={`w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100 font-mono text-sm ${!isRazorpayWebhookMasked && razorpaySettings.webhookSecret ? 'pr-10' : ''}`}
                             />
                             {!isRazorpayWebhookMasked && razorpaySettings.webhookSecret && (
                               <button
                                 type="button"
                                 onClick={() => setShowRazorpayWebhook(!showRazorpayWebhook)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
                                 title={showRazorpayWebhook ? "Hide secret" : "Show secret"}
                               >
                                 {showRazorpayWebhook ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -1329,7 +1329,7 @@ export default function Settings() {
                             )}
                           </div>
                           {isRazorpayWebhookMasked && (
-                            <p className="text-xs text-gray-500 mt-1">Secret is hidden. Enter a new value to update.</p>
+                            <p className="text-xs text-slate-500 mt-1">Secret is hidden. Enter a new value to update.</p>
                           )}
                         </div>
                       </div>
@@ -1340,7 +1340,7 @@ export default function Settings() {
                         <button
                           type="submit"
                           disabled={loadingPaymentSettings}
-                          className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Save className="h-4 w-4" />
                           {loadingPaymentSettings ? 'Saving...' : 'Save Payment Settings'}
@@ -1364,20 +1364,20 @@ export default function Settings() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-gray-100 rounded-lg">
-                        <DollarSign className="w-5 h-5 text-gray-900" />
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <DollarSign className="w-5 h-5 text-slate-900" />
                       </div>
                       <div>
-                        <h3 className="text-2xl font-bold text-gray-900">PayU Payment Gateway</h3>
-                        <p className="text-sm text-gray-600 mt-1">Configure PayU for Indian market payments</p>
+                        <h3 className="text-2xl font-bold text-slate-900">PayU Payment Gateway</h3>
+                        <p className="text-sm text-slate-600 mt-1">Configure PayU for Indian market payments</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">Status:</span>
+                      <span className="text-sm text-slate-600">Status:</span>
                       <span
                         className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${payuSettings.enabled
-                          ? "bg-gray-900 text-white"
-                          : "bg-gray-200 text-gray-700"
+                          ? "bg-brand-500 text-white"
+                          : "bg-slate-200 text-slate-700"
                           }`}
                       >
                         {payuSettings.enabled ? "● Active" : "● Inactive"}
@@ -1387,11 +1387,11 @@ export default function Settings() {
 
                   <form onSubmit={handlePayUSettingsUpdate}>
                     {/* Enable/Disable Toggle */}
-                    <div className="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="mb-6 p-4 border border-slate-200 rounded-lg bg-slate-50">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium text-gray-900">Enable PayU Payments</p>
-                          <p className="text-sm text-gray-600">Allow customers to pay using PayU gateway</p>
+                          <p className="font-medium text-slate-900">Enable PayU Payments</p>
+                          <p className="text-sm text-slate-600">Allow customers to pay using PayU gateway</p>
                           {payuSettings.enabled && razorpaySettings.enabled && (
                             <p className="text-xs text-amber-600 mt-1">⚠ Enabling this will disable Razorpay</p>
                           )}
@@ -1401,7 +1401,7 @@ export default function Settings() {
                           checked={payuSettings.enabled}
                           onChange={(e) => setPayuSettings({ ...payuSettings, enabled: e.target.checked })}
                           disabled={currentUser.role !== "super_admin"}
-                          className="h-5 w-5 text-gray-900 border-gray-300 rounded focus:ring-gray-900 disabled:opacity-50"
+                          className="h-5 w-5 text-slate-900 border-slate-300 rounded focus:ring-brand-500/40 disabled:opacity-50"
                         />
                       </div>
                     </div>
@@ -1417,14 +1417,14 @@ export default function Settings() {
 
                     {/* API Credentials */}
                     <div className="space-y-4 mb-6">
-                      <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                      <h4 className="font-semibold text-slate-900 flex items-center gap-2">
                         <Key className="h-4 w-4" />
                         API Credentials
                       </h4>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <label className="block text-sm font-medium text-slate-700 mb-2">
                             Merchant Key <span className="text-red-500">*</span>
                           </label>
                           <input
@@ -1433,12 +1433,12 @@ export default function Settings() {
                             onChange={(e) => setPayuSettings({ ...payuSettings, merchantKey: e.target.value })}
                             disabled={currentUser.role !== "super_admin"}
                             placeholder="gtKFFx"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 font-mono text-sm"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100 font-mono text-sm"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <label className="block text-sm font-medium text-slate-700 mb-2">
                             Merchant Salt <span className="text-red-500">*</span>
                           </label>
                           <div className="relative">
@@ -1454,13 +1454,13 @@ export default function Settings() {
                               }}
                               disabled={currentUser.role !== "super_admin"}
                               placeholder="Enter merchant salt"
-                              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 font-mono text-sm ${!isPayuSaltMasked && payuSettings.merchantSalt ? 'pr-10' : ''}`}
+                              className={`w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100 font-mono text-sm ${!isPayuSaltMasked && payuSettings.merchantSalt ? 'pr-10' : ''}`}
                             />
                             {!isPayuSaltMasked && payuSettings.merchantSalt && (
                               <button
                                 type="button"
                                 onClick={() => setShowPayuSalt(!showPayuSalt)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
                                 title={showPayuSalt ? "Hide salt" : "Show salt"}
                               >
                                 {showPayuSalt ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -1468,7 +1468,7 @@ export default function Settings() {
                             )}
                           </div>
                           {isPayuSaltMasked && (
-                            <p className="text-xs text-gray-500 mt-1">Salt is hidden. Enter a new value to update.</p>
+                            <p className="text-xs text-slate-500 mt-1">Salt is hidden. Enter a new value to update.</p>
                           )}
                         </div>
                       </div>
@@ -1479,7 +1479,7 @@ export default function Settings() {
                         <button
                           type="submit"
                           disabled={loadingPaymentSettings}
-                          className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Save className="h-4 w-4" />
                           {loadingPaymentSettings ? 'Saving...' : 'Save PayU Settings'}
@@ -1606,7 +1606,7 @@ function VendorNotificationTab() {
   };
 
   if (loading) {
-    return <div className="text-center py-8 text-gray-500">Loading...</div>;
+    return <div className="text-center py-8 text-slate-500">Loading...</div>;
   }
 
   return (
@@ -1614,10 +1614,10 @@ function VendorNotificationTab() {
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <Mail className="h-5 w-5 text-gray-700" />
+            <Mail className="h-5 w-5 text-slate-700" />
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Vendor Registration Mail Notification</h3>
-              <p className="text-sm text-gray-500">When a new vendor registers, notification emails will be sent only to the email addresses listed below.</p>
+              <h3 className="text-lg font-semibold text-slate-900">Vendor Registration Mail Notification</h3>
+              <p className="text-sm text-slate-500">When a new vendor registers, notification emails will be sent only to the email addresses listed below.</p>
             </div>
           </div>
 
@@ -1628,12 +1628,12 @@ function VendorNotificationTab() {
               value={newEmail}
               onChange={(e) => { setNewEmail(e.target.value); setError(''); }}
               onKeyDown={(e) => e.key === 'Enter' && addEmail()}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+              className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
               placeholder="Enter email address"
             />
             <button
               onClick={addEmail}
-              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 font-medium text-sm"
+              className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 font-medium text-sm"
             >
               Add Email
             </button>
@@ -1642,18 +1642,18 @@ function VendorNotificationTab() {
 
           {/* Email List */}
           {emails.length === 0 ? (
-            <div className="text-center py-6 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-              <Mail className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No notification emails configured.</p>
-              <p className="text-xs text-gray-400">Add email addresses above to receive vendor registration notifications.</p>
+            <div className="text-center py-6 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+              <Mail className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm text-slate-500">No notification emails configured.</p>
+              <p className="text-xs text-slate-400">Add email addresses above to receive vendor registration notifications.</p>
             </div>
           ) : (
             <div className="space-y-2 mb-4">
               {emails.map((email, index) => (
-                <div key={index} className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div key={index} className="flex items-center justify-between px-4 py-3 bg-slate-50 rounded-lg border border-slate-200">
                   <div className="flex items-center gap-3">
-                    <Mail className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm font-medium text-gray-800">{email}</span>
+                    <Mail className="h-4 w-4 text-slate-400" />
+                    <span className="text-sm font-medium text-slate-800">{email}</span>
                   </div>
                   <button
                     onClick={() => removeEmail(email)}
@@ -1663,7 +1663,7 @@ function VendorNotificationTab() {
                   </button>
                 </div>
               ))}
-              <p className="text-xs text-gray-500">{emails.length} email(s) will be notified on new vendor registration</p>
+              <p className="text-xs text-slate-500">{emails.length} email(s) will be notified on new vendor registration</p>
             </div>
           )}
 

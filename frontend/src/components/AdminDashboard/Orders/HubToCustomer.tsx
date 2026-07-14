@@ -103,17 +103,17 @@ export default function HubToCustomer() {
     switch (status) {
       case "RECEIVED_AT_ADMIN_HUB":
       case "APPROVED_BY_ADMIN_HUB":
-        return "bg-teal-100 text-teal-800";
+        return "bg-teal-50 text-teal-700 border border-teal-200";
       case "SHIPPED_TO_CUSTOMER":
-        return "bg-orange-100 text-orange-800";
+        return "bg-orange-50 text-orange-700 border border-orange-200";
       case "DELIVERED":
-        return "bg-green-100 text-green-800";
+        return "bg-green-50 text-green-700 border border-green-200";
       case "CANCELLED":
       case "REJECTED_BY_ADMIN_HUB":
       case "RETURNED":
-        return "bg-red-100 text-red-800";
+        return "bg-red-50 text-red-700 border border-red-200";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-50 text-slate-700 border border-slate-200";
     }
   };
 
@@ -122,31 +122,31 @@ export default function HubToCustomer() {
   };
 
   if (isLoading) {
-    return <div className="p-6 text-center text-gray-500">Loading orders...</div>;
+    return <div className="p-6 text-center text-slate-500">Loading orders...</div>;
   }
 
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Total Orders</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{orders.length}</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Total Orders</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{orders.length}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">At Hub</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">At Hub</p>
           <p className="text-2xl font-bold text-teal-600 mt-1">
             {orders.filter((o) => ["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB"].includes(o.status)).length}
           </p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Out for Delivery</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Out for Delivery</p>
           <p className="text-2xl font-bold text-orange-600 mt-1">
             {orders.filter((o) => o.status === "SHIPPED_TO_CUSTOMER").length}
           </p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Delivered</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Delivered</p>
           <p className="text-2xl font-bold text-green-600 mt-1">
             {orders.filter((o) => o.status === "DELIVERED").length}
           </p>
@@ -154,16 +154,16 @@ export default function HubToCustomer() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
             <input
               type="text"
               placeholder="Search by Order ID, Product, SKU, or Customer..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
             />
           </div>
           <div className="w-full md:w-64">
@@ -187,9 +187,9 @@ export default function HubToCustomer() {
       </div>
 
       {/* Orders Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
         <Table>
-          <TableHeader>
+          <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
             <TableRow>
               <TableHead>Order ID</TableHead>
               <TableHead>Product</TableHead>
@@ -204,7 +204,7 @@ export default function HubToCustomer() {
           <TableBody>
             {paginatedOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={8} className="text-center py-8 text-slate-500">
                   No orders found
                 </TableCell>
               </TableRow>
@@ -220,7 +220,7 @@ export default function HubToCustomer() {
                     <TableCell className="font-medium">{order.orderId}</TableCell>
                     <TableCell>
                       {productName}
-                      {order.items?.length > 1 && <span className="text-xs text-gray-500 block">+{order.items.length - 1} more items</span>}
+                      {order.items?.length > 1 && <span className="text-xs text-slate-500 block">+{order.items.length - 1} more items</span>}
                     </TableCell>
                     <TableCell>{sku}</TableCell>
                     <TableCell>{customer}</TableCell>
@@ -239,7 +239,7 @@ export default function HubToCustomer() {
                       {hasPermission('hub_to_customer:view') && (
                         <button
                           onClick={() => handleViewOrder(order.id)}
-                          className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                          className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
                           title="View Order"
                         >
                           <Eye className="h-5 w-5" />
@@ -274,7 +274,7 @@ export default function HubToCustomer() {
                   key={`p-${p}`}
                   onClick={() => setCurrentPage(p as number)}
                   aria-current={p === currentPage ? 'page' : undefined}
-                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
                 >
                   {p}
                 </button>

@@ -210,10 +210,14 @@ class AdminProductService {
       variantOriginalPricesINR?: Record<string, number>;
       variantOriginalPricesUSD?: Record<string, number>;
       variantVisibilities?: Record<string, string>;
-    }
+    },
+    subCategory?: string
   ): Promise<{ success: boolean; data?: AdminProduct; message?: string }> {
     try {
       const payload: any = {};
+      if (subCategory !== undefined) {
+        payload.subCategory = subCategory;
+      }
       if (adminPrice !== undefined) {
         payload.adminPrice = adminPrice;
       }

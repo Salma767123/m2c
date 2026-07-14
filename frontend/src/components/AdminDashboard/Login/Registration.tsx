@@ -118,7 +118,7 @@ export default function AdminRegistration() {
       case "weak":
         return "bg-red-500"
       default:
-        return "bg-gray-300"
+        return "bg-slate-300"
     }
   }
 
@@ -198,7 +198,7 @@ export default function AdminRegistration() {
   return (
     <div className="min-h-screen flex bg-white font-sans">
       {/* Left Side - Professional Branding */}
-      <div className="hidden lg:flex lg:flex-1 relative bg-[#000000]">
+      <div className="hidden lg:flex lg:flex-1 relative bg-gradient-to-br from-brand-600 to-brand-700">
         <div className="flex items-center justify-center w-full p-12">
           <div className="max-w-lg text-center text-white">
             {/* Logo Section */}
@@ -214,7 +214,7 @@ export default function AdminRegistration() {
               <h1 className="text-4xl font-bold mb-3">
                 Join Our Team
               </h1>
-              <p className="text-xl text-gray-100 font-medium">
+              <p className="text-xl text-slate-100 font-medium">
                 Become an administrator and help shape the future
               </p>
             </div>
@@ -273,15 +273,15 @@ export default function AdminRegistration() {
       </div>
 
       {/* Right Side - Registration Form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-gray-50">
+      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-slate-50">
         <div className="max-w-2xl w-full">
           {/* Registration Form Card */}
           <Card className="shadow-2xl border-0 bg-white">
             <CardHeader className="text-center pb-6 pt-8">
-              <CardTitle className="text-3xl font-bold text-gray-900 mb-2">
+              <CardTitle className="text-3xl font-bold text-slate-900 mb-2">
                 Create Account
               </CardTitle>
-              <p className="text-gray-600">
+              <p className="text-slate-600">
                 Join our platform as an administrator
               </p>
             </CardHeader>
@@ -289,7 +289,7 @@ export default function AdminRegistration() {
               <form onSubmit={handleRegistration} className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
                       First Name *
                     </label>
                     <input
@@ -297,13 +297,13 @@ export default function AdminRegistration() {
                       name="firstName"
                       value={registrationData.firstName}
                       onChange={handleRegistrationChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:border-brand-500 transition-all duration-200 bg-white text-slate-900 placeholder-slate-500"
                       placeholder="John"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Last Name *
                     </label>
                     <input
@@ -311,7 +311,7 @@ export default function AdminRegistration() {
                       name="lastName"
                       value={registrationData.lastName}
                       onChange={handleRegistrationChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:border-brand-500 transition-all duration-200 bg-white text-slate-900 placeholder-slate-500"
                       placeholder="Doe"
                       required
                     />
@@ -320,7 +320,7 @@ export default function AdminRegistration() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Email Address *
                   </label>
                   <input
@@ -329,10 +329,10 @@ export default function AdminRegistration() {
                     value={registrationData.email}
                     onChange={handleRegistrationChange}
                     onBlur={() => validateEmail(registrationData.email)}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:border-brand-500 transition-all duration-200 bg-white text-slate-900 placeholder-slate-500 ${
                       emailError
                         ? "border-red-500 focus:ring-red-200"
-                        : "border-gray-300 focus:ring-[#455a64]"
+                        : "border-slate-300 focus:ring-brand-500/40"
                     }`}
                     placeholder="admin@example.com"
                     required
@@ -346,7 +346,7 @@ export default function AdminRegistration() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Phone Number
                   </label>
                   <input
@@ -354,7 +354,7 @@ export default function AdminRegistration() {
                     name="phone"
                     value={registrationData.phone}
                     onChange={handleRegistrationChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:border-brand-500 transition-all duration-200 bg-white text-slate-900 placeholder-slate-500"
                     placeholder="+1 (555) 123-4567"
                   />
                 </div>
@@ -362,7 +362,7 @@ export default function AdminRegistration() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Company
                     </label>
                     <input
@@ -370,12 +370,12 @@ export default function AdminRegistration() {
                       name="company"
                       value={registrationData.company}
                       onChange={handleRegistrationChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:border-brand-500 transition-all duration-200 bg-white text-slate-900 placeholder-slate-500"
                       placeholder="Company Name"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Position
                     </label>
                     <input
@@ -383,7 +383,7 @@ export default function AdminRegistration() {
                       name="position"
                       value={registrationData.position}
                       onChange={handleRegistrationChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:border-brand-500 transition-all duration-200 bg-white text-slate-900 placeholder-slate-500"
                       placeholder="Job Title"
                     />
                   </div>
@@ -391,7 +391,7 @@ export default function AdminRegistration() {
 
                <div className="grid grid-cols-2 gap-4">     
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Password *
                   </label>
                   <div className="relative">
@@ -401,10 +401,10 @@ export default function AdminRegistration() {
                       value={registrationData.password}
                       onChange={handleRegistrationChange}
                       onBlur={() => validatePassword(registrationData.password)}
-                      className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${
+                      className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:border-brand-500 transition-all duration-200 bg-white text-slate-900 placeholder-slate-500 ${
                         passwordError
                           ? "border-red-500 focus:ring-red-200"
-                          : "border-gray-300 focus:ring-[#455a64]"
+                          : "border-slate-300 focus:ring-brand-500/40"
                       }`}
                       placeholder="Minimum 8 characters"
                       required
@@ -412,7 +412,7 @@ export default function AdminRegistration() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
                     >
                       {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
@@ -430,7 +430,7 @@ export default function AdminRegistration() {
                   {registrationData.password && !passwordError && (
                     <div className="mt-3">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium text-gray-600">
+                        <span className="text-xs font-medium text-slate-600">
                           Password Strength
                         </span>
                         <span
@@ -445,7 +445,7 @@ export default function AdminRegistration() {
                           {getPasswordStrengthLabel(passwordStrength)}
                         </span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="w-full bg-slate-200 rounded-full h-2">
                         <div
                           className={`h-2 rounded-full transition-all duration-300 ${getPasswordStrengthColor(
                             passwordStrength
@@ -465,7 +465,7 @@ export default function AdminRegistration() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Confirm Password *
                   </label>
                   <div className="relative">
@@ -474,14 +474,14 @@ export default function AdminRegistration() {
                       name="confirmPassword"
                       value={registrationData.confirmPassword}
                       onChange={handleRegistrationChange}
-                      className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500"
+                      className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-lg focus:ring-2 focus:border-brand-500 transition-all duration-200 bg-white text-slate-900 placeholder-slate-500"
                       placeholder="Confirm your password"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
                     >
                       {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
@@ -495,16 +495,16 @@ export default function AdminRegistration() {
                     name="acceptTerms"
                     checked={registrationData.acceptTerms}
                     onChange={handleRegistrationChange}
-                    className="w-4 h-4 text-gray-700 border-gray-300 rounded focus:ring-[#455a64] mt-1"
+                    className="w-4 h-4 text-slate-700 border-slate-300 rounded focus:ring-brand-500/40 mt-1"
                     required
                   />
-                  <label className="ml-2 text-sm text-gray-600">
+                  <label className="ml-2 text-sm text-slate-600">
                     I agree to the{' '}
-                    <button type="button" className="text-gray-700 hover:text-gray-900 font-medium transition-colors">
+                    <button type="button" className="text-slate-700 hover:text-slate-900 font-medium transition-colors">
                       Terms of Service
                     </button>{' '}
                     and{' '}
-                    <button type="button" className="text-gray-700 hover:text-gray-900 font-medium transition-colors">
+                    <button type="button" className="text-slate-700 hover:text-slate-900 font-medium transition-colors">
                       Privacy Policy
                     </button>
                   </label>
@@ -513,7 +513,7 @@ export default function AdminRegistration() {
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-gray-900 hover:bg-gray-700 text-white py-3 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"
+                  className="w-full bg-brand-500 hover:bg-brand-600 text-white py-3 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"
                 >
                   <Users className="w-4 h-4 mr-2" />
                   {isLoading ? 'Creating Account...' : 'Create Admin Account'}
@@ -522,10 +522,10 @@ export default function AdminRegistration() {
                 {/* Divider */}
                 <div className="relative py-4">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300"></div>
+                    <div className="w-full border-t border-slate-300"></div>
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-4 bg-white text-gray-500">
+                    <span className="px-4 bg-white text-slate-500">
                       Already have an account?
                     </span>
                   </div>
@@ -535,7 +535,7 @@ export default function AdminRegistration() {
                 <Link href="/admin/login" className="block">
                   <Button
                     variant="outline"
-                    className="w-full border border-gray-900 text-gray-900 bg-white hover:bg-gray-200 hover:border-gray-700 py-3 text-sm font-semibold rounded-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-md"
+                    className="w-full border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 hover:border-slate-400 py-3 text-sm font-semibold rounded-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-md"
                   >
                     <TrendingUp className="w-4 h-4 mr-2" />
                     Sign In Instead

@@ -49,10 +49,10 @@ export default function EditRolePage() {
           </div>
         ) : error || !role ? (
           <div className="text-center py-12">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            <h2 className="text-xl font-semibold text-slate-900 mb-2">
               {error || 'Role not found'}
             </h2>
-            <p className="text-gray-600">
+            <p className="text-slate-600">
               The role you&apos;re looking for doesn&apos;t exist or has been deleted.
             </p>
           </div>

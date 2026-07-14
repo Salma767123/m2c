@@ -207,16 +207,16 @@ export default function CategoryLists() {
   const renderCategoryRow = (category: Category, isSubcategory = false) => {
     if (isSubcategory || !canDrag) {
       return (
-        <TableRow key={category.id} className={isSubcategory ? 'bg-gray-50' : ''}>
+        <TableRow key={category.id} className={isSubcategory ? 'bg-slate-50' : ''}>
           <TableCell className="text-center">
-            <span className="text-sm font-medium text-gray-500">{category.sortOrder}</span>
+            <span className="text-sm font-medium text-slate-500">{category.sortOrder}</span>
           </TableCell>
           <TableCell>
             <div className="flex items-center">
               {!isSubcategory && category.subcategories.length > 0 && (
                 <button
                   onClick={() => toggleExpanded(category.id)}
-                  className="mr-2 p-1 hover:bg-gray-200 rounded"
+                  className="mr-2 p-1 hover:bg-slate-200 rounded"
                 >
                   <svg
                     className={`w-4 h-4 transition-transform ${
@@ -231,7 +231,7 @@ export default function CategoryLists() {
                 </button>
               )}
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden shrink-0">
+                <div className="w-10 h-10 bg-slate-100 rounded-lg overflow-hidden shrink-0">
                   {category.image ? (
                     <img
                       src={category.image}
@@ -243,36 +243,36 @@ export default function CategoryLists() {
                       }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                      <div className="w-4 h-4 bg-gray-300 rounded"></div>
+                    <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                      <div className="w-4 h-4 bg-slate-300 rounded"></div>
                     </div>
                   )}
                 </div>
                 
                 <div className={isSubcategory ? 'ml-6' : ''}>
-                  <div className="text-sm font-medium text-gray-900">{category.name}</div>
-                  <div className="text-sm text-gray-500">{category.slug}</div>
+                  <div className="text-sm font-medium text-slate-900">{category.name}</div>
+                  <div className="text-sm text-slate-500">{category.slug}</div>
                 </div>
               </div>
             </div>
           </TableCell>
           <TableCell>
-            <div className="text-sm text-gray-900 max-w-xs truncate" title={category.description}>
+            <div className="text-sm text-slate-900 max-w-xs truncate" title={category.description}>
               {category.description}
             </div>
           </TableCell>
           <TableCell className="text-center">
-            <span className="text-sm font-medium text-gray-900">{category.productCount}</span>
+            <span className="text-sm font-medium text-slate-900">{category.productCount}</span>
           </TableCell>
           <TableCell>
             <Badge 
               variant={category.status === 'ACTIVE' ? 'default' : 'secondary'}
-              className={category.status === 'ACTIVE' ? 'bg-green-100 text-green-800 border-green-200' : ''}
+              className={category.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border border-green-200 border-green-200' : ''}
             >
               {category.status.toLowerCase()}
             </Badge>
           </TableCell>
-          <TableCell className="text-sm text-gray-500">
+          <TableCell className="text-sm text-slate-500">
             {new Date(category.updatedAt).toLocaleDateString()}
           </TableCell>
           <TableCell className="text-right">
@@ -315,12 +315,12 @@ export default function CategoryLists() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Categories</h1>
-          <p className="text-gray-600">Manage your product categories and subcategories</p>
+          <h1 className="text-2xl font-bold text-slate-900">Categories</h1>
+          <p className="text-slate-600">Manage your product categories and subcategories</p>
         </div>
         {hasPermission('categories:create') && (
           <Link href="/admin/dashboard/categories/add">
-            <Button className="bg-[#313131] text-white hover:bg-[#222222]">
+            <Button className="bg-brand-500 text-white hover:bg-brand-600">
               <Plus className="h-4 w-4 mr-2" />
               Add Category
             </Button>
@@ -333,9 +333,9 @@ export default function CategoryLists() {
         <Card>
           <CardContent className="p-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">{stats?.total || 0}</div>
-              <div className="text-sm text-gray-500">Main Categories</div>
-              <div className="text-xs text-gray-400 mt-1">Root level categories</div>
+              <div className="text-2xl font-bold text-slate-900">{stats?.total || 0}</div>
+              <div className="text-sm text-slate-500">Main Categories</div>
+              <div className="text-xs text-slate-400 mt-1">Root level categories</div>
             </div>
           </CardContent>
         </Card>
@@ -345,8 +345,8 @@ export default function CategoryLists() {
               <div className="text-2xl font-bold text-green-600">
                 {stats?.active || 0}
               </div>
-              <div className="text-sm text-gray-500">Active Categories</div>
-              <div className="text-xs text-gray-400 mt-1">Currently visible</div>
+              <div className="text-sm text-slate-500">Active Categories</div>
+              <div className="text-xs text-slate-400 mt-1">Currently visible</div>
             </div>
           </CardContent>
         </Card>
@@ -356,8 +356,8 @@ export default function CategoryLists() {
               <div className="text-2xl font-bold text-blue-600">
                 {stats?.subcategories || 0}
               </div>
-              <div className="text-sm text-gray-500">Total Subcategories</div>
-              <div className="text-xs text-gray-400 mt-1">Nested under main categories</div>
+              <div className="text-sm text-slate-500">Total Subcategories</div>
+              <div className="text-xs text-slate-400 mt-1">Nested under main categories</div>
             </div>
           </CardContent>
         </Card>
@@ -367,8 +367,8 @@ export default function CategoryLists() {
               <div className="text-2xl font-bold text-purple-600">
                 {categories.reduce((sum, c) => sum + c.productCount, 0)}
               </div>
-              <div className="text-sm text-gray-500">Total Products</div>
-              <div className="text-xs text-gray-400 mt-1">Across all categories</div>
+              <div className="text-sm text-slate-500">Total Products</div>
+              <div className="text-xs text-slate-400 mt-1">Across all categories</div>
             </div>
           </CardContent>
         </Card>
@@ -380,13 +380,13 @@ export default function CategoryLists() {
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                 <input
                   type="text"
                   placeholder="Search categories..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                 />
               </div>
             </div>
@@ -420,8 +420,8 @@ export default function CategoryLists() {
         <CardContent className="p-0">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-700"></div>
-              <span className="ml-3 text-gray-600">Loading categories...</span>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-700"></div>
+              <span className="ml-3 text-slate-600">Loading categories...</span>
             </div>
           ) : (
             <DndContext
@@ -430,7 +430,7 @@ export default function CategoryLists() {
               onDragEnd={handleDragEnd}
             >
               <Table>
-                <TableHeader>
+                <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                   <TableRow>
                     <TableHead className="w-[120px] pl-6">Order</TableHead>
                     <TableHead>Category Name</TableHead>
@@ -445,7 +445,7 @@ export default function CategoryLists() {
                   {filteredCategories.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-12">
-                        <div className="text-gray-500">
+                        <div className="text-slate-500">
                           <p className="text-lg font-medium">No categories found</p>
                           <p className="text-sm">Try adjusting your search or filter criteria</p>
                         </div>
@@ -473,10 +473,10 @@ export default function CategoryLists() {
           )}
         </CardContent>
         {totalPages > 1 && (
-          <div className="flex items-center justify-end gap-3 text-sm p-4 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-3 text-sm p-4 border-t border-slate-200">
             <div className="flex items-center gap-1">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-              {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+              {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
             </div>
           </div>
@@ -515,10 +515,10 @@ function SortableCategoryRow({ category, toggleExpanded, expandedCategories, han
     <TableRow ref={setNodeRef} style={style} className={isDragging ? 'bg-white' : ''}>
       <TableCell className="pl-6">
         <div className="flex items-center gap-3">
-          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1.5 bg-white border border-gray-300 shadow-sm hover:bg-gray-50 rounded-md text-gray-700 transition-colors" title="Drag to reorder">
+          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1.5 bg-white border border-slate-300 shadow-sm hover:bg-slate-50 rounded-md text-slate-700 transition-colors" title="Drag to reorder">
             <GripVertical size={16} />
           </div>
-          <span className="text-sm font-semibold text-gray-700 min-w-[20px] text-center">{category.sortOrder}</span>
+          <span className="text-sm font-semibold text-slate-700 min-w-[20px] text-center">{category.sortOrder}</span>
         </div>
       </TableCell>
       <TableCell>
@@ -526,7 +526,7 @@ function SortableCategoryRow({ category, toggleExpanded, expandedCategories, han
           {category.subcategories && category.subcategories.length > 0 && (
             <button
               onClick={() => toggleExpanded(category.id)}
-              className="mr-2 p-1 hover:bg-gray-200 rounded"
+              className="mr-2 p-1 hover:bg-slate-200 rounded"
             >
               <svg
                 className={`w-4 h-4 transition-transform ${
@@ -541,7 +541,7 @@ function SortableCategoryRow({ category, toggleExpanded, expandedCategories, han
             </button>
           )}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden shrink-0">
+            <div className="w-10 h-10 bg-slate-100 rounded-lg overflow-hidden shrink-0">
               {category.image ? (
                 <img
                   src={category.image}
@@ -553,36 +553,36 @@ function SortableCategoryRow({ category, toggleExpanded, expandedCategories, han
                   }}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                  <div className="w-4 h-4 bg-gray-300 rounded"></div>
+                <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                  <div className="w-4 h-4 bg-slate-300 rounded"></div>
                 </div>
               )}
             </div>
             
             <div>
-              <div className="text-sm font-medium text-gray-900">{category.name}</div>
-              <div className="text-sm text-gray-500">{category.slug}</div>
+              <div className="text-sm font-medium text-slate-900">{category.name}</div>
+              <div className="text-sm text-slate-500">{category.slug}</div>
             </div>
           </div>
         </div>
       </TableCell>
       <TableCell>
-        <div className="text-sm text-gray-900 max-w-xs truncate" title={category.description}>
+        <div className="text-sm text-slate-900 max-w-xs truncate" title={category.description}>
           {category.description}
         </div>
       </TableCell>
       <TableCell className="text-center">
-        <span className="text-sm font-medium text-gray-900">{category.productCount}</span>
+        <span className="text-sm font-medium text-slate-900">{category.productCount}</span>
       </TableCell>
       <TableCell>
         <Badge 
           variant={category.status === 'ACTIVE' ? 'default' : 'secondary'}
-          className={category.status === 'ACTIVE' ? 'bg-green-100 text-green-800 border-green-200' : ''}
+          className={category.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border border-green-200 border-green-200' : ''}
         >
           {category.status.toLowerCase()}
         </Badge>
       </TableCell>
-      <TableCell className="text-sm text-gray-500">
+      <TableCell className="text-sm text-slate-500">
         {new Date(category.updatedAt).toLocaleDateString()}
       </TableCell>
       <TableCell className="text-right">

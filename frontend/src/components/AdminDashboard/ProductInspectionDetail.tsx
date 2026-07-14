@@ -77,7 +77,7 @@ function PhotoGallery({ photos, title, onImageClick }: { photos?: any[]; title: 
                                 alt={p.name || `Photo ${i + 1}`}
                                 className="w-full h-full object-cover rounded-xl border border-slate-200 shadow-sm transition-transform group-hover:scale-[1.02]"
                             />
-                            <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] px-2 py-1 rounded-b-xl truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="absolute bottom-0 inset-x-0 bg-slate-900/50 text-white text-[10px] px-2 py-1 rounded-b-xl truncate opacity-0 group-hover:opacity-100 transition-opacity">
                                 {p.name || `Photo ${i + 1}`}
                             </div>
                         </div>
@@ -176,7 +176,7 @@ export default function ProductInspectionDetail({ productId }: Props) {
 
     if (loading) return (
         <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-500" />
         </div>
     )
 
@@ -192,9 +192,9 @@ export default function ProductInspectionDetail({ productId }: Props) {
     const approvalStatus = (product as any).approvalStatus
 
     const statusColors: Record<string, string> = {
-        APPROVED: 'bg-green-100 text-green-800',
-        REJECTED: 'bg-red-100 text-red-800',
-        PENDING: 'bg-amber-100 text-amber-800',
+        APPROVED: 'bg-green-50 text-green-700 border border-green-200',
+        REJECTED: 'bg-red-50 text-red-700 border border-red-200',
+        PENDING: 'bg-amber-50 text-amber-700 border border-amber-200',
     }
 
     return (
@@ -216,13 +216,13 @@ export default function ProductInspectionDetail({ productId }: Props) {
                 <button
                     onClick={handleDownloadPdf}
                     disabled={downloading}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#222222] rounded-lg hover:bg-[#333333] transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1"
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
                 >
                     <Download className="w-4 h-4" />
                     {downloading ? 'Generating...' : 'Download PDF'}
                 </button>
                 <div className="flex gap-2 flex-shrink-0">
-                    <Badge className={statusColors[approvalStatus] || 'bg-gray-100 text-gray-700'}>
+                    <Badge className={statusColors[approvalStatus] || 'bg-slate-100 text-slate-700'}>
                         {approvalStatus}
                     </Badge>
                 </div>
@@ -232,7 +232,7 @@ export default function ProductInspectionDetail({ productId }: Props) {
             <div className="space-y-6">
 
             {/* General Info Banner */}
-            <div className="bg-gradient-to-r from-[#222222] to-[#333333] rounded-2xl p-6 text-white">
+            <div className="bg-gradient-to-r from-brand-500 to-brand-600 rounded-2xl p-6 text-white">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                     <div>
                         <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Vendor</p>
@@ -256,7 +256,7 @@ export default function ProductInspectionDetail({ productId }: Props) {
 
             <div className="grid grid-cols-1 gap-6">
                 {/* Section 1: Preparation */}
-                <Section title="Preparation & Quantitative Data" icon={Layers} accent="bg-blue-50 text-blue-800">
+                <Section title="Preparation & Quantitative Data" icon={Layers} accent="bg-slate-50 text-slate-700">
                     <div className="mb-6 overflow-x-auto">
                         <table className="w-full text-sm text-left border-collapse">
                             <thead className="bg-slate-50 text-slate-600 font-semibold">
@@ -283,10 +283,10 @@ export default function ProductInspectionDetail({ productId }: Props) {
                 </Section>
 
                 {/* Section 2: Measurements */}
-                <Section title="Measurements & Dimensions" icon={Ruler} accent="bg-indigo-50 text-indigo-800">
+                <Section title="Measurements & Dimensions" icon={Ruler} accent="bg-slate-50 text-slate-700">
                     <div className="mb-6 overflow-x-auto">
                         <table className="w-full text-sm text-left border-collapse">
-                            <thead className="bg-indigo-50/50 text-indigo-800 font-semibold">
+                            <thead className="bg-slate-50/80 text-slate-600 font-semibold">
                                 <tr>
                                     <th className="p-3 border-b text-xs uppercase tracking-wider">Sample Name</th>
                                     <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Carton (L×W×H) cm</th>
@@ -305,8 +305,8 @@ export default function ProductInspectionDetail({ productId }: Props) {
                                         <td className="p-3 text-center text-slate-600">
                                             {m.productLength || 0} × {m.productWidth || 0}
                                         </td>
-                                        <td className="p-3 font-bold text-center text-indigo-600">{m.retailWeight || 0}</td>
-                                        <td className="p-3 font-bold text-center text-indigo-600">{m.cartonGrossWeight || 0}</td>
+                                        <td className="p-3 font-bold text-center text-brand-600">{m.retailWeight || 0}</td>
+                                        <td className="p-3 font-bold text-center text-brand-600">{m.cartonGrossWeight || 0}</td>
                                     </tr>
                                 ))}
                                 {(!formData.measurements || formData.measurements.length === 0) && (
@@ -323,7 +323,7 @@ export default function ProductInspectionDetail({ productId }: Props) {
                 </Section>
 
                 {/* Section 3: Packaging & Workmanship */}
-                <Section title="Packaging & Product Integrity" icon={Truck} accent="bg-teal-50 text-teal-800">
+                <Section title="Packaging & Product Integrity" icon={Truck} accent="bg-slate-50 text-slate-700">
                     <div className="space-y-3 mb-6">
                         {Object.entries(REMARK_LABELS).map(([key, label]) => {
                             const val = formData[key]
@@ -345,7 +345,7 @@ export default function ProductInspectionDetail({ productId }: Props) {
                 </Section>
 
                 {/* Section 5: Defects & AQL — compact AQL table + defect-detail cards (mirrors Checker portal) */}
-                <Section title="Defects & AQL" icon={XCircle} accent="bg-orange-50 text-orange-800">
+                <Section title="Defects & AQL" icon={XCircle} accent="bg-slate-50 text-slate-700">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                         <InfoCard label="Inspection Level" value={formData.inspectionLevel} />
                         <InfoCard label="Sample Size" value={formData.sampleSize} />
@@ -418,7 +418,7 @@ export default function ProductInspectionDetail({ productId }: Props) {
                 </Section>
 
                 {/* Section 6: On-site Testing — mirrors Checker portal */}
-                <Section title="On-site Testing" icon={FlaskConical} accent="bg-rose-50 text-rose-800">
+                <Section title="On-site Testing" icon={FlaskConical} accent="bg-slate-50 text-slate-700">
                     {(formData.tests && formData.tests.length > 0) ? (
                         <div className="space-y-4">
                             {formData.tests.map((test: any, i: number) => {
@@ -500,7 +500,7 @@ export default function ProductInspectionDetail({ productId }: Props) {
                 </Section>
 
                 {/* Documentation — mirrors Checker portal */}
-                <Section title="Documentation" icon={Camera} accent="bg-sky-50 text-sky-800">
+                <Section title="Documentation" icon={Camera} accent="bg-slate-50 text-slate-700">
                     <div className="mb-4">
                         <InfoCard label="Inspector Signature" value={formData.inspectorSignature} />
                     </div>
@@ -510,7 +510,7 @@ export default function ProductInspectionDetail({ productId }: Props) {
                 </Section>
 
                 {/* Review & Final Decision — mirrors Checker portal */}
-                <Section title="Review & Final Decision" icon={Star} accent="bg-amber-50 text-amber-800">
+                <Section title="Review & Final Decision" icon={Star} accent="bg-slate-50 text-slate-700">
                     <div className="flex items-center gap-4 mb-4 flex-wrap">
                         <span className="text-sm font-medium text-slate-700">Final Decision:</span>
                         {formData.finalDecision === 'Approved' ? (
@@ -552,7 +552,7 @@ export default function ProductInspectionDetail({ productId }: Props) {
                 <button
                     onClick={handleDownloadPdf}
                     disabled={downloading}
-                    className="px-6 py-2.5 bg-[#222222] text-white rounded-xl font-semibold shadow-lg hover:bg-[#333333] transition-all flex items-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-6 py-2.5 bg-brand-500 text-white rounded-xl font-semibold shadow-lg hover:bg-brand-600 transition-all flex items-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Download className="w-4 h-4" />
                     {downloading ? 'Generating...' : 'Download PDF'}
@@ -582,7 +582,7 @@ export default function ProductInspectionDetail({ productId }: Props) {
                     <div className="relative max-w-5xl max-h-screen">
                         <button
                             onClick={(e) => {e.stopPropagation(); setSelectedImage(null)}}
-                            className="absolute -top-10 -right-4 p-2 text-white hover:text-gray-300"
+                            className="absolute -top-10 -right-4 p-2 text-white hover:text-slate-300"
                         >
                             <XCircle className="w-8 h-8" />
                         </button>

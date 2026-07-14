@@ -530,13 +530,13 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 Back to Inventory
               </Button>
             </Link>
-            <h1 className="text-2xl font-bold text-[#222222]">Loading...</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Loading...</h1>
           </div>
         </div>
         <Card>
           <CardContent className="p-8">
             <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#222222]"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
               <span className="ml-3 text-slate-600">Loading inventory data...</span>
             </div>
           </CardContent>
@@ -549,7 +549,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-[#222222]">
+          <h1 className="text-2xl font-bold text-slate-900">
             {isEdit ? 'Edit Inventory Item' : 'Add New Inventory Item'}
           </h1>
         </div>
@@ -561,9 +561,9 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
           <div className="lg:col-span-2 space-y-6">
 
             {/* Basic Product Information */}
-            <Card className="border border-gray-200">
-              <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <CardTitle className="text-[#222222]">Basic Product Information</CardTitle>
+            <Card className="border border-slate-200">
+              <CardHeader className="bg-slate-50 border-b border-slate-200">
+                <CardTitle className="text-slate-900">Basic Product Information</CardTitle>
                 <p className="text-sm text-slate-600">This will be the master product data</p>
               </CardHeader>
               <CardContent className="space-y-4 p-6">
@@ -605,7 +605,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                     value={formData.name}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
                     placeholder="Enter product name"
                   />
                 </div>
@@ -663,7 +663,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                     name="sku"
                     value={formData.sku}
                     readOnly
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-slate-600 cursor-not-allowed"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-600 cursor-not-allowed"
                     placeholder={isEdit ? '' : 'Auto-generated on save'}
                   />
                   <p className="text-xs text-slate-500 mt-1">
@@ -681,7 +681,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                     value={formData.description}
                     onChange={handleInputChange}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
                     placeholder="Basic product description"
                   />
                 </div>
@@ -689,9 +689,9 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
             </Card>
 
             {/* Stock Management Card - Only Low Stock Alert */}
-            <Card className="border border-gray-200">
-              <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <CardTitle className="text-[#222222]">Stock Settings</CardTitle>
+            <Card className="border border-slate-200">
+              <CardHeader className="bg-slate-50 border-b border-slate-200">
+                <CardTitle className="text-slate-900">Stock Settings</CardTitle>
                 <p className="text-sm text-slate-600">Opening stock is set when a product is created.</p>
               </CardHeader>
               <CardContent className="space-y-4 p-6">
@@ -711,7 +711,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                     onChange={handleInputChange}
                     required
                     min="5"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
                     placeholder="e.g. 5"
                   />
                   <p className="text-xs text-slate-500 mt-1">Alert threshold when stock falls below this level.</p>
@@ -720,9 +720,9 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
             </Card>
 
             {/* Additional Information */}
-            <Card className="border border-gray-200">
-              <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <CardTitle className="text-[#222222]">Additional Information</CardTitle>
+            <Card className="border border-slate-200">
+              <CardHeader className="bg-slate-50 border-b border-slate-200">
+                <CardTitle className="text-slate-900">Additional Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 p-6">
 
@@ -736,15 +736,15 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div
                       className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${formData.sourceType === 'supplier'
-                        ? 'border-gray-800 bg-gray-100 shadow-sm'
-                        : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                        ? 'border-slate-800 bg-slate-100 shadow-sm'
+                        : 'border-slate-200 hover:border-slate-400 hover:bg-slate-50'
                         }`}
                       onClick={() => handleSourceTypeChange('supplier')}
                     >
                       <div className="flex items-center space-x-3">
                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${formData.sourceType === 'supplier'
-                          ? 'border-gray-800 bg-gray-800'
-                          : 'border-gray-300'
+                          ? 'border-slate-800 bg-slate-800'
+                          : 'border-slate-300'
                           }`}>
                           {formData.sourceType === 'supplier' && (
                             <div className="w-2 h-2 rounded-full bg-white"></div>
@@ -759,15 +759,15 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
                     <div
                       className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${formData.sourceType === 'manufacture'
-                        ? 'border-gray-800 bg-gray-100 shadow-sm'
-                        : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                        ? 'border-slate-800 bg-slate-100 shadow-sm'
+                        : 'border-slate-200 hover:border-slate-400 hover:bg-slate-50'
                         }`}
                       onClick={() => handleSourceTypeChange('manufacture')}
                     >
                       <div className="flex items-center space-x-3">
                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${formData.sourceType === 'manufacture'
-                          ? 'border-gray-800 bg-gray-800'
-                          : 'border-gray-300'
+                          ? 'border-slate-800 bg-slate-800'
+                          : 'border-slate-300'
                           }`}>
                           {formData.sourceType === 'manufacture' && (
                             <div className="w-2 h-2 rounded-full bg-white"></div>
@@ -784,9 +784,9 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
                 {/* Conditional Fields Based on Source Type */}
                 {formData.sourceType === 'supplier' && (
-                  <div className="space-y-4 p-4 bg-gray-50 border border-gray-300 rounded-lg animate-in slide-in-from-top-2 duration-300">
-                    <h4 className="font-medium text-gray-900 mb-3 flex items-center">
-                      <span className="w-2 h-2 bg-gray-800 rounded-full mr-2"></span>
+                  <div className="space-y-4 p-4 bg-slate-50 border border-slate-300 rounded-lg animate-in slide-in-from-top-2 duration-300">
+                    <h4 className="font-medium text-slate-900 mb-3 flex items-center">
+                      <span className="w-2 h-2 bg-slate-800 rounded-full mr-2"></span>
                       Trader Information
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -800,9 +800,9 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           value={formData.supplier}
                           onChange={handleInputChange}
                           required={formData.sourceType === 'supplier'}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors ${formData.sourceType === 'supplier' && !formData.supplier
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors ${formData.sourceType === 'supplier' && !formData.supplier
                             ? 'border-red-300 bg-red-50'
-                            : 'border-gray-200'
+                            : 'border-slate-200'
                             }`}
                           placeholder="Enter supplier name"
                         />
@@ -819,7 +819,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           name="lastRestocked"
                           value={formData.lastRestocked}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
                         />
                       </div>
                     </div>
@@ -827,18 +827,18 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 )}
 
                 {formData.sourceType === 'manufacture' && (
-                  <div className="space-y-4 p-4 bg-gray-50 border border-gray-300 rounded-lg animate-in slide-in-from-top-2 duration-300">
-                    <h4 className="font-medium text-gray-900 mb-3 flex items-center">
-                      <span className="w-2 h-2 bg-gray-800 rounded-full mr-2"></span>
+                  <div className="space-y-4 p-4 bg-slate-50 border border-slate-300 rounded-lg animate-in slide-in-from-top-2 duration-300">
+                    <h4 className="font-medium text-slate-900 mb-3 flex items-center">
+                      <span className="w-2 h-2 bg-slate-800 rounded-full mr-2"></span>
                       Manufacturing Information
                     </h4>
-                    <div className="text-sm text-gray-700 mb-4 space-y-2">
+                    <div className="text-sm text-slate-700 mb-4 space-y-2">
                       <div className="flex items-center">
-                        <span className="w-1.5 h-1.5 bg-gray-600 rounded-full mr-2"></span>
+                        <span className="w-1.5 h-1.5 bg-slate-600 rounded-full mr-2"></span>
                         <span>This product is manufactured in-house</span>
                       </div>
                       <div className="flex items-center">
-                        <span className="w-1.5 h-1.5 bg-gray-600 rounded-full mr-2"></span>
+                        <span className="w-1.5 h-1.5 bg-slate-600 rounded-full mr-2"></span>
                         <span>Full control over quality and production timeline</span>
                       </div>
                     </div>
@@ -853,7 +853,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           name="manufacturingDate"
                           value={formData.manufacturingDate}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
                         />
                       </div>
                       <div>
@@ -865,7 +865,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           name="lastRestocked"
                           value={formData.lastRestocked}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
                         />
                       </div>
                     </div>
@@ -882,7 +882,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                     value={formData.notes}
                     onChange={handleInputChange}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
                     placeholder="Any additional notes about this inventory item..."
                   />
                 </div>
@@ -892,9 +892,9 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
           {/* Sidebar */}
           <div className="space-y-6">
-            <Card className="border border-gray-200">
-              <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <CardTitle className="text-[#222222]">Status & Settings</CardTitle>
+            <Card className="border border-slate-200">
+              <CardHeader className="bg-slate-50 border-b border-slate-200">
+                <CardTitle className="text-slate-900">Status & Settings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 p-6">
                 <div>
@@ -913,14 +913,14 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
             </Card>
 
             {/* Product Creation Status */}
-            <Card className="border border-gray-200">
-              <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <CardTitle className="text-[#222222]">Product Status</CardTitle>
+            <Card className="border border-slate-200">
+              <CardHeader className="bg-slate-50 border-b border-slate-200">
+                <CardTitle className="text-slate-900">Product Status</CardTitle>
               </CardHeader>
               <CardContent className="p-6">
                 {formData.hasProductCreated ? (
                   <div className="space-y-3">
-                    <div className="flex items-center text-gray-700">
+                    <div className="flex items-center text-slate-700">
                       <Package className="h-4 w-4 mr-2" />
                       <span className="text-sm font-medium">Product Created</span>
                     </div>
@@ -971,33 +971,33 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
             )}
 
             {/* Quick Stats */}
-            <Card className="border border-gray-200">
-              <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <CardTitle className="text-[#222222]">Quick Stats</CardTitle>
+            <Card className="border border-slate-200">
+              <CardHeader className="bg-slate-50 border-b border-slate-200">
+                <CardTitle className="text-slate-900">Quick Stats</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 p-6">
                 {formData.vendorName && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Vendor:</span>
-                    <span className="font-medium text-[#222222]">{formData.vendorName}</span>
+                    <span className="font-medium text-slate-900">{formData.vendorName}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-600">Low Stock Alert:</span>
-                  <span className="font-medium text-[#222222]">
+                  <span className="font-medium text-slate-900">
                     {formData.lowStockAlert} units
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-600">Current Stock:</span>
-                  <span className={`font-medium ${formData.currentStock <= formData.lowStockAlert ? 'text-red-600 font-bold' : 'text-[#222222]'}`}>
+                  <span className={`font-medium ${formData.currentStock <= formData.lowStockAlert ? 'text-red-600 font-bold' : 'text-slate-900'}`}>
                     {formData.currentStock} units
                   </span>
                 </div>
                 {formData.sourceType && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Source Type:</span>
-                    <span className="font-medium text-gray-800">
+                    <span className="font-medium text-slate-800">
                       {formData.sourceType === 'supplier' ? 'Trader' : 'Manufacture'}
                     </span>
                   </div>
@@ -1006,21 +1006,21 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
             </Card>
 
             {/* Actions */}
-            <Card className="border border-gray-200">
-              <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <CardTitle className="text-[#222222]">Actions</CardTitle>
+            <Card className="border border-slate-200">
+              <CardHeader className="bg-slate-50 border-b border-slate-200">
+                <CardTitle className="text-slate-900">Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 p-6">
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-[#222222] text-white hover:bg-[#313131]"
+                  className="w-full bg-brand-500 text-white hover:bg-brand-600"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {isLoading ? 'Saving...' : (isEdit ? 'Update Item' : 'Create Item')}
                 </Button>
                 <Link href="/admin/dashboard/inventory" className="block">
-                  <Button type="button" variant="outline" className="w-full hover:bg-gray-50 hover:border-gray-200">
+                  <Button type="button" variant="outline" className="w-full hover:bg-slate-50 hover:border-slate-200">
                     Cancel
                   </Button>
                 </Link>
@@ -1032,29 +1032,29 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
       {/* Stock Change Reason Modal */}
       {showStockReasonModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-lg font-bold text-gray-900">Stock Change Reason Required</h3>
-              <p className="text-sm text-gray-600 mt-1">
+            <div className="p-6 border-b border-slate-200">
+              <h3 className="text-lg font-bold text-slate-900">Stock Change Reason Required</h3>
+              <p className="text-sm text-slate-600 mt-1">
                 Stock changed from {originalStock} to {formData.currentStock} units
               </p>
             </div>
             <div className="p-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
                 Reason for stock change <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={stockChangeReason}
                 onChange={(e) => setStockChangeReason(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent resize-none"
                 placeholder="e.g., New shipment received, Damaged items removed, Inventory correction"
                 rows={4}
                 autoFocus
               />
-              <p className="text-xs text-gray-500 mt-1">Minimum 5 characters required</p>
+              <p className="text-xs text-slate-500 mt-1">Minimum 5 characters required</p>
             </div>
-            <div className="p-6 border-t border-gray-200 flex space-x-3">
+            <div className="p-6 border-t border-slate-200 flex space-x-3">
               <Button
                 type="button"
                 onClick={() => {
@@ -1070,7 +1070,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
               <Button
                 type="button"
                 onClick={handleStockReasonSubmit}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex-1 bg-brand-500 hover:bg-brand-600 text-white"
                 disabled={!stockChangeReason.trim() || stockChangeReason.trim().length < 5}
               >
                 Continue

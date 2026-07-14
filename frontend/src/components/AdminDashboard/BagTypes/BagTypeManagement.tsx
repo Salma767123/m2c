@@ -62,33 +62,33 @@ function SortableBagTypeRow({
         <div className="flex items-center gap-3">
           <div 
             {...(canDrag ? { ...attributes, ...listeners } : {})}
-            className={`p-1.5 bg-white border border-gray-300 shadow-sm hover:bg-gray-50 rounded-md transition-colors ${canDrag ? 'cursor-grab active:cursor-grabbing text-gray-700' : 'cursor-not-allowed text-gray-300'}`}
+            className={`p-1.5 bg-white border border-slate-300 shadow-sm hover:bg-slate-50 rounded-md transition-colors ${canDrag ? 'cursor-grab active:cursor-grabbing text-slate-700' : 'cursor-not-allowed text-slate-300'}`}
             title={canDrag ? "Drag to reorder" : "Clear search and filters to reorder"}
           >
             <GripVertical className="h-4 w-4" />
           </div>
-          <span className="text-sm font-semibold text-gray-700 min-w-[20px] text-center">
+          <span className="text-sm font-semibold text-slate-700 min-w-[20px] text-center">
             {bagType.sortOrder}
           </span>
         </div>
       </TableCell>
       <TableCell>
         {bagType.image ? (
-          <img src={bagType.image} alt={bagType.name} className="w-12 h-12 object-cover rounded-lg border border-gray-200" />
+          <img src={bagType.image} alt={bagType.name} className="w-12 h-12 object-cover rounded-lg border border-slate-200" />
         ) : (
-          <div className="w-12 h-12 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
-            <Package className="w-5 h-5 text-gray-400" />
+          <div className="w-12 h-12 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center">
+            <Package className="w-5 h-5 text-slate-400" />
           </div>
         )}
       </TableCell>
       <TableCell>
-        <div className="font-medium text-gray-900">{bagType.name}</div>
+        <div className="font-medium text-slate-900">{bagType.name}</div>
       </TableCell>
       <TableCell>
-        <div className="text-sm text-gray-500 max-w-[200px] truncate">{bagType.description || '—'}</div>
+        <div className="text-sm text-slate-500 max-w-[200px] truncate">{bagType.description || '—'}</div>
       </TableCell>
       <TableCell>
-        <span className="font-semibold text-gray-900">₹{bagType.price.toFixed(2)}</span>
+        <span className="font-semibold text-slate-900">₹{bagType.price.toFixed(2)}</span>
       </TableCell>
       <TableCell>
         <span className="text-sm font-medium text-blue-600">{salesMap.get(bagType.id)?.sold || 0}</span>
@@ -98,7 +98,7 @@ function SortableBagTypeRow({
       </TableCell>
 
       <TableCell>
-        <span className={`px-3 py-1 rounded-full text-xs font-medium ${bagType.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+        <span className={`px-3 py-1 rounded-full text-xs font-medium ${bagType.isActive ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
           {bagType.isActive ? 'Active' : 'Inactive'}
         </span>
       </TableCell>
@@ -315,13 +315,13 @@ export default function BagTypeManagement() {
       <Breadcrumb />
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Bag Types</h1>
-          <p className="text-gray-600 mt-1">Manage bag add-ons that customers can purchase with their orders</p>
+          <h1 className="text-2xl font-bold text-slate-900">Bag Types</h1>
+          <p className="text-slate-600 mt-1">Manage bag add-ons that customers can purchase with their orders</p>
         </div>
         {hasPermission('bag_types:create') && (
           <button
             onClick={handleCreate}
-            className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
           >
             <Plus className="h-5 w-5" />
             Add Bag Type
@@ -333,31 +333,31 @@ export default function BagTypeManagement() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Total</div>
-            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+            <div className="text-sm text-slate-600">Total</div>
+            <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Active</div>
+            <div className="text-sm text-slate-600">Active</div>
             <div className="text-2xl font-bold text-green-600">{activeCount}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Inactive</div>
+            <div className="text-sm text-slate-600">Inactive</div>
             <div className="text-2xl font-bold text-red-600">{inactiveCount}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Total Bags Sold</div>
+            <div className="text-sm text-slate-600">Total Bags Sold</div>
             <div className="text-2xl font-bold text-blue-600">{stats.totalBagsSold}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Total Revenue</div>
+            <div className="text-sm text-slate-600">Total Revenue</div>
             <div className="text-2xl font-bold text-purple-600">₹{stats.totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
           </CardContent>
         </Card>
@@ -368,13 +368,13 @@ export default function BagTypeManagement() {
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 z-10" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5 z-10" />
               <input
                 type="text"
                 placeholder="Search by name or description..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
               />
             </div>
             <div className="w-full md:w-48">
@@ -408,7 +408,7 @@ export default function BagTypeManagement() {
       <Card>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <Table>
-          <TableHeader>
+          <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
             <TableRow>
               <TableHead className="w-24">Order</TableHead>
               <TableHead>Image</TableHead>
@@ -426,7 +426,7 @@ export default function BagTypeManagement() {
               <TableRow>
                 <TableCell colSpan={9}>
                   <div className="flex justify-center items-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
                   </div>
                 </TableCell>
               </TableRow>
@@ -448,9 +448,9 @@ export default function BagTypeManagement() {
               <TableRow>
                 <TableCell colSpan={9}>
                   <div className="p-12 text-center">
-                    <ShoppingBag className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500 font-medium">No bag types found</p>
-                    <p className="text-gray-400 text-sm mt-1">Create your first bag type to get started</p>
+                    <ShoppingBag className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                    <p className="text-slate-500 font-medium">No bag types found</p>
+                    <p className="text-slate-400 text-sm mt-1">Create your first bag type to get started</p>
                   </div>
                 </TableCell>
               </TableRow>
@@ -480,7 +480,7 @@ export default function BagTypeManagement() {
                   key={`p-${p}`}
                   onClick={() => setCurrentPage(p as number)}
                   aria-current={p === currentPage ? 'page' : undefined}
-                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
                 >
                   {p}
                 </button>
@@ -516,7 +516,7 @@ export default function BagTypeManagement() {
         const isActive = bagTypeToDelete.isActive;
 
         return (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl max-w-md w-full">
               <div className="p-6">
                 {/* Header */}
@@ -525,33 +525,33 @@ export default function BagTypeManagement() {
                     <AlertCircle className={`w-6 h-6 ${hasSales ? 'text-amber-600' : 'text-red-600'}`} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-gray-900">
+                    <h3 className="text-lg font-bold text-slate-900">
                       {hasSales && isActive ? 'Deactivate or Delete?' : 'Delete Bag Type'}
                     </h3>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-slate-500">
                       {hasSales ? 'This bag type has order history' : 'This action cannot be undone'}
                     </p>
                   </div>
                 </div>
 
                 {/* Bag preview */}
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-4">
                   <div className="flex items-center gap-3">
                     {bagTypeToDelete.image ? (
-                      <img src={bagTypeToDelete.image} alt={bagTypeToDelete.name} className="w-10 h-10 object-cover rounded-lg border border-gray-200" />
+                      <img src={bagTypeToDelete.image} alt={bagTypeToDelete.name} className="w-10 h-10 object-cover rounded-lg border border-slate-200" />
                     ) : (
-                      <div className="w-10 h-10 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
-                        <Package className="w-5 h-5 text-gray-400" />
+                      <div className="w-10 h-10 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center">
+                        <Package className="w-5 h-5 text-slate-400" />
                       </div>
                     )}
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900">{bagTypeToDelete.name}</p>
-                      <p className="text-sm text-gray-500">₹{bagTypeToDelete.price.toFixed(2)}</p>
+                      <p className="font-medium text-slate-900">{bagTypeToDelete.name}</p>
+                      <p className="text-sm text-slate-500">₹{bagTypeToDelete.price.toFixed(2)}</p>
                     </div>
                     {hasSales && (
                       <div className="text-right">
                         <p className="text-sm font-medium text-blue-600">{soldCount} sold</p>
-                        <p className="text-xs text-gray-500">₹{revenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-xs text-slate-500">₹{revenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
                       </div>
                     )}
                   </div>
@@ -578,7 +578,7 @@ export default function BagTypeManagement() {
                     <button
                       onClick={confirmDeactivate}
                       disabled={deleting}
-                      className="w-full px-4 py-2.5 bg-[#222222] text-white rounded-lg hover:bg-[#333333] transition-colors font-medium disabled:opacity-50"
+                      className="w-full px-4 py-2.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-medium disabled:opacity-50"
                     >
                       {deleting ? 'Processing...' : 'Deactivate (Recommended)'}
                     </button>
@@ -588,7 +588,7 @@ export default function BagTypeManagement() {
                     <button
                       onClick={() => { setShowDeleteModal(false); setBagTypeToDelete(null); }}
                       disabled={deleting}
-                      className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50"
+                      className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium disabled:opacity-50"
                     >
                       Cancel
                     </button>

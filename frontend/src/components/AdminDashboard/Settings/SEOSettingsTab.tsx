@@ -143,8 +143,8 @@ export default function SEOSettingsTab() {
                 <CardContent className="p-6">
                     <div className="flex items-center justify-center py-12">
                         <div className="text-center">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-                            <p className="text-gray-600">Loading SEO settings...</p>
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
+                            <p className="text-slate-600">Loading SEO settings...</p>
                         </div>
                     </div>
                 </CardContent>
@@ -167,8 +167,8 @@ export default function SEOSettingsTab() {
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2">
-                                    <Globe className="w-4 h-4 text-gray-600" />
-                                    <h3 className="font-medium text-gray-900">{displayName}</h3>
+                                    <Globe className="w-4 h-4 text-slate-600" />
+                                    <h3 className="font-medium text-slate-900">{displayName}</h3>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     {isPageConfigured(page) ? (
@@ -179,14 +179,14 @@ export default function SEOSettingsTab() {
                                 </div>
                             </div>
                             
-                            <p className="text-xs text-gray-500 mb-3">
+                            <p className="text-xs text-slate-500 mb-3">
                                 {isPageConfigured(page) ? 'SEO configured' : 'Not configured'}
                             </p>
                             
                             {canManage && (
                                 <button
                                     onClick={() => handleEditClick(page)}
-                                    className="w-full flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-3 rounded-lg text-sm transition-colors"
+                                    className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-3 rounded-lg text-sm transition-colors"
                                 >
                                     <Edit className="w-3 h-3" />
                                     Configure SEO
@@ -199,16 +199,16 @@ export default function SEOSettingsTab() {
 
             {/* Edit Modal */}
             {editingPage && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-6 border-b border-gray-200">
+                        <div className="p-6 border-b border-slate-200">
                             <div className="flex items-center justify-between">
-                                <h2 className="text-xl font-semibold text-gray-900">
+                                <h2 className="text-xl font-semibold text-slate-900">
                                     SEO Settings - {pageDisplayNames[editingPage]}
                                 </h2>
                                 <button
                                     onClick={handleCancel}
-                                    className="text-gray-400 hover:text-gray-600"
+                                    className="text-slate-400 hover:text-slate-600"
                                 >
                                     ×
                                 </button>
@@ -217,7 +217,7 @@ export default function SEOSettingsTab() {
 
                         <div className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
                                     Meta Title
                                 </label>
                                 <input
@@ -226,13 +226,13 @@ export default function SEOSettingsTab() {
                                     value={editForm.metaTitle || ''}
                                     onChange={handleFormChange}
                                     placeholder="Enter page title for search engines"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                                 />
-                                <p className="text-xs text-gray-500 mt-1">Recommended: 50-60 characters</p>
+                                <p className="text-xs text-slate-500 mt-1">Recommended: 50-60 characters</p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
                                     Meta Description
                                 </label>
                                 <textarea
@@ -241,13 +241,13 @@ export default function SEOSettingsTab() {
                                     value={editForm.metaDescription || ''}
                                     onChange={handleFormChange}
                                     placeholder="Brief description of the page content"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                                 />
-                                <p className="text-xs text-gray-500 mt-1">Recommended: 150-160 characters</p>
+                                <p className="text-xs text-slate-500 mt-1">Recommended: 150-160 characters</p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
                                     Meta Keywords
                                 </label>
                                 <input
@@ -256,13 +256,13 @@ export default function SEOSettingsTab() {
                                     value={editForm.metaKeywords || ''}
                                     onChange={handleFormChange}
                                     placeholder="keyword1, keyword2, keyword3"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                                 />
-                                <p className="text-xs text-gray-500 mt-1">Separate keywords with commas</p>
+                                <p className="text-xs text-slate-500 mt-1">Separate keywords with commas</p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
                                     Open Graph Image
                                 </label>
                                 <div className="space-y-3">
@@ -281,7 +281,7 @@ export default function SEOSettingsTab() {
                                             <img
                                                 src={imagePreview}
                                                 alt="OG Image Preview"
-                                                className="w-full max-w-md h-32 object-cover rounded-lg border-2 border-gray-200 shadow-sm"
+                                                className="w-full max-w-md h-32 object-cover rounded-lg border-2 border-slate-200 shadow-sm"
                                             />
                                             {selectedImage && (
                                                 <button
@@ -292,7 +292,7 @@ export default function SEOSettingsTab() {
                                                     <X className="w-3 h-3" />
                                                 </button>
                                             )}
-                                            <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                                            <div className="absolute bottom-2 left-2 bg-slate-900/50 text-white text-xs px-2 py-1 rounded">
                                                 OG Image Preview
                                             </div>
                                         </div>
@@ -305,11 +305,11 @@ export default function SEOSettingsTab() {
                                             tabIndex={0}
                                             onClick={() => fileInputRef.current?.click()}
                                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
-                                            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 focus-visible:border-blue-500"
+                                            className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 focus-visible:border-blue-500"
                                         >
-                                            <Image className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                                            <p className="text-gray-600 font-medium">Click to upload Open Graph image</p>
-                                            <p className="text-sm text-gray-500 mt-1">JPG, PNG, WebP up to 5MB</p>
+                                            <Image className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                                            <p className="text-slate-600 font-medium">Click to upload Open Graph image</p>
+                                            <p className="text-sm text-slate-500 mt-1">JPG, PNG, WebP up to 5MB</p>
                                         </div>
                                     )}
                                     
@@ -319,7 +319,7 @@ export default function SEOSettingsTab() {
                                             <button
                                                 type="button"
                                                 onClick={() => fileInputRef.current?.click()}
-                                                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                                                className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                                             >
                                                 <Upload className="w-4 h-4" />
                                                 Change Image
@@ -333,7 +333,7 @@ export default function SEOSettingsTab() {
                                         </div>
                                     )}
                                     
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-slate-500">
                                         Recommended: 1200x630px for optimal social media sharing. Max file size: 5MB.
                                     </p>
                                 </div>
@@ -353,10 +353,10 @@ export default function SEOSettingsTab() {
                             </div>
                         </div>
 
-                        <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+                        <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
                             <button
                                 onClick={handleCancel}
-                                className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                                className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium"
                             >
                                 Cancel
                             </button>
@@ -364,7 +364,7 @@ export default function SEOSettingsTab() {
                                 <button
                                     onClick={handleSave}
                                     disabled={loading}
-                                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Save className="h-4 w-4" />
                                     {loading ? 'Saving...' : 'Save Settings'}

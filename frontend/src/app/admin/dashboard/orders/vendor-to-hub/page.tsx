@@ -6,8 +6,8 @@ export default function VendorToHubPage() {
     <PermissionGuard permission="vendor_to_hub:view">
       <div className="p-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Vendor to Hub Orders</h1>
-          <p className="text-gray-600 mt-1">Manage orders from vendors to your hubs</p>
+          <h1 className="text-2xl font-bold text-slate-900">Vendor to Hub Orders</h1>
+          <p className="text-slate-600 mt-1">Manage orders from vendors to your hubs</p>
         </div>
         <VendorToHub />
       </div>

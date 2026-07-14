@@ -456,10 +456,10 @@ export default function CreateAssignment() {
                       <div>
                         <span
                           className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${formData.priority === "high"
-                            ? "bg-red-100 text-red-800"
+                            ? "bg-red-50 text-red-700 border border-red-200"
                             : formData.priority === "medium"
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-green-100 text-green-800"
+                              ? "bg-amber-50 text-amber-700 border border-amber-200"
+                              : "bg-green-50 text-green-700 border border-green-200"
                             }`}
                         >
                           {formData.priority.toUpperCase()} PRIORITY
@@ -486,7 +486,7 @@ export default function CreateAssignment() {
                     {formData.vendorId ? (
                       <CheckCircle className="h-5 w-5 text-green-600" />
                     ) : (
-                      <AlertCircle className="h-5 w-5 text-gray-300" />
+                      <AlertCircle className="h-5 w-5 text-slate-300" />
                     )}
                   </div>
                   <div className="flex items-center justify-between">
@@ -494,7 +494,7 @@ export default function CreateAssignment() {
                     {formData.checkerId ? (
                       <CheckCircle className="h-5 w-5 text-green-600" />
                     ) : (
-                      <AlertCircle className="h-5 w-5 text-gray-300" />
+                      <AlertCircle className="h-5 w-5 text-slate-300" />
                     )}
                   </div>
                   <div className="flex items-center justify-between">
@@ -502,7 +502,7 @@ export default function CreateAssignment() {
                     {formData.scheduledDate && formData.scheduledTime ? (
                       <CheckCircle className="h-5 w-5 text-green-600" />
                     ) : (
-                      <AlertCircle className="h-5 w-5 text-gray-300" />
+                      <AlertCircle className="h-5 w-5 text-slate-300" />
                     )}
                   </div>
                 </div>

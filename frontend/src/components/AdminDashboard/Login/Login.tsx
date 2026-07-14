@@ -217,7 +217,7 @@ export default function AdminLogin() {
   return (
     <div className={`min-h-screen flex bg-white font-sans${authChecked ? "" : " invisible"}`}>
       {/* Left Side - Professional Branding */}
-      <div className="hidden lg:flex lg:flex-1 relative bg-[#000000]">
+      <div className="hidden lg:flex lg:flex-1 relative bg-gradient-to-br from-brand-600 to-brand-700">
         <div className="flex items-center justify-center w-full p-12">
           <div className="max-w-lg text-center text-white">
             {/* Logo Section */}
@@ -233,7 +233,7 @@ export default function AdminLogin() {
               <h1 className="text-4xl font-bold mb-3">
                 Administrative Hub
               </h1>
-              <p className="text-xl text-gray-100 font-medium">
+              <p className="text-xl text-slate-100 font-medium">
                 Multi-tier access for Super Admin, Admin & Employee roles
               </p>
             </div>
@@ -291,15 +291,15 @@ export default function AdminLogin() {
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-gray-50">
+      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-slate-50">
         <div className="max-w-md w-full">
           {/* Login Form Card */}
           <Card className="shadow-2xl border-0 bg-white">
             <CardHeader className="text-center pb-6 pt-8">
-              <CardTitle className="text-3xl font-bold text-gray-900 mb-2">
+              <CardTitle className="text-3xl font-bold text-slate-900 mb-2">
                 Welcome Back
               </CardTitle>
-              <p className="text-gray-600">
+              <p className="text-slate-600">
                 Sign in to your admin dashboard
               </p>
             </CardHeader>
@@ -343,7 +343,7 @@ export default function AdminLogin() {
                         <button
                           type="button"
                           onClick={handleGoogleSignIn}
-                          className="mt-2 flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all"
+                          className="mt-2 flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all"
                         >
                           <svg className="w-4 h-4" viewBox="0 0 24 24">
                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -367,7 +367,7 @@ export default function AdminLogin() {
                 <div>
                   <label
                     htmlFor="email"
-                    className="block text-sm font-semibold text-gray-700 mb-2"
+                    className="block text-sm font-semibold text-slate-700 mb-2"
                   >
                     Email Address
                   </label>
@@ -379,9 +379,9 @@ export default function AdminLogin() {
                     value={loginData.email}
                     onChange={handleLoginChange}
                     onBlur={() => validateEmail(loginData.email)}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${emailError
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:border-brand-500 transition-all duration-200 bg-white text-slate-900 placeholder-slate-500 ${emailError
                         ? "border-red-500 focus:ring-red-200"
-                        : "border-gray-300 focus:ring-[#455a64]"
+                        : "border-slate-300 focus:ring-brand-500/40"
                       }`}
                     placeholder="Enter your email"
                     autoFocus
@@ -399,7 +399,7 @@ export default function AdminLogin() {
                 <div>
                   <label
                     htmlFor="password"
-                    className="block text-sm font-semibold text-gray-700 mb-2"
+                    className="block text-sm font-semibold text-slate-700 mb-2"
                   >
                     Password
                   </label>
@@ -410,14 +410,14 @@ export default function AdminLogin() {
                       name="password"
                       value={loginData.password}
                       onChange={handleLoginChange}
-                      className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:border-[#455a64] focus:ring-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500"
+                      className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-lg focus:ring-2 focus:border-brand-500 focus:ring-brand-500/40 transition-all duration-200 bg-white text-slate-900 placeholder-slate-500"
                       placeholder="Enter your password"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
                       aria-label={
                         showPassword ? "Hide password" : "Show password"
                       }
@@ -439,15 +439,15 @@ export default function AdminLogin() {
                       name="rememberMe"
                       checked={loginData.rememberMe}
                       onChange={handleLoginChange}
-                      className="w-4 h-4 text-gray-700 border-gray-300 rounded focus:ring-[#455a64]"
+                      className="w-4 h-4 text-slate-700 border-slate-300 rounded focus:ring-brand-500/40"
                     />
-                    <span className="ml-2 text-sm text-gray-700">
+                    <span className="ml-2 text-sm text-slate-700">
                       Remember me
                     </span>
                   </label>
                   <button
                     type="button"
-                    className="text-sm text-gray-700 hover:text-gray-900 font-medium transition-colors"
+                    className="text-sm text-slate-700 hover:text-slate-900 font-medium transition-colors"
                   >
                     Forgot password?
                   </button>
@@ -457,7 +457,7 @@ export default function AdminLogin() {
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-gray-900 hover:bg-gray-700 text-white py-3 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"
+                  className="w-full bg-brand-500 hover:bg-brand-600 text-white py-3 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"
                 >
                   <Lock className="w-4 h-4 mr-2" />
                   {isLoading ? 'Signing in...' : 'Sign In to Dashboard'}
@@ -466,10 +466,10 @@ export default function AdminLogin() {
                 {/* Divider */}
                 <div className="relative py-4">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300"></div>
+                    <div className="w-full border-t border-slate-300"></div>
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-4 bg-white text-gray-500">
+                    <span className="px-4 bg-white text-slate-500">
                       Or continue with
                     </span>
                   </div>
@@ -479,7 +479,7 @@ export default function AdminLogin() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 py-3 text-sm font-semibold rounded-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-md"
+                  className="w-full border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 hover:border-slate-400 py-3 text-sm font-semibold rounded-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-md"
                   onClick={handleGoogleSignIn}
                 >
                   <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">

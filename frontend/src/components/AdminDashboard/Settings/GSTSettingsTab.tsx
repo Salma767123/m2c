@@ -110,12 +110,12 @@ export default function GSTSettingsTab() {
                         <div className="p-2 bg-blue-100 rounded-lg">
                             <Percent className="w-5 h-5 text-blue-600" />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900">Add New GST Rate</h3>
+                        <h3 className="text-lg font-semibold text-slate-900">Add New GST Rate</h3>
                     </div>
 
                     <form onSubmit={handleCreate} className="flex gap-4 items-end">
                         <div className="flex-1">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
                                 Percentage (%) <span className="text-red-500">*</span>
                             </label>
                             <input
@@ -125,12 +125,12 @@ export default function GSTSettingsTab() {
                                 value={newPercentage}
                                 onChange={(e) => setNewPercentage(e.target.value)}
                                 placeholder="e.g. 18"
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                             />
                         </div>
 
                         <div className="flex-[2]">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
                                 Description (Optional)
                             </label>
                             <input
@@ -138,14 +138,14 @@ export default function GSTSettingsTab() {
                                 value={newDescription}
                                 onChange={(e) => setNewDescription(e.target.value)}
                                 placeholder="e.g. Standard Rate"
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                             />
                         </div>
 
                         <button
                             type="submit"
                             disabled={creating || !newPercentage}
-                            className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="px-6 py-2 bg-brand-500 text-white font-medium rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
                             <Plus className="w-4 h-4" />
                             {creating ? "Adding..." : "Add Rate"}
@@ -171,37 +171,37 @@ export default function GSTSettingsTab() {
             {/* List Existing Settings */}
             <Card>
                 <CardContent className="p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Existing GST Rates</h3>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Existing GST Rates</h3>
 
                     {loading ? (
-                        <div className="text-center py-8 text-gray-500">Loading settings...</div>
+                        <div className="text-center py-8 text-slate-500">Loading settings...</div>
                     ) : settings.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                        <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-300">
                             No GST rates found. Add one above.
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="border-b border-gray-200">
-                                        <th className="py-3 px-4 text-sm font-medium text-gray-500">Rate (%)</th>
-                                        <th className="py-3 px-4 text-sm font-medium text-gray-500">Description</th>
-                                        <th className="py-3 px-4 text-sm font-medium text-gray-500">Status</th>
-                                        <th className="py-3 px-4 text-sm font-medium text-gray-500 text-right">Actions</th>
+                                    <tr className="border-b border-slate-200">
+                                        <th className="py-3 px-4 text-sm font-medium text-slate-500">Rate (%)</th>
+                                        <th className="py-3 px-4 text-sm font-medium text-slate-500">Description</th>
+                                        <th className="py-3 px-4 text-sm font-medium text-slate-500">Status</th>
+                                        <th className="py-3 px-4 text-sm font-medium text-slate-500 text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {settings.map((setting) => (
-                                        <tr key={setting.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                            <td className="py-3 px-4 font-medium text-gray-900">{setting.percentage}%</td>
-                                            <td className="py-3 px-4 text-gray-600">{setting.description || "-"}</td>
+                                        <tr key={setting.id} className="border-b border-slate-100 hover:bg-slate-50">
+                                            <td className="py-3 px-4 font-medium text-slate-900">{setting.percentage}%</td>
+                                            <td className="py-3 px-4 text-slate-600">{setting.description || "-"}</td>
                                             <td className="py-3 px-4">
                                                 <button
                                                     onClick={() => canManage && handleToggleActive(setting)}
                                                     disabled={!canManage}
                                                     className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${setting.isActive
-                                                            ? "bg-green-100 text-green-800"
-                                                            : "bg-gray-100 text-gray-800"
+                                                            ? "bg-green-50 text-green-700 border border-green-200"
+                                                            : "bg-slate-50 text-slate-700 border border-slate-200"
                                                         } ${!canManage ? "cursor-not-allowed opacity-70" : ""}`}
                                                 >
                                                     {setting.isActive ? (

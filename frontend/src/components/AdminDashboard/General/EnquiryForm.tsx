@@ -72,21 +72,21 @@ const EnquiryForm = () => {
     switch (status) {
       case 'pending':
         return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200">
             <Clock className="w-3 h-3" />
             Pending
           </span>
         );
       case 'approved':
         return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
             <CheckCircle className="w-3 h-3" />
             Approved
           </span>
         );
       case 'rejected':
         return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
             <XCircle className="w-3 h-3" />
             Rejected
           </span>
@@ -175,17 +175,17 @@ const EnquiryForm = () => {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-6 bg-slate-50 min-h-screen">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Vendor Enquiry Forms</h1>
-          <p className="text-gray-600">Manage vendor applications submitted through the website</p>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Vendor Enquiry Forms</h1>
+          <p className="text-slate-600">Manage vendor applications submitted through the website</p>
         </div>
         <button
           onClick={fetchEnquiries}
           disabled={isLoading}
-          className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors text-sm font-medium"
+          className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors text-sm font-medium"
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh
@@ -194,21 +194,21 @@ const EnquiryForm = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Enquiries</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
+              <p className="text-sm text-slate-600 font-medium">Total Enquiries</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{stats.total}</p>
             </div>
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-              <FileText className="w-6 h-6 text-gray-700" />
+            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
+              <FileText className="w-6 h-6 text-slate-700" />
             </div>
           </div>
         </div>
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Pending</p>
+              <p className="text-sm text-slate-600 font-medium">Pending</p>
               <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.pending}</p>
             </div>
             <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
@@ -216,10 +216,10 @@ const EnquiryForm = () => {
             </div>
           </div>
         </div>
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Approved</p>
+              <p className="text-sm text-slate-600 font-medium">Approved</p>
               <p className="text-2xl font-bold text-green-600 mt-1">{stats.approved}</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
@@ -227,10 +227,10 @@ const EnquiryForm = () => {
             </div>
           </div>
         </div>
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Rejected</p>
+              <p className="text-sm text-slate-600 font-medium">Rejected</p>
               <p className="text-2xl font-bold text-red-600 mt-1">{stats.rejected}</p>
             </div>
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
@@ -241,16 +241,16 @@ const EnquiryForm = () => {
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
               type="text"
               placeholder="Search by name, company, email, or GST number..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
             />
           </div>
           <div className="w-full md:w-48">
@@ -270,15 +270,15 @@ const EnquiryForm = () => {
       </div>
 
       {/* Enquiries Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-            <span className="ml-3 text-gray-500">Loading enquiries...</span>
+            <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+            <span className="ml-3 text-slate-500">Loading enquiries...</span>
           </div>
         ) : (
           <Table>
-            <TableHeader>
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
               <TableRow>
                 <TableHead>Vendor Details</TableHead>
                 <TableHead>Company Info</TableHead>
@@ -291,7 +291,7 @@ const EnquiryForm = () => {
             <TableBody>
               {enquiries.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-gray-500">
+                  <TableCell colSpan={6} className="text-center py-12 text-slate-500">
                     No enquiries found
                   </TableCell>
                 </TableRow>
@@ -299,35 +299,35 @@ const EnquiryForm = () => {
                 enquiries.map((enquiry) => (
                   <TableRow key={enquiry.id}>
                     <TableCell>
-                      <div className="font-medium text-gray-900">{enquiry.name}</div>
+                      <div className="font-medium text-slate-900">{enquiry.name}</div>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        <div className="font-medium text-gray-900">{enquiry.companyName}</div>
-                        <div className="text-gray-500 text-xs mt-1">GST: {enquiry.gstNumber}</div>
+                        <div className="font-medium text-slate-900">{enquiry.companyName}</div>
+                        <div className="text-slate-500 text-xs mt-1">GST: {enquiry.gstNumber}</div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        <div className="flex items-center gap-1 text-gray-700">
+                        <div className="flex items-center gap-1 text-slate-700">
                           <Mail className="w-3 h-3" />
                           <span className="text-xs">{enquiry.email}</span>
                         </div>
-                        <div className="flex items-center gap-1 text-gray-700 mt-1">
+                        <div className="flex items-center gap-1 text-slate-700 mt-1">
                           <Phone className="w-3 h-3" />
                           <span className="text-xs">{enquiry.phone}</span>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-gray-600">{formatDate(enquiry.createdAt)}</div>
+                      <div className="text-sm text-slate-600">{formatDate(enquiry.createdAt)}</div>
                     </TableCell>
                     <TableCell>{getStatusBadge(enquiry.status)}</TableCell>
                     <TableCell>
                       {canView && (
                         <button
                           onClick={() => handleViewDetails(enquiry)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
                         >
                           <Eye className="w-4 h-4" />
                           View
@@ -356,17 +356,17 @@ const EnquiryForm = () => {
 
       {/* Detail Modal */}
       {showDetailModal && selectedEnquiry && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-slate-50">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Vendor Enquiry Details</h2>
-                <p className="text-sm text-gray-600 mt-1">Review and manage vendor application</p>
+                <h2 className="text-2xl font-bold text-slate-900">Vendor Enquiry Details</h2>
+                <p className="text-sm text-slate-600 mt-1">Review and manage vendor application</p>
               </div>
               <button
                 onClick={() => setShowDetailModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-slate-400 hover:text-slate-600 transition-colors"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -377,20 +377,20 @@ const EnquiryForm = () => {
               <div className="space-y-6">
                 {/* Status */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Current Status</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Current Status</label>
                   {getStatusBadge(selectedEnquiry.status)}
                 </div>
 
                 {/* Personal Info */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
-                    <div className="text-gray-900">{selectedEnquiry.name}</div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Full Name</label>
+                    <div className="text-slate-900">{selectedEnquiry.name}</div>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Company Name</label>
-                    <div className="flex items-center gap-2 text-gray-900">
-                      <Building2 className="w-4 h-4 text-gray-500" />
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Company Name</label>
+                    <div className="flex items-center gap-2 text-slate-900">
+                      <Building2 className="w-4 h-4 text-slate-500" />
                       {selectedEnquiry.companyName}
                     </div>
                   </div>
@@ -399,16 +399,16 @@ const EnquiryForm = () => {
                 {/* GST and Email */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">GST Number</label>
-                    <div className="flex items-center gap-2 text-gray-900">
-                      <FileText className="w-4 h-4 text-gray-500" />
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">GST Number</label>
+                    <div className="flex items-center gap-2 text-slate-900">
+                      <FileText className="w-4 h-4 text-slate-500" />
                       {selectedEnquiry.gstNumber}
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
-                    <div className="flex items-center gap-2 text-gray-900">
-                      <Mail className="w-4 h-4 text-gray-500" />
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Email Address</label>
+                    <div className="flex items-center gap-2 text-slate-900">
+                      <Mail className="w-4 h-4 text-slate-500" />
                       {selectedEnquiry.email}
                     </div>
                   </div>
@@ -417,14 +417,14 @@ const EnquiryForm = () => {
                 {/* Phone and Website */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
-                    <div className="flex items-center gap-2 text-gray-900">
-                      <Phone className="w-4 h-4 text-gray-500" />
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Phone Number</label>
+                    <div className="flex items-center gap-2 text-slate-900">
+                      <Phone className="w-4 h-4 text-slate-500" />
                       {selectedEnquiry.phone}
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Website</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Website</label>
                     {toExternalUrl(selectedEnquiry.website) ? (
                       <a
                         href={toExternalUrl(selectedEnquiry.website)!}
@@ -436,16 +436,16 @@ const EnquiryForm = () => {
                         {selectedEnquiry.website}
                       </a>
                     ) : (
-                      <div className="text-gray-500">Not provided</div>
+                      <div className="text-slate-500">Not provided</div>
                     )}
                   </div>
                 </div>
 
                 {/* Submission Date */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Submitted On</label>
-                  <div className="flex items-center gap-2 text-gray-900">
-                    <Calendar className="w-4 h-4 text-gray-500" />
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Submitted On</label>
+                  <div className="flex items-center gap-2 text-slate-900">
+                    <Calendar className="w-4 h-4 text-slate-500" />
                     {formatDate(selectedEnquiry.createdAt)}
                   </div>
                 </div>
@@ -463,7 +463,7 @@ const EnquiryForm = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between p-6 border-t border-slate-200 bg-slate-50">
               {/* Delete button on left */}
               {canDelete ? (
                 <button
@@ -484,7 +484,7 @@ const EnquiryForm = () => {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setShowDetailModal(false)}
-                  className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                  className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors font-medium"
                 >
                   Close
                 </button>

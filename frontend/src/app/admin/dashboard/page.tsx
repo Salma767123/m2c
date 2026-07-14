@@ -81,10 +81,10 @@ function DashboardContent() {
 
   if (!dashboardData) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center bg-white rounded-lg shadow-sm border border-gray-100 min-h-[400px]">
-        <h3 className="text-xl font-semibold text-gray-900 mb-2">Failed to load Dashboard data</h3>
-        <p className="text-gray-500 mb-4">Please try refreshing the page or logging in again.</p>
-        <button onClick={() => window.location.reload()} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Refresh Page</button>
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-white rounded-lg shadow-sm border border-slate-100 min-h-[400px]">
+        <h3 className="text-xl font-semibold text-slate-900 mb-2">Failed to load Dashboard data</h3>
+        <p className="text-slate-500 mb-4">Please try refreshing the page or logging in again.</p>
+        <button onClick={() => window.location.reload()} className="px-4 py-2 bg-brand-500 text-white rounded-md hover:bg-brand-600">Refresh Page</button>
       </div>
     )
   }
@@ -142,8 +142,8 @@ export default function DashboardPage() {
     <Suspense fallback={
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading dashboard...</p>
         </div>
       </div>
     }>

@@ -50,12 +50,12 @@ interface ProductDetail {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  PENDING: 'bg-gray-100 text-gray-800',
-  QC_APPROVED: 'bg-green-100 text-green-800',
-  UNDER_ADMIN_REVIEW: 'bg-yellow-100 text-yellow-800',
-  APPROVED: 'bg-green-100 text-green-800',
-  REJECTED: 'bg-red-100 text-red-800',
-  REINSPECTION: 'bg-amber-100 text-amber-800',
+  PENDING: 'bg-slate-50 text-slate-700 border border-slate-200',
+  QC_APPROVED: 'bg-green-50 text-green-700 border border-green-200',
+  UNDER_ADMIN_REVIEW: 'bg-yellow-50 text-yellow-700 border border-yellow-200',
+  APPROVED: 'bg-green-50 text-green-700 border border-green-200',
+  REJECTED: 'bg-red-50 text-red-700 border border-red-200',
+  REINSPECTION: 'bg-amber-50 text-amber-700 border border-amber-200',
 };
 
 export default function ProductInspectionReviewPage() {
@@ -127,14 +127,14 @@ export default function ProductInspectionReviewPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <IconLoader2 size={32} className="animate-spin text-gray-400" />
+        <IconLoader2 size={32} className="animate-spin text-slate-400" />
       </div>
     );
   }
 
   if (!product) {
     return (
-      <div className="text-center py-24 text-gray-500">
+      <div className="text-center py-24 text-slate-500">
         <p>Product not found</p>
         <Button variant="outline" className="mt-4" onClick={() => router.back()}>
           <IconArrowLeft size={16} className="mr-1" /> Go Back
@@ -154,11 +154,11 @@ export default function ProductInspectionReviewPage() {
           <IconArrowLeft size={16} />
         </Button>
         <div className="flex-1">
-          <h1 className="text-xl font-bold text-gray-900">Product Inspection Review</h1>
-          <p className="text-sm text-gray-500">{product.name} (SKU: {product.baseSku})</p>
+          <h1 className="text-xl font-bold text-slate-900">Product Inspection Review</h1>
+          <p className="text-sm text-slate-500">{product.name} (SKU: {product.baseSku})</p>
         </div>
         {canReview && (
-          <Button onClick={() => setShowReviewModal(true)} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={() => setShowReviewModal(true)} className="bg-brand-500 hover:bg-brand-600">
             Take Action
           </Button>
         )}
@@ -167,13 +167,13 @@ export default function ProductInspectionReviewPage() {
       {/* Status & Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border p-4">
-          <div className="text-xs text-gray-500 mb-2">Status</div>
+          <div className="text-xs text-slate-500 mb-2">Status</div>
           <div className="flex items-center gap-2">
-            <Badge className={STATUS_COLORS[product.approvalStatus] || 'bg-gray-100 text-gray-800'}>
+            <Badge className={STATUS_COLORS[product.approvalStatus] || 'bg-slate-50 text-slate-700 border border-slate-200'}>
               {product.approvalStatus}
             </Badge>
             {product.inspectionCycleNumber > 1 && (
-              <Badge className="bg-indigo-100 text-indigo-800">
+              <Badge className="bg-brand-50 text-brand-700 border border-brand-200">
                 Cycle #{product.inspectionCycleNumber}
               </Badge>
             )}
@@ -181,21 +181,21 @@ export default function ProductInspectionReviewPage() {
         </div>
 
         <div className="bg-white rounded-xl border p-4">
-          <div className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+          <div className="text-xs text-slate-500 mb-2 flex items-center gap-1">
             <IconUser size={12} /> QC Checker
           </div>
           {product.assignedQc ? (
             <>
               <div className="font-medium text-sm">{product.assignedQc.name}</div>
-              <div className="text-xs text-gray-500">{product.assignedQc.email}</div>
+              <div className="text-xs text-slate-500">{product.assignedQc.email}</div>
             </>
           ) : (
-            <div className="text-sm text-gray-400">Not assigned</div>
+            <div className="text-sm text-slate-400">Not assigned</div>
           )}
         </div>
 
         <div className="bg-white rounded-xl border p-4">
-          <div className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+          <div className="text-xs text-slate-500 mb-2 flex items-center gap-1">
             <IconPackage size={12} /> Product Info
           </div>
           <div className="text-sm">
@@ -238,7 +238,7 @@ export default function ProductInspectionReviewPage() {
       {/* Current Inspection Data */}
       {product.qcInspectionData && (
         <div className="bg-white rounded-xl border p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
             <IconFileText size={16} /> Current Inspection Data
           </h2>
           <QCInspectionDataView data={qcData} />
@@ -248,7 +248,7 @@ export default function ProductInspectionReviewPage() {
       {/* Previous Inspection Data (History) */}
       {product.previousInspectionData && product.previousInspectionData.length > 0 && (
         <div className="bg-white rounded-xl border p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
             <IconHistory size={16} /> Previous Inspection Data ({product.previousInspectionData.length} cycles)
           </h2>
           <div className="flex gap-2 mb-4 flex-wrap">
@@ -258,8 +258,8 @@ export default function ProductInspectionReviewPage() {
                 onClick={() => setActiveHistoryTab(activeHistoryTab === idx ? null : idx)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                   activeHistoryTab === idx
-                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-brand-400 bg-brand-50 text-brand-700'
+                    : 'border-slate-200 hover:border-slate-300'
                 }`}
               >
                 Cycle #{prev.cycleNumber}
@@ -268,8 +268,8 @@ export default function ProductInspectionReviewPage() {
             ))}
           </div>
           {activeHistoryTab !== null && product.previousInspectionData[activeHistoryTab] && (
-            <div className="border rounded-lg p-4 bg-gray-50">
-              <div className="flex items-center gap-2 mb-3 text-sm text-gray-600">
+            <div className="border rounded-lg p-4 bg-slate-50">
+              <div className="flex items-center gap-2 mb-3 text-sm text-slate-600">
                 <IconCalendar size={14} />
                 Reviewed: {product.previousInspectionData[activeHistoryTab].reviewedAt
                   ? new Date(product.previousInspectionData[activeHistoryTab].reviewedAt!).toLocaleString()
@@ -291,7 +291,7 @@ export default function ProductInspectionReviewPage() {
 
       {/* Audit Trail */}
       <div className="bg-white rounded-xl border p-5">
-        <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
           <IconClock size={16} /> Audit Trail
         </h2>
         <InspectionAuditTimeline logs={auditLogs} />
@@ -314,7 +314,7 @@ export default function ProductInspectionReviewPage() {
 // Reusable component to display QC inspection data
 function QCInspectionDataView({ data }: { data: Record<string, unknown> }) {
   if (!data || Object.keys(data).length === 0) {
-    return <p className="text-sm text-gray-400">No inspection data available</p>;
+    return <p className="text-sm text-slate-400">No inspection data available</p>;
   }
 
   // Extract key fields from the 8-step product inspection form
@@ -349,7 +349,7 @@ function QCInspectionDataView({ data }: { data: Record<string, unknown> }) {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
         {displayFields.map(({ key, label }) => (
           <div key={key}>
-            <span className="text-gray-500 text-xs">{label}</span>
+            <span className="text-slate-500 text-xs">{label}</span>
             <div className="font-medium">{String(data[key])}</div>
           </div>
         ))}
@@ -357,19 +357,19 @@ function QCInspectionDataView({ data }: { data: Record<string, unknown> }) {
 
       {photoKeys.length > 0 && (
         <div>
-          <h4 className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
+          <h4 className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1">
             <IconPhoto size={14} /> Photos
           </h4>
           {photoKeys.map(key => (
             <div key={key} className="mb-3">
-              <span className="text-xs text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+              <span className="text-xs text-slate-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
               <div className="flex gap-2 flex-wrap mt-1">
                 {(data[key] as string[]).filter(url => url.startsWith('http')).map((url, i) => (
                   <button key={i} type="button" onClick={() => openDoc(url, `${key} ${i + 1}`)}>
                     <img
                       src={url}
                       alt={`${key} ${i + 1}`}
-                      className="w-16 h-16 object-cover rounded border hover:ring-2 ring-blue-300 transition-all"
+                      className="w-16 h-16 object-cover rounded border hover:ring-2 ring-brand-400 transition-all"
                     />
                   </button>
                 ))}

@@ -165,8 +165,8 @@ export default function InvoiceSettings() {
         return (
             <div className="p-8 flex items-center justify-center min-h-96">
                 <div className="text-center">
-                    <RefreshCw className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-500">Loading invoice settings…</p>
+                    <RefreshCw className="h-8 w-8 animate-spin text-slate-400 mx-auto mb-3" />
+                    <p className="text-slate-500">Loading invoice settings…</p>
                 </div>
             </div>
         );
@@ -208,14 +208,14 @@ export default function InvoiceSettings() {
             {/* ── Header ── */}
             <div className="mb-6 flex items-center justify-between">
                 <div>
-                    <h2 className="text-xl font-bold text-gray-900">Invoice Settings</h2>
-                    <p className="text-gray-600 mt-1">Configure how invoice numbers are generated</p>
+                    <h2 className="text-xl font-bold text-slate-900">Invoice Settings</h2>
+                    <p className="text-slate-600 mt-1">Configure how invoice numbers are generated</p>
                 </div>
                 {hasPermission("settings:edit") && (
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                        className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-slate-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
                     >
                         {saving ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                         {saving ? "Saving…" : "Save Settings"}
@@ -227,13 +227,13 @@ export default function InvoiceSettings() {
             <Card>
                 <CardContent className="p-6">
                     <div className="mb-6">
-                        <h2 className="text-lg font-bold text-gray-900">Invoice Numbering</h2>
-                        <p className="text-sm text-gray-500">Configure prefix and sequence numbers</p>
+                        <h2 className="text-lg font-bold text-slate-900">Invoice Numbering</h2>
+                        <p className="text-sm text-slate-500">Configure prefix and sequence numbers</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
                                 Invoice Prefix *
                             </label>
                             <input
@@ -241,13 +241,13 @@ export default function InvoiceSettings() {
                                 name="invoicePrefix"
                                 value={settings.invoicePrefix}
                                 onChange={handleInput}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222]"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                             />
-                            <p className="text-xs text-gray-500 mt-1">e.g. INV, BILL, ORD</p>
+                            <p className="text-xs text-slate-500 mt-1">e.g. INV, BILL, ORD</p>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
                                 Sequence Length *
                             </label>
                             <input
@@ -257,14 +257,14 @@ export default function InvoiceSettings() {
                                 onChange={handleInput}
                                 min="3"
                                 max="10"
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222]"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                             />
-                            <p className="text-xs text-gray-500 mt-1">Digits in sequence — e.g. 4 = 0001</p>
+                            <p className="text-xs text-slate-500 mt-1">Digits in sequence — e.g. 4 = 0001</p>
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
                             Current Sequence Number
                         </label>
                         <input
@@ -272,9 +272,9 @@ export default function InvoiceSettings() {
                             name="currentSequence"
                             value={settings.currentSequence || ''}
                             onChange={handleInput}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-slate-50"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-slate-500 mt-1">
                             Auto-incremented with each invoice. Resets to 1 at financial year rollover.
                         </p>
                     </div>
@@ -287,8 +287,8 @@ export default function InvoiceSettings() {
                     {/* Header row */}
                     <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div>
-                            <h2 className="text-lg font-bold text-gray-900">Financial Year</h2>
-                            <p className="text-sm text-gray-500">Configure FY for invoice numbering</p>
+                            <h2 className="text-lg font-bold text-slate-900">Financial Year</h2>
+                            <p className="text-sm text-slate-500">Configure FY for invoice numbering</p>
                         </div>
                         {/* Auto toggle */}
                         <div className="flex items-center gap-3">
@@ -301,9 +301,9 @@ export default function InvoiceSettings() {
                                     onChange={handleInput}
                                     className="sr-only peer"
                                 />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-900" />
+                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-500" />
                             </label>
-                            <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                            <span className="text-sm font-medium text-slate-700 whitespace-nowrap">
                                 Auto Financial Year
                             </span>
                         </div>
@@ -330,25 +330,25 @@ export default function InvoiceSettings() {
                             {/* Month + Day picker */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
                                         FY Start Month *
                                     </label>
                                     <select
                                         value={fyMonth}
                                         onChange={e => setFyMonth(Number(e.target.value))}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] bg-white"
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 bg-white"
                                     >
                                         {MONTHS.map(m => (
                                             <option key={m.value} value={m.value}>{m.label}</option>
                                         ))}
                                     </select>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="text-xs text-slate-500 mt-1">
                                         Month the financial year begins (Indian FY = April)
                                     </p>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
                                         FY Start Day *
                                     </label>
                                     <input
@@ -357,9 +357,9 @@ export default function InvoiceSettings() {
                                         max={31}
                                         value={fyDay || ''}
                                         onChange={e => setFyDay(Number(e.target.value))}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222]"
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="text-xs text-slate-500 mt-1">
                                         Day of the month (1–31)
                                     </p>
                                 </div>
@@ -367,27 +367,27 @@ export default function InvoiceSettings() {
 
                             {/* Live calculated dates */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                                    <p className="text-xs text-gray-500 mb-1">Current FY Label</p>
-                                    <p className="text-lg font-bold text-gray-900 font-mono">{fyPreview.label}</p>
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <p className="text-xs text-slate-500 mb-1">Current FY Label</p>
+                                    <p className="text-lg font-bold text-slate-900 font-mono">{fyPreview.label}</p>
                                 </div>
-                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                                    <p className="text-xs text-gray-500 mb-1">FY Start</p>
-                                    <p className="text-sm font-semibold text-gray-900">
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <p className="text-xs text-slate-500 mb-1">FY Start</p>
+                                    <p className="text-sm font-semibold text-slate-900">
                                         <CalendarCheck className="inline h-4 w-4 mr-1 text-green-600" />
                                         {fmtDate(fyPreview.start)}
                                     </p>
                                 </div>
-                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                                    <p className="text-xs text-gray-500 mb-1">FY End (auto-calculated)</p>
-                                    <p className="text-sm font-semibold text-gray-900">
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <p className="text-xs text-slate-500 mb-1">FY End (auto-calculated)</p>
+                                    <p className="text-sm font-semibold text-slate-900">
                                         <CalendarClock className="inline h-4 w-4 mr-1 text-orange-500" />
                                         {fmtDate(fyPreview.end)}
                                     </p>
                                 </div>
                             </div>
 
-                            <p className="text-xs text-gray-400 italic">
+                            <p className="text-xs text-slate-400 italic">
                                 * FY end is always auto-calculated as the day before{" "}
                                 {MONTHS.find(m => m.value === fyMonth)?.label} {fyDay} of the following year.
                                 You cannot set it manually in auto mode.
@@ -412,7 +412,7 @@ export default function InvoiceSettings() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
                                         Financial Year Start *
                                     </label>
                                     <input
@@ -420,22 +420,22 @@ export default function InvoiceSettings() {
                                         name="financialYearStart"
                                         value={settings.financialYearStart ? settings.financialYearStart.split("T")[0] : ""}
                                         onChange={handleInput}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222]"
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">Start date of your financial year</p>
+                                    <p className="text-xs text-slate-500 mt-1">Start date of your financial year</p>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
                                         Financial Year End (auto-calculated)
                                     </label>
                                     <input
                                         type="date"
                                         value={settings.financialYearEnd ? settings.financialYearEnd.split("T")[0] : ""}
                                         disabled
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 opacity-70 cursor-not-allowed"
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-slate-100 opacity-70 cursor-not-allowed"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">One year after start date minus one day</p>
+                                    <p className="text-xs text-slate-500 mt-1">One year after start date minus one day</p>
                                 </div>
                             </div>
                         </div>
@@ -447,13 +447,13 @@ export default function InvoiceSettings() {
             <Card>
                 <CardContent className="p-6">
                     <div className="mb-6">
-                        <h2 className="text-lg font-bold text-gray-900">Invoice Format</h2>
-                        <p className="text-sm text-gray-500">Auto-generated invoice number format</p>
+                        <h2 className="text-lg font-bold text-slate-900">Invoice Format</h2>
+                        <p className="text-sm text-slate-500">Auto-generated invoice number format</p>
                     </div>
 
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
                                 Format Template
                             </label>
                             <input
@@ -461,23 +461,23 @@ export default function InvoiceSettings() {
                                 name="formatTemplate"
                                 value={settings.formatTemplate}
                                 onChange={handleInput}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222]"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                             />
-                            <p className="text-xs text-gray-500 mt-1">
-                                Variables: <code className="bg-gray-100 px-1 rounded">{"{PREFIX}"}</code> = Prefix &nbsp;
-                                <code className="bg-gray-100 px-1 rounded">{"{FY}"}</code> = Financial Year &nbsp;
-                                <code className="bg-gray-100 px-1 rounded">{"{SEQ}"}</code> = Sequence
+                            <p className="text-xs text-slate-500 mt-1">
+                                Variables: <code className="bg-slate-100 px-1 rounded">{"{PREFIX}"}</code> = Prefix &nbsp;
+                                <code className="bg-slate-100 px-1 rounded">{"{FY}"}</code> = Financial Year &nbsp;
+                                <code className="bg-slate-100 px-1 rounded">{"{SEQ}"}</code> = Sequence
                             </p>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
                                 Preview
                             </label>
-                            <div className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-green-400 font-mono font-bold tracking-widest text-lg">
+                            <div className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-green-400 font-mono font-bold tracking-widest text-lg">
                                 {generatePreview()}
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">This is how your next invoice number will look</p>
+                            <p className="text-xs text-slate-500 mt-1">This is how your next invoice number will look</p>
                         </div>
                     </div>
                 </CardContent>

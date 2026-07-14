@@ -26,27 +26,27 @@ export default function AnalyticsPage() {
 
   return (
     <PermissionGuard permission="analytics:view">
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-6 bg-slate-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <BarChart3 className="w-7 h-7 text-gray-900" />
-            <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
+            <BarChart3 className="w-7 h-7 text-slate-900" />
+            <h1 className="text-3xl font-bold text-slate-900">Analytics</h1>
           </div>
-          <p className="text-gray-600">Product heat map and website page performance tracking</p>
+          <p className="text-slate-600">Product heat map and website page performance tracking</p>
         </div>
 
         {/* Period Selector */}
-        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-1">
+        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1">
           {PERIODS.map((p) => (
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
               className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                 period === p.value
-                  ? 'bg-gray-900 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-brand-500 text-white'
+                  : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
               {p.label}
@@ -56,7 +56,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-1 mb-6 w-fit">
+      <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 mb-6 w-fit">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -65,8 +65,8 @@ export default function AnalyticsPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                 activeTab === tab.id
-                  ? 'bg-gray-900 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-brand-500 text-white'
+                  : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
               <Icon className="w-4 h-4" />

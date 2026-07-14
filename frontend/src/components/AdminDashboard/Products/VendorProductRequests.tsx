@@ -646,7 +646,7 @@ export default function VendorProductRequests() {
 
       {/* ══ Approval Modal ══════════════════════════════════════════════════ */}
       {showApprovalModal && approvingRequest && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-lg font-bold text-slate-900">Approve Product</h3>
@@ -699,7 +699,7 @@ export default function VendorProductRequests() {
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Original ₹ (MRP)</label>
                   <input id="base-original-inr" type="number" value={originalPriceINR || ''} onChange={(e) => setOriginalPriceINR(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 text-sm"
                     placeholder="MRP for .in domain" step="0.01" min="0" />
                   <p className="text-[10px] text-slate-400 mt-1">Strikethrough on .in</p>
                 </div>
@@ -713,7 +713,7 @@ export default function VendorProductRequests() {
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Visibility</label>
                   <select value={priceVisibility} onChange={(e) => setPriceVisibility(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 text-sm">
                     <option value="BOTH">Both (.in + .com)</option>
                     <option value="IN_ONLY">.in Only (India)</option>
                     <option value="COM_ONLY">.com Only (International)</option>
@@ -771,7 +771,7 @@ export default function VendorProductRequests() {
 
       {/* ══ Rejection Modal ══════════════════════════════════════════════════ */}
       {showRejectionModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-slate-900">Reject Product Request</h3>
@@ -816,7 +816,7 @@ export default function VendorProductRequests() {
         const isReassign = Boolean(currentQcId)
         const isUnchanged = isReassign && selectedQcChecker === currentQcId
         return (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-slate-900">{isReassign ? 'Reassign QC Checker' : 'Assign QC Checker'}</h3>

@@ -72,30 +72,30 @@ function getPageRange(current: number, total: number): Array<number | '…'> {
 const getStatusBadge = (status: string) => {
   switch (status) {
     case "ACTIVE":
-      return <Badge className="bg-green-100 text-green-800">Active</Badge>
+      return <Badge className="bg-green-50 text-green-700 border border-green-200">Active</Badge>
     case "INACTIVE":
-      return <Badge className="bg-gray-100 text-gray-800">Inactive</Badge>
+      return <Badge className="bg-slate-50 text-slate-700 border border-slate-200">Inactive</Badge>
     case "OUT_OF_STOCK":
-      return <Badge className="bg-red-100 text-red-800">Out of Stock</Badge>
+      return <Badge className="bg-red-50 text-red-700 border border-red-200">Out of Stock</Badge>
     default:
-      return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>
+      return <Badge className="bg-slate-50 text-slate-700 border border-slate-200">Unknown</Badge>
   }
 }
 
 const getApprovalBadge = (status: string) => {
   switch (status) {
     case "APPROVED":
-      return <Badge className="bg-green-100 text-green-800">Approved</Badge>
+      return <Badge className="bg-green-50 text-green-700 border border-green-200">Approved</Badge>
     case "QC_APPROVED":
-      return <Badge className="bg-blue-100 text-blue-800">QC Approved</Badge>
+      return <Badge className="bg-blue-50 text-blue-700 border border-blue-200">QC Approved</Badge>
     case "REINSPECTION":
-      return <Badge className="bg-orange-100 text-orange-800">Reinspection</Badge>
+      return <Badge className="bg-orange-50 text-orange-700 border border-orange-200">Reinspection</Badge>
     case "PENDING":
-      return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
+      return <Badge className="bg-yellow-50 text-yellow-700 border border-yellow-200">Pending</Badge>
     case "REJECTED":
-      return <Badge className="bg-red-100 text-red-800">Rejected</Badge>
+      return <Badge className="bg-red-50 text-red-700 border border-red-200">Rejected</Badge>
     default:
-      return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>
+      return <Badge className="bg-slate-50 text-slate-700 border border-slate-200">Unknown</Badge>
   }
 }
 
@@ -327,7 +327,7 @@ export default function ProductsTable() {
           <CardTitle>Products Management</CardTitle>
           {hasPermission('all_products:create') && (
             <Link href="/admin/dashboard/products/add">
-              <Button className="bg-[#313131] text-white hover:bg-[#222222]">
+              <Button className="bg-brand-500 text-white hover:bg-brand-600">
                 Add Product
               </Button>
             </Link>
@@ -344,10 +344,10 @@ export default function ProductsTable() {
                 placeholder="Search by product name, SKU, or description..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                className="w-full px-4 py-2 pl-10 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
               />
               <svg
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400"
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -362,7 +362,7 @@ export default function ProductsTable() {
               {searchInput && (
                 <button
                   onClick={() => setSearchInput('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 >
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -412,8 +412,8 @@ export default function ProductsTable() {
 
       <CardContent>
         <Table>
-          <TableHeader className="bg-[#313131] text-white">
-            <TableRow>
+          <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
+            <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
               <TableHead>Product</TableHead>
               <TableHead>Vendor</TableHead>
               <TableHead>Category</TableHead>
@@ -430,14 +430,14 @@ export default function ProductsTable() {
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-8">
                   <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-700"></div>
-                    <span className="ml-3 text-gray-500">Loading products...</span>
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-700"></div>
+                    <span className="ml-3 text-slate-500">Loading products...</span>
                   </div>
                 </TableCell>
               </TableRow>
             ) : products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={9} className="text-center py-8 text-slate-500">
                   No products found
                 </TableCell>
               </TableRow>
@@ -445,7 +445,7 @@ export default function ProductsTable() {
               <TableRow key={product.id}>
                 <TableCell>
                   <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
                       {product.images?.[0]?.url ? (
                         <img
                           src={product.images[0].url}
@@ -453,29 +453,29 @@ export default function ProductsTable() {
                           className="w-full h-full object-cover rounded-lg"
                         />
                       ) : (
-                        <span className="text-gray-400 text-xs">No Image</span>
+                        <span className="text-slate-400 text-xs">No Image</span>
                       )}
                     </div>
                     <div>
-                      <div className="font-medium text-gray-900">{product.name}</div>
-                      <div className="text-sm text-gray-500">{product.vendor.companyName}</div>
+                      <div className="font-medium text-slate-900">{product.name}</div>
+                      <div className="text-sm text-slate-500">{product.vendor.companyName}</div>
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div>
-                    <div className="font-medium text-gray-900">{product.vendor.companyName}</div>
-                    <div className="text-sm text-gray-500">{product.vendor.ownerName}</div>
+                    <div className="font-medium text-slate-900">{product.vendor.companyName}</div>
+                    <div className="text-sm text-slate-500">{product.vendor.ownerName}</div>
                   </div>
                 </TableCell>
                 <TableCell>{product.category}</TableCell>
                 <TableCell>
                   <div>
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-slate-900">
                       Vendor: {formatPrice(product.basePrice)}
                     </div>
                     {product.originalPrice && (
-                      <div className="text-sm text-gray-500 line-through">
+                      <div className="text-sm text-slate-500 line-through">
                         Original: {formatPrice(product.originalPrice)}
                       </div>
                     )}
@@ -494,7 +494,7 @@ export default function ProductsTable() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <span className={product.totalStock === 0 ? "text-red-600" : "text-gray-900"}>
+                  <span className={product.totalStock === 0 ? "text-red-600" : "text-slate-900"}>
                     {product.totalStock}
                   </span>
                 </TableCell>
@@ -514,7 +514,7 @@ export default function ProductsTable() {
                   <div className="flex items-center space-x-2">
                     {hasPermission('all_products:view') && (
                       <Link href={`/admin/dashboard/products/vendor-requests/view/${product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}--${product.id}`}>
-                        <Button variant="ghost" size="sm" className="hover:bg-gray-50">
+                        <Button variant="ghost" size="sm" className="hover:bg-slate-50">
                           <Eye className="h-4 w-4" />
                         </Button>
                       </Link>
@@ -546,7 +546,7 @@ export default function ProductsTable() {
 
                     {hasPermission('all_products:edit') && (
                       <Link href={`/admin/dashboard/products/edit/${product.id}`}>
-                        <Button variant="ghost" size="sm" className="hover:bg-gray-50">
+                        <Button variant="ghost" size="sm" className="hover:bg-slate-50">
                           <Edit className="h-4 w-4" />
                         </Button>
                       </Link>
@@ -573,7 +573,7 @@ export default function ProductsTable() {
           <div className="flex items-center justify-end gap-3 text-sm mt-4">
             <div className="flex items-center gap-1">
               <button onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))} disabled={pagination.currentPage === 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-              {getPageRange(pagination.currentPage, pagination.totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setPagination(prev => ({ ...prev, currentPage: p as number }))} aria-current={p === pagination.currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === pagination.currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+              {getPageRange(pagination.currentPage, pagination.totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setPagination(prev => ({ ...prev, currentPage: p as number }))} aria-current={p === pagination.currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === pagination.currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
               <button onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))} disabled={pagination.currentPage === pagination.totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
             </div>
           </div>
@@ -582,47 +582,47 @@ export default function ProductsTable() {
 
       {/* Approval Modal */}
       {showApprovalModal && approvingProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Approve Product</h3>
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700">Product: {approvingProduct.name}</p>
-              <p className="text-sm text-gray-600">Vendor: {approvingProduct.vendor.companyName}</p>
-              <p className="text-sm text-gray-500">Vendor Base Price: ₹{approvingProduct.basePrice}</p>
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Approve Product</h3>
+            <div className="mb-4 p-3 bg-slate-50 rounded-lg">
+              <p className="text-sm font-medium text-slate-700">Product: {approvingProduct.name}</p>
+              <p className="text-sm text-slate-600">Vendor: {approvingProduct.vendor.companyName}</p>
+              <p className="text-sm text-slate-500">Vendor Base Price: ₹{approvingProduct.basePrice}</p>
             </div>
 
             {/* Base Pricing - always shown */}
             <div className="mb-4 grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Admin Selling Price (₹) *
                 </label>
-                <div className="mb-2 text-sm text-gray-600">
+                <div className="mb-2 text-sm text-slate-600">
                   Vendor Base Price: ₹{approvingProduct.basePrice}
                 </div>
                 <input
                   type="number"
                   value={adminPrice || ''}
                   onChange={(e) => setAdminPrice(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                   placeholder="Enter selling price"
                   step="0.01"
                   min="0"
                 />
-                <p className="text-xs text-gray-500 mt-1">Final selling price customers see.</p>
+                <p className="text-xs text-slate-500 mt-1">Final selling price customers see.</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Original Price (₹) *
                 </label>
-                <div className="mb-2 text-sm text-gray-600">
+                <div className="mb-2 text-sm text-slate-600">
                   For showing strikethrough discount
                 </div>
                 <input
                   type="number"
                   value={originalPrice || ''}
                   onChange={(e) => setOriginalPrice(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                   placeholder="Enter original price"
                   step="0.01"
                   min="0"
@@ -638,25 +638,25 @@ export default function ProductsTable() {
             {/* Variant: per-variant admin prices */}
             {approvingProduct.variants && approvingProduct.variants.length > 0 && (
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-3">
+                <label className="block text-sm font-medium text-slate-700 mb-3">
                   Set Prices for Each Variant
                 </label>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {approvingProduct.variants.map((variant) => (
-                    <div key={variant.id} className="p-3 border border-gray-200 rounded-lg bg-white">
+                    <div key={variant.id} className="p-3 border border-slate-200 rounded-lg bg-white">
                       <div className="flex items-center justify-between mb-2">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-medium text-slate-900">
                             {variant.size} - {variant.color}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-slate-500">
                             Vendor Price: ₹{variant.price} | Stock: {variant.stock}
                           </p>
                         </div>
                       </div>
                       <div className="mt-2 grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">
                             Admin Price (₹) *
                           </label>
                           <input
@@ -666,14 +666,14 @@ export default function ProductsTable() {
                               ...prev,
                               [variant.id]: e.target.value
                             }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent text-sm"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm"
                             placeholder="Selling price"
                             step="0.01"
                             min="0"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">
                             Original Price (₹) *
                           </label>
                           <input
@@ -683,7 +683,7 @@ export default function ProductsTable() {
                               ...prev,
                               [variant.id]: e.target.value
                             }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent text-sm"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm"
                             placeholder="Original price"
                             step="0.01"
                             min="0"
@@ -698,7 +698,7 @@ export default function ProductsTable() {
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-slate-500 mt-2">
                   Set admin selling price and original price for each variant. Discount % is auto-calculated.
                 </p>
               </div>

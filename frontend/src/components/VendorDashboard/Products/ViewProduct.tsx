@@ -372,8 +372,8 @@ export default function ViewProduct({ productId }: ViewProductProps) {
                     {product.baseSku && <InfoField label="SKU" value={product.baseSku} />}
                     <InfoField label="Price" value={`₹${product.basePrice}`} />
                     <InfoField label="Stock Quantity" value={`${product.inventory?.baseStock ?? 0}`} />
-                    {((product as any).lowStockThreshold ?? product.inventory?.lowStockThreshold) != null && (
-                      <InfoField label="Low Stock Alert" value={`${(product as any).lowStockThreshold ?? product.inventory?.lowStockThreshold}`} />
+                    {((product as any).lowStockThreshold ?? (product.inventory as any)?.lowStockThreshold) != null && (
+                      <InfoField label="Low Stock Alert" value={`${(product as any).lowStockThreshold ?? (product.inventory as any)?.lowStockThreshold}`} />
                     )}
                   </div>
                 </div>
@@ -443,8 +443,8 @@ export default function ViewProduct({ productId }: ViewProductProps) {
               <InfoField label="Total Stock" value={`${product.totalStock ?? 0} units`} />
               {product.hasVariants ? <InfoField label="Base Unit Stock" value={`${product.inventory?.baseStock ?? 0} units`} /> : null}
               {product.hasVariants && product.variants ? <InfoField label="Variants Stock" value={`${product.variants.reduce((s, v) => s + (v.stock || 0), 0)} units`} /> : null}
-              {((product as any).lowStockThreshold ?? product.inventory?.lowStockThreshold) != null && (
-                <InfoField label="Low Stock Threshold" value={`${(product as any).lowStockThreshold ?? product.inventory?.lowStockThreshold}`} />
+              {((product as any).lowStockThreshold ?? (product.inventory as any)?.lowStockThreshold) != null && (
+                <InfoField label="Low Stock Threshold" value={`${(product as any).lowStockThreshold ?? (product.inventory as any)?.lowStockThreshold}`} />
               )}
             </div>
           </SpecSection>

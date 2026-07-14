@@ -210,26 +210,26 @@ export default function QCReports() {
         switch (status) {
             case 'PASSED':
             case 'APPROVED':
-                return <Badge className="bg-green-100 text-green-800">Passed / Approved</Badge>
+                return <Badge className="bg-green-50 text-green-700 border border-green-200">Passed / Approved</Badge>
             case 'QC_APPROVED':
-                return <Badge className="bg-emerald-100 text-emerald-800">QC Approved</Badge>
+                return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200">QC Approved</Badge>
             case 'REINSPECTION':
             case 'RE_INSPECTION':
-                return <Badge className="bg-amber-100 text-amber-800">Re-Inspection</Badge>
+                return <Badge className="bg-amber-50 text-amber-700 border border-amber-200">Re-Inspection</Badge>
             case 'FAILED':
             case 'REJECTED':
-                return <Badge className="bg-red-100 text-red-800">Failed / Rejected</Badge>
+                return <Badge className="bg-red-50 text-red-700 border border-red-200">Failed / Rejected</Badge>
             case 'PENDING':
             case 'IN_PROGRESS':
-                return <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>
+                return <Badge className="bg-brand-50 text-brand-700 border border-brand-200">In Progress</Badge>
             case 'SUBMITTED':
-                return <Badge className="bg-blue-100 text-blue-800">Submitted for Review</Badge>
+                return <Badge className="bg-brand-50 text-brand-700 border border-brand-200">Submitted for Review</Badge>
             case 'UNDER_ADMIN_REVIEW':
-                return <Badge className="bg-yellow-100 text-yellow-800">Under Admin Review</Badge>
+                return <Badge className="bg-yellow-50 text-yellow-700 border border-yellow-200">Under Admin Review</Badge>
             case 'COMPLETED':
-                return <Badge className="bg-green-100 text-green-800">Completed</Badge>
+                return <Badge className="bg-green-50 text-green-700 border border-green-200">Completed</Badge>
             default:
-                return <Badge className="bg-gray-100 text-gray-800">{status}</Badge>
+                return <Badge className="bg-slate-50 text-slate-700 border border-slate-200">{status}</Badge>
         }
     }
 
@@ -259,32 +259,32 @@ export default function QCReports() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">QC Reports</h1>
-                    <p className="text-gray-500 text-sm mt-1">Review Factory and Product quality inspection reports</p>
+                    <h1 className="text-2xl font-bold text-slate-900">QC Reports</h1>
+                    <p className="text-slate-500 text-sm mt-1">Review Factory and Product quality inspection reports</p>
                 </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-4 border-b border-gray-200">
+            <div className="flex gap-4 border-b border-slate-200">
                 <button
                     onClick={() => setActiveTab('factory')}
-                    className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'factory' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'factory' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     <div className="flex items-center gap-2">
                         <Factory className="h-4 w-4" />
                         Factory Inspections
                     </div>
-                    {activeTab === 'factory' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />}
+                    {activeTab === 'factory' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />}
                 </button>
                 <button
                     onClick={() => setActiveTab('product')}
-                    className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'product' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'product' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     <div className="flex items-center gap-2">
                         <PackageCheck className="h-4 w-4" />
                         Product Inspections
                     </div>
-                    {activeTab === 'product' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />}
+                    {activeTab === 'product' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />}
                 </button>
             </div>
 
@@ -300,7 +300,7 @@ export default function QCReports() {
                                 placeholder="Search by vendor, client, or checker..."
                                 value={factorySearchInput}
                                 onChange={(e) => setFactorySearchInput(e.target.value)}
-                                className="w-full pl-11 pr-10 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent transition-all bg-white shadow-sm text-sm"
+                                className="w-full pl-11 pr-10 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent transition-all bg-white shadow-sm text-sm"
                             />
                             {factorySearchInput && (
                                 <button
@@ -341,7 +341,7 @@ export default function QCReports() {
                         {factoryHasFilters && (
                             <button
                                 onClick={clearFactoryFilters}
-                                className="text-[#222222] hover:text-[#333333] font-medium underline underline-offset-2"
+                                className="text-brand-600 hover:text-brand-700 font-medium underline underline-offset-2"
                             >
                                 Clear filters
                             </button>
@@ -351,7 +351,7 @@ export default function QCReports() {
                     <Card>
                         <CardContent className="p-0" style={{ minHeight: TABLE_MIN_HEIGHT_PX }}>
                             <Table>
-                                <TableHeader className="bg-[#313131] text-white">
+                                <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                                     <TableRow>
                                         <TableHead>Vendor</TableHead>
                                         <TableHead>Checker</TableHead>
@@ -365,12 +365,12 @@ export default function QCReports() {
                                     {loadingFactory ? (
                                         Array.from({ length: 5 }).map((_, i) => (
                                             <TableRow key={i} className="animate-pulse">
-                                                <TableCell><div className="space-y-2"><div className="h-4 bg-gray-200 rounded w-32" /><div className="h-3 bg-gray-100 rounded w-24" /></div></TableCell>
-                                                <TableCell><div className="space-y-2"><div className="h-4 bg-gray-200 rounded w-32" /><div className="h-3 bg-gray-100 rounded w-24" /></div></TableCell>
-                                                <TableCell><div className="h-6 bg-gray-200 rounded-full w-24" /></TableCell>
-                                                <TableCell><div className="h-6 bg-gray-200 rounded-full w-20" /></TableCell>
-                                                <TableCell><div className="h-4 bg-gray-200 rounded w-24" /></TableCell>
-                                                <TableCell><div className="h-8 bg-gray-200 rounded-lg w-28" /></TableCell>
+                                                <TableCell><div className="space-y-2"><div className="h-4 bg-slate-200 rounded w-32" /><div className="h-3 bg-slate-100 rounded w-24" /></div></TableCell>
+                                                <TableCell><div className="space-y-2"><div className="h-4 bg-slate-200 rounded w-32" /><div className="h-3 bg-slate-100 rounded w-24" /></div></TableCell>
+                                                <TableCell><div className="h-6 bg-slate-200 rounded-full w-24" /></TableCell>
+                                                <TableCell><div className="h-6 bg-slate-200 rounded-full w-20" /></TableCell>
+                                                <TableCell><div className="h-4 bg-slate-200 rounded w-24" /></TableCell>
+                                                <TableCell><div className="h-8 bg-slate-200 rounded-lg w-28" /></TableCell>
                                             </TableRow>
                                         ))
                                     ) : factoryError ? (
@@ -390,7 +390,7 @@ export default function QCReports() {
                                         </TableRow>
                                     ) : factoryReports.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                                            <TableCell colSpan={6} className="text-center py-8 text-slate-500">
                                                 {factoryHasFilters ? 'No reports match the current filters.' : 'No factory inspection reports found.'}
                                             </TableCell>
                                         </TableRow>
@@ -398,22 +398,22 @@ export default function QCReports() {
                                         factoryReports.map((report) => (
                                             <TableRow key={report.id}>
                                                 <TableCell>
-                                                    <div className="font-medium text-gray-900">{report.vendor?.companyName || 'Unknown Vendor'}</div>
-                                                    <div className="text-xs text-gray-500">{report.vendor?.email}</div>
+                                                    <div className="font-medium text-slate-900">{report.vendor?.companyName || 'Unknown Vendor'}</div>
+                                                    <div className="text-xs text-slate-500">{report.vendor?.email}</div>
                                                 </TableCell>
                                                 <TableCell>
                                                     {report.checker ? (
                                                         <>
-                                                            <div className="font-medium text-gray-900">{formatCheckerName(report.checker)}</div>
-                                                            <div className="text-xs text-gray-500">{report.checker.email}</div>
+                                                            <div className="font-medium text-slate-900">{formatCheckerName(report.checker)}</div>
+                                                            <div className="text-xs text-slate-500">{report.checker.email}</div>
                                                         </>
                                                     ) : (
-                                                        <span className="text-gray-400 text-sm">Unassigned</span>
+                                                        <span className="text-slate-400 text-sm">Unassigned</span>
                                                     )}
                                                 </TableCell>
                                                 <TableCell>{getStatusBadge(report.status)}</TableCell>
-                                                <TableCell>{report.result ? getStatusBadge(report.result) : <span className="text-xs text-gray-400">—</span>}</TableCell>
-                                                <TableCell className="text-sm text-gray-500">
+                                                <TableCell>{report.result ? getStatusBadge(report.result) : <span className="text-xs text-slate-400">—</span>}</TableCell>
+                                                <TableCell className="text-sm text-slate-500">
                                                     {formatDate(report.completedAt || report.createdAt)}
                                                 </TableCell>
                                                 <TableCell>
@@ -428,7 +428,7 @@ export default function QCReports() {
                                                         </button>
                                                         <button
                                                             onClick={() => router.push(`/admin/dashboard/qc-reports/${report.id}?type=factory`)}
-                                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors"
                                                         >
                                                             <Eye className="w-3.5 h-3.5" />
                                                             View Details
@@ -465,7 +465,7 @@ export default function QCReports() {
                                                 key={`f-${p}`}
                                                 onClick={() => setFactoryPage(p as number)}
                                                 aria-current={p === factoryPagination.page ? 'page' : undefined}
-                                                className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === factoryPagination.page ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                                                className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === factoryPagination.page ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
                                             >
                                                 {p}
                                             </button>
@@ -498,7 +498,7 @@ export default function QCReports() {
                                 placeholder="Search by product, SKU, category, or vendor..."
                                 value={productSearchInput}
                                 onChange={(e) => setProductSearchInput(e.target.value)}
-                                className="w-full pl-11 pr-10 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent transition-all bg-white shadow-sm text-sm"
+                                className="w-full pl-11 pr-10 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent transition-all bg-white shadow-sm text-sm"
                             />
                             {productSearchInput && (
                                 <button
@@ -539,7 +539,7 @@ export default function QCReports() {
                         {productHasFilters && (
                             <button
                                 onClick={clearProductFilters}
-                                className="text-[#222222] hover:text-[#333333] font-medium underline underline-offset-2"
+                                className="text-brand-600 hover:text-brand-700 font-medium underline underline-offset-2"
                             >
                                 Clear filters
                             </button>
@@ -549,7 +549,7 @@ export default function QCReports() {
                     <Card>
                         <CardContent className="p-0" style={{ minHeight: TABLE_MIN_HEIGHT_PX }}>
                             <Table>
-                                <TableHeader className="bg-[#313131] text-white">
+                                <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                                     <TableRow>
                                         <TableHead>Product</TableHead>
                                         <TableHead>Vendor</TableHead>
@@ -564,13 +564,13 @@ export default function QCReports() {
                                     {loadingProduct ? (
                                         Array.from({ length: 5 }).map((_, i) => (
                                             <TableRow key={i} className="animate-pulse">
-                                                <TableCell><div className="space-y-2"><div className="h-4 bg-gray-200 rounded w-32" /><div className="h-3 bg-gray-100 rounded w-24" /></div></TableCell>
-                                                <TableCell><div className="h-4 bg-gray-200 rounded w-32" /></TableCell>
-                                                <TableCell><div className="h-4 bg-gray-200 rounded w-20" /></TableCell>
-                                                <TableCell><div className="h-6 bg-gray-200 rounded-full w-24" /></TableCell>
-                                                <TableCell><div className="h-4 bg-gray-200 rounded w-20" /></TableCell>
-                                                <TableCell><div className="h-4 bg-gray-200 rounded w-24" /></TableCell>
-                                                <TableCell><div className="h-8 bg-gray-200 rounded-lg w-28" /></TableCell>
+                                                <TableCell><div className="space-y-2"><div className="h-4 bg-slate-200 rounded w-32" /><div className="h-3 bg-slate-100 rounded w-24" /></div></TableCell>
+                                                <TableCell><div className="h-4 bg-slate-200 rounded w-32" /></TableCell>
+                                                <TableCell><div className="h-4 bg-slate-200 rounded w-20" /></TableCell>
+                                                <TableCell><div className="h-6 bg-slate-200 rounded-full w-24" /></TableCell>
+                                                <TableCell><div className="h-4 bg-slate-200 rounded w-20" /></TableCell>
+                                                <TableCell><div className="h-4 bg-slate-200 rounded w-24" /></TableCell>
+                                                <TableCell><div className="h-8 bg-slate-200 rounded-lg w-28" /></TableCell>
                                             </TableRow>
                                         ))
                                     ) : productError ? (
@@ -590,7 +590,7 @@ export default function QCReports() {
                                         </TableRow>
                                     ) : productReports.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                                            <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                                                 {productHasFilters ? 'No reports match the current filters.' : 'No product inspection reports found.'}
                                             </TableCell>
                                         </TableRow>
@@ -600,14 +600,14 @@ export default function QCReports() {
                                             return (
                                                 <TableRow key={product.id}>
                                                     <TableCell>
-                                                        <div className="font-medium text-gray-900">{product.name}</div>
-                                                        <div className="text-xs text-gray-500">SKU: {product.baseSku}</div>
+                                                        <div className="font-medium text-slate-900">{product.name}</div>
+                                                        <div className="text-xs text-slate-500">SKU: {product.baseSku}</div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <div className="font-medium text-gray-900">{product.vendor?.companyName || 'Unknown Vendor'}</div>
+                                                        <div className="font-medium text-slate-900">{product.vendor?.companyName || 'Unknown Vendor'}</div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <span className="text-sm text-gray-900">{product.category}</span>
+                                                        <span className="text-sm text-slate-900">{product.category}</span>
                                                     </TableCell>
                                                     <TableCell>{getStatusBadge(product.approvalStatus)}</TableCell>
                                                     <TableCell>
@@ -620,7 +620,7 @@ export default function QCReports() {
                                                             </div>
                                                         )}
                                                     </TableCell>
-                                                    <TableCell className="text-sm text-gray-500">
+                                                    <TableCell className="text-sm text-slate-500">
                                                         {formatDate(product.updatedAt)}
                                                     </TableCell>
                                                     <TableCell>
@@ -635,7 +635,7 @@ export default function QCReports() {
                                                             </button>
                                                             <button
                                                                 onClick={() => router.push(`/admin/dashboard/qc-reports/${product.id}?type=product`)}
-                                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors"
                                                             >
                                                                 <Eye className="w-3.5 h-3.5" />
                                                                 View Details
@@ -673,7 +673,7 @@ export default function QCReports() {
                                                 key={`p-${p}`}
                                                 onClick={() => setProductPage(p as number)}
                                                 aria-current={p === productPagination.page ? 'page' : undefined}
-                                                className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === productPagination.page ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                                                className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === productPagination.page ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
                                             >
                                                 {p}
                                             </button>

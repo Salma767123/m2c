@@ -125,14 +125,14 @@ export default function FactoryInspectionReviewPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <IconLoader2 size={32} className="animate-spin text-gray-400" />
+        <IconLoader2 size={32} className="animate-spin text-slate-400" />
       </div>
     );
   }
 
   if (!inspection) {
     return (
-      <div className="text-center py-24 text-gray-500">
+      <div className="text-center py-24 text-slate-500">
         <p>Inspection not found</p>
         <Button variant="outline" className="mt-4" onClick={() => router.back()}>
           <IconArrowLeft size={16} className="mr-1" /> Go Back
@@ -152,11 +152,11 @@ export default function FactoryInspectionReviewPage() {
           <IconArrowLeft size={16} />
         </Button>
         <div className="flex-1">
-          <h1 className="text-xl font-bold text-gray-900">Factory Inspection Review</h1>
-          <p className="text-sm text-gray-500">{inspection.vendor.companyName}</p>
+          <h1 className="text-xl font-bold text-slate-900">Factory Inspection Review</h1>
+          <p className="text-sm text-slate-500">{inspection.vendor.companyName}</p>
         </div>
         {canReview && (
-          <Button onClick={() => setShowReviewModal(true)} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={() => setShowReviewModal(true)} className="bg-brand-500 hover:bg-brand-600">
             Take Action
           </Button>
         )}
@@ -165,39 +165,39 @@ export default function FactoryInspectionReviewPage() {
       {/* Status & Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border p-4">
-          <div className="text-xs text-gray-500 mb-2">Status</div>
+          <div className="text-xs text-slate-500 mb-2">Status</div>
           <div className="flex items-center gap-2">
-            {inspection.status === 'SUBMITTED' && <Badge className="bg-blue-100 text-blue-800">Submitted</Badge>}
-            {inspection.status === 'UNDER_ADMIN_REVIEW' && <Badge className="bg-yellow-100 text-yellow-800">Under Review</Badge>}
-            {inspection.status === 'REJECTED' && <Badge className="bg-red-100 text-red-800">Rejected</Badge>}
-            {inspection.status === 'COMPLETED' && <Badge className="bg-green-100 text-green-800">Completed</Badge>}
-            {inspection.status === 'REINSPECTION' && <Badge className="bg-amber-100 text-amber-800">Re-Inspection</Badge>}
+            {inspection.status === 'SUBMITTED' && <Badge className="bg-blue-50 text-blue-700 border border-blue-200">Submitted</Badge>}
+            {inspection.status === 'UNDER_ADMIN_REVIEW' && <Badge className="bg-yellow-50 text-yellow-700 border border-yellow-200">Under Review</Badge>}
+            {inspection.status === 'REJECTED' && <Badge className="bg-red-50 text-red-700 border border-red-200">Rejected</Badge>}
+            {inspection.status === 'COMPLETED' && <Badge className="bg-green-50 text-green-700 border border-green-200">Completed</Badge>}
+            {inspection.status === 'REINSPECTION' && <Badge className="bg-amber-50 text-amber-700 border border-amber-200">Re-Inspection</Badge>}
             {!['SUBMITTED', 'UNDER_ADMIN_REVIEW', 'REJECTED', 'COMPLETED', 'REINSPECTION'].includes(inspection.status) && (
-              <Badge className="bg-gray-100 text-gray-800">{inspection.status}</Badge>
+              <Badge className="bg-slate-50 text-slate-700 border border-slate-200">{inspection.status}</Badge>
             )}
             {inspection.result && (
-              <Badge className={inspection.result === 'PASSED' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+              <Badge className={inspection.result === 'PASSED' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}>
                 {inspection.result}
               </Badge>
             )}
           </div>
           {inspection.cycleNumber > 1 && (
-            <Badge className="mt-2 bg-indigo-100 text-indigo-800">
+            <Badge className="mt-2 bg-brand-50 text-brand-700 border border-brand-200">
               Re-Inspection Cycle #{inspection.cycleNumber}
             </Badge>
           )}
         </div>
 
         <div className="bg-white rounded-xl border p-4">
-          <div className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+          <div className="text-xs text-slate-500 mb-2 flex items-center gap-1">
             <IconUser size={12} /> QC Checker
           </div>
           <div className="font-medium text-sm">{inspection.checker.name}</div>
-          <div className="text-xs text-gray-500">{inspection.checker.email}</div>
+          <div className="text-xs text-slate-500">{inspection.checker.email}</div>
         </div>
 
         <div className="bg-white rounded-xl border p-4">
-          <div className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+          <div className="text-xs text-slate-500 mb-2 flex items-center gap-1">
             <IconCalendar size={12} /> Timeline
           </div>
           <div className="space-y-1 text-xs">
@@ -210,24 +210,24 @@ export default function FactoryInspectionReviewPage() {
 
       {/* Vendor Info */}
       <div className="bg-white rounded-xl border p-5">
-        <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
           <IconBuilding size={16} /> Vendor Information
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
-            <span className="text-gray-500">Company</span>
+            <span className="text-slate-500">Company</span>
             <div className="font-medium">{inspection.vendor.companyName}</div>
           </div>
           <div>
-            <span className="text-gray-500">Owner</span>
+            <span className="text-slate-500">Owner</span>
             <div className="font-medium">{inspection.vendor.ownerName}</div>
           </div>
           <div>
-            <span className="text-gray-500">Email</span>
+            <span className="text-slate-500">Email</span>
             <div className="font-medium">{inspection.vendor.email}</div>
           </div>
           <div>
-            <span className="text-gray-500">Location</span>
+            <span className="text-slate-500">Location</span>
             <div className="font-medium">{inspection.vendor.businessCity}, {inspection.vendor.businessState}</div>
           </div>
         </div>
@@ -270,31 +270,31 @@ export default function FactoryInspectionReviewPage() {
 
       {/* Inspection Form Data Summary */}
       <div className="bg-white rounded-xl border p-5">
-        <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
           <IconFileText size={16} /> Inspection Data
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           {formData.factoryName && (
-            <div><span className="text-gray-500">Factory Name:</span> <span className="font-medium">{String(formData.factoryName)}</span></div>
+            <div><span className="text-slate-500">Factory Name:</span> <span className="font-medium">{String(formData.factoryName)}</span></div>
           )}
           {formData.contactPersonName && (
-            <div><span className="text-gray-500">Contact Person:</span> <span className="font-medium">{String(formData.contactPersonName)}</span></div>
+            <div><span className="text-slate-500">Contact Person:</span> <span className="font-medium">{String(formData.contactPersonName)}</span></div>
           )}
           {formData.businessRegistrationNumber && (
-            <div><span className="text-gray-500">Registration #:</span> <span className="font-medium">{String(formData.businessRegistrationNumber)}</span></div>
+            <div><span className="text-slate-500">Registration #:</span> <span className="font-medium">{String(formData.businessRegistrationNumber)}</span></div>
           )}
           {formData.monthlyProductionCapacity && (
-            <div><span className="text-gray-500">Monthly Capacity:</span> <span className="font-medium">{String(formData.monthlyProductionCapacity)}</span></div>
+            <div><span className="text-slate-500">Monthly Capacity:</span> <span className="font-medium">{String(formData.monthlyProductionCapacity)}</span></div>
           )}
           {formData.inspectionDate && (
-            <div><span className="text-gray-500">Inspection Date:</span> <span className="font-medium">{String(formData.inspectionDate)}</span></div>
+            <div><span className="text-slate-500">Inspection Date:</span> <span className="font-medium">{String(formData.inspectionDate)}</span></div>
           )}
           {formData.inspectionStatus && (
-            <div><span className="text-gray-500">Inspector Decision:</span> <span className="font-medium">{String(formData.inspectionStatus)}</span></div>
+            <div><span className="text-slate-500">Inspector Decision:</span> <span className="font-medium">{String(formData.inspectionStatus)}</span></div>
           )}
           {formData.inspectorRemarks && (
             <div className="md:col-span-2">
-              <span className="text-gray-500">Inspector Remarks:</span>
+              <span className="text-slate-500">Inspector Remarks:</span>
               <p className="font-medium mt-0.5">{String(formData.inspectorRemarks)}</p>
             </div>
           )}
@@ -303,7 +303,7 @@ export default function FactoryInspectionReviewPage() {
         {/* Factory Photos */}
         {formData.factoryPhotos && Array.isArray(formData.factoryPhotos) && formData.factoryPhotos.length > 0 && (
           <div className="mt-4">
-            <h3 className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
+            <h3 className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1">
               <IconPhoto size={14} /> Factory Photos ({formData.factoryPhotos.length})
             </h3>
             <div className="flex gap-2 flex-wrap">
@@ -318,9 +318,9 @@ export default function FactoryInspectionReviewPage() {
                   <img
                     src={url}
                     alt={name}
-                    className="w-20 h-20 object-cover rounded-lg border hover:ring-2 ring-blue-300 transition-all"
+                    className="w-20 h-20 object-cover rounded-lg border hover:ring-2 ring-brand-400 transition-all"
                   />
-                  <span className="text-[10px] text-gray-600 font-medium text-center truncate w-full">{name}</span>
+                  <span className="text-[10px] text-slate-600 font-medium text-center truncate w-full">{name}</span>
                 </button>
                 );
               })}
@@ -332,7 +332,7 @@ export default function FactoryInspectionReviewPage() {
       {/* Inspection Chain (for re-inspections) */}
       {inspectionChain.length > 1 && (
         <div className="bg-white rounded-xl border p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
             <IconRefresh size={16} /> Inspection Chain ({inspectionChain.length} cycles)
           </h2>
           <div className="space-y-2">
@@ -340,26 +340,26 @@ export default function FactoryInspectionReviewPage() {
               <div
                 key={item.id}
                 className={`flex items-center gap-3 p-3 rounded-lg border ${
-                  item.id === inspectionId ? 'border-blue-300 bg-blue-50' : 'border-gray-200'
+                  item.id === inspectionId ? 'border-blue-300 bg-blue-50' : 'border-slate-200'
                 }`}
               >
-                <Badge className={item.id === inspectionId ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'}>
+                <Badge className={item.id === inspectionId ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-700'}>
                   Cycle #{item.cycleNumber}
                 </Badge>
-                <span className="text-sm text-gray-700">{item.checker.name}</span>
+                <span className="text-sm text-slate-700">{item.checker.name}</span>
                 <Badge className={
-                  item.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                  item.status === 'SUBMITTED' ? 'bg-blue-100 text-blue-800' :
-                  'bg-gray-100 text-gray-800'
+                  item.status === 'COMPLETED' ? 'bg-green-50 text-green-700 border border-green-200' :
+                  item.status === 'SUBMITTED' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                  'bg-slate-50 text-slate-700 border border-slate-200'
                 }>
                   {item.status}
                 </Badge>
                 {item.result && (
-                  <Badge className={item.result === 'PASSED' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                  <Badge className={item.result === 'PASSED' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}>
                     {item.result}
                   </Badge>
                 )}
-                <span className="text-xs text-gray-500 ml-auto">
+                <span className="text-xs text-slate-500 ml-auto">
                   {new Date(item.createdAt).toLocaleDateString()}
                 </span>
                 {item.id !== inspectionId && (
@@ -379,7 +379,7 @@ export default function FactoryInspectionReviewPage() {
 
       {/* Audit Trail */}
       <div className="bg-white rounded-xl border p-5">
-        <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
           <IconClock size={16} /> Audit Trail
         </h2>
         <InspectionAuditTimeline logs={auditLogs} />

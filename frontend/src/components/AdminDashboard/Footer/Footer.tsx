@@ -4,7 +4,7 @@ export default function Footer() {
   const currentYear = new Date().getFullYear()
 
   return (
-    <footer className="bg-black border-t border-gray-200 px-6 py-4">
+    <footer className="bg-brand-500 border-t border-slate-200 px-6 py-4">
       <div className="flex flex-col md:flex-row justify-between items-center space-y-2 md:space-y-0">
         {/* Left Section - Copyright */}
         <div className="flex items-center space-x-1 text-sm text-white">
@@ -53,8 +53,8 @@ export default function Footer() {
       </div>
 
       {/* Mobile Quick Stats */}
-      <div className="lg:hidden mt-3 pt-3 border-t border-gray-100">
-        <div className="flex justify-center space-x-6 text-xs text-gray-500">
+      <div className="lg:hidden mt-3 pt-3 border-t border-slate-100">
+        <div className="flex justify-center space-x-6 text-xs text-slate-500">
           <div className="flex items-center space-x-1">
             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
             <span>Online</span>

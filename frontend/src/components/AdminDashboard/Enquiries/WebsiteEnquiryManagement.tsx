@@ -115,10 +115,10 @@ export default function WebsiteEnquiryManagement() {
 
   const getStatusBadge = (status: string) => {
     const styles = {
-      new: 'bg-blue-100 text-blue-800',
-      read: 'bg-yellow-100 text-yellow-800',
-      replied: 'bg-green-100 text-green-800',
-      closed: 'bg-gray-100 text-gray-800'
+      new: 'bg-blue-50 text-blue-700 border border-blue-200',
+      read: 'bg-yellow-50 text-yellow-700 border border-yellow-200',
+      replied: 'bg-green-50 text-green-700 border border-green-200',
+      closed: 'bg-slate-50 text-slate-700 border border-slate-200'
     };
     return <Badge className={`${styles[status as keyof typeof styles]} text-xs`}>{status.toUpperCase()}</Badge>;
   };
@@ -130,22 +130,22 @@ export default function WebsiteEnquiryManagement() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Website Enquiries</h1>
-        <p className="text-gray-600">Manage contact form submissions from website visitors</p>
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">Website Enquiries</h1>
+        <p className="text-slate-600">Manage contact form submissions from website visitors</p>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {[
-          { label: 'Total', value: stats.total, color: 'bg-gray-100' },
+          { label: 'Total', value: stats.total, color: 'bg-slate-100' },
           { label: 'New', value: stats.new, color: 'bg-blue-100' },
           { label: 'Read', value: stats.read, color: 'bg-yellow-100' },
           { label: 'Replied', value: stats.replied, color: 'bg-green-100' },
-          { label: 'Closed', value: stats.closed, color: 'bg-gray-100' }
+          { label: 'Closed', value: stats.closed, color: 'bg-slate-100' }
         ].map((stat) => (
           <Card key={stat.label}>
             <CardContent className="p-4">
-              <div className="text-sm text-gray-600">{stat.label}</div>
+              <div className="text-sm text-slate-600">{stat.label}</div>
               <div className="text-2xl font-bold">{stat.value}</div>
             </CardContent>
           </Card>
@@ -158,13 +158,13 @@ export default function WebsiteEnquiryManagement() {
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
                 <input
                   type="text"
                   placeholder="Search by name, email, subject..."
                   value={searchTerm}
                   onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40"
                 />
               </div>
             </div>
@@ -195,13 +195,13 @@ export default function WebsiteEnquiryManagement() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-8 text-center text-gray-500">Loading...</div>
+            <div className="p-8 text-center text-slate-500">Loading...</div>
           ) : enquiries.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No enquiries found</div>
+            <div className="p-8 text-center text-slate-500">No enquiries found</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-800 text-white">
+                <thead className="bg-brand-500/[0.06] border-b border-brand-100/50 [&_th]:!text-brand-500/60">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Name</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Contact</th>
@@ -211,20 +211,20 @@ export default function WebsiteEnquiryManagement() {
                     <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-slate-200">
                   {paginatedItems.map((enquiry) => (
-                    <tr key={enquiry.id} className="hover:bg-gray-50">
+                    <tr key={enquiry.id} className="hover:bg-slate-50">
                       <td className="px-6 py-4">
-                        <div className="font-medium text-gray-900">{enquiry.name}</div>
+                        <div className="font-medium text-slate-900">{enquiry.name}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm">
-                          <div className="flex items-center gap-1 text-gray-600">
+                          <div className="flex items-center gap-1 text-slate-600">
                             <Mail className="w-3 h-3" />
                             {enquiry.email}
                           </div>
                           {enquiry.phone && (
-                            <div className="flex items-center gap-1 text-gray-600 mt-1">
+                            <div className="flex items-center gap-1 text-slate-600 mt-1">
                               <Phone className="w-3 h-3" />
                               {enquiry.phone}
                             </div>
@@ -232,9 +232,9 @@ export default function WebsiteEnquiryManagement() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 max-w-xs truncate">{enquiry.subject}</div>
+                        <div className="text-sm text-slate-900 max-w-xs truncate">{enquiry.subject}</div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-6 py-4 text-sm text-slate-600">
                         {new Date(enquiry.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4">{getStatusBadge(enquiry.status)}</td>
@@ -276,7 +276,7 @@ export default function WebsiteEnquiryManagement() {
         <div className="flex items-center justify-end gap-3 text-sm">
           <div className="flex items-center gap-1">
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-            {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+            {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
           </div>
         </div>
@@ -294,43 +294,43 @@ export default function WebsiteEnquiryManagement() {
 
       {/* View Modal */}
       {showModal && selectedEnquiry && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <h2 className="text-2xl font-bold">Enquiry Details</h2>
-                <button onClick={() => setShowModal(false)} className="text-gray-500 hover:text-gray-700">
+                <button onClick={() => setShowModal(false)} className="text-slate-500 hover:text-slate-700">
                   ✕
                 </button>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-semibold text-gray-600">Name</label>
-                  <div className="text-gray-900">{selectedEnquiry.name}</div>
+                  <label className="text-sm font-semibold text-slate-600">Name</label>
+                  <div className="text-slate-900">{selectedEnquiry.name}</div>
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-600">Email</label>
-                  <div className="text-gray-900">{selectedEnquiry.email}</div>
+                  <label className="text-sm font-semibold text-slate-600">Email</label>
+                  <div className="text-slate-900">{selectedEnquiry.email}</div>
                 </div>
                 {selectedEnquiry.phone && (
                   <div>
-                    <label className="text-sm font-semibold text-gray-600">Phone</label>
-                    <div className="text-gray-900">{selectedEnquiry.phone}</div>
+                    <label className="text-sm font-semibold text-slate-600">Phone</label>
+                    <div className="text-slate-900">{selectedEnquiry.phone}</div>
                   </div>
                 )}
                 <div>
-                  <label className="text-sm font-semibold text-gray-600">Subject</label>
-                  <div className="text-gray-900">{selectedEnquiry.subject}</div>
+                  <label className="text-sm font-semibold text-slate-600">Subject</label>
+                  <div className="text-slate-900">{selectedEnquiry.subject}</div>
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-600">Message</label>
-                  <div className="text-gray-900 whitespace-pre-wrap bg-gray-50 p-4 rounded">
+                  <label className="text-sm font-semibold text-slate-600">Message</label>
+                  <div className="text-slate-900 whitespace-pre-wrap bg-slate-50 p-4 rounded">
                     {selectedEnquiry.message}
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-600">Status</label>
+                  <label className="text-sm font-semibold text-slate-600">Status</label>
                   <div>{getStatusBadge(selectedEnquiry.status)}</div>
                 </div>
 
@@ -348,7 +348,7 @@ export default function WebsiteEnquiryManagement() {
                 )}
                 {selectedEnquiry.status === 'closed' && (
                   <div className="pt-4 border-t">
-                    <p className="text-sm text-gray-500 text-center italic">This enquiry has been closed.</p>
+                    <p className="text-sm text-slate-500 text-center italic">This enquiry has been closed.</p>
                   </div>
                 )}
               </div>

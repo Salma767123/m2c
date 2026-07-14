@@ -155,7 +155,7 @@ export default function CustomerReviews() {
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
-            className={`h-4 w-4 ${star <= rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+            className={`h-4 w-4 ${star <= rating ? "fill-yellow-400 text-yellow-400" : "text-slate-300"
               }`}
           />
         ))}
@@ -167,12 +167,12 @@ export default function CustomerReviews() {
     const s = review.status || (review.isApproved ? 'APPROVED' : 'REJECTED');
     switch (s) {
       case 'APPROVED':
-        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Approved</span>;
+        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">Approved</span>;
       case 'REJECTED':
-        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">Rejected</span>;
+        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">Rejected</span>;
       case 'PENDING':
       default:
-        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Pending</span>;
+        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">Pending</span>;
     }
   };
 
@@ -180,8 +180,8 @@ export default function CustomerReviews() {
     <div className="p-6">
       <Breadcrumb />
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Customer Reviews</h1>
-        <p className="text-gray-600 mt-1">Manage and moderate customer product reviews</p>
+        <h1 className="text-2xl font-bold text-slate-900">Customer Reviews</h1>
+        <p className="text-slate-600 mt-1">Manage and moderate customer product reviews</p>
       </div>
 
       {/* Stats */}
@@ -190,8 +190,8 @@ export default function CustomerReviews() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-gray-600">Total Reviews</div>
-                <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+                <div className="text-sm text-slate-600">Total Reviews</div>
+                <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
               </div>
               <MessageSquare className="h-8 w-8 text-blue-500 opacity-50" />
             </div>
@@ -201,7 +201,7 @@ export default function CustomerReviews() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-gray-600">Pending</div>
+                <div className="text-sm text-slate-600">Pending</div>
                 <div className="text-2xl font-bold text-amber-600">{stats.pending}</div>
               </div>
               <Clock className="h-8 w-8 text-amber-500 opacity-50" />
@@ -212,7 +212,7 @@ export default function CustomerReviews() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-gray-600">Approved</div>
+                <div className="text-sm text-slate-600">Approved</div>
                 <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
               </div>
               <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
@@ -223,7 +223,7 @@ export default function CustomerReviews() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-gray-600">Rejected</div>
+                <div className="text-sm text-slate-600">Rejected</div>
                 <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
               </div>
               <XCircle className="h-8 w-8 text-red-500 opacity-50" />
@@ -234,7 +234,7 @@ export default function CustomerReviews() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-gray-600">Avg. Rating</div>
+                <div className="text-sm text-slate-600">Avg. Rating</div>
                 <div className="text-2xl font-bold text-yellow-600 flex items-center gap-1">
                   {stats.averageRating}
                   <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
@@ -251,13 +251,13 @@ export default function CustomerReviews() {
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 z-10" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5 z-10" />
               <input
                 type="text"
                 placeholder="Search by customer name, product, or comment..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
               />
             </div>
             <div className="w-full md:w-48">
@@ -275,7 +275,7 @@ export default function CustomerReviews() {
             </div>
             <button
               onClick={fetchReviews}
-              className="flex items-center gap-2 px-4 py-2 bg-[#222222] text-white rounded-lg hover:bg-[#333333] transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
@@ -293,12 +293,12 @@ export default function CustomerReviews() {
       <Card>
         {loading ? (
           <div className="p-12 text-center">
-            <RefreshCw className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-500">Loading reviews...</p>
+            <RefreshCw className="h-8 w-8 animate-spin text-slate-400 mx-auto mb-3" />
+            <p className="text-slate-500">Loading reviews...</p>
           </div>
         ) : (
           <Table>
-            <TableHeader>
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
               <TableRow>
                 <TableHead>Customer</TableHead>
                 <TableHead>Product</TableHead>
@@ -315,8 +315,8 @@ export default function CustomerReviews() {
                   <TableRow key={review.id}>
                     <TableCell>
                       <div>
-                        <div className="font-medium text-gray-900">{review.user?.name || 'Unknown'}</div>
-                        <div className="text-xs text-gray-500">{review.user?.email || ''}</div>
+                        <div className="font-medium text-slate-900">{review.user?.name || 'Unknown'}</div>
+                        <div className="text-xs text-slate-500">{review.user?.email || ''}</div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -330,7 +330,7 @@ export default function CustomerReviews() {
                             className="w-8 h-8 rounded object-cover"
                           />
                         )}
-                        <div className="text-sm text-gray-900 max-w-[150px] truncate">
+                        <div className="text-sm text-slate-900 max-w-[150px] truncate">
                           {review.product?.name || 'Unknown Product'}
                         </div>
                       </div>
@@ -338,19 +338,19 @@ export default function CustomerReviews() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {renderStars(review.rating)}
-                        <span className="text-sm text-gray-600">({review.rating})</span>
+                        <span className="text-sm text-slate-600">({review.rating})</span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-gray-700 max-w-xs truncate">
-                        {review.comment || <span className="text-gray-400 italic">No comment</span>}
+                      <div className="text-sm text-slate-700 max-w-xs truncate">
+                        {review.comment || <span className="text-slate-400 italic">No comment</span>}
                       </div>
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(review)}
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-slate-900">
                         {new Date(review.createdAt).toLocaleDateString()}
                       </div>
                     </TableCell>
@@ -390,7 +390,7 @@ export default function CustomerReviews() {
                           <button
                             onClick={() => handleDeleteClick(review)}
                             disabled={actionLoading === review.id}
-                            className="inline-flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                            className="inline-flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
                             title="Delete"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -404,9 +404,9 @@ export default function CustomerReviews() {
                 <TableRow>
                   <TableCell colSpan={7}>
                     <div className="p-12 text-center">
-                      <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-500 font-medium">No reviews found</p>
-                      <p className="text-gray-400 text-sm mt-1">
+                      <MessageSquare className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                      <p className="text-slate-500 font-medium">No reviews found</p>
+                      <p className="text-slate-400 text-sm mt-1">
                         {searchTerm || filterStatus !== "all"
                           ? "Try adjusting your search or filter criteria"
                           : "Customer reviews will appear here once submitted"}
@@ -424,7 +424,7 @@ export default function CustomerReviews() {
         <div className="flex items-center justify-end gap-3 text-sm">
           <div className="flex items-center gap-1">
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-            {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+            {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
           </div>
         </div>
@@ -432,17 +432,17 @@ export default function CustomerReviews() {
 
       {/* Detail Modal */}
       {selectedReview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto bg-white">
-            <div className="p-6 border-b border-gray-200">
+            <div className="p-6 border-b border-slate-200">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">Customer Review Details</h2>
-                  <p className="text-sm text-gray-500 mt-1">{selectedReview.product?.name || 'Unknown Product'}</p>
+                  <h2 className="text-xl font-bold text-slate-900">Customer Review Details</h2>
+                  <p className="text-sm text-slate-500 mt-1">{selectedReview.product?.name || 'Unknown Product'}</p>
                 </div>
                 <button
                   onClick={() => setSelectedReview(null)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-slate-400 hover:text-slate-600"
                 >
                   ✕
                 </button>
@@ -451,7 +451,7 @@ export default function CustomerReviews() {
 
             <CardContent className="p-6 space-y-6">
               {/* Customer Info */}
-              <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="bg-slate-50 p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
                     {selectedReview.user?.image ? (
@@ -461,22 +461,22 @@ export default function CustomerReviews() {
                         className="w-10 h-10 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-semibold">
+                      <div className="w-10 h-10 rounded-full bg-slate-300 flex items-center justify-center text-slate-600 font-semibold">
                         {(selectedReview.user?.name || 'U').charAt(0).toUpperCase()}
                       </div>
                     )}
                     <div>
-                      <h3 className="font-semibold text-gray-900">{selectedReview.user?.name || 'Unknown'}</h3>
-                      <p className="text-sm text-gray-500">{selectedReview.user?.email || ''}</p>
+                      <h3 className="font-semibold text-slate-900">{selectedReview.user?.name || 'Unknown'}</h3>
+                      <p className="text-sm text-slate-500">{selectedReview.user?.email || ''}</p>
                     </div>
                   </div>
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
+                  <span className="px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 text-xs rounded-full font-medium">
                     Verified Purchase
                   </span>
                 </div>
                 <div className="flex items-center gap-3 mt-3">
                   {renderStars(selectedReview.rating)}
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-slate-600">
                     {new Date(selectedReview.createdAt).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
@@ -488,8 +488,8 @@ export default function CustomerReviews() {
 
               {/* Product Info */}
               <div>
-                <label className="text-sm font-semibold text-gray-700 block mb-2">Product</label>
-                <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg">
+                <label className="text-sm font-semibold text-slate-700 block mb-2">Product</label>
+                <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg">
                   {selectedReview.product?.images?.[0]?.url && (
                     <Image
                       src={selectedReview.product.images[0].url}
@@ -500,18 +500,18 @@ export default function CustomerReviews() {
                     />
                   )}
                   <div>
-                    <p className="font-medium text-gray-900">{selectedReview.product?.name || 'Unknown Product'}</p>
-                    <p className="text-xs text-gray-500">Order: #{selectedReview.order?.orderId || selectedReview.orderId}</p>
+                    <p className="font-medium text-slate-900">{selectedReview.product?.name || 'Unknown Product'}</p>
+                    <p className="text-xs text-slate-500">Order: #{selectedReview.order?.orderId || selectedReview.orderId}</p>
                   </div>
                 </div>
               </div>
 
               {/* Review Comment */}
               <div>
-                <label className="text-sm font-semibold text-gray-700 block mb-2">Review Comment</label>
+                <label className="text-sm font-semibold text-slate-700 block mb-2">Review Comment</label>
                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <p className="text-gray-900">
-                    {selectedReview.comment || <span className="text-gray-400 italic">No comment provided</span>}
+                  <p className="text-slate-900">
+                    {selectedReview.comment || <span className="text-slate-400 italic">No comment provided</span>}
                   </p>
                 </div>
               </div>
@@ -519,7 +519,7 @@ export default function CustomerReviews() {
               {/* Review Images */}
               {selectedReview.images && selectedReview.images.length > 0 && (
                 <div>
-                  <label className="text-sm font-semibold text-gray-700 block mb-2">Review Images</label>
+                  <label className="text-sm font-semibold text-slate-700 block mb-2">Review Images</label>
                   <div className="flex gap-2 flex-wrap">
                     {selectedReview.images.map((img, idx) => (
                       <Image
@@ -528,7 +528,7 @@ export default function CustomerReviews() {
                         alt={`Review image ${idx + 1}`}
                         width={80}
                         height={80}
-                        className="w-20 h-20 rounded-lg object-cover border border-gray-200"
+                        className="w-20 h-20 rounded-lg object-cover border border-slate-200"
                       />
                     ))}
                   </div>
@@ -537,12 +537,12 @@ export default function CustomerReviews() {
 
               {/* Status */}
               <div>
-                <label className="text-sm font-semibold text-gray-700 block mb-2">Status</label>
+                <label className="text-sm font-semibold text-slate-700 block mb-2">Status</label>
                 <div>{getStatusBadge(selectedReview)}</div>
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex gap-3 pt-4 border-t border-slate-200">
                 {selectedReview.isApproved ? (
                   <button
                     onClick={() => {
@@ -568,18 +568,18 @@ export default function CustomerReviews() {
                 )}
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex gap-3 pt-4 border-t border-slate-200">
                 <button
                   onClick={() => handleDeleteClick(selectedReview)}
                   disabled={actionLoading === selectedReview.id}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete
                 </button>
                 <button
                   onClick={() => setSelectedReview(null)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
                 >
                   Close
                 </button>

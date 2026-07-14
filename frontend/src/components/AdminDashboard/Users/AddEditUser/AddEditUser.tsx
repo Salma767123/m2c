@@ -133,7 +133,7 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+                <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
             </div>
         );
     }
@@ -148,16 +148,16 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
                         variant="ghost"
                         size="sm"
                         onClick={() => router.back()}
-                        className="hover:bg-gray-100"
+                        className="hover:bg-slate-100"
                     >
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back
                     </Button>
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">
+                        <h1 className="text-2xl font-bold text-slate-900">
                             {isEdit ? 'Edit Staff Member' : 'Add New Staff Member'}
                         </h1>
-                        <p className="text-gray-600">
+                        <p className="text-slate-600">
                             {isEdit ? 'Update details for an existing staff account' : 'Create a new staff account and assign permissions'}
                         </p>
                     </div>
@@ -170,7 +170,7 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                                <User className="h-5 w-5 text-gray-500" />
+                                <User className="h-5 w-5 text-slate-500" />
                                 Personal Information
                             </CardTitle>
                         </CardHeader>
@@ -178,9 +178,9 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
                             <form id="staff-form" onSubmit={handleSubmit} className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-700">First Name</label>
+                                        <label className="text-sm font-medium text-slate-700">First Name</label>
                                         <div className="relative">
-                                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                             <input
                                                 required
                                                 type="text"
@@ -188,14 +188,14 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
                                                 value={formData.firstName}
                                                 onChange={handleInputChange}
                                                 placeholder="e.g. John"
-                                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                                                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
                                             />
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-700">Last Name</label>
+                                        <label className="text-sm font-medium text-slate-700">Last Name</label>
                                         <div className="relative">
-                                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                             <input
                                                 required
                                                 type="text"
@@ -203,7 +203,7 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
                                                 value={formData.lastName}
                                                 onChange={handleInputChange}
                                                 placeholder="e.g. Doe"
-                                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                                                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
                                             />
                                         </div>
                                     </div>
@@ -211,9 +211,9 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-700">Email Address</label>
+                                        <label className="text-sm font-medium text-slate-700">Email Address</label>
                                         <div className="relative">
-                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                             <input
                                                 required
                                                 type="email"
@@ -221,14 +221,14 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
                                                 value={formData.email}
                                                 onChange={handleInputChange}
                                                 placeholder="john.doe@example.com"
-                                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                                                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
                                             />
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-700">Phone Number</label>
+                                        <label className="text-sm font-medium text-slate-700">Phone Number</label>
                                         <div className="relative">
-                                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                             <input
                                                 required
                                                 type="tel"
@@ -236,7 +236,7 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
                                                 value={formData.phone}
                                                 onChange={handleInputChange}
                                                 placeholder="+1 (555) 000-0000"
-                                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                                                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
                                             />
                                         </div>
                                     </div>
@@ -244,28 +244,28 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
 
                                 {!isEdit && (
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-700">
+                                        <label className="text-sm font-medium text-slate-700">
                                             Password (Optional)
                                         </label>
                                         <div className="relative">
-                                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                             <input
                                                 type={showPassword ? 'text' : 'password'}
                                                 name="password"
                                                 value={formData.password}
                                                 onChange={handleInputChange}
                                                 placeholder="Leave empty to auto-generate a password"
-                                                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                                                className="w-full pl-10 pr-10 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
                                             />
                                             <button
                                                 type="button"
                                                 onClick={() => setShowPassword(!showPassword)}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                                             >
                                                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                             </button>
                                         </div>
-                                        <p className="text-xs text-gray-500 italic">
+                                        <p className="text-xs text-slate-500 italic">
                                             A secure password will be auto-generated and emailed to the staff member. It's recommended to change it after first login.
                                         </p>
                                     </div>
@@ -280,7 +280,7 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                                <Shield className="h-5 w-5 text-gray-500" />
+                                <Shield className="h-5 w-5 text-slate-500" />
                                 Access & Role
                             </CardTitle>
                         </CardHeader>
@@ -311,7 +311,7 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
                                     type="submit"
                                     form="staff-form"
                                     disabled={isSaving}
-                                    className="w-full bg-gray-900 hover:bg-gray-800 text-white"
+                                    className="w-full bg-brand-500 hover:bg-brand-600 text-white"
                                 >
                                     {isSaving ? (
                                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
