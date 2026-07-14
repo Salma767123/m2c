@@ -17,6 +17,7 @@ import {
   UserCircle,
   Image as ImageIcon,
   Download,
+  Eye,
   RotateCw,
   Map as MapIcon,
   Truck,
@@ -163,6 +164,32 @@ const mk = (
 
 const compact = (arr: Array<ResolvedField | null>): ResolvedField[] =>
   arr.filter(Boolean) as ResolvedField[];
+
+// Resolve a person's landline fields (main owner or additional owner) into
+// display strings that include the country code. Handles both the split shape
+// (std + number) and the concatenated `localLandline` / legacy `landline`
+// values stored at registration. Local landlines are domestic → default +91.
+const resolveLandline = (parts: {
+  std?: string | null;
+  number?: string | null;
+  concat?: string | null;
+  intl?: string | null;
+  legacy?: string | null;
+}) => {
+  const std = (parts.std || "").trim();
+  let number = (parts.number || "").trim();
+  if (!number) {
+    const raw = (parts.concat || "").trim();
+    number = std && raw.startsWith(std) ? raw.slice(std.length) : raw;
+  }
+  return getLandlineDisplay({
+    localLandlineCountryCode: "+91",
+    localLandlineStd: std,
+    localLandline: number,
+    intlLandline: parts.intl,
+    landline: parts.legacy,
+  });
+};
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   if (value === null || value === undefined || value === "") return null;
@@ -343,37 +370,37 @@ function DocsGrid({ heading, docs }: { heading: string; docs: any[] }) {
   return (
     <div>
       <SubHeading><FileText className="w-3.5 h-3.5 text-slate-400" /> {heading} ({docs.length})</SubHeading>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {docs.map((doc: any, idx: number) => {
           const typeLabel = (doc.type || "DOCUMENT").toString().replace(/_/g, " ");
           const uploaded = formatDate(doc.uploadedAt || doc.createdAt);
+          const isImg = isImageUrl(doc.documentUrl, doc.name);
           return (
-            <div key={doc.id || idx} className="bg-white border border-slate-200/80 rounded-lg p-2 space-y-2 shadow-xs hover:shadow-sm hover:border-brand-200 transition-all">
-              {isImageUrl(doc.documentUrl, doc.name) ? (
-                <button type="button" onClick={() => openDoc(doc.documentUrl, doc.name)} className="block w-full">
-                  <img src={doc.documentUrl} alt={doc.name} className="w-full h-20 object-cover rounded-md border border-slate-200" />
-                </button>
+            <div key={doc.id || idx} className="flex items-center gap-3 p-2.5 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 transition-colors">
+              {isImg ? (
+                <img src={doc.documentUrl} alt={doc.name} className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0" loading="lazy" />
               ) : (
-                <div className="w-full h-20 flex items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-300">
-                  <FileText className="w-8 h-8" />
+                <div className="w-10 h-10 rounded-lg bg-brand-50 text-brand-500 flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5" />
                 </div>
               )}
-              <div className="space-y-1">
-                <p className="text-[11px] font-bold text-slate-800 truncate" title={doc.name}>{doc.name}</p>
-                <div className="flex items-center gap-1 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-slate-900 truncate" title={doc.name}>{doc.name}</p>
+                <div className="flex items-center gap-2 mt-0.5">
                   <span className="inline-flex px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-bold uppercase tracking-wide">{typeLabel}</span>
-                </div>
-                <div className="flex items-center justify-between gap-1.5 pt-0.5">
-                  {uploaded ? (
-                    <span className="text-[10px] text-slate-400 truncate">{uploaded}</span>
-                  ) : <span />}
-                  {doc.documentUrl && (
-                    <button type="button" onClick={() => downloadDoc(doc.documentUrl, doc.name)} className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold text-brand-600 hover:text-brand-700" title="Download">
-                      <Download className="w-3 h-3" /> Download
-                    </button>
-                  )}
+                  {uploaded && <span className="text-[10px] text-slate-400 truncate">{uploaded}</span>}
                 </div>
               </div>
+              {doc.documentUrl && (
+                <div className="flex gap-1 shrink-0">
+                  <button type="button" onClick={() => openDoc(doc.documentUrl, doc.name)} className="inline-flex items-center gap-1 h-7 px-2 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors">
+                    <Eye className="w-3 h-3" /> View
+                  </button>
+                  <button type="button" onClick={() => downloadDoc(doc.documentUrl, doc.name)} className="inline-flex items-center gap-1 h-7 px-2 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors">
+                    <Download className="w-3 h-3" /> Download
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
@@ -1036,12 +1063,20 @@ export default function VendorSettings() {
     v.designation === 'Others' && v.customDesignation ? mk("Custom Designation", v.customDesignation) : null,
     mk("Owner Name", buildFullName(v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName, v.ownerName)),
   ]);
+  const ownerLandline = resolveLandline({
+    std: v.ownerLocalLandlineStd,
+    number: v.ownerLocalLandlineNumber,
+    concat: v.ownerLandline,
+    intl: v.ownerIntlLandline,
+    legacy: v.ownerLandline,
+  });
   const ownerContact = compact([
     mk("Primary Email", v.ownerEmail),
     mk("Secondary Email", v.ownerEmail2),
     mk("Primary Phone", v.ownerPhone),
     mk("Secondary Phone", v.ownerPhone2),
-    mk("Local Landline Number", v.ownerLandline),
+    mk("Local Landline Number", ownerLandline.local || (!ownerLandline.hasNew ? ownerLandline.legacy : "")),
+    mk("International Landline Number", ownerLandline.intl),
   ]);
   const businessHistory = compact([
     mk("Start Business Date", v.businessStartDate, { type: "date" }),
@@ -1235,6 +1270,17 @@ export default function VendorSettings() {
       {/* ============ SECTION 1: COMPANY DETAILS ============ */}
       {effectiveTab === "company" && showCompany && (
         <SectionBody>
+          {v.companyLogo && (
+            <div className="flex items-center gap-4 pb-2">
+              <button type="button" onClick={() => openDoc(v.companyLogo!, "Company Logo")} className="group block shrink-0">
+                <img src={v.companyLogo} alt="Company Logo" className="w-20 h-20 object-cover rounded-xl border border-slate-200 group-hover:border-brand-300 transition-colors" />
+              </button>
+              <div>
+                <p className="text-sm font-bold text-slate-800">Company Logo</p>
+                <p className="text-xs text-slate-500">Your brand logo shown across the portal</p>
+              </div>
+            </div>
+          )}
           {businessProfile.length > 0 && (
             <SubSection title="Business Profile" description="Business type, company identity, and regulatory IDs" icon={<Briefcase className="w-4 h-4" />}>
               <FieldsGrid items={businessProfile} />
@@ -1245,9 +1291,13 @@ export default function VendorSettings() {
               <FieldsGrid items={companyContact} />
             </SubSection>
           )}
-          {companyAddress.length > 0 && (
-            <SubSection title="Address" description="Registered business address" icon={<MapPin className="w-4 h-4" />}>
+          {(companyAddress.length > 0 || factorySiteImages.length > 0) && (
+            <SubSection title="Legal Address & Factory Site" description="Registered legal address & factory site" icon={<MapPin className="w-4 h-4" />}>
               <div className="space-y-4">
+                <FieldsGrid items={compact([
+                  mk("Ownership Type", v.factoryOwnershipType, { transform: getOwnershipTypeLabel }),
+                  mk("Warehousing Capacity", v.factorySize),
+                ])} />
                 <AddressCard
                   line1={v.businessAddress}
                   line2={v.addressLine2}
@@ -1258,20 +1308,15 @@ export default function VendorSettings() {
                   country={v.businessCountry}
                   zip={v.businessZipCode}
                 />
-                {v.factoryOwnershipType && (
-                  <FieldsGrid items={compact([mk("Factory Ownership Type", v.factoryOwnershipType, { transform: getOwnershipTypeLabel })])} />
+                {factorySiteImages.length > 0 && (
+                  <ImageStrip heading={`Factory Images (${factorySiteImages.length})`} icon={<ImageIcon className="w-4 h-4 text-slate-400" />} items={factorySiteImages} />
                 )}
               </div>
             </SubSection>
           )}
-          {hasCompanyDocs && (
-            <SubSection title="Documents" description="Company logo and registration certificates" icon={<FileText className="w-4 h-4" />}>
-              <div className="space-y-4">
-                {v.companyLogo && (
-                  <ImageStrip heading="Company Logo" icon={<ImageIcon className="w-4 h-4 text-slate-400" />} items={[{ label: "Company Logo", url: v.companyLogo }]} />
-                )}
-                {registrationDocs.length > 0 && <DocsGrid heading="Registration Documents" docs={registrationDocs} />}
-              </div>
+          {registrationDocs.length > 0 && (
+            <SubSection title="Documents" description="Registration certificates" icon={<FileText className="w-4 h-4" />}>
+              <DocsGrid heading="Registration Documents" docs={registrationDocs} />
             </SubSection>
           )}
         </SectionBody>
@@ -1299,16 +1344,9 @@ export default function VendorSettings() {
               />
             </SubSection>
           )}
-          {factoryImages.length > 0 && (
-            <SubSection title="Factory & Facility Photos" icon={<ImageIcon className="w-4 h-4" />}>
-              <div className="space-y-6">
-                {factorySiteImages.length > 0 && (
-                  <ImageStrip heading={`Factory Site Images (${factorySiteImages.length})`} icon={<ImageIcon className="w-4 h-4 text-slate-400" />} items={factorySiteImages} />
-                )}
-                {warehouseImages.length > 0 && (
-                  <ImageStrip heading={`Warehouse Images (${warehouseImages.length})`} icon={<ImageIcon className="w-4 h-4 text-slate-400" />} items={warehouseImages} />
-                )}
-              </div>
+          {warehouseImages.length > 0 && (
+            <SubSection title="Warehouse Photos" icon={<ImageIcon className="w-4 h-4" />}>
+              <ImageStrip heading={`Warehouse Images (${warehouseImages.length})`} icon={<ImageIcon className="w-4 h-4 text-slate-400" />} items={warehouseImages} />
             </SubSection>
           )}
           {locationMap.length > 0 && (
@@ -1322,34 +1360,53 @@ export default function VendorSettings() {
       {/* ============ SECTION 3: OWNER PROFILE ============ */}
       {effectiveTab === "owner" && showOwner && (
         <SectionBody>
-          {(ownerIdentity.length > 0 || v.ownerPhoto) && (
-            <SubSection title="Owner Identity" icon={<UserCircle className="w-4 h-4" />}>
-              <div className="space-y-4">
-                {v.ownerPhoto && (
-                  <ImageStrip heading="Owner Profile Photo" icon={<ImageIcon className="w-4 h-4 text-slate-400" />} items={[{ label: "Owner Photo", url: v.ownerPhoto }]} />
-                )}
-                <FieldsGrid items={ownerIdentity} />
-              </div>
-            </SubSection>
-          )}
-          {ownerContact.length > 0 && (
-            <SubSection title="Owner Contact" icon={<Phone className="w-4 h-4" />}>
-              <FieldsGrid items={ownerContact} />
-            </SubSection>
-          )}
-          {additionalOwners.length > 0 && (
-            <SubSection title={`Additional Owners (${additionalOwners.length})`} icon={<UserCircle className="w-4 h-4" />}>
+          {(ownerIdentity.length > 0 || v.ownerPhoto || ownerContact.length > 0 || additionalOwners.length > 0) && (
+            <SubSection title="Owners" icon={<UserCircle className="w-4 h-4" />}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Owner 1 (Primary) — same card format as additional owners */}
+                <div className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    {v.ownerPhoto ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={v.ownerPhoto}
+                        alt="Owner 1 profile"
+                        className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                        <UserCircle className="w-6 h-6 text-slate-300" />
+                      </div>
+                    )}
+                    <p className="text-sm font-bold text-slate-800">Owner 1</p>
+                  </div>
+                  {buildFullName(v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName, v.ownerName) && (
+                    <Field label="Name" value={buildFullName(v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName, v.ownerName)} />
+                  )}
+                  {v.designation && <Field label="Designation" value={v.designation === 'Others' && v.customDesignation ? v.customDesignation : v.designation} />}
+                  {v.ownerEmail && <Field label="Primary Email" value={v.ownerEmail} />}
+                  {v.ownerEmail2 && <Field label="Secondary Email" value={v.ownerEmail2} />}
+                  {v.ownerPhone && <Field label="Primary Phone" value={v.ownerPhone} />}
+                  {v.ownerPhone2 && <Field label="Secondary Phone" value={v.ownerPhone2} />}
+                  {ownerLandline.local && <Field label="Local Landline Number" value={ownerLandline.local} />}
+                  {ownerLandline.intl && <Field label="International Landline Number" value={ownerLandline.intl} />}
+                  {!ownerLandline.hasNew && ownerLandline.legacy && <Field label="Landline" value={ownerLandline.legacy} />}
+                </div>
+                {/* Additional owners */}
                 {additionalOwners.map((owner: any, idx: number) => (
                   <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
                     <div className="flex items-center gap-3">
-                      {owner.photo && (
+                      {owner.photo ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={owner.photo}
                           alt={`Owner ${idx + 2} profile`}
                           className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0"
                         />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                          <UserCircle className="w-6 h-6 text-slate-300" />
+                        </div>
                       )}
                       <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
                     </div>
@@ -1359,7 +1416,22 @@ export default function VendorSettings() {
                     {owner.email2 && <Field label="Secondary Email" value={owner.email2} />}
                     {owner.phone && <Field label="Primary Phone" value={owner.phone} />}
                     {owner.phone2 && <Field label="Secondary Phone" value={owner.phone2} />}
-                    {owner.landline && <Field label="Landline" value={owner.landline} />}
+                    {(() => {
+                      const ll = resolveLandline({
+                        std: owner.localLandlineStd,
+                        number: owner.localLandlineNumber,
+                        concat: owner.localLandline,
+                        intl: owner.intlLandline,
+                        legacy: owner.landline,
+                      });
+                      return (
+                        <>
+                          {ll.local && <Field label="Local Landline Number" value={ll.local} />}
+                          {ll.intl && <Field label="International Landline Number" value={ll.intl} />}
+                          {!ll.hasNew && ll.legacy && <Field label="Landline" value={ll.legacy} />}
+                        </>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>

@@ -2,12 +2,13 @@
 
 import React from "react";
 import {
-  Building2, User, Factory, Package, Wrench, ShieldCheck, Phone, Landmark, FileText, Image as ImageIcon, MapPin, Globe,
+  Building2, User, Factory, Warehouse, Package, Wrench, ShieldCheck, Phone, Landmark, FileText, Image as ImageIcon, MapPin, Globe, Eye, Download,
 } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
 import { Badge } from "../../UI/Badge";
 import { buildFullName, toExternalUrl } from "@/lib/utils";
 import { openDoc } from "@/lib/docViewerBus";
+import { downloadDoc } from "@/lib/docDownload";
 import { Country } from "country-state-city";
 
 // name → ISO code for flag images (flag emoji don't render on Windows).
@@ -112,6 +113,37 @@ function DocThumb({ url, name }: { url?: string; name?: string }) {
   );
 }
 
+// Compact document row — icon + label + View/Download, matching the vendor
+// profile document cards elsewhere. Replaces the tall placeholder tiles so
+// non-image documents (GST / PAN / CIN / IEC / certificates) stay small.
+function DocRow({ url, label, sub }: { url?: string; label: string; sub?: string }) {
+  if (!url) return null;
+  const img = isImageUrl(url);
+  return (
+    <div className="flex items-center gap-3 p-2.5 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 transition-colors">
+      {img ? (
+        <img src={url} alt={label} className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0" loading="lazy" />
+      ) : (
+        <div className="w-10 h-10 rounded-lg bg-brand-50 text-brand-500 flex items-center justify-center shrink-0">
+          <FileText className="w-5 h-5" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-slate-900 truncate" title={label}>{label}</p>
+        {sub && sub !== label && <p className="text-xs text-slate-500 truncate" title={sub}>{sub}</p>}
+      </div>
+      <div className="flex gap-1 shrink-0">
+        <button type="button" onClick={() => openDoc(url, label)} className="inline-flex items-center gap-1 h-7 px-2 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors">
+          <Eye className="w-3 h-3" /> View
+        </button>
+        <button type="button" onClick={() => downloadDoc(url, label)} className="inline-flex items-center gap-1 h-7 px-2 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors">
+          <Download className="w-3 h-3" /> Download
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const FACILITY_LABELS: Record<string, string> = {
   spinning: "Spinning", weaving: "Weaving", dyeing: "Dyeing",
   printing: "Printing", stitching: "Stitching", finishing: "Finishing",
@@ -142,6 +174,26 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
   const documents: any[] = Array.isArray(v.documents) ? v.documents : [];
   const factoryImages = documents.filter((d) => d?.type === "OTHER" && isImageUrl(d.documentUrl));
   const fileDocs = documents.filter((d) => !(d?.type === "OTHER" && isImageUrl(d.documentUrl)));
+
+  // Split the vendor's factory/warehouse photos the same way the checker
+  // inspection form does: "Factory Site …" photos belong to the Legal Address
+  // & Factory Site; every other "Factory …" photo is a Warehouse photo.
+  const isFactorySiteDoc = (name?: string) => (name || "").startsWith("Factory Site");
+  const legalImages = factoryImages.filter((d) => isFactorySiteDoc(d.name));
+  const warehouseImages = factoryImages.filter((d) => !isFactorySiteDoc(d.name));
+
+  // Warehouse counts as "same as" the Legal Address & Factory Site when the
+  // vendor entered no separate warehouse address, or one that matches the
+  // factory address field-for-field (registration mirrors the factory address
+  // into the warehouse columns when "Same as warehouse" is ticked).
+  const eqStr = (a: any, b: any) => (a || "").toString().trim() === (b || "").toString().trim();
+  const sameAsWarehouse =
+    (!v.warehouseAddress && !v.warehouseCity) ||
+    (eqStr(v.warehouseAddress, v.factoryAddress) &&
+      eqStr(v.warehouseCity, v.factoryCity) &&
+      eqStr(v.warehouseState, v.factoryState) &&
+      eqStr(v.warehouseZipCode, v.factoryZipCode) &&
+      eqStr(v.warehouseCountry, v.factoryCountry));
   const certifications: any[] = Array.isArray(v.certifications) ? v.certifications : [];
   const additionalOwners: any[] = Array.isArray(v.additionalOwners) ? v.additionalOwners : [];
   const alternateContacts: any[] = Array.isArray(v.alternateContacts) ? v.alternateContacts : [];
@@ -260,30 +312,68 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
         )}
       </Section>
 
-      {/* Warehouse & Factory */}
-      <Section title="Warehouse & Factory" icon={<Factory className="h-5 w-5" />}>
+      {/* Legal Address & Factory Site — mirrors the vendor registration form */}
+      <Section title="Legal Address & Factory Site" icon={<Factory className="h-5 w-5" />}>
         <FieldGrid>
-          <Field label="Ownership Type" value={titleCase(v.ownershipType || v.factoryOwnershipType)} />
-          <Field label="Warehouse Size" value={v.warehouseSize} />
-          <Field label="Storage Capacity" value={v.storageCapacity} />
-          <Field label="Factory Size" value={v.factorySize} />
-          <Field label="Production Capacity" value={v.productionCapacity} wide />
-          <Field label="Warehouse Address" value={[v.warehouseAddress, v.warehouseAddressLine2, v.warehouseAddressLine3, v.warehouseLandmark].filter(Boolean).join(", ")} wide />
-          <Field label="Warehouse Location" value={[v.warehouseCity, v.warehouseState, v.warehouseZipCode, v.warehouseCountry].filter(Boolean).join(", ")} wide />
-          <Field label="Factory Address" value={[v.factoryAddress, v.factoryCity, v.factoryState, v.factoryZipCode, v.factoryCountry].filter(Boolean).join(", ")} wide />
+          <Field label="Ownership Type" value={titleCase(v.factoryOwnershipType || v.ownershipType)} />
+          <Field label="Warehousing Capacity" value={v.factorySize} />
+          <Field label="Address Line 1" value={v.factoryAddress} wide />
+          <Field label="Address Line 2" value={v.addressLine2} />
+          <Field label="Address Line 3" value={v.addressLine3} />
+          <Field label="Landmark" value={v.landmark} />
+          <Field label="City" value={v.factoryCity} />
+          <Field label="State" value={v.factoryState} />
+          <Field label="ZIP / Postal Code" value={v.factoryZipCode} />
+          <Field label="Country" value={v.factoryCountry} />
         </FieldGrid>
         {v.mapLink && (
           <a href={v.mapLink.match(/src=["']([^"']+)["']/i)?.[1] || v.mapLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-3 text-sm text-brand-600 hover:underline">
             <MapPin className="w-4 h-4" /> View Map Location
           </a>
         )}
-        {factoryImages.length > 0 && (
+        {legalImages.length > 0 && (
           <div className="mt-4">
-            <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Factory & Warehouse Images ({factoryImages.length})</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Factory Images ({legalImages.length})</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {factoryImages.map((d, i) => <DocThumb key={i} url={d.documentUrl} name={d.name} />)}
+              {legalImages.map((d, i) => <DocThumb key={i} url={d.documentUrl} name={d.name} />)}
             </div>
           </div>
+        )}
+      </Section>
+
+      {/* Warehouse Details — separate section; collapses to a note when the
+          vendor selected "Same as Legal Address & Factory Site". */}
+      <Section title="Warehouse Details" icon={<Warehouse className="h-5 w-5" />}>
+        {sameAsWarehouse ? (
+          <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <MapPin className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-blue-800 font-medium">
+              Warehouse details are the same as the Legal Address &amp; Factory Site.
+            </p>
+          </div>
+        ) : (
+          <>
+            <FieldGrid>
+              <Field label="Ownership Type" value={titleCase(v.ownershipType)} />
+              <Field label="Warehousing Capacity" value={v.warehouseSize} />
+              <Field label="Address Line 1" value={v.warehouseAddress} wide />
+              <Field label="Address Line 2" value={v.warehouseAddressLine2} />
+              <Field label="Address Line 3" value={v.warehouseAddressLine3} />
+              <Field label="Landmark" value={v.warehouseLandmark} />
+              <Field label="City" value={v.warehouseCity} />
+              <Field label="State" value={v.warehouseState} />
+              <Field label="ZIP / Postal Code" value={v.warehouseZipCode} />
+              <Field label="Country" value={v.warehouseCountry} />
+            </FieldGrid>
+            {warehouseImages.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Warehouse Images ({warehouseImages.length})</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {warehouseImages.map((d, i) => <DocThumb key={i} url={d.documentUrl} name={d.name} />)}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </Section>
 
@@ -384,9 +474,7 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
                   )}
                 </div>
                 {c.documentUrl && (
-                  <div className="w-40">
-                    <DocThumb url={c.documentUrl} name="Certificate" />
-                  </div>
+                  <DocRow url={c.documentUrl} label="Certificate" sub={c.name} />
                 )}
               </div>
             ))}
@@ -449,8 +537,8 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
       {/* Documents */}
       {fileDocs.length > 0 && (
         <Section title={`Documents (${fileDocs.length})`} icon={<FileText className="h-5 w-5" />}>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {fileDocs.map((d, i) => <DocThumb key={i} url={d.documentUrl} name={d.name || titleCase(d.type)} />)}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {fileDocs.map((d, i) => <DocRow key={i} url={d.documentUrl} label={d.name || titleCase(d.type) || "Document"} />)}
           </div>
         </Section>
       )}

@@ -693,7 +693,7 @@ const getQcFactoryReports = async (req, res) => {
                     result: true,
                     createdAt: true,
                     completedAt: true,
-                    vendor: { select: { id: true, companyName: true, email: true } },
+                    vendor: { select: { id: true, vendorCode: true, companyName: true, email: true } },
                     checker: { select: { id: true, name: true, title: true, email: true } },
                 },
                 orderBy: { [sortBy]: sortOrder },
@@ -756,7 +756,7 @@ const getQcProductReports = async (req, res) => {
                     rejectionReason: true,
                     updatedAt: true,
                     qcInspectionData: true, // needed to extract finalDecision; stripped before response
-                    vendor: { select: { id: true, companyName: true, email: true } },
+                    vendor: { select: { id: true, vendorCode: true, companyName: true, email: true } },
                 },
                 orderBy: { updatedAt: sortOrder },
                 skip,

@@ -12,6 +12,7 @@ import vendorService from '@/services/vendorService'
 import { generateFactoryInspectionPdf } from '@/lib/factoryInspectionReportPdf'
 import type { FactoryImageEntry, FactoryReportMeta } from '@/lib/factoryInspectionReportPdf'
 import { formatCheckerName } from '@/lib/checkerUtils'
+import { fieldLabelForKey } from '@/lib/inspectionFieldLabel'
 import { formatTime12 } from '@/lib/utils'
 import VendorInspectionData from '@/components/AdminDashboard/Vendors/VendorInspectionData'
 
@@ -43,6 +44,8 @@ function stepForKey(key: string): string {
     if (key.startsWith('o_'))  return 'Step 3 – Owner Profile'
     return 'Other'
 }
+
+// Field labels come from the shared util so this view matches the PDF report.
 
 // ── Verification types ─────────────────────────────────────────────────────────
 type VF = Record<string, { ok: boolean | null; remarks: string }>
@@ -418,6 +421,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                                             <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-xs font-bold text-red-700">{stepForKey(key)}</p>
+                                                <p className="text-sm font-semibold text-red-900 mt-0.5">{fieldLabelForKey(key)}</p>
                                                 {v.remarks
                                                     ? <p className="text-sm text-red-800 mt-0.5">{v.remarks}</p>
                                                     : <p className="text-sm text-red-600 italic mt-0.5">No remarks provided.</p>

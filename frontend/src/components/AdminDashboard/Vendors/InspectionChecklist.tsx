@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ClipboardCheck, CheckCircle, XCircle, Clock, ChevronDown } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
+import { fieldLabelForKey as humanizeFieldKey } from "@/lib/inspectionFieldLabel";
 
 type Verification = { ok: boolean | null; remarks: string };
 
@@ -17,15 +18,6 @@ const VERIFICATION_SECTIONS: { label: string; test: (k: string) => boolean }[] =
   { label: "Step 6 · Certifications", test: (k) => k.startsWith("cert_") || k.startsWith("certDoc_") },
   { label: "Step 7 · Contact & Trade", test: (k) => k.startsWith("ct_") },
 ];
-
-// Turn a field key into a readable label: strip the step prefix, split
-// snake_case / camelCase, and title-case. e.g. "ct_mainContact_name" → "Main Contact Name".
-function humanizeFieldKey(key: string): string {
-  const stripped = key.replace(/^(certDoc_|cert_|c_|w_|o_|vt_|mf_|ct_)/, "");
-  const spaced = stripped.replace(/_/g, " ").replace(/([a-z0-9])([A-Z])/g, "$1 $2");
-  const label = spaced.replace(/\b\w/g, (ch) => ch.toUpperCase()).trim();
-  return label || key;
-}
 
 function statusBadge(ok: boolean | null) {
   if (ok === true) return <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><CheckCircle className="w-3.5 h-3.5" /> Verified</span>;

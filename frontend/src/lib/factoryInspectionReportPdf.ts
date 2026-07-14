@@ -18,6 +18,7 @@
 import jsPDF from "jspdf"
 import { formatCheckerName } from "@/lib/checkerUtils"
 import { resolveOwnerDesignation } from "@/lib/utils"
+import { fieldLabelForKey } from "@/lib/inspectionFieldLabel"
 import autoTable from "jspdf-autotable"
 import type { Verifications } from "@/components/Checker/Vendor/Steps/VI_VerifyField"
 export interface FactoryReportChecker {
@@ -105,6 +106,9 @@ function stepForKey(key: string): string {
   if (key.startsWith("o_"))  return "Step 3 – Owner Profile"
   return "Unknown"
 }
+
+// `fieldLabelForKey` lives in the shared util so the report and every on-screen
+// inspection view produce identical field labels — imported at the top.
 
 // ── Utility helpers ───────────────────────────────────────────────────────────
 function blank(v: unknown): boolean {
@@ -477,7 +481,7 @@ export function generateFactoryInspectionPdf(
     sectionTitle("E. Market Focus", sectionStatus(['vt_']))
     const mfRows: string[][] = []
     if (!blank(v.marketFocus)) mfRows.push(["Market Focus", val(v.marketFocus)])
-    if (Array.isArray(v.primaryMarkets) && v.primaryMarkets.length > 0) mfRows.push(["Primary Markets", val(v.primaryMarkets)])
+    if (Array.isArray(v.primaryMarkets) && v.primaryMarkets.length > 0) mfRows.push(["Market Type", val(v.primaryMarkets)])
     if (Array.isArray(v.domesticMarkets) && v.domesticMarkets.length > 0) mfRows.push(["Domestic Markets", val(v.domesticMarkets)])
     runTable([["Field", "Value"]], mfRows)
   }
@@ -642,8 +646,8 @@ export function generateFactoryInspectionPdf(
   if (issues.length > 0) {
     sectionTitle("J. Issues Found")
     runTable(
-      [["Step", "Remarks"]],
-      issues.map(([key, v]) => [stepForKey(key), val(v.remarks)])
+      [["Step", "Field", "Remarks"]],
+      issues.map(([key, v]) => [stepForKey(key), fieldLabelForKey(key), val(v.remarks)])
     )
   }
 

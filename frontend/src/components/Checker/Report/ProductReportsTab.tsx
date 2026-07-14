@@ -321,15 +321,15 @@ export default function ProductReportsTab() {
           </div>
         ) : (
           <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="font-semibold">Product</TableHead>
-                <TableHead className="font-semibold">Vendor</TableHead>
-                <TableHead className="font-semibold">Category</TableHead>
-                <TableHead className="font-semibold">SKU</TableHead>
-                <TableHead className="font-semibold">Inspected On</TableHead>
-                <TableHead className="font-semibold">Result</TableHead>
-                <TableHead className="font-semibold">Actions</TableHead>
+            <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b-0">
+              <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
+                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Product</TableHead>
+                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Category</TableHead>
+                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">SKU</TableHead>
+                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Inspected On</TableHead>
+                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Result</TableHead>
+                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

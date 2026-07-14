@@ -135,7 +135,7 @@ export default function BankDetails() {
     try {
       const response = await VendorService.getVendorDocuments()
       const kycDocs = response.documents.filter(doc => 
-        ['COMPANY_REGISTRATION', 'GST_CERTIFICATE', 'PAN_CARD', 'TRADE_LICENSE'].includes(doc.type)
+        ['COMPANY_REGISTRATION', 'GST_CERTIFICATE', 'PAN_CARD'].includes(doc.type)
       )
       setDocuments(kycDocs)
     } catch (error) {
@@ -710,12 +710,11 @@ export default function BankDetails() {
         {/* KYC Status — interactive: uploaded cards show View, empty cards open upload modal */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <h2 className="text-base font-semibold mb-3">Verification Status</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
             {[
               { type: 'COMPANY_REGISTRATION', label: 'Company Registration', description: 'Certificate of Incorporation / Business Registration' },
               { type: 'GST_CERTIFICATE', label: 'GST Certificate', description: 'Goods and Services Tax Registration' },
               { type: 'PAN_CARD', label: 'PAN Card', description: 'Permanent Account Number Card' },
-              { type: 'TRADE_LICENSE', label: 'Trade License', description: 'Business/Trade License from Local Authority' }
             ].map(({ type, label, description }) => {
               const doc = documents.find(d => d.type === type)
               const uploaded = getDocumentStatus(type) === 'verified'

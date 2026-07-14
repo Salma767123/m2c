@@ -143,8 +143,8 @@ export default function SettingsPage() {
             {/* Contact */}
             <SectionCard icon={Mail} title="Contact Information" subtitle="How we reach you">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Field label="Email Address" value={profile?.email} />
-                <Field label="Phone Number" value={profile?.phone} />
+                <Field label="Primary Email" value={profile?.email} />
+                <Field label="Primary Phone" value={profile?.phone} />
                 <Field label="Secondary Email" value={profile?.alternateEmail} />
                 <Field label="Secondary Phone" value={profile?.alternatePhone} />
               </div>

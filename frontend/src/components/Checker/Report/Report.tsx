@@ -188,11 +188,15 @@ export default function ReportsPage() {
     return {
       id: insp.id,
       vendor: insp.vendor?.companyName || "—",
+      // Human-readable vendor code (VND-YYYY-NNNN), same as the admin panel.
+      // Falls back to the raw id only if a legacy vendor has no code yet.
+      vendorId: insp.vendor?.vendorCode || insp.vendor?.id || insp.vendorId || "—",
       // Date the inspection was scheduled/assigned.
       assignedDate: fmtDate(insp.scheduledDate),
-      inspectionDate: insp.completedAt
-        ? new Date(insp.completedAt).toLocaleDateString("en-IN")
-        : insp.scheduledDate || "—",
+      // Format consistently — the old fallback returned the raw ISO string
+      // (e.g. "2026-07-23") when completedAt was missing, so some rows showed
+      // ISO while others showed DD/MM/YYYY.
+      inspectionDate: fmtDate(insp.completedAt || insp.scheduledDate),
       priority: insp.priority || "—",
       result: insp.result || "—",
     }
@@ -374,13 +378,14 @@ export default function ReportsPage() {
               </div>
             ) : (
               <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="font-semibold w-[32%]">Vendor</TableHead>
-                    <TableHead className="font-semibold w-[18%]">Assigned Date</TableHead>
-                    <TableHead className="font-semibold w-[18%]">Completed On</TableHead>
-                    <TableHead className="font-semibold w-[16%]">Priority</TableHead>
-                    <TableHead className="font-semibold w-[16%]">Result</TableHead>
+                <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b-0">
+                  <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
+                    <TableHead className="w-[24%] font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                    <TableHead className="w-[20%] font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor ID</TableHead>
+                    <TableHead className="w-[15%] font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Assigned Date</TableHead>
+                    <TableHead className="w-[15%] font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Completed On</TableHead>
+                    <TableHead className="w-[13%] font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Priority</TableHead>
+                    <TableHead className="w-[13%] font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Result</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -391,6 +396,7 @@ export default function ReportsPage() {
                         <TableCell>
                           <div className="font-medium text-slate-900">{row.vendor}</div>
                         </TableCell>
+                        <TableCell className="text-slate-500 text-xs font-mono truncate" title={row.vendorId}>{row.vendorId}</TableCell>
                         <TableCell className="text-slate-600 text-sm">{row.assignedDate}</TableCell>
                         <TableCell className="text-slate-600 text-sm">{row.inspectionDate}</TableCell>
                         <TableCell>{getPriorityBadge(row.priority)}</TableCell>

@@ -15,6 +15,7 @@ import RejectionModal from "./RejectionModal";
 import AdminReviewModal from "../ReInspection/AdminReviewModal";
 import axiosInstance from "@/lib/axios";
 import { generateFactoryInspectionPdf, pdfFileName } from "@/lib/factoryInspectionReportPdf";
+import { fieldLabelForKey as humanizeFieldKey } from "@/lib/inspectionFieldLabel";
 import VendorInspectionData from "./VendorInspectionData";
 import InspectionChecklist from "./InspectionChecklist";
 
@@ -46,15 +47,6 @@ function openDataUriInTab(dataUri: string, mimeType: string) {
     const blob = new Blob([ab], { type: mimeType });
     window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
   } catch { /* ignore */ }
-}
-
-// Turn a field key into a readable label: strip the step prefix, split
-// snake_case / camelCase, and title-case. e.g. "ct_mainContact_name" → "Main Contact Name".
-function humanizeFieldKey(key: string): string {
-  const stripped = key.replace(/^(certDoc_|cert_|c_|w_|o_|vt_|mf_|ct_)/, "");
-  const spaced = stripped.replace(/_/g, " ").replace(/([a-z0-9])([A-Z])/g, "$1 $2");
-  const label = spaced.replace(/\b\w/g, (ch) => ch.toUpperCase()).trim();
-  return label || key;
 }
 
 interface InspectionData {
@@ -344,14 +336,34 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
     }
   };
 
-  const getResultBadge = (result: string | null) => {
-    switch (result) {
-      case 'PASSED':
-        return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-base px-4 py-2"><CheckCircle className="w-4 h-4 mr-2" />Passed</Badge>;
-      case 'FAILED':
-        return <Badge className="bg-red-100 text-red-800 border-red-200 text-base px-4 py-2"><XCircle className="w-4 h-4 mr-2" />Failed</Badge>;
+  // The checker's Pass/Fail verdict (`inspection.result`) is only final once the
+  // inspection is COMPLETED. While it is still SUBMITTED / under admin review the
+  // card must show the lifecycle status — not a premature "Passed". Uses only
+  // existing inspection statuses.
+  const getInspectionStatusBadge = (insp: { status?: string | null; result?: string | null } | null) => {
+    const status = (insp?.status || '').toUpperCase();
+    const result = (insp?.result || '').toUpperCase();
+    const base = "text-base px-4 py-2 border";
+    switch (status) {
+      case 'COMPLETED':
+        if (result === 'FAILED')
+          return <Badge className={`bg-red-100 text-red-800 border-red-200 ${base}`}><XCircle className="w-4 h-4 mr-2" />Failed</Badge>;
+        return <Badge className={`bg-emerald-100 text-emerald-800 border-emerald-200 ${base}`}><CheckCircle className="w-4 h-4 mr-2" />{result === 'PASSED' ? 'Passed' : 'Completed'}</Badge>;
+      case 'SUBMITTED':
+      case 'UNDER_ADMIN_REVIEW':
+        return <Badge className={`bg-blue-100 text-blue-800 border-blue-200 ${base}`}><Clock className="w-4 h-4 mr-2" />Under Review by Admin</Badge>;
+      case 'SCHEDULED':
+        return <Badge className={`bg-slate-100 text-slate-700 border-slate-200 ${base}`}><Clock className="w-4 h-4 mr-2" />Scheduled</Badge>;
+      case 'IN_PROGRESS':
+        return <Badge className={`bg-amber-100 text-amber-800 border-amber-200 ${base}`}><Clock className="w-4 h-4 mr-2" />In Progress</Badge>;
+      case 'REJECTED':
+        return <Badge className={`bg-red-100 text-red-800 border-red-200 ${base}`}><XCircle className="w-4 h-4 mr-2" />Rejected</Badge>;
+      case 'REINSPECTION':
+        return <Badge className={`bg-amber-100 text-amber-800 border-amber-200 ${base}`}><Clock className="w-4 h-4 mr-2" />Re-Inspection</Badge>;
+      case 'CANCELLED':
+        return <Badge className={`bg-slate-100 text-slate-600 border-slate-200 ${base}`}><XCircle className="w-4 h-4 mr-2" />Cancelled</Badge>;
       default:
-        return <Badge className="bg-slate-100 text-slate-800 text-base px-4 py-2"><Clock className="w-4 h-4 mr-2" />Pending</Badge>;
+        return <Badge className={`bg-slate-100 text-slate-800 ${base}`}><Clock className="w-4 h-4 mr-2" />{status ? status.replace(/_/g, ' ') : 'Pending'}</Badge>;
     }
   };
 
@@ -474,7 +486,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
         <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-4">
             <div className="text-sm text-slate-500">Inspection Status</div>
-            <div className="mt-1">{getResultBadge(inspection.result)}</div>
+            <div className="mt-1">{getInspectionStatusBadge(inspection)}</div>
           </CardContent>
         </Card>
         <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
@@ -497,12 +509,25 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
         </Card>
         <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-4">
-            <div className="text-sm text-slate-500">Vendor Status</div>
+            <div className="text-sm text-slate-500">Admin Status</div>
             <div className="text-lg font-bold mt-1">
-              {vendorStatus === 'APPROVED' ? <span className="text-emerald-600">Approved</span> :
-               vendorStatus === 'UNDER_REVIEW' ? <span className="text-blue-600">Under Review</span> :
-               vendorStatus === 'REJECTED' ? <span className="text-red-600">Rejected</span> :
-               <span className="text-slate-500">{vendorStatus || "N/A"}</span>}
+              {(() => {
+                // Admin's decision/review state on the vendor. Labels match the
+                // admin Vendor Management / Assign QC Checker pages.
+                const s = (vendorStatus || '').toUpperCase();
+                const map: Record<string, { label: string; cls: string }> = {
+                  APPROVED:     { label: 'Approved',      cls: 'text-emerald-600' },
+                  UNDER_REVIEW: { label: 'Under Review',  cls: 'text-blue-600' },
+                  REJECTED:     { label: 'Rejected',      cls: 'text-red-600' },
+                  REINSPECTION: { label: 'Re-Inspection', cls: 'text-amber-600' },
+                  SUSPENDED:    { label: 'Suspended',     cls: 'text-orange-600' },
+                  PENDING:      { label: 'Pending',       cls: 'text-slate-600' },
+                };
+                const m = map[s];
+                return m
+                  ? <span className={m.cls}>{m.label}</span>
+                  : <span className="text-slate-500">{vendorStatus || 'N/A'}</span>;
+              })()}
             </div>
           </CardContent>
         </Card>

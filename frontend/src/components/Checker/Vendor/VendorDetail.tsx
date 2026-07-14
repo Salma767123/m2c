@@ -27,12 +27,13 @@ import {
   ShieldCheck,
   Image as ImageIcon,
   Eye,
+  Download,
 } from "lucide-react"
 import { Vendor } from "@/types/inspection"
 import qcCheckerService from "@/services/qcCheckerService"
 import { formatLocalLandline, formatIntlLandline } from "@/components/VendorHub/FormUI"
 import { buildFullName, toExternalUrl, resolveOwnerDesignation, formatTime12 } from "@/lib/utils"
-import { isDocImageUrl } from "@/lib/docDownload"
+import { isDocImageUrl, downloadDoc } from "@/lib/docDownload"
 import DocViewerModal from "@/components/UI/DocViewerModal"
 import { FACILITY_META, withUnit } from "./Steps/VI_Step5_Manufacturing"
 import { Country } from "country-state-city"
@@ -494,38 +495,51 @@ export default function VendorDetail({
       </div>
     )
 
+    // Compact document rows — icon/thumbnail + label + View/Download, matching
+    // the document cards used elsewhere. Replaces the tall placeholder tiles so
+    // non-image docs (GST / PAN / CIN / IEC) stay small and consistent.
     const renderDocsGrid = (heading: string, docs: any[]) => (
       <div>
         <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
           <FileText className="w-4.5 h-4.5 text-slate-400" /> {heading} ({docs.length})
         </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {docs.map((doc: any, idx: number) => (
-            <div key={doc.id || idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-3 space-y-2">
-              {isImageUrl(doc.documentUrl, doc.name) ? (
-                <button type="button" onClick={() => setViewerDoc({ url: doc.documentUrl, name: doc.name || 'Document' })} className="block w-full">
-                  <img src={doc.documentUrl} alt={doc.name} className="w-full h-32 object-cover rounded-lg border border-slate-200" />
-                </button>
-              ) : (
-                <div className="w-full h-32 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-300">
-                  <FileText className="w-10 h-10" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {docs.map((doc: any, idx: number) => {
+            const isImg = isImageUrl(doc.documentUrl, doc.name)
+            return (
+              <div key={doc.id || idx} className="flex items-center gap-3 p-2.5 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 transition-colors">
+                {isImg ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={doc.documentUrl} alt={doc.name} className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0" loading="lazy" />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-brand-50 text-brand-500 flex items-center justify-center shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 truncate" title={doc.name}>{doc.name}</p>
                 </div>
-              )}
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-bold text-slate-700 truncate" title={doc.name}>{doc.name}</p>
                 {doc.documentUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setViewerDoc({ url: doc.documentUrl, name: doc.name || 'Document' })}
-                    className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg transition-colors"
-                    title="View"
-                  >
-                    <Eye className="w-3.5 h-3.5" /> View
-                  </button>
+                  <div className="flex gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setViewerDoc({ url: doc.documentUrl, name: doc.name || 'Document' })}
+                      className="inline-flex items-center gap-1 h-7 px-2 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      <Eye className="w-3 h-3" /> View
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadDoc(doc.documentUrl, doc.name || 'Document')}
+                      className="inline-flex items-center gap-1 h-7 px-2 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      <Download className="w-3 h-3" /> Download
+                    </button>
+                  </div>
                 )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     )
