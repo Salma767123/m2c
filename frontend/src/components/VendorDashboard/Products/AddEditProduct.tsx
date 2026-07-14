@@ -1033,7 +1033,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     if (!formData.name.trim()) newErrors.name = 'Product name is required.'
     if (!formData.description.trim()) newErrors.description = 'Description is required.'
     if (!formData.category) newErrors.category = 'Please select a category.'
-    if (!formData.subCategory) newErrors.subCategory = 'Please select a sub-category.'
+    // Sub-category is assigned by the admin at approval time, not by the vendor.
     if (!formData.fabricType) newErrors.fabricType = 'Please select a fabric type.'
     if (formData.fabricType === 'Others' && !otherFabricType.trim()) newErrors.otherFabricType = 'Please enter a custom fabric type.'
     if (formData.fabricSpecifications.careInstructions.length === 0) {
@@ -1441,30 +1441,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       {formData.isFromInventory && !isEdit && (
                         <p className="text-xs text-slate-500 mt-1">From inventory item</p>
                       )}
-                    </div>
-                    <div>
-                      <div id="vf-subCategory" className={errors.subCategory ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
-                        <Dropdown
-                          label="Sub-Category *"
-                          value={formData.subCategory}
-                          options={
-                            formData.category
-                              ? (
-                                formData.isFromInventory && selectedInventoryItem?.subcategory && selectedInventoryItem.category === formData.category
-                                  ? [selectedInventoryItem.subcategory, ...(categorySubcategories[formData.category] || []).filter(sub => sub !== selectedInventoryItem.subcategory)]
-                                  : categorySubcategories[formData.category] || []
-                              )
-                              : []
-                          }
-                          placeholder="Select Sub-Category"
-                          onChange={(value) => { clearError('subCategory'); setFormData(prev => ({ ...prev, subCategory: value as string })) }}
-                          disabled={formData.isFromInventory && !isEdit}
-                        />
-                      </div>
-                      {errors.subCategory && <p className="text-xs text-red-600 mt-1">{errors.subCategory}</p>}
-                      {formData.isFromInventory && !isEdit && (
-                        <p className="text-xs text-slate-500 mt-1">From inventory item</p>
-                      )}
+                      {/* Sub-Category is intentionally not collected here — the
+                          admin assigns it when approving/publishing the product. */}
                     </div>
                   </div>
 
