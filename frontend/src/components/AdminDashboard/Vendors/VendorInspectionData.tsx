@@ -302,8 +302,12 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
                   <FieldGrid cols="grid-cols-2">
                     <Field label="Name" value={buildFullName(o.title, o.firstName, o.middleName, o.lastName, o.name)} />
                     <Field label="Designation" value={o.designation === "Others" ? o.customDesignation : titleCase(o.designation)} />
-                    <Field label="Email" value={o.email} />
-                    <Field label="Phone" value={o.phone} />
+                    <Field label="Primary Email" value={o.email} />
+                    <Field label="Secondary Email" value={o.email2} />
+                    <Field label="Primary Phone" value={o.phone} />
+                    <Field label="Secondary Phone" value={o.phone2} />
+                    <Field label="Local Landline" value={o.localLandline} />
+                    <Field label="International Landline" value={o.intlLandline} />
                   </FieldGrid>
                 </div>
               ))}
