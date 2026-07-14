@@ -59,13 +59,13 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+            <ArrowLeft className="h-5 w-5 text-slate-600" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Settlement Details</h1>
-            <p className="text-sm text-gray-600 mt-1">Settlement: {settlement.settlementNumber}</p>
+            <h1 className="text-2xl font-bold text-slate-900">Settlement Details</h1>
+            <p className="text-sm text-slate-600 mt-1">Settlement: {settlement.settlementNumber}</p>
           </div>
         </div>
         {status === "Pending" && hasPermission("settlement:mark_paid") && (
@@ -80,23 +80,23 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
       </div>
 
       {/* Settlement Overview */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Settlement Overview</h2>
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">Settlement Overview</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <p className="text-sm text-gray-600">Settlement Number</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{settlement.settlementNumber}</p>
+            <p className="text-sm text-slate-600">Settlement Number</p>
+            <p className="text-base font-medium text-slate-900 mt-1">{settlement.settlementNumber}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Billing Number</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{settlement.billingNumber}</p>
+            <p className="text-sm text-slate-600">Billing Number</p>
+            <p className="text-base font-medium text-slate-900 mt-1">{settlement.billingNumber}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Period</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{settlement.period}</p>
+            <p className="text-sm text-slate-600">Period</p>
+            <p className="text-base font-medium text-slate-900 mt-1">{settlement.period}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Status</p>
+            <p className="text-sm text-slate-600">Status</p>
             <p className={`text-base font-medium mt-1 ${
               status === "Paid" ? "text-green-600" :
               status === "Processing" ? "text-blue-600" :
@@ -109,40 +109,40 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
       </div>
 
       {/* Vendor Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
-          <Building2 className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Vendor Information</h2>
+          <Building2 className="h-5 w-5 text-slate-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Vendor Information</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <p className="text-sm text-gray-600">Vendor Name</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{settlement.vendor.name}</p>
+            <p className="text-sm text-slate-600">Vendor Name</p>
+            <p className="text-base font-medium text-slate-900 mt-1">{settlement.vendor.name}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Email</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{settlement.vendor.email}</p>
+            <p className="text-sm text-slate-600">Email</p>
+            <p className="text-base font-medium text-slate-900 mt-1">{settlement.vendor.email}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Phone</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{settlement.vendor.phone}</p>
+            <p className="text-sm text-slate-600">Phone</p>
+            <p className="text-base font-medium text-slate-900 mt-1">{settlement.vendor.phone}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">GST Number</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{settlement.vendor.gst}</p>
+            <p className="text-sm text-slate-600">GST Number</p>
+            <p className="text-base font-medium text-slate-900 mt-1">{settlement.vendor.gst}</p>
           </div>
           <div className="md:col-span-2">
-            <p className="text-sm text-gray-600">Address</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{settlement.vendor.address}</p>
+            <p className="text-sm text-slate-600">Address</p>
+            <p className="text-base font-medium text-slate-900 mt-1">{settlement.vendor.address}</p>
           </div>
         </div>
       </div>
 
       {/* Bank Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
-          <CreditCard className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Bank Account Details</h2>
+          <CreditCard className="h-5 w-5 text-slate-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Bank Account Details</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
           <div>
@@ -165,22 +165,22 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
       </div>
 
       {/* Billing Summary */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Billing Summary</h2>
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">Billing Summary</h2>
         <div className="space-y-3">
-          <div className="flex justify-between py-2 border-b border-gray-200">
-            <span className="text-sm text-gray-600">Total Orders</span>
-            <span className="text-sm font-medium text-gray-900">{settlement.billing.totalOrders}</span>
+          <div className="flex justify-between py-2 border-b border-slate-200">
+            <span className="text-sm text-slate-600">Total Orders</span>
+            <span className="text-sm font-medium text-slate-900">{settlement.billing.totalOrders}</span>
           </div>
-          <div className="flex justify-between py-2 border-b border-gray-200">
-            <span className="text-sm text-gray-600">Total Sales Amount</span>
-            <span className="text-sm font-medium text-gray-900">₹{settlement.billing.totalAmount.toLocaleString()}</span>
+          <div className="flex justify-between py-2 border-b border-slate-200">
+            <span className="text-sm text-slate-600">Total Sales Amount</span>
+            <span className="text-sm font-medium text-slate-900">₹{settlement.billing.totalAmount.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between py-2 border-b border-gray-200">
-            <span className="text-sm text-gray-600">Platform Commission ({settlement.billing.commissionRate}%)</span>
+          <div className="flex justify-between py-2 border-b border-slate-200">
+            <span className="text-sm text-slate-600">Platform Commission ({settlement.billing.commissionRate}%)</span>
             <span className="text-sm font-medium text-red-600">-₹{settlement.billing.commission.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between py-3 bg-gray-900 text-white px-4 rounded-lg">
+          <div className="flex justify-between py-3 bg-brand-500 text-white px-4 rounded-lg">
             <span className="text-base font-semibold">Net Payable Amount</span>
             <span className="text-base font-bold">₹{settlement.billing.netAmount.toLocaleString()}</span>
           </div>
@@ -188,10 +188,10 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
       </div>
 
       {/* Timeline */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
-          <Calendar className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Timeline</h2>
+          <Calendar className="h-5 w-5 text-slate-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Timeline</h2>
         </div>
         <div className="space-y-4">
           <div className="flex gap-4">
@@ -199,11 +199,11 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
               <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
                 <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
-              <div className="w-0.5 h-full bg-gray-200 mt-2"></div>
+              <div className="w-0.5 h-full bg-slate-200 mt-2"></div>
             </div>
             <div className="flex-1 pb-4">
-              <p className="text-sm font-medium text-gray-900">Settlement Created</p>
-              <p className="text-xs text-gray-600 mt-1">{new Date(settlement.createdDate).toLocaleDateString()}</p>
+              <p className="text-sm font-medium text-slate-900">Settlement Created</p>
+              <p className="text-xs text-slate-600 mt-1">{new Date(settlement.createdDate).toLocaleDateString()}</p>
             </div>
           </div>
 
@@ -218,11 +218,11 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
                   <Clock className="h-5 w-5 text-yellow-600" />
                 )}
               </div>
-              {status === "Paid" && <div className="w-0.5 h-full bg-gray-200 mt-2"></div>}
+              {status === "Paid" && <div className="w-0.5 h-full bg-slate-200 mt-2"></div>}
             </div>
             <div className="flex-1 pb-4">
-              <p className="text-sm font-medium text-gray-900">Payment Due</p>
-              <p className="text-xs text-gray-600 mt-1">{settlement.dueDate ? new Date(settlement.dueDate).toLocaleDateString() : 'Not set'}</p>
+              <p className="text-sm font-medium text-slate-900">Payment Due</p>
+              <p className="text-xs text-slate-600 mt-1">{settlement.dueDate ? new Date(settlement.dueDate).toLocaleDateString() : 'Not set'}</p>
             </div>
           </div>
 
@@ -234,8 +234,8 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
                 </div>
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">Payment Completed</p>
-                <p className="text-xs text-gray-600 mt-1">{new Date(settlement.payment.paymentDate).toLocaleDateString()}</p>
+                <p className="text-sm font-medium text-slate-900">Payment Completed</p>
+                <p className="text-xs text-slate-600 mt-1">{new Date(settlement.payment.paymentDate).toLocaleDateString()}</p>
                 <div className="mt-2 bg-green-50 p-3 rounded-lg border border-green-200">
                   <p className="text-xs text-green-800">
                     Transaction ID: <span className="font-medium">{settlement.payment.transactionId}</span>

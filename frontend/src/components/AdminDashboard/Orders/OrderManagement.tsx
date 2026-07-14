@@ -10,11 +10,11 @@ export default function OrderManagement() {
     return (
         <div className="space-y-6">
             {/* Tabs */}
-            <div className="flex border-b border-gray-200">
+            <div className="flex border-b border-slate-200">
                 <button
                     className={`px-6 py-3 text-sm font-medium transition-colors relative ${activeTab === "vendor-to-hub"
-                            ? "text-teal-600 border-b-2 border-teal-600"
-                            : "text-gray-500 hover:text-gray-700"
+                            ? "text-brand-600 border-b-2 border-brand-500"
+                            : "text-slate-500 hover:text-slate-700"
                         }`}
                     onClick={() => setActiveTab("vendor-to-hub")}
                 >
@@ -22,8 +22,8 @@ export default function OrderManagement() {
                 </button>
                 <button
                     className={`px-6 py-3 text-sm font-medium transition-colors relative ${activeTab === "hub-to-customer"
-                            ? "text-teal-600 border-b-2 border-teal-600"
-                            : "text-gray-500 hover:text-gray-700"
+                            ? "text-brand-600 border-b-2 border-brand-500"
+                            : "text-slate-500 hover:text-slate-700"
                         }`}
                     onClick={() => setActiveTab("hub-to-customer")}
                 >

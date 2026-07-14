@@ -99,7 +99,7 @@ function DocThumb({ url, name }: { url?: string; name?: string }) {
   if (!url) return null;
   const img = isImageUrl(url);
   return (
-    <button type="button" onClick={() => openDoc(url, name || "Image")} className="block w-full border border-slate-200 rounded-xl overflow-hidden hover:border-brand-300 transition-colors">
+    <button type="button" onClick={() => openDoc(url, name || "Image")} className="block w-full border border-slate-200 rounded-xl overflow-hidden hover:border-brand-400 transition-colors">
       {img ? (
         <img src={url} alt={name || "Image"} className="w-full h-32 object-cover" loading="lazy" />
       ) : (

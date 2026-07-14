@@ -124,20 +124,20 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-green-50">
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-green-50">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-green-100 rounded-lg">
               <Truck className="w-6 h-6 text-green-700" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Free Shipping Offers</h2>
-              <p className="text-sm text-gray-600">Set free shipping on specific order numbers</p>
+              <h2 className="text-xl font-bold text-slate-900">Free Shipping Offers</h2>
+              <p className="text-sm text-slate-600">Set free shipping on specific order numbers</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -145,31 +145,31 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
           {/* Existing Free Shipping Coupons */}
           <div className="mb-6">
-            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3">
               Active Offers ({freeShippingOffers.length})
             </h3>
 
             {loading ? (
-              <div className="text-center py-6 text-gray-500 text-sm">Loading...</div>
+              <div className="text-center py-6 text-slate-500 text-sm">Loading...</div>
             ) : freeShippingOffers.length === 0 ? (
-              <div className="text-center py-6 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                <Package className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">No free shipping offers yet</p>
+              <div className="text-center py-6 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                <Package className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                <p className="text-sm text-slate-500">No free shipping offers yet</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {freeShippingOffers.map((offer) => (
-                  <div key={offer.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
+                  <div key={offer.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-3 border border-slate-200">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-gray-900">Free Shipping Offer</span>
+                        <span className="font-semibold text-slate-900">Free Shipping Offer</span>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          offer.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                          offer.isActive ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-slate-100 text-slate-600'
                         }`}>
                           {offer.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </div>
-                      <div className="text-xs text-gray-600 mt-1">
+                      <div className="text-xs text-slate-600 mt-1">
                         {offer.orderNumbers && offer.orderNumbers.length > 0
                           ? `Free shipping on ${offer.orderNumbers.map(n => `${n}${getOrdinalSuffix(n)}`).join(', ')} order(s)`
                           : 'Free shipping on all orders'}
@@ -182,7 +182,7 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
                       {canEdit && (
                         <button
                           onClick={() => startEdit(offer)}
-                          className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100"
+                          className="px-3 py-1.5 text-xs font-medium text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100"
                         >
                           Edit
                         </button>
@@ -203,7 +203,7 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
           </div>
 
           {/* Divider */}
-          <div className="border-t border-gray-200 mb-6" />
+          <div className="border-t border-slate-200 mb-6" />
 
           {/* Create / Edit Form */}
           <div className="bg-green-50 rounded-lg border border-green-200 p-5">
@@ -215,14 +215,14 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
             <div className="space-y-4">
               {/* Order Numbers */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
                   Free Shipping on Which Orders?
                 </label>
                 <input
                   type="text"
                   value={orderNumbers}
                   onChange={(e) => setOrderNumbers(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
                   placeholder="e.g., 3, 5, 10 (comma-separated)"
                 />
                 <div className="mt-1.5 flex items-start gap-1.5 text-xs text-green-800 bg-green-100 p-2 rounded">
@@ -237,30 +237,30 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
 
               {/* Minimum Order Value */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Minimum Order Value <span className="text-gray-400 text-xs">($)</span>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                  Minimum Order Value <span className="text-slate-400 text-xs">($)</span>
                 </label>
                 <input
                   type="number"
                   value={minOrderValue || ''}
                   onChange={(e) => setMinOrderValue(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
                   placeholder="e.g., 500"
                   min="0"
                   step="1"
                 />
-                <div className="mt-1.5 text-xs text-gray-600">
+                <div className="mt-1.5 text-xs text-slate-600">
                   Minimum cart value required to qualify for free shipping. Set to 0 for no minimum.
                 </div>
               </div>
 
               {/* Active Toggle */}
-              <div className="flex items-center justify-between bg-white px-4 py-3 rounded-lg border border-gray-200">
-                <span className="text-sm font-medium text-gray-700">Active</span>
+              <div className="flex items-center justify-between bg-white px-4 py-3 rounded-lg border border-slate-200">
+                <span className="text-sm font-medium text-slate-700">Active</span>
                 <button
                   type="button"
                   onClick={() => setIsActive(!isActive)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isActive ? 'bg-green-600' : 'bg-gray-300'}`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isActive ? 'bg-green-600' : 'bg-slate-300'}`}
                 >
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
@@ -273,7 +273,7 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
                     <button
                       type="button"
                       onClick={resetForm}
-                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                      className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-sm font-medium"
                     >
                       Cancel Edit
                     </button>
@@ -282,7 +282,7 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
                     type="button"
                     onClick={handleSave}
                     disabled={saving}
-                    className="flex-1 px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:bg-gray-400 text-sm font-medium transition-colors"
+                    className="flex-1 px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:bg-slate-400 text-sm font-medium transition-colors"
                   >
                     {saving ? 'Saving...' : editingId ? 'Update Offer' : 'Create Offer'}
                   </button>

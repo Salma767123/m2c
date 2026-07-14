@@ -1407,7 +1407,7 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
           <CardContent className="px-4 pb-4">
             <div className="flex flex-wrap gap-1.5">
               {vendorTypesArray.map((t) => (
-                <Badge key={t} className="bg-blue-100 text-blue-800 capitalize text-xs font-medium">{t}</Badge>
+                <Badge key={t} className="bg-blue-50 text-blue-700 border border-blue-200 capitalize text-xs font-medium">{t}</Badge>
               ))}
             </div>
           </CardContent>
@@ -1421,7 +1421,7 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
             <CardContent className="px-4 pb-4">
               <div className="flex flex-wrap gap-1.5">
                 {marketTypeArray.map((type: string, i: number) => (
-                  <Badge key={i} className="bg-orange-100 text-orange-800 capitalize text-xs font-medium">{type}</Badge>
+                  <Badge key={i} className="bg-orange-50 text-orange-700 border border-orange-200 capitalize text-xs font-medium">{type}</Badge>
                 ))}
               </div>
             </CardContent>
@@ -1436,7 +1436,7 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
             <CardContent className="px-4 pb-4">
               <div className="flex flex-wrap gap-1.5">
                 {Array.from(new Set(vendor.productCategories)).map((category, i) => (
-                  <Badge key={`${category}-${i}`} className="bg-green-100 text-green-800 capitalize text-xs font-medium">
+                  <Badge key={`${category}-${i}`} className="bg-green-50 text-green-700 border border-green-200 capitalize text-xs font-medium">
                     {category}
                   </Badge>
                 ))}
@@ -1628,7 +1628,7 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
                 <p className="text-sm text-slate-500 mb-2">Shipping Methods</p>
                 <div className="flex flex-wrap gap-2">
                   {vendor.shippingMethods.map((method, index) => (
-                    <Badge key={index} className="bg-indigo-100 text-indigo-800 capitalize">{method}</Badge>
+                    <Badge key={index} className="bg-indigo-50 text-indigo-700 border border-indigo-200 capitalize">{method}</Badge>
                   ))}
                 </div>
               </div>
@@ -1865,18 +1865,18 @@ function BankDetailsTab({ vendor, onVerify, loading }: { vendor: VendorProfile, 
             <div className="flex items-center space-x-2">
               <span className="text-sm text-slate-500">Verification Status:</span>
               {bankDetails.isVerified ? (
-                <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
+                <Badge className="bg-green-50 text-green-700 border border-green-200 flex items-center gap-1">
                   <CheckCircle className="h-3 w-3" /> Verified
                 </Badge>
               ) : (
                 <div className="flex items-center gap-4">
-                  <Badge className="bg-yellow-100 text-yellow-800">Pending Verification</Badge>
+                  <Badge className="bg-yellow-50 text-yellow-700 border border-yellow-200">Pending Verification</Badge>
                   {onVerify && hasPermission('vendor_management:edit') && (
                     <Button
                       size="sm"
                       onClick={onVerify}
                       disabled={loading}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      className="bg-brand-500 hover:bg-brand-600 text-white"
                     >
                       {loading ? <LoadingSpinner size="sm" /> : 'Verify Bank Details'}
                     </Button>
@@ -2287,7 +2287,7 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
         <button
           type="button"
           onClick={() => setStatusFilter('all')}
-          className="text-left rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-brand-300 transition-all"
+          className="text-left rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-brand-400 transition-all"
         >
           <div className="p-4">
             <div className="flex items-center gap-3">
@@ -2375,7 +2375,7 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
             placeholder="Search by order ID, product name, or comments..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-9 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900 bg-white transition-colors"
+            className="w-full pl-10 pr-9 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500 bg-white transition-colors"
           />
           {searchTerm && (
             <button
@@ -2442,7 +2442,7 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
         ) : (
           <div>
           <Table>
-            <TableHeader>
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
               <TableRow>
                 <TableHead>Product</TableHead>
                 <TableHead>Order ID</TableHead>
@@ -2487,7 +2487,7 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${review.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${review.status === 'approved' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
                         {review.status === 'approved' ? 'Approved' : 'Rejected'}
                       </span>
                     </TableCell>
@@ -2545,7 +2545,7 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
 
       {/* Detail Modal */}
       {selectedReview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-slate-200">
               <div className="flex justify-between items-start">
@@ -2567,7 +2567,7 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                     <p className="text-sm text-slate-500 mt-1">SKU: {selectedReview.productSKU}</p>
                     <p className="text-sm text-slate-500">Order ID: {selectedReview.orderId}</p>
                     <div className="mt-2">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${selectedReview.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${selectedReview.status === 'approved' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
                         {selectedReview.status === 'approved' ? 'Approved' : 'Rejected'}
                       </span>
                     </div>

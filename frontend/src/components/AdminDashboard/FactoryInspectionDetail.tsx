@@ -200,7 +200,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
 
     if (loading) return (
         <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-500" />
         </div>
     )
 
@@ -285,13 +285,13 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
     const vendor = { ...(inspection.vendor || {}), ...(fullVendor || {}) }
 
     const statusColors: Record<string, string> = {
-        COMPLETED: 'bg-green-100 text-green-800',
-        IN_PROGRESS: 'bg-blue-100 text-blue-800',
-        SCHEDULED: 'bg-amber-100 text-amber-800',
+        COMPLETED: 'bg-green-50 text-green-700 border border-green-200',
+        IN_PROGRESS: 'bg-brand-50 text-brand-700 border border-brand-200',
+        SCHEDULED: 'bg-amber-50 text-amber-700 border border-amber-200',
     }
     const resultColors: Record<string, string> = {
-        PASSED: 'bg-green-100 text-green-800',
-        FAILED: 'bg-red-100 text-red-800',
+        PASSED: 'bg-green-50 text-green-700 border border-green-200',
+        FAILED: 'bg-red-50 text-red-700 border border-red-200',
     }
 
     return (
@@ -313,15 +313,15 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 <button
                     onClick={handleDownloadPdf}
                     disabled={downloading}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#222222] rounded-lg hover:bg-[#333333] transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1"
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
                 >
                     <Download className="w-4 h-4" />
                     {downloading ? 'Generating...' : 'Download PDF'}
                 </button>
                 <div className="flex gap-2 flex-shrink-0">
-                    <Badge className={statusColors[status] || 'bg-gray-100 text-gray-700'}>{status}</Badge>
+                    <Badge className={statusColors[status] || 'bg-slate-100 text-slate-700'}>{status}</Badge>
                     {inspection.result && (
-                        <Badge className={resultColors[inspection.result] || 'bg-gray-100 text-gray-700'}>
+                        <Badge className={resultColors[inspection.result] || 'bg-slate-100 text-slate-700'}>
                             {inspection.result}
                         </Badge>
                     )}
@@ -332,7 +332,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
             <div className="space-y-6">
 
             {/* Assignment Banner */}
-            <div className="bg-gradient-to-r from-[#222222] to-[#333333] rounded-2xl p-6 text-white">
+            <div className="bg-gradient-to-r from-brand-500 to-brand-600 rounded-2xl p-6 text-white">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                     <div>
                         <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Vendor</p>
@@ -414,7 +414,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                         const issues = Object.entries(vf).filter(([, v]) => v.ok === false)
                         if (!issues.length) return null
                         return (
-                            <Section title="Issues Found" icon={AlertTriangle} accent="bg-red-50 text-red-800">
+                            <Section title="Issues Found" icon={AlertTriangle} accent="bg-slate-50 text-slate-700">
                                 <div className="space-y-2">
                                     {issues.map(([key, v]) => (
                                         <div key={key} className="flex items-start gap-3 p-3 rounded-xl bg-red-50/60 border border-red-100">
@@ -435,7 +435,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                     })()}
 
                     {/* Inspection Details */}
-                    <Section title="Inspection Details" icon={ClipboardList} accent="bg-orange-50 text-orange-800">
+                    <Section title="Inspection Details" icon={ClipboardList} accent="bg-slate-50 text-slate-700">
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                             <InfoCard label="Inspector Name" value={formData.inspectorName} />
                             <InfoCard label="Inspection Date" value={formData.inspectionDate} />
@@ -464,7 +464,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                         <p className="text-sm text-amber-800 font-medium">This inspection was submitted using the legacy form format.</p>
                     </div>
 
-                    <Section title="Section 1 — Factory Details" icon={Factory} accent="bg-blue-50 text-blue-800">
+                    <Section title="Section 1 — Factory Details" icon={Factory} accent="bg-slate-50 text-slate-700">
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                             <InfoCard label="Vendor Name" value={formData.vendorName} />
                             <InfoCard label="Factory Name" value={formData.factoryName} />
@@ -474,7 +474,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                         </div>
                     </Section>
 
-                    <Section title="Section 2 — Legal & Registration" icon={ShieldCheck} accent="bg-indigo-50 text-indigo-800">
+                    <Section title="Section 2 — Legal & Registration" icon={ShieldCheck} accent="bg-slate-50 text-slate-700">
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                             <InfoCard label="GST Number" value={formData.gstTaxId} />
                             {formData.panNumber && <InfoCard label={formData.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number'} value={formData.panNumber} />}
@@ -512,7 +512,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                         )}
                     </Section>
 
-                    <Section title="Section 3 — Production Info" icon={Settings} accent="bg-purple-50 text-purple-800">
+                    <Section title="Section 3 — Production Info" icon={Settings} accent="bg-slate-50 text-slate-700">
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                             <InfoCard label="Products Manufactured" value={formData.productsManufactured} />
                             <InfoCard label="Monthly Production Capacity" value={formData.monthlyProductionCapacity} />
@@ -521,20 +521,20 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                         </div>
                     </Section>
 
-                    <Section title="Section 4 — Basic Infrastructure Check" icon={Building2} accent="bg-teal-50 text-teal-800">
+                    <Section title="Section 4 — Basic Infrastructure Check" icon={Building2} accent="bg-slate-50 text-slate-700">
                         <YesNoRow label="Machinery Available" value={formData.machineryAvailable} />
                         <YesNoRow label="Electricity Available" value={formData.electricityAvailable} />
                         <YesNoRow label="Water Available" value={formData.waterAvailable} />
                         <YesNoRow label="Storage Area Available" value={formData.storageAreaAvailable} />
                     </Section>
 
-                    <Section title="Section 5 — Quality & Safety" icon={ShieldCheck} accent="bg-emerald-50 text-emerald-800">
+                    <Section title="Section 5 — Quality & Safety" icon={ShieldCheck} accent="bg-slate-50 text-slate-700">
                         <YesNoRow label="Quality Check Process in Place" value={formData.qualityCheckProcess} />
                         <YesNoRow label="Safety Equipment Available" value={formData.safetyEquipment} />
                         <YesNoRow label="Clean Working Environment" value={formData.cleanWorkingEnvironment} />
                     </Section>
 
-                    <Section title="Section 6 — Inspection Info" icon={ClipboardList} accent="bg-orange-50 text-orange-800">
+                    <Section title="Section 6 — Inspection Info" icon={ClipboardList} accent="bg-slate-50 text-slate-700">
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                             <InfoCard label="Inspection Date" value={formData.inspectionDate} />
                             <InfoCard label="Inspector Name" value={formData.inspectorName} />
@@ -554,7 +554,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                     </Section>
 
                     {((formData.factoryPhotos?.length > 0) || (formData.documentsUpload?.length > 0)) && (
-                        <Section title="Section 7 — Evidence" icon={FileText} accent="bg-rose-50 text-rose-800">
+                        <Section title="Section 7 — Evidence" icon={FileText} accent="bg-slate-50 text-slate-700">
                             {formData.factoryPhotos?.length > 0 && (
                                 <div className="mb-5">
                                     <p className="text-xs font-semibold text-slate-500 uppercase mb-3">Factory Photos ({formData.factoryPhotos.length})</p>
@@ -588,7 +588,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                                         {formData.documentsUpload.map((doc: any, i: number) =>
                                             doc?.data ? (
                                                 <a key={i} href={doc.data} download={doc.name || `Document_${i + 1}`}
-                                                    className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors">
+                                                    className="flex items-center gap-2 px-3 py-2 bg-brand-50 text-brand-700 border border-brand-200 rounded-lg text-xs font-medium hover:bg-brand-100 transition-colors">
                                                     <FileText className="w-3.5 h-3.5" />
                                                     {doc.name || `Document ${i + 1}`}
                                                 </a>
@@ -608,7 +608,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
 
             {/* ── Selfie Verification ── */}
             {(formData.beforeSelfiePhoto || formData.afterSelfiePhoto) && (
-                <Section title="Selfie Verification" icon={Camera} accent="bg-violet-50 text-violet-800">
+                <Section title="Selfie Verification" icon={Camera} accent="bg-slate-50 text-slate-700">
                     <div className="flex flex-wrap gap-6">
                         {([
                             { key: 'before', photo: formData.beforeSelfiePhoto, takenAt: formData.beforeSelfieTakenAt, label: 'Before Inspection' },
@@ -618,9 +618,9 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                             if (!src) return null
                             return (
                                 <div key={key} className="flex flex-col items-center gap-2">
-                                    <div className="relative w-44 rounded-2xl overflow-hidden border-2 border-violet-200 shadow-md" style={{ aspectRatio: '0.8' }}>
+                                    <div className="relative w-44 rounded-2xl overflow-hidden border-2 border-slate-200 shadow-md" style={{ aspectRatio: '0.8' }}>
                                         <img src={src} alt={label} className="w-full h-full object-cover" />
-                                        <div className="absolute bottom-0 inset-x-0 bg-violet-900/70 text-white text-[10px] font-bold text-center py-1 px-2">{label}</div>
+                                        <div className="absolute bottom-0 inset-x-0 bg-slate-900/70 text-white text-[10px] font-bold text-center py-1 px-2">{label}</div>
                                     </div>
                                     {takenAt && (
                                         <div className="flex items-center gap-1 text-slate-400 text-xs">
@@ -641,11 +641,11 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                     accent={inspection.locationVerified ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}>
                     <div className="flex items-center gap-3 mb-4">
                         {inspection.locationVerified ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 border border-emerald-200">
                                 <CheckCircle className="w-3.5 h-3.5" />Location Verified ✓
                             </span>
                         ) : (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200 border border-red-200">
                                 <XCircle className="w-3.5 h-3.5" />Location Mismatch
                             </span>
                         )}
@@ -703,7 +703,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 >
                     <div className="relative max-w-5xl max-h-screen">
                         <button onClick={(e) => { e.stopPropagation(); setSelectedImage(null) }}
-                            className="absolute -top-10 -right-4 p-2 text-white hover:text-gray-300">
+                            className="absolute -top-10 -right-4 p-2 text-white hover:text-slate-300">
                             <XCircle className="w-8 h-8" />
                         </button>
                         <img src={selectedImage.src} alt={selectedImage.alt}

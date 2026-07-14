@@ -8,8 +8,8 @@ import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-        <p className="font-semibold text-gray-900 mb-2">{payload[0].payload.month}</p>
+      <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg">
+        <p className="font-semibold text-slate-900 mb-2">{payload[0].payload.month}</p>
         {payload.map((entry: any, index: number) => (
           <p key={index} className="text-sm" style={{ color: entry.color }}>
             {entry.name}: ${entry.value.toLocaleString()}
@@ -36,18 +36,18 @@ export default function EarningsChart({ earningsData }: { earningsData: any[] })
                 <stop offset="95%" stopColor="#10b981" stopOpacity={0.1} />
               </linearGradient>
               <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1} />
+                <stop offset="5%" stopColor="#e01a1b" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="#e01a1b" stopOpacity={0.1} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis
               dataKey="name"
-              stroke="#6b7280"
+              stroke="#94a3b8"
               style={{ fontSize: '12px' }}
             />
             <YAxis
-              stroke="#6b7280"
+              stroke="#94a3b8"
               style={{ fontSize: '12px' }}
               tickFormatter={(value) => `$${value / 1000}k`}
             />
@@ -67,7 +67,7 @@ export default function EarningsChart({ earningsData }: { earningsData: any[] })
             <Area
               type="monotone"
               dataKey="total"
-              stroke="#3b82f6"
+              stroke="#e01a1b"
               fillOpacity={1}
               fill="url(#colorRevenue)"
               name="Revenue"

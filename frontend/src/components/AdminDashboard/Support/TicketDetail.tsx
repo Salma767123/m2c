@@ -83,7 +83,7 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
   };
 
   if (isLoading) {
-    return <div className="p-6 text-center text-gray-500">Loading ticket details...</div>;
+    return <div className="p-6 text-center text-slate-500">Loading ticket details...</div>;
   }
 
   if (!ticket) {
@@ -93,30 +93,30 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "open":
-        return "bg-red-100 text-red-800";
+        return "bg-red-50 text-red-700 border border-red-200";
       case "in-progress":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-50 text-blue-700 border border-blue-200";
       case "resolved":
-        return "bg-green-100 text-green-800";
+        return "bg-green-50 text-green-700 border border-green-200";
       case "closed":
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-50 text-slate-700 border border-slate-200";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-50 text-slate-700 border border-slate-200";
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "urgent":
-        return "bg-red-100 text-red-800";
+        return "bg-red-50 text-red-700 border border-red-200";
       case "high":
-        return "bg-orange-100 text-orange-800";
+        return "bg-orange-50 text-orange-700 border border-orange-200";
       case "medium":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-50 text-yellow-700 border border-yellow-200";
       case "low":
-        return "bg-green-100 text-green-800";
+        return "bg-green-50 text-green-700 border border-green-200";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-50 text-slate-700 border border-slate-200";
     }
   };
 
@@ -129,8 +129,8 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-gray-900">{ticket.subject}</h1>
-          <p className="text-gray-600 mt-1">Ticket ID: {ticket.ticketId}</p>
+          <h1 className="text-2xl font-bold text-slate-900">{ticket.subject}</h1>
+          <p className="text-slate-600 mt-1">Ticket ID: {ticket.ticketId}</p>
         </div>
       </div>
 
@@ -140,31 +140,31 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
           {/* Ticket Details */}
           <Card>
             <CardContent className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Ticket Information</h2>
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">Ticket Information</h2>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Status:</span>
+                  <span className="text-sm text-slate-600">Status:</span>
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}>
                     {ticket.status.replace("-", " ").toUpperCase()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Priority:</span>
+                  <span className="text-sm text-slate-600">Priority:</span>
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityColor(ticket.priority)}`}>
                     {ticket.priority.toUpperCase()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Category:</span>
-                  <span className="text-sm font-medium text-gray-900">{ticket.category}</span>
+                  <span className="text-sm text-slate-600">Category:</span>
+                  <span className="text-sm font-medium text-slate-900">{ticket.category}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Created:</span>
-                  <span className="text-sm text-gray-900">{new Date(ticket.createdAt).toLocaleString()}</span>
+                  <span className="text-sm text-slate-600">Created:</span>
+                  <span className="text-sm text-slate-900">{new Date(ticket.createdAt).toLocaleString()}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Last Updated:</span>
-                  <span className="text-sm text-gray-900">{new Date(ticket.updatedAt).toLocaleString()}</span>
+                  <span className="text-sm text-slate-600">Last Updated:</span>
+                  <span className="text-sm text-slate-900">{new Date(ticket.updatedAt).toLocaleString()}</span>
                 </div>
               </div>
             </CardContent>
@@ -173,7 +173,7 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
           {/* Conversation */}
           <Card>
             <CardContent className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Conversation</h2>
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">Conversation</h2>
               <div className="space-y-4">
                 {messages.map((message) => (
                   <div
@@ -184,7 +184,7 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
                     <div
                       className={`max-w-[80%] rounded-lg p-4 ${message.senderType === "admin" || message.senderType === "super_admin"
                           ? "bg-blue-600 text-white"
-                          : "bg-gray-100 text-gray-900"
+                          : "bg-slate-100 text-slate-900"
                         }`}
                     >
                       <div className="flex items-center gap-2 mb-2">
@@ -193,7 +193,7 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
                       </div>
                       <p className="text-sm">{message.message}</p>
                       <p
-                        className={`text-xs mt-2 ${message.senderType === "admin" || message.senderType === "super_admin" ? "text-blue-100" : "text-gray-500"
+                        className={`text-xs mt-2 ${message.senderType === "admin" || message.senderType === "super_admin" ? "text-blue-100" : "text-slate-500"
                           }`}
                       >
                         {new Date(message.createdAt).toLocaleString()}
@@ -209,21 +209,21 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
           {canManage && (
             <Card>
               <CardContent className="p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Send Reply</h2>
+                <h2 className="text-lg font-semibold text-slate-900 mb-4">Send Reply</h2>
                 <form onSubmit={handleSubmitReply} className="space-y-4">
                   <textarea
                     value={replyMessage}
                     onChange={(e) => setReplyMessage(e.target.value)}
                     placeholder="Type your response to the vendor..."
                     rows={5}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                     required
                   />
                   <div className="flex justify-end">
                     <button
                       type="submit"
                       disabled={isSubmitting || !replyMessage.trim()}
-                      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                      className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-slate-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
                     >
                       <Send className="w-4 h-4" />
                       {isSubmitting ? "Sending..." : "Send Reply"}
@@ -240,15 +240,15 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
           {/* Vendor Info */}
           <Card>
             <CardContent className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Vendor Information</h2>
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">Vendor Information</h2>
               <div className="space-y-3">
                 <div>
-                  <span className="text-sm text-gray-600">Name:</span>
-                  <p className="font-medium text-gray-900">{ticket.creatorName}</p>
+                  <span className="text-sm text-slate-600">Name:</span>
+                  <p className="font-medium text-slate-900">{ticket.creatorName}</p>
                 </div>
                 <div>
-                  <span className="text-sm text-gray-600">Email:</span>
-                  <p className="font-medium text-gray-900">{ticket.creatorEmail}</p>
+                  <span className="text-sm text-slate-600">Email:</span>
+                  <p className="font-medium text-slate-900">{ticket.creatorEmail}</p>
                 </div>
               </div>
             </CardContent>
@@ -258,7 +258,7 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
           {canManage && (
             <Card>
               <CardContent className="p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Update Status</h2>
+                <h2 className="text-lg font-semibold text-slate-900 mb-4">Update Status</h2>
                 <Dropdown
                   value={ticketStatus}
                   options={[
@@ -278,7 +278,7 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
           {canManage && (
             <Card>
               <CardContent className="p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+                <h2 className="text-lg font-semibold text-slate-900 mb-4">Quick Actions</h2>
                 <div className="space-y-2">
                   <button
                     onClick={() => handleQuickAction("resolved")}
@@ -289,7 +289,7 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
                   </button>
                   <button
                     onClick={() => handleQuickAction("request_info")}
-                    className="w-full flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    className="w-full flex items-center gap-2 px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors"
                   >
                     <Clock className="w-4 h-4" />
                     Request More Info

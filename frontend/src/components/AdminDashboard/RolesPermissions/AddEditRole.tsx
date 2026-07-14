@@ -223,23 +223,23 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
       <div className="w-full p-6 space-y-6">
         {/* Header */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-white rounded-lg border border-slate-200 p-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-black">
                 {isEdit ? 'Edit Role' : 'Create New Role'}
               </h1>
-              <p className="text-gray-600 mt-1">
+              <p className="text-slate-600 mt-1">
                 {isEdit ? 'Update role details and permissions' : 'Define a new role with specific permissions'}
               </p>
             </div>
             <Button
               variant="outline"
               onClick={handleCancel}
-              className="border-gray-300 hover:bg-gray-50"
+              className="border-slate-300 hover:bg-slate-50"
             >
               Back
             </Button>
@@ -261,14 +261,14 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
-          <Card className="border-gray-200 bg-white">
-            <CardHeader className="bg-gray-50 border-b border-gray-200">
+          <Card className="border-slate-200 bg-white">
+            <CardHeader className="bg-slate-50 border-b border-slate-200">
               <CardTitle className="text-lg font-semibold text-black">Basic Information</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-2">
                     Role Name *
                   </label>
                   <input
@@ -277,7 +277,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black focus:border-transparent ${errors.name ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black focus:border-transparent ${errors.name ? 'border-red-300 bg-red-50' : 'border-slate-300'
                       }`}
                     placeholder="Enter role name"
                     disabled={isLoading}
@@ -291,7 +291,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                 </div>
 
                 <div>
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="description" className="block text-sm font-medium text-slate-700 mb-2">
                     Description *
                   </label>
                   <textarea
@@ -300,7 +300,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                     value={formData.description}
                     onChange={handleInputChange}
                     rows={3}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black focus:border-transparent resize-none ${errors.description ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black focus:border-transparent resize-none ${errors.description ? 'border-red-300 bg-red-50' : 'border-slate-300'
                       }`}
                     placeholder="Describe the role's responsibilities"
                     disabled={isLoading}
@@ -317,11 +317,11 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
           </Card>
 
           {/* Permissions */}
-          <Card className="border-gray-200 bg-white">
-            <CardHeader className="bg-gray-50 border-b border-gray-200">
+          <Card className="border-slate-200 bg-white">
+            <CardHeader className="bg-slate-50 border-b border-slate-200">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg font-semibold text-black">Permissions</CardTitle>
-                <Badge className="bg-gray-200 text-gray-800">
+                <Badge className="bg-slate-200 text-slate-800">
                   {formData.selectedPermissions.length} of {allPermissionNames.length} selected
                 </Badge>
               </div>
@@ -345,7 +345,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                     }))
                   }
                   disabled={isLoading}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="border-slate-300 text-slate-700 hover:bg-slate-50"
                 >
                   View Only
                 </Button>
@@ -360,7 +360,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                     }))
                   }
                   disabled={isLoading}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="border-slate-300 text-slate-700 hover:bg-slate-50"
                 >
                   Editor
                 </Button>
@@ -372,7 +372,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                     setFormData(prev => ({ ...prev, selectedPermissions: [...allPermissionNames] }))
                   }
                   disabled={isLoading}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="border-slate-300 text-slate-700 hover:bg-slate-50"
                 >
                   Full Access
                 </Button>
@@ -382,7 +382,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                   size="sm"
                   onClick={() => setFormData(prev => ({ ...prev, selectedPermissions: [] }))}
                   disabled={isLoading}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="border-slate-300 text-slate-700 hover:bg-slate-50"
                 >
                   Clear All
                 </Button>
@@ -390,12 +390,12 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
             </CardHeader>
             <CardContent className="p-6">
               {modules.length === 0 ? (
-                <div className="text-center py-10 text-gray-500 text-sm">Loading permission modules…</div>
+                <div className="text-center py-10 text-slate-500 text-sm">Loading permission modules…</div>
               ) : (
                 <div className="space-y-5">
                   {/* Step 1 — pick a module */}
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
                       Step 1 — Select a module
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -411,23 +411,23 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                             onClick={() => setActiveModuleKey(mod.key)}
                             disabled={isLoading}
                             className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all text-left ${isActive
-                              ? 'border-black bg-gray-50 shadow-sm'
-                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                              ? 'border-black bg-slate-50 shadow-sm'
+                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                               }`}
                           >
                             <div className="flex items-center gap-3">
-                              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isActive ? 'bg-black text-white' : 'bg-gray-100 text-gray-500'
+                              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isActive ? 'bg-brand-500 text-white' : 'bg-slate-100 text-slate-500'
                                 }`}>
                                 <Icon className="w-5 h-5" />
                               </div>
                               <div>
                                 <span className="font-semibold text-black block">{mod.name}</span>
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs text-slate-500">
                                   {mod.submodules.length} submodules
                                 </span>
                               </div>
                             </div>
-                            <Badge className={count > 0 ? 'bg-black text-white' : 'bg-gray-200 text-gray-600'}>
+                            <Badge className={count > 0 ? 'bg-brand-500 text-white' : 'bg-slate-200 text-slate-600'}>
                               {count}/{total}
                             </Badge>
                           </button>
@@ -439,14 +439,14 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                   {/* Step 2 — submodule matrix */}
                   {activeModule && (
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
                         Step 2 — Set access for each submodule
                       </p>
-                      <div className="border border-gray-200 rounded-lg overflow-x-auto">
+                      <div className="border border-slate-200 rounded-lg overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
-                            <tr className="bg-gray-50 border-b border-gray-200">
-                              <th className="text-left font-semibold text-gray-700 px-4 py-3 min-w-[220px]">
+                            <tr className="bg-slate-50 border-b border-slate-200">
+                              <th className="text-left font-semibold text-slate-700 px-4 py-3 min-w-[220px]">
                                 Submodule
                               </th>
                               {PERMISSION_ACTIONS.map(action => {
@@ -457,7 +457,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                                 return (
                                   <th key={action} className="px-3 py-3 text-center w-24">
                                     <div className="flex flex-col items-center gap-1">
-                                      <span className="font-semibold text-gray-700">{ACTION_LABELS[action]}</span>
+                                      <span className="font-semibold text-slate-700">{ACTION_LABELS[action]}</span>
                                       {colPerms.length > 0 ? (
                                         <input
                                           type="checkbox"
@@ -465,20 +465,20 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                                           onChange={() => toggleColumn(activeModule, action)}
                                           disabled={isLoading}
                                           title={`Toggle ${ACTION_LABELS[action]} for all submodules`}
-                                          className="w-3.5 h-3.5 text-black border-gray-300 rounded focus:ring-black"
+                                          className="w-3.5 h-3.5 text-black border-slate-300 rounded focus:ring-black"
                                         />
                                       ) : (
-                                        <span className="text-gray-300 text-xs">—</span>
+                                        <span className="text-slate-300 text-xs">—</span>
                                       )}
                                     </div>
                                   </th>
                                 )
                               })}
                               <th className="px-3 py-3 text-left min-w-[180px]">
-                                <span className="font-semibold text-gray-700">Special buttons</span>
+                                <span className="font-semibold text-slate-700">Special buttons</span>
                               </th>
                               <th className="px-3 py-3 text-center w-20">
-                                <span className="font-semibold text-gray-700">All</span>
+                                <span className="font-semibold text-slate-700">All</span>
                               </th>
                             </tr>
                           </thead>
@@ -490,12 +490,12 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                               return (
                                 <tr
                                   key={sub.key}
-                                  className={`border-b border-gray-100 last:border-b-0 ${idx % 2 === 1 ? 'bg-gray-50/50' : 'bg-white'
+                                  className={`border-b border-slate-100 last:border-b-0 ${idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'
                                     } ${rowSomeOn ? '' : ''}`}
                                 >
                                   <td className="px-4 py-3">
                                     <div className="font-medium text-black">{sub.name}</div>
-                                    <div className="text-xs text-gray-500 mt-0.5">{sub.description}</div>
+                                    <div className="text-xs text-slate-500 mt-0.5">{sub.description}</div>
                                   </td>
                                   {PERMISSION_ACTIONS.map(action => (
                                     <td key={action} className="px-3 py-3 text-center">
@@ -505,12 +505,12 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                                           checked={selected.has(permName(sub.key, action))}
                                           onChange={() => toggleAction(sub, action)}
                                           disabled={isLoading}
-                                          className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black cursor-pointer"
+                                          className="w-4 h-4 text-black border-slate-300 rounded focus:ring-black cursor-pointer"
                                         />
                                       ) : (
                                         // This submodule has no such action — shown as a hyphen by design
                                         <span
-                                          className="inline-flex items-center justify-center text-gray-300 select-none"
+                                          className="inline-flex items-center justify-center text-slate-300 select-none"
                                           title={`${ACTION_LABELS[action]} is not applicable for ${sub.name}`}
                                         >
                                           <Minus className="w-4 h-4" />
@@ -531,8 +531,8 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                                               disabled={isLoading}
                                               title={x.description || x.label}
                                               className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-xs font-medium transition-colors ${on
-                                                ? 'bg-black border-black text-white'
-                                                : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
+                                                ? 'bg-brand-500 border-black text-white'
+                                                : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
                                                 }`}
                                             >
                                               {on && <Check className="w-3 h-3" />}
@@ -543,7 +543,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                                       </div>
                                     ) : (
                                       <span
-                                        className="inline-flex items-center text-gray-300 select-none"
+                                        className="inline-flex items-center text-slate-300 select-none"
                                         title={`No special buttons for ${sub.name}`}
                                       >
                                         <Minus className="w-4 h-4" />
@@ -557,10 +557,10 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                                       disabled={isLoading}
                                       title={rowAllOn ? 'Clear all access for this submodule' : 'Grant all available access for this submodule'}
                                       className={`inline-flex items-center justify-center h-6 w-6 rounded border transition-colors ${rowAllOn
-                                        ? 'bg-black border-black text-white'
+                                        ? 'bg-brand-500 border-black text-white'
                                         : rowSomeOn
-                                          ? 'bg-gray-200 border-gray-300 text-gray-600'
-                                          : 'bg-white border-gray-300 text-gray-400 hover:border-gray-400'
+                                          ? 'bg-slate-200 border-slate-300 text-slate-600'
+                                          : 'bg-white border-slate-300 text-slate-400 hover:border-slate-400'
                                         }`}
                                     >
                                       <Check className="w-3.5 h-3.5" />
@@ -572,8 +572,8 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                           </tbody>
                         </table>
                       </div>
-                      <p className="text-xs text-gray-500 mt-2 flex items-center gap-1.5">
-                        <Minus className="w-3.5 h-3.5 text-gray-400" />
+                      <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
+                        <Minus className="w-3.5 h-3.5 text-slate-400" />
                         means the action does not exist for that submodule. Special buttons are page-specific actions (Approve, Suspend, Mark as Paid…). Granting any action automatically grants View.
                       </p>
                     </div>
@@ -584,11 +584,11 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
           </Card>
 
           {/* Actions */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="bg-white rounded-lg border border-slate-200 p-6">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-black">Ready to {isEdit ? 'Update' : 'Create'} Role?</h3>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-slate-600">
                   {formData.selectedPermissions.length} permissions selected for this role
                 </p>
               </div>
@@ -599,14 +599,14 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                   variant="outline"
                   onClick={handleCancel}
                   disabled={isLoading}
-                  className="border-gray-300 hover:bg-gray-50"
+                  className="border-slate-300 hover:bg-slate-50"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   disabled={isLoading || formData.selectedPermissions.length === 0}
-                  className="bg-black hover:bg-gray-800 text-white"
+                  className="bg-brand-500 hover:bg-brand-600 text-white"
                 >
                   {isLoading ? (
                     <>

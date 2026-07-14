@@ -22,7 +22,7 @@ export default function ReviewsPage() {
             <CardTitle>Reviews Management</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600">Reviews management interface will be implemented here...</p>
+            <p className="text-slate-600">Reviews management interface will be implemented here...</p>
           </CardContent>
         </Card>
       </div>

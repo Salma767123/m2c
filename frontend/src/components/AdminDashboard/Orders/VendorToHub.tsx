@@ -195,17 +195,17 @@ export default function VendorToHub() {
     switch (status) {
       case "ORDER_CREATED":
       case "VENDOR_PROCESSING":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-50 text-yellow-700 border border-yellow-200";
       case "PACKED_BY_VENDOR":
-        return "bg-purple-100 text-purple-800";
+        return "bg-purple-50 text-purple-700 border border-purple-200";
       case "IN_TRANSIT_TO_ADMIN_HUB":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-50 text-blue-700 border border-blue-200";
       case "RECEIVED_AT_ADMIN_HUB":
-        return "bg-green-100 text-green-800";
+        return "bg-green-50 text-green-700 border border-green-200";
       case "MIXED":
-        return "bg-orange-100 text-orange-800";
+        return "bg-orange-50 text-orange-700 border border-orange-200";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-50 text-slate-700 border border-slate-200";
     }
   };
 
@@ -218,37 +218,37 @@ export default function VendorToHub() {
   };
 
   if (isLoading) {
-    return <div className="p-6 text-center text-gray-500">Loading shipments...</div>;
+    return <div className="p-6 text-center text-slate-500">Loading shipments...</div>;
   }
 
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Total Shipments</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{shipments.length}</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Total Shipments</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{shipments.length}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Processing</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Processing</p>
           <p className="text-2xl font-bold text-yellow-600 mt-1">
             {shipments.filter((s) => s.status === "VENDOR_PROCESSING" || s.status === "ORDER_CREATED").length}
           </p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Packed</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Packed</p>
           <p className="text-2xl font-bold text-purple-600 mt-1">
             {shipments.filter((s) => s.status === "PACKED_BY_VENDOR").length}
           </p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">In Transit</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">In Transit</p>
           <p className="text-2xl font-bold text-blue-600 mt-1">
             {shipments.filter((s) => s.status === "IN_TRANSIT_TO_ADMIN_HUB").length}
           </p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Received at Hub</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Received at Hub</p>
           <p className="text-2xl font-bold text-green-600 mt-1">
             {shipments.filter((s) => s.status === "RECEIVED_AT_ADMIN_HUB").length}
           </p>
@@ -256,16 +256,16 @@ export default function VendorToHub() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
             <input
               type="text"
               placeholder="Search by Order ID, Product, SKU, or Vendor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
             />
           </div>
           <div className="w-full md:w-64">
@@ -280,7 +280,7 @@ export default function VendorToHub() {
             type="button"
             onClick={handleManualRefresh}
             disabled={isRefreshing}
-            className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shrink-0"
+            className="flex items-center justify-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shrink-0"
             title={lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString("en-IN")}` : "Refresh"}
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
@@ -288,7 +288,7 @@ export default function VendorToHub() {
           </button>
         </div>
         {lastUpdated && (
-          <p className="text-xs text-gray-500 mt-3">
+          <p className="text-xs text-slate-500 mt-3">
             Auto-updates every 30s &middot; Last updated {lastUpdated.toLocaleTimeString("en-IN")}
           </p>
         )}
@@ -304,9 +304,9 @@ export default function VendorToHub() {
       </div>
 
       {/* Orders Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
         <Table>
-          <TableHeader>
+          <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
             <TableRow>
               <TableHead className="w-8"></TableHead>
               <TableHead>Order ID</TableHead>
@@ -322,7 +322,7 @@ export default function VendorToHub() {
           <TableBody>
             {paginatedGroups.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={9} className="text-center py-8 text-slate-500">
                   No orders found
                 </TableCell>
               </TableRow>
@@ -344,7 +344,7 @@ export default function VendorToHub() {
                       <TableCell className="font-medium">{group.orderId}</TableCell>
                       <TableCell>
                         {productName}
-                        {s.items?.length > 1 && <span className="text-xs text-gray-500 block">+{s.items.length - 1} more</span>}
+                        {s.items?.length > 1 && <span className="text-xs text-slate-500 block">+{s.items.length - 1} more</span>}
                       </TableCell>
                       <TableCell>{sku}</TableCell>
                       <TableCell>{s.vendorName}</TableCell>
@@ -358,7 +358,7 @@ export default function VendorToHub() {
                       <TableCell>
                         <button
                           onClick={() => handleViewShipment(s.id)}
-                          className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                          className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
                           title="View Shipment"
                         >
                           <Eye className="h-5 w-5" />
@@ -380,24 +380,24 @@ export default function VendorToHub() {
                   <React.Fragment key={group.orderId}>
                     {/* Parent row */}
                     <TableRow
-                      className="cursor-pointer hover:bg-gray-50"
+                      className="cursor-pointer hover:bg-slate-50"
                       onClick={() => toggleExpanded(group.orderId)}
                     >
                       <TableCell>
                         {isExpanded
-                          ? <ChevronUp className="h-4 w-4 text-gray-500" />
-                          : <ChevronDown className="h-4 w-4 text-gray-500" />
+                          ? <ChevronUp className="h-4 w-4 text-slate-500" />
+                          : <ChevronDown className="h-4 w-4 text-slate-500" />
                         }
                       </TableCell>
                       <TableCell className="font-medium">{group.orderId}</TableCell>
                       <TableCell>
-                        <span className="text-sm text-gray-900">{totalItems} item{totalItems !== 1 ? 's' : ''}</span>
+                        <span className="text-sm text-slate-900">{totalItems} item{totalItems !== 1 ? 's' : ''}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-xs text-gray-500">—</span>
+                        <span className="text-xs text-slate-500">—</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm font-medium text-gray-900">
+                        <span className="text-sm font-medium text-slate-900">
                           {vendorCount} vendor{vendorCount !== 1 ? 's' : ''}
                         </span>
                       </TableCell>
@@ -419,20 +419,20 @@ export default function VendorToHub() {
                       const shipmentAmount = s.items?.reduce((acc: number, item: any) => acc + item.totalPrice, 0) || 0;
 
                       return (
-                        <TableRow key={s.id} className="bg-gray-50/70">
+                        <TableRow key={s.id} className="bg-slate-50/70">
                           <TableCell>
-                            <div className="w-px h-6 bg-gray-300 mx-auto"></div>
+                            <div className="w-px h-6 bg-slate-300 mx-auto"></div>
                           </TableCell>
-                          <TableCell className="text-xs text-gray-500 pl-6">
+                          <TableCell className="text-xs text-slate-500 pl-6">
                             {s.shipmentId.split('-').slice(-1)[0]}
                           </TableCell>
                           <TableCell>
                             {productName}
-                            {s.items?.length > 1 && <span className="text-xs text-gray-500 block">+{s.items.length - 1} more</span>}
+                            {s.items?.length > 1 && <span className="text-xs text-slate-500 block">+{s.items.length - 1} more</span>}
                           </TableCell>
                           <TableCell>{sku}</TableCell>
                           <TableCell>{s.vendorName}</TableCell>
-                          <TableCell className="text-xs text-gray-500">—</TableCell>
+                          <TableCell className="text-xs text-slate-500">—</TableCell>
                           <TableCell>₹{shipmentAmount.toLocaleString("en-IN")}</TableCell>
                           <TableCell>
                             <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(s.status)}`}>
@@ -446,7 +446,7 @@ export default function VendorToHub() {
                                   e.stopPropagation();
                                   handleViewShipment(s.id);
                                 }}
-                                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
                                 title="View Shipment"
                               >
                                 <Eye className="h-5 w-5" />
@@ -484,7 +484,7 @@ export default function VendorToHub() {
                   key={`p-${p}`}
                   onClick={() => setCurrentPage(p as number)}
                   aria-current={p === currentPage ? 'page' : undefined}
-                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
                 >
                   {p}
                 </button>

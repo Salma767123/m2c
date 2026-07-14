@@ -24,14 +24,14 @@ import {
 import { formatCheckerName } from '@/lib/checkerUtils';
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  SUBMITTED: { label: 'Submitted', className: 'bg-blue-100 text-blue-800' },
-  UNDER_ADMIN_REVIEW: { label: 'Under Review', className: 'bg-yellow-100 text-yellow-800' },
-  REJECTED: { label: 'Rejected', className: 'bg-red-100 text-red-800' },
-  REINSPECTION: { label: 'Re-Inspection', className: 'bg-amber-100 text-amber-800' },
+  SUBMITTED: { label: 'Submitted', className: 'bg-brand-50 text-brand-700 border border-brand-200' },
+  UNDER_ADMIN_REVIEW: { label: 'Under Review', className: 'bg-yellow-50 text-yellow-700 border border-yellow-200' },
+  REJECTED: { label: 'Rejected', className: 'bg-red-50 text-red-700 border border-red-200' },
+  REINSPECTION: { label: 'Re-Inspection', className: 'bg-amber-50 text-amber-700 border border-amber-200' },
 };
 
 function getStatusBadge(status: string) {
-  const config = STATUS_BADGE[status] || { label: status, className: 'bg-gray-100 text-gray-800' };
+  const config = STATUS_BADGE[status] || { label: status, className: 'bg-slate-50 text-slate-700 border border-slate-200' };
   return <Badge className={config.className}>{config.label}</Badge>;
 }
 
@@ -102,8 +102,8 @@ export default function ReinspectionReviewDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Re-Inspection Review</h1>
-          <p className="text-sm text-gray-500 mt-1">Review submitted and rejected inspections</p>
+          <h1 className="text-2xl font-bold text-slate-900">Re-Inspection Review</h1>
+          <p className="text-sm text-slate-500 mt-1">Review submitted and rejected inspections</p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
           <IconRefresh size={16} className={loading ? 'animate-spin' : ''} />
@@ -115,28 +115,28 @@ export default function ReinspectionReviewDashboard() {
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl border p-4">
-            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+            <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
               <IconClock size={16} />
               Total Pending
             </div>
-            <div className="text-2xl font-bold text-gray-900">{stats.totalPendingReview}</div>
+            <div className="text-2xl font-bold text-slate-900">{stats.totalPendingReview}</div>
           </div>
           <div className="bg-white rounded-xl border p-4">
-            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+            <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
               <IconBuilding size={16} />
               Factory Pending
             </div>
-            <div className="text-2xl font-bold text-blue-600">{stats.factory.pendingReview}</div>
+            <div className="text-2xl font-bold text-slate-900">{stats.factory.pendingReview}</div>
           </div>
           <div className="bg-white rounded-xl border p-4">
-            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+            <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
               <IconPackage size={16} />
               Product Pending
             </div>
-            <div className="text-2xl font-bold text-purple-600">{stats.product.pendingReview}</div>
+            <div className="text-2xl font-bold text-slate-900">{stats.product.pendingReview}</div>
           </div>
           <div className="bg-white rounded-xl border p-4">
-            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+            <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
               <IconAlertTriangle size={16} />
               Re-Inspections
             </div>
@@ -154,28 +154,28 @@ export default function ReinspectionReviewDashboard() {
             onClick={() => setActiveTab('factory')}
             className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'factory'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-brand-500 text-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             <IconBuilding size={16} className="inline mr-1.5 -mt-0.5" />
             Factory Inspections
             {stats && stats.factory.pendingReview > 0 && (
-              <Badge className="ml-2 bg-blue-100 text-blue-800 text-xs">{stats.factory.pendingReview}</Badge>
+              <Badge className="ml-2 bg-brand-50 text-brand-700 border border-brand-200 text-xs">{stats.factory.pendingReview}</Badge>
             )}
           </button>
           <button
             onClick={() => setActiveTab('product')}
             className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'product'
-                ? 'border-purple-500 text-purple-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-brand-500 text-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             <IconPackage size={16} className="inline mr-1.5 -mt-0.5" />
             Product Inspections
             {stats && stats.product.pendingReview > 0 && (
-              <Badge className="ml-2 bg-purple-100 text-purple-800 text-xs">{stats.product.pendingReview}</Badge>
+              <Badge className="ml-2 bg-brand-50 text-brand-700 border border-brand-200 text-xs">{stats.product.pendingReview}</Badge>
             )}
           </button>
         </div>
@@ -183,13 +183,13 @@ export default function ReinspectionReviewDashboard() {
         {/* Search */}
         <div className="p-4 border-b">
           <div className="relative max-w-sm">
-            <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder={`Search ${activeTab === 'factory' ? 'vendor' : 'product'} name...`}
-              className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+              className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 outline-none"
             />
           </div>
         </div>
@@ -198,7 +198,7 @@ export default function ReinspectionReviewDashboard() {
         <div className="overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <IconLoader2 size={24} className="animate-spin text-gray-400" />
+              <IconLoader2 size={24} className="animate-spin text-slate-400" />
             </div>
           ) : activeTab === 'factory' ? (
             <FactoryTable
@@ -216,7 +216,7 @@ export default function ReinspectionReviewDashboard() {
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t">
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-slate-500">
               Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
             </span>
             <div className="flex gap-1">
@@ -243,7 +243,7 @@ function FactoryTable({
 }) {
   if (inspections.length === 0) {
     return (
-      <div className="py-16 text-center text-gray-500">
+      <div className="py-16 text-center text-slate-500">
         <IconBuilding size={32} className="mx-auto mb-2 opacity-30" />
         <p>No factory inspections pending review</p>
       </div>
@@ -253,7 +253,7 @@ function FactoryTable({
   return (
     <table className="w-full">
       <thead>
-        <tr className="text-left text-xs font-medium text-gray-500 uppercase bg-gray-50">
+        <tr className="text-left text-xs font-medium text-slate-500 uppercase bg-slate-50">
           <th className="px-4 py-3">Vendor</th>
           <th className="px-4 py-3">Checker</th>
           <th className="px-4 py-3">Status</th>
@@ -263,34 +263,34 @@ function FactoryTable({
           <th className="px-4 py-3">Actions</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-gray-100">
+      <tbody className="divide-y divide-slate-100">
         {inspections.map(ins => (
-          <tr key={ins.id} className="hover:bg-gray-50 transition-colors">
+          <tr key={ins.id} className="hover:bg-slate-50 transition-colors">
             <td className="px-4 py-3">
-              <div className="font-medium text-sm text-gray-900">{ins.vendor.companyName}</div>
-              <div className="text-xs text-gray-500">
+              <div className="font-medium text-sm text-slate-900">{ins.vendor.companyName}</div>
+              <div className="text-xs text-slate-500">
                 {ins.vendor.businessCity && `${ins.vendor.businessCity}, ${ins.vendor.businessState}`}
               </div>
             </td>
-            <td className="px-4 py-3 text-sm text-gray-700">{formatCheckerName(ins.checker)}</td>
+            <td className="px-4 py-3 text-sm text-slate-700">{formatCheckerName(ins.checker)}</td>
             <td className="px-4 py-3">{getStatusBadge(ins.status)}</td>
             <td className="px-4 py-3">
               {ins.result === 'PASSED' ? (
-                <Badge className="bg-green-100 text-green-800">Passed</Badge>
+                <Badge className="bg-green-50 text-green-700 border border-green-200">Passed</Badge>
               ) : ins.result === 'FAILED' ? (
-                <Badge className="bg-red-100 text-red-800">Failed</Badge>
+                <Badge className="bg-red-50 text-red-700 border border-red-200">Failed</Badge>
               ) : (
-                <span className="text-gray-400 text-sm">—</span>
+                <span className="text-slate-400 text-sm">—</span>
               )}
             </td>
             <td className="px-4 py-3">
               {ins.cycleNumber > 1 ? (
-                <Badge className="bg-indigo-100 text-indigo-800">#{ins.cycleNumber}</Badge>
+                <Badge className="bg-brand-50 text-brand-700 border border-brand-200">#{ins.cycleNumber}</Badge>
               ) : (
-                <span className="text-gray-400 text-sm">#1</span>
+                <span className="text-slate-400 text-sm">#1</span>
               )}
             </td>
-            <td className="px-4 py-3 text-sm text-gray-500">{formatDate(ins.submittedAt)}</td>
+            <td className="px-4 py-3 text-sm text-slate-500">{formatDate(ins.submittedAt)}</td>
             <td className="px-4 py-3">
               <Button size="sm" variant="outline" onClick={() => onViewDetails(ins.id)}>
                 <IconEye size={14} className="mr-1" />
@@ -313,7 +313,7 @@ function ProductTable({
 }) {
   if (inspections.length === 0) {
     return (
-      <div className="py-16 text-center text-gray-500">
+      <div className="py-16 text-center text-slate-500">
         <IconPackage size={32} className="mx-auto mb-2 opacity-30" />
         <p>No product inspections pending review</p>
       </div>
@@ -323,7 +323,7 @@ function ProductTable({
   return (
     <table className="w-full">
       <thead>
-        <tr className="text-left text-xs font-medium text-gray-500 uppercase bg-gray-50">
+        <tr className="text-left text-xs font-medium text-slate-500 uppercase bg-slate-50">
           <th className="px-4 py-3">Product</th>
           <th className="px-4 py-3">Vendor</th>
           <th className="px-4 py-3">QC Checker</th>
@@ -333,24 +333,24 @@ function ProductTable({
           <th className="px-4 py-3">Actions</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-gray-100">
+      <tbody className="divide-y divide-slate-100">
         {inspections.map(product => (
-          <tr key={product.id} className="hover:bg-gray-50 transition-colors">
+          <tr key={product.id} className="hover:bg-slate-50 transition-colors">
             <td className="px-4 py-3">
-              <div className="font-medium text-sm text-gray-900">{product.name}</div>
-              <div className="text-xs text-gray-500">SKU: {product.baseSku}</div>
+              <div className="font-medium text-sm text-slate-900">{product.name}</div>
+              <div className="text-xs text-slate-500">SKU: {product.baseSku}</div>
             </td>
-            <td className="px-4 py-3 text-sm text-gray-700">{product.vendor.companyName}</td>
-            <td className="px-4 py-3 text-sm text-gray-700">{product.assignedQc?.name || '—'}</td>
+            <td className="px-4 py-3 text-sm text-slate-700">{product.vendor.companyName}</td>
+            <td className="px-4 py-3 text-sm text-slate-700">{product.assignedQc?.name || '—'}</td>
             <td className="px-4 py-3">{getStatusBadge(product.approvalStatus)}</td>
             <td className="px-4 py-3">
               {product.inspectionCycleNumber > 1 ? (
-                <Badge className="bg-indigo-100 text-indigo-800">#{product.inspectionCycleNumber}</Badge>
+                <Badge className="bg-brand-50 text-brand-700 border border-brand-200">#{product.inspectionCycleNumber}</Badge>
               ) : (
-                <span className="text-gray-400 text-sm">#1</span>
+                <span className="text-slate-400 text-sm">#1</span>
               )}
             </td>
-            <td className="px-4 py-3 text-sm text-gray-500">{formatDate(product.updatedAt)}</td>
+            <td className="px-4 py-3 text-sm text-slate-500">{formatDate(product.updatedAt)}</td>
             <td className="px-4 py-3">
               <Button size="sm" variant="outline" onClick={() => onViewDetails(product.id)}>
                 <IconEye size={14} className="mr-1" />

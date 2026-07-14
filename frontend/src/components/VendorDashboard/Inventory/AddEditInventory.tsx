@@ -91,8 +91,6 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(isEdit && !!inventoryId)
   const [vendorCategories, setVendorCategories] = useState<Array<{ id?: string; name: string; slug?: string }>>([])
-  const [vendorSubcategories, setVendorSubcategories] = useState<Array<{ id: string; name: string; slug: string; parentId?: string }>>([])
-  const [filteredSubcategories, setFilteredSubcategories] = useState<Array<{ id: string; name: string; slug: string; parentId?: string }>>([])
   const [isLoadingCategories, setIsLoadingCategories] = useState(true)
 
   const [linkedProductApproved, setLinkedProductApproved] = useState(false)
@@ -156,31 +154,10 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
         const categoriesData = await inventoryService.getVendorCategories()
         console.log('Loaded vendor categories:', categoriesData.categories)
 
-        // Store categories with their subcategories
+        // Store the vendor's selected categories (standard + custom). Subcategories
+        // are not collected on the vendor form — the admin assigns them when
+        // publishing the product to the website.
         setVendorCategories(categoriesData.categories)
-
-        // Store all subcategories with parent reference
-        // We need to map subcategories to their parent categories
-        const allSubcategoriesWithParent: Array<{ id: string; name: string; slug: string; parentId?: string }> = []
-
-        // If categories have subcategories nested, extract them
-        categoriesData.categories.forEach((cat: any) => {
-          if (cat.subcategories && Array.isArray(cat.subcategories)) {
-            cat.subcategories.forEach((sub: any) => {
-              allSubcategoriesWithParent.push({
-                ...sub,
-                parentId: cat.id
-              })
-            })
-          }
-        })
-
-        // If subcategories are provided separately, use them
-        if (categoriesData.subcategories && categoriesData.subcategories.length > 0) {
-          setVendorSubcategories(categoriesData.subcategories)
-        } else {
-          setVendorSubcategories(allSubcategoriesWithParent as any)
-        }
       } catch (error: any) {
         console.error('Error loading vendor categories:', error)
         if (error.response?.status === 401) {
@@ -204,26 +181,6 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
 
     loadVendorCategories()
   }, [router])
-
-  // Update filtered subcategories when category changes
-  useEffect(() => {
-    if (formData.category) {
-      // Find the selected category
-      const selectedCategory = vendorCategories.find(cat => cat.name === formData.category)
-
-      if (selectedCategory && selectedCategory.id) {
-        // Filter subcategories that belong to this category
-        const filtered = vendorSubcategories.filter((sub: any) => sub.parentId === selectedCategory.id)
-        setFilteredSubcategories(filtered)
-        console.log(`Filtered ${filtered.length} subcategories for category: ${formData.category}`)
-      } else {
-        // If category doesn't have an ID, show all subcategories (fallback for legacy data)
-        setFilteredSubcategories(vendorSubcategories)
-      }
-    } else {
-      setFilteredSubcategories([])
-    }
-  }, [vendorSubcategories, formData.category, vendorCategories])
 
   // Debug: Log when formData.category or vendorCategories change
   useEffect(() => {
@@ -275,18 +232,8 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
             }
           }
 
-          // Normalize subcategory to match vendor subcategories (case-insensitive)
-          if (formattedData.subcategory && vendorSubcategories.length > 0) {
-            const matchingSubcategory = vendorSubcategories.find(
-              sub => sub.name.toLowerCase() === formattedData.subcategory.toLowerCase()
-            )
-            if (matchingSubcategory) {
-              formattedData.subcategory = matchingSubcategory.name
-              console.log('Normalized subcategory to:', matchingSubcategory.name)
-            } else {
-              console.warn('No matching subcategory found for:', formattedData.subcategory)
-            }
-          }
+          // Subcategory (if any, set by admin) is preserved as-is and re-sent on
+          // save; the vendor form no longer displays or edits it.
 
           setFormData(formattedData)
           // Store original stock for comparison
@@ -314,7 +261,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
         setIsLoadingData(false)
       }
     }
-  }, [isEdit, inventoryId, router, isLoadingCategories, vendorCategories, vendorSubcategories])
+  }, [isEdit, inventoryId, router, isLoadingCategories, vendorCategories])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
@@ -378,28 +325,13 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
         [name]: value
       }
 
-      // Reset subcategory when category changes
+      // Changing the category invalidates any admin-assigned subcategory.
       if (name === 'category') {
         newData.subcategory = ''
       }
 
       return newData
     })
-
-    // Filter subcategories when category changes
-    if (name === 'category') {
-      const selectedCategory = vendorCategories.find(cat => cat.name === value)
-
-      if (selectedCategory && selectedCategory.id) {
-        // Filter subcategories that belong to this category
-        const filtered = vendorSubcategories.filter((sub: any) => sub.parentId === selectedCategory.id)
-        setFilteredSubcategories(filtered)
-        console.log(`Filtered ${filtered.length} subcategories for category: ${value}`)
-      } else {
-        // If category doesn't have an ID, show all subcategories (fallback for legacy data)
-        setFilteredSubcategories(vendorSubcategories)
-      }
-    }
   }
 
   const handleSourceTypeChange = (sourceType: 'supplier' | 'manufacture') => {
@@ -676,19 +608,8 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
                         No categories found. Please update your vendor profile to add product categories.
                       </p>
                     )}
-                  </div>
-                  <div>
-                    <Dropdown
-                      id="subcategory"
-                      label="Subcategory *"
-                      value={formData.subcategory}
-                      options={filteredSubcategories.map(sub => sub.name)}
-                      placeholder={formData.category ? "Select Subcategory" : "Select category first"}
-                      onChange={(value) => handleDropdownChange('subcategory', value as string)}
-                    />
-                    {formData.category && filteredSubcategories.length === 0 && (
-                      <p className="text-xs text-slate-500 mt-1">No subcategories available for this category</p>
-                    )}
+                    {/* Subcategory is intentionally not collected here — the admin
+                        assigns it when publishing this product to the website. */}
                   </div>
                 </div>
 

@@ -348,14 +348,14 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                 Back to Categories
               </Button>
             </Link>
-            <h1 className="text-2xl font-bold text-gray-900">Loading...</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Loading...</h1>
           </div>
         </div>
         <Card>
           <CardContent className="p-8">
             <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-700"></div>
-              <span className="ml-3 text-gray-600">Loading category data...</span>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-700"></div>
+              <span className="ml-3 text-slate-600">Loading category data...</span>
             </div>
           </CardContent>
         </Card>
@@ -368,7 +368,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-slate-900">
             {isEdit ? 'Edit Category' : 'Add New Category'}
           </h1>
         </div>
@@ -378,7 +378,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
       <form onSubmit={handleSubmit}>
         {/* Tab Navigation */}
         <div className="mb-6">
-          <div className="border-b border-gray-200">
+          <div className="border-b border-slate-200">
             <nav className="-mb-px flex space-x-4">
               {[
                 { id: 'category', label: 'Category Details' },
@@ -390,8 +390,8 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                   onClick={() => setActiveTab(tab.id as 'category' | 'subcategories')}
                   className={`py-2 px-1 border-b-2 font-medium text-base ${
                     activeTab === tab.id
-                      ? 'border-white text-white bg-gray-900 px-4 rounded-t-sm'
-                      : 'border-gray-100 text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-white text-white bg-brand-500 px-4 rounded-t-sm'
+                      : 'border-slate-100 text-slate-500 hover:text-slate-700 hover:border-slate-300'
                   }`}
                 >
                   {tab.label}
@@ -413,7 +413,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Category Name *
                     </label>
                     <input
@@ -422,13 +422,13 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                       value={categoryData.name}
                       onChange={handleCategoryChange}
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                       placeholder="Enter category name"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Description *
                     </label>
                     <textarea
@@ -437,14 +437,14 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                       onChange={handleCategoryChange}
                       required
                       rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                       placeholder="Category description"
                     />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
                         URL Slug *
                       </label>
                       <input
@@ -453,13 +453,13 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                         value={categoryData.slug}
                         onChange={handleCategoryChange}
                         required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                         placeholder="category-url-slug"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Auto-generated from name, but can be customized</p>
+                      <p className="text-xs text-slate-500 mt-1">Auto-generated from name, but can be customized</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
                         Sort Order
                       </label>
                       <input
@@ -468,7 +468,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                         value={categoryData.sortOrder || ''}
                         onChange={handleCategoryChange}
                         min="0"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                         placeholder="0"
                       />
                     </div>
@@ -476,10 +476,10 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
 
                   {/* SEO Section */}
                   <div className="border-t pt-4">
-                    <h4 className="text-lg font-medium text-gray-900 mb-4">SEO Settings</h4>
+                    <h4 className="text-lg font-medium text-slate-900 mb-4">SEO Settings</h4>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
                         Meta Title
                       </label>
                       <input
@@ -488,16 +488,16 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                         value={categoryData.metaTitle}
                         onChange={handleCategoryChange}
                         maxLength={60}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                         placeholder="SEO title for search engines"
                       />
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-slate-500 mt-1">
                         {categoryData.metaTitle?.length || 0}/60 characters
                       </p>
                     </div>
 
                     <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
                         Meta Description
                       </label>
                       <textarea
@@ -506,10 +506,10 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                         onChange={handleCategoryChange}
                         maxLength={160}
                         rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                         placeholder="SEO description for search engines"
                       />
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-slate-500 mt-1">
                         {categoryData.metaDescription?.length || 0}/160 characters
                       </p>
                     </div>
@@ -526,8 +526,8 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Add New Subcategory */}
-                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                    <h4 className="font-medium text-gray-900 mb-3">Add New Subcategory</h4>
+                  <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                    <h4 className="font-medium text-slate-900 mb-3">Add New Subcategory</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                       <div>
                         <input
@@ -536,7 +536,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                           value={newSubcategory.name}
                           onChange={handleNewSubcategoryChange}
                           placeholder="Subcategory name"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                         />
                       </div>
                       <div>
@@ -546,7 +546,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                           value={newSubcategory.slug}
                           onChange={handleNewSubcategoryChange}
                           placeholder="URL slug"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                         />
                       </div>
                     </div>
@@ -557,13 +557,13 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                         onChange={handleNewSubcategoryChange}
                         placeholder="Subcategory description"
                         rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                       />
                     </div>
                     
                     {/* Image Upload for New Subcategory */}
                     <div className="mb-3">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
                         Subcategory Image
                       </label>
                       {newSubcategory.image ? (
@@ -586,7 +586,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                           </button>
                         </div>
                       ) : (
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors cursor-pointer">
+                        <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:border-slate-400 transition-colors cursor-pointer">
                           <input
                             type="file"
                             accept="image/*"
@@ -594,9 +594,9 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                             className="hidden"
                             id="new-subcategory-image-upload"
                           />
-                          <label htmlFor="new-subcategory-image-upload" tabIndex={0} aria-label="Upload subcategory image" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }} className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40 rounded block">
-                            <Upload className="mx-auto h-8 w-8 text-gray-400" />
-                            <p className="mt-1 text-xs text-gray-600">Click to upload image</p>
+                          <label htmlFor="new-subcategory-image-upload" tabIndex={0} aria-label="Upload subcategory image" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }} className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 rounded block">
+                            <Upload className="mx-auto h-8 w-8 text-slate-400" />
+                            <p className="mt-1 text-xs text-slate-600">Click to upload image</p>
                           </label>
                         </div>
                       )}
@@ -611,7 +611,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                         ]}
                         onChange={(value) => setNewSubcategory(prev => ({ ...prev, status: value as 'ACTIVE' | 'INACTIVE' }))}
                       />
-                      <Button type="button" onClick={addSubcategory} className="bg-gray-900 text-white p-4" >
+                      <Button type="button" onClick={addSubcategory} className="bg-brand-500 text-white p-4" >
                         <Plus className="h-4 w-4 mr-2" />
                         Add Subcategory
                       </Button>
@@ -621,40 +621,40 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                   {/* Existing Subcategories */}
                   {subcategories.length > 0 && (
                     <div className="space-y-3">
-                      <h4 className="font-medium text-gray-900">Current Subcategories</h4>
+                      <h4 className="font-medium text-slate-900">Current Subcategories</h4>
                       {subcategories.map((subcategory) => (
-                        <div key={subcategory.id} className="border border-gray-200 rounded-lg p-4">
+                        <div key={subcategory.id} className="border border-slate-200 rounded-lg p-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                             <div>
-                              <label className="block text-xs text-gray-500 mb-1">Name</label>
+                              <label className="block text-xs text-slate-500 mb-1">Name</label>
                               <input
                                 type="text"
                                 value={subcategory.name}
                                 onChange={(e) => updateSubcategory(subcategory.id!, 'name', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                className="w-full px-2 py-1 border border-slate-300 rounded text-sm"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs text-gray-500 mb-1">Slug</label>
+                              <label className="block text-xs text-slate-500 mb-1">Slug</label>
                               <input
                                 type="text"
                                 value={subcategory.slug}
                                 onChange={(e) => updateSubcategory(subcategory.id!, 'slug', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                className="w-full px-2 py-1 border border-slate-300 rounded text-sm"
                               />
                             </div>
                           </div>
                           <div className="mb-3">
-                            <label className="block text-xs text-gray-500 mb-1">Description</label>
+                            <label className="block text-xs text-slate-500 mb-1">Description</label>
                             <textarea
                               value={subcategory.description}
                               onChange={(e) => updateSubcategory(subcategory.id!, 'description', e.target.value)}
                               rows={2}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                              className="w-full px-2 py-1 border border-slate-300 rounded text-sm"
                             />
                           </div>
                           <div className="mb-3">
-                            <label className="block text-xs text-gray-500 mb-1">Image</label>
+                            <label className="block text-xs text-slate-500 mb-1">Image</label>
                             {subcategory.image ? (
                               <div className="relative">
                                 <img
@@ -675,7 +675,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                                 </button>
                               </div>
                             ) : (
-                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-gray-400 transition-colors cursor-pointer">
+                              <div className="border-2 border-dashed border-slate-300 rounded-lg p-3 text-center hover:border-slate-400 transition-colors cursor-pointer">
                                 <input
                                   type="file"
                                   accept="image/*"
@@ -683,9 +683,9 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                                   className="hidden"
                                   id={`subcategory-image-upload-${subcategory.id}`}
                                 />
-                                <label htmlFor={`subcategory-image-upload-${subcategory.id}`} tabIndex={0} aria-label="Upload subcategory image" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }} className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40 rounded block">
-                                  <Upload className="mx-auto h-6 w-6 text-gray-400" />
-                                  <p className="mt-1 text-xs text-gray-600">Click to upload</p>
+                                <label htmlFor={`subcategory-image-upload-${subcategory.id}`} tabIndex={0} aria-label="Upload subcategory image" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }} className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 rounded block">
+                                  <Upload className="mx-auto h-6 w-6 text-slate-400" />
+                                  <p className="mt-1 text-xs text-slate-600">Click to upload</p>
                                 </label>
                               </div>
                             )}
@@ -693,7 +693,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <div>
-                                <label className="block text-xs text-gray-500 mb-1">Status</label>
+                                <label className="block text-xs text-slate-500 mb-1">Status</label>
                                 <Dropdown
                                   value={subcategory.status}
                                   options={[
@@ -704,13 +704,13 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs text-gray-500 mb-1">Sort Order</label>
+                                <label className="block text-xs text-slate-500 mb-1">Sort Order</label>
                                 <input
                                   type="number"
                                   value={subcategory.sortOrder || ''}
                                   onChange={(e) => updateSubcategory(subcategory.id!, 'sortOrder', parseInt(e.target.value) || 0)}
                                   min="0"
-                                  className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                                  className="w-20 px-2 py-1 border border-slate-300 rounded text-sm"
                                 />
                               </div>
                             </div>
@@ -739,7 +739,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     Category Status
                   </label>
                   <Dropdown
@@ -781,7 +781,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                       </button>
                     </div>
                   ) : (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer">
+                    <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-slate-400 transition-colors cursor-pointer">
                       <input
                         type="file"
                         accept="image/*"
@@ -789,12 +789,12 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                         className="hidden"
                         id="category-image-upload"
                       />
-                      <label htmlFor="category-image-upload" tabIndex={0} aria-label="Upload category image" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }} className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40 rounded block">
-                        <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                        <p className="mt-2 text-sm text-gray-600">
+                      <label htmlFor="category-image-upload" tabIndex={0} aria-label="Upload category image" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }} className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 rounded block">
+                        <Upload className="mx-auto h-12 w-12 text-slate-400" />
+                        <p className="mt-2 text-sm text-slate-600">
                           Click to upload category image
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-slate-500">
                           PNG, JPG up to 5MB
                         </p>
                       </label>
@@ -803,7 +803,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                   
                   {/* URL Input Alternative */}
                   <div className="border-t pt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Or paste image URL
                     </label>
                     <input
@@ -812,9 +812,9 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                       value={categoryData.image || ''}
                       onChange={handleCategoryChange}
                       placeholder="https://example.com/image.jpg"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent text-sm"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       You can also paste a direct image URL here
                     </p>
                   </div>
@@ -829,11 +829,11 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subcategories:</span>
+                  <span className="text-slate-600">Subcategories:</span>
                   <span className="font-medium">{subcategories.length}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Active Subcategories:</span>
+                  <span className="text-slate-600">Active Subcategories:</span>
                   <span className="font-medium">
                     {subcategories.filter(sub => sub.status === 'ACTIVE').length}
                   </span>
@@ -850,7 +850,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-[#313131] text-white hover:bg-[#222222]"
+                  className="w-full bg-brand-500 text-white hover:bg-brand-600"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {isLoading ? 'Saving...' : (isEdit ? 'Update Category' : 'Create Category')}

@@ -87,7 +87,7 @@ const CouponModal = ({
 
     if (isExpired) {
       return (
-        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
           Expired
         </span>
       );
@@ -95,35 +95,35 @@ const CouponModal = ({
 
     if (isActive) {
       return (
-        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
           Active
         </span>
       );
     }
 
     return (
-      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200">
         Inactive
       </span>
     );
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-slate-50">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-slate-900">
               {mode === 'create' ? 'Create New Coupon' : mode === 'edit' ? 'Edit Coupon' : 'Coupon Details'}
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-slate-600 mt-1">
               {mode === 'view' ? 'View coupon information' : 'Fill in the coupon details'}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-slate-400 hover:text-slate-600 transition-colors"
           >
             <X className="w-6 h-6" />
           </button>
@@ -137,23 +137,23 @@ const CouponModal = ({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Left Column - Basic Info */}
                 <div className="space-y-4">
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                     <div className="flex items-center gap-2 mb-3">
-                      <Tag className="w-5 h-5 text-gray-700" />
-                      <h3 className="font-semibold text-gray-900">Basic Information</h3>
+                      <Tag className="w-5 h-5 text-slate-700" />
+                      <h3 className="font-semibold text-slate-900">Basic Information</h3>
                     </div>
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Coupon Code</label>
-                        <div className="text-gray-900 font-mono text-lg font-bold">{coupon.code}</div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Coupon Code</label>
+                        <div className="text-slate-900 font-mono text-lg font-bold">{coupon.code}</div>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Status</label>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Status</label>
                         {getStatusBadge(coupon.isActive, coupon.expiryDate)}
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Description</label>
-                        <div className="text-gray-900 text-sm">{coupon.description || '-'}</div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Description</label>
+                        <div className="text-slate-900 text-sm">{coupon.description || '-'}</div>
                       </div>
                     </div>
                   </div>
@@ -161,32 +161,32 @@ const CouponModal = ({
 
                 {/* Center Column - Discount Details */}
                 <div className="space-y-4">
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                     <div className="flex items-center gap-2 mb-3">
-                      <Percent className="w-5 h-5 text-gray-700" />
-                      <h3 className="font-semibold text-gray-900">Discount Details</h3>
+                      <Percent className="w-5 h-5 text-slate-700" />
+                      <h3 className="font-semibold text-slate-900">Discount Details</h3>
                     </div>
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Discount Type</label>
-                        <div className="text-gray-900 capitalize">{coupon.discountType === 'PERCENTAGE' ? 'Percentage' : 'Fixed Amount'}</div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Discount Type</label>
+                        <div className="text-slate-900 capitalize">{coupon.discountType === 'PERCENTAGE' ? 'Percentage' : 'Fixed Amount'}</div>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Discount Value</label>
-                        <div className="text-gray-900 text-2xl font-bold">
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Discount Value</label>
+                        <div className="text-slate-900 text-2xl font-bold">
                           {coupon.discountType === 'PERCENTAGE'
                             ? `${coupon.discountValue}%`
                             : `₹${coupon.discountValue}`}
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Minimum Purchase</label>
-                        <div className="text-gray-900">₹{coupon.minPurchaseAmount || 0}</div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Minimum Purchase</label>
+                        <div className="text-slate-900">₹{coupon.minPurchaseAmount || 0}</div>
                       </div>
                       {coupon.maxDiscountAmount ? (
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">Maximum Discount</label>
-                          <div className="text-gray-900">₹{coupon.maxDiscountAmount}</div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Maximum Discount</label>
+                          <div className="text-slate-900">₹{coupon.maxDiscountAmount}</div>
                         </div>
                       ) : null}
                     </div>
@@ -195,30 +195,30 @@ const CouponModal = ({
 
                 {/* Right Column - Usage & Validity */}
                 <div className="space-y-4">
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                     <div className="flex items-center gap-2 mb-3">
-                      <TrendingUp className="w-5 h-5 text-gray-700" />
-                      <h3 className="font-semibold text-gray-900">Usage Statistics</h3>
+                      <TrendingUp className="w-5 h-5 text-slate-700" />
+                      <h3 className="font-semibold text-slate-900">Usage Statistics</h3>
                     </div>
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Usage Limit</label>
-                        <div className="text-gray-900">{coupon.usageLimit || 'Unlimited'}</div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Usage Limit</label>
+                        <div className="text-slate-900">{coupon.usageLimit || 'Unlimited'}</div>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Used Count</label>
-                        <div className="text-gray-900 text-2xl font-bold">{coupon.usedCount || 0}</div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Used Count</label>
+                        <div className="text-slate-900 text-2xl font-bold">{coupon.usedCount || 0}</div>
                       </div>
                       {coupon.usageLimit ? (
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">Usage Progress</label>
-                          <div className="w-full bg-gray-200 rounded-full h-3">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Usage Progress</label>
+                          <div className="w-full bg-slate-200 rounded-full h-3">
                             <div
-                              className="bg-gray-900 h-3 rounded-full transition-all"
+                              className="bg-brand-500 h-3 rounded-full transition-all"
                               style={{ width: `${((coupon.usedCount || 0) / coupon.usageLimit) * 100}%` }}
                             />
                           </div>
-                          <div className="text-xs text-gray-600 mt-1">
+                          <div className="text-xs text-slate-600 mt-1">
                             {Math.round(((coupon.usedCount || 0) / coupon.usageLimit) * 100)}% used
                           </div>
                         </div>
@@ -226,19 +226,19 @@ const CouponModal = ({
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                     <div className="flex items-center gap-2 mb-3">
-                      <Calendar className="w-5 h-5 text-gray-700" />
-                      <h3 className="font-semibold text-gray-900">Validity Period</h3>
+                      <Calendar className="w-5 h-5 text-slate-700" />
+                      <h3 className="font-semibold text-slate-900">Validity Period</h3>
                     </div>
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Start Date</label>
-                        <div className="text-gray-900">{formatDate(coupon.startDate)}</div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Start Date</label>
+                        <div className="text-slate-900">{formatDate(coupon.startDate)}</div>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Expiry Date</label>
-                        <div className="text-gray-900">{formatDate(coupon.expiryDate)}</div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Expiry Date</label>
+                        <div className="text-slate-900">{formatDate(coupon.expiryDate)}</div>
                       </div>
                     </div>
                   </div>
@@ -247,40 +247,40 @@ const CouponModal = ({
 
               {/* Promotional Popup Info (View Mode) */}
               {coupon.showAsPopup && (
-                <div className="mt-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="mt-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
                   <div className="flex items-center gap-2 mb-3">
-                    <Megaphone className="w-5 h-5 text-gray-700" />
-                    <h3 className="font-semibold text-gray-900">Promotional Popup</h3>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                    <Megaphone className="w-5 h-5 text-slate-700" />
+                    <h3 className="font-semibold text-slate-900">Promotional Popup</h3>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
                       Enabled
                     </span>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {coupon.popupImage && (
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Popup Image</label>
-                        <img src={coupon.popupImage} alt="Popup" className="w-full max-w-xs h-32 object-cover rounded-lg border border-gray-200" />
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Popup Image</label>
+                        <img src={coupon.popupImage} alt="Popup" className="w-full max-w-xs h-32 object-cover rounded-lg border border-slate-200" />
                       </div>
                     )}
                     <div className="space-y-3">
                       {coupon.popupTitle && (
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">Popup Title</label>
-                          <div className="text-gray-900 text-sm">{coupon.popupTitle}</div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Popup Title</label>
+                          <div className="text-slate-900 text-sm">{coupon.popupTitle}</div>
                         </div>
                       )}
                       {coupon.popupMessage && (
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">Popup Message</label>
-                          <div className="text-gray-900 text-sm">{coupon.popupMessage}</div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Popup Message</label>
+                          <div className="text-slate-900 text-sm">{coupon.popupMessage}</div>
                         </div>
                       )}
                       {coupon.applicableCategories && coupon.applicableCategories.length > 0 && (
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">Applicable Categories</label>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Applicable Categories</label>
                           <div className="flex flex-wrap gap-1">
                             {coupon.applicableCategories.map((cat, idx) => (
-                              <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
                                 {cat}
                               </span>
                             ))}
@@ -300,15 +300,15 @@ const CouponModal = ({
                 {/* Top Row: Basic Information | Discount Details */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Left: Basic Information */}
-                  <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                  <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
                     <div className="flex items-center gap-2 mb-4">
-                      <Tag className="w-5 h-5 text-gray-700" />
-                      <h3 className="font-semibold text-gray-900">Basic Information</h3>
+                      <Tag className="w-5 h-5 text-slate-700" />
+                      <h3 className="font-semibold text-slate-900">Basic Information</h3>
                     </div>
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">
                             Coupon Code <span className="text-red-500">*</span>
                           </label>
                           <input
@@ -316,13 +316,13 @@ const CouponModal = ({
                             required
                             value={formData.code || ''}
                             onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent font-mono"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent font-mono"
                             placeholder="e.g., FREESHIP3"
                             disabled={mode === 'edit'}
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">
                             Status <span className="text-red-500">*</span>
                           </label>
                           <Dropdown
@@ -336,12 +336,12 @@ const CouponModal = ({
                         </div>
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
                         <textarea
                           rows={4}
                           value={formData.description || ''}
                           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent resize-none"
                           placeholder="Brief description of the coupon"
                         />
                       </div>
@@ -349,15 +349,15 @@ const CouponModal = ({
                   </div>
 
                   {/* Right: Discount Details */}
-                  <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                  <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
                     <div className="flex items-center gap-2 mb-4">
-                      <Percent className="w-5 h-5 text-gray-700" />
-                      <h3 className="font-semibold text-gray-900">Discount Details</h3>
+                      <Percent className="w-5 h-5 text-slate-700" />
+                      <h3 className="font-semibold text-slate-900">Discount Details</h3>
                     </div>
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">
                             Discount Type <span className="text-red-500">*</span>
                           </label>
                           <Dropdown
@@ -370,7 +370,7 @@ const CouponModal = ({
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">
                             Discount Value <span className="text-red-500">*</span>
                           </label>
                           <input
@@ -379,14 +379,14 @@ const CouponModal = ({
                             min="0"
                             value={formData.discountValue || ''}
                             onChange={(e) => setFormData({ ...formData, discountValue: Number(e.target.value) })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                             placeholder={formData.discountType === 'PERCENTAGE' ? '10' : '200'}
                           />
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">
                             Min Purchase <span className="text-red-500">*</span>
                           </label>
                           <input
@@ -395,20 +395,20 @@ const CouponModal = ({
                             min="0"
                             value={formData.minPurchaseAmount || ''}
                             onChange={(e) => setFormData({ ...formData, minPurchaseAmount: Number(e.target.value) })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                             placeholder="500"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Max Discount <span className="text-gray-500 text-xs">(Optional)</span>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">
+                            Max Discount <span className="text-slate-500 text-xs">(Optional)</span>
                           </label>
                           <input
                             type="number"
                             min="0"
                             value={formData.maxDiscountAmount || ''}
                             onChange={(e) => setFormData({ ...formData, maxDiscountAmount: Number(e.target.value) })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                             placeholder="100"
                           />
                         </div>
@@ -419,38 +419,38 @@ const CouponModal = ({
 
                 {/* Middle Row: Usage Limit | Validity Period */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                  <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
                     <div className="flex items-center gap-2 mb-4">
-                      <TrendingUp className="w-5 h-5 text-gray-700" />
-                      <h3 className="font-semibold text-gray-900">Usage Limit</h3>
+                      <TrendingUp className="w-5 h-5 text-slate-700" />
+                      <h3 className="font-semibold text-slate-900">Usage Limit</h3>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Usage Limit <span className="text-gray-500 text-xs">(Optional)</span>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Usage Limit <span className="text-slate-500 text-xs">(Optional)</span>
                       </label>
                       <input
                         type="number"
                         min="1"
                         value={formData.usageLimit || ''}
                         onChange={(e) => setFormData({ ...formData, usageLimit: Number(e.target.value) })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                         placeholder="1000"
                       />
-                      <div className="mt-2 flex items-start gap-2 text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                      <div className="mt-2 flex items-start gap-2 text-xs text-slate-600 bg-blue-50 p-2 rounded">
                         <Info className="w-4 h-4 shrink-0 mt-0.5" />
                         <span>Maximum number of times this coupon can be used globally</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                  <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
                     <div className="flex items-center gap-2 mb-4">
-                      <Calendar className="w-5 h-5 text-gray-700" />
-                      <h3 className="font-semibold text-gray-900">Validity Period</h3>
+                      <Calendar className="w-5 h-5 text-slate-700" />
+                      <h3 className="font-semibold text-slate-900">Validity Period</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
                           Start Date <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -458,11 +458,11 @@ const CouponModal = ({
                           required
                           value={formData.startDate?.split('T')[0] || ''}
                           onChange={(e) => setFormData({ ...formData, startDate: new Date(e.target.value).toISOString() })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
                           Expiry Date <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -470,7 +470,7 @@ const CouponModal = ({
                           required
                           value={formData.expiryDate?.split('T')[0] || ''}
                           onChange={(e) => setFormData({ ...formData, expiryDate: new Date(e.target.value).toISOString() })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                         />
                       </div>
                     </div>
@@ -478,11 +478,11 @@ const CouponModal = ({
                 </div>
 
                 {/* Promotional Popup Section */}
-                <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                      <Megaphone className="w-5 h-5 text-gray-700" />
-                      <h3 className="font-semibold text-gray-900">Promotional Popup</h3>
+                      <Megaphone className="w-5 h-5 text-slate-700" />
+                      <h3 className="font-semibold text-slate-900">Promotional Popup</h3>
                     </div>
                     <label className="flex items-center gap-3 cursor-pointer">
                       <div className="relative">
@@ -492,10 +492,10 @@ const CouponModal = ({
                           onChange={(e) => setFormData({ ...formData, showAsPopup: e.target.checked })}
                           className="sr-only peer"
                         />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-gray-900 rounded-full peer peer-checked:bg-green-600 transition-colors"></div>
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-brand-500/40 rounded-full peer peer-checked:bg-brand-500 transition-colors"></div>
                         <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform"></div>
                       </div>
-                      <span className="text-sm text-gray-700">{formData.showAsPopup ? 'Enabled' : 'Disabled'}</span>
+                      <span className="text-sm text-slate-700">{formData.showAsPopup ? 'Enabled' : 'Disabled'}</span>
                     </label>
                   </div>
 
@@ -503,12 +503,12 @@ const CouponModal = ({
                     <div className="space-y-4">
                       {/* Popup Image */}
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">Popup Image <span className="text-xs font-normal text-gray-400">(optional)</span></label>
-                        <p className="text-xs text-gray-500 mb-2">If not uploaded, the category image will be used automatically.</p>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">Popup Image <span className="text-xs font-normal text-slate-400">(optional)</span></label>
+                        <p className="text-xs text-slate-500 mb-2">If not uploaded, the category image will be used automatically.</p>
                         <div>
                           {popupImagePreview ? (
                             <div className="relative inline-block">
-                              <img src={popupImagePreview} alt="Popup Preview" className="w-full max-w-xs h-32 object-cover rounded-lg border border-gray-200" />
+                              <img src={popupImagePreview} alt="Popup Preview" className="w-full max-w-xs h-32 object-cover rounded-lg border border-slate-200" />
                               <button
                                 type="button"
                                 onClick={handleRemovePopupImage}
@@ -521,7 +521,7 @@ const CouponModal = ({
                             <button
                               type="button"
                               onClick={() => popupFileInputRef.current?.click()}
-                              className="w-full max-w-xs h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-gray-400 hover:text-gray-500 transition-colors"
+                              className="w-full max-w-xs h-32 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-slate-400 hover:text-slate-500 transition-colors"
                             >
                               <Upload className="w-6 h-6" />
                               <span className="text-xs">Upload Popup Image</span>
@@ -540,42 +540,42 @@ const CouponModal = ({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Popup Title */}
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Popup Title</label>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">Popup Title</label>
                           <input
                             type="text"
                             value={formData.popupTitle || ''}
                             onChange={(e) => setFormData({ ...formData, popupTitle: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                             placeholder="e.g., Special Offer on Towels!"
                           />
                         </div>
 
                         {/* Applicable Categories */}
                         <div className="relative">
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">
                             Applicable Categories
                           </label>
                           <button
                             type="button"
                             onClick={() => { setShowCategoryDropdown(prev => !prev); setCategorySearch(''); }}
-                            className="w-full flex items-center justify-between px-4 py-2.5 border border-gray-300 rounded-lg bg-white hover:border-gray-400 transition-colors text-left"
+                            className="w-full flex items-center justify-between px-4 py-2.5 border border-slate-300 rounded-lg bg-white hover:border-slate-400 transition-colors text-left"
                           >
-                            <span className={`text-sm ${(formData.applicableCategories || []).length > 0 ? 'text-gray-900' : 'text-gray-400'}`}>
+                            <span className={`text-sm ${(formData.applicableCategories || []).length > 0 ? 'text-slate-900' : 'text-slate-400'}`}>
                               {(formData.applicableCategories || []).length > 0
                                 ? (formData.applicableCategories || []).join(', ')
                                 : 'Select categories'}
                             </span>
-                            <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+                            <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
                           </button>
                           {showCategoryDropdown && (
-                            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
-                              <div className="p-2 border-b border-gray-100">
+                            <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg">
+                              <div className="p-2 border-b border-slate-100">
                                 <input
                                   type="text"
                                   value={categorySearch}
                                   onChange={(e) => setCategorySearch(e.target.value)}
                                   placeholder="Search categories..."
-                                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-400 focus:border-gray-400 outline-none"
+                                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-1 focus:ring-brand-500/40 focus:border-brand-500 outline-none"
                                   autoFocus
                                 />
                               </div>
@@ -587,7 +587,7 @@ const CouponModal = ({
                                     return (
                                       <label
                                         key={cat}
-                                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
+                                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 cursor-pointer"
                                       >
                                         <input
                                           type="checkbox"
@@ -601,14 +601,14 @@ const CouponModal = ({
                                                 : [...current, cat],
                                             });
                                           }}
-                                          className="w-4 h-4 accent-gray-800 rounded"
+                                          className="w-4 h-4 accent-brand-500 rounded"
                                         />
-                                        <span className="text-sm text-gray-700">{cat}</span>
+                                        <span className="text-sm text-slate-700">{cat}</span>
                                       </label>
                                     );
                                   })}
                                 {availableCategories.filter(cat => cat.toLowerCase().includes(categorySearch.toLowerCase())).length === 0 && (
-                                  <p className="px-4 py-3 text-sm text-gray-400">No categories found</p>
+                                  <p className="px-4 py-3 text-sm text-slate-400">No categories found</p>
                                 )}
                               </div>
                             </div>
@@ -618,17 +618,17 @@ const CouponModal = ({
 
                       {/* Popup Message */}
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Popup Message</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Popup Message</label>
                         <textarea
                           rows={3}
                           value={formData.popupMessage || ''}
                           onChange={(e) => setFormData({ ...formData, popupMessage: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent resize-none"
                           placeholder="Message to display in the popup"
                         />
                       </div>
 
-                      <div className="flex items-start gap-2 text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                      <div className="flex items-start gap-2 text-xs text-slate-600 bg-blue-50 p-2 rounded">
                         <Info className="w-4 h-4 shrink-0 mt-0.5" />
                         <span>This popup will appear when customers visit the specified category or product pages. Each customer sees it once per session per category.</span>
                       </div>
@@ -639,17 +639,17 @@ const CouponModal = ({
               </div>
 
               {/* Form Actions */}
-              <div className="flex items-center gap-3 mt-6 pt-6 border-t border-gray-200">
+              <div className="flex items-center gap-3 mt-6 pt-6 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  className="flex-1 px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                  className="flex-1 px-6 py-2.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-medium"
                 >
                   {mode === 'create' ? 'Create Coupon' : 'Update Coupon'}
                 </button>
@@ -660,10 +660,10 @@ const CouponModal = ({
 
         {/* Footer for View Mode */}
         {mode === 'view' && (
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-200 bg-slate-50">
             <button
               onClick={onClose}
-              className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+              className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors font-medium"
             >
               Close
             </button>

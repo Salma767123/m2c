@@ -782,6 +782,7 @@ const getVendorCategories = async (req, res) => {
       where: { id: vendorId },
       select: {
         productCategories: true,
+        additionalCategories: true,
         productTypes: true
       }
     });
@@ -896,6 +897,21 @@ const getVendorCategories = async (req, res) => {
             ...unresolvedNames.map(name => ({ id: name, name: name, slug: name }))
           ];
         }
+      }
+    }
+
+    // Append vendor-defined custom categories (Step 4 "Other" path). These
+    // live in additionalCategories JSON, not the master Category collection,
+    // so they have no DB row / subcategories — the vendor still needs to pick
+    // them when adding inventory. Admin assigns a real subcategory later when
+    // publishing the product to the website.
+    if (Array.isArray(vendor.additionalCategories)) {
+      const existingNames = new Set(categories.map(c => c.name.toLowerCase()));
+      for (const cat of vendor.additionalCategories) {
+        const name = typeof cat?.name === 'string' ? cat.name.trim() : '';
+        if (!name || existingNames.has(name.toLowerCase())) continue;
+        existingNames.add(name.toLowerCase());
+        categories.push({ id: cat.id || name, name, slug: cat.slug || name, isCustom: true });
       }
     }
 

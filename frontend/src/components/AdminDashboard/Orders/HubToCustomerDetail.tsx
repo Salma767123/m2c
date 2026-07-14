@@ -61,7 +61,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
   };
 
   if (isLoading) {
-    return <div className="p-6 text-center text-gray-500">Loading order details...</div>;
+    return <div className="p-6 text-center text-slate-500">Loading order details...</div>;
   }
 
   if (!order) {
@@ -149,7 +149,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
     warning: { wrap: 'bg-amber-50 border-amber-200', title: 'text-amber-900', message: 'text-amber-800', iconColor: 'text-amber-600' },
     danger: { wrap: 'bg-red-50 border-red-200', title: 'text-red-900', message: 'text-red-800', iconColor: 'text-red-600' },
     info: { wrap: 'bg-blue-50 border-blue-200', title: 'text-blue-900', message: 'text-blue-800', iconColor: 'text-blue-600' },
-    neutral: { wrap: 'bg-gray-50 border-gray-200', title: 'text-gray-900', message: 'text-gray-700', iconColor: 'text-gray-500' },
+    neutral: { wrap: 'bg-slate-50 border-slate-200', title: 'text-slate-900', message: 'text-slate-700', iconColor: 'text-slate-500' },
   };
   const renderBannerIcon = (tone: BannerTone) => {
     const cls = `h-5 w-5 ${bannerToneClasses[tone].iconColor}`;
@@ -178,13 +178,13 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+            <ArrowLeft className="h-5 w-5 text-slate-600" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Hub to Customer Order</h1>
-            <p className="text-sm text-gray-600 mt-1">Order ID: {order.orderId}</p>
+            <h1 className="text-2xl font-bold text-slate-900">Hub to Customer Order</h1>
+            <p className="text-sm text-slate-600 mt-1">Order ID: {order.orderId}</p>
           </div>
         </div>
         <div className="flex gap-3">
@@ -194,7 +194,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
               disabled={!canMarkOutForDelivery}
               className={`px-6 py-2 rounded-lg transition-colors font-medium ${canMarkOutForDelivery
                 ? "bg-orange-600 text-white hover:bg-orange-700"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                : "bg-slate-200 text-slate-400 cursor-not-allowed"
               }`}
               title={!canMarkOutForDelivery ? outForDeliveryBlockerReason : ""}
             >
@@ -210,7 +210,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
             </button>
           )}
           {status === "DELIVERED" && (
-            <div className="px-6 py-2 bg-green-100 text-green-800 rounded-lg font-medium border border-green-300">
+            <div className="px-6 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg font-medium border border-green-300">
               Order Delivered
             </div>
           )}
@@ -238,69 +238,69 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
       )}
 
       {/* Order Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
-          <Package className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Order Information</h2>
+          <Package className="h-5 w-5 text-slate-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Order Information</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <p className="text-sm text-gray-600">Order Date</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
+            <p className="text-sm text-slate-600">Order Date</p>
+            <p className="text-base font-medium text-slate-900 mt-1">
               {new Date(order.createdAt).toLocaleDateString()}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Status</p>
+            <p className="text-sm text-slate-600">Status</p>
             <p className={`text-base font-medium mt-1 ${["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB"].includes(status) ? "text-teal-600" :
               status === "SHIPPED_TO_CUSTOMER" ? "text-orange-600" :
-                status === "DELIVERED" ? "text-green-600" : "text-gray-600"
+                status === "DELIVERED" ? "text-green-600" : "text-slate-600"
               }`}>
               {status.replace(/_/g, " ")}
             </p>
             {hasShipments && !isTerminal && status !== 'DELIVERED' && (
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-slate-500 mt-1">
                 {approvedCount} of {totalShipmentCount} vendor shipment{totalShipmentCount === 1 ? '' : 's'} approved
               </p>
             )}
           </div>
           {/* TODO: Uncomment when tracking reference feature is implemented
           <div>
-            <p className="text-sm text-gray-600">Tracking Ref</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
+            <p className="text-sm text-slate-600">Tracking Ref</p>
+            <p className="text-base font-medium text-slate-900 mt-1">
               {order.trackingReference || "N/A"}
             </p>
           </div>
           */}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-4 border-t border-gray-200">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-4 border-t border-slate-200">
           <div>
-            <p className="text-sm text-gray-600">Subtotal</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
+            <p className="text-sm text-slate-600">Subtotal</p>
+            <p className="text-base font-medium text-slate-900 mt-1">
               ₹{order.subtotal?.toLocaleString() || 0}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Tax</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
+            <p className="text-sm text-slate-600">Tax</p>
+            <p className="text-base font-medium text-slate-900 mt-1">
               ₹{order.tax?.toLocaleString() || 0}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Shipping</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
+            <p className="text-sm text-slate-600">Shipping</p>
+            <p className="text-base font-medium text-slate-900 mt-1">
               ₹{order.shippingCost?.toLocaleString() || 0}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Discount</p>
+            <p className="text-sm text-slate-600">Discount</p>
             <p className="text-base font-medium text-green-600 mt-1">
               -₹{order.discount?.toLocaleString() || 0}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Total Amount</p>
-            <p className="text-lg font-bold text-gray-900 mt-1">
+            <p className="text-sm text-slate-600">Total Amount</p>
+            <p className="text-lg font-bold text-slate-900 mt-1">
               ₹{order.totalAmount?.toLocaleString() || 0}
             </p>
           </div>
@@ -308,50 +308,50 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
       </div>
 
       {/* Product Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Product Details</h2>
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">Product Details</h2>
         <div className="space-y-4">
           {order.items?.map((item: any) => (
-            <div key={item.id} className="flex gap-4 p-4 border border-gray-100 rounded-lg">
+            <div key={item.id} className="flex gap-4 p-4 border border-slate-100 rounded-lg">
               <img
                 src={item.productImage || "/assets/images/placeholder.jpg"}
                 alt={item.productName}
-                className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                className="w-24 h-24 object-cover rounded-lg border border-slate-200"
               />
               <div className="flex-1">
-                <h3 className="text-base font-semibold text-gray-900">{item.productName}</h3>
-                <p className="text-sm text-gray-600 mt-1">SKU: {item.sku}</p>
+                <h3 className="text-base font-semibold text-slate-900">{item.productName}</h3>
+                <p className="text-sm text-slate-600 mt-1">SKU: {item.sku}</p>
                 {(item.size || item.color) && (
                   <div className="flex items-center gap-2 mt-1">
-                    {item.size && <p className="text-sm text-gray-600">Size: {item.size}</p>}
-                    {item.size && item.color && <span className="text-gray-300">|</span>}
+                    {item.size && <p className="text-sm text-slate-600">Size: {item.size}</p>}
+                    {item.size && item.color && <span className="text-slate-300">|</span>}
                     {item.color && (
                       <div className="flex items-center gap-1.5">
-                        <p className="text-sm text-gray-600">Color:</p>
+                        <p className="text-sm text-slate-600">Color:</p>
                         <div 
-                          className="w-4 h-4 rounded-full border border-gray-300 shadow-sm"
+                          className="w-4 h-4 rounded-full border border-slate-300 shadow-sm"
                           style={{ backgroundColor: item.colorHex || item.color }}
                           title={item.color}
                         />
-                        <span className="text-xs text-gray-500 capitalize">{item.color}</span>
+                        <span className="text-xs text-slate-500 capitalize">{item.color}</span>
                       </div>
                     )}
                   </div>
                 )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                   <div>
-                    <p className="text-sm text-gray-600">Quantity</p>
-                    <p className="text-base font-medium text-gray-900">{item.quantity}</p>
+                    <p className="text-sm text-slate-600">Quantity</p>
+                    <p className="text-base font-medium text-slate-900">{item.quantity}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Unit Price</p>
-                    <p className="text-base font-medium text-gray-900">
+                    <p className="text-sm text-slate-600">Unit Price</p>
+                    <p className="text-base font-medium text-slate-900">
                       ₹{item.unitPrice?.toLocaleString() || 0}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Total Price</p>
-                    <p className="text-base font-medium text-gray-900">
+                    <p className="text-sm text-slate-600">Total Price</p>
+                    <p className="text-base font-medium text-slate-900">
                       ₹{item.totalPrice?.toLocaleString() || (item.unitPrice * item.quantity).toLocaleString()}
                     </p>
                   </div>
@@ -364,62 +364,62 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
 
       {/* Bag Add-on */}
       {order.bagTypeName && order.bagTypePrice && order.bagTypePrice > 0 && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
           <div className="flex items-center gap-2 mb-4">
-            <ShoppingBag className="h-5 w-5 text-gray-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Bag Add-on</h2>
+            <ShoppingBag className="h-5 w-5 text-slate-600" />
+            <h2 className="text-lg font-semibold text-slate-900">Bag Add-on</h2>
           </div>
           <div className="flex items-center gap-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
             <ShoppingBag className="h-8 w-8 text-amber-600 shrink-0" />
             <div className="flex-1">
-              <p className="font-medium text-gray-900">{order.bagTypeName}</p>
-              <p className="text-sm text-gray-600 mt-0.5">Customer requested this bag with their order</p>
+              <p className="font-medium text-slate-900">{order.bagTypeName}</p>
+              <p className="text-sm text-slate-600 mt-0.5">Customer requested this bag with their order</p>
             </div>
-            <p className="text-lg font-bold text-gray-900 shrink-0">₹{order.bagTypePrice.toFixed(2)}</p>
+            <p className="text-lg font-bold text-slate-900 shrink-0">₹{order.bagTypePrice.toFixed(2)}</p>
           </div>
         </div>
       )}
 
       {/* Payment Method */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
-          <CreditCard className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Payment Information</h2>
+          <CreditCard className="h-5 w-5 text-slate-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Payment Information</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <p className="text-sm text-gray-600">Payment Method</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.paymentMethod}</p>
+            <p className="text-sm text-slate-600">Payment Method</p>
+            <p className="text-base font-medium text-slate-900 mt-1">{order.paymentMethod}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Transaction ID</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.paymentId || "N/A"}</p>
+            <p className="text-sm text-slate-600">Transaction ID</p>
+            <p className="text-base font-medium text-slate-900 mt-1">{order.paymentId || "N/A"}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Payment Status</p>
+            <p className="text-sm text-slate-600">Payment Status</p>
             <p className="text-base font-medium text-green-600 mt-1">{order.paymentStatus}</p>
           </div>
         </div>
       </div>
 
       {/* Customer Details — unified layout shared with VendorToHubDetail and OrderDetail */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
-          <User className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Customer Details</h2>
+          <User className="h-5 w-5 text-slate-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Customer Details</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <h3 className="text-sm font-medium text-gray-900 mb-2">Customer Info</h3>
-            <p className="text-sm text-gray-600">{order.customerName}</p>
-            <p className="text-sm text-gray-600">{order.customerEmail}</p>
+            <h3 className="text-sm font-medium text-slate-900 mb-2">Customer Info</h3>
+            <p className="text-sm text-slate-600">{order.customerName}</p>
+            <p className="text-sm text-slate-600">{order.customerEmail}</p>
             {order.customerPhone && (
-              <p className="text-sm text-gray-600">{formatPhoneForDisplay(order.customerPhone, order?.shippingAddress?.country)}</p>
+              <p className="text-sm text-slate-600">{formatPhoneForDisplay(order.customerPhone, order?.shippingAddress?.country)}</p>
             )}
           </div>
           <div>
-            <h3 className="text-sm font-medium text-gray-900 mb-2">Delivery Address</h3>
-            <div className="text-sm text-gray-600">
+            <h3 className="text-sm font-medium text-slate-900 mb-2">Delivery Address</h3>
+            <div className="text-sm text-slate-600">
               {order?.shippingAddress ? (
                 <>
                   {(() => {
@@ -428,7 +428,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
                       ? `${a.firstName} ${a.lastName}`
                       : a.firstName || a.name || "";
                     return recipient ? (
-                      <p className="font-medium text-gray-900">{recipient}</p>
+                      <p className="font-medium text-slate-900">{recipient}</p>
                     ) : null;
                   })()}
                   <p>{order.shippingAddress.address || order.shippingAddress.street}</p>
@@ -445,10 +445,10 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
       </div>
 
       {/* Hub Location */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
-          <MapPin className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Hub Information</h2>
+          <MapPin className="h-5 w-5 text-slate-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Hub Information</h2>
         </div>
         <div className="bg-teal-50 border border-teal-200 p-4 rounded-lg">
           <p className="text-sm text-teal-800">
@@ -459,11 +459,11 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
 
       {/* Vendor Shipments Summary */}
       {hasShipments && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
           <div className="flex items-center gap-2 mb-4">
-            <Truck className="h-5 w-5 text-gray-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Vendor Shipments</h2>
-            <span className="text-sm text-gray-500 ml-auto">
+            <Truck className="h-5 w-5 text-slate-600" />
+            <h2 className="text-lg font-semibold text-slate-900">Vendor Shipments</h2>
+            <span className="text-sm text-slate-500 ml-auto">
               {nonCancelledShipments.filter((s) => s.status === 'APPROVED_BY_ADMIN_HUB').length}/{nonCancelledShipments.length} approved
             </span>
           </div>
@@ -479,31 +479,31 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
             {shipments.map((s) => {
               const reviewData = (s as VendorShipment & { adminReviews?: Array<{ approved?: boolean; rating?: number }> }).adminReviews?.[0];
               return (
-                <div key={s.id} className="flex items-center gap-4 p-3 border border-gray-100 rounded-lg">
+                <div key={s.id} className="flex items-center gap-4 p-3 border border-slate-100 rounded-lg">
                   {s.status === 'APPROVED_BY_ADMIN_HUB' ? (
                     <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
                   ) : s.status === 'REJECTED_BY_ADMIN_HUB' ? (
                     <XCircle className="h-5 w-5 text-red-500 shrink-0" />
                   ) : s.status === 'CANCELLED' ? (
-                    <XCircle className="h-5 w-5 text-gray-400 shrink-0" />
+                    <XCircle className="h-5 w-5 text-slate-400 shrink-0" />
                   ) : (
                     <AlertTriangle className="h-5 w-5 text-yellow-500 shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{s.vendorName}</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm font-medium text-slate-900">{s.vendorName}</p>
+                    <p className="text-xs text-slate-500">
                       {s.items?.length || 0} item{(s.items?.length || 0) !== 1 ? 's' : ''} &middot; {s.status.replace(/_/g, ' ')}
                     </p>
                   </div>
                   {s.vendorCarrier && (
-                    <p className="text-xs text-gray-500 shrink-0">
+                    <p className="text-xs text-slate-500 shrink-0">
                       {s.vendorCarrier}: {s.vendorTrackingId}
                     </p>
                   )}
                   {reviewData?.approved && typeof reviewData.rating === 'number' && (
                     <div className="flex items-center gap-1 shrink-0">
                       <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                      <span className="text-xs font-medium text-gray-700">{reviewData.rating}/5</span>
+                      <span className="text-xs font-medium text-slate-700">{reviewData.rating}/5</span>
                     </div>
                   )}
                 </div>

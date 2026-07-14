@@ -6,7 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { getProductHeatMap, ProductHeatMapData } from '@/services/analyticsService';
 
 const HEAT_COLORS = ['#dc2626', '#ea580c', '#d97706', '#ca8a04', '#65a30d', '#16a34a', '#0d9488', '#0284c7', '#4f46e5', '#7c3aed'];
-const SOURCE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const SOURCE_COLORS = ['#e01a1b', '#16a34a', '#0074c8', '#f59e0b', '#64748b'];
 
 interface ProductHeatMapProps {
   period: string;
@@ -34,15 +34,15 @@ export default function ProductHeatMap({ period }: ProductHeatMapProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="text-center py-12 text-gray-500">
-        <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+      <div className="text-center py-12 text-slate-500">
+        <Package className="w-12 h-12 mx-auto mb-3 text-slate-300" />
         <p className="text-sm">No product view data available yet</p>
       </div>
     );
@@ -71,51 +71,51 @@ export default function ProductHeatMap({ period }: ProductHeatMapProps) {
     <div className="space-y-6">
       {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-gray-200">
+        <div className="bg-white p-4 rounded-xl border border-slate-200">
           <div className="flex items-center gap-2 mb-2">
             <Eye className="w-4 h-4 text-blue-600" />
-            <span className="text-xs font-semibold text-gray-500 uppercase">Total Views</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase">Total Views</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{data.totalProductViews.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-slate-900">{data.totalProductViews.toLocaleString()}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200">
+        <div className="bg-white p-4 rounded-xl border border-slate-200">
           <div className="flex items-center gap-2 mb-2">
             <Package className="w-4 h-4 text-purple-600" />
-            <span className="text-xs font-semibold text-gray-500 uppercase">Products Viewed</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase">Products Viewed</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{data.products.length}</p>
+          <p className="text-2xl font-bold text-slate-900">{data.products.length}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200">
+        <div className="bg-white p-4 rounded-xl border border-slate-200">
           <div className="flex items-center gap-2 mb-2">
             <ShoppingCart className="w-4 h-4 text-green-600" />
-            <span className="text-xs font-semibold text-gray-500 uppercase">Avg Conversion</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase">Avg Conversion</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">
+          <p className="text-2xl font-bold text-slate-900">
             {data.products.length > 0
               ? (data.products.reduce((sum, p) => sum + p.conversionRate, 0) / data.products.length).toFixed(1)
               : 0}%
           </p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200">
+        <div className="bg-white p-4 rounded-xl border border-slate-200">
           <div className="flex items-center gap-2 mb-2">
             <Flame className="w-4 h-4 text-red-600" />
-            <span className="text-xs font-semibold text-gray-500 uppercase">Hottest Product</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase">Hottest Product</span>
           </div>
-          <p className="text-sm font-bold text-gray-900 truncate">
+          <p className="text-sm font-bold text-slate-900 truncate">
             {data.products[0]?.productName || '—'}
           </p>
         </div>
       </div>
 
       {/* Product Heat Grid */}
-      <div className="bg-white p-6 rounded-xl border border-gray-200">
+      <div className="bg-white p-6 rounded-xl border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
           <Flame className="w-5 h-5 text-red-600" />
-          <h3 className="text-lg font-bold text-gray-900">Product Interest Heat Map</h3>
+          <h3 className="text-lg font-bold text-slate-900">Product Interest Heat Map</h3>
         </div>
 
         {/* Heat Scale Legend */}
-        <div className="flex items-center gap-2 mb-4 text-xs text-gray-500">
+        <div className="flex items-center gap-2 mb-4 text-xs text-slate-500">
           <span>Low</span>
           <div className="flex h-3 rounded-full overflow-hidden flex-1 max-w-[200px]">
             <div className="flex-1 bg-blue-200" />
@@ -151,9 +151,9 @@ export default function ProductHeatMap({ period }: ProductHeatMapProps) {
               </div>
               <div className="mt-1">
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  product.conversionRate > 10 ? 'bg-green-100 text-green-800' :
-                  product.conversionRate > 5 ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-red-100 text-red-800'
+                  product.conversionRate > 10 ? 'bg-green-50 text-green-700 border border-green-200' :
+                  product.conversionRate > 5 ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+                  'bg-red-50 text-red-700 border border-red-200'
                 }`}>
                   {product.conversionRate}% conv.
                 </span>
@@ -163,7 +163,7 @@ export default function ProductHeatMap({ period }: ProductHeatMapProps) {
         </div>
 
         {data.products.length === 0 && (
-          <div className="text-center py-8 text-gray-400 text-sm">
+          <div className="text-center py-8 text-slate-400 text-sm">
             No product views recorded yet. Views will appear as customers browse products.
           </div>
         )}
@@ -172,8 +172,8 @@ export default function ProductHeatMap({ period }: ProductHeatMapProps) {
       {/* Category Heat Map + Source Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Category Bar Chart */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200">
-          <h3 className="text-sm font-bold text-gray-900 mb-4">Views by Category</h3>
+        <div className="bg-white p-6 rounded-xl border border-slate-200">
+          <h3 className="text-sm font-bold text-slate-900 mb-4">Views by Category</h3>
           {data.categoryHeatMap.length > 0 ? (
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={data.categoryHeatMap} layout="vertical" margin={{ left: 80 }}>
@@ -191,13 +191,13 @@ export default function ProductHeatMap({ period }: ProductHeatMapProps) {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="text-center py-8 text-gray-400 text-sm">No category data</div>
+            <div className="text-center py-8 text-slate-400 text-sm">No category data</div>
           )}
         </div>
 
         {/* Traffic Source Pie */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200">
-          <h3 className="text-sm font-bold text-gray-900 mb-4">Traffic Sources</h3>
+        <div className="bg-white p-6 rounded-xl border border-slate-200">
+          <h3 className="text-sm font-bold text-slate-900 mb-4">Traffic Sources</h3>
           {data.sourceBreakdown.length > 0 ? (
             <div className="flex items-center gap-4">
               <ResponsiveContainer width="50%" height={200}>
@@ -222,58 +222,58 @@ export default function ProductHeatMap({ period }: ProductHeatMapProps) {
                 {data.sourceBreakdown.map((s, i) => (
                   <div key={s.source} className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: SOURCE_COLORS[i % SOURCE_COLORS.length] }} />
-                    <span className="text-xs text-gray-700 capitalize flex-1">{s.source}</span>
-                    <span className="text-xs font-bold text-gray-900">{s.count}</span>
+                    <span className="text-xs text-slate-700 capitalize flex-1">{s.source}</span>
+                    <span className="text-xs font-bold text-slate-900">{s.count}</span>
                   </div>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-400 text-sm">No source data</div>
+            <div className="text-center py-8 text-slate-400 text-sm">No source data</div>
           )}
         </div>
       </div>
 
       {/* Top Products Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-gray-700" />
-          <h3 className="font-bold text-gray-900">Product Performance</h3>
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-slate-700" />
+          <h3 className="font-bold text-slate-900">Product Performance</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50">
+            <thead className="bg-slate-50">
               <tr>
-                <th className="text-left px-6 py-3 font-semibold text-gray-600">#</th>
-                <th className="text-left px-6 py-3 font-semibold text-gray-600">Product</th>
-                <th className="text-left px-6 py-3 font-semibold text-gray-600">Category</th>
-                <th className="text-right px-6 py-3 font-semibold text-gray-600">Views</th>
-                <th className="text-right px-6 py-3 font-semibold text-gray-600">Orders</th>
-                <th className="text-right px-6 py-3 font-semibold text-gray-600">Qty Sold</th>
-                <th className="text-right px-6 py-3 font-semibold text-gray-600">Conversion</th>
-                <th className="px-6 py-3 font-semibold text-gray-600">Heat</th>
+                <th className="text-left px-6 py-3 font-semibold text-slate-600">#</th>
+                <th className="text-left px-6 py-3 font-semibold text-slate-600">Product</th>
+                <th className="text-left px-6 py-3 font-semibold text-slate-600">Category</th>
+                <th className="text-right px-6 py-3 font-semibold text-slate-600">Views</th>
+                <th className="text-right px-6 py-3 font-semibold text-slate-600">Orders</th>
+                <th className="text-right px-6 py-3 font-semibold text-slate-600">Qty Sold</th>
+                <th className="text-right px-6 py-3 font-semibold text-slate-600">Conversion</th>
+                <th className="px-6 py-3 font-semibold text-slate-600">Heat</th>
               </tr>
             </thead>
             <tbody>
               {data.products.slice(0, 15).map((p, i) => (
-                <tr key={p.productId} className="border-t border-gray-100 hover:bg-gray-50/50">
-                  <td className="px-6 py-3 text-gray-500 font-medium">{i + 1}</td>
-                  <td className="px-6 py-3 font-semibold text-gray-900 max-w-[200px] truncate">{p.productName}</td>
-                  <td className="px-6 py-3 text-gray-600">{p.category}</td>
+                <tr key={p.productId} className="border-t border-slate-100 hover:bg-slate-50/50">
+                  <td className="px-6 py-3 text-slate-500 font-medium">{i + 1}</td>
+                  <td className="px-6 py-3 font-semibold text-slate-900 max-w-[200px] truncate">{p.productName}</td>
+                  <td className="px-6 py-3 text-slate-600">{p.category}</td>
                   <td className="px-6 py-3 text-right font-medium">{p.views.toLocaleString()}</td>
                   <td className="px-6 py-3 text-right font-medium">{p.orders}</td>
                   <td className="px-6 py-3 text-right font-medium">{p.quantitySold}</td>
                   <td className="px-6 py-3 text-right">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                      p.conversionRate > 10 ? 'bg-green-100 text-green-800' :
-                      p.conversionRate > 5 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
+                      p.conversionRate > 10 ? 'bg-green-50 text-green-700 border border-green-200' :
+                      p.conversionRate > 5 ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+                      'bg-red-50 text-red-700 border border-red-200'
                     }`}>
                       {p.conversionRate}%
                     </span>
                   </td>
                   <td className="px-6 py-3">
-                    <div className="w-16 bg-gray-200 rounded-full h-2">
+                    <div className="w-16 bg-slate-200 rounded-full h-2">
                       <div
                         className="h-2 rounded-full transition-all"
                         style={{
@@ -288,7 +288,7 @@ export default function ProductHeatMap({ period }: ProductHeatMapProps) {
             </tbody>
           </table>
           {data.products.length === 0 && (
-            <div className="text-center py-8 text-gray-400 text-sm">No data yet</div>
+            <div className="text-center py-8 text-slate-400 text-sm">No data yet</div>
           )}
         </div>
       </div>

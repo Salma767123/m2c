@@ -347,23 +347,23 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
     switch (status) {
       case 'COMPLETED':
         if (result === 'FAILED')
-          return <Badge className={`bg-red-100 text-red-800 border-red-200 ${base}`}><XCircle className="w-4 h-4 mr-2" />Failed</Badge>;
-        return <Badge className={`bg-emerald-100 text-emerald-800 border-emerald-200 ${base}`}><CheckCircle className="w-4 h-4 mr-2" />{result === 'PASSED' ? 'Passed' : 'Completed'}</Badge>;
+          return <Badge className={`bg-red-50 text-red-700 border border-red-200 border-red-200 ${base}`}><XCircle className="w-4 h-4 mr-2" />Failed</Badge>;
+        return <Badge className={`bg-emerald-50 text-emerald-700 border border-emerald-200 border-emerald-200 ${base}`}><CheckCircle className="w-4 h-4 mr-2" />{result === 'PASSED' ? 'Passed' : 'Completed'}</Badge>;
       case 'SUBMITTED':
       case 'UNDER_ADMIN_REVIEW':
-        return <Badge className={`bg-blue-100 text-blue-800 border-blue-200 ${base}`}><Clock className="w-4 h-4 mr-2" />Under Review by Admin</Badge>;
+        return <Badge className={`bg-blue-50 text-blue-700 border border-blue-200 border-blue-200 ${base}`}><Clock className="w-4 h-4 mr-2" />Under Review by Admin</Badge>;
       case 'SCHEDULED':
         return <Badge className={`bg-slate-100 text-slate-700 border-slate-200 ${base}`}><Clock className="w-4 h-4 mr-2" />Scheduled</Badge>;
       case 'IN_PROGRESS':
-        return <Badge className={`bg-amber-100 text-amber-800 border-amber-200 ${base}`}><Clock className="w-4 h-4 mr-2" />In Progress</Badge>;
+        return <Badge className={`bg-amber-50 text-amber-700 border border-amber-200 border-amber-200 ${base}`}><Clock className="w-4 h-4 mr-2" />In Progress</Badge>;
       case 'REJECTED':
-        return <Badge className={`bg-red-100 text-red-800 border-red-200 ${base}`}><XCircle className="w-4 h-4 mr-2" />Rejected</Badge>;
+        return <Badge className={`bg-red-50 text-red-700 border border-red-200 border-red-200 ${base}`}><XCircle className="w-4 h-4 mr-2" />Rejected</Badge>;
       case 'REINSPECTION':
-        return <Badge className={`bg-amber-100 text-amber-800 border-amber-200 ${base}`}><Clock className="w-4 h-4 mr-2" />Re-Inspection</Badge>;
+        return <Badge className={`bg-amber-50 text-amber-700 border border-amber-200 border-amber-200 ${base}`}><Clock className="w-4 h-4 mr-2" />Re-Inspection</Badge>;
       case 'CANCELLED':
         return <Badge className={`bg-slate-100 text-slate-600 border-slate-200 ${base}`}><XCircle className="w-4 h-4 mr-2" />Cancelled</Badge>;
       default:
-        return <Badge className={`bg-slate-100 text-slate-800 ${base}`}><Clock className="w-4 h-4 mr-2" />{status ? status.replace(/_/g, ' ') : 'Pending'}</Badge>;
+        return <Badge className={`bg-slate-50 text-slate-700 border border-slate-200 ${base}`}><Clock className="w-4 h-4 mr-2" />{status ? status.replace(/_/g, ' ') : 'Pending'}</Badge>;
     }
   };
 
@@ -413,7 +413,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
         </div>
         <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-12 text-center">
-            <ClipboardCheck className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <ClipboardCheck className="h-16 w-16 text-slate-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-slate-900 mb-2">No Inspection Found</h3>
             <p className="text-slate-500">No inspection has been assigned or completed for this vendor yet.</p>
           </CardContent>
@@ -475,7 +475,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
           </div>
         )}
         {vendorStatus === 'APPROVED' && (
-          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-base px-4 py-2">
+          <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 border-emerald-200 text-base px-4 py-2">
             <CheckCircle className="w-4 h-4 mr-2" /> Vendor Approved
           </Badge>
         )}

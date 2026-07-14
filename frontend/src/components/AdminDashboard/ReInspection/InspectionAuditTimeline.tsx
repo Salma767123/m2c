@@ -35,7 +35,7 @@ const ACTION_CONFIG: Record<string, { label: string; color: string; icon: React.
 };
 
 function getActionConfig(action: string) {
-  return ACTION_CONFIG[action] || { label: action, color: 'bg-gray-400', icon: <IconClock size={14} /> };
+  return ACTION_CONFIG[action] || { label: action, color: 'bg-slate-400', icon: <IconClock size={14} /> };
 }
 
 function formatDate(dateStr: string) {
@@ -65,10 +65,10 @@ export default function InspectionAuditTimeline({ logs, loading }: InspectionAud
       <div className="space-y-4 animate-pulse">
         {[1, 2, 3].map(i => (
           <div key={i} className="flex gap-3">
-            <div className="w-3 h-3 rounded-full bg-gray-200 mt-1.5" />
+            <div className="w-3 h-3 rounded-full bg-slate-200 mt-1.5" />
             <div className="flex-1 space-y-2">
-              <div className="h-4 bg-gray-200 rounded w-1/3" />
-              <div className="h-3 bg-gray-100 rounded w-2/3" />
+              <div className="h-4 bg-slate-200 rounded w-1/3" />
+              <div className="h-3 bg-slate-100 rounded w-2/3" />
             </div>
           </div>
         ))}
@@ -78,7 +78,7 @@ export default function InspectionAuditTimeline({ logs, loading }: InspectionAud
 
   if (!logs || logs.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-slate-500">
         <IconClock size={24} className="mx-auto mb-2 opacity-50" />
         <p className="text-sm">No audit trail available</p>
       </div>
@@ -96,7 +96,7 @@ export default function InspectionAuditTimeline({ logs, loading }: InspectionAud
           <div key={log.id} className="flex gap-3 relative">
             {/* Timeline line */}
             {!isLast && (
-              <div className="absolute left-[5px] top-6 bottom-0 w-0.5 bg-gray-200" />
+              <div className="absolute left-[5px] top-6 bottom-0 w-0.5 bg-slate-200" />
             )}
 
             {/* Timeline dot */}
@@ -105,25 +105,25 @@ export default function InspectionAuditTimeline({ logs, loading }: InspectionAud
             {/* Content */}
             <div className="flex-1 pb-6">
               <div
-                className="cursor-pointer hover:bg-gray-50 rounded-lg p-2 -ml-2 transition-colors"
+                className="cursor-pointer hover:bg-slate-50 rounded-lg p-2 -ml-2 transition-colors"
                 onClick={() => toggleExpand(log.id)}
               >
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-white p-0.5 rounded" style={{ backgroundColor: config.color.replace('bg-', '').includes('-') ? undefined : undefined }}>
                     {config.icon}
                   </span>
-                  <span className="font-medium text-sm text-gray-900">{config.label}</span>
+                  <span className="font-medium text-sm text-slate-900">{config.label}</span>
                   {log.cycleNumber > 1 && (
-                    <Badge className="bg-indigo-100 text-indigo-800 text-xs">
+                    <Badge className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs">
                       Cycle #{log.cycleNumber}
                     </Badge>
                   )}
-                  <span className="text-xs text-gray-500 ml-auto flex items-center gap-1">
+                  <span className="text-xs text-slate-500 ml-auto flex items-center gap-1">
                     {isExpanded ? <IconChevronUp size={12} /> : <IconChevronDown size={12} />}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
                   <span>{log.performedByName || log.performedByType}</span>
                   <span>&middot;</span>
                   <span>{formatDate(log.createdAt)}</span>
@@ -131,7 +131,7 @@ export default function InspectionAuditTimeline({ logs, loading }: InspectionAud
 
                 {/* Brief summary (always visible) */}
                 {log.rejectionReason && !isExpanded && (
-                  <p className="text-xs text-gray-600 mt-1 truncate">
+                  <p className="text-xs text-slate-600 mt-1 truncate">
                     Reason: {log.rejectionReason}
                   </p>
                 )}
@@ -139,38 +139,38 @@ export default function InspectionAuditTimeline({ logs, loading }: InspectionAud
 
               {/* Expanded details */}
               {isExpanded && (
-                <div className="mt-2 ml-2 space-y-2 text-sm border-l-2 border-gray-100 pl-3">
+                <div className="mt-2 ml-2 space-y-2 text-sm border-l-2 border-slate-100 pl-3">
                   {log.fromStatus && log.toStatus && (
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-xs">{log.fromStatus}</Badge>
-                      <span className="text-gray-400">&rarr;</span>
+                      <span className="text-slate-400">&rarr;</span>
                       <Badge variant="outline" className="text-xs">{log.toStatus}</Badge>
                     </div>
                   )}
 
                   {log.rejectionReason && (
                     <div>
-                      <span className="font-medium text-gray-700">Reason:</span>
-                      <p className="text-gray-600 mt-0.5">{log.rejectionReason}</p>
+                      <span className="font-medium text-slate-700">Reason:</span>
+                      <p className="text-slate-600 mt-0.5">{log.rejectionReason}</p>
                     </div>
                   )}
 
                   {log.remarks && (
                     <div>
-                      <span className="font-medium text-gray-700">Remarks:</span>
-                      <p className="text-gray-600 mt-0.5">{log.remarks}</p>
+                      <span className="font-medium text-slate-700">Remarks:</span>
+                      <p className="text-slate-600 mt-0.5">{log.remarks}</p>
                     </div>
                   )}
 
                   {log.notes && (
                     <div>
-                      <span className="font-medium text-gray-700">Notes:</span>
-                      <p className="text-gray-600 mt-0.5">{log.notes}</p>
+                      <span className="font-medium text-slate-700">Notes:</span>
+                      <p className="text-slate-600 mt-0.5">{log.notes}</p>
                     </div>
                   )}
 
                   {log.locationDetails && (
-                    <div className="flex items-center gap-1 text-gray-600">
+                    <div className="flex items-center gap-1 text-slate-600">
                       <IconMapPin size={14} />
                       <span>{log.locationDetails}</span>
                     </div>
@@ -178,7 +178,7 @@ export default function InspectionAuditTimeline({ logs, loading }: InspectionAud
 
                   {log.attachments && log.attachments.length > 0 && (
                     <div>
-                      <span className="font-medium text-gray-700 flex items-center gap-1">
+                      <span className="font-medium text-slate-700 flex items-center gap-1">
                         <IconPhoto size={14} />
                         Attachments ({log.attachments.length})
                       </span>
@@ -188,7 +188,7 @@ export default function InspectionAuditTimeline({ logs, loading }: InspectionAud
                             <img
                               src={url}
                               alt={`Attachment ${i + 1}`}
-                              className="w-16 h-16 object-cover rounded border hover:ring-2 ring-blue-300 transition-all"
+                              className="w-16 h-16 object-cover rounded border hover:ring-2 ring-brand-400 transition-all"
                             />
                           </button>
                         ))}

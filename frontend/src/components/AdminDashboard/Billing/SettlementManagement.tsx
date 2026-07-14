@@ -83,17 +83,17 @@ export default function SettlementManagement() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Paid":
-        return "bg-green-100 text-green-800";
+        return "bg-green-50 text-green-700 border border-green-200";
       case "Processing":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-50 text-blue-700 border border-blue-200";
       case "Pending":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-50 text-yellow-700 border border-yellow-200";
       case "Failed":
-        return "bg-red-100 text-red-800";
+        return "bg-red-50 text-red-700 border border-red-200";
       case "Cancelled":
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-50 text-slate-700 border border-slate-200";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-50 text-slate-700 border border-slate-200";
     }
   };
 
@@ -177,35 +177,35 @@ export default function SettlementManagement() {
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Total Settlements</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{settlements.length}</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Total Settlements</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{settlements.length}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Pending</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Pending</p>
           <p className="text-2xl font-bold text-yellow-600 mt-1">₹{totalPending.toLocaleString()}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Processing</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Processing</p>
           <p className="text-2xl font-bold text-blue-600 mt-1">₹{totalProcessing.toLocaleString()}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Paid</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Paid</p>
           <p className="text-2xl font-bold text-green-600 mt-1">₹{totalPaid.toLocaleString()}</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
             <input
               type="text"
               placeholder="Search by Settlement Number, Vendor, or Billing Number..."
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
             />
           </div>
           <div className="w-full md:w-48">
@@ -219,7 +219,7 @@ export default function SettlementManagement() {
           <button
             onClick={fetchSettlements}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -235,15 +235,15 @@ export default function SettlementManagement() {
       )}
 
       {/* Settlements Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center p-10">
             <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
-            <span className="ml-3 text-gray-500 font-medium">Loading Settlements...</span>
+            <span className="ml-3 text-slate-500 font-medium">Loading Settlements...</span>
           </div>
         ) : (
           <Table>
-            <TableHeader>
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
               <TableRow>
                 <TableHead>Settlement No.</TableHead>
                 <TableHead>Vendor</TableHead>
@@ -259,7 +259,7 @@ export default function SettlementManagement() {
             <TableBody>
               {paginatedSettlements.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={9} className="text-center py-8 text-slate-500">
                     No settlements found
                   </TableCell>
                 </TableRow>
@@ -279,7 +279,7 @@ export default function SettlementManagement() {
                               {new Date(settlement.dueDate).toLocaleDateString()}
                             </span>
                             {settlement.status !== 'Paid' && hasPermission('settlement:set_due_date') && (
-                              <button onClick={() => handleSetDueDate(settlement)} className="p-1 text-gray-400 hover:text-gray-700 rounded transition-colors" title="Edit due date">
+                              <button onClick={() => handleSetDueDate(settlement)} className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors" title="Edit due date">
                                 <CalendarDays className="h-3.5 w-3.5" />
                               </button>
                             )}
@@ -289,13 +289,13 @@ export default function SettlementManagement() {
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-amber-600 font-medium">Awaiting Approval</span>
                               {hasPermission('settlement:set_due_date') && (
-                                <button onClick={() => handleSetDueDate(settlement)} className="p-1 text-gray-400 hover:text-gray-700 rounded transition-colors" title="Set due date manually">
+                                <button onClick={() => handleSetDueDate(settlement)} className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors" title="Set due date manually">
                                   <CalendarDays className="h-3.5 w-3.5" />
                                 </button>
                               )}
                             </div>
                           ) : (
-                            <span className="text-xs text-gray-400">—</span>
+                            <span className="text-xs text-slate-400">—</span>
                           )
                         )}
                       </div>
@@ -306,10 +306,10 @@ export default function SettlementManagement() {
                         const isDelivered = os === 'DELIVERED' || os === 'COMPLETED';
                         return (
                           <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                            isDelivered ? 'bg-green-100 text-green-800' :
-                            os.includes('TRANSIT') || os.includes('SHIPPED') ? 'bg-blue-100 text-blue-800' :
-                            os.includes('CANCEL') ? 'bg-red-100 text-red-800' :
-                            'bg-yellow-100 text-yellow-800'
+                            isDelivered ? 'bg-green-50 text-green-700 border border-green-200' :
+                            os.includes('TRANSIT') || os.includes('SHIPPED') ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                            os.includes('CANCEL') ? 'bg-red-50 text-red-700 border border-red-200' :
+                            'bg-yellow-50 text-yellow-700 border border-yellow-200'
                           }`}>
                             {settlement.order?.status?.replace(/_/g, ' ') || 'Unknown'}
                           </span>
@@ -334,7 +334,7 @@ export default function SettlementManagement() {
                             const hasBankDetails = !!settlement.vendor?.bankDetails;
 
                             if (!isDelivered) {
-                              return <span className="text-xs text-gray-400 italic">Awaiting delivery</span>;
+                              return <span className="text-xs text-slate-400 italic">Awaiting delivery</span>;
                             }
                             if (!hasBankDetails) {
                               return <span className="text-xs text-red-500 italic">No bank details</span>;
@@ -360,12 +360,12 @@ export default function SettlementManagement() {
         )}
 
         {!loading && filteredSettlements.length > 0 && totalPages > 1 && (
-          <div className="flex items-center justify-end px-6 py-4 border-t border-gray-200">
+          <div className="flex items-center justify-end px-6 py-4 border-t border-slate-200">
             {totalPages > 1 && (
               <div className="flex items-center justify-end gap-3 text-sm">
                 <div className="flex items-center gap-1">
                   <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-                  {getPageRange(currentPage, totalPages).map((p, i) => p === '...' ? (<span key={`e-${i}`} className="px-2 text-slate-400">...</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                  {getPageRange(currentPage, totalPages).map((p, i) => p === '...' ? (<span key={`e-${i}`} className="px-2 text-slate-400">...</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
                   <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
                 </div>
               </div>
@@ -376,39 +376,39 @@ export default function SettlementManagement() {
 
       {/* Payment Confirmation Modal */}
       {showPaymentModal && selectedSettlement && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">Confirm Payment</h2>
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-900">Confirm Payment</h2>
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                <X className="h-5 w-5 text-gray-600" />
+                <X className="h-5 w-5 text-slate-600" />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Settlement Details</h3>
+              <div className="bg-slate-50 p-4 rounded-lg">
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">Settlement Details</h3>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Settlement Number:</span>
-                    <span className="text-sm font-medium text-gray-900">{selectedSettlement.settlementNumber}</span>
+                    <span className="text-sm text-slate-600">Settlement Number:</span>
+                    <span className="text-sm font-medium text-slate-900">{selectedSettlement.settlementNumber}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Vendor:</span>
-                    <span className="text-sm font-medium text-gray-900">{selectedSettlement.vendorName}</span>
+                    <span className="text-sm text-slate-600">Vendor:</span>
+                    <span className="text-sm font-medium text-slate-900">{selectedSettlement.vendorName}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Amount:</span>
-                    <span className="text-sm font-medium text-gray-900">₹{selectedSettlement.amount.toLocaleString()}</span>
+                    <span className="text-sm text-slate-600">Amount:</span>
+                    <span className="text-sm font-medium text-slate-900">₹{selectedSettlement.amount.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Transaction ID <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -416,7 +416,7 @@ export default function SettlementManagement() {
                   value={transactionId}
                   onChange={(e) => setTransactionId(e.target.value)}
                   placeholder="Enter transaction/reference ID"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                 />
               </div>
 
@@ -427,11 +427,11 @@ export default function SettlementManagement() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowPaymentModal(false)}
                 disabled={processing}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50"
+                className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -449,28 +449,28 @@ export default function SettlementManagement() {
       )}
       {/* Due Date Modal */}
       {showDueDateModal && dueDateSettlement && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-sm w-full">
-            <div className="p-5 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900">Set Due Date</h2>
-              <button onClick={() => setShowDueDateModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-                <X className="h-5 w-5 text-gray-600" />
+            <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Set Due Date</h2>
+              <button onClick={() => setShowDueDateModal(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+                <X className="h-5 w-5 text-slate-600" />
               </button>
             </div>
             <div className="p-5 space-y-4">
-              <div className="bg-gray-50 p-3 rounded-lg text-sm">
-                <p className="font-medium text-gray-900">{dueDateSettlement.settlementNumber}</p>
-                <p className="text-gray-600">{dueDateSettlement.vendorName} &middot; ₹{dueDateSettlement.amount.toLocaleString()}</p>
+              <div className="bg-slate-50 p-3 rounded-lg text-sm">
+                <p className="font-medium text-slate-900">{dueDateSettlement.settlementNumber}</p>
+                <p className="text-slate-600">{dueDateSettlement.vendorName} &middot; ₹{dueDateSettlement.amount.toLocaleString()}</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Quick Presets</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Quick Presets</label>
                 <div className="flex gap-2">
                   {[7, 14, 30].map((d) => (
                     <button
                       key={d}
                       onClick={() => setPresetDueDate(d)}
-                      className="flex-1 px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="flex-1 px-3 py-2 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                     >
                       {d} days
                     </button>
@@ -479,7 +479,7 @@ export default function SettlementManagement() {
               </div>
 
               <div>
-                <label htmlFor="due-date-picker" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="due-date-picker" className="block text-sm font-medium text-slate-700 mb-2">
                   Or pick a date
                 </label>
                 <input
@@ -488,28 +488,28 @@ export default function SettlementManagement() {
                   value={dueDateValue}
                   min={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setDueDateValue(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                 />
               </div>
 
               {dueDateValue && (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-slate-600">
                   Due date will be set to <strong>{new Date(dueDateValue).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</strong>
                 </p>
               )}
             </div>
-            <div className="p-5 border-t border-gray-200 flex justify-end gap-3">
+            <div className="p-5 border-t border-slate-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowDueDateModal(false)}
                 disabled={processing}
-                className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50"
+                className="px-5 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDueDate}
                 disabled={processing || !dueDateValue}
-                className="flex items-center gap-2 px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-medium disabled:opacity-50"
+                className="flex items-center gap-2 px-5 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-medium disabled:opacity-50"
               >
                 {processing && <RefreshCw className="h-4 w-4 animate-spin" />}
                 Set Due Date

@@ -1095,7 +1095,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     // SECOND vertical scrollbar inside the already-scrolling admin <main>.
     <div className="bg-slate-50/50">
       {isLoadingVendorData && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-(--z-modal-backdrop)">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-(--z-modal-backdrop)">
           <div className="bg-white rounded-lg p-6 flex flex-col items-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mb-4"></div>
             <p className="text-slate-700 font-medium">Loading vendor data...</p>
@@ -1311,15 +1311,15 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                     {currentStep + 1}
                   </div>
                   <div>
-                    <h1 className="text-headline-md text-gray-900">
+                    <h1 className="text-headline-md text-slate-900">
                       {steps[currentStep].title}
                     </h1>
-                    <p className="text-gray-600">
+                    <p className="text-slate-600">
                       Step {currentStep + 1} of {steps.length}
                     </p>
                   </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-1">
+                <div className="w-full bg-slate-200 rounded-full h-1">
                   <div
                     className="bg-brand-500 h-1 rounded-full transition-all duration-300"
                     style={{

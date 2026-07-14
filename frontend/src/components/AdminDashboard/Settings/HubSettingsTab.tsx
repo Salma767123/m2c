@@ -176,7 +176,7 @@ export default function HubSettingsTab() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[300px]">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-slate-600" />
       </div>
     );
   }
@@ -186,15 +186,15 @@ export default function HubSettingsTab() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Hub Management</h2>
-          <p className="text-sm text-gray-600 mt-1">
+          <h2 className="text-xl font-bold text-slate-900">Hub Management</h2>
+          <p className="text-sm text-slate-600 mt-1">
             Manage delivery hubs and their locations
           </p>
         </div>
         {canManage && (
           <button
             onClick={handleAddHub}
-            className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
           >
             <Plus className="h-4 w-4" />
             Add Hub
@@ -213,14 +213,14 @@ export default function HubSettingsTab() {
                     <MapPin className="h-5 w-5 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900">{hub.name}</h3>
-                    <p className="text-sm text-gray-600">{hub.city}, {hub.state}</p>
+                    <h3 className="font-semibold text-slate-900">{hub.name}</h3>
+                    <p className="text-sm text-slate-600">{hub.city}, {hub.state}</p>
                   </div>
                 </div>
                 <span
                   className={`px-2 py-1 rounded-full text-xs font-medium ${hub.isActive
-                      ? "bg-green-100 text-green-800"
-                      : "bg-gray-100 text-gray-800"
+                      ? "bg-green-50 text-green-700 border border-green-200"
+                      : "bg-slate-50 text-slate-700 border border-slate-200"
                     }`}
                 >
                   {hub.isActive ? "Active" : "Inactive"}
@@ -229,22 +229,22 @@ export default function HubSettingsTab() {
 
               <div className="space-y-2 mb-4">
                 <div>
-                  <p className="text-xs text-gray-500">Address</p>
-                  <p className="text-sm text-gray-900">{hub.address || "—"}</p>
+                  <p className="text-xs text-slate-500">Address</p>
+                  <p className="text-sm text-slate-900">{hub.address || "—"}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <p className="text-xs text-gray-500">Phone</p>
-                    <p className="text-sm text-gray-900">{hub.phone || "—"}</p>
+                    <p className="text-xs text-slate-500">Phone</p>
+                    <p className="text-sm text-slate-900">{hub.phone || "—"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">ZIP Code</p>
-                    <p className="text-sm text-gray-900">{hub.zipCode || "—"}</p>
+                    <p className="text-xs text-slate-500">ZIP Code</p>
+                    <p className="text-sm text-slate-900">{hub.zipCode || "—"}</p>
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Email</p>
-                  <p className="text-sm text-gray-900">{hub.email || "—"}</p>
+                  <p className="text-xs text-slate-500">Email</p>
+                  <p className="text-sm text-slate-900">{hub.email || "—"}</p>
                 </div>
               </div>
 
@@ -252,7 +252,7 @@ export default function HubSettingsTab() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleEditHub(hub)}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm"
                   >
                     <Edit className="h-4 w-4" />
                     Edit
@@ -274,17 +274,17 @@ export default function HubSettingsTab() {
       {hubs.length === 0 && (
         <Card>
           <CardContent className="p-12 text-center">
-            <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <MapPin className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">
               No Hubs Added
             </h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-slate-600 mb-4">
               Get started by adding your first delivery hub
             </p>
             {canManage && (
               <button
                 onClick={handleAddHub}
-                className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
               >
                 <Plus className="h-4 w-4" />
                 Add Hub
@@ -308,14 +308,14 @@ export default function HubSettingsTab() {
 
       {/* Add/Edit Hub Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-slate-900">
                   {editingHub ? "Edit Hub" : "Add New Hub"}
                 </h2>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-slate-600 mt-1">
                   {editingHub
                     ? "Update hub information"
                     : "Enter details for the new hub"}
@@ -323,16 +323,16 @@ export default function HubSettingsTab() {
               </div>
               <button
                 onClick={handleCancel}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                <X className="h-5 w-5 text-gray-600" />
+                <X className="h-5 w-5 text-slate-600" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     Hub Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -342,13 +342,13 @@ export default function HubSettingsTab() {
                       setFormData({ ...formData, name: e.target.value })
                     }
                     placeholder="e.g., Mumbai Hub"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                     required
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     Address
                   </label>
                   <input
@@ -358,12 +358,12 @@ export default function HubSettingsTab() {
                       setFormData({ ...formData, address: e.target.value })
                     }
                     placeholder="Street address"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     City <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -373,13 +373,13 @@ export default function HubSettingsTab() {
                       setFormData({ ...formData, city: e.target.value })
                     }
                     placeholder="City name"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     State <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -389,13 +389,13 @@ export default function HubSettingsTab() {
                       setFormData({ ...formData, state: e.target.value })
                     }
                     placeholder="State name"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     ZIP Code
                   </label>
                   <input
@@ -405,12 +405,12 @@ export default function HubSettingsTab() {
                       setFormData({ ...formData, zipCode: e.target.value })
                     }
                     placeholder="e.g., 400053"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     Phone
                   </label>
                   <input
@@ -420,12 +420,12 @@ export default function HubSettingsTab() {
                       setFormData({ ...formData, phone: e.target.value })
                     }
                     placeholder="+91 XX-XXXX-XXXX"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     Email
                   </label>
                   <input
@@ -435,7 +435,7 @@ export default function HubSettingsTab() {
                       setFormData({ ...formData, email: e.target.value })
                     }
                     placeholder="hub@example.com"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                   />
                 </div>
 
@@ -447,13 +447,13 @@ export default function HubSettingsTab() {
                       onChange={(e) =>
                         setFormData({ ...formData, isActive: e.target.checked })
                       }
-                      className="h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
+                      className="h-4 w-4 text-slate-900 border-slate-300 rounded focus:ring-brand-500/40"
                     />
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-sm font-medium text-slate-700">
                       Active Hub
                     </span>
                   </label>
-                  <p className="text-xs text-gray-500 ml-6">
+                  <p className="text-xs text-slate-500 ml-6">
                     Only active hubs will be available for order assignment
                   </p>
                 </div>
@@ -463,14 +463,14 @@ export default function HubSettingsTab() {
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="flex-1 px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  className="flex-1 px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="flex-1 flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

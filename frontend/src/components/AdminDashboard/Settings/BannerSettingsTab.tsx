@@ -232,8 +232,8 @@ export default function BannerSettingsTab() {
             <Card>
                 <CardContent className="p-6">
                     <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                        <span className="ml-3 text-gray-600">Loading banners...</span>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+                        <span className="ml-3 text-slate-600">Loading banners...</span>
                     </div>
                 </CardContent>
             </Card>
@@ -245,7 +245,7 @@ export default function BannerSettingsTab() {
             {/* Add New Banner */}
             <Card>
                 <CardContent className="p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                         <Plus className="h-5 w-5" />
                         Add New Banner
                     </h3>
@@ -253,7 +253,7 @@ export default function BannerSettingsTab() {
                     <div className="space-y-4">
                         {/* Image Upload */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
                                 Banner Image *
                             </label>
 
@@ -277,7 +277,7 @@ export default function BannerSettingsTab() {
                                 <div
                                     role="button"
                                     tabIndex={0}
-                                    className="flex-1 border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-gray-400 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40 focus-visible:border-gray-500"
+                                    className="flex-1 border-2 border-dashed border-slate-300 rounded-lg p-4 text-center cursor-pointer hover:border-slate-400 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 focus-visible:border-slate-500"
                                     onClick={() => fileInputRef.current?.click()}
                                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
                                 >
@@ -300,11 +300,11 @@ export default function BannerSettingsTab() {
                                         </div>
                                     ) : (
                                         <div className="py-6">
-                                            <Upload className="h-10 w-10 text-gray-400 mx-auto mb-2" />
-                                            <p className="text-sm text-gray-500">
+                                            <Upload className="h-10 w-10 text-slate-400 mx-auto mb-2" />
+                                            <p className="text-sm text-slate-500">
                                                 Click to upload banner image
                                             </p>
-                                            <p className="text-xs text-gray-400 mt-1">
+                                            <p className="text-xs text-slate-400 mt-1">
                                                 JPG, PNG or WebP · up to 5MB · 2872 × 1152 px
                                             </p>
                                         </div>
@@ -322,7 +322,7 @@ export default function BannerSettingsTab() {
 
                         {/* Alt Text */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
                                 Alt Text (for accessibility)
                             </label>
                             <input
@@ -330,7 +330,7 @@ export default function BannerSettingsTab() {
                                 value={newAltText}
                                 onChange={(e) => setNewAltText(e.target.value)}
                                 placeholder="Describe the banner image..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 text-sm"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 text-sm"
                             />
                         </div>
 
@@ -339,7 +339,7 @@ export default function BannerSettingsTab() {
                             <button
                                 onClick={handleAddBanner}
                                 disabled={!selectedFile || uploading}
-                                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+                                className="flex items-center gap-2 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
                             >
                                 {uploading ? (
                                     <>
@@ -361,16 +361,16 @@ export default function BannerSettingsTab() {
             {/* Existing Banners */}
             <Card>
                 <CardContent className="p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                         <Image className="h-5 w-5" />
                         Banner Images ({banners.length})
                     </h3>
 
                     {banners.length === 0 ? (
-                        <div className="text-center py-12 text-gray-500">
-                            <Image className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                        <div className="text-center py-12 text-slate-500">
+                            <Image className="h-12 w-12 mx-auto mb-3 text-slate-300" />
                             <p className="text-sm">No banners added yet.</p>
-                            <p className="text-xs text-gray-400 mt-1">Add your first banner image above.</p>
+                            <p className="text-xs text-slate-400 mt-1">Add your first banner image above.</p>
                         </div>
                     ) : (
                         <div className="space-y-4">
@@ -378,7 +378,7 @@ export default function BannerSettingsTab() {
                                 <div
                                     key={banner.id}
                                     className={`border rounded-lg p-4 transition-colors ${
-                                        banner.isActive ? 'border-gray-200 bg-white' : 'border-gray-200 bg-gray-50 opacity-60'
+                                        banner.isActive ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-50 opacity-60'
                                     }`}
                                 >
                                     {editingId === banner.id ? (
@@ -388,7 +388,7 @@ export default function BannerSettingsTab() {
                                                 <div
                                                     role="button"
                                                     tabIndex={0}
-                                                    className="w-48 h-28 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer border-2 border-dashed border-gray-300 hover:border-gray-400 outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40 focus-visible:border-gray-500"
+                                                    className="w-48 h-28 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer border-2 border-dashed border-slate-300 hover:border-slate-400 outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 focus-visible:border-slate-500"
                                                     onClick={() => editFileInputRef.current?.click()}
                                                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
                                                 >
@@ -411,21 +411,21 @@ export default function BannerSettingsTab() {
                                                         value={editAltText}
                                                         onChange={(e) => setEditAltText(e.target.value)}
                                                         placeholder="Alt text..."
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 text-sm"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 text-sm"
                                                     />
-                                                    <p className="text-xs text-gray-400">Click the image to replace it</p>
+                                                    <p className="text-xs text-slate-400">Click the image to replace it</p>
                                                     <div className="flex gap-2">
                                                         <button
                                                             onClick={() => handleUpdateBanner(banner.id)}
                                                             disabled={loading}
-                                                            className="flex items-center gap-1 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-medium hover:bg-gray-800 disabled:opacity-50"
+                                                            className="flex items-center gap-1 px-3 py-1.5 bg-brand-500 text-white rounded-lg text-xs font-medium hover:bg-brand-600 disabled:opacity-50"
                                                         >
                                                             <Save className="h-3 w-3" />
                                                             {loading ? 'Saving...' : 'Save'}
                                                         </button>
                                                         <button
                                                             onClick={cancelEditing}
-                                                            className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium hover:bg-gray-50"
+                                                            className="flex items-center gap-1 px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium hover:bg-slate-50"
                                                         >
                                                             Cancel
                                                         </button>
@@ -441,7 +441,7 @@ export default function BannerSettingsTab() {
                                                 <button
                                                     onClick={() => moveBanner(index, 'up')}
                                                     disabled={index === 0}
-                                                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                    className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed"
                                                     title="Move up"
                                                 >
                                                     <GripVertical className="h-4 w-4 rotate-180" />
@@ -449,7 +449,7 @@ export default function BannerSettingsTab() {
                                                 <button
                                                     onClick={() => moveBanner(index, 'down')}
                                                     disabled={index === banners.length - 1}
-                                                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                    className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed"
                                                     title="Move down"
                                                 >
                                                     <GripVertical className="h-4 w-4" />
@@ -457,7 +457,7 @@ export default function BannerSettingsTab() {
                                             </div>
 
                                             {/* Image Preview */}
-                                            <div className="w-48 h-28 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                                            <div className="w-48 h-28 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0">
                                                 <img
                                                     src={banner.imageUrl}
                                                     alt={banner.altText || 'Banner'}
@@ -467,10 +467,10 @@ export default function BannerSettingsTab() {
 
                                             {/* Banner Info */}
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium text-gray-900 truncate">
+                                                <p className="text-sm font-medium text-slate-900 truncate">
                                                     {banner.altText || 'No alt text'}
                                                 </p>
-                                                <p className="text-xs text-gray-500 mt-1">
+                                                <p className="text-xs text-slate-500 mt-1">
                                                     Order: {banner.displayOrder + 1} | {banner.isActive ? 'Active' : 'Hidden'}
                                                 </p>
                                             </div>
@@ -483,7 +483,7 @@ export default function BannerSettingsTab() {
                                                         className={`p-2 rounded-lg transition-colors ${
                                                             banner.isActive
                                                                 ? 'text-green-600 hover:bg-green-50'
-                                                                : 'text-gray-400 hover:bg-gray-100'
+                                                                : 'text-slate-400 hover:bg-slate-100'
                                                         }`}
                                                         title={banner.isActive ? 'Hide banner' : 'Show banner'}
                                                     >
@@ -491,7 +491,7 @@ export default function BannerSettingsTab() {
                                                     </button>
                                                     <button
                                                         onClick={() => startEditing(banner)}
-                                                        className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                                                        className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
                                                         title="Edit banner"
                                                     >
                                                         <Save className="h-4 w-4" />

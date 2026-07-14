@@ -161,7 +161,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
   };
 
   if (isLoading) {
-    return <div className="p-6 text-center text-gray-500">Loading shipment details...</div>;
+    return <div className="p-6 text-center text-slate-500">Loading shipment details...</div>;
   }
 
   if (!shipment) {
@@ -183,13 +183,13 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+            <ArrowLeft className="h-5 w-5 text-slate-600" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Vendor to Hub Order</h1>
-            <p className="text-sm text-gray-600 mt-1">
+            <h1 className="text-2xl font-bold text-slate-900">Vendor to Hub Order</h1>
+            <p className="text-sm text-slate-600 mt-1">
               Order ID: {shipment.order?.orderId || shipment.shipmentId}
             </p>
           </div>
@@ -198,7 +198,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           {shipment.status === "ORDER_CREATED" && hasPermission('vendor_to_hub:update_status') && (
             <button
               onClick={handleProceed}
-              className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+              className="px-6 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-medium"
             >
               Assign Hub / Proceed
             </button>
@@ -207,7 +207,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
             <button
               onClick={handleMarkAsReceived}
               disabled={isProcessing}
-              className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isProcessing ? "Updating Status..." : "Mark as Received at Hub"}
             </button>
@@ -215,7 +215,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           {shipment.status === "RECEIVED_AT_ADMIN_HUB" && hasPermission('vendor_to_hub:edit') && (
             <button
               onClick={() => setShowReviewModal(true)}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              className="px-6 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-medium"
             >
               Review Delivery & Approve
             </button>
@@ -224,73 +224,73 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       </div>
 
       {/* Order Information */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
-          <Package className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Order Information</h2>
+          <Package className="h-5 w-5 text-slate-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Order Information</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <p className="text-sm text-gray-600">Order Date</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
+            <p className="text-sm text-slate-600">Order Date</p>
+            <p className="text-base font-medium text-slate-900 mt-1">
               {new Date(shipment.order?.createdAt || shipment.createdAt).toLocaleDateString("en-IN")}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Status</p>
+            <p className="text-sm text-slate-600">Status</p>
             <p className={`text-base font-medium mt-1 ${shipment.status === "ORDER_CREATED" ? "text-yellow-600" :
               shipment.status === "VENDOR_PROCESSING" ? "text-blue-600" :
                 shipment.status === "PACKED_BY_VENDOR" ? "text-purple-600" :
                   shipment.status === "IN_TRANSIT_TO_ADMIN_HUB" ? "text-indigo-600" :
                     ["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "DELIVERED", "SHIPPED_TO_CUSTOMER"].includes(shipment.status) ? "text-green-600" :
-                      "text-gray-600"
+                      "text-slate-600"
               }`}>
               {shipment.status.replace(/_/g, " ")}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Assigned Hub</p>
-            <p className={`text-base font-medium mt-1 ${assignedHub === "Not Assigned" ? "text-red-600" : "text-gray-900"}`}>
+            <p className="text-sm text-slate-600">Assigned Hub</p>
+            <p className={`text-base font-medium mt-1 ${assignedHub === "Not Assigned" ? "text-red-600" : "text-slate-900"}`}>
               {assignedHub}
             </p>
           </div>
           {/* TODO: Uncomment when tracking reference feature is implemented
           <div>
-            <p className="text-sm text-gray-600">Tracking Ref</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
+            <p className="text-sm text-slate-600">Tracking Ref</p>
+            <p className="text-base font-medium text-slate-900 mt-1">
               {order?.trackingReference || "N/A"}
             </p>
           </div>
           */}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-4 border-t border-gray-200">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-4 border-t border-slate-200">
           <div>
-            <p className="text-sm text-gray-600">Subtotal</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
+            <p className="text-sm text-slate-600">Subtotal</p>
+            <p className="text-base font-medium text-slate-900 mt-1">
               ₹{order?.subtotal?.toLocaleString() || 0}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Tax</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
+            <p className="text-sm text-slate-600">Tax</p>
+            <p className="text-base font-medium text-slate-900 mt-1">
               ₹{order?.tax?.toLocaleString() || 0}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Shipping</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
+            <p className="text-sm text-slate-600">Shipping</p>
+            <p className="text-base font-medium text-slate-900 mt-1">
               ₹{order?.shippingCost?.toLocaleString() || 0}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Discount</p>
+            <p className="text-sm text-slate-600">Discount</p>
             <p className="text-base font-medium text-green-600 mt-1">
               -₹{order?.discount?.toLocaleString() || 0}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Total Amount</p>
-            <p className="text-lg font-bold text-gray-900 mt-1">
+            <p className="text-sm text-slate-600">Total Amount</p>
+            <p className="text-lg font-bold text-slate-900 mt-1">
               ₹{order?.totalAmount?.toLocaleString() || 0}
             </p>
           </div>
@@ -303,21 +303,21 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           status, so it belongs near the top with the rest of the order summary.
           Only renders once the shipment has actually left the vendor. */}
       {(["IN_TRANSIT_TO_ADMIN_HUB", "RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "SHIPPED_TO_CUSTOMER", "DELIVERED"].includes(shipment.status)) && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
           <div className="flex items-center gap-2 mb-4">
-            <Truck className="h-5 w-5 text-gray-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Vendor Shipping Details</h2>
+            <Truck className="h-5 w-5 text-slate-600" />
+            <h2 className="text-lg font-semibold text-slate-900">Vendor Shipping Details</h2>
           </div>
           {shipment.vendorCarrier && shipment.vendorTrackingId ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <p className="text-sm text-gray-600">Courier</p>
-                <p className="text-base font-medium text-gray-900 mt-1">{shipment.vendorCarrier}</p>
+                <p className="text-sm text-slate-600">Courier</p>
+                <p className="text-base font-medium text-slate-900 mt-1">{shipment.vendorCarrier}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Tracking ID</p>
+                <p className="text-sm text-slate-600">Tracking ID</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <p className="text-base font-mono font-medium text-gray-900 break-all">
+                  <p className="text-base font-mono font-medium text-slate-900 break-all">
                     {shipment.vendorTrackingId}
                   </p>
                   <button
@@ -330,7 +330,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                         showErrorToast("Copy failed");
                       }
                     }}
-                    className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors shrink-0"
+                    className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded transition-colors shrink-0"
                     title="Copy tracking ID"
                   >
                     <Copy className="h-4 w-4" />
@@ -339,8 +339,8 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               </div>
               {shipment.vendorShippedAt && (
                 <div>
-                  <p className="text-sm text-gray-600">Shipped On</p>
-                  <p className="text-base font-medium text-gray-900 mt-1">
+                  <p className="text-sm text-slate-600">Shipped On</p>
+                  <p className="text-base font-medium text-slate-900 mt-1">
                     {new Date(shipment.vendorShippedAt).toLocaleString("en-IN")}
                   </p>
                 </div>
@@ -357,23 +357,23 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       )}
 
       {/* Customer Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
-          <MapPin className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Customer Details</h2>
+          <MapPin className="h-5 w-5 text-slate-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Customer Details</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <h3 className="text-sm font-medium text-gray-900 mb-2">Customer Info</h3>
-            <p className="text-sm text-gray-600">{order?.customerName}</p>
-            <p className="text-sm text-gray-600">{order?.customerEmail}</p>
+            <h3 className="text-sm font-medium text-slate-900 mb-2">Customer Info</h3>
+            <p className="text-sm text-slate-600">{order?.customerName}</p>
+            <p className="text-sm text-slate-600">{order?.customerEmail}</p>
             {order?.customerPhone && (
-              <p className="text-sm text-gray-600">{formatPhoneForDisplay(order.customerPhone, order?.shippingAddress?.country)}</p>
+              <p className="text-sm text-slate-600">{formatPhoneForDisplay(order.customerPhone, order?.shippingAddress?.country)}</p>
             )}
           </div>
           <div>
-            <h3 className="text-sm font-medium text-gray-900 mb-2">Shipping Address</h3>
-            <div className="text-sm text-gray-600">
+            <h3 className="text-sm font-medium text-slate-900 mb-2">Shipping Address</h3>
+            <div className="text-sm text-slate-600">
               {order?.shippingAddress ? (
                 <>
                   {(() => {
@@ -382,7 +382,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                       ? `${a.firstName} ${a.lastName}`
                       : a.firstName || a.name || "";
                     return recipient ? (
-                      <p className="font-medium text-gray-900">{recipient}</p>
+                      <p className="font-medium text-slate-900">{recipient}</p>
                     ) : null;
                   })()}
                   <p>{order.shippingAddress.address || order.shippingAddress.street}</p>
@@ -397,50 +397,50 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       </div>
 
       {/* Product Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Product Details</h2>
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">Product Details</h2>
         <div className="space-y-4">
           {shipment.items?.map((item) => (
-            <div key={item.id} className="flex gap-4 p-4 border border-gray-100 rounded-lg">
+            <div key={item.id} className="flex gap-4 p-4 border border-slate-100 rounded-lg">
               <img
                 src={item.productImage || "/assets/images/placeholder.jpg"}
                 alt={item.productName}
-                className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                className="w-24 h-24 object-cover rounded-lg border border-slate-200"
               />
               <div className="flex-1">
-                <h3 className="text-base font-semibold text-gray-900">{item.productName}</h3>
-                <p className="text-sm text-gray-600 mt-1">SKU: {item.sku}</p>
+                <h3 className="text-base font-semibold text-slate-900">{item.productName}</h3>
+                <p className="text-sm text-slate-600 mt-1">SKU: {item.sku}</p>
                 {(item.size || item.color) && (
                   <div className="flex items-center gap-2 mt-1">
-                    {item.size && <p className="text-sm text-gray-600">Size: {item.size}</p>}
-                    {item.size && item.color && <span className="text-gray-300">|</span>}
+                    {item.size && <p className="text-sm text-slate-600">Size: {item.size}</p>}
+                    {item.size && item.color && <span className="text-slate-300">|</span>}
                     {item.color && (
                       <div className="flex items-center gap-1.5">
-                        <p className="text-sm text-gray-600">Color:</p>
+                        <p className="text-sm text-slate-600">Color:</p>
                         <div 
-                          className="w-4 h-4 rounded-full border border-gray-300 shadow-sm"
+                          className="w-4 h-4 rounded-full border border-slate-300 shadow-sm"
                           style={{ backgroundColor: item.colorHex || item.color }}
                           title={item.color}
                         />
-                        <span className="text-xs text-gray-500 capitalize">{item.color}</span>
+                        <span className="text-xs text-slate-500 capitalize">{item.color}</span>
                       </div>
                     )}
                   </div>
                 )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                   <div>
-                    <p className="text-sm text-gray-600">Quantity</p>
-                    <p className="text-base font-medium text-gray-900">{item.quantity}</p>
+                    <p className="text-sm text-slate-600">Quantity</p>
+                    <p className="text-base font-medium text-slate-900">{item.quantity}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Unit Price</p>
-                    <p className="text-base font-medium text-gray-900">
+                    <p className="text-sm text-slate-600">Unit Price</p>
+                    <p className="text-base font-medium text-slate-900">
                       ₹{item.unitPrice?.toLocaleString() || 0}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Total Price</p>
-                    <p className="text-base font-medium text-gray-900">
+                    <p className="text-sm text-slate-600">Total Price</p>
+                    <p className="text-base font-medium text-slate-900">
                       ₹{item.totalPrice?.toLocaleString() || (item.unitPrice * item.quantity).toLocaleString()}
                     </p>
                   </div>
@@ -452,37 +452,37 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       </div>
 
       {/* Payment Method */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
-          <CreditCard className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Payment Information</h2>
+          <CreditCard className="h-5 w-5 text-slate-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Payment Information</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <p className="text-sm text-gray-600">Payment Method</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order?.paymentMethod || "N/A"}</p>
+            <p className="text-sm text-slate-600">Payment Method</p>
+            <p className="text-base font-medium text-slate-900 mt-1">{order?.paymentMethod || "N/A"}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Transaction ID</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order?.paymentId || "N/A"}</p>
+            <p className="text-sm text-slate-600">Transaction ID</p>
+            <p className="text-base font-medium text-slate-900 mt-1">{order?.paymentId || "N/A"}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Payment Status</p>
+            <p className="text-sm text-slate-600">Payment Status</p>
             <p className="text-base font-medium text-green-600 mt-1">{order?.paymentStatus || "PENDING"}</p>
           </div>
         </div>
       </div>
 
       {/* Vendor Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
-          <Building2 className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Vendor Information</h2>
+          <Building2 className="h-5 w-5 text-slate-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Vendor Information</h2>
         </div>
         <div className="grid grid-cols-1 gap-4">
           <div>
-            <p className="text-sm text-gray-600">Vendor Name</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{shipment.vendorName}</p>
+            <p className="text-sm text-slate-600">Vendor Name</p>
+            <p className="text-base font-medium text-slate-900 mt-1">{shipment.vendorName}</p>
           </div>
         </div>
       </div>
@@ -490,18 +490,18 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
 
       {/* Hub Selection Modal */}
       {showHubModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Assign to Hub</h2>
-              <p className="text-sm text-gray-600 mt-1">Select a hub to assign this shipment</p>
+            <div className="p-6 border-b border-slate-200">
+              <h2 className="text-xl font-bold text-slate-900">Assign to Hub</h2>
+              <p className="text-sm text-slate-600 mt-1">Select a hub to assign this shipment</p>
             </div>
 
             <div className="p-6 space-y-6">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Shipment Summary</h3>
-                <p className="text-sm text-gray-600">Vendor: {shipment.vendorName}</p>
-                <p className="text-sm text-gray-600">Items: {shipment.items.length}</p>
+              <div className="bg-slate-50 p-4 rounded-lg">
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">Shipment Summary</h3>
+                <p className="text-sm text-slate-600">Vendor: {shipment.vendorName}</p>
+                <p className="text-sm text-slate-600">Items: {shipment.items.length}</p>
               </div>
 
               <div>
@@ -518,17 +518,17 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowHubModal(false)}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmHub}
                 disabled={isProcessing}
-                className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isProcessing ? "Updating Status..." : "Confirm"}
               </button>
@@ -539,31 +539,31 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
 
       {/* Review Modal */}
       {showReviewModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Review Vendor Delivery</h2>
-                <p className="text-sm text-gray-600 mt-1">Provide feedback on the received shipment</p>
+                <h2 className="text-xl font-bold text-slate-900">Review Vendor Delivery</h2>
+                <p className="text-sm text-slate-600 mt-1">Provide feedback on the received shipment</p>
               </div>
               <button
                 onClick={() => setShowReviewModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                <X className="h-5 w-5 text-gray-600" />
+                <X className="h-5 w-5 text-slate-600" />
               </button>
             </div>
 
             <div className="p-6 space-y-6">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Reviewing Delivery From Vendor</h3>
-                <p className="text-sm text-gray-600">Order ID: {shipment.order?.orderId || shipment.shipmentId}</p>
-                <p className="text-sm text-gray-600">Vendor: {shipment.vendorName}</p>
+              <div className="bg-slate-50 p-4 rounded-lg">
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">Reviewing Delivery From Vendor</h3>
+                <p className="text-sm text-slate-600">Order ID: {shipment.order?.orderId || shipment.shipmentId}</p>
+                <p className="text-sm text-slate-600">Vendor: {shipment.vendorName}</p>
               </div>
 
               {/* Rating */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Rating <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-2">
@@ -579,13 +579,13 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                       <Star
                         className={`h-8 w-8 ${star <= (hoveredRating || rating)
                           ? "fill-yellow-400 text-yellow-400"
-                          : "text-gray-300"
+                          : "text-slate-300"
                           }`}
                       />
                     </button>
                   ))}
                   {rating > 0 && (
-                    <span className="ml-2 text-sm text-gray-600 self-center">
+                    <span className="ml-2 text-sm text-slate-600 self-center">
                       {rating} out of 5
                     </span>
                   )}
@@ -594,7 +594,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
 
               {/* Review */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Review <span className="text-red-500">*</span>
                 </label>
                 <textarea
@@ -602,13 +602,13 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                   onChange={(e) => setReview(e.target.value)}
                   placeholder="Describe the quality of the product received, packaging, condition, etc."
                   rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent resize-none"
                 />
               </div>
 
               {/* Notice */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Quality Check Notes (Optional)
                 </label>
                 <textarea
@@ -616,20 +616,20 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                   onChange={(e) => setNotice(e.target.value)}
                   placeholder="Any additional notes or issues to communicate to the vendor"
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent resize-none"
                 />
               </div>
 
               {/* Approval Decision */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Decision</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Decision</label>
                 <div className="flex gap-3">
                   <button
                     type="button"
                     onClick={() => setIsApproved(true)}
                     className={`flex-1 py-2.5 px-4 rounded-lg border-2 text-sm font-medium transition-colors ${isApproved
                       ? "border-green-500 bg-green-50 text-green-800"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
                     }`}
                   >
                     Approve
@@ -639,7 +639,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                     onClick={() => setIsApproved(false)}
                     className={`flex-1 py-2.5 px-4 rounded-lg border-2 text-sm font-medium transition-colors ${!isApproved
                       ? "border-red-500 bg-red-50 text-red-800"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
                     }`}
                   >
                     Reject
@@ -651,7 +651,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               {!isApproved && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Rejection Reason <span className="text-red-500">*</span>
                     </label>
                     <textarea
@@ -667,18 +667,18 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                       type="checkbox"
                       checked={returnToVendor}
                       onChange={(e) => setReturnToVendor(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                      className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
                     />
-                    <span className="text-sm text-gray-700">Return items to vendor</span>
+                    <span className="text-sm text-slate-700">Return items to vendor</span>
                   </label>
                 </>
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowReviewModal(false)}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
               >
                 Cancel
               </button>

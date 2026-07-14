@@ -55,30 +55,30 @@ export default function AdminSupport() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "open":
-        return "bg-red-100 text-red-800";
+        return "bg-red-50 text-red-700 border border-red-200";
       case "in-progress":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-50 text-blue-700 border border-blue-200";
       case "resolved":
-        return "bg-green-100 text-green-800";
+        return "bg-green-50 text-green-700 border border-green-200";
       case "closed":
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-50 text-slate-700 border border-slate-200";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-50 text-slate-700 border border-slate-200";
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "urgent":
-        return "bg-red-100 text-red-800";
+        return "bg-red-50 text-red-700 border border-red-200";
       case "high":
-        return "bg-orange-100 text-orange-800";
+        return "bg-orange-50 text-orange-700 border border-orange-200";
       case "medium":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-50 text-yellow-700 border border-yellow-200";
       case "low":
-        return "bg-green-100 text-green-800";
+        return "bg-green-50 text-green-700 border border-green-200";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-50 text-slate-700 border border-slate-200";
     }
   };
 
@@ -124,8 +124,8 @@ export default function AdminSupport() {
       <Breadcrumb />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Vendor Support Tickets</h1>
-          <p className="text-gray-600 mt-1">Manage and respond to vendor support requests</p>
+          <h1 className="text-2xl font-bold text-slate-900">Vendor Support Tickets</h1>
+          <p className="text-slate-600 mt-1">Manage and respond to vendor support requests</p>
         </div>
       </div>
 
@@ -136,8 +136,8 @@ export default function AdminSupport() {
             <div className="flex items-center">
               <MessageCircle className="w-8 h-8 text-blue-600" />
               <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500">Total Tickets</h3>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                <h3 className="text-sm font-medium text-slate-500">Total Tickets</h3>
+                <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
               </div>
             </div>
           </CardContent>
@@ -148,8 +148,8 @@ export default function AdminSupport() {
             <div className="flex items-center">
               <AlertCircle className="w-8 h-8 text-red-600" />
               <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500">Open</h3>
-                <p className="text-2xl font-bold text-gray-900">{stats.open}</p>
+                <h3 className="text-sm font-medium text-slate-500">Open</h3>
+                <p className="text-2xl font-bold text-slate-900">{stats.open}</p>
               </div>
             </div>
           </CardContent>
@@ -160,8 +160,8 @@ export default function AdminSupport() {
             <div className="flex items-center">
               <Clock className="w-8 h-8 text-blue-600" />
               <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500">In Progress</h3>
-                <p className="text-2xl font-bold text-gray-900">{stats.inProgress}</p>
+                <h3 className="text-sm font-medium text-slate-500">In Progress</h3>
+                <p className="text-2xl font-bold text-slate-900">{stats.inProgress}</p>
               </div>
             </div>
           </CardContent>
@@ -172,8 +172,8 @@ export default function AdminSupport() {
             <div className="flex items-center">
               <CheckCircle className="w-8 h-8 text-green-600" />
               <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500">Resolved</h3>
-                <p className="text-2xl font-bold text-gray-900">{stats.resolved}</p>
+                <h3 className="text-sm font-medium text-slate-500">Resolved</h3>
+                <p className="text-2xl font-bold text-slate-900">{stats.resolved}</p>
               </div>
             </div>
           </CardContent>
@@ -186,13 +186,13 @@ export default function AdminSupport() {
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 z-10" />
                 <input
                   type="text"
                   placeholder="Search tickets by ID, vendor, or subject..."
                   value={searchTerm}
                   onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#222222]"
+                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                 />
               </div>
             </div>
@@ -240,7 +240,7 @@ export default function AdminSupport() {
       )}
       <Card>
         <Table>
-          <TableHeader>
+          <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
             <TableRow>
               <TableHead>Ticket ID</TableHead>
               <TableHead>Vendor</TableHead>
@@ -258,18 +258,18 @@ export default function AdminSupport() {
               paginatedItems.map((ticket) => (
                 <TableRow key={ticket.id}>
                   <TableCell>
-                    <div className="font-mono font-medium text-gray-900">{ticket.ticketId}</div>
+                    <div className="font-mono font-medium text-slate-900">{ticket.ticketId}</div>
                   </TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium text-gray-900">{ticket.creatorName}</div>
-                      <div className="text-sm text-gray-500">{ticket.creatorEmail}</div>
+                      <div className="font-medium text-slate-900">{ticket.creatorName}</div>
+                      <div className="text-sm text-slate-500">{ticket.creatorEmail}</div>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium text-gray-900">{ticket.subject}</div>
-                      <div className="text-sm text-gray-500 line-clamp-1">{ticket.description}</div>
+                      <div className="font-medium text-slate-900">{ticket.subject}</div>
+                      <div className="text-sm text-slate-500 line-clamp-1">{ticket.description}</div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -292,13 +292,13 @@ export default function AdminSupport() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm text-gray-900">{ticket.category}</span>
+                    <span className="text-sm text-slate-900">{ticket.category}</span>
                   </TableCell>
                   <TableCell>
-                    <div className="text-sm text-gray-900">{new Date(ticket.createdAt).toLocaleDateString()}</div>
+                    <div className="text-sm text-slate-900">{new Date(ticket.createdAt).toLocaleDateString()}</div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm text-gray-900">{ticket.messages?.length || 0}</span>
+                    <span className="text-sm text-slate-900">{ticket.messages?.length || 0}</span>
                   </TableCell>
                   <TableCell>
                     {hasPermission('support:view') && (
@@ -316,7 +316,7 @@ export default function AdminSupport() {
             ) : (
               <TableRow>
                 <TableCell colSpan={9}>
-                  <div className="p-6 text-center text-gray-500">No tickets found matching your criteria.</div>
+                  <div className="p-6 text-center text-slate-500">No tickets found matching your criteria.</div>
                 </TableCell>
               </TableRow>
             )}
@@ -328,7 +328,7 @@ export default function AdminSupport() {
         <div className="flex items-center justify-end gap-3 text-sm">
           <div className="flex items-center gap-1">
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-            {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+            {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
           </div>
         </div>

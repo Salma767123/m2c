@@ -126,8 +126,8 @@ export default function VendorProductReviews() {
 
   const getStatusBadge = (status: string) => {
     const styles = {
-      approved: "bg-green-100 text-green-800",
-      rejected: "bg-red-100 text-red-800",
+      approved: "bg-green-50 text-green-700 border border-green-200",
+      rejected: "bg-red-50 text-red-700 border border-red-200",
     };
     return (
       <span className={`px-3 py-1 rounded-full text-xs font-medium ${styles[status as keyof typeof styles]}`}>
@@ -142,7 +142,7 @@ export default function VendorProductReviews() {
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
-            className={`h-4 w-4 ${star <= rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+            className={`h-4 w-4 ${star <= rating ? "fill-yellow-400 text-yellow-400" : "text-slate-300"
               }`}
           />
         ))}
@@ -154,8 +154,8 @@ export default function VendorProductReviews() {
     <div className="p-6">
       <Breadcrumb />
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Vendor Product Reviews</h1>
-        <p className="text-gray-600 mt-1">Quality check reviews given by admin after receiving products from vendors</p>
+        <h1 className="text-2xl font-bold text-slate-900">Vendor Product Reviews</h1>
+        <p className="text-slate-600 mt-1">Quality check reviews given by admin after receiving products from vendors</p>
       </div>
 
       {/* Stats */}
@@ -164,8 +164,8 @@ export default function VendorProductReviews() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-gray-600">Total Reviews</div>
-                <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+                <div className="text-sm text-slate-600">Total Reviews</div>
+                <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
               </div>
               <MessageSquare className="h-8 w-8 text-blue-500 opacity-50" />
             </div>
@@ -175,7 +175,7 @@ export default function VendorProductReviews() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-gray-600">Approved</div>
+                <div className="text-sm text-slate-600">Approved</div>
                 <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
               </div>
               <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
@@ -186,7 +186,7 @@ export default function VendorProductReviews() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-gray-600">Rejected</div>
+                <div className="text-sm text-slate-600">Rejected</div>
                 <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
               </div>
               <XCircle className="h-8 w-8 text-red-500 opacity-50" />
@@ -197,7 +197,7 @@ export default function VendorProductReviews() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-gray-600">Approval Rate</div>
+                <div className="text-sm text-slate-600">Approval Rate</div>
                 <div className="text-2xl font-bold text-emerald-600">
                   {stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0}%
                 </div>
@@ -210,7 +210,7 @@ export default function VendorProductReviews() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-gray-600">Avg. Rating</div>
+                <div className="text-sm text-slate-600">Avg. Rating</div>
                 <div className="text-2xl font-bold text-yellow-600 flex items-center gap-1">
                   {stats.averageRating ? stats.averageRating.toFixed(1) : '0.0'}
                   <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
@@ -227,13 +227,13 @@ export default function VendorProductReviews() {
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 z-10" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5 z-10" />
               <input
                 type="text"
                 placeholder="Search by vendor, product name, order ID, or SKU..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
               />
             </div>
             <div className="w-full md:w-48">
@@ -267,12 +267,12 @@ export default function VendorProductReviews() {
       <Card>
         {loading ? (
           <div className="p-12 text-center">
-            <RefreshCw className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-500">Loading reviews...</p>
+            <RefreshCw className="h-8 w-8 animate-spin text-slate-400 mx-auto mb-3" />
+            <p className="text-slate-500">Loading reviews...</p>
           </div>
         ) : (
           <Table>
-            <TableHeader>
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
               <TableRow>
                 <TableHead>Product</TableHead>
                 <TableHead>Vendor</TableHead>
@@ -293,39 +293,39 @@ export default function VendorProductReviews() {
                           <img
                             src={review.productImage}
                             alt={review.productName}
-                            className="w-12 h-12 object-cover rounded border border-gray-200"
+                            className="w-12 h-12 object-cover rounded border border-slate-200"
                           />
                         ) : (
-                          <div className="w-12 h-12 bg-gray-100 rounded border border-gray-200 flex items-center justify-center">
-                            <Package className="w-6 h-6 text-gray-400" />
+                          <div className="w-12 h-12 bg-slate-100 rounded border border-slate-200 flex items-center justify-center">
+                            <Package className="w-6 h-6 text-slate-400" />
                           </div>
                         )}
                         <div>
-                          <div className="font-medium text-gray-900">{review.productName}</div>
-                          <div className="text-sm text-gray-500">SKU: {review.productSKU}</div>
+                          <div className="font-medium text-slate-900">{review.productName}</div>
+                          <div className="text-sm text-slate-500">SKU: {review.productSKU}</div>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-gray-900">{review.vendorName}</div>
+                      <div className="text-sm text-slate-900">{review.vendorName}</div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm font-mono text-gray-900">{review.orderId}</div>
+                      <div className="text-sm font-mono text-slate-900">{review.orderId}</div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {renderStars(review.rating)}
-                        <span className="text-sm text-gray-600">({review.rating})</span>
+                        <span className="text-sm text-slate-600">({review.rating})</span>
                       </div>
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(review.status)}
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-slate-900">
                         {new Date(review.reviewedDate).toLocaleDateString()}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-slate-500">
                         {new Date(review.reviewedDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
                       </div>
                     </TableCell>
@@ -346,9 +346,9 @@ export default function VendorProductReviews() {
                 <TableRow>
                   <TableCell colSpan={7}>
                     <div className="p-12 text-center">
-                      <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500 text-lg font-medium mb-2">No reviews found</p>
-                      <p className="text-gray-400 text-sm">
+                      <AlertCircle className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                      <p className="text-slate-500 text-lg font-medium mb-2">No reviews found</p>
+                      <p className="text-slate-400 text-sm">
                         {reviews.length === 0
                           ? "Admin reviews will appear here after quality checks are completed during order processing."
                           : "Try adjusting your search or filter criteria."}
@@ -382,7 +382,7 @@ export default function VendorProductReviews() {
                   key={`p-${p}`}
                   onClick={() => setCurrentPage(p as number)}
                   aria-current={p === currentPage ? 'page' : undefined}
-                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
                 >
                   {p}
                 </button>
@@ -402,32 +402,32 @@ export default function VendorProductReviews() {
 
       {/* Detail Modal */}
       {selectedReview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
+            <div className="p-6 border-b border-slate-200">
               <div className="flex justify-between items-start">
                 <div className="flex items-start gap-4">
                   {selectedReview.productImage ? (
                     <img
                       src={selectedReview.productImage}
                       alt={selectedReview.productName}
-                      className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                      className="w-24 h-24 object-cover rounded-lg border border-slate-200"
                     />
                   ) : (
-                    <div className="w-24 h-24 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
-                      <Package className="w-10 h-10 text-gray-400" />
+                    <div className="w-24 h-24 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center">
+                      <Package className="w-10 h-10 text-slate-400" />
                     </div>
                   )}
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">{selectedReview.productName}</h2>
-                    <p className="text-sm text-gray-500 mt-1">SKU: {selectedReview.productSKU}</p>
-                    <p className="text-sm text-gray-500">Order ID: {selectedReview.orderId}</p>
+                    <h2 className="text-xl font-bold text-slate-900">{selectedReview.productName}</h2>
+                    <p className="text-sm text-slate-500 mt-1">SKU: {selectedReview.productSKU}</p>
+                    <p className="text-sm text-slate-500">Order ID: {selectedReview.orderId}</p>
                     <div className="mt-2">{getStatusBadge(selectedReview.status)}</div>
                   </div>
                 </div>
                 <button
                   onClick={() => setSelectedReview(null)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-slate-400 hover:text-slate-600"
                 >
                   ✕
                 </button>
@@ -436,11 +436,11 @@ export default function VendorProductReviews() {
 
             <div className="p-6 space-y-6">
               {/* Rating */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <label className="text-sm font-semibold text-gray-700 block mb-2">Quality Rating</label>
+              <div className="bg-slate-50 p-4 rounded-lg">
+                <label className="text-sm font-semibold text-slate-700 block mb-2">Quality Rating</label>
                 <div className="flex items-center gap-3">
                   {renderStars(selectedReview.rating)}
-                  <span className="text-lg font-bold text-gray-900">
+                  <span className="text-lg font-bold text-slate-900">
                     {selectedReview.rating}/5
                   </span>
                 </div>
@@ -448,17 +448,17 @@ export default function VendorProductReviews() {
 
               {/* Review Comments */}
               <div>
-                <label className="text-sm font-semibold text-gray-700 block mb-2">Review Comments</label>
+                <label className="text-sm font-semibold text-slate-700 block mb-2">Review Comments</label>
                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <p className="text-gray-900">{selectedReview.reviewComments || "No comments provided"}</p>
+                  <p className="text-slate-900">{selectedReview.reviewComments || "No comments provided"}</p>
                 </div>
               </div>
 
               {/* Quality Check Notes */}
               <div>
-                <label className="text-sm font-semibold text-gray-700 block mb-2">Quality Check Notes</label>
+                <label className="text-sm font-semibold text-slate-700 block mb-2">Quality Check Notes</label>
                 <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <p className="text-gray-900">{selectedReview.qualityCheckNotes || "No notes provided"}</p>
+                  <p className="text-slate-900">{selectedReview.qualityCheckNotes || "No notes provided"}</p>
                 </div>
               </div>
 
@@ -473,38 +473,38 @@ export default function VendorProductReviews() {
               )}
 
               {/* Order & Vendor Details */}
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Vendor</label>
-                  <p className="text-gray-900 font-medium">{selectedReview.vendorName}</p>
+                  <label className="text-sm font-medium text-slate-700">Vendor</label>
+                  <p className="text-slate-900 font-medium">{selectedReview.vendorName}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Customer</label>
-                  <p className="text-gray-900 font-medium">{selectedReview.customerName}</p>
+                  <label className="text-sm font-medium text-slate-700">Customer</label>
+                  <p className="text-slate-900 font-medium">{selectedReview.customerName}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Quantity</label>
-                  <p className="text-gray-900">{selectedReview.quantity} units</p>
+                  <label className="text-sm font-medium text-slate-700">Quantity</label>
+                  <p className="text-slate-900">{selectedReview.quantity} units</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Amount</label>
-                  <p className="text-gray-900 font-medium">₹{selectedReview.totalAmount.toFixed(2)}</p>
+                  <label className="text-sm font-medium text-slate-700">Amount</label>
+                  <p className="text-slate-900 font-medium">₹{selectedReview.totalAmount.toFixed(2)}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Order Date</label>
-                  <p className="text-gray-900">{new Date(selectedReview.orderDate).toLocaleDateString()}</p>
+                  <label className="text-sm font-medium text-slate-700">Order Date</label>
+                  <p className="text-slate-900">{new Date(selectedReview.orderDate).toLocaleDateString()}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Reviewed Date</label>
-                  <p className="text-gray-900">{new Date(selectedReview.reviewedDate).toLocaleString()}</p>
+                  <label className="text-sm font-medium text-slate-700">Reviewed Date</label>
+                  <p className="text-slate-900">{new Date(selectedReview.reviewedDate).toLocaleString()}</p>
                 </div>
               </div>
 
               {/* Close Button */}
-              <div className="flex justify-end pt-4 border-t border-gray-200">
+              <div className="flex justify-end pt-4 border-t border-slate-200">
                 <button
                   onClick={() => setSelectedReview(null)}
-                  className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  className="px-6 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors"
                 >
                   Close
                 </button>

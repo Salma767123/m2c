@@ -1017,7 +1017,7 @@ const getAvailableInventoryItems = async (req, res) => {
 const approveProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { adminPrice, variantPrices, originalPrice, variantOriginalPrices, priceINR, priceUSD, originalPriceINR, originalPriceUSD, priceVisibility, variantPricesINR, variantPricesUSD, variantOriginalPricesINR, variantOriginalPricesUSD, variantVisibilities } = req.body;
+    const { adminPrice, variantPrices, originalPrice, variantOriginalPrices, priceINR, priceUSD, originalPriceINR, originalPriceUSD, priceVisibility, variantPricesINR, variantPricesUSD, variantOriginalPricesINR, variantOriginalPricesUSD, variantVisibilities, subCategory } = req.body;
     const adminId = req.user.id;
 
     // Find the product with variants
@@ -1066,6 +1066,12 @@ const approveProduct = async (req, res) => {
       approvedBy: adminId,
       rejectionReason: null
     };
+
+    // Admin assigns the website subcategory at approval time (optional — custom
+    // categories have none). Only overwrite when a non-empty value is sent.
+    if (typeof subCategory === 'string' && subCategory.trim()) {
+      updateData.subCategory = subCategory.trim();
+    }
 
     // Handle pricing based on whether product has variants
     if (product.hasVariants && product.variants.length > 0) {

@@ -57,23 +57,23 @@ function getPageRange(current: number, total: number): Array<number | '…'> {
 
 const getStatusBadge = (currentStock: number, lowStockAlert: number) => {
   if (currentStock === 0) {
-    return <Badge className="bg-red-100 text-red-800">Out of Stock</Badge>
+    return <Badge className="bg-red-50 text-red-700 border border-red-200">Out of Stock</Badge>
   }
   if (currentStock <= lowStockAlert) {
-    return <Badge className="bg-yellow-100 text-yellow-800">Low Stock</Badge>
+    return <Badge className="bg-yellow-50 text-yellow-700 border border-yellow-200">Low Stock</Badge>
   }
-  return <Badge className="bg-green-100 text-green-800">In Stock</Badge>
+  return <Badge className="bg-green-50 text-green-700 border border-green-200">In Stock</Badge>
 }
 
 const getApprovalBadge = (item: InventoryItem) => {
-  if (!item.hasProductCreated) return <Badge className="bg-gray-100 text-gray-600">No Product</Badge>
+  if (!item.hasProductCreated) return <Badge className="bg-slate-100 text-slate-600">No Product</Badge>
   switch (item.productApprovalStatus) {
-    case 'APPROVED': return <Badge className="bg-green-100 text-green-800">Approved</Badge>
-    case 'PENDING': return <Badge className="bg-yellow-100 text-yellow-800">Pending Approval</Badge>
-    case 'QC_APPROVED': return <Badge className="bg-blue-100 text-blue-800">QC Approved</Badge>
-    case 'REJECTED': return <Badge className="bg-red-100 text-red-800">Rejected</Badge>
-    case 'REINSPECTION': return <Badge className="bg-orange-100 text-orange-800">Reinspection</Badge>
-    default: return <Badge className="bg-gray-100 text-gray-600">Unknown</Badge>
+    case 'APPROVED': return <Badge className="bg-green-50 text-green-700 border border-green-200">Approved</Badge>
+    case 'PENDING': return <Badge className="bg-yellow-50 text-yellow-700 border border-yellow-200">Pending Approval</Badge>
+    case 'QC_APPROVED': return <Badge className="bg-blue-50 text-blue-700 border border-blue-200">QC Approved</Badge>
+    case 'REJECTED': return <Badge className="bg-red-50 text-red-700 border border-red-200">Rejected</Badge>
+    case 'REINSPECTION': return <Badge className="bg-orange-50 text-orange-700 border border-orange-200">Reinspection</Badge>
+    default: return <Badge className="bg-slate-100 text-slate-600">Unknown</Badge>
   }
 }
 
@@ -223,12 +223,12 @@ export default function Inventory() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
-          <p className="text-gray-600">Track and manage your product inventory</p>
+          <h1 className="text-2xl font-bold text-slate-900">Inventory Management</h1>
+          <p className="text-slate-600">Track and manage your product inventory</p>
         </div>
         {hasPermission('inventory:create') && (
           <Link href="/admin/dashboard/inventory/add">
-            <Button className="bg-[#313131] text-white hover:bg-[#222222]">
+            <Button className="bg-brand-500 text-white hover:bg-brand-600">
               <Plus className="h-4 w-4 mr-2" />
               Add Inventory Item
             </Button>
@@ -245,7 +245,7 @@ export default function Inventory() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalItems}</div>
-            <p className="text-xs text-gray-600">Unique products</p>
+            <p className="text-xs text-slate-600">Unique products</p>
           </CardContent>
         </Card>
 
@@ -256,7 +256,7 @@ export default function Inventory() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">{stats.lowStockItems}</div>
-            <p className="text-xs text-gray-600">Need restocking</p>
+            <p className="text-xs text-slate-600">Need restocking</p>
           </CardContent>
         </Card>
 
@@ -267,7 +267,7 @@ export default function Inventory() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{stats.outOfStockItems}</div>
-            <p className="text-xs text-gray-600">Urgent attention</p>
+            <p className="text-xs text-slate-600">Urgent attention</p>
           </CardContent>
         </Card>
 
@@ -278,7 +278,7 @@ export default function Inventory() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalStockUnits.toLocaleString()}</div>
-            <p className="text-xs text-gray-600">Total units</p>
+            <p className="text-xs text-slate-600">Total units</p>
           </CardContent>
         </Card>
       </div>
@@ -289,13 +289,13 @@ export default function Inventory() {
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                 <input
                   type="text"
                   placeholder="Search inventory..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                 />
               </div>
             </div>
@@ -342,13 +342,13 @@ export default function Inventory() {
         <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-              <span className="ml-3 text-gray-600">Loading inventory...</span>
+              <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+              <span className="ml-3 text-slate-600">Loading inventory...</span>
             </div>
           ) : (
             <>
               <Table>
-                <TableHeader>
+                <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                   <TableRow>
                     <TableHead>Product</TableHead>
                     <TableHead>SKU</TableHead>
@@ -365,7 +365,7 @@ export default function Inventory() {
                   {filteredItems.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center py-12">
-                        <div className="text-gray-500">
+                        <div className="text-slate-500">
                           <p className="text-lg font-medium">No inventory items found</p>
                           <p className="text-sm">Try adjusting your search or filter criteria</p>
                         </div>
@@ -377,7 +377,7 @@ export default function Inventory() {
                         <TableCell>
                           <div>
                             <div className="font-medium">{item.name}</div>
-                            <div className="text-sm text-gray-500">
+                            <div className="text-sm text-slate-500">
                               {item.category}{item.subcategory ? ` / ${item.subcategory}` : ''}
                             </div>
                           </div>
@@ -386,22 +386,22 @@ export default function Inventory() {
                         <TableCell>
                           <div>
                             <div className="font-medium">{item.vendor.companyName}</div>
-                            <div className="text-xs text-gray-500">{item.vendor.email}</div>
+                            <div className="text-xs text-slate-500">{item.vendor.email}</div>
                           </div>
                         </TableCell>
                         <TableCell>
                           {getApprovalBadge(item)}
                         </TableCell>
                         <TableCell>
-                          <span className={item.currentStock <= item.lowStockAlert ? 'text-red-600 font-bold' : 'text-gray-900'}>
+                          <span className={item.currentStock <= item.lowStockAlert ? 'text-red-600 font-bold' : 'text-slate-900'}>
                             {item.currentStock}
                           </span>
                         </TableCell>
-                        <TableCell className="text-sm text-gray-600">
+                        <TableCell className="text-sm text-slate-600">
                           {item.lowStockAlert}
                         </TableCell>
                         <TableCell>{getStatusBadge(item.currentStock, item.lowStockAlert)}</TableCell>
-                        <TableCell className="text-sm text-gray-600">
+                        <TableCell className="text-sm text-slate-600">
                           {item.lastRestocked ? new Date(item.lastRestocked).toLocaleDateString() : 'Never'}
                         </TableCell>
                         <TableCell>
@@ -467,7 +467,7 @@ export default function Inventory() {
                 <div className="flex items-center justify-end gap-3 text-sm mt-4">
                   <div className="flex items-center gap-1">
                     <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-                    {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                    {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
                     <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
                   </div>
                 </div>

@@ -40,10 +40,10 @@ const TrendChip = ({ current, previous }: { current: number; previous: number })
   const change = calcChange(current, previous);
   const val = parseFloat(change);
   return (
-    <div className={`flex items-center gap-1 text-sm font-medium ${val > 0 ? 'text-green-600' : val < 0 ? 'text-red-600' : 'text-gray-500'}`}>
+    <div className={`flex items-center gap-1 text-sm font-medium ${val > 0 ? 'text-green-600' : val < 0 ? 'text-red-600' : 'text-slate-500'}`}>
       {val > 0 ? <ArrowUp className="w-4 h-4" /> : val < 0 ? <ArrowDown className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
       <span>{Math.abs(val)}%</span>
-      <span className="text-gray-500 text-xs ml-1">vs last period</span>
+      <span className="text-slate-500 text-xs ml-1">vs last period</span>
     </div>
   );
 };
@@ -51,21 +51,21 @@ const TrendChip = ({ current, previous }: { current: number; previous: number })
 const StatusBadge = ({ status }: { status: string }) => {
   const s = status?.toUpperCase();
   const map: Record<string, string> = {
-    DELIVERED: 'bg-green-100 text-green-800',
-    PAID: 'bg-green-100 text-green-800',
-    COMPLETED: 'bg-green-100 text-green-800',
-    ORDER_CREATED: 'bg-blue-100 text-blue-800',
-    VENDOR_PROCESSING: 'bg-blue-100 text-blue-800',
-    PROCESSING: 'bg-blue-100 text-blue-800',
-    PACKED_BY_VENDOR: 'bg-yellow-100 text-yellow-800',
-    IN_TRANSIT_TO_ADMIN_HUB: 'bg-purple-100 text-purple-800',
-    SHIPPED_TO_CUSTOMER: 'bg-indigo-100 text-indigo-800',
-    PENDING: 'bg-yellow-100 text-yellow-800',
-    CANCELLED: 'bg-red-100 text-red-800',
-    RETURNED: 'bg-orange-100 text-orange-800',
+    DELIVERED: 'bg-green-50 text-green-700 border border-green-200',
+    PAID: 'bg-green-50 text-green-700 border border-green-200',
+    COMPLETED: 'bg-green-50 text-green-700 border border-green-200',
+    ORDER_CREATED: 'bg-blue-50 text-blue-700 border border-blue-200',
+    VENDOR_PROCESSING: 'bg-blue-50 text-blue-700 border border-blue-200',
+    PROCESSING: 'bg-blue-50 text-blue-700 border border-blue-200',
+    PACKED_BY_VENDOR: 'bg-yellow-50 text-yellow-700 border border-yellow-200',
+    IN_TRANSIT_TO_ADMIN_HUB: 'bg-purple-50 text-purple-700 border border-purple-200',
+    SHIPPED_TO_CUSTOMER: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+    PENDING: 'bg-yellow-50 text-yellow-700 border border-yellow-200',
+    CANCELLED: 'bg-red-50 text-red-700 border border-red-200',
+    RETURNED: 'bg-orange-50 text-orange-700 border border-orange-200',
   };
   return (
-    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${map[s] || 'bg-gray-100 text-gray-800'}`}>
+    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${map[s] || 'bg-slate-50 text-slate-700 border border-slate-200'}`}>
       {status?.replace(/_/g, ' ')}
     </span>
   );
@@ -157,7 +157,7 @@ export default function AdminReports() {
             body: dataRows,
             theme: 'grid',
             styles: { fontSize: 8 },
-            headStyles: { fillColor: [17, 24, 39] }, // bg-gray-900
+            headStyles: { fillColor: [17, 24, 39] }, // bg-slate-900
           });
 
           yPos = (doc as any).lastAutoTable.finalY + 15;
@@ -211,8 +211,8 @@ export default function AdminReports() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
-          <p className="text-gray-600 mt-1">Live data from your platform</p>
+          <h1 className="text-3xl font-bold text-slate-900">Reports & Analytics</h1>
+          <p className="text-slate-600 mt-1">Live data from your platform</p>
         </div>
         <div className="flex flex-wrap gap-3 items-center">
           <div className="w-44">
@@ -259,7 +259,7 @@ export default function AdminReports() {
                 key={id}
                 variant="outline"
                 onClick={() => setReportType(id)}
-                className={`gap-2 ${reportType === id ? 'bg-gray-900 text-white hover:bg-gray-800 border-gray-900' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                className={`gap-2 ${reportType === id ? 'bg-brand-500 text-white hover:bg-brand-600 border-brand-500' : 'bg-white text-slate-700 hover:bg-slate-50'}`}
               >
                 <Icon className="w-4 h-4" />
                 {label}
@@ -272,8 +272,8 @@ export default function AdminReports() {
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-          <span className="ml-3 text-gray-500 text-lg">Loading report…</span>
+          <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+          <span className="ml-3 text-slate-500 text-lg">Loading report…</span>
         </div>
       )}
 
@@ -297,8 +297,8 @@ export default function AdminReports() {
                       <Icon className={`w-5 h-5 ${color.split(' ')[1]}`} />
                     </div>
                   </div>
-                  <p className="text-sm font-medium text-gray-500">{label}</p>
-                  <p className="text-2xl font-bold text-gray-900 my-1">{format(current)}</p>
+                  <p className="text-sm font-medium text-slate-500">{label}</p>
+                  <p className="text-2xl font-bold text-slate-900 my-1">{format(current)}</p>
                   <TrendChip current={current} previous={previous} />
                 </CardContent>
               </Card>
@@ -308,7 +308,7 @@ export default function AdminReports() {
           {/* Charts row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="w-5 h-5 text-gray-600" />Revenue Trend</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="w-5 h-5 text-slate-600" />Revenue Trend</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <AreaChart data={data.charts?.revenueChartData || []}>
@@ -319,8 +319,8 @@ export default function AdminReports() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="month" stroke="#6b7280" />
-                    <YAxis stroke="#6b7280" tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
+                    <XAxis dataKey="month" stroke="#94a3b8" />
+                    <YAxis stroke="#94a3b8" tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
                     <Tooltip formatter={(v: any) => fmt(v)} />
                     <Legend />
                     <Area type="monotone" dataKey="revenue" stroke="#10b981" fillOpacity={1} fill="url(#grad)" name="Revenue" />
@@ -330,7 +330,7 @@ export default function AdminReports() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2"><PieChart className="w-5 h-5 text-gray-600" />Order Status</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><PieChart className="w-5 h-5 text-slate-600" />Order Status</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <RechartsPie>
@@ -357,7 +357,7 @@ export default function AdminReports() {
             <CardHeader><CardTitle className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" />Recent Orders</CardTitle></CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
+                <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                   <TableRow>
                     <TableHead>Order ID</TableHead>
                     <TableHead>Customer</TableHead>
@@ -370,12 +370,12 @@ export default function AdminReports() {
                 <TableBody>
                   {(data.tables?.recentOrders || []).map((o: any) => (
                     <TableRow key={o.id}>
-                      <TableCell className="font-medium text-gray-900">{o.id}</TableCell>
-                      <TableCell className="text-gray-600">{o.customer}</TableCell>
-                      <TableCell className="text-gray-600">{o.vendor}</TableCell>
+                      <TableCell className="font-medium text-slate-900">{o.id}</TableCell>
+                      <TableCell className="text-slate-600">{o.customer}</TableCell>
+                      <TableCell className="text-slate-600">{o.vendor}</TableCell>
                       <TableCell className="font-semibold">{fmt(o.amount)}</TableCell>
                       <TableCell><StatusBadge status={o.status} /></TableCell>
-                      <TableCell className="text-gray-500 text-sm">{new Date(o.date).toLocaleDateString('en-IN')}</TableCell>
+                      <TableCell className="text-slate-500 text-sm">{new Date(o.date).toLocaleDateString('en-IN')}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -389,15 +389,15 @@ export default function AdminReports() {
             <CardContent>
               <div className="space-y-3">
                 {(data.tables?.topVendors || []).map((v: any) => (
-                  <div key={v.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div key={v.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
                     <div className="flex items-center gap-4">
-                      <div className="w-9 h-9 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-bold">#{v.rank}</div>
+                      <div className="w-9 h-9 rounded-full bg-brand-500 text-white flex items-center justify-center text-sm font-bold">#{v.rank}</div>
                       <div>
-                        <p className="font-semibold text-gray-900">{v.name}</p>
-                        <p className="text-sm text-gray-500">{v.orders} orders</p>
+                        <p className="font-semibold text-slate-900">{v.name}</p>
+                        <p className="text-sm text-slate-500">{v.orders} orders</p>
                       </div>
                     </div>
-                    <p className="text-xl font-bold text-gray-900">{fmt(v.revenue)}</p>
+                    <p className="text-xl font-bold text-slate-900">{fmt(v.revenue)}</p>
                   </div>
                 ))}
               </div>
@@ -420,8 +420,8 @@ export default function AdminReports() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">{label}</p>
-                      <p className="text-2xl font-bold text-gray-900">{value}</p>
+                      <p className="text-sm text-slate-600 mb-1">{label}</p>
+                      <p className="text-2xl font-bold text-slate-900">{value}</p>
                     </div>
                     <div className={`p-3 rounded-lg ${color.split(' ')[0]}`}>
                       <Icon className={`w-7 h-7 ${color.split(' ')[1]}`} />
@@ -438,11 +438,11 @@ export default function AdminReports() {
               <ResponsiveContainer width="100%" height={350}>
                 <LineChart data={data.charts?.dailySalesTrend || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="day" stroke="#6b7280" />
-                  <YAxis stroke="#6b7280" tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
+                  <XAxis dataKey="day" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
                   <Tooltip formatter={(v: any, name: any) => name === 'sales' ? [fmt(v), 'Sales'] : [v, 'Orders']} />
                   <Legend />
-                  <Line type="monotone" dataKey="sales" stroke="#3b82f6" strokeWidth={3} dot={{ fill: '#3b82f6', r: 5 }} name="Sales" />
+                  <Line type="monotone" dataKey="sales" stroke="#e01a1b" strokeWidth={3} dot={{ fill: '#e01a1b', r: 5 }} name="Sales" />
                   <Line type="monotone" dataKey="orders" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 5 }} name="Orders" />
                 </LineChart>
               </ResponsiveContainer>
@@ -453,7 +453,7 @@ export default function AdminReports() {
             <CardHeader><CardTitle>Top Selling Products</CardTitle></CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
+                <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                   <TableRow>
                     <TableHead>Product</TableHead>
                     <TableHead>Revenue</TableHead>
@@ -464,10 +464,10 @@ export default function AdminReports() {
                 <TableBody>
                   {(data.tables?.topProducts || []).map((p: any, i: number) => (
                     <TableRow key={i}>
-                      <TableCell className="font-medium text-gray-900">{p.name}</TableCell>
+                      <TableCell className="font-medium text-slate-900">{p.name}</TableCell>
                       <TableCell className="font-semibold">{fmt(p.revenue)}</TableCell>
-                      <TableCell className="text-gray-600">{fmtN(p.quantity)}</TableCell>
-                      <TableCell className="text-gray-600">{p.orders}</TableCell>
+                      <TableCell className="text-slate-600">{fmtN(p.quantity)}</TableCell>
+                      <TableCell className="text-slate-600">{p.orders}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -491,8 +491,8 @@ export default function AdminReports() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">{label}</p>
-                      <p className="text-3xl font-bold text-gray-900">{value}</p>
+                      <p className="text-sm text-slate-600 mb-1">{label}</p>
+                      <p className="text-3xl font-bold text-slate-900">{value}</p>
                     </div>
                     <div className={`p-3 rounded-full ${color.split(' ')[0]}`}>
                       <Icon className={`w-8 h-8 ${color.split(' ')[1]}`} />
@@ -510,10 +510,10 @@ export default function AdminReports() {
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={data.charts?.statusBreakdown || []}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="status" stroke="#6b7280" tick={{ fontSize: 10 }} />
-                    <YAxis stroke="#6b7280" />
+                    <XAxis dataKey="status" stroke="#94a3b8" tick={{ fontSize: 10 }} />
+                    <YAxis stroke="#94a3b8" />
                     <Tooltip />
-                    <Bar dataKey="count" fill="#3b82f6" radius={[6, 6, 0, 0]} name="Orders" />
+                    <Bar dataKey="count" fill="#e01a1b" radius={[6, 6, 0, 0]} name="Orders" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -528,11 +528,11 @@ export default function AdminReports() {
                     return (
                       <div key={s.status}>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="font-medium text-gray-700">{s.status.replace(/_/g, ' ')}</span>
-                          <span className="text-gray-500">{s.count} ({pct}%)</span>
+                          <span className="font-medium text-slate-700">{s.status.replace(/_/g, ' ')}</span>
+                          <span className="text-slate-500">{s.count} ({pct}%)</span>
                         </div>
-                        <div className="w-full bg-gray-100 rounded-full h-2">
-                          <div className="h-2 rounded-full bg-gray-800 transition-all" style={{ width: `${pct}%` }} />
+                        <div className="w-full bg-slate-100 rounded-full h-2">
+                          <div className="h-2 rounded-full bg-slate-800 transition-all" style={{ width: `${pct}%` }} />
                         </div>
                       </div>
                     );
@@ -546,7 +546,7 @@ export default function AdminReports() {
             <CardHeader><CardTitle>Order List</CardTitle></CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
+                <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                   <TableRow>
                     <TableHead>Order ID</TableHead>
                     <TableHead>Customer</TableHead>
@@ -560,13 +560,13 @@ export default function AdminReports() {
                 <TableBody>
                   {(data.tables?.orders || []).map((o: any) => (
                     <TableRow key={o.id}>
-                      <TableCell className="font-medium text-gray-900">{o.id}</TableCell>
-                      <TableCell className="text-gray-600">{o.customer}</TableCell>
-                      <TableCell className="text-gray-600">{o.vendor}</TableCell>
+                      <TableCell className="font-medium text-slate-900">{o.id}</TableCell>
+                      <TableCell className="text-slate-600">{o.customer}</TableCell>
+                      <TableCell className="text-slate-600">{o.vendor}</TableCell>
                       <TableCell className="font-semibold">{fmt(o.amount)}</TableCell>
                       <TableCell><StatusBadge status={o.status} /></TableCell>
                       <TableCell><StatusBadge status={o.paymentStatus} /></TableCell>
-                      <TableCell className="text-gray-500 text-sm">{new Date(o.date).toLocaleDateString('en-IN')}</TableCell>
+                      <TableCell className="text-slate-500 text-sm">{new Date(o.date).toLocaleDateString('en-IN')}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -590,8 +590,8 @@ export default function AdminReports() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">{label}</p>
-                      <p className="text-2xl font-bold text-gray-900">{value}</p>
+                      <p className="text-sm text-slate-600 mb-1">{label}</p>
+                      <p className="text-2xl font-bold text-slate-900">{value}</p>
                     </div>
                     <div className={`p-3 rounded-full ${cl.split(' ')[0]}`}>
                       <Icon className={`w-8 h-8 ${cl.split(' ')[1]}`} />
@@ -606,7 +606,7 @@ export default function AdminReports() {
             <CardHeader><CardTitle>Settlement Transactions</CardTitle></CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
+                <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                   <TableRow>
                     <TableHead>Settlement #</TableHead>
                     <TableHead>Vendor</TableHead>
@@ -619,16 +619,16 @@ export default function AdminReports() {
                 <TableBody>
                   {(data.tables?.settlements || []).map((s: any) => (
                     <TableRow key={s.id}>
-                      <TableCell className="font-medium text-gray-900">{s.id}</TableCell>
-                      <TableCell className="text-gray-600">{s.vendor}</TableCell>
-                      <TableCell className="font-semibold text-gray-900">{fmt(s.amount)}</TableCell>
+                      <TableCell className="font-medium text-slate-900">{s.id}</TableCell>
+                      <TableCell className="text-slate-600">{s.vendor}</TableCell>
+                      <TableCell className="font-semibold text-slate-900">{fmt(s.amount)}</TableCell>
                       <TableCell><StatusBadge status={s.status} /></TableCell>
-                      <TableCell className="text-gray-500 text-sm">{s.dueDate ? new Date(s.dueDate).toLocaleDateString('en-IN') : '-'}</TableCell>
-                      <TableCell className="text-gray-500 text-sm">{new Date(s.date).toLocaleDateString('en-IN')}</TableCell>
+                      <TableCell className="text-slate-500 text-sm">{s.dueDate ? new Date(s.dueDate).toLocaleDateString('en-IN') : '-'}</TableCell>
+                      <TableCell className="text-slate-500 text-sm">{new Date(s.date).toLocaleDateString('en-IN')}</TableCell>
                     </TableRow>
                   ))}
                   {(data.tables?.settlements || []).length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center text-gray-400 py-8">No settlements found for this period</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center text-slate-400 py-8">No settlements found for this period</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -650,7 +650,7 @@ export default function AdminReports() {
             ].map(({ label, value, cl }) => (
               <Card key={label}>
                 <CardContent className="p-5">
-                  <p className="text-sm text-gray-500 mb-1">{label}</p>
+                  <p className="text-sm text-slate-500 mb-1">{label}</p>
                   <p className={`text-2xl font-bold ${cl.split(' ')[1]}`}>{value}</p>
                 </CardContent>
               </Card>
@@ -663,13 +663,13 @@ export default function AdminReports() {
               <ResponsiveContainer width="100%" height={350}>
                 <BarChart data={data.charts?.monthlyFinancials || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="month" stroke="#6b7280" />
-                  <YAxis stroke="#6b7280" tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
+                  <XAxis dataKey="month" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
                   <Tooltip formatter={(v: any) => fmt(v)} />
                   <Legend />
                   <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} name="Revenue" />
                   <Bar dataKey="expenses" fill="#ef4444" radius={[4, 4, 0, 0]} name="Expenses" />
-                  <Bar dataKey="profit" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Net Profit" />
+                  <Bar dataKey="profit" fill="#e01a1b" radius={[4, 4, 0, 0]} name="Net Profit" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -683,14 +683,14 @@ export default function AdminReports() {
           <div className="grid grid-cols-2 gap-4">
             <Card>
               <CardContent className="p-6">
-                <p className="text-sm text-gray-500">Active Vendors</p>
-                <p className="text-4xl font-bold text-gray-900 mt-1">{fmtN(data.metrics.totalActive)}</p>
+                <p className="text-sm text-slate-500">Active Vendors</p>
+                <p className="text-4xl font-bold text-slate-900 mt-1">{fmtN(data.metrics.totalActive)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-6">
-                <p className="text-sm text-gray-500">New This Period</p>
-                <p className="text-4xl font-bold text-gray-900 mt-1">{fmtN(data.metrics.newThisPeriod)}</p>
+                <p className="text-sm text-slate-500">New This Period</p>
+                <p className="text-4xl font-bold text-slate-900 mt-1">{fmtN(data.metrics.newThisPeriod)}</p>
               </CardContent>
             </Card>
           </div>
@@ -699,7 +699,7 @@ export default function AdminReports() {
             <CardHeader><CardTitle>Top Vendors by Revenue</CardTitle></CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
+                <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                   <TableRow>
                     <TableHead>Rank</TableHead>
                     <TableHead>Vendor</TableHead>
@@ -710,10 +710,10 @@ export default function AdminReports() {
                 <TableBody>
                   {(data.tables?.topVendors || []).map((v: any) => (
                     <TableRow key={v.id}>
-                      <TableCell className="font-bold text-gray-700">#{v.rank}</TableCell>
-                      <TableCell className="font-medium text-gray-900">{v.name}</TableCell>
+                      <TableCell className="font-bold text-slate-700">#{v.rank}</TableCell>
+                      <TableCell className="font-medium text-slate-900">{v.name}</TableCell>
                       <TableCell className="font-semibold">{fmt(v.revenue)}</TableCell>
-                      <TableCell className="text-gray-600">{v.orders}</TableCell>
+                      <TableCell className="text-slate-600">{v.orders}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -735,8 +735,8 @@ export default function AdminReports() {
             ].map(({ label, value, cl }) => (
               <Card key={label} className={cl}>
                 <CardContent className="p-6">
-                  <p className="text-sm text-gray-600">{label}</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
+                  <p className="text-sm text-slate-600">{label}</p>
+                  <p className="text-3xl font-bold text-slate-900 mt-1">{value}</p>
                 </CardContent>
               </Card>
             ))}
@@ -747,7 +747,7 @@ export default function AdminReports() {
               <CardHeader><CardTitle className="flex items-center gap-2"><AlertCircle className="w-5 h-5 text-red-500" />Low Stock Products</CardTitle></CardHeader>
               <CardContent>
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                     <TableRow>
                       <TableHead>Product</TableHead>
                       <TableHead>SKU</TableHead>
@@ -758,12 +758,12 @@ export default function AdminReports() {
                   <TableBody>
                     {(data.tables?.lowStockProducts || []).map((p: any) => (
                       <TableRow key={p.id}>
-                        <TableCell className="font-medium text-gray-900">{p.name}</TableCell>
-                        <TableCell className="font-mono text-xs text-gray-500">{p.baseSku}</TableCell>
+                        <TableCell className="font-medium text-slate-900">{p.name}</TableCell>
+                        <TableCell className="font-mono text-xs text-slate-500">{p.baseSku}</TableCell>
                         <TableCell>
                           <span className={`font-bold ${p.totalStock <= 0 ? 'text-red-600' : 'text-orange-600'}`}>{p.totalStock}</span>
                         </TableCell>
-                        <TableCell className="text-gray-500">{p.lowStockThreshold}</TableCell>
+                        <TableCell className="text-slate-500">{p.lowStockThreshold}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -775,7 +775,7 @@ export default function AdminReports() {
               <CardHeader><CardTitle>Top Selling Products</CardTitle></CardHeader>
               <CardContent>
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                     <TableRow>
                       <TableHead>Product</TableHead>
                       <TableHead>Revenue</TableHead>
@@ -785,9 +785,9 @@ export default function AdminReports() {
                   <TableBody>
                     {(data.tables?.topSellingProducts || []).map((p: any, i: number) => (
                       <TableRow key={i}>
-                        <TableCell className="font-medium text-gray-900">{p.name}</TableCell>
+                        <TableCell className="font-medium text-slate-900">{p.name}</TableCell>
                         <TableCell className="font-semibold">{fmt(p.revenue)}</TableCell>
-                        <TableCell className="text-gray-600">{fmtN(p.quantity)}</TableCell>
+                        <TableCell className="text-slate-600">{fmtN(p.quantity)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -804,14 +804,14 @@ export default function AdminReports() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Card>
               <CardContent className="p-6">
-                <p className="text-sm text-gray-500">Total Customers</p>
-                <p className="text-4xl font-bold text-gray-900 mt-1">{fmtN(data.metrics.total)}</p>
+                <p className="text-sm text-slate-500">Total Customers</p>
+                <p className="text-4xl font-bold text-slate-900 mt-1">{fmtN(data.metrics.total)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-6">
-                <p className="text-sm text-gray-500">New This Period</p>
-                <p className="text-4xl font-bold text-gray-900 mt-1">{fmtN(data.metrics.new?.current)}</p>
+                <p className="text-sm text-slate-500">New This Period</p>
+                <p className="text-4xl font-bold text-slate-900 mt-1">{fmtN(data.metrics.new?.current)}</p>
                 <TrendChip current={data.metrics.new?.current || 0} previous={data.metrics.new?.previous || 0} />
               </CardContent>
             </Card>
@@ -821,7 +821,7 @@ export default function AdminReports() {
             <CardHeader><CardTitle>Top Customers by Spend</CardTitle></CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
+                <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                   <TableRow>
                     <TableHead>Rank</TableHead>
                     <TableHead>Customer</TableHead>
@@ -833,15 +833,15 @@ export default function AdminReports() {
                 <TableBody>
                   {(data.tables?.topCustomers || []).map((c: any) => (
                     <TableRow key={c.rank}>
-                      <TableCell className="font-bold text-gray-700">#{c.rank}</TableCell>
-                      <TableCell className="font-medium text-gray-900">{c.name}</TableCell>
-                      <TableCell className="text-gray-500 text-sm">{c.email}</TableCell>
+                      <TableCell className="font-bold text-slate-700">#{c.rank}</TableCell>
+                      <TableCell className="font-medium text-slate-900">{c.name}</TableCell>
+                      <TableCell className="text-slate-500 text-sm">{c.email}</TableCell>
                       <TableCell className="font-semibold">{fmt(c.revenue)}</TableCell>
-                      <TableCell className="text-gray-600">{c.orders}</TableCell>
+                      <TableCell className="text-slate-600">{c.orders}</TableCell>
                     </TableRow>
                   ))}
                   {(data.tables?.topCustomers || []).length === 0 && (
-                    <TableRow><TableCell colSpan={5} className="text-center text-gray-400 py-8">No customer data for this period</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center text-slate-400 py-8">No customer data for this period</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -852,7 +852,7 @@ export default function AdminReports() {
 
       {/* Empty state */}
       {!loading && !data && (
-        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
           <BarChart3 className="w-12 h-12 mb-4" />
           <p className="text-lg">No data available</p>
           <Button className="mt-4" onClick={fetchReport}>Retry</Button>

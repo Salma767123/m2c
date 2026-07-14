@@ -63,6 +63,9 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
   const [variantOriginalPricesUSD, setVariantOriginalPricesUSD] = useState<Record<string, string>>({})
   const [variantVisibilities, setVariantVisibilities] = useState<Record<string, string>>({})
   const [actionLoading, setActionLoading] = useState(false)
+  // Subcategory the admin assigns at approval time (for the website listing).
+  const [subCategory, setSubCategory] = useState('')
+  const [subcategoryOptions, setSubcategoryOptions] = useState<string[]>([])
 
   // Fetch product data from backend
   useEffect(() => {
@@ -117,6 +120,36 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
     }
   }, [requestId])
 
+  // Load subcategory options for this product's category so the admin can
+  // assign one at approval time. Sourced from the vendor's resolved category
+  // tree (same endpoint the admin Edit-Product screen uses). Custom categories
+  // have no master subcategories, so options come back empty and the field is
+  // then optional.
+  useEffect(() => {
+    if (!product?.vendorId || !product?.category) return
+    let cancelled = false
+    const loadSubcategories = async () => {
+      try {
+        const { default: axiosInstance } = await import('@/lib/axios')
+        const response = await axiosInstance.get(`/inventory/admin/vendor/${product.vendorId}/categories`)
+        const cats = response.data?.data?.categories || []
+        const subs = response.data?.data?.subcategories || []
+        const matched = cats.find((c: any) => (c.name || '').toLowerCase() === product.category.toLowerCase())
+        const options = matched
+          ? subs.filter((s: any) => s.parentId === matched.id).map((s: any) => s.name)
+          : []
+        if (!cancelled) setSubcategoryOptions(options)
+      } catch (error) {
+        console.error('Error loading subcategory options:', error)
+        if (!cancelled) setSubcategoryOptions([])
+      } finally {
+        if (!cancelled) setSubCategory(product.subCategory || '')
+      }
+    }
+    loadSubcategories()
+    return () => { cancelled = true }
+  }, [product?.vendorId, product?.category, product?.subCategory])
+
   const handleApprove = async () => {
     if (!product) return
 
@@ -165,6 +198,13 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
         showErrorToast('Invalid Prices', 'Original price must be greater than admin price for all variants')
         return
       }
+    }
+
+    // Require a subcategory when the category actually offers options to choose
+    // from (custom categories have none, so the field stays optional there).
+    if (subcategoryOptions.length > 0 && !subCategory) {
+      showErrorToast('Subcategory Required', 'Please select a subcategory for this product')
+      return
     }
 
     try {
@@ -223,7 +263,8 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
             ? Object.fromEntries(Object.entries(variantOriginalPricesUSD).filter(([, v]) => v).map(([id, v]) => [id, parseFloat(v)]))
             : undefined,
           variantVisibilities: Object.keys(variantVisibilities).length > 0 ? variantVisibilities : undefined,
-        }
+        },
+        subCategory || undefined
       )
 
       if (response.success) {
@@ -234,7 +275,8 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
           ...prev,
           approvalStatus: 'APPROVED',
           approvedAt: new Date().toISOString(),
-          adminFixedPrice: parseFloat(adminPrice)
+          adminFixedPrice: parseFloat(adminPrice),
+          subCategory: subCategory || prev.subCategory
         } : null)
         // Optionally redirect back to requests list
         setTimeout(() => {
@@ -282,25 +324,25 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800'
+        return 'bg-yellow-50 text-yellow-700 border border-yellow-200'
       case 'qc_approved':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-blue-50 text-blue-700 border border-blue-200'
       case 'reinspection':
-        return 'bg-orange-100 text-orange-800'
+        return 'bg-orange-50 text-orange-700 border border-orange-200'
       case 'approved':
-        return 'bg-green-100 text-green-800'
+        return 'bg-green-50 text-green-700 border border-green-200'
       case 'rejected':
-        return 'bg-red-100 text-red-800'
+        return 'bg-red-50 text-red-700 border border-red-200'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-slate-50 text-slate-700 border border-slate-200'
     }
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-700"></div>
-        <span className="ml-3 text-gray-600">Loading product details...</span>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-700"></div>
+        <span className="ml-3 text-slate-600">Loading product details...</span>
       </div>
     )
   }
@@ -309,9 +351,9 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500 font-medium">Product not found</p>
-          <p className="text-sm text-gray-400">The requested vendor product could not be found.</p>
+          <Package className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+          <p className="text-slate-500 font-medium">Product not found</p>
+          <p className="text-sm text-slate-400">The requested vendor product could not be found.</p>
           <Button
             onClick={() => router.push('/admin/dashboard/products/vendor-requests')}
             className="mt-4"
@@ -326,21 +368,21 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
-      <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-6" aria-label="Breadcrumb">
+      <nav className="flex items-center space-x-2 text-sm text-slate-600 mb-6" aria-label="Breadcrumb">
         <div className="flex items-center space-x-2">
-          <Link href="/admin/dashboard" className="hover:text-gray-900 transition-colors duration-200 hover:underline">
+          <Link href="/admin/dashboard" className="hover:text-slate-900 transition-colors duration-200 hover:underline">
             Dashboard
           </Link>
-          <span className="text-gray-400">/</span>
-          <Link href="/admin/dashboard/products" className="hover:text-gray-900 transition-colors duration-200 hover:underline">
+          <span className="text-slate-400">/</span>
+          <Link href="/admin/dashboard/products" className="hover:text-slate-900 transition-colors duration-200 hover:underline">
             Products
           </Link>
-          <span className="text-gray-400">/</span>
-          <Link href="/admin/dashboard/products/vendor-requests" className="hover:text-gray-900 transition-colors duration-200 hover:underline">
+          <span className="text-slate-400">/</span>
+          <Link href="/admin/dashboard/products/vendor-requests" className="hover:text-slate-900 transition-colors duration-200 hover:underline">
             Vendor Requests
           </Link>
-          <span className="text-gray-400">/</span>
-          <span className="text-gray-900 font-medium" aria-current="page">
+          <span className="text-slate-400">/</span>
+          <span className="text-slate-900 font-medium" aria-current="page">
             {product?.name || 'View Request'}
           </span>
         </div>
@@ -352,14 +394,14 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
           <Button
             variant="ghost"
             onClick={() => router.push('/admin/dashboard/products/vendor-requests')}
-            className="text-gray-600 hover:text-gray-900"
+            className="text-slate-600 hover:text-slate-900"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Requests
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
-            <p className="text-gray-600">Vendor Product Request Details</p>
+            <h1 className="text-2xl font-bold text-slate-900">{product.name}</h1>
+            <p className="text-slate-600">Vendor Product Request Details</p>
           </div>
         </div>
         <div className="flex items-center space-x-3">
@@ -384,7 +426,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   <Badge variant="outline" className="text-orange-600 mb-1 border-orange-200">
                     Awaiting QC Re-Inspection
                   </Badge>
-                  <span className="text-[10px] text-gray-400 italic">
+                  <span className="text-[10px] text-slate-400 italic">
                     QC checker must complete re-inspection
                   </span>
                 </div>
@@ -404,7 +446,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   <Badge variant="outline" className="text-yellow-600 mb-1 border-yellow-200">
                     Waiting for QC Approval
                   </Badge>
-                  <span className="text-[10px] text-gray-400 italic">
+                  <span className="text-[10px] text-slate-400 italic">
                     QC must approve first
                   </span>
                 </div>
@@ -456,8 +498,8 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                     </div>
                   ))
                 ) : (
-                  <div className="col-span-full text-center py-8 text-gray-500">
-                    <ImageIcon className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                  <div className="col-span-full text-center py-8 text-slate-500">
+                    <ImageIcon className="h-12 w-12 mx-auto mb-2 text-slate-300" />
                     <p>No images available</p>
                   </div>
                 )}
@@ -488,14 +530,14 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                           />
                         )}
                         <div>
-                          <h4 className="font-semibold text-gray-900">
+                          <h4 className="font-semibold text-slate-900">
                             Base Unit {product.singleUnitSize && product.singleUnitColor ? `(${product.singleUnitSize} - ${product.singleUnitColor})` : ''}
                           </h4>
                           <p className="text-xs text-blue-600 font-medium">Base / Default Variant</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">₹{product.basePrice}</p>
+                        <p className="text-sm font-medium text-slate-900">₹{product.basePrice}</p>
                         {product.adminFixedPrice && (
                           <p className="text-xs text-green-600">Admin: ₹{product.adminFixedPrice}</p>
                         )}
@@ -503,23 +545,23 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                       <div className="bg-white p-3 rounded border">
-                        <p className="text-xs text-gray-500 mb-1">Vendor Price</p>
-                        <p className="text-sm font-semibold text-gray-900">₹{product.basePrice}</p>
+                        <p className="text-xs text-slate-500 mb-1">Vendor Price</p>
+                        <p className="text-sm font-semibold text-slate-900">₹{product.basePrice}</p>
                       </div>
                       {product.originalPrice && (
-                        <div className="bg-white p-3 rounded border border-gray-200">
-                          <p className="text-xs text-gray-500 mb-1">Original Price</p>
-                          <p className="text-sm font-semibold text-gray-500 line-through">₹{product.originalPrice}</p>
+                        <div className="bg-white p-3 rounded border border-slate-200">
+                          <p className="text-xs text-slate-500 mb-1">Original Price</p>
+                          <p className="text-sm font-semibold text-slate-500 line-through">₹{product.originalPrice}</p>
                         </div>
                       )}
                       {product.adminFixedPrice && (
                         <div className="bg-white p-3 rounded border border-green-200">
-                          <p className="text-xs text-gray-500 mb-1">Admin Price</p>
+                          <p className="text-xs text-slate-500 mb-1">Admin Price</p>
                           <p className="text-sm font-semibold text-green-600">₹{product.adminFixedPrice}</p>
                         </div>
                       )}
                       <div className="bg-white p-3 rounded border">
-                        <p className="text-xs text-gray-500 mb-1">Stock</p>
+                        <p className="text-xs text-slate-500 mb-1">Stock</p>
                         <p className="text-sm font-semibold text-blue-700">{product.inventory?.baseStock ?? 0} units</p>
                       </div>
                     </div>
@@ -540,14 +582,14 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                         )}
                         {product.originalPriceINR && (
                           <div className="bg-white p-3 rounded border border-blue-100">
-                            <p className="text-xs text-gray-500 mb-1">Original ₹</p>
-                            <p className="text-sm font-semibold text-gray-500 line-through">₹{product.originalPriceINR.toLocaleString()}</p>
+                            <p className="text-xs text-slate-500 mb-1">Original ₹</p>
+                            <p className="text-sm font-semibold text-slate-500 line-through">₹{product.originalPriceINR.toLocaleString()}</p>
                           </div>
                         )}
                         {product.originalPriceUSD && (
                           <div className="bg-white p-3 rounded border border-blue-100">
-                            <p className="text-xs text-gray-500 mb-1">Original $</p>
-                            <p className="text-sm font-semibold text-gray-500 line-through">${product.originalPriceUSD.toFixed(2)}</p>
+                            <p className="text-xs text-slate-500 mb-1">Original $</p>
+                            <p className="text-sm font-semibold text-slate-500 line-through">${product.originalPriceUSD.toFixed(2)}</p>
                           </div>
                         )}
                       </div>
@@ -555,29 +597,29 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   </div>
 
                   {product.variants.map((variant, index) => (
-                    <div key={variant.id || index} className="p-4 border rounded-lg bg-gray-50">
+                    <div key={variant.id || index} className="p-4 border rounded-lg bg-slate-50">
                       {/* Variant Details */}
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center space-x-3">
                           {variant.colorHex && (
                             <div
-                              className="w-10 h-10 rounded border-2 border-gray-300 shadow-sm"
+                              className="w-10 h-10 rounded border-2 border-slate-300 shadow-sm"
                               style={{ backgroundColor: variant.colorHex }}
                               title={variant.color}
                             />
                           )}
                           <div>
-                            <h4 className="font-semibold text-gray-900">
+                            <h4 className="font-semibold text-slate-900">
                               {variant.variantName?.trim() || [variant.size, variant.color].filter(Boolean).join(' - ') || 'Variant'}
                             </h4>
                             {(variant.size || variant.color) && (
-                              <p className="text-xs text-gray-500">{[variant.size, variant.color].filter(Boolean).join(' / ')}</p>
+                              <p className="text-xs text-slate-500">{[variant.size, variant.color].filter(Boolean).join(' / ')}</p>
                             )}
-                            <p className="text-xs text-gray-500 font-mono">{variant.sku}</p>
+                            <p className="text-xs text-slate-500 font-mono">{variant.sku}</p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-medium text-gray-900">₹{variant.price}</p>
+                          <p className="text-sm font-medium text-slate-900">₹{variant.price}</p>
                           {variant.adminFixedPrice && (
                             <p className="text-xs text-green-600">Admin: ₹{variant.adminFixedPrice}</p>
                           )}
@@ -587,28 +629,28 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                       {/* Variant Info Grid */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                         <div className="bg-white p-3 rounded border">
-                          <p className="text-xs text-gray-500 mb-1">Vendor Price</p>
-                          <p className="text-sm font-semibold text-gray-900">₹{variant.price}</p>
+                          <p className="text-xs text-slate-500 mb-1">Vendor Price</p>
+                          <p className="text-sm font-semibold text-slate-900">₹{variant.price}</p>
                         </div>
                         {variant.originalPrice && (
-                          <div className="bg-white p-3 rounded border border-gray-200">
-                            <p className="text-xs text-gray-500 mb-1">Original Price</p>
-                            <p className="text-sm font-semibold text-gray-500 line-through">₹{variant.originalPrice}</p>
+                          <div className="bg-white p-3 rounded border border-slate-200">
+                            <p className="text-xs text-slate-500 mb-1">Original Price</p>
+                            <p className="text-sm font-semibold text-slate-500 line-through">₹{variant.originalPrice}</p>
                           </div>
                         )}
                         {variant.adminFixedPrice && (
                           <div className="bg-white p-3 rounded border border-green-200">
-                            <p className="text-xs text-gray-500 mb-1">Admin Price</p>
+                            <p className="text-xs text-slate-500 mb-1">Admin Price</p>
                             <p className="text-sm font-semibold text-green-600">₹{variant.adminFixedPrice}</p>
                           </div>
                         )}
                         <div className="bg-white p-3 rounded border">
-                          <p className="text-xs text-gray-500 mb-1">Stock</p>
-                          <p className="text-sm font-semibold text-gray-900">{variant.stock} units</p>
+                          <p className="text-xs text-slate-500 mb-1">Stock</p>
+                          <p className="text-sm font-semibold text-slate-900">{variant.stock} units</p>
                         </div>
                         {variant.lowStockThreshold != null && (
                           <div className="bg-white p-3 rounded border border-amber-200">
-                            <p className="text-xs text-gray-500 mb-1">Low Stock Alert</p>
+                            <p className="text-xs text-slate-500 mb-1">Low Stock Alert</p>
                             <p className="text-sm font-semibold text-amber-700">{variant.lowStockThreshold} units</p>
                           </div>
                         )}
@@ -631,14 +673,14 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                           )}
                           {(variant as any).originalPriceINR && (
                             <div className="bg-white p-3 rounded border border-blue-100">
-                              <p className="text-xs text-gray-500 mb-1">Original ₹</p>
-                              <p className="text-sm font-semibold text-gray-500 line-through">₹{(variant as any).originalPriceINR.toLocaleString()}</p>
+                              <p className="text-xs text-slate-500 mb-1">Original ₹</p>
+                              <p className="text-sm font-semibold text-slate-500 line-through">₹{(variant as any).originalPriceINR.toLocaleString()}</p>
                             </div>
                           )}
                           {(variant as any).originalPriceUSD && (
                             <div className="bg-white p-3 rounded border border-blue-100">
-                              <p className="text-xs text-gray-500 mb-1">Original $</p>
-                              <p className="text-sm font-semibold text-gray-500 line-through">${(variant as any).originalPriceUSD.toFixed(2)}</p>
+                              <p className="text-xs text-slate-500 mb-1">Original $</p>
+                              <p className="text-sm font-semibold text-slate-500 line-through">${(variant as any).originalPriceUSD.toFixed(2)}</p>
                             </div>
                           )}
                         </div>
@@ -647,7 +689,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                       {/* Variant Images */}
                       {variant.images && variant.images.length > 0 && (
                         <div>
-                          <p className="text-sm font-medium text-gray-700 mb-2">Variant Images</p>
+                          <p className="text-sm font-medium text-slate-700 mb-2">Variant Images</p>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             {variant.images.map((imageUrl, imgIndex) => (
                               <div key={imgIndex} className="relative aspect-square rounded-lg overflow-hidden border bg-white">
@@ -679,7 +721,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-700 leading-relaxed">{product.description}</p>
+              <p className="text-slate-700 leading-relaxed">{product.description}</p>
             </CardContent>
           </Card>
 
@@ -696,10 +738,10 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {Object.entries(product.fabricSpecifications).map(([key, value]) => (
                     <div key={key} className="flex flex-col">
-                      <span className="text-sm font-medium text-gray-500 capitalize">
+                      <span className="text-sm font-medium text-slate-500 capitalize">
                         {key.replace(/([A-Z])/g, ' $1').trim()}
                       </span>
-                      <span className="text-gray-900">{String(value)}</span>
+                      <span className="text-slate-900">{String(value)}</span>
                     </div>
                   ))}
                 </div>
@@ -719,35 +761,35 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {product.uom && (
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Unit of Measurement</span>
-                    <span className="text-gray-900">{product.uom}</span>
+                    <span className="text-sm font-medium text-slate-500">Unit of Measurement</span>
+                    <span className="text-slate-900">{product.uom}</span>
                   </div>
                 )}
                 {product.dimensions && (
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Display Dimensions</span>
-                    <span className="text-gray-900">{product.dimensions}</span>
+                    <span className="text-sm font-medium text-slate-500">Display Dimensions</span>
+                    <span className="text-slate-900">{product.dimensions}</span>
                   </div>
                 )}
                 {product.weight && (
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Display Weight</span>
-                    <span className="text-gray-900">{product.weight}</span>
+                    <span className="text-sm font-medium text-slate-500">Display Weight</span>
+                    <span className="text-slate-900">{product.weight}</span>
                   </div>
                 )}
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium text-gray-500">Dispatch Timeline</span>
-                  <span className="text-gray-900">
+                  <span className="text-sm font-medium text-slate-500">Dispatch Timeline</span>
+                  <span className="text-slate-900">
                     {product.dispatchTimeline.totalDays} days
                     ({product.dispatchTimeline.processingDays} processing + {product.dispatchTimeline.shippingDays} shipping)
                   </span>
                 </div>
                 {product.tags && product.tags.length > 0 && (
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Tags</span>
+                    <span className="text-sm font-medium text-slate-500">Tags</span>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {product.tags.map((tag, index) => (
-                        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                        <span key={index} className="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded">
                           {tag}
                         </span>
                       ))}
@@ -768,10 +810,10 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center space-x-3">
-                <Calendar className="h-4 w-4 text-gray-500" />
+                <Calendar className="h-4 w-4 text-slate-500" />
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Submitted Date</p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm font-medium text-slate-900">Submitted Date</p>
+                  <p className="text-sm text-slate-600">
                     {new Date(product.createdAt).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
@@ -781,12 +823,12 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                 </div>
               </div>
               <div className="flex items-center space-x-3">
-                <DollarSign className="h-4 w-4 text-gray-500" />
+                <DollarSign className="h-4 w-4 text-slate-500" />
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Pricing</p>
-                  <p className="text-sm text-gray-600">Vendor Price: ₹{product.basePrice}</p>
+                  <p className="text-sm font-medium text-slate-900">Pricing</p>
+                  <p className="text-sm text-slate-600">Vendor Price: ₹{product.basePrice}</p>
                   {product.originalPrice && (
-                    <p className="text-sm text-gray-500 line-through">Original Price: ₹{product.originalPrice}</p>
+                    <p className="text-sm text-slate-500 line-through">Original Price: ₹{product.originalPrice}</p>
                   )}
                   {product.adminFixedPrice && (
                     <p className="text-sm text-green-600 font-medium">Admin Price: ₹{product.adminFixedPrice}</p>
@@ -798,16 +840,16 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                     <p className="text-sm text-blue-600">USD: ${product.priceUSD.toFixed(2)}</p>
                   )}
                   {product.originalPriceINR && (
-                    <p className="text-xs text-gray-500">Original ₹: ₹{product.originalPriceINR.toLocaleString()}</p>
+                    <p className="text-xs text-slate-500">Original ₹: ₹{product.originalPriceINR.toLocaleString()}</p>
                   )}
                   {product.originalPriceUSD && (
-                    <p className="text-xs text-gray-500">Original $: ${product.originalPriceUSD.toFixed(2)}</p>
+                    <p className="text-xs text-slate-500">Original $: ${product.originalPriceUSD.toFixed(2)}</p>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-slate-500 mt-1">
                     Visibility: {product.priceVisibility === 'IN_ONLY' ? '.in only (India)' : product.priceVisibility === 'COM_ONLY' ? '.com only (International)' : 'Both (.in + .com)'}
                   </p>
                   {product.gstPercentage ? (
-                    <p className="text-sm text-gray-600">GST: {product.gstPercentage}%</p>
+                    <p className="text-sm text-slate-600">GST: {product.gstPercentage}%</p>
                   ) : null}
                   {product.discount ? (
                     <p className="text-sm text-green-600 font-medium">Discount: {product.discount}% off</p>
@@ -815,26 +857,26 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                 </div>
               </div>
               <div className="flex items-center space-x-3">
-                <Tag className="h-4 w-4 text-gray-500" />
+                <Tag className="h-4 w-4 text-slate-500" />
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Category</p>
-                  <p className="text-sm text-gray-600">{product.category}</p>
+                  <p className="text-sm font-medium text-slate-900">Category</p>
+                  <p className="text-sm text-slate-600">{product.category}</p>
                   {product.subCategory && (
-                    <p className="text-xs text-gray-500">{product.subCategory}</p>
+                    <p className="text-xs text-slate-500">{product.subCategory}</p>
                   )}
                 </div>
               </div>
               <div className="flex items-center space-x-3">
-                <Warehouse className="h-4 w-4 text-gray-500" />
+                <Warehouse className="h-4 w-4 text-slate-500" />
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Stock & Variants</p>
-                  <p className="text-sm text-gray-600">{product.totalStock} units</p>
+                  <p className="text-sm font-medium text-slate-900">Stock & Variants</p>
+                  <p className="text-sm text-slate-600">{product.totalStock} units</p>
                   {product.hasVariants && product.variants && (
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-slate-500">
                       Base: {product.inventory?.baseStock ?? 0} units | Variants: {product.variants.reduce((sum, v) => sum + (v.stock || 0), 0)} units
                     </p>
                   )}
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-500">
                     {product.hasVariants ? `${product.variants?.length || 0} variants` : 'No variants'}
                   </p>
                 </div>
@@ -869,9 +911,9 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                 <div className="flex items-center space-x-3">
                   <UserCheck className="h-4 w-4 text-blue-500" />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">QC Checker</p>
-                    <p className="text-sm text-gray-600">{product.assignedQc.name}</p>
-                    <p className="text-xs text-gray-500">{product.assignedQc.email}</p>
+                    <p className="text-sm font-medium text-slate-900">QC Checker</p>
+                    <p className="text-sm text-slate-600">{product.assignedQc.name}</p>
+                    <p className="text-xs text-slate-500">{product.assignedQc.email}</p>
                   </div>
                 </div>
               )}
@@ -888,25 +930,25 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                 <div className="grid grid-cols-2 gap-2">
                   {product.qcInspectionData.finalDecision && (
                     <div className={`p-2 rounded text-center ${product.qcInspectionData.finalDecision === 'Approved' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
-                      <p className="text-[10px] text-gray-500">Decision</p>
+                      <p className="text-[10px] text-slate-500">Decision</p>
                       <p className="text-xs font-semibold">{product.qcInspectionData.finalDecision}</p>
                     </div>
                   )}
                   {product.qcInspectionData.inspectionDate && (
-                    <div className="p-2 rounded bg-gray-50 text-center">
-                      <p className="text-[10px] text-gray-500">Inspected</p>
-                      <p className="text-xs font-semibold text-gray-800">{product.qcInspectionData.inspectionDate}</p>
+                    <div className="p-2 rounded bg-slate-50 text-center">
+                      <p className="text-[10px] text-slate-500">Inspected</p>
+                      <p className="text-xs font-semibold text-slate-800">{product.qcInspectionData.inspectionDate}</p>
                     </div>
                   )}
                 </div>
                 {product.qcInspectionData.inspectionType && (
-                  <p className="text-xs text-gray-600">Type: {product.qcInspectionData.inspectionType}</p>
+                  <p className="text-xs text-slate-600">Type: {product.qcInspectionData.inspectionType}</p>
                 )}
 
                 {/* Remark Scores */}
                 {(product.qcInspectionData.shipperCartonRemark || product.qcInspectionData.aqlWorkmanshipRemark) ? (
                   <div role="list" aria-label="Quality inspection scores">
-                    <p className="text-[10px] font-medium text-gray-500 mb-1.5">Quality Scores</p>
+                    <p className="text-[10px] font-medium text-slate-500 mb-1.5">Quality Scores</p>
                     <div className="space-y-1">
                       {QC_SCORE_FIELDS.map(({ key, label }) => {
                         const score = product.qcInspectionData?.[key];
@@ -915,7 +957,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                         const color = num >= 8 ? 'text-green-700 bg-green-50' : num >= 6 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50';
                         return (
                           <div key={key} role="listitem" className="flex items-center justify-between text-xs" aria-label={`${label}: ${score} out of 10`}>
-                            <span className="text-gray-600">{label}</span>
+                            <span className="text-slate-600">{label}</span>
                             <span className={`px-1.5 py-0.5 rounded font-semibold transition-colors duration-200 ${color}`}>{score}/10</span>
                           </div>
                         );
@@ -925,9 +967,9 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                 ) : null}
 
                 {product.qcInspectionData.finalRemarks && (
-                  <div className="p-2 bg-gray-50 rounded">
-                    <p className="text-[10px] font-medium text-gray-500 mb-1">Remarks</p>
-                    <p className="text-xs text-gray-700">{product.qcInspectionData.finalRemarks}</p>
+                  <div className="p-2 bg-slate-50 rounded">
+                    <p className="text-[10px] font-medium text-slate-500 mb-1">Remarks</p>
+                    <p className="text-xs text-slate-700">{product.qcInspectionData.finalRemarks}</p>
                   </div>
                 )}
 
@@ -948,20 +990,20 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <p className="text-sm font-medium text-gray-900">{product.vendor.companyName}</p>
-                <p className="text-xs text-gray-500">{product.vendor.ownerName}</p>
+                <p className="text-sm font-medium text-slate-900">{product.vendor.companyName}</p>
+                <p className="text-xs text-slate-500">{product.vendor.ownerName}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900">Owner Name</p>
-                <p className="text-sm text-gray-600">{product.vendor.ownerName}</p>
+                <p className="text-sm font-medium text-slate-900">Owner Name</p>
+                <p className="text-sm text-slate-600">{product.vendor.ownerName}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900">Contact</p>
-                <p className="text-sm text-gray-600">{product.vendor.businessEmail}</p>
+                <p className="text-sm font-medium text-slate-900">Contact</p>
+                <p className="text-sm text-slate-600">{product.vendor.businessEmail}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900">Status</p>
-                <Badge className={product.vendor.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                <p className="text-sm font-medium text-slate-900">Status</p>
+                <Badge className={product.vendor.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-slate-50 text-slate-700 border border-slate-200'}>
                   {product.vendor.status}
                 </Badge>
               </div>
@@ -976,19 +1018,19 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
             <CardContent className="space-y-3">
               {product.fabricType && (
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Fabric Type</p>
-                  <p className="text-sm text-gray-600">{product.fabricType}</p>
+                  <p className="text-sm font-medium text-slate-900">Fabric Type</p>
+                  <p className="text-sm text-slate-600">{product.fabricType}</p>
                 </div>
               )}
               {product.material && (
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Material</p>
-                  <p className="text-sm text-gray-600">{product.material}</p>
+                  <p className="text-sm font-medium text-slate-900">Material</p>
+                  <p className="text-sm text-slate-600">{product.material}</p>
                 </div>
               )}
               <div>
-                <p className="text-sm font-medium text-gray-900">Base SKU</p>
-                <p className="text-sm text-gray-600 font-mono">{product.baseSku}</p>
+                <p className="text-sm font-medium text-slate-900">Base SKU</p>
+                <p className="text-sm text-slate-600 font-mono">{product.baseSku}</p>
               </div>
             </CardContent>
           </Card>
@@ -1005,57 +1047,57 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   return (
                     <>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">Shipping Weight per Unit</p>
-                        <p className="text-sm text-gray-600">{lc.unitWeight} {lc.weightUom}</p>
+                        <p className="text-sm font-medium text-slate-900">Shipping Weight per Unit</p>
+                        <p className="text-sm text-slate-600">{lc.unitWeight} {lc.weightUom}</p>
                       </div>
                       {lc.maxWeight > 0 && (
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Max Shippable Weight</p>
-                          <p className="text-sm text-gray-600">{lc.maxWeight} {lc.weightUom}</p>
+                          <p className="text-sm font-medium text-slate-900">Max Shippable Weight</p>
+                          <p className="text-sm text-slate-600">{lc.maxWeight} {lc.weightUom}</p>
                         </div>
                       )}
                       {lc.dimensions && (
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Shipping Dimensions</p>
-                          <p className="text-sm text-gray-600">{lc.dimensions.length} × {lc.dimensions.width} × {lc.dimensions.height} {lc.dimensions.unit}</p>
+                          <p className="text-sm font-medium text-slate-900">Shipping Dimensions</p>
+                          <p className="text-sm text-slate-600">{lc.dimensions.length} × {lc.dimensions.width} × {lc.dimensions.height} {lc.dimensions.unit}</p>
                         </div>
                       )}
                       {lc.transportTypes.length > 0 && (
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Transport Types</p>
-                          <p className="text-sm text-gray-600">{lc.transportTypes.join(', ')}</p>
+                          <p className="text-sm font-medium text-slate-900">Transport Types</p>
+                          <p className="text-sm text-slate-600">{lc.transportTypes.join(', ')}</p>
                         </div>
                       )}
                       {lc.transportTypes.includes('AIR') && lc.airDeliveryDays > 0 && (
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Air Delivery Days</p>
-                          <p className="text-sm text-gray-600">{lc.airDeliveryDays} days</p>
+                          <p className="text-sm font-medium text-slate-900">Air Delivery Days</p>
+                          <p className="text-sm text-slate-600">{lc.airDeliveryDays} days</p>
                         </div>
                       )}
                       {lc.transportTypes.includes('SHIP') && lc.shipDeliveryDays > 0 && (
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Ship Delivery Days</p>
-                          <p className="text-sm text-gray-600">{lc.shipDeliveryDays} days</p>
+                          <p className="text-sm font-medium text-slate-900">Ship Delivery Days</p>
+                          <p className="text-sm text-slate-600">{lc.shipDeliveryDays} days</p>
                         </div>
                       )}
                       {lc.airCostPerKg > 0 && (
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Air Cost per {lc.weightUom}</p>
-                          <p className="text-sm text-gray-600">₹{lc.airCostPerKg}</p>
+                          <p className="text-sm font-medium text-slate-900">Air Cost per {lc.weightUom}</p>
+                          <p className="text-sm text-slate-600">₹{lc.airCostPerKg}</p>
                         </div>
                       )}
                       {lc.shipCostPerKg > 0 && (
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Ship Cost per {lc.weightUom}</p>
-                          <p className="text-sm text-gray-600">₹{lc.shipCostPerKg}</p>
+                          <p className="text-sm font-medium text-slate-900">Ship Cost per {lc.weightUom}</p>
+                          <p className="text-sm text-slate-600">₹{lc.shipCostPerKg}</p>
                         </div>
                       )}
                       {lc.weightRanges.length > 0 && (
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Weight Range Rules</p>
+                          <p className="text-sm font-medium text-slate-900">Weight Range Rules</p>
                           <ul className="mt-1 space-y-0.5">
                             {lc.weightRanges.map((wr, i) => (
-                              <li key={i} className="text-sm text-gray-600">
+                              <li key={i} className="text-sm text-slate-600">
                                 {wr.minWeight}–{wr.maxWeight} {lc.weightUom} → {wr.recommendedTransport}
                               </li>
                             ))}
@@ -1064,8 +1106,8 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                       )}
                       {lc.notes && (
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Logistics Notes</p>
-                          <p className="text-sm text-gray-600">{lc.notes}</p>
+                          <p className="text-sm font-medium text-slate-900">Logistics Notes</p>
+                          <p className="text-sm text-slate-600">{lc.notes}</p>
                         </div>
                       )}
                     </>
@@ -1079,52 +1121,88 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
 
       {/* Approval Modal */}
       {showApprovalModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Approve Product Request</h3>
-            <p className="text-gray-600 mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Approve Product Request</h3>
+            <p className="text-slate-600 mb-4">
               Set the final price for this product. This will be the price customers see.
             </p>
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700">Product: {product.name}</p>
-              <p className="text-sm text-gray-600">Vendor: {product.vendor.companyName}</p>
+            <div className="mb-4 p-3 bg-slate-50 rounded-lg">
+              <p className="text-sm font-medium text-slate-700">Product: {product.name}</p>
+              <p className="text-sm text-slate-600">Vendor: {product.vendor.companyName}</p>
+            </div>
+
+            {/* Category (fixed, chosen by vendor) + Subcategory (admin assigns
+                for the website listing at approval time). */}
+            <div className="mb-4 grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Category
+                </label>
+                <input
+                  type="text"
+                  value={product.category || '—'}
+                  readOnly
+                  className="w-full px-3 py-2 border border-slate-200 rounded-md bg-slate-100 text-slate-600 cursor-not-allowed"
+                />
+                <p className="text-xs text-slate-500 mt-1">Selected by the vendor.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Subcategory {subcategoryOptions.length > 0 && <span className="text-red-500">*</span>}
+                </label>
+                <select
+                  value={subCategory}
+                  onChange={(e) => setSubCategory(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  disabled={actionLoading || subcategoryOptions.length === 0}
+                >
+                  <option value="">
+                    {subcategoryOptions.length === 0 ? 'No subcategories for this category' : 'Select subcategory'}
+                  </option>
+                  {subcategoryOptions.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">Assigned for the website listing.</p>
+              </div>
             </div>
 
             {/* Base Pricing - always shown */}
             <div className="mb-4 grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Admin Selling Price (₹) *
                 </label>
-                <div className="mb-2 text-sm text-gray-600">
+                <div className="mb-2 text-sm text-slate-600">
                   Vendor Base Price: ₹{product.basePrice}
                 </div>
                 <input
                   type="number"
                   value={adminPrice || ''}
                   onChange={(e) => setAdminPrice(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                   placeholder="Enter selling price"
                   step="0.01"
                   min="0"
                   disabled={actionLoading}
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Final selling price customers see.
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Original Price (₹) *
                 </label>
-                <div className="mb-2 text-sm text-gray-600">
+                <div className="mb-2 text-sm text-slate-600">
                   For showing strikethrough discount
                 </div>
                 <input
                   type="number"
                   value={originalPrice || ''}
                   onChange={(e) => setOriginalPrice(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                   placeholder="Enter original price"
                   step="0.01"
                   min="0"
@@ -1143,27 +1221,27 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               <h4 className="text-sm font-semibold text-blue-900 mb-3">Currency Pricing</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-white rounded-md p-3 border border-blue-100">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Selling Price (.in)</p>
-                  <p className="text-lg font-bold text-gray-900">₹{adminPrice || '—'}</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Selling Price (.in)</p>
+                  <p className="text-lg font-bold text-slate-900">₹{adminPrice || '—'}</p>
                 </div>
                 <div className="bg-white rounded-md p-3 border border-blue-100">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Selling Price (.com)</p>
-                  <p className="text-lg font-bold text-gray-900">{adminPrice ? `$${convertINRtoUSD(parseFloat(adminPrice)).toFixed(2)}` : '—'}</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Selling Price (.com)</p>
+                  <p className="text-lg font-bold text-slate-900">{adminPrice ? `$${convertINRtoUSD(parseFloat(adminPrice)).toFixed(2)}` : '—'}</p>
                   <p className="text-[10px] text-green-600">Auto-calculated from exchange rate</p>
                 </div>
               </div>
 
               {/* Original Prices (MRP) */}
-              <p className="text-xs font-medium text-gray-600 mb-2 mt-4 border-b border-blue-200 pb-1">Original Prices (MRP)</p>
+              <p className="text-xs font-medium text-slate-600 mb-2 mt-4 border-b border-blue-200 pb-1">Original Prices (MRP)</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                 <div>
-                  <label htmlFor="view-original-inr" className="block text-xs font-medium text-gray-700 mb-1">Original ₹ (MRP)</label>
+                  <label htmlFor="view-original-inr" className="block text-xs font-medium text-slate-700 mb-1">Original ₹ (MRP)</label>
                   <input
                     id="view-original-inr"
                     type="number"
                     value={originalPriceINR || ''}
                     onChange={(e) => setOriginalPriceINR(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors duration-200 text-sm"
                     placeholder="MRP for .in domain"
                     step="0.01"
                     min="0"
@@ -1171,19 +1249,19 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Original $ (MRP)</label>
-                  <div className="w-full px-3 py-2.5 border border-gray-200 rounded-md bg-gray-50 text-sm text-gray-600">
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Original $ (MRP)</label>
+                  <div className="w-full px-3 py-2.5 border border-slate-200 rounded-md bg-slate-50 text-sm text-slate-600">
                     {originalPriceINR ? `$${convertINRtoUSD(parseFloat(originalPriceINR)).toFixed(2)}` : 'Auto-calculated'}
                   </div>
                   <p className="text-[10px] text-green-600 mt-1">Auto-calculated from exchange rate</p>
                 </div>
                 <div>
-                  <label htmlFor="view-display-on" className="block text-xs font-medium text-gray-700 mb-1">Display On</label>
+                  <label htmlFor="view-display-on" className="block text-xs font-medium text-slate-700 mb-1">Display On</label>
                   <select
                     id="view-display-on"
                     value={priceVisibility}
                     onChange={(e) => setPriceVisibility(e.target.value as 'IN_ONLY' | 'COM_ONLY' | 'BOTH')}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors duration-200 text-sm"
                     disabled={actionLoading}
                   >
                     <option value="BOTH">Both (.in & .com)</option>
@@ -1200,23 +1278,23 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
             {/* Variant Prices - shown only when product has variants */}
             {product.hasVariants && product.variants && product.variants.length > 0 && (
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-3">
+                <label className="block text-sm font-medium text-slate-700 mb-3">
                   Set Prices for Each Variant
                 </label>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {product.variants.map((variant) => (
-                    <div key={variant.id} className="p-3 border border-gray-200 rounded-lg bg-white">
+                    <div key={variant.id} className="p-3 border border-slate-200 rounded-lg bg-white">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-3">
                           <div
-                            className="w-6 h-6 rounded border border-gray-300"
+                            className="w-6 h-6 rounded border border-slate-300"
                             style={{ backgroundColor: variant.colorHex || '#ccc' }}
                           />
                           <div>
-                            <p className="text-sm font-medium text-gray-900">
+                            <p className="text-sm font-medium text-slate-900">
                               {variant.variantName?.trim() || [variant.size, variant.color].filter(Boolean).join(' - ') || 'Variant'}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-slate-500">
                               Vendor Price: ₹{variant.price} | Stock: {variant.stock}
                             </p>
                           </div>
@@ -1224,7 +1302,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                       </div>
                       <div className="mt-2 grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">
                             Admin Price (₹) *
                           </label>
                           <input
@@ -1234,7 +1312,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                               ...prev,
                               [variant.id]: e.target.value
                             }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent text-sm"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm"
                             placeholder="Selling price"
                             step="0.01"
                             min="0"
@@ -1242,7 +1320,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">
                             Original Price (₹) *
                           </label>
                           <input
@@ -1252,7 +1330,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                               ...prev,
                               [variant.id]: e.target.value
                             }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent text-sm"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm"
                             placeholder="Original price"
                             step="0.01"
                             min="0"
@@ -1270,11 +1348,11 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                         <p className="text-[10px] font-medium text-blue-600 mb-1.5">Currency Pricing</p>
                         <div className="grid grid-cols-2 gap-2">
                           <div className="bg-white rounded p-2 border border-blue-100">
-                            <p className="text-[10px] text-gray-500">Price (.in)</p>
+                            <p className="text-[10px] text-slate-500">Price (.in)</p>
                             <p className="text-sm font-bold">₹{variantPrices[variant.id] || variant.price || '—'}</p>
                           </div>
                           <div className="bg-white rounded p-2 border border-blue-100">
-                            <p className="text-[10px] text-gray-500">Price (.com)</p>
+                            <p className="text-[10px] text-slate-500">Price (.com)</p>
                             <p className="text-sm font-bold">{(variantPrices[variant.id] || variant.price) ? `$${convertINRtoUSD(parseFloat(variantPrices[variant.id] || String(variant.price))).toFixed(2)}` : '—'}</p>
                             <p className="text-[8px] text-green-600">Auto from exchange rate</p>
                           </div>
@@ -1283,7 +1361,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-slate-500 mt-2">
                   Set admin selling price and original price for each variant. Discount % is auto-calculated.
                 </p>
               </div>
@@ -1311,20 +1389,20 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
 
       {/* Rejection Modal */}
       {showRejectionModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Reject Product Request</h3>
-            <p className="text-gray-600 mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Reject Product Request</h3>
+            <p className="text-slate-600 mb-4">
               Please provide a reason for rejecting this product request. The vendor will be notified.
             </p>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
                 Rejection Reason
               </label>
               <textarea
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                 placeholder="Enter reason for rejection..."
                 rows={4}
               />

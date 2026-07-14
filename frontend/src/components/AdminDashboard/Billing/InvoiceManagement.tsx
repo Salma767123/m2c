@@ -29,9 +29,9 @@ const invoiceStatus = (paymentStatus?: string): "Paid" | "Pending" | "Overdue" =
 };
 
 const statusColor = (s: string) => {
-  if (s === "Paid") return "bg-green-100 text-green-800";
-  if (s === "Pending") return "bg-yellow-100 text-yellow-800";
-  return "bg-red-100 text-red-800";
+  if (s === "Paid") return "bg-green-50 text-green-700 border border-green-200";
+  if (s === "Pending") return "bg-yellow-50 text-yellow-700 border border-yellow-200";
+  return "bg-red-50 text-red-700 border border-red-200";
 };
 
 const PAGE_SIZE = 10;
@@ -131,29 +131,29 @@ export default function InvoiceManagement() {
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Invoices", value: ordersWithInvoice.length, color: "text-gray-900" },
+          { label: "Total Invoices", value: ordersWithInvoice.length, color: "text-slate-900" },
           { label: "Paid", value: paid, color: "text-green-600" },
           { label: "Pending", value: pending, color: "text-yellow-600" },
           { label: "Overdue", value: overdue, color: "text-red-600" },
         ].map(s => (
-          <div key={s.label} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-            <p className="text-sm text-gray-600">{s.label}</p>
+          <div key={s.label} className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+            <p className="text-sm text-slate-600">{s.label}</p>
             <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
           </div>
         ))}
       </div>
 
       {/* ── Filters ── */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
             <input
               type="text"
               placeholder="Search by Invoice No, Order ID or Customer…"
               value={searchTerm}
               onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
             />
           </div>
           <div className="w-full md:w-44">
@@ -167,7 +167,7 @@ export default function InvoiceManagement() {
           <button
             onClick={fetchOrders}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -183,15 +183,15 @@ export default function InvoiceManagement() {
       )}
 
       {/* ── Table ── */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <RefreshCw className="h-6 w-6 animate-spin text-gray-400 mr-3" />
-            <span className="text-gray-500">Loading invoices…</span>
+            <RefreshCw className="h-6 w-6 animate-spin text-slate-400 mr-3" />
+            <span className="text-slate-500">Loading invoices…</span>
           </div>
         ) : (
           <Table>
-            <TableHeader>
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
               <TableRow>
                 <TableHead>Invoice No</TableHead>
                 <TableHead>Order ID</TableHead>
@@ -206,11 +206,11 @@ export default function InvoiceManagement() {
             <TableBody>
               {paginatedInvoices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12 text-gray-400">
+                  <TableCell colSpan={8} className="text-center py-12 text-slate-400">
                     <Receipt className="h-10 w-10 mx-auto mb-3 opacity-30" />
                     <p>No invoices found</p>
                     {!searchTerm && statusFilter === "All" && (
-                      <p className="text-xs mt-1 text-gray-400">New orders will appear here once placed</p>
+                      <p className="text-xs mt-1 text-slate-400">New orders will appear here once placed</p>
                     )}
                   </TableCell>
                 </TableRow>
@@ -226,21 +226,21 @@ export default function InvoiceManagement() {
                             {order.invoiceNo}
                           </span>
                         ) : (
-                          <span className="text-gray-400 text-xs italic">No invoice</span>
+                          <span className="text-slate-400 text-xs italic">No invoice</span>
                         )}
                       </TableCell>
                       <TableCell className="font-mono text-sm">{order.orderId}</TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium text-gray-900 text-sm">{order.customerName || "—"}</p>
-                          <p className="text-xs text-gray-500">{order.customerEmail}</p>
+                          <p className="font-medium text-slate-900 text-sm">{order.customerName || "—"}</p>
+                          <p className="text-xs text-slate-500">{order.customerEmail}</p>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-gray-600">
+                      <TableCell className="text-sm text-slate-600">
                         {fmtDate(order.orderDate || order.createdAt)}
                       </TableCell>
                       <TableCell className="font-semibold">{fmtINR(order.totalAmount)}</TableCell>
-                      <TableCell className="text-sm text-gray-600">{order.paymentMethod || "—"}</TableCell>
+                      <TableCell className="text-sm text-slate-600">{order.paymentMethod || "—"}</TableCell>
                       <TableCell>
                         <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColor(status)}`}>
                           {status}
@@ -251,7 +251,7 @@ export default function InvoiceManagement() {
                           {hasPermission('invoices:view') && (
                             <button
                               onClick={() => router.push(`/admin/dashboard/billing/invoices/view/${order.id}`)}
-                              className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
                               title="View Invoice"
                             >
                               <Eye className="h-4 w-4" />
@@ -277,12 +277,12 @@ export default function InvoiceManagement() {
         )}
 
         {!loading && filtered.length > 0 && totalPages > 1 && (
-          <div className="flex items-center justify-end px-6 py-4 border-t border-gray-200">
+          <div className="flex items-center justify-end px-6 py-4 border-t border-slate-200">
             {totalPages > 1 && (
               <div className="flex items-center justify-end gap-3 text-sm">
                 <div className="flex items-center gap-1">
                   <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-                  {getPageRange(currentPage, totalPages).map((p, i) => p === '...' ? (<span key={`e-${i}`} className="px-2 text-slate-400">...</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                  {getPageRange(currentPage, totalPages).map((p, i) => p === '...' ? (<span key={`e-${i}`} className="px-2 text-slate-400">...</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
                   <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
                 </div>
               </div>

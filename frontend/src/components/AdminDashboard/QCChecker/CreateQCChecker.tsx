@@ -596,7 +596,7 @@ export default function CreateQCChecker() {
           <div className="flex items-start gap-3">
             <Mail className="h-5 w-5 text-brand-600 mt-0.5 shrink-0" />
             <div>
-              <h3 className="text-sm font-semibold text-brand-800">Auto-generated Credentials</h3>
+              <h3 className="text-sm font-semibold text-brand-700">Auto-generated Credentials</h3>
               <p className="text-sm text-brand-700/80 mt-1">
                 A unique Checker ID and password will be automatically generated and sent to the email address provided above.
                 The QC checker can use these credentials to log in to the QC Portal.

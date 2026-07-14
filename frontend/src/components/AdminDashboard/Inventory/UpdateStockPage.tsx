@@ -248,8 +248,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-        <span className="ml-3 text-gray-600">Loading...</span>
+        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        <span className="ml-3 text-slate-600">Loading...</span>
       </div>
     )
   }
@@ -258,7 +258,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <p className="text-lg font-medium text-gray-900">Inventory item not found</p>
+          <p className="text-lg font-medium text-slate-900">Inventory item not found</p>
           <Button onClick={() => router.push('/admin/dashboard/inventory')} className="mt-4">
             Back to Inventory
           </Button>
@@ -271,13 +271,13 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
   if (!inventoryItem.hasProductCreated || !product || productApprovalStatus !== 'APPROVED') {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Card className="max-w-md w-full border border-gray-200">
+        <Card className="max-w-md w-full border border-slate-200">
           <CardContent className="p-8 text-center space-y-4">
             <div className="w-16 h-16 mx-auto bg-yellow-100 rounded-full flex items-center justify-center">
               <Package className="h-8 w-8 text-yellow-600" />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900">Stock Update Not Available</h2>
-            <p className="text-sm text-gray-600">
+            <h2 className="text-lg font-semibold text-slate-900">Stock Update Not Available</h2>
+            <p className="text-sm text-slate-600">
               {!inventoryItem.hasProductCreated
                 ? 'A product must be created from this inventory item before stock can be updated.'
                 : `Stock updates are only available after the product has been approved. Current status: ${productApprovalStatus || 'Unknown'}`
@@ -310,8 +310,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
             Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Update Stock</h1>
-            <p className="text-gray-600">Manage inventory stock levels</p>
+            <h1 className="text-2xl font-bold text-slate-900">Update Stock</h1>
+            <p className="text-slate-600">Manage inventory stock levels</p>
           </div>
         </div>
       </div>
@@ -325,7 +325,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
           <CardContent className="space-y-4">
             {/* Product Image */}
             {primaryImage && (
-              <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-100">
+              <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-slate-100">
                 <Image
                   src={primaryImage}
                   alt={inventoryItem.name}
@@ -338,45 +338,45 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
 
             <div className="space-y-3">
               <div>
-                <label className="text-sm font-medium text-gray-500">Product Name</label>
-                <p className="text-base font-semibold text-gray-900">{inventoryItem.name}</p>
+                <label className="text-sm font-medium text-slate-500">Product Name</label>
+                <p className="text-base font-semibold text-slate-900">{inventoryItem.name}</p>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-500">SKU</label>
-                <p className="text-base font-mono text-gray-900">{inventoryItem.sku}</p>
+                <label className="text-sm font-medium text-slate-500">SKU</label>
+                <p className="text-base font-mono text-slate-900">{inventoryItem.sku}</p>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-500">Category</label>
-                <p className="text-base text-gray-900">
+                <label className="text-sm font-medium text-slate-500">Category</label>
+                <p className="text-base text-slate-900">
                   {inventoryItem.category}
                   {inventoryItem.subcategory && ` / ${inventoryItem.subcategory}`}
                 </p>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-500">Vendor</label>
-                <p className="text-base font-semibold text-gray-900">{inventoryItem.vendor.companyName}</p>
-                <p className="text-sm text-gray-600">{inventoryItem.vendor.email}</p>
+                <label className="text-sm font-medium text-slate-500">Vendor</label>
+                <p className="text-base font-semibold text-slate-900">{inventoryItem.vendor.companyName}</p>
+                <p className="text-sm text-slate-600">{inventoryItem.vendor.email}</p>
               </div>
 
               <div className="pt-3 border-t">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-500">Current Stock</span>
-                  <span className="text-2xl font-bold text-gray-900">
+                  <span className="text-sm font-medium text-slate-500">Current Stock</span>
+                  <span className="text-2xl font-bold text-slate-900">
                     {originalAggregate}
                   </span>
                 </div>
                 <div className="flex justify-between items-center mt-2">
-                  <span className="text-sm font-medium text-gray-500">Min Stock</span>
-                  <span className="text-base text-gray-600">{inventoryItem.lowStockAlert}</span>
+                  <span className="text-sm font-medium text-slate-500">Min Stock</span>
+                  <span className="text-base text-slate-600">{inventoryItem.lowStockAlert}</span>
                 </div>
               </div>
 
               {product?.hasVariants && (
                 <div className="pt-3 border-t">
-                  <Badge className="bg-blue-100 text-blue-800">
+                  <Badge className="bg-blue-50 text-blue-700 border border-blue-200">
                     Has {product.variants.length} Variants
                   </Badge>
                 </div>
@@ -397,18 +397,18 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
               {/* Variant Stock Updates */}
               {product?.hasVariants && product.variants.length > 0 && (
                 <div className="space-y-4">
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-slate-700">
                     Variant Stock Levels <span className="text-red-500">*</span>
                   </label>
                   <div className="space-y-3">
                     {product.variants.map((variant) => (
                       <div
                         key={variant.id}
-                        className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg"
+                        className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg"
                       >
                         {/* Variant Image */}
                         {variant.images && variant.images.length > 0 && (
-                          <div className="relative w-16 h-16 rounded-md overflow-hidden bg-gray-100 shrink-0">
+                          <div className="relative w-16 h-16 rounded-md overflow-hidden bg-slate-100 shrink-0">
                             <Image
                               src={variant.images[0]}
                               alt={`${variant.size} - ${variant.color}`}
@@ -422,20 +422,20 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                         {/* Variant Info */}
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-900">{variant.variantName?.trim() || variant.size || 'Variant'}</span>
-                            {variant.color && <span className="text-gray-400">•</span>}
+                            <span className="font-medium text-slate-900">{variant.variantName?.trim() || variant.size || 'Variant'}</span>
+                            {variant.color && <span className="text-slate-400">•</span>}
                             <div className="flex items-center gap-2">
                               {variant.colorHex && (
                                 <div
-                                  className="w-4 h-4 rounded-full border border-gray-300"
+                                  className="w-4 h-4 rounded-full border border-slate-300"
                                   style={{ backgroundColor: variant.colorHex }}
                                 />
                               )}
-                              <span className="text-gray-700">{variant.color}</span>
+                              <span className="text-slate-700">{variant.color}</span>
                             </div>
                           </div>
-                          <p className="text-sm text-gray-500 font-mono">{variant.sku}</p>
-                          <p className="text-sm text-gray-600">Current: {variant.stock} units</p>
+                          <p className="text-sm text-slate-500 font-mono">{variant.sku}</p>
+                          <p className="text-sm text-slate-600">Current: {variant.stock} units</p>
                         </div>
 
                         {/* Stock Input */}
@@ -444,7 +444,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                             type="number"
                             value={variantStocks[variant.id] ?? ''}
                             onChange={(e) => handleVariantStockChange(variant.id, e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                             min="0"
                             disabled={isSaving}
                           />
@@ -454,14 +454,14 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                   </div>
 
                   {/* Total Stock Summary */}
-                  <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="bg-slate-50 rounded-lg p-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700">Total Stock</span>
-                      <span className="text-xl font-bold text-gray-900">
+                      <span className="text-sm font-medium text-slate-700">Total Stock</span>
+                      <span className="text-xl font-bold text-slate-900">
                         {getAggregateStock()} units
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       Base ({parseInt(newStock) || 0}) + Variants ({calculateTotalVariantStock()})
                     </p>
                   </div>
@@ -470,16 +470,16 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
 
               {/* Base/Total Stock Input */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   {product?.hasVariants ? (
                     <span>
                       Base Variant Stock
                       {product.singleUnitSize && product.singleUnitColor && (
-                        <span className="ml-1 text-gray-500 font-normal">
+                        <span className="ml-1 text-slate-500 font-normal">
                           ({product.singleUnitSize} - {product.singleUnitColor})
                           {product.singleUnitColorHex && (
                             <span
-                              className="inline-block w-3 h-3 rounded-full ml-1 border border-gray-200 align-middle"
+                              className="inline-block w-3 h-3 rounded-full ml-1 border border-slate-200 align-middle"
                               style={{ backgroundColor: product.singleUnitColorHex }}
                             />
                           )}
@@ -490,7 +490,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                 </label>
                 <div className="flex flex-col gap-1 mb-2">
                   {product?.hasVariants && (
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-slate-500">
                       Update the stock for the base/default variant (Inventory Stock).
                     </p>
                   )}
@@ -502,7 +502,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                     setNewStock(e.target.value)
                     setErrors({ ...errors, newStock: undefined })
                   }}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.newStock ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent ${errors.newStock ? 'border-red-500' : 'border-slate-300'
                     }`}
                   placeholder="Enter stock quantity"
                   min="0"
@@ -534,7 +534,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
 
               {/* Reason Input */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Reason for Change <span className="text-red-500">*</span>
                 </label>
                 <textarea
@@ -543,25 +543,25 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                     setReason(e.target.value)
                     setErrors({ ...errors, reason: undefined })
                   }}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${errors.reason ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent resize-none ${errors.reason ? 'border-red-500' : 'border-slate-300'
                     }`}
                   placeholder="e.g., New shipment received, Damaged items removed, Inventory correction"
                   rows={3}
                   disabled={isSaving}
                 />
                 {errors.reason && <p className="mt-1 text-sm text-red-600">{errors.reason}</p>}
-                <p className="mt-1 text-xs text-gray-500">Minimum 5 characters required</p>
+                <p className="mt-1 text-xs text-slate-500">Minimum 5 characters required</p>
               </div>
 
               {/* Additional Notes */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Additional Notes (Optional)
                 </label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent resize-none"
                   placeholder="Any additional information..."
                   rows={2}
                   disabled={isSaving}
@@ -581,7 +581,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                 </Button>
                 <Button
                   type="submit"
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  className="flex-1 bg-brand-500 hover:bg-brand-600 text-white"
                   disabled={isSaving}
                 >
                   {isSaving ? (

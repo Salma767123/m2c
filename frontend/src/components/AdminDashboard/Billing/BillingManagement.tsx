@@ -123,13 +123,13 @@ export default function BillingManagement() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Paid":
-        return "bg-green-100 text-green-800";
+        return "bg-green-50 text-green-700 border border-green-200";
       case "Processed":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-50 text-blue-700 border border-blue-200";
       case "Pending":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-50 text-yellow-700 border border-yellow-200";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-50 text-slate-700 border border-slate-200";
     }
   };
 
@@ -145,35 +145,35 @@ export default function BillingManagement() {
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Total Billings</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{mockBillings.length}</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Total Billings</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{mockBillings.length}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Total Revenue</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">₹{totalRevenue.toLocaleString()}</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Total Revenue</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">₹{totalRevenue.toLocaleString()}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Total Commission</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Total Commission</p>
           <p className="text-2xl font-bold text-blue-600 mt-1">₹{totalCommission.toLocaleString()}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Net Payable</p>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+          <p className="text-sm text-slate-600">Net Payable</p>
           <p className="text-2xl font-bold text-green-600 mt-1">₹{totalNetAmount.toLocaleString()}</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
             <input
               type="text"
               placeholder="Search by Billing Number, Vendor, or Period..."
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
             />
           </div>
           <div className="w-full md:w-48">
@@ -195,9 +195,9 @@ export default function BillingManagement() {
       )}
 
       {/* Billings Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
         <Table>
-          <TableHeader>
+          <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
             <TableRow>
               <TableHead>Billing Number</TableHead>
               <TableHead>Vendor</TableHead>
@@ -213,7 +213,7 @@ export default function BillingManagement() {
           <TableBody>
             {paginatedBillings.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={9} className="text-center py-8 text-slate-500">
                   No billings found
                 </TableCell>
               </TableRow>
@@ -241,7 +241,7 @@ export default function BillingManagement() {
                       {hasPermission('settlement:view') && (
                         <button
                           onClick={() => handleViewBilling(billing.id)}
-                          className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                          className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
                           title="View Billing"
                         >
                           <Eye className="h-5 w-5" />
@@ -256,10 +256,10 @@ export default function BillingManagement() {
         </Table>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-end gap-3 text-sm px-6 py-4 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-3 text-sm px-6 py-4 border-t border-slate-200">
             <div className="flex items-center gap-1">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-              {getPageRange(currentPage, totalPages).map((p, i) => p === '...' ? (<span key={`e-${i}`} className="px-2 text-slate-400">...</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+              {getPageRange(currentPage, totalPages).map((p, i) => p === '...' ? (<span key={`e-${i}`} className="px-2 text-slate-400">...</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
             </div>
           </div>

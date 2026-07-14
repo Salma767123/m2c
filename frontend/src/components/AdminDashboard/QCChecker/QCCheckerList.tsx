@@ -113,9 +113,9 @@ export default function QCCheckerList() {
   const getStatusBadge = (status: string) => {
     const normalizedStatus = status.toLowerCase();
     const styles = {
-      active: "bg-green-100 text-green-800",
-      inactive: "bg-gray-100 text-gray-800",
-      suspended: "bg-red-100 text-red-800",
+      active: "bg-green-50 text-green-700 border border-green-200",
+      inactive: "bg-slate-50 text-slate-700 border border-slate-200",
+      suspended: "bg-red-50 text-red-700 border border-red-200",
     };
     return (
       <span className={`px-3 py-1 rounded-full text-xs font-medium ${styles[normalizedStatus as keyof typeof styles] || styles.inactive}`}>
@@ -136,13 +136,13 @@ export default function QCCheckerList() {
       <Breadcrumb />
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">QC Checker Management</h1>
-          <p className="text-gray-600 mt-1">Manage quality control checkers and their assignments</p>
+          <h1 className="text-2xl font-bold text-slate-900">QC Checker Management</h1>
+          <p className="text-slate-600 mt-1">Manage quality control checkers and their assignments</p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={fetchCheckers}
-            className="flex items-center gap-2 px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -150,7 +150,7 @@ export default function QCCheckerList() {
           {hasPermission('qc_checker_management:create') && (
             <Link
               href="/admin/dashboard/qc-checker/create"
-              className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+              className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
             >
               <UserPlus className="h-5 w-5" />
               Add QC Checker
@@ -163,25 +163,25 @@ export default function QCCheckerList() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Total Checkers</div>
-            <div className="text-2xl font-bold text-gray-900">{checkers.length}</div>
+            <div className="text-sm text-slate-600">Total Checkers</div>
+            <div className="text-2xl font-bold text-slate-900">{checkers.length}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Active</div>
+            <div className="text-sm text-slate-600">Active</div>
             <div className="text-2xl font-bold text-green-600">{totalActive}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Inactive</div>
-            <div className="text-2xl font-bold text-gray-600">{totalInactive}</div>
+            <div className="text-sm text-slate-600">Inactive</div>
+            <div className="text-2xl font-bold text-slate-600">{totalInactive}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Total Inspections</div>
+            <div className="text-sm text-slate-600">Total Inspections</div>
             <div className="text-2xl font-bold text-blue-600">{totalInspections}</div>
           </CardContent>
         </Card>
@@ -192,13 +192,13 @@ export default function QCCheckerList() {
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 z-10" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5 z-10" />
               <input
                 type="text"
                 placeholder="Search by name, email, phone, or checker ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
               />
             </div>
             <div className="w-full md:w-48">
@@ -227,12 +227,12 @@ export default function QCCheckerList() {
       <Card>
         {loading ? (
           <div className="p-12 text-center">
-            <RefreshCw className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-500">Loading QC Checkers...</p>
+            <RefreshCw className="h-8 w-8 animate-spin text-slate-400 mx-auto mb-3" />
+            <p className="text-slate-500">Loading QC Checkers...</p>
           </div>
         ) : (
           <Table>
-            <TableHeader>
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
               <TableRow>
                 <TableHead>Checker Details</TableHead>
                 <TableHead>Contact</TableHead>
@@ -250,37 +250,37 @@ export default function QCCheckerList() {
                   <TableRow key={checker.id}>
                     <TableCell>
                       <div>
-                        <div className="font-medium text-gray-900">{formatCheckerName(checker)}</div>
+                        <div className="font-medium text-slate-900">{formatCheckerName(checker)}</div>
                         <div className="text-sm text-blue-600 font-mono">{checker.checkerId}</div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        <div className="flex items-center text-sm text-gray-900">
-                          <Mail className="h-3 w-3 mr-1 text-gray-400" />
+                        <div className="flex items-center text-sm text-slate-900">
+                          <Mail className="h-3 w-3 mr-1 text-slate-400" />
                           {checker.email}
                         </div>
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Phone className="h-3 w-3 mr-1 text-gray-400" />
+                        <div className="flex items-center text-sm text-slate-500">
+                          <Phone className="h-3 w-3 mr-1 text-slate-400" />
                           {checker.phone}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(checker.status)}</TableCell>
                     <TableCell>
-                      <div className="text-sm font-medium text-gray-900">{checker.assignedVendors || 0}</div>
+                      <div className="text-sm font-medium text-slate-900">{checker.assignedVendors || 0}</div>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm font-medium text-blue-600">{checker.completedInspections || 0}</div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center text-sm text-gray-900">
-                        <Calendar className="h-3 w-3 mr-1 text-gray-400" />
+                      <div className="flex items-center text-sm text-slate-900">
+                        <Calendar className="h-3 w-3 mr-1 text-slate-400" />
                         {new Date(checker.joiningDate).toLocaleDateString()}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-slate-500">
                         {checker.lastLoginAt
                           ? new Date(checker.lastLoginAt).toLocaleDateString()
                           : "Never"}
@@ -334,7 +334,7 @@ export default function QCCheckerList() {
                 <TableRow>
                   <TableCell colSpan={8}>
                     <div className="p-12 text-center">
-                      <p className="text-gray-500">No QC checkers found</p>
+                      <p className="text-slate-500">No QC checkers found</p>
                       {hasPermission('qc_checker_management:create') && (
                         <Link
                           href="/admin/dashboard/qc-checker/create"
@@ -357,7 +357,7 @@ export default function QCCheckerList() {
         <div className="flex items-center justify-end gap-3 text-sm">
           <div className="flex items-center gap-1">
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-            {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+            {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
           </div>
         </div>

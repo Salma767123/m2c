@@ -160,27 +160,27 @@ export default function BillingDetail({ billingId }: BillingDetailProps) {
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+            <ArrowLeft className="h-5 w-5 text-slate-600" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Billing Statement</h1>
-            <p className="text-sm text-gray-600 mt-1">Billing: {billing.billingNumber}</p>
+            <h1 className="text-2xl font-bold text-slate-900">Billing Statement</h1>
+            <p className="text-sm text-slate-600 mt-1">Billing: {billing.billingNumber}</p>
           </div>
         </div>
         {hasPermission('settlement:view') && (
           <div className="flex gap-3">
             <button
               onClick={handleDownload}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center gap-2"
+              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium flex items-center gap-2"
             >
               <Download className="h-4 w-4" />
               Download
             </button>
             <button
               onClick={handlePrint}
-              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium flex items-center gap-2"
+              className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-medium flex items-center gap-2"
             >
               <Printer className="h-4 w-4" />
               Print
@@ -190,26 +190,26 @@ export default function BillingDetail({ billingId }: BillingDetailProps) {
       </div>
 
       {/* Billing Content */}
-      <div ref={billingRef} className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+      <div ref={billingRef} className="bg-white rounded-lg shadow-sm border border-slate-200 p-8">
         {/* Header */}
-        <div className="border-b border-gray-200 pb-6 mb-6">
+        <div className="border-b border-slate-200 pb-6 mb-6">
           <div className="flex justify-between items-start">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900">Navnit Textiles</h2>
-              <p className="text-sm text-gray-600 mt-2">123, Textile Market, Mumbai, Maharashtra - 400001</p>
-              <p className="text-sm text-gray-600">Phone: +91 98765 00000</p>
-              <p className="text-sm text-gray-600">Email: info@navnittextiles.com</p>
+              <h2 className="text-3xl font-bold text-slate-900">Navnit Textiles</h2>
+              <p className="text-sm text-slate-600 mt-2">123, Textile Market, Mumbai, Maharashtra - 400001</p>
+              <p className="text-sm text-slate-600">Phone: +91 98765 00000</p>
+              <p className="text-sm text-slate-600">Email: info@navnittextiles.com</p>
             </div>
             <div className="text-right">
-              <h3 className="text-2xl font-bold text-gray-900">BILLING STATEMENT</h3>
-              <p className="text-sm text-gray-600 mt-2">
-                Billing #: <span className="font-medium text-gray-900">{billing.billingNumber}</span>
+              <h3 className="text-2xl font-bold text-slate-900">BILLING STATEMENT</h3>
+              <p className="text-sm text-slate-600 mt-2">
+                Billing #: <span className="font-medium text-slate-900">{billing.billingNumber}</span>
               </p>
-              <p className="text-sm text-gray-600">
-                Period: <span className="font-medium text-gray-900">{billing.period}</span>
+              <p className="text-sm text-slate-600">
+                Period: <span className="font-medium text-slate-900">{billing.period}</span>
               </p>
-              <p className="text-sm text-gray-600">
-                Generated: <span className="font-medium text-gray-900">{new Date(billing.generatedDate).toLocaleDateString()}</span>
+              <p className="text-sm text-slate-600">
+                Generated: <span className="font-medium text-slate-900">{new Date(billing.generatedDate).toLocaleDateString()}</span>
               </p>
             </div>
           </div>
@@ -218,29 +218,29 @@ export default function BillingDetail({ billingId }: BillingDetailProps) {
         {/* Vendor Details */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-3">
-            <Building2 className="h-5 w-5 text-gray-600" />
-            <h4 className="text-lg font-semibold text-gray-900">Vendor Details</h4>
+            <Building2 className="h-5 w-5 text-slate-600" />
+            <h4 className="text-lg font-semibold text-slate-900">Vendor Details</h4>
           </div>
-          <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+          <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg">
             <div>
-              <p className="text-sm text-gray-600">Vendor Name</p>
-              <p className="text-base font-medium text-gray-900">{billing.vendor.name}</p>
+              <p className="text-sm text-slate-600">Vendor Name</p>
+              <p className="text-base font-medium text-slate-900">{billing.vendor.name}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Email</p>
-              <p className="text-base font-medium text-gray-900">{billing.vendor.email}</p>
+              <p className="text-sm text-slate-600">Email</p>
+              <p className="text-base font-medium text-slate-900">{billing.vendor.email}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Phone</p>
-              <p className="text-base font-medium text-gray-900">{billing.vendor.phone}</p>
+              <p className="text-sm text-slate-600">Phone</p>
+              <p className="text-base font-medium text-slate-900">{billing.vendor.phone}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">GST Number</p>
-              <p className="text-base font-medium text-gray-900">{billing.vendor.gst}</p>
+              <p className="text-sm text-slate-600">GST Number</p>
+              <p className="text-base font-medium text-slate-900">{billing.vendor.gst}</p>
             </div>
             <div className="col-span-2">
-              <p className="text-sm text-gray-600">Address</p>
-              <p className="text-base font-medium text-gray-900">{billing.vendor.address}</p>
+              <p className="text-sm text-slate-600">Address</p>
+              <p className="text-base font-medium text-slate-900">{billing.vendor.address}</p>
             </div>
           </div>
         </div>
@@ -248,8 +248,8 @@ export default function BillingDetail({ billingId }: BillingDetailProps) {
         {/* Billing Period */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-3">
-            <Calendar className="h-5 w-5 text-gray-600" />
-            <h4 className="text-lg font-semibold text-gray-900">Billing Period</h4>
+            <Calendar className="h-5 w-5 text-slate-600" />
+            <h4 className="text-lg font-semibold text-slate-900">Billing Period</h4>
           </div>
           <div className="flex gap-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
             <div>
@@ -270,48 +270,48 @@ export default function BillingDetail({ billingId }: BillingDetailProps) {
         {/* Sample Orders */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-3">
-            <Package className="h-5 w-5 text-gray-600" />
-            <h4 className="text-lg font-semibold text-gray-900">Sample Orders (First 3)</h4>
+            <Package className="h-5 w-5 text-slate-600" />
+            <h4 className="text-lg font-semibold text-slate-900">Sample Orders (First 3)</h4>
           </div>
-          <table className="w-full border-collapse border border-gray-900">
-            <thead className="bg-gray-900 text-white">
+          <table className="w-full border-collapse border border-slate-300">
+            <thead className="bg-brand-500/[0.06] [&_th]:!text-brand-500/70">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium border border-gray-900">Order ID</th>
-                <th className="px-4 py-3 text-left text-sm font-medium border border-gray-900">Date</th>
-                <th className="px-4 py-3 text-left text-sm font-medium border border-gray-900">Product</th>
-                <th className="px-4 py-3 text-center text-sm font-medium border border-gray-900">Quantity</th>
-                <th className="px-4 py-3 text-right text-sm font-medium border border-gray-900">Amount</th>
+                <th className="px-4 py-3 text-left text-sm font-medium border border-slate-300">Order ID</th>
+                <th className="px-4 py-3 text-left text-sm font-medium border border-slate-300">Date</th>
+                <th className="px-4 py-3 text-left text-sm font-medium border border-slate-300">Product</th>
+                <th className="px-4 py-3 text-center text-sm font-medium border border-slate-300">Quantity</th>
+                <th className="px-4 py-3 text-right text-sm font-medium border border-slate-300">Amount</th>
               </tr>
             </thead>
             <tbody>
               {billing.orders.map((order) => (
                 <tr key={order.id}>
-                  <td className="px-4 py-3 text-sm text-gray-900 border border-gray-300">{order.orderId}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600 border border-gray-300">{new Date(order.date).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 border border-gray-300">{order.product}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-center border border-gray-300">{order.quantity}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium border border-gray-300">₹{order.amount.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-sm text-slate-900 border border-slate-300">{order.orderId}</td>
+                  <td className="px-4 py-3 text-sm text-slate-600 border border-slate-300">{new Date(order.date).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-sm text-slate-900 border border-slate-300">{order.product}</td>
+                  <td className="px-4 py-3 text-sm text-slate-900 text-center border border-slate-300">{order.quantity}</td>
+                  <td className="px-4 py-3 text-sm text-slate-900 text-right font-medium border border-slate-300">₹{order.amount.toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="text-xs text-gray-500 mt-2">* Showing first 3 orders. Total {billing.totalOrders} orders in this period.</p>
+          <p className="text-xs text-slate-500 mt-2">* Showing first 3 orders. Total {billing.totalOrders} orders in this period.</p>
         </div>
 
         {/* Summary */}
         <div className="mb-6">
-          <h4 className="text-lg font-semibold text-gray-900 mb-3">Billing Summary</h4>
+          <h4 className="text-lg font-semibold text-slate-900 mb-3">Billing Summary</h4>
           <div className="flex justify-end">
             <div className="w-80">
-              <div className="flex justify-between py-2 border-b border-gray-200">
-                <span className="text-sm text-gray-600">Total Sales Amount:</span>
-                <span className="text-sm font-medium text-gray-900">₹{billing.totalAmount.toLocaleString()}</span>
+              <div className="flex justify-between py-2 border-b border-slate-200">
+                <span className="text-sm text-slate-600">Total Sales Amount:</span>
+                <span className="text-sm font-medium text-slate-900">₹{billing.totalAmount.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between py-2 border-b border-gray-200">
-                <span className="text-sm text-gray-600">Platform Commission ({billing.commissionRate}%):</span>
+              <div className="flex justify-between py-2 border-b border-slate-200">
+                <span className="text-sm text-slate-600">Platform Commission ({billing.commissionRate}%):</span>
                 <span className="text-sm font-medium text-red-600">-₹{billing.commission.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between py-3 bg-gray-900 text-white px-4 rounded-lg mt-2">
+              <div className="flex justify-between py-3 bg-brand-500 text-white px-4 rounded-lg mt-2">
                 <span className="text-base font-semibold">Net Payable Amount:</span>
                 <span className="text-base font-bold">₹{billing.netAmount.toLocaleString()}</span>
               </div>
@@ -320,29 +320,29 @@ export default function BillingDetail({ billingId }: BillingDetailProps) {
         </div>
 
         {/* Bank Details */}
-        <div className="border-t border-gray-200 pt-6 mb-6">
-          <h4 className="text-sm font-semibold text-gray-900 mb-3">Vendor Bank Details</h4>
-          <div className="grid grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg">
+        <div className="border-t border-slate-200 pt-6 mb-6">
+          <h4 className="text-sm font-semibold text-slate-900 mb-3">Vendor Bank Details</h4>
+          <div className="grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg">
             <div>
-              <p className="text-xs text-gray-600">Bank Name</p>
-              <p className="text-sm font-medium text-gray-900">{billing.vendor.bankName}</p>
+              <p className="text-xs text-slate-600">Bank Name</p>
+              <p className="text-sm font-medium text-slate-900">{billing.vendor.bankName}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-600">Account Number</p>
-              <p className="text-sm font-medium text-gray-900">{billing.vendor.accountNumber}</p>
+              <p className="text-xs text-slate-600">Account Number</p>
+              <p className="text-sm font-medium text-slate-900">{billing.vendor.accountNumber}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-600">IFSC Code</p>
-              <p className="text-sm font-medium text-gray-900">{billing.vendor.ifsc}</p>
+              <p className="text-xs text-slate-600">IFSC Code</p>
+              <p className="text-sm font-medium text-slate-900">{billing.vendor.ifsc}</p>
             </div>
           </div>
         </div>
 
         {/* Status */}
-        <div className="border-t border-gray-200 pt-6">
+        <div className="border-t border-slate-200 pt-6">
           <div className="flex justify-between items-center">
             <div>
-              <p className="text-sm text-gray-600">Payment Status</p>
+              <p className="text-sm text-slate-600">Payment Status</p>
               <p className={`text-lg font-semibold mt-1 ${
                 billing.status === "Paid" ? "text-green-600" :
                 billing.status === "Processed" ? "text-blue-600" :
@@ -353,16 +353,16 @@ export default function BillingDetail({ billingId }: BillingDetailProps) {
             </div>
             {billing.status === "Paid" && (
               <div className="text-right">
-                <p className="text-xs text-gray-500">This billing statement has been processed and paid.</p>
+                <p className="text-xs text-slate-500">This billing statement has been processed and paid.</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 mt-6 pt-6 text-center">
-          <p className="text-sm text-gray-600">Thank you for your partnership!</p>
-          <p className="text-xs text-gray-500 mt-2">This is a computer-generated billing statement.</p>
+        <div className="border-t border-slate-200 mt-6 pt-6 text-center">
+          <p className="text-sm text-slate-600">Thank you for your partnership!</p>
+          <p className="text-xs text-slate-500 mt-2">This is a computer-generated billing statement.</p>
         </div>
       </div>
     </div>
