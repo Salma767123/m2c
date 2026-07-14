@@ -26,6 +26,7 @@ import Image from 'next/image'
 import { productService, type Product } from '@/services/productService'
 import { showErrorToast } from '@/lib/toast-utils'
 import { CARE_INSTRUCTIONS, CareIcon, CATEGORY_COLORS, CATEGORY_BORDER } from './CareInstructionModal'
+import { openDoc } from '@/lib/docViewerBus'
 
 // Match the create form's dropdown labels so the view shows the same wording.
 const UOM_LABELS: Record<string, string> = {
@@ -133,6 +134,10 @@ export default function ViewProduct({ productId }: ViewProductProps) {
 
   return (
     <div className="space-y-6">
+      {/* Sticky top: breadcrumb + product header stay pinned while the content
+          below scrolls. Negative margins bleed the background to the layout
+          edges (matches the vendor dashboard's p-4/sm:p-6/lg:p-8 padding). */}
+      <div className="sticky top-0 z-20 bg-slate-50 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 -mt-4 sm:-mt-6 lg:-mt-8 pt-4 sm:pt-6 lg:pt-8 pb-4 space-y-4">
       {/* Breadcrumb */}
       <nav className="flex items-center space-x-2 text-sm text-slate-600">
         <Link href="/vendor/dashboard" className="hover:text-slate-900 hover:underline">Dashboard</Link>
@@ -183,6 +188,7 @@ export default function ViewProduct({ productId }: ViewProductProps) {
           )}
         </div>
       </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
@@ -202,8 +208,12 @@ export default function ViewProduct({ productId }: ViewProductProps) {
             <div className="p-4">
               {allImages.length > 0 ? (
                 <div className="space-y-3">
-                  {/* Main image */}
-                  <div className="relative h-64 sm:h-72 md:h-80 rounded-lg overflow-hidden bg-slate-50 border border-slate-100">
+                  {/* Main image — click to open in the in-app viewer */}
+                  <button
+                    type="button"
+                    onClick={() => allImages[selectedImage]?.url && openDoc(allImages[selectedImage].url, allImages[selectedImage]?.alt || product.name, true)}
+                    className="relative w-full h-64 sm:h-72 md:h-80 rounded-lg overflow-hidden bg-slate-50 border border-slate-100 cursor-zoom-in group"
+                  >
                     <Image
                       src={allImages[selectedImage]?.url}
                       alt={allImages[selectedImage]?.alt || product.name}
@@ -216,7 +226,7 @@ export default function ViewProduct({ productId }: ViewProductProps) {
                         <Badge className="bg-blue-600 text-white text-xs shadow-sm">Primary</Badge>
                       </div>
                     )}
-                  </div>
+                  </button>
                   {/* Thumbnails */}
                   {allImages.length > 1 && (
                     <div className="flex gap-2 overflow-x-auto pb-1">
@@ -255,15 +265,11 @@ export default function ViewProduct({ productId }: ViewProductProps) {
             )}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {product.category && <InfoField label="Category" value={product.category} />}
-              {product.subCategory && <InfoField label="Sub-Category" value={product.subCategory} />}
-              {product.uom && <InfoField label="Unit of Measurement (UOM)" value={UOM_LABELS[product.uom] || product.uom} />}
-              {product.dimensions && <InfoField icon={<Ruler className="h-3.5 w-3.5" />} label="Dimensions" value={product.dimensions} />}
-              {(product as any).dimensionUnit && <InfoField label="Dimension Unit" value={(product as any).dimensionUnit} />}
+              {product.uom && <InfoField label="Selling Unit (UOM)" value={UOM_LABELS[product.uom] || product.uom} />}
               {product.baseSku && <InfoField label="Base SKU" value={product.baseSku} />}
-              {(product as any).singleUnitSize && <InfoField label="Default Size" value={(product as any).singleUnitSize} />}
               {(product as any).singleUnitColor && (
                 <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                  <p className="text-xs font-medium text-slate-500 mb-1">Default Color</p>
+                  <p className="text-xs font-medium text-slate-500 mb-1">Base Color</p>
                   <div className="flex items-center gap-2">
                     {(product as any).singleUnitColorHex && (
                       <span className="w-4 h-4 rounded border border-slate-200 shrink-0" style={{ backgroundColor: (product as any).singleUnitColorHex }} />
@@ -286,20 +292,23 @@ export default function ViewProduct({ productId }: ViewProductProps) {
           </SpecSection>
 
           {/* Fabric Type & Specifications — mirrors the "Fabric & Specs" tab */}
-          {(product.fabricType || product.material || product.fabricSpecifications?.composition || product.fabricSpecifications?.weight || (product.fabricSpecifications as any)?.weave || (product.fabricSpecifications?.careInstructions?.length ?? 0) > 0) && (
+          {(() => {
+          const fs = product.fabricSpecifications || {}
+          const hasFabric = product.fabricType || product.material || fs.composition || fs.gsm || fs.weightValue || fs.length || fs.breadth || fs.weight || fs.weave || (fs.careInstructions?.length ?? 0) > 0
+          if (!hasFabric) return null
+          return (
             <SpecSection icon={<Layers className="h-4 w-4" />} title="Fabric Type & Specifications">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {product.fabricType && <InfoField icon={<Layers className="h-3.5 w-3.5" />} label="Fabric Type" value={product.fabricType} />}
                 {product.material && <InfoField icon={<Package className="h-3.5 w-3.5" />} label="Material Description" value={product.material} />}
-                {product.fabricSpecifications?.composition && <InfoField label="Composition" value={product.fabricSpecifications.composition} />}
-                {product.fabricSpecifications?.weight && (
-                  <InfoField
-                    icon={<Scale className="h-3.5 w-3.5" />}
-                    label="Weight"
-                    value={`${product.fabricSpecifications.weight}${(product.fabricSpecifications as any)?.weightUnit ? ` ${(product.fabricSpecifications as any).weightUnit}` : ''}`}
-                  />
-                )}
-                {(product.fabricSpecifications as any)?.weave && <InfoField label="Type of Weave" value={(product.fabricSpecifications as any).weave} />}
+                {fs.composition && <InfoField label="Composition" value={fs.composition} />}
+                {fs.weightValue && <InfoField icon={<Scale className="h-3.5 w-3.5" />} label="Weight" value={`${fs.weightValue} g`} />}
+                {fs.length && <InfoField icon={<Ruler className="h-3.5 w-3.5" />} label="Length" value={`${fs.length} cm`} />}
+                {fs.breadth && <InfoField icon={<Ruler className="h-3.5 w-3.5" />} label="Breadth" value={`${fs.breadth} cm`} />}
+                {fs.gsm && <InfoField icon={<Scale className="h-3.5 w-3.5" />} label="GSM" value={`${fs.gsm} GSM`} />}
+                {/* Legacy single-weight field for products created before the GSM fields existed. */}
+                {!fs.gsm && !fs.weightValue && fs.weight && <InfoField icon={<Scale className="h-3.5 w-3.5" />} label="Weight" value={`${fs.weight}${fs.weightUnit ? ` ${fs.weightUnit}` : ''}`} />}
+                {fs.weave && <InfoField label="Type of Weave" value={fs.weave} />}
               </div>
 
               {product.fabricSpecifications?.careInstructions && product.fabricSpecifications.careInstructions.length > 0 && (
@@ -332,7 +341,8 @@ export default function ViewProduct({ productId }: ViewProductProps) {
                 </div>
               )}
             </SpecSection>
-          )}
+          )
+          })()}
 
           {/* Size & Color Variants — mirrors the "Variants" tab */}
           {product.hasVariants && product.variants && product.variants.length > 0 && (
@@ -357,7 +367,6 @@ export default function ViewProduct({ productId }: ViewProductProps) {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {(product as any).singleUnitSize && <InfoField label="Size" value={(product as any).singleUnitSize} />}
                     {(product as any).singleUnitColor && (
                       <div className="bg-white rounded-lg p-3 border border-slate-100">
                         <p className="text-xs font-medium text-slate-500 mb-1">Color</p>
@@ -382,19 +391,33 @@ export default function ViewProduct({ productId }: ViewProductProps) {
                 {product.variants.map((variant, idx) => (
                   <div key={variant.id || idx} className="p-4">
                     <div className="flex items-center gap-3 mb-3">
+                      {/* Variant image(s) — leftmost, before the color swatch / name / SKU. Click to open in the in-app viewer. */}
+                      {variant.images && variant.images.length > 0 && (
+                        <div className="flex gap-2 shrink-0">
+                          {variant.images.map((imgUrl, imgIdx) => (
+                            <button
+                              type="button"
+                              key={imgIdx}
+                              onClick={() => imgUrl && openDoc(imgUrl, `${variant.size || ''} ${variant.color || ''}`.trim() || product.name, true)}
+                              className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-200 bg-white shrink-0 cursor-zoom-in hover:border-slate-400 transition-colors"
+                            >
+                              <Image src={imgUrl} alt={`${variant.size} ${variant.color}`} fill sizes="80px" className="object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       {variant.colorHex && (
                         <div className="w-8 h-8 rounded-lg border-2 border-slate-200 shadow-sm shrink-0" style={{ backgroundColor: variant.colorHex }} />
                       )}
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-slate-900 truncate">
-                          {(variant as any).variantName || `${variant.size || '—'} / ${variant.color || '—'}`}
+                          {(variant as any).variantName || variant.color || '—'}
                         </p>
                         <p className="text-xs text-slate-500 font-mono">{variant.sku}</p>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {(variant as any).variantName && <InfoField label="Variant Name" value={(variant as any).variantName} />}
-                      <InfoField label="Size" value={variant.size || '—'} />
                       <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
                         <p className="text-xs font-medium text-slate-500 mb-1">Color</p>
                         <div className="flex items-center gap-2">
@@ -411,16 +434,6 @@ export default function ViewProduct({ productId }: ViewProductProps) {
                         <InfoField label="Low Stock Alert" value={`${(variant as any).lowStockThreshold}`} />
                       )}
                     </div>
-                    {/* Variant Images */}
-                    {variant.images && variant.images.length > 0 && (
-                      <div className="flex gap-2 mt-3">
-                        {variant.images.map((imgUrl, imgIdx) => (
-                          <div key={imgIdx} className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-200 bg-white shrink-0">
-                            <Image src={imgUrl} alt={`${variant.size} ${variant.color}`} fill sizes="56px" className="object-cover" />
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -438,16 +451,26 @@ export default function ViewProduct({ productId }: ViewProductProps) {
           </SpecSection>
 
           {/* Stock Quantity Management — mirrors the "Inventory" tab */}
+          {(() => {
+            const baseStock = product.inventory?.baseStock ?? 0;
+            const variantsStock = (product.variants || []).reduce((s, v) => s + (v.stock || 0), 0);
+            // Total = base unit stock + every variant's stock. The backend's
+            // stored totalStock can lag behind (it sometimes reflects variants
+            // only), so compute it from the live parts for variant products.
+            const totalStock = product.hasVariants ? baseStock + variantsStock : (product.totalStock ?? 0);
+            return (
           <SpecSection icon={<Warehouse className="h-4 w-4" />} title="Stock Quantity Management">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <InfoField label="Total Stock" value={`${product.totalStock ?? 0} units`} />
-              {product.hasVariants ? <InfoField label="Base Unit Stock" value={`${product.inventory?.baseStock ?? 0} units`} /> : null}
-              {product.hasVariants && product.variants ? <InfoField label="Variants Stock" value={`${product.variants.reduce((s, v) => s + (v.stock || 0), 0)} units`} /> : null}
+              <InfoField label="Total Stock" value={`${totalStock} units`} />
+              {product.hasVariants ? <InfoField label="Base Unit Stock" value={`${baseStock} units`} /> : null}
+              {product.hasVariants && product.variants ? <InfoField label="Variants Stock" value={`${variantsStock} units`} /> : null}
               {((product as any).lowStockThreshold ?? (product.inventory as any)?.lowStockThreshold) != null && (
                 <InfoField label="Low Stock Threshold" value={`${(product as any).lowStockThreshold ?? (product.inventory as any)?.lowStockThreshold}`} />
               )}
             </div>
           </SpecSection>
+            );
+          })()}
 
           {/* Dispatch Timeline Configuration — mirrors the "Shipping" tab */}
           {(product.dispatchTimeline || product.weight) && (
@@ -468,8 +491,9 @@ export default function ViewProduct({ productId }: ViewProductProps) {
           )}
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
+        {/* Sidebar — sticks below the pinned header (top offset clears the
+            sticky breadcrumb + product-title bar) while the main column scrolls. */}
+        <div className="space-y-6 lg:sticky lg:top-[188px] lg:self-start">
 
           {/* Status & Availability — mirrors the create form's sidebar */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">

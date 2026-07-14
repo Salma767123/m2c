@@ -33,6 +33,7 @@ export interface ReportMeta {
     vendorName?: string
     checker?: ReportChecker | null
     location?: { latitude: number; longitude: number } | null
+    inspectionStartedAt?: string
     generatedAt?: Date
 }
 
@@ -43,6 +44,22 @@ export interface ReportOptions {
 const BRAND: [number, number, number] = [224, 26, 27]   // #e01a1b
 const SLATE: [number, number, number] = [51, 65, 85]    // slate-700
 const MUTED: [number, number, number] = [100, 116, 139] // slate-500
+
+// Business-type full forms (mirrors the registration form / factory report).
+const BUSINESS_TYPE_LABELS: Record<string, string> = {
+    proprietorship: "Proprietorship",
+    "pvt-ltd": "Private Limited Company",
+    "partnership-firm": "Partnership Firm",
+    llp: "Limited Liability Partnership (LLP)",
+    unregistered: "Unregistered",
+}
+// Full form when known; otherwise Title-Case the raw value (first letter caps).
+const businessTypeLabel = (val?: string | null): string => {
+    if (!val) return "—"
+    const key = String(val).trim().toLowerCase()
+    if (BUSINESS_TYPE_LABELS[key]) return BUSINESS_TYPE_LABELS[key]
+    return key.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+}
 
 const REMARK_LABELS: Record<number, string> = {
     1: "Critical Defect", 2: "Major Defect", 3: "Functional Fail",
@@ -96,6 +113,10 @@ export function generateProductInspectionPdf(
     const margin = 40
     const contentW = pageW - margin * 2
     const generatedAt = meta.generatedAt || new Date()
+    // Inspection start time comes from when the inspection was opened; the
+    // complete time is the report-generation timestamp — same as the factory report.
+    const startTimeStr = meta.inspectionStartedAt ? fmtTime(new Date(meta.inspectionStartedAt)) : "—"
+    const completeTimeStr = fmtTime(generatedAt)
     const checker = meta.checker || {}
 
     let y = margin
@@ -137,13 +158,20 @@ export function generateProductInspectionPdf(
         y = (doc.lastAutoTable?.finalY ?? y) + 16
     }
 
-    // ── Cover header ────────────────────────────────────────────────────────────
-    doc.setFillColor(...BRAND)
+    // ── Cover header (matches the Factory Inspection Report style) ───────────────
+    doc.setFillColor(255, 245, 245)
     doc.rect(0, 0, pageW, 72, "F")
-    doc.setTextColor(255, 255, 255)
+    // Red accent line along the bottom of the header
+    doc.setDrawColor(...BRAND)
+    doc.setLineWidth(2)
+    doc.line(0, 72, pageW, 72)
+    // Title in brand red
+    doc.setTextColor(...BRAND)
     doc.setFont("helvetica", "bold")
     doc.setFontSize(18)
     doc.text("Product Inspection Report", margin, 34)
+    // Subtitle and date in slate
+    doc.setTextColor(...SLATE)
     doc.setFont("helvetica", "normal")
     doc.setFontSize(10)
     const subtitle = [meta.productName || "Product", meta.vendorName].filter(Boolean).join("  ·  ")
@@ -162,7 +190,7 @@ export function generateProductInspectionPdf(
             ["Client", val(formData.client) === "—" ? "M2C" : val(formData.client)],
             ["Vendor", val(formData.vendor || v.companyName || meta.vendorName)],
             ["Company Name", val(v.companyName)],
-            ["Business Type", val(v.businessType)],
+            ["Business Type", businessTypeLabel(v.businessType)],
             ["Primary Phone", val(v.businessPhone)],
             ["Secondary Phone", val(v.phoneNumber2)],
             ["Primary Email", val(v.businessEmail)],
@@ -344,7 +372,8 @@ export function generateProductInspectionPdf(
             ["Email", val(checker.email)],
             ["Phone", val(checker.phone)],
             ["Inspection Date", val(formData.serviceStartDate)],
-            ["Inspection Time", fmtTime(generatedAt)],
+            ["Inspection Start Time", startTimeStr],
+            ["Inspection Complete Time", completeTimeStr],
             ["Inspection Status", val(formData.inspectionStatus)],
             [
                 "GPS Location",
@@ -410,9 +439,14 @@ export function generateProductInspectionPdf(
     doc.text(val(formData.serviceStartDate), margin + 108, blockY + 22)
 
     doc.setFont("helvetica", "bold")
-    doc.text("Inspection Time:", margin, blockY + 44)
+    doc.text("Inspection Start Time:", margin, blockY + 44)
     doc.setFont("helvetica", "normal")
-    doc.text(fmtTime(generatedAt), margin + 108, blockY + 44)
+    doc.text(startTimeStr, margin + 130, blockY + 44)
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Inspection Complete Time:", margin, blockY + 66)
+    doc.setFont("helvetica", "normal")
+    doc.text(completeTimeStr, margin + 148, blockY + 66)
 
     // Right: Client Signature section
     const sigX = margin + contentW / 2

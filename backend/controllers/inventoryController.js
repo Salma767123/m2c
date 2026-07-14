@@ -67,13 +67,8 @@ const createInventoryItem = async (req, res) => {
       });
     }
 
-    // Validate source type specific fields
-    if (sourceType === 'SUPPLIER' && !supplier) {
-      return res.status(400).json({
-        success: false,
-        message: 'Supplier name is required when source type is supplier'
-      });
-    }
+    // Note: supplier name is no longer collected in the UI (the field was
+    // removed), so it is not required for the SUPPLIER (Trader) source type.
 
     // Fetch the vendor's company name for the SKU company-code prefix.
     const vendorRecord = await prisma.vendor.findUnique({
@@ -317,13 +312,8 @@ const updateInventoryItem = async (req, res) => {
       }
     }
 
-    // Validate source type specific fields
-    if (sourceType === 'SUPPLIER' && !supplier) {
-      return res.status(400).json({
-        success: false,
-        message: 'Supplier name is required when source type is supplier'
-      });
-    }
+    // Note: supplier name is no longer collected in the UI (the field was
+    // removed), so it is not required for the SUPPLIER (Trader) source type.
 
     // Build update data
     const updateData = {
@@ -1180,7 +1170,8 @@ const getVendorCategoriesByVendorId = async (req, res) => {
       where: { id: vendorId },
       select: {
         productCategories: true,
-        productTypes: true
+        productTypes: true,
+        additionalCategories: true
       }
     });
 
@@ -1294,6 +1285,20 @@ const getVendorCategoriesByVendorId = async (req, res) => {
             ...unresolvedNames.map(name => ({ id: name, name: name, slug: name }))
           ];
         }
+      }
+    }
+
+    // Append vendor-defined custom categories (Step 4 "Other" path). These live
+    // in additionalCategories JSON, not the master Category collection, so the
+    // admin product form must still surface them in the Category dropdown when
+    // creating/editing a product for a vendor who has custom categories.
+    if (Array.isArray(vendor.additionalCategories)) {
+      const existingNames = new Set(categories.map(c => c.name.toLowerCase()));
+      for (const cat of vendor.additionalCategories) {
+        const name = typeof cat?.name === 'string' ? cat.name.trim() : '';
+        if (!name || existingNames.has(name.toLowerCase())) continue;
+        existingNames.add(name.toLowerCase());
+        categories.push({ id: cat.id || name, name, slug: cat.slug || name, isCustom: true });
       }
     }
 

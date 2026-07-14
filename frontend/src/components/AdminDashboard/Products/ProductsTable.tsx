@@ -647,7 +647,7 @@ export default function ProductsTable() {
                       <div className="flex items-center justify-between mb-2">
                         <div>
                           <p className="text-sm font-medium text-slate-900">
-                            {variant.size} - {variant.color}
+                            {variant.color || '—'}
                           </p>
                           <p className="text-xs text-slate-500">
                             Vendor Price: ₹{variant.price} | Stock: {variant.stock}

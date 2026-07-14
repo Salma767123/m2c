@@ -143,6 +143,8 @@ export interface ProductDetailData {
   updatedAt?: string | null
   // Product fields
   uom?: string | null
+  singleUnitColor?: string | null
+  singleUnitColorHex?: string | null
   dimensions?: string | null
   dimensionUnit?: string | null
   weight?: string | null

@@ -82,8 +82,45 @@ const locations = [
   'Display Area'
 ]
 
+// Human-readable duration between two dates (e.g. "1 Year / 2 Months / 3 Days").
+// Mirrors the vendor inventory form.
+const calcDateRangeDuration = (startDate: string, endDate: string): string => {
+  if (!startDate || !endDate) return ''
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return ''
+
+  let years = end.getFullYear() - start.getFullYear()
+  let months = end.getMonth() - start.getMonth()
+  let days = end.getDate() - start.getDate()
+
+  if (days < 0) {
+    months -= 1
+    days += new Date(end.getFullYear(), end.getMonth(), 0).getDate()
+  }
+  if (months < 0) {
+    years -= 1
+    months += 12
+  }
+  if (days < 0) days = 0
+  if (months < 0) months = 0
+  if (years < 0) years = 0
+
+  const part = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+  return [
+    years > 0 ? part(years, 'Year') : '',
+    months > 0 ? part(months, 'Month') : '',
+    days > 0 ? part(days, 'Day') : '',
+  ].filter(Boolean).join(' / ') || '0 Days'
+}
+
 export default function AddEditInventory({ inventoryId, isEdit = false }: AddEditInventoryProps) {
   const router = useRouter()
+  const todayStr = (() => {
+    const d = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  })()
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(isEdit)
   const [vendors, setVendors] = useState<Array<{ id: string; companyName: string; email: string; status: string }>>([])
@@ -546,17 +583,47 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
   }
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-slate-900">
-            {isEdit ? 'Edit Inventory Item' : 'Add New Inventory Item'}
-          </h1>
+      {/* Sticky header — matches the vendor inventory / product create forms */}
+      <div className="sticky top-0 z-20 bg-slate-50 py-4 border-b border-slate-200">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              aria-label="Go back"
+              className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors shrink-0"
+            >
+              <ArrowLeft className="h-4 w-4 text-slate-600" />
+            </button>
+            <h1 className="text-2xl font-bold text-slate-900">
+              {isEdit ? 'Edit Inventory Item' : 'Add New Inventory Item'}
+            </h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href="/admin/dashboard/inventory" className="shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 transition-colors"
+              >
+                Cancel
+              </Button>
+            </Link>
+            <Button
+              type="submit"
+              form="admin-inventory-form"
+              disabled={isLoading}
+              className="bg-brand-500 text-white hover:bg-brand-600 hover:shadow-md hover:shadow-brand-500/30 active:bg-brand-700 transition-all shadow-sm shadow-brand-500/20"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {isLoading ? 'Saving...' : (isEdit ? 'Update Item' : 'Create Item')}
+            </Button>
+          </div>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <form id="admin-inventory-form" onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:items-start">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
 
@@ -568,49 +635,70 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
               </CardHeader>
               <CardContent className="space-y-4 p-6">
 
-                {/* Vendor Selection */}
-                <div>
-                  <Dropdown
-                    id="vendor"
-                    label="Vendor *"
-                    value={formData.vendorId || ''}
-                    options={vendors.map(vendor => ({
-                      value: vendor.id,
-                      label: `${vendor.companyName} (${vendor.email})`
-                    }))}
-                    placeholder={isLoadingVendors ? "Loading vendors..." : vendors.length === 0 ? "No vendors available" : "Select Vendor"}
-                    onChange={(value) => handleVendorSelect(value as string)}
-                    disabled={isLoadingVendors || vendors.length === 0}
-                  />
-                  {formData.vendorName && (
-                    <p className="text-xs text-slate-500 mt-1">Selected: {formData.vendorName}</p>
-                  )}
-                  {!isLoadingVendors && vendors.length === 0 && (
-                    <p className="text-xs text-red-600 mt-1">
-                      No approved vendors found. Please approve vendors in the Vendors section first.
+                {/* Basic fields — 3 per row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Vendor Selection */}
+                  <div>
+                    <Dropdown
+                      id="vendor"
+                      label="Vendor *"
+                      value={formData.vendorId || ''}
+                      options={vendors.map(vendor => ({
+                        value: vendor.id,
+                        label: `${vendor.companyName} (${vendor.email})`
+                      }))}
+                      placeholder={isLoadingVendors ? "Loading vendors..." : vendors.length === 0 ? "No vendors available" : "Select Vendor"}
+                      onChange={(value) => handleVendorSelect(value as string)}
+                      disabled={isLoadingVendors || vendors.length === 0}
+                    />
+                    {formData.vendorName && (
+                      <p className="text-xs text-slate-500 mt-1">Selected: {formData.vendorName}</p>
+                    )}
+                    {!isLoadingVendors && vendors.length === 0 && (
+                      <p className="text-xs text-red-600 mt-1">
+                        No approved vendors found. Please approve vendors in the Vendors section first.
+                      </p>
+                    )}
+                    {isLoadingVendors && (
+                      <p className="text-xs text-slate-500 mt-1">Loading vendors from database...</p>
+                    )}
+                  </div>
+
+                  {/* Product Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Product Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      required
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
+                      placeholder="Enter product name"
+                    />
+                  </div>
+
+                  {/* SKU — beside Product Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      SKU
+                    </label>
+                    <input
+                      type="text"
+                      name="sku"
+                      value={formData.sku}
+                      readOnly
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-600 cursor-not-allowed"
+                      placeholder={isEdit ? '' : 'Auto-generated on save'}
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Auto-generated &amp; permanent — not editable.
                     </p>
-                  )}
-                  {isLoadingVendors && (
-                    <p className="text-xs text-slate-500 mt-1">Loading vendors from database...</p>
-                  )}
-                </div>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Product Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
-                    placeholder="Enter product name"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Category */}
                   <div>
                     <Dropdown
                       id="category"
@@ -638,6 +726,8 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       </p>
                     )}
                   </div>
+
+                  {/* Subcategory */}
                   <div>
                     <Dropdown
                       id="subcategory"
@@ -652,23 +742,6 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       disabled={!formData.category || subcategories.length === 0}
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    SKU
-                  </label>
-                  <input
-                    type="text"
-                    name="sku"
-                    value={formData.sku}
-                    readOnly
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-600 cursor-not-allowed"
-                    placeholder={isEdit ? '' : 'Auto-generated on save'}
-                  />
-                  <p className="text-xs text-slate-500 mt-1">
-                    Auto-generated &amp; permanent — not editable.
-                  </p>
                 </div>
 
 
@@ -695,8 +768,8 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 <p className="text-sm text-slate-600">Opening stock is set when a product is created.</p>
               </CardHeader>
               <CardContent className="space-y-4 p-6">
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-700">
+                <div className="p-3 bg-brand-50 border border-brand-200 rounded-lg">
+                  <p className="text-sm text-brand-700">
                     ℹ️ Opening stock is set when creating a product from this inventory item. Manage stock thereafter via the <strong>Update Stock</strong> action.
                   </p>
                 </div>
@@ -743,7 +816,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                     >
                       <div className="flex items-center space-x-3">
                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${formData.sourceType === 'supplier'
-                          ? 'border-slate-800 bg-slate-800'
+                          ? 'border-slate-800 bg-brand-600'
                           : 'border-slate-300'
                           }`}>
                           {formData.sourceType === 'supplier' && (
@@ -766,7 +839,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                     >
                       <div className="flex items-center space-x-3">
                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${formData.sourceType === 'manufacture'
-                          ? 'border-slate-800 bg-slate-800'
+                          ? 'border-slate-800 bg-brand-600'
                           : 'border-slate-300'
                           }`}>
                           {formData.sourceType === 'manufacture' && (
@@ -780,36 +853,25 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       </div>
                     </div>
                   </div>
+
+                  {!formData.sourceType && (
+                    <div className="p-3 bg-brand-50 border border-brand-200 rounded-lg">
+                      <p className="text-sm text-brand-700">
+                        💡 You can skip this section if you don&apos;t want to specify a source type.
+                        Select &quot;Trader&quot; if you purchase from external vendors, or &quot;Manufacture&quot; if you make the products yourself.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Conditional Fields Based on Source Type */}
                 {formData.sourceType === 'supplier' && (
                   <div className="space-y-4 p-4 bg-slate-50 border border-slate-300 rounded-lg animate-in slide-in-from-top-2 duration-300">
                     <h4 className="font-medium text-slate-900 mb-3 flex items-center">
-                      <span className="w-2 h-2 bg-slate-800 rounded-full mr-2"></span>
+                      <span className="w-2 h-2 bg-brand-600 rounded-full mr-2"></span>
                       Trader Information
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Trader Name *
-                        </label>
-                        <input
-                          type="text"
-                          name="supplier"
-                          value={formData.supplier}
-                          onChange={handleInputChange}
-                          required={formData.sourceType === 'supplier'}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors ${formData.sourceType === 'supplier' && !formData.supplier
-                            ? 'border-red-300 bg-red-50'
-                            : 'border-slate-200'
-                            }`}
-                          placeholder="Enter supplier name"
-                        />
-                        {formData.sourceType === 'supplier' && !formData.supplier && (
-                          <p className="text-xs text-red-600 mt-1">Supplier name is required</p>
-                        )}
-                      </div>
+                    <div className="grid grid-cols-1 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
                           Last Restocked
@@ -819,8 +881,18 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           name="lastRestocked"
                           value={formData.lastRestocked}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                          max={todayStr}
+                          className="w-full max-w-xs px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-slate-500 transition-colors"
                         />
+                        {formData.lastRestocked && (() => {
+                          const age = calcDateRangeDuration(formData.lastRestocked!, todayStr)
+                          return age ? (
+                            <div className="mt-2 flex min-h-[36px] w-full items-center rounded-lg border border-slate-200 bg-white px-4 py-2">
+                              <span className="text-xs text-slate-500 mr-2">Time Since Last Restock:</span>
+                              <span className="text-sm font-bold tracking-tight text-brand-500">{age}</span>
+                            </div>
+                          ) : null
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -829,7 +901,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 {formData.sourceType === 'manufacture' && (
                   <div className="space-y-4 p-4 bg-slate-50 border border-slate-300 rounded-lg animate-in slide-in-from-top-2 duration-300">
                     <h4 className="font-medium text-slate-900 mb-3 flex items-center">
-                      <span className="w-2 h-2 bg-slate-800 rounded-full mr-2"></span>
+                      <span className="w-2 h-2 bg-brand-600 rounded-full mr-2"></span>
                       Manufacturing Information
                     </h4>
                     <div className="text-sm text-slate-700 mb-4 space-y-2">
@@ -853,7 +925,8 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           name="manufacturingDate"
                           value={formData.manufacturingDate}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                          max={todayStr}
+                          className="w-full max-w-xs px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-slate-500 transition-colors"
                         />
                       </div>
                       <div>
@@ -865,10 +938,35 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           name="lastRestocked"
                           value={formData.lastRestocked}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                          min={formData.manufacturingDate || undefined}
+                          max={todayStr}
+                          disabled={!formData.manufacturingDate}
+                          className="w-full max-w-xs px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-slate-500 transition-colors disabled:bg-slate-100 disabled:cursor-not-allowed"
                         />
+                        <p className="text-xs text-slate-500 mt-1">
+                          Select the Manufacturing Date first; it can&apos;t be earlier than that.
+                        </p>
                       </div>
                     </div>
+
+                    {/* Duration between Manufacturing Date and Last Restocked */}
+                    {formData.manufacturingDate && formData.lastRestocked && (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          Duration
+                        </label>
+                        <div className="flex min-h-[40px] w-full items-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5">
+                          {(() => {
+                            const d = calcDateRangeDuration(formData.manufacturingDate!, formData.lastRestocked!)
+                            return d ? (
+                              <span className="text-sm font-bold tracking-tight text-brand-500">{d}</span>
+                            ) : (
+                              <span className="text-sm text-slate-400">—</span>
+                            )
+                          })()}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -890,8 +988,8 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
             </Card>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
+          {/* Sidebar — sticks below the pinned header while the form scrolls */}
+          <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
             <Card className="border border-slate-200">
               <CardHeader className="bg-slate-50 border-b border-slate-200">
                 <CardTitle className="text-slate-900">Status & Settings</CardTitle>
@@ -961,9 +1059,9 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
             {/* Low Stock Alert Notice */}
             {formData.lowStockAlert > 0 && (
-              <Card className="border border-blue-100">
+              <Card className="border border-brand-100">
                 <CardContent className="p-4">
-                  <p className="text-sm text-blue-700">
+                  <p className="text-sm text-brand-700">
                     📋 You will be alerted when stock drops below <strong>{formData.lowStockAlert}</strong> units.
                   </p>
                 </CardContent>

@@ -365,41 +365,73 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-slate-900">
-            {isEdit ? 'Edit Category' : 'Add New Category'}
-          </h1>
+      {/* Sticky header + tabs — matches the admin product create form: pinned
+          while content scrolls, negative horizontal margins bleed to the layout
+          edges, and top action buttons/tabs use the same styling. */}
+      <div className="sticky top-0 z-20 bg-slate-50 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pt-3 pb-4">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              aria-label="Go back"
+              className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors shrink-0"
+            >
+              <ArrowLeft className="h-4 w-4 text-slate-600" />
+            </button>
+            <h1 className="text-2xl font-bold text-slate-900">
+              {isEdit ? 'Edit Category' : 'Add New Category'}
+            </h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href="/admin/dashboard/categories" className="shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 transition-colors"
+              >
+                Cancel
+              </Button>
+            </Link>
+            <Button
+              type="submit"
+              form="category-form"
+              disabled={isLoading}
+              className="bg-brand-500 text-white hover:bg-brand-600 hover:shadow-md hover:shadow-brand-500/30 active:bg-brand-700 transition-all shadow-sm shadow-brand-500/20"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {isLoading ? 'Saving...' : (isEdit ? 'Update Category' : 'Create Category')}
+            </Button>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="mt-4 border-b border-slate-200">
+          <nav className="-mb-px flex gap-1 overflow-x-auto">
+            {[
+              { id: 'category', label: 'Category Details' },
+              { id: 'subcategories', label: 'Subcategories' }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as 'category' | 'subcategories')}
+                className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 rounded-t-md ${
+                  activeTab === tab.id
+                    ? 'border-brand-500 text-brand-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
         </div>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit}>
-        {/* Tab Navigation */}
-        <div className="mb-6">
-          <div className="border-b border-slate-200">
-            <nav className="-mb-px flex space-x-4">
-              {[
-                { id: 'category', label: 'Category Details' },
-                { id: 'subcategories', label: 'Subcategories' }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id as 'category' | 'subcategories')}
-                  className={`py-2 px-1 border-b-2 font-medium text-base ${
-                    activeTab === tab.id
-                      ? 'border-white text-white bg-brand-500 px-4 rounded-t-sm'
-                      : 'border-slate-100 text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
+      <form id="category-form" onSubmit={handleSubmit}>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
@@ -850,13 +882,17 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-brand-500 text-white hover:bg-brand-600"
+                  className="w-full bg-brand-500 text-white hover:bg-brand-600 hover:shadow-md hover:shadow-brand-500/30 active:bg-brand-700 transition-all shadow-sm shadow-brand-500/20"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {isLoading ? 'Saving...' : (isEdit ? 'Update Category' : 'Create Category')}
                 </Button>
                 <Link href="/admin/dashboard/categories" className="block">
-                  <Button type="button" variant="outline" className="w-full">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 transition-colors"
+                  >
                     Cancel
                   </Button>
                 </Link>

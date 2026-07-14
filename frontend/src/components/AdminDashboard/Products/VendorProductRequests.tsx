@@ -448,15 +448,15 @@ export default function VendorProductRequests() {
               <Table className="table-fixed">
                 <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50">
                   <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
-                    <TableHead className="w-[19%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Product</TableHead>
-                    <TableHead className="w-[8%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">SKU</TableHead>
-                    <TableHead className="w-[9%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Category</TableHead>
-                    <TableHead className="w-[7%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Variants</TableHead>
-                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Vendor</TableHead>
-                    <TableHead className="w-[13%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">QC Checker</TableHead>
-                    <TableHead className="w-[11%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider whitespace-nowrap">Insp. Status</TableHead>
+                    <TableHead className="w-[16%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Product</TableHead>
+                    <TableHead className="w-[11%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">SKU</TableHead>
+                    <TableHead className="w-[11%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Category</TableHead>
+                    <TableHead className="w-[9%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Variants</TableHead>
+                    <TableHead className="w-[16%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                    <TableHead className="w-[11%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">QC Checker</TableHead>
+                    <TableHead className="w-[10%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider whitespace-nowrap">Insp. Status</TableHead>
                     <TableHead className="w-[9%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider whitespace-nowrap">Submitted</TableHead>
-                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-right whitespace-nowrap">Actions</TableHead>
+                    <TableHead className="w-[7%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-right whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -490,7 +490,6 @@ export default function VendorProductRequests() {
                       {/* Category */}
                       <TableCell className="py-3 px-3 align-middle">
                         <div className="text-sm text-slate-700">{request.category}</div>
-                        {request.subCategory && <div className="text-xs text-slate-400">{request.subCategory}</div>}
                       </TableCell>
 
                       {/* Variants */}
@@ -636,12 +635,6 @@ export default function VendorProductRequests() {
           )}
         </div>
 
-        {/* Results summary when no pagination */}
-        {!loading && pagination.totalPages <= 1 && pagination.totalCount > 0 && (
-          <p className="text-xs text-slate-400">
-            Showing {requests.length} of {pagination.totalCount} product{pagination.totalCount === 1 ? '' : 's'}
-          </p>
-        )}
       </div>
 
       {/* ══ Approval Modal ══════════════════════════════════════════════════ */}
@@ -729,7 +722,7 @@ export default function VendorProductRequests() {
                   {approvingRequest.variants.map((variant) => (
                     <div key={variant.id} className="p-3 border border-slate-200 rounded-xl bg-slate-50/50">
                       <div className="mb-2">
-                        <p className="text-sm font-medium text-slate-900">{variant.size} – {variant.color}</p>
+                        <p className="text-sm font-medium text-slate-900">{[variant.size, variant.color].filter(Boolean).join(' – ') || '—'}</p>
                         <p className="text-xs text-slate-500">Vendor Price: ₹{variant.price} · Stock: {variant.stock}</p>
                       </div>
                       <div className="grid grid-cols-2 gap-3">

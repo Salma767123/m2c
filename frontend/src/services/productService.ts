@@ -31,12 +31,20 @@ export interface ProductFormData {
   fabricType?: string;
   material?: string;
   fabricSpecifications?: {
-    type: string;
-    composition: string;
-    weight: string;
-    weave: string;
-    finish: string;
-    careInstructions: string[];
+    type?: string;
+    composition?: string;
+    // GSM calculation fields (current form): weight in grams + length/breadth in
+    // cm auto-calculate GSM; weightUnit is forced to 'GSM'.
+    weightValue?: string;
+    weightUnit?: string;
+    length?: string;
+    breadth?: string;
+    gsm?: string;
+    weave?: string;
+    // Legacy fields (older products created before the GSM fields existed).
+    weight?: string;
+    finish?: string;
+    careInstructions?: string[];
   };
 
   // Variants Management

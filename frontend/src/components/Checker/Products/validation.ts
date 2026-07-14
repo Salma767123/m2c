@@ -34,11 +34,12 @@ export function getExpectedProductVerificationKeys(productData: any): string[] {
     const p = productData || {}
     const keys: string[] = []
 
-    if (notEmptyVal(p.name))        keys.push("pv_name")
-    if (notEmptyVal(p.category))    keys.push("pv_category")
-    if (notEmptyVal(p.subCategory)) keys.push("pv_subCategory")
-    if (notEmptyVal(p.brand))       keys.push("pv_brand")
-    if (notEmptyVal(p.description)) keys.push("pv_description")
+    if (notEmptyVal(p.name))            keys.push("pv_name")
+    if (notEmptyVal(p.category))        keys.push("pv_category")
+    if (notEmptyVal(p.singleUnitColor)) keys.push("pv_baseColor")
+    if (notEmptyVal(p.uom))             keys.push("pv_uom")
+    if (notEmptyVal(p.brand))           keys.push("pv_brand")
+    if (notEmptyVal(p.description))     keys.push("pv_description")
 
     if (Array.isArray(p.images)) {
         p.images.forEach((_: unknown, i: number) => keys.push(`pv_img_${i}`))
@@ -56,12 +57,11 @@ export function getExpectedProductVerificationKeys(productData: any): string[] {
             if (notEmptyVal(v.color))       keys.push(`pv_var${vi}_color`)
             if (notEmptyVal(v.size))        keys.push(`pv_var${vi}_size`)
             if (notEmptyVal(v.material))    keys.push(`pv_var${vi}_material`)
-            if (notEmptyVal(v.sku))         keys.push(`pv_var${vi}_sku`)
             if (notEmptyVal(v.variantName)) keys.push(`pv_var${vi}_variantName`)
+            if (Array.isArray(v.images) && v.images[0]) keys.push(`pv_var${vi}_image`)
         })
     }
 
-    if (notEmptyVal(p.dimensions)) keys.push("pv_dimensions")
     if (p.fabricSpecifications && typeof p.fabricSpecifications === "object") {
         Object.entries(p.fabricSpecifications).forEach(([key, val]) => {
             if (key === 'basis') return

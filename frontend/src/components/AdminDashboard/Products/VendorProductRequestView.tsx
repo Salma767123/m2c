@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { convertINRtoUSD } from '@/lib/currency'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
 import {
@@ -21,14 +20,63 @@ import {
   Layers,
   Warehouse,
   UserCheck,
-  CheckCircle
+  CheckCircle,
+  Info,
+  Ruler,
+  Scale,
+  Truck,
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Image from 'next/image'
 import { adminProductService, type AdminProduct } from '@/services/adminProductService'
+import { CARE_INSTRUCTIONS, CareIcon, CATEGORY_COLORS, CATEGORY_BORDER } from '@/components/VendorDashboard/Products/CareInstructionModal'
 import qcCheckerService from '@/services/qcCheckerService'
 import { formatCheckerName } from '@/lib/checkerUtils'
 import { hasPermission } from '@/lib/auth'
+import { openDoc } from '@/lib/docViewerBus'
+
+/** Card wrapper matching the vendor product-view page's section headings. */
+function SpecSection({ icon, title, action, children }: { icon: React.ReactNode; title: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+          <span className="text-slate-500">{icon}</span>
+          {title}
+        </h2>
+        {action}
+      </div>
+      <div className="p-4">{children}</div>
+    </div>
+  )
+}
+
+/** Reusable label/value field block (gray box) for the specification grids. */
+function InfoField({ icon, label, value }: { icon?: React.ReactNode; label: string; value: React.ReactNode }) {
+  return (
+    <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+      <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mb-1">
+        {icon ? <span className="text-slate-400">{icon}</span> : null}
+        {label}
+      </p>
+      <div className="text-sm font-medium text-slate-900">{value}</div>
+    </div>
+  )
+}
+
+/** Color swatch + name field block — matches the vendor variant cards. */
+function ColorField({ label = 'Color', color, hex }: { label?: string; color?: string | null; hex?: string | null }) {
+  if (!color) return null
+  return (
+    <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+      <p className="text-xs font-medium text-slate-500 mb-1">{label}</p>
+      <div className="flex items-center gap-2">
+        {hex && <span className="w-4 h-4 rounded border border-slate-200 shrink-0" style={{ backgroundColor: hex }} />}
+        <span className="text-sm font-medium text-slate-900">{color}</span>
+      </div>
+    </div>
+  )
+}
 
 // Hoisted static array — allocated once, not re-created every render (Rule 6.3)
 const QC_SCORE_FIELDS = [
@@ -48,6 +96,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
   const router = useRouter()
   const [product, setProduct] = useState<AdminProduct | null>(null)
   const [loading, setLoading] = useState(true)
+  const [selectedImage, setSelectedImage] = useState(0)
   const [showApprovalModal, setShowApprovalModal] = useState(false)
   const [showRejectionModal, setShowRejectionModal] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
@@ -363,6 +412,28 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
     }
   }
 
+  const getProductStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'active': return 'bg-green-50 text-green-700 border border-green-200'
+      case 'inactive': return 'bg-slate-50 text-slate-700 border border-slate-200'
+      case 'out_of_stock': return 'bg-red-50 text-red-700 border border-red-200'
+      default: return 'bg-slate-50 text-slate-700 border border-slate-200'
+    }
+  }
+
+  // Standard vendor-status colours (matches the status colours used across the admin).
+  const getVendorStatusColor = (status: string) => {
+    switch (status?.toUpperCase()) {
+      case 'APPROVED':
+      case 'ACTIVE': return 'bg-green-50 text-green-700 border border-green-200'
+      case 'PENDING':
+      case 'UNDER_REVIEW': return 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+      case 'REJECTED':
+      case 'SUSPENDED': return 'bg-red-50 text-red-700 border border-red-200'
+      default: return 'bg-slate-50 text-slate-700 border border-slate-200'
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -407,49 +478,45 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
     )
   }
 
+  const allImages = product.images?.filter((img) => img.url) || []
+
   return (
     <div className="space-y-6">
+      {/* Sticky top: breadcrumb + header — matches the vendor product-view page */}
+      <div className="sticky top-0 z-20 bg-slate-50 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 -mt-4 sm:-mt-6 lg:-mt-8 pt-4 sm:pt-6 lg:pt-8 pb-4 space-y-4">
       {/* Breadcrumb */}
-      <nav className="flex items-center space-x-2 text-sm text-slate-600 mb-6" aria-label="Breadcrumb">
-        <div className="flex items-center space-x-2">
-          <Link href="/admin/dashboard" className="hover:text-slate-900 transition-colors duration-200 hover:underline">
-            Dashboard
-          </Link>
-          <span className="text-slate-400">/</span>
-          <Link href="/admin/dashboard/products" className="hover:text-slate-900 transition-colors duration-200 hover:underline">
-            Products
-          </Link>
-          <span className="text-slate-400">/</span>
-          <Link href="/admin/dashboard/products/vendor-requests" className="hover:text-slate-900 transition-colors duration-200 hover:underline">
-            Vendor Requests
-          </Link>
-          <span className="text-slate-400">/</span>
-          <span className="text-slate-900 font-medium" aria-current="page">
-            {product?.name || 'View Request'}
-          </span>
-        </div>
+      <nav className="flex items-center space-x-2 text-sm text-slate-600" aria-label="Breadcrumb">
+        <Link href="/admin/dashboard" className="hover:text-slate-900 transition-colors hover:underline">Dashboard</Link>
+        <span className="text-slate-400">/</span>
+        <Link href="/admin/dashboard/products" className="hover:text-slate-900 transition-colors hover:underline">Products</Link>
+        <span className="text-slate-400">/</span>
+        <Link href="/admin/dashboard/products/vendor-requests" className="hover:text-slate-900 transition-colors hover:underline">Vendor Requests</Link>
+        <span className="text-slate-400">/</span>
+        <span className="text-slate-900 font-medium" aria-current="page">{product?.name || 'View Request'}</span>
       </nav>
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="ghost"
-            onClick={() => router.push('/admin/dashboard/products/vendor-requests')}
-            className="text-slate-600 hover:text-slate-900"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Requests
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">{product.name}</h1>
-            <p className="text-slate-600">Vendor Product Request Details</p>
+      {/* Header card */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push('/admin/dashboard/products/vendor-requests')}
+              className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors shrink-0"
+              aria-label="Back to requests"
+            >
+              <ArrowLeft className="h-4 w-4 text-slate-600" />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">{product.name}</h1>
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <Badge className={`${getProductStatusColor(product.status)} text-xs`}>{product.status?.replace(/_/g, ' ')}</Badge>
+                {product.baseSku && (
+                  <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">SKU: {product.baseSku}</span>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center space-x-3">
-          <Badge className={getStatusColor(product.approvalStatus)}>
-            {product.approvalStatus.replace('_', ' ').charAt(0).toUpperCase() + product.approvalStatus.replace('_', ' ').slice(1).toLowerCase()}
-          </Badge>
+          <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
           {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED' || product.approvalStatus === 'REINSPECTION' || product.approvalStatus === 'REJECTED') && (
             <>
               {product.approvalStatus === 'QC_APPROVED' ? (
@@ -464,7 +531,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   </Button>
                 )
               ) : product.approvalStatus === 'REINSPECTION' ? (
-                <div className="flex flex-col items-end gap-1.5">
+                <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-orange-600 border-orange-200">
                     Awaiting QC Re-Inspection
                   </Badge>
@@ -494,7 +561,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   </Button>
                 )
               ) : (
-                <div className="flex flex-col items-end gap-1.5">
+                <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-yellow-600 border-yellow-200">
                     Waiting for QC Approval
                   </Badge>
@@ -525,351 +592,261 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               )}
             </>
           )}
+          </div>
         </div>
+      </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Product Images */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <ImageIcon className="h-5 w-5 mr-2" />
+          {/* Product Images — gallery (matches the vendor product-view page) */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-100">
+              <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                <ImageIcon className="h-4 w-4 text-slate-500" />
                 {product.hasVariants ? 'Product Images (General)' : 'Product Images'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {product.images && product.images.length > 0 ? (
-                  product.images.map((image, index) => (
-                    <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
-                      <Image
-                        src={image.url}
-                        alt={image.alt || `${product.name} - Image ${index + 1}`}
-                        fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        className="object-cover"
-                      />
-                      {image.isPrimary && (
-                        <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
-                          Primary
-                        </div>
-                      )}
+                {allImages.length > 0 && (
+                  <span className="text-xs font-normal text-slate-500">({allImages.length})</span>
+                )}
+              </h2>
+            </div>
+            <div className="p-4">
+              {allImages.length > 0 ? (
+                <div className="space-y-3">
+                  {/* Main image — click to open in the in-app viewer */}
+                  <button
+                    type="button"
+                    onClick={() => allImages[selectedImage]?.url && openDoc(allImages[selectedImage].url, allImages[selectedImage]?.alt || product.name, true)}
+                    className="relative w-full h-64 sm:h-72 md:h-80 rounded-lg overflow-hidden bg-slate-50 border border-slate-100 cursor-zoom-in group"
+                  >
+                    <Image
+                      src={allImages[selectedImage]?.url}
+                      alt={allImages[selectedImage]?.alt || product.name}
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 50vw"
+                      className="object-contain"
+                    />
+                    {allImages[selectedImage]?.isPrimary && (
+                      <div className="absolute top-3 left-3">
+                        <Badge className="bg-brand-500 text-white text-xs shadow-sm">Primary</Badge>
+                      </div>
+                    )}
+                  </button>
+                  {/* Thumbnails */}
+                  {allImages.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {allImages.map((img, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setSelectedImage(idx)}
+                          className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
+                            selectedImage === idx
+                              ? 'border-brand-500 ring-1 ring-brand-500/40'
+                              : 'border-slate-200 hover:border-slate-400'
+                          }`}
+                        >
+                          <Image src={img.url} alt="" fill sizes="64px" className="object-cover" />
+                        </button>
+                      ))}
                     </div>
-                  ))
-                ) : (
-                  <div className="col-span-full text-center py-8 text-slate-500">
+                  )}
+                </div>
+              ) : (
+                  <div className="text-center py-8 text-slate-500">
                     <ImageIcon className="h-12 w-12 mx-auto mb-2 text-slate-300" />
                     <p>No images available</p>
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+
+          {/* Basic Information — mirrors the vendor product-view page */}
+          <SpecSection icon={<Info className="h-4 w-4" />} title="Basic Information">
+            {product.description && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Description</p>
+                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{product.description}</p>
+              </div>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {product.category && <InfoField label="Category" value={product.category} />}
+              {product.uom && <InfoField label="Selling Unit (UOM)" value={product.uom} />}
+              {product.baseSku && <InfoField label="Base SKU" value={product.baseSku} />}
+              {product.singleUnitColor && (
+                <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                  <p className="text-xs font-medium text-slate-500 mb-1">Base Color</p>
+                  <div className="flex items-center gap-2">
+                    {product.singleUnitColorHex && (
+                      <span className="w-4 h-4 rounded border border-slate-200 shrink-0" style={{ backgroundColor: product.singleUnitColorHex }} />
+                    )}
+                    <span className="text-sm font-medium text-slate-900">{product.singleUnitColor}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            {product.tags && product.tags.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Tags</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {product.tags.map((tag, idx) => (
+                    <span key={idx} className="text-xs px-2.5 py-1 bg-slate-100 text-slate-700 rounded-full">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </SpecSection>
+
+          {/* Fabric Type & Specifications */}
+          {(product.fabricType || product.material || product.fabricSpecifications) && (
+            <SpecSection icon={<Layers className="h-4 w-4" />} title="Fabric Type & Specifications">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {product.fabricType && <InfoField icon={<Layers className="h-3.5 w-3.5" />} label="Fabric Type" value={product.fabricType} />}
+                {product.material && <InfoField icon={<Package className="h-3.5 w-3.5" />} label="Material Description" value={product.material} />}
+                {(() => {
+                  const fs = product.fabricSpecifications || {}
+                  const rows: Array<{ label: string; value: string; icon?: React.ReactNode }> = []
+                  if (fs.composition) rows.push({ label: 'Composition', value: String(fs.composition) })
+                  if (fs.weightValue) rows.push({ label: 'Weight', value: `${fs.weightValue} g`, icon: <Scale className="h-3.5 w-3.5" /> })
+                  if (fs.length) rows.push({ label: 'Length', value: `${fs.length} cm`, icon: <Ruler className="h-3.5 w-3.5" /> })
+                  if (fs.breadth) rows.push({ label: 'Breadth', value: `${fs.breadth} cm`, icon: <Ruler className="h-3.5 w-3.5" /> })
+                  if (fs.gsm) rows.push({ label: 'GSM', value: `${fs.gsm} GSM`, icon: <Scale className="h-3.5 w-3.5" /> })
+                  else if (!fs.weightValue && fs.weight) rows.push({ label: 'Weight', value: `${fs.weight}${fs.weightUnit ? ` ${fs.weightUnit}` : ''}`, icon: <Scale className="h-3.5 w-3.5" /> })
+                  if (fs.weave) rows.push({ label: 'Type of Weave', value: String(fs.weave) })
+                  return rows.map((r) => <InfoField key={r.label} icon={r.icon} label={r.label} value={r.value} />)
+                })()}
+              </div>
+              {/* Care Instructions — same chips as the vendor product-view page */}
+              {(((product.fabricSpecifications as any)?.careInstructions as string[] | undefined)?.length ?? 0) > 0 && (
+                <div className="mt-5 pt-4 border-t border-slate-100">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Care Instructions</p>
+                  <div className="flex flex-wrap gap-2">
+                    {((product.fabricSpecifications as any).careInstructions as string[]).map((instruction, idx) => {
+                      const match = CARE_INSTRUCTIONS.find((c) => c.label === instruction)
+                      if (!match) {
+                        return (
+                          <span key={idx} className="inline-flex items-center text-xs px-2.5 py-1.5 bg-slate-50 text-slate-700 rounded-lg border border-slate-200">
+                            {instruction}
+                          </span>
+                        )
+                      }
+                      const iconColor = CATEGORY_COLORS[match.category] || 'text-slate-500'
+                      const chipStyle = CATEGORY_BORDER[match.category] || 'border-slate-200 bg-slate-50 text-slate-700'
+                      return (
+                        <span key={idx} className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border ${chipStyle}`}>
+                          <span className={iconColor}>
+                            <CareIcon paths={match.paths} className="w-4 h-4" />
+                          </span>
+                          {match.label}
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </SpecSection>
+          )}
 
           {/* Variants with Images */}
           {product.hasVariants && product.variants && product.variants.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Layers className="h-5 w-5 mr-2" />
-                  Product Variants ({product.variants.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {/* Base Variant Stock */}
-                  <div className="p-4 border-2 border-blue-200 rounded-lg bg-blue-50">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-3">
-                        {product.singleUnitColorHex && (
-                          <div
-                            className="w-10 h-10 rounded border-2 border-blue-300 shadow-sm"
-                            style={{ backgroundColor: product.singleUnitColorHex }}
-                            title={product.singleUnitColor || 'Base'}
-                          />
-                        )}
-                        <div>
-                          <h4 className="font-semibold text-slate-900">
-                            Base Unit {product.singleUnitSize && product.singleUnitColor ? `(${product.singleUnitSize} - ${product.singleUnitColor})` : ''}
-                          </h4>
-                          <p className="text-xs text-blue-600 font-medium">Base / Default Variant</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-slate-900">₹{product.basePrice}</p>
-                        {product.adminFixedPrice && (
-                          <p className="text-xs text-green-600">Admin: ₹{product.adminFixedPrice}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                      <div className="bg-white p-3 rounded border">
-                        <p className="text-xs text-slate-500 mb-1">Vendor Price</p>
-                        <p className="text-sm font-semibold text-slate-900">₹{product.basePrice}</p>
-                      </div>
-                      {product.originalPrice && (
-                        <div className="bg-white p-3 rounded border border-slate-200">
-                          <p className="text-xs text-slate-500 mb-1">Original Price</p>
-                          <p className="text-sm font-semibold text-slate-500 line-through">₹{product.originalPrice}</p>
-                        </div>
-                      )}
-                      {product.adminFixedPrice && (
-                        <div className="bg-white p-3 rounded border border-green-200">
-                          <p className="text-xs text-slate-500 mb-1">Admin Price</p>
-                          <p className="text-sm font-semibold text-green-600">₹{product.adminFixedPrice}</p>
-                        </div>
-                      )}
-                      <div className="bg-white p-3 rounded border">
-                        <p className="text-xs text-slate-500 mb-1">Stock</p>
-                        <p className="text-sm font-semibold text-blue-700">{product.inventory?.baseStock ?? 0} units</p>
-                      </div>
-                    </div>
-                    {/* Multi-currency prices for base product */}
-                    {(product.priceINR || product.priceUSD) && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
-                        {product.priceINR && (
-                          <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                            <p className="text-xs text-blue-600 mb-1">INR Price</p>
-                            <p className="text-sm font-semibold text-blue-800">₹{product.priceINR.toLocaleString()}</p>
-                          </div>
-                        )}
-                        {product.priceUSD && (
-                          <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                            <p className="text-xs text-blue-600 mb-1">USD Price</p>
-                            <p className="text-sm font-semibold text-blue-800">${product.priceUSD.toFixed(2)}</p>
-                          </div>
-                        )}
-                        {product.originalPriceINR && (
-                          <div className="bg-white p-3 rounded border border-blue-100">
-                            <p className="text-xs text-slate-500 mb-1">Original ₹</p>
-                            <p className="text-sm font-semibold text-slate-500 line-through">₹{product.originalPriceINR.toLocaleString()}</p>
-                          </div>
-                        )}
-                        {product.originalPriceUSD && (
-                          <div className="bg-white p-3 rounded border border-blue-100">
-                            <p className="text-xs text-slate-500 mb-1">Original $</p>
-                            <p className="text-sm font-semibold text-slate-500 line-through">${product.originalPriceUSD.toFixed(2)}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {product.variants.map((variant, index) => (
-                    <div key={variant.id || index} className="p-4 border rounded-lg bg-slate-50">
-                      {/* Variant Details */}
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center space-x-3">
-                          {variant.colorHex && (
-                            <div
-                              className="w-10 h-10 rounded border-2 border-slate-300 shadow-sm"
-                              style={{ backgroundColor: variant.colorHex }}
-                              title={variant.color}
-                            />
-                          )}
-                          <div>
-                            <h4 className="font-semibold text-slate-900">
-                              {variant.variantName?.trim() || [variant.size, variant.color].filter(Boolean).join(' - ') || 'Variant'}
-                            </h4>
-                            {(variant.size || variant.color) && (
-                              <p className="text-xs text-slate-500">{[variant.size, variant.color].filter(Boolean).join(' / ')}</p>
-                            )}
-                            <p className="text-xs text-slate-500 font-mono">{variant.sku}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium text-slate-900">₹{variant.price}</p>
-                          {variant.adminFixedPrice && (
-                            <p className="text-xs text-green-600">Admin: ₹{variant.adminFixedPrice}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Variant Info Grid */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                        <div className="bg-white p-3 rounded border">
-                          <p className="text-xs text-slate-500 mb-1">Vendor Price</p>
-                          <p className="text-sm font-semibold text-slate-900">₹{variant.price}</p>
-                        </div>
-                        {variant.originalPrice && (
-                          <div className="bg-white p-3 rounded border border-slate-200">
-                            <p className="text-xs text-slate-500 mb-1">Original Price</p>
-                            <p className="text-sm font-semibold text-slate-500 line-through">₹{variant.originalPrice}</p>
-                          </div>
-                        )}
-                        {variant.adminFixedPrice && (
-                          <div className="bg-white p-3 rounded border border-green-200">
-                            <p className="text-xs text-slate-500 mb-1">Admin Price</p>
-                            <p className="text-sm font-semibold text-green-600">₹{variant.adminFixedPrice}</p>
-                          </div>
-                        )}
-                        <div className="bg-white p-3 rounded border">
-                          <p className="text-xs text-slate-500 mb-1">Stock</p>
-                          <p className="text-sm font-semibold text-slate-900">{variant.stock} units</p>
-                        </div>
-                        {variant.lowStockThreshold != null && (
-                          <div className="bg-white p-3 rounded border border-amber-200">
-                            <p className="text-xs text-slate-500 mb-1">Low Stock Alert</p>
-                            <p className="text-sm font-semibold text-amber-700">{variant.lowStockThreshold} units</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Variant Multi-Currency Display */}
-                      {((variant as any).priceINR || (variant as any).priceUSD) ? (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4" role="group" aria-label="Variant regional pricing">
-                          {(variant as any).priceINR && (
-                            <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                              <p className="text-xs text-blue-600 mb-1">INR Price</p>
-                              <p className="text-sm font-semibold text-blue-800">₹{(variant as any).priceINR.toLocaleString()}</p>
-                            </div>
-                          )}
-                          {(variant as any).priceUSD && (
-                            <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                              <p className="text-xs text-blue-600 mb-1">USD Price</p>
-                              <p className="text-sm font-semibold text-blue-800">${(variant as any).priceUSD.toFixed(2)}</p>
-                            </div>
-                          )}
-                          {(variant as any).originalPriceINR && (
-                            <div className="bg-white p-3 rounded border border-blue-100">
-                              <p className="text-xs text-slate-500 mb-1">Original ₹</p>
-                              <p className="text-sm font-semibold text-slate-500 line-through">₹{(variant as any).originalPriceINR.toLocaleString()}</p>
-                            </div>
-                          )}
-                          {(variant as any).originalPriceUSD && (
-                            <div className="bg-white p-3 rounded border border-blue-100">
-                              <p className="text-xs text-slate-500 mb-1">Original $</p>
-                              <p className="text-sm font-semibold text-slate-500 line-through">${(variant as any).originalPriceUSD.toFixed(2)}</p>
-                            </div>
-                          )}
-                        </div>
-                      ) : null}
-
-                      {/* Variant Images */}
-                      {variant.images && variant.images.length > 0 && (
-                        <div>
-                          <p className="text-sm font-medium text-slate-700 mb-2">Variant Images</p>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {variant.images.map((imageUrl, imgIndex) => (
-                              <div key={imgIndex} className="relative aspect-square rounded-lg overflow-hidden border bg-white">
-                                <Image
-                                  src={imageUrl}
-                                  alt={`${variant.variantName?.trim() || [variant.size, variant.color].filter(Boolean).join(' - ') || 'Variant'} - Image ${imgIndex + 1}`}
-                                  fill
-                                  sizes="(max-width: 768px) 50vw, 25vw"
-                                  className="object-cover"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Product Description */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <FileText className="h-5 w-5 mr-2" />
-                Product Description
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-slate-700 leading-relaxed">{product.description}</p>
-            </CardContent>
-          </Card>
-
-          {/* Product Specifications */}
-          {product.fabricSpecifications && Object.keys(product.fabricSpecifications).length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Layers className="h-5 w-5 mr-2" />
-                  Specifications
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Object.entries(product.fabricSpecifications).map(([key, value]) => (
-                    <div key={key} className="flex flex-col">
-                      <span className="text-sm font-medium text-slate-500 capitalize">
-                        {key.replace(/([A-Z])/g, ' $1').trim()}
-                      </span>
-                      <span className="text-slate-900">{String(value)}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Additional Product Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Layers className="h-5 w-5 mr-2" />
-                Additional Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {product.uom && (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-slate-500">Unit of Measurement</span>
-                    <span className="text-slate-900">{product.uom}</span>
-                  </div>
-                )}
-                {product.dimensions && (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-slate-500">Display Dimensions</span>
-                    <span className="text-slate-900">{product.dimensions}</span>
-                  </div>
-                )}
-                {product.weight && (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-slate-500">Display Weight</span>
-                    <span className="text-slate-900">{product.weight}</span>
-                  </div>
-                )}
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-slate-500">Dispatch Timeline</span>
-                  <span className="text-slate-900">
-                    {product.dispatchTimeline.totalDays} days
-                    ({product.dispatchTimeline.processingDays} processing + {product.dispatchTimeline.shippingDays} shipping)
-                  </span>
-                </div>
-                {product.tags && product.tags.length > 0 && (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-slate-500">Tags</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {product.tags.map((tag, index) => (
-                        <span key={index} className="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="p-4 border-b border-slate-100">
+                <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-slate-500" />
+                  Size &amp; Color Variants
+                  <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{product.variants.length}</span>
+                </h2>
               </div>
-            </CardContent>
-          </Card>
+              <div className="divide-y divide-slate-100">
+                {/* Base variant */}
+                <div className="p-4 bg-blue-50/50">
+                  <div className="flex items-center gap-3 mb-3">
+                    {product.singleUnitColorHex && (
+                      <div className="w-8 h-8 rounded-lg border-2 border-blue-200 shadow-sm shrink-0" style={{ backgroundColor: product.singleUnitColorHex }} />
+                    )}
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Base Unit</p>
+                      <p className="text-xs text-blue-600">Default variant</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <ColorField color={product.singleUnitColor} hex={product.singleUnitColorHex} />
+                    {product.baseSku && <InfoField label="SKU" value={product.baseSku} />}
+                    <InfoField label="Vendor Price" value={`₹${product.basePrice}`} />
+                    {product.originalPrice && <InfoField label="Original Price" value={<span className="line-through text-slate-500">₹{product.originalPrice}</span>} />}
+                    {product.adminFixedPrice && <InfoField label="Admin Price" value={<span className="text-green-600">₹{product.adminFixedPrice}</span>} />}
+                    <InfoField label="Stock Quantity" value={`${product.inventory?.baseStock ?? 0} units`} />
+                    {product.priceINR && <InfoField label="INR Price" value={`₹${product.priceINR.toLocaleString()}`} />}
+                    {product.priceUSD && <InfoField label="USD Price" value={`$${product.priceUSD.toFixed(2)}`} />}
+                  </div>
+                </div>
+
+                {/* Variants */}
+                {product.variants.map((variant, index) => (
+                  <div key={variant.id || index} className="p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      {/* Variant image(s) — leftmost, before the color swatch / name / SKU. Click to open in the in-app viewer. */}
+                      {variant.images && variant.images.length > 0 && (
+                        <div className="flex gap-2 shrink-0">
+                          {variant.images.map((imageUrl, imgIndex) => (
+                            <button
+                              type="button"
+                              key={imgIndex}
+                              onClick={() => imageUrl && openDoc(imageUrl, `${variant.size || ''} ${variant.color || ''}`.trim() || product.name, true)}
+                              className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-200 bg-white shrink-0 cursor-zoom-in hover:border-slate-400 transition-colors"
+                            >
+                              <Image src={imageUrl} alt={`${variant.color || 'variant'}`} fill sizes="80px" className="object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {variant.colorHex && (
+                        <div className="w-8 h-8 rounded-lg border-2 border-slate-200 shadow-sm shrink-0" style={{ backgroundColor: variant.colorHex }} />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-slate-900 truncate">
+                          {variant.variantName?.trim() || [variant.size, variant.color].filter(Boolean).join(' - ') || 'Variant'}
+                        </p>
+                        <p className="text-xs text-slate-500 font-mono">{variant.sku}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {variant.variantName && <InfoField label="Variant Name" value={variant.variantName} />}
+                      <ColorField color={variant.color} hex={variant.colorHex} />
+                      <InfoField label="SKU" value={variant.sku} />
+                      <InfoField label="Vendor Price" value={`₹${variant.price}`} />
+                      {variant.originalPrice && <InfoField label="Original Price" value={<span className="line-through text-slate-500">₹{variant.originalPrice}</span>} />}
+                      {variant.adminFixedPrice && <InfoField label="Admin Price" value={<span className="text-green-600">₹{variant.adminFixedPrice}</span>} />}
+                      <InfoField label="Stock Quantity" value={`${variant.stock ?? 0} units`} />
+                      {variant.lowStockThreshold != null && <InfoField label="Low Stock Alert" value={<span className="text-amber-700">{variant.lowStockThreshold} units</span>} />}
+                      {(variant as any).priceINR && <InfoField label="INR Price" value={`₹${(variant as any).priceINR.toLocaleString()}`} />}
+                      {(variant as any).priceUSD && <InfoField label="USD Price" value={`$${(variant as any).priceUSD.toFixed(2)}`} />}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Dispatch Timeline — mirrors the vendor product-view page */}
+          {(product.dispatchTimeline || product.weight) && (
+            <SpecSection icon={<Truck className="h-4 w-4" />} title="Dispatch Timeline Configuration">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {product.dispatchTimeline && <InfoField label="Processing Days" value={`${product.dispatchTimeline.processingDays}`} />}
+                {product.dispatchTimeline && <InfoField label="Shipping Days" value={`${product.dispatchTimeline.shippingDays}`} />}
+                {product.dispatchTimeline && <InfoField label="Total Days" value={`${product.dispatchTimeline.totalDays} days`} />}
+                {product.weight && <InfoField icon={<Scale className="h-3.5 w-3.5" />} label="Shipping Weight" value={`${product.weight}${(product as any).weightUnit ? ` ${(product as any).weightUnit}` : ''}`} />}
+              </div>
+            </SpecSection>
+          )}
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-6 lg:sticky lg:top-[188px] lg:self-start">
           {/* Request Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Request Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <SpecSection icon={<Calendar className="h-4 w-4" />} title="Request Information">
+            <div className="space-y-4">
               <div className="flex items-center space-x-3">
                 <Calendar className="h-4 w-4 text-slate-500" />
                 <div>
@@ -883,65 +860,9 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   </p>
                 </div>
               </div>
-              <div className="flex items-center space-x-3">
-                <DollarSign className="h-4 w-4 text-slate-500" />
-                <div>
-                  <p className="text-sm font-medium text-slate-900">Pricing</p>
-                  <p className="text-sm text-slate-600">Vendor Price: ₹{product.basePrice}</p>
-                  {product.originalPrice && (
-                    <p className="text-sm text-slate-500 line-through">Original Price: ₹{product.originalPrice}</p>
-                  )}
-                  {product.adminFixedPrice && (
-                    <p className="text-sm text-green-600 font-medium">Admin Price: ₹{product.adminFixedPrice}</p>
-                  )}
-                  {product.priceINR && (
-                    <p className="text-sm text-blue-600">INR: ₹{product.priceINR.toLocaleString()}</p>
-                  )}
-                  {product.priceUSD && (
-                    <p className="text-sm text-blue-600">USD: ${product.priceUSD.toFixed(2)}</p>
-                  )}
-                  {product.originalPriceINR && (
-                    <p className="text-xs text-slate-500">Original ₹: ₹{product.originalPriceINR.toLocaleString()}</p>
-                  )}
-                  {product.originalPriceUSD && (
-                    <p className="text-xs text-slate-500">Original $: ${product.originalPriceUSD.toFixed(2)}</p>
-                  )}
-                  <p className="text-xs text-slate-500 mt-1">
-                    Visibility: {product.priceVisibility === 'IN_ONLY' ? '.in only (India)' : product.priceVisibility === 'COM_ONLY' ? '.com only (International)' : 'Both (.in + .com)'}
-                  </p>
-                  {product.gstPercentage ? (
-                    <p className="text-sm text-slate-600">GST: {product.gstPercentage}%</p>
-                  ) : null}
-                  {product.discount ? (
-                    <p className="text-sm text-green-600 font-medium">Discount: {product.discount}% off</p>
-                  ) : null}
-                </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <Tag className="h-4 w-4 text-slate-500" />
-                <div>
-                  <p className="text-sm font-medium text-slate-900">Category</p>
-                  <p className="text-sm text-slate-600">{product.category}</p>
-                  {product.subCategory && (
-                    <p className="text-xs text-slate-500">{product.subCategory}</p>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <Warehouse className="h-4 w-4 text-slate-500" />
-                <div>
-                  <p className="text-sm font-medium text-slate-900">Stock & Variants</p>
-                  <p className="text-sm text-slate-600">{product.totalStock} units</p>
-                  {product.hasVariants && product.variants && (
-                    <p className="text-xs text-slate-500">
-                      Base: {product.inventory?.baseStock ?? 0} units | Variants: {product.variants.reduce((sum, v) => sum + (v.stock || 0), 0)} units
-                    </p>
-                  )}
-                  <p className="text-xs text-slate-500">
-                    {product.hasVariants ? `${product.variants?.length || 0} variants` : 'No variants'}
-                  </p>
-                </div>
-              </div>
+              {/* Pricing, Category and Stock & Variants are shown in the main
+                  content (Basic Information + Product Variants), so they're not
+                  duplicated here. */}
               {product.approvalStatus === 'REJECTED' && product.rejectionReason && (
                 <div className="flex items-start space-x-3 p-3 bg-red-50 rounded-lg">
                   <X className="h-4 w-4 text-red-500 mt-0.5" />
@@ -970,7 +891,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               {/* Assigned QC Checker */}
               {product.assignedQc && (
                 <div className="flex items-center space-x-3">
-                  <UserCheck className="h-4 w-4 text-blue-500" />
+                  <UserCheck className="h-4 w-4 text-brand-500" />
                   <div>
                     <p className="text-sm font-medium text-slate-900">QC Checker</p>
                     <p className="text-sm text-slate-600">{product.assignedQc.name}</p>
@@ -978,16 +899,13 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </SpecSection>
 
           {/* QC Inspection Summary */}
           {product.qcInspectionData && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">QC Inspection Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <SpecSection icon={<CheckCircle className="h-4 w-4" />} title="QC Inspection Summary">
+              <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-2">
                   {product.qcInspectionData.finalDecision && (
                     <div className={`p-2 rounded text-center ${product.qcInspectionData.finalDecision === 'Approved' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
@@ -1037,19 +955,13 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                 {product.inspectionCycleNumber && product.inspectionCycleNumber > 1 ? (
                   <p className="text-xs text-amber-600 font-medium">Inspection Cycle #{product.inspectionCycleNumber}</p>
                 ) : null}
-              </CardContent>
-            </Card>
+              </div>
+            </SpecSection>
           )}
 
           {/* Vendor Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <User className="h-5 w-5 mr-2" />
-                Vendor Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <SpecSection icon={<User className="h-4 w-4" />} title="Vendor Information">
+            <div className="space-y-4">
               <div>
                 <p className="text-sm font-medium text-slate-900">{product.vendor.companyName}</p>
                 <p className="text-xs text-slate-500">{product.vendor.ownerName}</p>
@@ -1064,45 +976,17 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-900">Status</p>
-                <Badge className={product.vendor.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-slate-50 text-slate-700 border border-slate-200'}>
+                <Badge className={getVendorStatusColor(product.vendor.status)}>
                   {product.vendor.status}
                 </Badge>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Material Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Material Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {product.fabricType && (
-                <div>
-                  <p className="text-sm font-medium text-slate-900">Fabric Type</p>
-                  <p className="text-sm text-slate-600">{product.fabricType}</p>
-                </div>
-              )}
-              {product.material && (
-                <div>
-                  <p className="text-sm font-medium text-slate-900">Material</p>
-                  <p className="text-sm text-slate-600">{product.material}</p>
-                </div>
-              )}
-              <div>
-                <p className="text-sm font-medium text-slate-900">Base SKU</p>
-                <p className="text-sm text-slate-600 font-mono">{product.baseSku}</p>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </SpecSection>
 
           {/* Logistics Configuration */}
           {product.logisticsConfig && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Logistics</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <SpecSection icon={<Truck className="h-4 w-4" />} title="Logistics">
+              <div className="space-y-3">
                 {(() => {
                   const lc = product.logisticsConfig!
                   return (
@@ -1174,8 +1058,8 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                     </>
                   )
                 })()}
-              </CardContent>
-            </Card>
+              </div>
+            </SpecSection>
           )}
         </div>
       </div>

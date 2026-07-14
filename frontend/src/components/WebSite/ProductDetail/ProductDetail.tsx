@@ -269,7 +269,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
       // Add to cart via API
       await cartService.addToCart(product.id, quantity, selectedVariant?.id);
 
-      const variantInfo = selectedVariant ? ` (${selectedVariant.size} - ${selectedVariant.color})` : 
+      const variantInfo = selectedVariant ? ` (${[selectedVariant.size, selectedVariant.color].filter(Boolean).join(" - ")})` : 
         (product.singleUnitSize || product.singleUnitColor ? ` (${[product.singleUnitSize, product.singleUnitColor].filter(Boolean).join(' - ')})` : '');
 
       showSuccessToast(
@@ -326,7 +326,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
     if (!product) return;
 
     try {
-      const variantInfo = selectedVariant ? ` (${selectedVariant.size} - ${selectedVariant.color})` : 
+      const variantInfo = selectedVariant ? ` (${[selectedVariant.size, selectedVariant.color].filter(Boolean).join(" - ")})` : 
         (product.singleUnitSize || product.singleUnitColor ? ` (${[product.singleUnitSize, product.singleUnitColor].filter(Boolean).join(' - ')})` : '');
       console.log(`Buy now ${product.name}${variantInfo}`);
 
@@ -597,7 +597,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       {product.hasVariants && visibleVariants.length > 0 && (
                         <div>
                           <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3 break-words">
-                            Select Variant: {selectedVariant ? `${selectedVariant.size} - ${selectedVariant.color}` :
+                            Select Variant: {selectedVariant ? `${[selectedVariant.size, selectedVariant.color].filter(Boolean).join(" - ")}` :
                               ([product.singleUnitSize, product.singleUnitColor].filter(Boolean).join(' - ') || 'Base Variant')}
                           </h3>
                           <div className="grid grid-cols-2 gap-2">
@@ -678,7 +678,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-md overflow-hidden border border-gray-200 shrink-0">
                                       <Image
                                         src={variant.images[0]}
-                                        alt={`${variant.size} ${variant.color}`}
+                                        alt={variant.variantName || variant.color || 'Variant'}
                                         width={48}
                                         height={48}
                                         className="w-full h-full object-cover"
@@ -686,7 +686,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                     </div>
                                   )}
                                   <div className="min-w-0 flex-1">
-                                    <div className="font-semibold text-gray-900 text-sm break-words">{variant.size}</div>
+                                    <div className="font-semibold text-gray-900 text-sm break-words">{variant.variantName || variant.color}</div>
                                     <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mt-1">
                                       {variant.colorHex && (
                                         <div
@@ -953,12 +953,6 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     <span className="text-gray-600">{product.category}</span>
                   </div>
                 )}
-                {product.subCategory && (
-                  <div className="flex justify-between py-3 border-b border-gray-100">
-                    <span className="font-semibold text-gray-700">Sub Category</span>
-                    <span className="text-gray-600">{product.subCategory}</span>
-                  </div>
-                )}
                 {(!product.hasVariants) && product.singleUnitSize && (
                   <div className="flex justify-between py-3 border-b border-gray-100">
                     <span className="font-semibold text-gray-700">Size</span>
@@ -1038,14 +1032,30 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                   <div className="mt-4">
                     <h5 className="text-sm font-semibold text-gray-700 mb-2">Fabric Specifications:</h5>
                     <ul className="space-y-2">
-                      {Object.entries(product.fabricSpecifications).map(([key, value]) => (
-                        <li key={key} className="flex items-start">
-                          <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 shrink-0"></span>
-                          <span className="text-gray-600 text-sm">
-                            <span className="font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span> {Array.isArray(value) ? value.join(', ') : String(value)}
-                          </span>
-                        </li>
-                      ))}
+                      {Object.entries(product.fabricSpecifications)
+                        // Hide internal/duplicate keys: care instructions have their
+                        // own section; weightUnit is always 'GSM'; type/basis are internal.
+                        .filter(([key]) => !['careInstructions', 'weightUnit', 'basis', 'type'].includes(key))
+                        .filter(([, value]) => value != null && String(value).trim() !== '')
+                        .map(([key, value]) => {
+                          const LABELS: Record<string, string> = {
+                            weightValue: 'Weight', gsm: 'GSM', length: 'Length', breadth: 'Breadth',
+                            weave: 'Type of Weave', composition: 'Composition',
+                          }
+                          const UNITS: Record<string, string> = { weightValue: 'g', length: 'cm', breadth: 'cm', gsm: 'GSM' }
+                          const label = LABELS[key] ?? key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())
+                          const unit = UNITS[key]
+                          const raw = Array.isArray(value) ? value.join(', ') : String(value)
+                          const display = unit && /^[\d.,\s]+$/.test(raw.trim()) ? `${raw} ${unit}` : raw
+                          return (
+                            <li key={key} className="flex items-start">
+                              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 shrink-0"></span>
+                              <span className="text-gray-600 text-sm">
+                                <span className="font-medium">{label}:</span> {display}
+                              </span>
+                            </li>
+                          )
+                        })}
                     </ul>
                   </div>
                 )}

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Search, UserCheck, Building2, Mail, Phone, CheckCircle,
-  Plus, Eye, FileText, ChevronLeft, ChevronRight,
+  Plus, FileText, ChevronLeft, ChevronRight,
   AlertTriangle, Clock, Users, X,
 } from "lucide-react";
 import { Badge } from "@/components/UI/Badge";
@@ -408,13 +408,13 @@ export default function AssignQCChecker() {
               <Table className="table-fixed">
                 <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50">
                   <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
-                    <TableHead className="w-[21%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Vendor</TableHead>
-                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
-                    <TableHead className="w-[17%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact</TableHead>
-                    <TableHead className="w-[10%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Status</TableHead>
+                    <TableHead className="w-[23%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                    <TableHead className="w-[14%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
+                    <TableHead className="w-[19%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact</TableHead>
+                    <TableHead className="w-[11%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Status</TableHead>
                     <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Inspection</TableHead>
-                    <TableHead className="w-[16%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Assigned Checker</TableHead>
-                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-right whitespace-nowrap">Actions</TableHead>
+                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Assigned Checker</TableHead>
+                    <TableHead className="w-[9%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-right whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -520,15 +520,6 @@ export default function AssignQCChecker() {
                             }
                             return (
                               <>
-                                {s && (
-                                  <Link
-                                    href={`/admin/dashboard/vendors/inspection/${vendor.id}`}
-                                    title="View Inspection Details"
-                                    className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </Link>
-                                )}
                                 <Link
                                   href={`/admin/dashboard/vendors/assign-qc-checker/add?vendorId=${vendor.id}`}
                                   className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold rounded-lg transition-colors"
@@ -596,13 +587,6 @@ export default function AssignQCChecker() {
           )}
         </div>
 
-        {/* Results summary when no pagination */}
-        {!loading && pagination.pages <= 1 && pagination.total > 0 && (
-          <p className="text-xs text-slate-400">
-            Showing {filteredVendors.length} of {pagination.total} vendor{pagination.total === 1 ? "" : "s"}
-            {metricFilter !== "all" ? ` (filtered)` : ""}
-          </p>
-        )}
       </div>
     </div>
   );

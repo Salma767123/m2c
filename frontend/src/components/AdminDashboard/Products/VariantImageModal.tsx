@@ -79,7 +79,7 @@ export default function VariantImageModal({
                             Variant Image
                         </h3>
                         <p className="text-sm text-slate-500 mt-1">
-                            {variantData.size} / {variantData.color}
+                            {variantData.color || '—'}
                         </p>
                     </div>
                     <button

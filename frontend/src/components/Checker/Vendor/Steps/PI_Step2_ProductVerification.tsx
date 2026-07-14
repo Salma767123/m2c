@@ -6,7 +6,6 @@ import { createPortal } from 'react-dom'
 import VerifyField, { SectionBlock, HighlightFieldsProvider, type Verifications } from './VI_VerifyField'
 import ImageCropModal from '@/components/UI/ImageCropModal'
 import { getExpectedProductVerificationKeys } from '@/components/Checker/Products/validation'
-import { parseDimensions } from '@/lib/dimensions'
 import { CARE_INSTRUCTIONS, CATEGORY_COLORS, CareIcon } from '@/components/VendorDashboard/Products/CareInstructionModal'
 import { notifyUploadSuccess } from '@/lib/toast-utils'
 
@@ -34,6 +33,39 @@ async function compressImage(file: File, maxWidth = 1200, quality = 0.7): Promis
 }
 
 const SUPPORTED_WEIGHT_UNITS = ['kg', 'g', 'lb', 'oz']
+
+// Mirror the product form's UOM dropdown labels.
+const UOM_LABELS: Record<string, string> = {
+  pcs: 'Pieces (pcs)', meters: 'Meters', kg: 'Kilograms (kg)', yards: 'Yards',
+  sets: 'Sets', rolls: 'Rolls', pairs: 'Pairs', dozen: 'Dozen',
+}
+
+// Resolve a color name (e.g. "red") to its hex when no hex is stored.
+const COLOR_NAME_HEX: Record<string, string> = {
+  black: '#000000', white: '#ffffff', gray: '#808080', grey: '#808080',
+  silver: '#c0c0c0', red: '#ff0000', green: '#008000', lime: '#00ff00',
+  blue: '#0000ff', navy: '#000080', yellow: '#ffff00', magenta: '#ff00ff',
+  cyan: '#00ffff', maroon: '#800000', olive: '#808000', purple: '#800080',
+  teal: '#008080', orange: '#ffa500', pink: '#ffc0cb', brown: '#a52a2a',
+  beige: '#f5f5dc',
+}
+const resolveHex = (name?: string, hex?: string): string | undefined => {
+  if (hex && /^#[0-9a-fA-F]{3,8}$/.test(hex.trim())) return hex.trim()
+  const n = (name || '').trim().toLowerCase()
+  return COLOR_NAME_HEX[n]
+}
+// "name" → "name (#hex)" when a hex is known.
+const colorValue = (name?: string, hex?: string): string => {
+  const h = resolveHex(name, hex)
+  const n = name || ''
+  return h ? `${n} (${h})` : n
+}
+// A small colour swatch to sit in the field header.
+const colorSwatch = (name?: string, hex?: string) => {
+  const h = resolveHex(name, hex)
+  if (!h) return undefined
+  return <span className="inline-block w-4 h-4 rounded-full border border-slate-300 shrink-0" style={{ backgroundColor: h }} />
+}
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function safe(val: any): string {
@@ -155,7 +187,7 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
 
       {/* ── 1. Basic Product Info ─────────────────────────────────────────── */}
       <SectionBlock title="Basic Product Information" icon={<Package className="w-4 h-4" />}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {notEmpty(p.name) && (
             <VerifyField fieldKey="pv_name" label="Product Name" value={p.name}
               verifications={verifications} onChange={onVerify} />
@@ -164,8 +196,14 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
             <VerifyField fieldKey="pv_category" label="Category" value={p.category}
               verifications={verifications} onChange={onVerify} />
           )}
-          {notEmpty(p.subCategory) && (
-            <VerifyField fieldKey="pv_subCategory" label="Sub-Category" value={p.subCategory}
+          {notEmpty(p.singleUnitColor) && (
+            <VerifyField fieldKey="pv_baseColor" label="Base Color"
+              value={colorValue(p.singleUnitColor, p.singleUnitColorHex)}
+              headerAction={colorSwatch(p.singleUnitColor, p.singleUnitColorHex)}
+              verifications={verifications} onChange={onVerify} />
+          )}
+          {notEmpty(p.uom) && (
+            <VerifyField fieldKey="pv_uom" label="Selling Unit (UOM)" value={UOM_LABELS[p.uom] || p.uom}
               verifications={verifications} onChange={onVerify} />
           )}
           {notEmpty(p.brand) && (
@@ -182,10 +220,12 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
       {/* ── 2. Product Images ─────────────────────────────────────────────── */}
       {Array.isArray(p.images) && p.images.length > 0 && (
         <SectionBlock title="Product Images" icon={<ImageIcon className="w-4 h-4" />}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {p.images.map((img: any, i: number) => {
               const imgUrl = img.url || img.imageUrl
-              const imgLabel = img.alt || `Product Image ${i + 1}${img.isPrimary ? ' (Primary)' : ''}`
+              // Always use a generic label — the raw uploaded filename
+              // (e.g. "ChatGPT Image …PNG") is noise and overlaps the thumbnail.
+              const imgLabel = `Product Image ${i + 1}${img.isPrimary ? ' (Primary)' : ''}`
               return (
                 <VerifyField
                   key={i}
@@ -213,10 +253,10 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
         </SectionBlock>
       )}
 
-      {/* ── 3. Material & Construction ────────────────────────────────────── */}
-      {(notEmpty(p.fabricType) || notEmpty(p.material) || notEmpty(p.construction)) && (
-        <SectionBlock title="Material & Construction" icon={<Layers className="w-4 h-4" />}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* ── 3. Measurements & Specifications ─────────────────────────────── */}
+      {(notEmpty(p.fabricType) || notEmpty(p.material) || notEmpty(p.fabricSpecifications)) && (
+        <SectionBlock title="Measurements & Specifications" icon={<Ruler className="w-4 h-4" />}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {notEmpty(p.fabricType) && (
               <VerifyField fieldKey="pv_fabricType" label="Fabric Type" value={p.fabricType}
                 verifications={verifications} onChange={onVerify} />
@@ -225,6 +265,151 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
               <VerifyField fieldKey="pv_material" label="Material Description" value={p.material}
                 verifications={verifications} onChange={onVerify} />
             )}
+            {p.fabricSpecifications && typeof p.fabricSpecifications === 'object' &&
+              Object.entries(p.fabricSpecifications)
+                // `weightUnit` is always 'GSM' (implied by the GSM field) — hide it.
+                .filter(([key]) => key !== 'basis' && key !== 'careInstructions' && key !== 'weightUnit')
+                .filter(([, val]) => notEmpty(val))
+                .map(([key, val]) => {
+                  const SPEC_LABEL_MAP: Record<string, string> = {
+                    weightValue: 'Weight',
+                    weave: 'Weave Type',
+                    gsm: 'GSM',
+                    length: 'Length',
+                    breadth: 'Breadth',
+                  }
+                  const SPEC_UNIT_MAP: Record<string, string> = {
+                    weightValue: 'g', length: 'cm', breadth: 'cm', gsm: 'GSM',
+                  }
+                  const label = SPEC_LABEL_MAP[key]
+                    ?? key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())
+                  const unit = SPEC_UNIT_MAP[key]
+                  const displayVal = Array.isArray(val)
+                    ? val
+                    : (unit && /^[\d.,\s]+$/.test(String(val).trim()) ? `${safe(val)} ${unit}` : safe(val))
+                  return (
+                    <VerifyField
+                      key={key}
+                      fieldKey={`pv_spec_${key}`}
+                      label={label}
+                      value={displayVal}
+                      verifications={verifications}
+                      onChange={onVerify}
+                    />
+                  )
+                })
+            }
+            {Array.isArray(p.fabricSpecifications?.careInstructions) && p.fabricSpecifications.careInstructions.length > 0 && (
+              <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
+                <CareInstructionsVerifyBlock
+                  fieldKey="pv_spec_careInstructions"
+                  labels={p.fabricSpecifications.careInstructions}
+                  verifications={verifications}
+                  onVerify={onVerify}
+                  needsHighlight={unverifiedKeys.has('pv_spec_careInstructions')}
+                />
+              </div>
+            )}
+          </div>
+        </SectionBlock>
+      )}
+
+      {/* ── 4. Variants (no pricing) ─────────────────────────────────────── */}
+      {variants.length > 0 && (
+        <SectionBlock title="Product Variants" icon={<Tag className="w-4 h-4" />}>
+          <div className="space-y-4">
+            {variants.map((variant: any, vi: number) => {
+              const varLabel = [variant.color, variant.size, variant.material]
+                .filter(Boolean).join(' / ') || `Variant ${vi + 1}`
+              return (
+                <div key={vi} className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+                    <p className="text-sm font-bold text-slate-700">Variant {vi + 1}: {varLabel}</p>
+                  </div>
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {notEmpty(variant.color) && (
+                      <VerifyField fieldKey={`pv_var${vi}_color`} label="Color"
+                        value={colorValue(variant.color, variant.colorHex)}
+                        headerAction={colorSwatch(variant.color, variant.colorHex)}
+                        verifications={verifications} onChange={onVerify} />
+                    )}
+                    {notEmpty(variant.size) && (
+                      <VerifyField fieldKey={`pv_var${vi}_size`} label="Size"
+                        value={variant.size} verifications={verifications} onChange={onVerify} />
+                    )}
+                    {notEmpty(variant.material) && (
+                      <VerifyField fieldKey={`pv_var${vi}_material`} label="Material"
+                        value={variant.material} verifications={verifications} onChange={onVerify} />
+                    )}
+                    {notEmpty(variant.variantName) && (
+                      <VerifyField fieldKey={`pv_var${vi}_variantName`} label="Variant Name"
+                        value={variant.variantName} verifications={verifications} onChange={onVerify} />
+                    )}
+                    {Array.isArray(variant.images) && variant.images[0] && (
+                      <VerifyField fieldKey={`pv_var${vi}_image`} label="Variant Image"
+                        value={variant.images[0]} type="image"
+                        verifications={verifications} onChange={onVerify} />
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </SectionBlock>
+      )}
+
+      {/* ── 6. Packaging Information ──────────────────────────────────────── */}
+      {(notEmpty(p.packagingType) || notEmpty(p.packagingDetails) || notEmpty(p.packagingMaterial)) && (
+        <SectionBlock title="Packaging Information" icon={<Package className="w-4 h-4" />}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {notEmpty(p.packagingType) && (
+              <VerifyField fieldKey="pv_packagingType" label="Packaging Type" value={p.packagingType}
+                verifications={verifications} onChange={onVerify} />
+            )}
+            {notEmpty(p.packagingMaterial) && (
+              <VerifyField fieldKey="pv_packagingMaterial" label="Packaging Material" value={p.packagingMaterial}
+                verifications={verifications} onChange={onVerify} />
+            )}
+            {notEmpty(p.packagingDetails) && (
+              <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
+                <VerifyField fieldKey="pv_packagingDetails" label="Packaging Details" value={
+                  typeof p.packagingDetails === 'object'
+                    ? JSON.stringify(p.packagingDetails)
+                    : p.packagingDetails
+                } verifications={verifications} onChange={onVerify} />
+              </div>
+            )}
+          </div>
+        </SectionBlock>
+      )}
+
+      {/* ── 7. Label & Marking Info ───────────────────────────────────────── */}
+      {(notEmpty(p.labelInfo) || notEmpty(p.careLabel) || notEmpty(p.countryOfOrigin)) && (
+        <SectionBlock title="Labels & Markings" icon={<Tag className="w-4 h-4" />}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {notEmpty(p.careLabel) && (
+              <VerifyField fieldKey="pv_careLabel" label="Care Label" value={p.careLabel}
+                verifications={verifications} onChange={onVerify} />
+            )}
+            {notEmpty(p.countryOfOrigin) && (
+              <VerifyField fieldKey="pv_countryOfOrigin" label="Country of Origin" value={p.countryOfOrigin}
+                verifications={verifications} onChange={onVerify} />
+            )}
+            {notEmpty(p.labelInfo) && (
+              <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
+                <VerifyField fieldKey="pv_labelInfo" label="Label Information" value={
+                  typeof p.labelInfo === 'object' ? JSON.stringify(p.labelInfo) : p.labelInfo
+                } verifications={verifications} onChange={onVerify} />
+              </div>
+            )}
+          </div>
+        </SectionBlock>
+      )}
+
+      {/* ── 8. Shipping (last product-data section) ──────────────────────── */}
+      {(notEmpty(p.construction) || notEmpty(p.weight) || notEmpty(p.dispatchTimeline?.processingDays) || notEmpty(p.dispatchTimeline?.shippingDays)) && (
+        <SectionBlock title="Shipping" icon={<Layers className="w-4 h-4" />}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {notEmpty(p.construction) && (
               <VerifyField fieldKey="pv_construction" label="Construction" value={p.construction}
                 verifications={verifications} onChange={onVerify} />
@@ -243,144 +428,6 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
               <VerifyField fieldKey="pv_shippingDays" label="Shipping Days"
                 value={`${p.dispatchTimeline.shippingDays} Day${p.dispatchTimeline.shippingDays !== 1 ? 's' : ''}`}
                 verifications={verifications} onChange={onVerify} />
-            )}
-          </div>
-        </SectionBlock>
-      )}
-
-      {/* ── 4. Variants (no pricing) ─────────────────────────────────────── */}
-      {variants.length > 0 && (
-        <SectionBlock title="Product Variants" icon={<Tag className="w-4 h-4" />}>
-          <div className="space-y-4">
-            {variants.map((variant: any, vi: number) => {
-              const varLabel = [variant.color, variant.size, variant.material]
-                .filter(Boolean).join(' / ') || `Variant ${vi + 1}`
-              return (
-                <div key={vi} className="border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
-                    <p className="text-sm font-bold text-slate-700">Variant {vi + 1}: {varLabel}</p>
-                  </div>
-                  <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {notEmpty(variant.color) && (
-                      <VerifyField fieldKey={`pv_var${vi}_color`} label="Color"
-                        value={variant.color} verifications={verifications} onChange={onVerify} />
-                    )}
-                    {notEmpty(variant.size) && (
-                      <VerifyField fieldKey={`pv_var${vi}_size`} label="Size"
-                        value={variant.size} verifications={verifications} onChange={onVerify} />
-                    )}
-                    {notEmpty(variant.material) && (
-                      <VerifyField fieldKey={`pv_var${vi}_material`} label="Material"
-                        value={variant.material} verifications={verifications} onChange={onVerify} />
-                    )}
-                    {notEmpty(variant.sku) && (
-                      <VerifyField fieldKey={`pv_var${vi}_sku`} label="SKU"
-                        value={variant.sku} verifications={verifications} onChange={onVerify} />
-                    )}
-                    {notEmpty(variant.variantName) && (
-                      <VerifyField fieldKey={`pv_var${vi}_variantName`} label="Variant Name"
-                        value={variant.variantName} verifications={verifications} onChange={onVerify} />
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </SectionBlock>
-      )}
-
-      {/* ── 5. Measurements / Specifications ─────────────────────────────── */}
-      {(notEmpty(p.dimensions) || notEmpty(p.fabricSpecifications)) && (
-        <SectionBlock title="Measurements & Specifications" icon={<Ruler className="w-4 h-4" />}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {notEmpty(p.dimensions) && (
-              <VerifyField fieldKey="pv_dimensions" label="Dimensions" value={
-                typeof p.dimensions === 'object'
-                  ? Object.entries(p.dimensions).map(([k, v]) => `${k}: ${v}`).join(' | ')
-                  : (() => { const { value, unit } = parseDimensions(p.dimensions); return value ? `${value} ${unit}` : p.dimensions })()
-              } verifications={verifications} onChange={onVerify} />
-            )}
-            {p.fabricSpecifications && typeof p.fabricSpecifications === 'object' &&
-              Object.entries(p.fabricSpecifications)
-                .filter(([key]) => key !== 'basis' && key !== 'careInstructions')
-                .filter(([, val]) => notEmpty(val))
-                .map(([key, val]) => {
-                  const SPEC_LABEL_MAP: Record<string, string> = {
-                    weightValue: 'Weight Per Unit',
-                    weave: 'Weave Type',
-                  }
-                  const label = SPEC_LABEL_MAP[key]
-                    ?? key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())
-                  return (
-                    <VerifyField
-                      key={key}
-                      fieldKey={`pv_spec_${key}`}
-                      label={label}
-                      value={Array.isArray(val) ? val : safe(val)}
-                      verifications={verifications}
-                      onChange={onVerify}
-                    />
-                  )
-                })
-            }
-            {Array.isArray(p.fabricSpecifications?.careInstructions) && p.fabricSpecifications.careInstructions.length > 0 && (
-              <div className="md:col-span-2">
-                <CareInstructionsVerifyBlock
-                  fieldKey="pv_spec_careInstructions"
-                  labels={p.fabricSpecifications.careInstructions}
-                  verifications={verifications}
-                  onVerify={onVerify}
-                  needsHighlight={unverifiedKeys.has('pv_spec_careInstructions')}
-                />
-              </div>
-            )}
-          </div>
-        </SectionBlock>
-      )}
-
-      {/* ── 6. Packaging Information ──────────────────────────────────────── */}
-      {(notEmpty(p.packagingType) || notEmpty(p.packagingDetails) || notEmpty(p.packagingMaterial)) && (
-        <SectionBlock title="Packaging Information" icon={<Package className="w-4 h-4" />}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {notEmpty(p.packagingType) && (
-              <VerifyField fieldKey="pv_packagingType" label="Packaging Type" value={p.packagingType}
-                verifications={verifications} onChange={onVerify} />
-            )}
-            {notEmpty(p.packagingMaterial) && (
-              <VerifyField fieldKey="pv_packagingMaterial" label="Packaging Material" value={p.packagingMaterial}
-                verifications={verifications} onChange={onVerify} />
-            )}
-            {notEmpty(p.packagingDetails) && (
-              <div className="md:col-span-2">
-                <VerifyField fieldKey="pv_packagingDetails" label="Packaging Details" value={
-                  typeof p.packagingDetails === 'object'
-                    ? JSON.stringify(p.packagingDetails)
-                    : p.packagingDetails
-                } verifications={verifications} onChange={onVerify} />
-              </div>
-            )}
-          </div>
-        </SectionBlock>
-      )}
-
-      {/* ── 7. Label & Marking Info ───────────────────────────────────────── */}
-      {(notEmpty(p.labelInfo) || notEmpty(p.careLabel) || notEmpty(p.countryOfOrigin)) && (
-        <SectionBlock title="Labels & Markings" icon={<Tag className="w-4 h-4" />}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {notEmpty(p.careLabel) && (
-              <VerifyField fieldKey="pv_careLabel" label="Care Label" value={p.careLabel}
-                verifications={verifications} onChange={onVerify} />
-            )}
-            {notEmpty(p.countryOfOrigin) && (
-              <VerifyField fieldKey="pv_countryOfOrigin" label="Country of Origin" value={p.countryOfOrigin}
-                verifications={verifications} onChange={onVerify} />
-            )}
-            {notEmpty(p.labelInfo) && (
-              <div className="md:col-span-2">
-                <VerifyField fieldKey="pv_labelInfo" label="Label Information" value={
-                  typeof p.labelInfo === 'object' ? JSON.stringify(p.labelInfo) : p.labelInfo
-                } verifications={verifications} onChange={onVerify} />
-              </div>
             )}
           </div>
         </SectionBlock>

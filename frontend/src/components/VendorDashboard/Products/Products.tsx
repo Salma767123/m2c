@@ -291,14 +291,6 @@ export default function Products() {
         </div>
       </div>
 
-      {/* Results summary */}
-      {displayedProducts.length > 0 && (
-        <p className="text-sm text-slate-500">
-          Showing {displayedProducts.length} product{displayedProducts.length === 1 ? '' : 's'}
-          {cardFilter === 'active' ? ' • Active' : cardFilter === 'pending' ? ' • Pending Approval' : cardFilter === 'out' ? ' • Out of Stock' : ''}
-        </p>
-      )}
-
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           {displayedProducts.length === 0 ? (
@@ -315,11 +307,11 @@ export default function Products() {
                 <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
                   <TableHead>Product</TableHead>
                   <TableHead>Category</TableHead>
+                  <TableHead>Variants</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Stock</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Approval</TableHead>
-                  <TableHead>Variants</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -333,6 +325,9 @@ export default function Products() {
                     <TableCell>
                       <span className="text-xs bg-slate-50 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-full font-medium">{product.category}</span>
                     </TableCell>
+                    <TableCell className="text-slate-600">
+                      {product.hasVariants ? `${product.variants?.length || 0} variants` : 'No variants'}
+                    </TableCell>
                     <TableCell className="font-semibold text-slate-900">
                       ₹{product.basePrice.toFixed(2)}
                       {product.hasVariants && product.variants && product.variants.length > 0 && (
@@ -343,9 +338,12 @@ export default function Products() {
                     </TableCell>
                     <TableCell>
                       {(() => {
-                        const stock = product.hasVariants && product.variants
-                          ? product.variants.reduce((sum, v) => sum + v.stock, 0)
-                          : product.totalStock;
+                        // Total stock = base-unit stock + every variant's stock.
+                        // The stored totalStock can lag (it sometimes reflects
+                        // variants only), so compute it from the live parts.
+                        const baseStock = product.inventory?.baseStock ?? 0;
+                        const variantsStock = (product.variants || []).reduce((s, v) => s + (v.stock || 0), 0);
+                        const stock = product.hasVariants ? baseStock + variantsStock : (product.totalStock ?? 0);
                         return (
                           <span className={`font-semibold ${stock === 0 ? 'text-red-600' : stock < 10 ? 'text-orange-600' : 'text-slate-900'}`}>
                             {stock}
@@ -369,10 +367,14 @@ export default function Products() {
                     <TableCell>
                       <div className="space-y-1">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap capitalize ${product.approvalStatus === 'APPROVED'
-                            ? 'bg-green-50 text-green-700 border-green-200'
-                            : product.approvalStatus === 'REINSPECTION'
-                              ? 'bg-orange-50 text-orange-700 border-orange-200'
-                              : 'bg-slate-50 text-slate-700 border-slate-200'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : product.approvalStatus === 'PENDING'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : product.approvalStatus === 'REINSPECTION'
+                                ? 'bg-orange-50 text-orange-700 border-orange-200'
+                                : product.approvalStatus === 'REJECTED'
+                                  ? 'bg-red-50 text-red-700 border-red-200'
+                                  : 'bg-slate-50 text-slate-700 border-slate-200'
                           }`}>
                           {product.approvalStatus === 'REINSPECTION' ? 'Reinspection Required' : product.approvalStatus?.toLowerCase()}
                         </span>
@@ -382,9 +384,6 @@ export default function Products() {
                           </div>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell className="text-slate-600">
-                      {product.hasVariants ? `${product.variants?.length || 0} variants` : 'No variants'}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">

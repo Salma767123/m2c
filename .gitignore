@@ -9,3 +9,6 @@ mobile/.env
 # Claude Code local config
 .claude/
 **/.claude/
+
+# macOS
+.DS_Store

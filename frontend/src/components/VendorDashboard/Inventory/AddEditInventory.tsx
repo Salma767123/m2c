@@ -521,7 +521,11 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
           </div>
           <div className="flex items-center gap-3">
             <Link href={fromProductCreation && returnTo ? returnTo : '/vendor/dashboard/inventory'} className="shrink-0">
-              <Button type="button" variant="outline">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 transition-colors"
+              >
                 Cancel
               </Button>
             </Link>
@@ -529,7 +533,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
               type="submit"
               form="inventory-form"
               disabled={isLoading}
-              className="bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20"
+              className="bg-brand-500 text-white hover:bg-brand-600 hover:shadow-md hover:shadow-brand-500/30 active:bg-brand-700 transition-all shadow-sm shadow-brand-500/20"
             >
               <Save className="h-4 w-4 mr-2" />
               {isLoading ? 'Saving...' : (isEdit ? 'Update Item' : 'Create Item')}

@@ -297,7 +297,6 @@ export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {
           <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
             <InfoBlock label="Product Name" value={p.name} />
             <InfoBlock label="Category" value={p.category} />
-            <InfoBlock label="Sub-Category" value={p.subCategory} />
           </div>
         </div>
       )}

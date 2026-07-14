@@ -1,19 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { convertINRtoUSD } from '@/lib/currency'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
-import { ArrowLeft, Save, X, Upload, Package, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Save, X, Upload, Package, Image as ImageIcon, ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
 import VariantImageModal from './VariantImageModal'
+import CareInstructionModal, { CARE_INSTRUCTIONS, CareIcon, CATEGORY_COLORS, CATEGORY_BORDER } from '@/components/VendorDashboard/Products/CareInstructionModal'
 import Link from 'next/link'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
 import { centerNotice } from '@/components/UI/CenterNotice'
 import { gstSettingsService, type GSTSetting } from '@/services/gstSettingsService'
-import { DIMENSION_UNITS, parseDimensions, combineDimensions } from '@/lib/dimensions'
+import { parseDimensions, combineDimensions } from '@/lib/dimensions'
 
 // 1 → A, 26 → Z, 27 → AA … (mirrors the backend variant-suffix logic).
 const variantAlphaSuffix = (n: number): string => {
@@ -40,6 +41,20 @@ interface InventoryItem {
 }
 
 // Helper function to get color name from hex value
+// Type a color name (e.g. "red", "blue") → auto-fill the swatch hex, same as
+// the vendor product form.
+const getColorHex = (name: string): string | null => {
+  const nameMap: { [key: string]: string } = {
+    black: '#000000', white: '#ffffff', gray: '#808080', grey: '#808080',
+    silver: '#c0c0c0', red: '#ff0000', green: '#008000', lime: '#00ff00',
+    blue: '#0000ff', navy: '#000080', yellow: '#ffff00', magenta: '#ff00ff',
+    cyan: '#00ffff', maroon: '#800000', olive: '#808000', purple: '#800080',
+    teal: '#008080', orange: '#ffa500', pink: '#ffc0cb', brown: '#a52a2a',
+    beige: '#f5f5dc',
+  }
+  return nameMap[name.trim().toLowerCase()] || null
+}
+
 const getColorName = (hex: string): string => {
   const colorMap: { [key: string]: string } = {
     '#000000': 'Black',
@@ -78,7 +93,6 @@ const fabricTypes = [
   'Cotton', 'Linen', 'Silk', 'Polyester', 'Microfiber', 'Bamboo', 'Modal', 'Tencel', 'Wool', 'Cashmere'
 ]
 
-const standardSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'King', 'Queen', 'Full', 'Twin', 'Custom']
 const standardColors = ['White', 'Black', 'Gray', 'Navy', 'Beige', 'Brown', 'Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Purple']
 
 interface ProductVariant {
@@ -114,6 +128,13 @@ interface FabricSpecification {
   type: string
   composition: string
   weight: string
+  // Fabric weight (g) + dimensions (cm) used to auto-calculate GSM — mirrors
+  // the vendor product form.
+  weightValue: string
+  weightUnit: string
+  length: string
+  breadth: string
+  gsm: string
   weave: string
   finish: string
   careInstructions: string[]
@@ -282,6 +303,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
       type: '',
       composition: '',
       weight: '',
+      weightValue: '',
+      weightUnit: 'GSM',
+      length: '',
+      breadth: '',
+      gsm: '',
       weave: '',
       finish: '',
       careInstructions: []
@@ -338,8 +364,30 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
   })
 
   const [selectedTag, setSelectedTag] = useState('')
-  const [newCareInstruction, setNewCareInstruction] = useState('')
+  const [careModalOpen, setCareModalOpen] = useState(false)
+  const handleAddCareInstructions = (instructions: string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      fabricSpecifications: { ...prev.fabricSpecifications, careInstructions: instructions },
+    }))
+  }
   const [activeTab, setActiveTab] = useState('basic')
+  const productTabs = [
+    { id: 'basic', label: 'Basic Info' },
+    { id: 'fabric', label: 'Fabric & Specs' },
+    { id: 'variants', label: 'Variants' },
+    { id: 'pricing', label: 'Pricing' },
+    { id: 'inventory', label: 'Inventory' },
+    { id: 'shipping', label: 'Shipping' },
+    { id: 'logistics', label: 'Logistics' },
+  ]
+  const activeTabIndex = productTabs.findIndex((t) => t.id === activeTab)
+  const goToPrevTab = () => {
+    if (activeTabIndex > 0) setActiveTab(productTabs[activeTabIndex - 1].id)
+  }
+  const goToNextTab = () => {
+    if (activeTabIndex < productTabs.length - 1) setActiveTab(productTabs[activeTabIndex + 1].id)
+  }
 
   // Debug: Log category and subcategory changes
   useEffect(() => {
@@ -347,6 +395,21 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
     console.log('Category:', formData.category)
     console.log('SubCategory:', formData.subCategory)
   }, [formData.category, formData.subCategory])
+
+  // Auto-calculate GSM from fabric weight (g) and dimensions (cm):
+  //   GSM = (Weight × 10000) ÷ (Length × Breadth)  — mirrors the vendor form.
+  useEffect(() => {
+    const w = parseFloat(formData.fabricSpecifications.weightValue)
+    const l = parseFloat(formData.fabricSpecifications.length)
+    const b = parseFloat(formData.fabricSpecifications.breadth)
+    const gsm = w > 0 && l > 0 && b > 0 ? String(Math.round((w * 10000) / (l * b))) : ''
+    if (gsm !== formData.fabricSpecifications.gsm) {
+      setFormData(prev => ({
+        ...prev,
+        fabricSpecifications: { ...prev.fabricSpecifications, gsm, weightUnit: 'GSM' },
+      }))
+    }
+  }, [formData.fabricSpecifications.weightValue, formData.fabricSpecifications.length, formData.fabricSpecifications.breadth, formData.fabricSpecifications.gsm])
 
   // Debug: Log when categories are loaded
   useEffect(() => {
@@ -438,8 +501,37 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
     images: [] // New field for variant images
   })
 
-  // State for variant image editing
+  // State for variant image editing (image modal)
   const [editingVariantId, setEditingVariantId] = useState<string | null>(null)
+
+  // Inline row-edit: load a variant back into the "Add New Variant" form so
+  // ALL its fields can be edited; saving updates that row instead of adding.
+  const [editVariantId, setEditVariantId] = useState<string | null>(null)
+  const addVariantSectionRef = useRef<HTMLDivElement>(null)
+
+  const handleEditVariantRow = (variant: ProductVariant) => {
+    setNewVariant({
+      variantName: variant.variantName || '',
+      size: variant.size || '',
+      color: variant.color || '',
+      colorHex: variant.colorHex || '#000000',
+      sku: variant.sku || '',
+      price: variant.price || 0,
+      originalPrice: variant.originalPrice,
+      discount: variant.discount,
+      stock: variant.stock || 0,
+      lowStockThreshold: variant.lowStockThreshold,
+      images: variant.images || [],
+    })
+    setEditVariantId(variant.id || null)
+    // Scroll the add/edit form into view.
+    setTimeout(() => addVariantSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+  }
+
+  const cancelEditVariant = () => {
+    setEditVariantId(null)
+    setNewVariant({ variantName: '', size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0, lowStockThreshold: undefined, images: [] })
+  }
 
   const handleVariantImagesUpdate = (variantId: string, newImages: string[]) => {
     updateVariant(variantId, 'images', newImages)
@@ -505,14 +597,22 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
 
               fabricType: product.fabricType || '',
               material: product.material || '',
-              fabricSpecifications: product.fabricSpecifications || {
-                type: '',
-                composition: '',
-                weight: '',
-                weave: '',
-                finish: '',
-                careInstructions: []
-              },
+              fabricSpecifications: (() => {
+                const fs = (product.fabricSpecifications as any) || {}
+                return {
+                  type: fs.type || '',
+                  composition: fs.composition || '',
+                  weight: fs.weight || '',
+                  weightValue: fs.weightValue || fs.weight || '',
+                  weightUnit: fs.weightUnit || 'GSM',
+                  length: fs.length || '',
+                  breadth: fs.breadth || '',
+                  gsm: fs.gsm || '',
+                  weave: fs.weave || '',
+                  finish: fs.finish || '',
+                  careInstructions: Array.isArray(fs.careInstructions) ? fs.careInstructions : [],
+                }
+              })(),
 
               variants: product.variants?.map(v => ({
                 id: v.id,
@@ -890,29 +990,51 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
 
   const addVariant = () => {
     // SKU is auto-generated server-side; size is optional. Color is required.
-    if (newVariant.color) {
-      const variant: ProductVariant = {
-        id: Date.now().toString(),
-        variantName: (newVariant.variantName || '').trim(),
-        size: newVariant.size || '',
-        color: newVariant.color!,
-        colorHex: newVariant.colorHex || '#000000',
-        sku: '', // assigned by the backend on save
-        price: newVariant.price || 0,
-        originalPrice: newVariant.originalPrice || undefined,
-        discount: newVariant.discount || undefined,
-        stock: newVariant.stock || 0,
-        lowStockThreshold: newVariant.lowStockThreshold,
-        images: newVariant.images || []
-      }
+    if (!newVariant.color) return
 
+    // Edit mode: update the existing row in place.
+    if (editVariantId) {
       setFormData(prev => ({
         ...prev,
-        variants: [...prev.variants, variant]
+        variants: prev.variants.map(v => v.id === editVariantId ? {
+          ...v,
+          variantName: (newVariant.variantName || '').trim(),
+          color: newVariant.color!,
+          colorHex: newVariant.colorHex || '#000000',
+          price: newVariant.price || 0,
+          originalPrice: newVariant.originalPrice || undefined,
+          discount: newVariant.discount || undefined,
+          stock: newVariant.stock || 0,
+          lowStockThreshold: newVariant.lowStockThreshold,
+          images: newVariant.images || [],
+        } : v)
       }))
-
+      setEditVariantId(null)
       setNewVariant({ variantName: '', size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0, lowStockThreshold: undefined, images: [] })
+      return
     }
+
+    const variant: ProductVariant = {
+      id: Date.now().toString(),
+      variantName: (newVariant.variantName || '').trim(),
+      size: newVariant.size || '',
+      color: newVariant.color!,
+      colorHex: newVariant.colorHex || '#000000',
+      sku: '', // assigned by the backend on save
+      price: newVariant.price || 0,
+      originalPrice: newVariant.originalPrice || undefined,
+      discount: newVariant.discount || undefined,
+      stock: newVariant.stock || 0,
+      lowStockThreshold: newVariant.lowStockThreshold,
+      images: newVariant.images || []
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      variants: [...prev.variants, variant]
+    }))
+
+    setNewVariant({ variantName: '', size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0, lowStockThreshold: undefined, images: [] })
   }
 
   const removeVariant = (variantId: string) => {
@@ -948,7 +1070,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
 
     const file = files[0]
     if (file.size > 5 * 1024 * 1024) { // 5MB limit
-      showWarningToast('File Too Large', 'Please select an image under 5MB.')
+      centerNotice.error('File Too Large', `${file.name} exceeds the 5MB limit.`)
       e.target.value = ''
       return
     }
@@ -960,35 +1082,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
           ...prev,
           images: [event.target?.result as string] // Overwrite with new single image
         }))
-        centerNotice.success('Image Uploaded', `${file.name} added to this variant.`)
+        centerNotice.success('Image Uploaded', 'Variant image added.')
+      } else {
+        centerNotice.error('Upload Failed', `Could not read ${file.name}.`)
       }
+      e.target.value = ''
+    }
+    reader.onerror = () => {
+      centerNotice.error('Upload Failed', `Failed to read ${file.name}.`)
+      e.target.value = ''
     }
     reader.readAsDataURL(file)
-    e.target.value = ''
-  }
-
-  // Care Instructions Functions
-  const addCareInstruction = () => {
-    if (newCareInstruction.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        fabricSpecifications: {
-          ...prev.fabricSpecifications,
-          careInstructions: [...prev.fabricSpecifications.careInstructions, newCareInstruction.trim()]
-        }
-      }))
-      setNewCareInstruction('')
-    }
-  }
-
-  const removeCareInstruction = (instruction: string) => {
-    setFormData(prev => ({
-      ...prev,
-      fabricSpecifications: {
-        ...prev.fabricSpecifications,
-        careInstructions: prev.fabricSpecifications.careInstructions.filter(i => i !== instruction)
-      }
-    }))
   }
 
   const addTag = () => {
@@ -1010,7 +1114,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
     const oversizedFiles = Array.from(files).filter(file => file.size > 10 * 1024 * 1024) // 10MB limit
     if (oversizedFiles.length > 0) {
       const fileNames = oversizedFiles.map(f => f.name).join(', ')
-      showWarningToast('File Too Large', `The following file(s) exceed 10MB limit: ${fileNames}`)
+      centerNotice.error('File Too Large', `The following file(s) exceed the 10MB limit: ${fileNames}`)
       e.target.value = '' // Reset input immediately
       return
     }
@@ -1019,12 +1123,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
     if (imageType === 'cover') {
       const existingCoverImages = formData.images.filter(img => img.imageType === 'cover')
       if (existingCoverImages.length >= 1) {
-        showWarningToast('Cover Image Limit', 'Only one cover image is allowed. Please remove the existing cover image first.')
+        centerNotice.error('Cover Image Limit', 'Only one cover image is allowed. Please remove the existing cover image first.')
         e.target.value = '' // Reset input
         return
       }
       if (files.length > 1) {
-        showWarningToast('Single Image Only', 'Please select only one image for cover image.')
+        centerNotice.error('Single Image Only', 'Please select only one image for the cover image.')
         e.target.value = '' // Reset input
         return
       }
@@ -1035,13 +1139,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
       const remainingSlots = 3 - existingGalleryImages.length
 
       if (remainingSlots <= 0) {
-        showWarningToast('Gallery Limit Reached', 'Maximum 3 gallery images allowed. Please remove some images first.')
+        centerNotice.error('Gallery Limit Reached', 'Maximum 3 gallery images allowed. Please remove some images first.')
         e.target.value = '' // Reset input
         return
       }
 
       if (files.length > remainingSlots) {
-        showWarningToast('Too Many Images', `You can only add ${remainingSlots} more gallery image${remainingSlots > 1 ? 's' : ''}.`)
+        centerNotice.error('Too Many Images', `You can only add ${remainingSlots} more gallery image${remainingSlots > 1 ? 's' : ''}.`)
         e.target.value = '' // Reset input
         return
       }
@@ -1089,7 +1193,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
     if (imageType === 'cover') {
       const existingCoverImages = formData.images.filter(img => img.imageType === 'cover' && img.id !== imageId)
       if (existingCoverImages.length >= 1) {
-        showWarningToast('Cover Image Limit', 'Only one cover image is allowed. Please remove the existing cover image first.')
+        centerNotice.error('Cover Image Limit', 'Only one cover image is allowed. Please remove the existing cover image first.')
         return
       }
     }
@@ -1097,7 +1201,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
     if (imageType === 'gallery') {
       const existingGalleryImages = formData.images.filter(img => img.imageType === 'gallery' && img.id !== imageId)
       if (existingGalleryImages.length >= 3) {
-        showWarningToast('Gallery Limit Reached', 'Maximum 3 gallery images allowed.')
+        centerNotice.error('Gallery Limit Reached', 'Maximum 3 gallery images allowed.')
         return
       }
     }
@@ -1268,47 +1372,82 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-slate-900">
-            {isEdit ? 'Edit Product' : 'Add New Product'}
-          </h1>
+      {/* Sticky header + tabs — stays pinned while the content scrolls (matches
+          the vendor product form). Horizontal negative margins bleed the
+          background to the layout edges; no negative TOP margin so it never
+          overlaps the page breadcrumb above it. */}
+      <div className="sticky top-0 z-20 bg-slate-50 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pt-3 pb-4">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              aria-label="Go back"
+              className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors shrink-0"
+            >
+              <ArrowLeft className="h-4 w-4 text-slate-600" />
+            </button>
+            <h1 className="text-2xl font-bold text-slate-900">
+              {isEdit ? 'Edit Product' : 'Add New Product'}
+            </h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href="/admin/dashboard/products" className="shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 transition-colors"
+              >
+                Cancel
+              </Button>
+            </Link>
+            {!isEdit && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSaveDraft}
+                disabled={isLoading}
+                className="border-brand-200 text-brand-600 hover:bg-brand-50 hover:border-brand-300 hover:text-brand-700 transition-colors"
+              >
+                Save as Draft
+              </Button>
+            )}
+            <Button
+              type="submit"
+              form="admin-product-form"
+              disabled={isLoading}
+              className="bg-brand-500 text-white hover:bg-brand-600 hover:shadow-md hover:shadow-brand-500/30 active:bg-brand-700 transition-all shadow-sm shadow-brand-500/20"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {isLoading ? 'Saving...' : (isEdit ? 'Update Product' : 'Create Product')}
+            </Button>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="mt-4 border-b border-slate-200">
+          <nav className="-mb-px flex gap-1 overflow-x-auto">
+            {productTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 rounded-t-md ${activeTab === tab.id
+                  ? 'border-brand-500 text-brand-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
         </div>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit}>
-        {/* Tab Navigation */}
-        <div className="mb-6">
-          <div className="border-b border-slate-200">
-            <nav className="-mb-px flex space-x-8">
-              {[
-                { id: 'basic', label: 'Basic Info' },
-                { id: 'fabric', label: 'Fabric & Specs' },
-                { id: 'variants', label: 'Variants' },
-                { id: 'pricing', label: 'Pricing' },
-                { id: 'inventory', label: 'Inventory' },
-                { id: 'shipping', label: 'Shipping' },
-                { id: 'logistics', label: 'Logistics' }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
-                    ? 'border-slate-700 text-slate-900'
-                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <form id="admin-product-form" onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:items-start">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
 
@@ -1342,9 +1481,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                   </div>
 
                   {/* Inventory Selection */}
-                  <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
-                    <h4 className="font-medium text-blue-900 mb-3">Select Inventory Item</h4>
-                    <p className="text-sm text-blue-800 mb-4">
+                  <div className="border border-brand-200 rounded-xl p-4 bg-brand-50">
+                    <h4 className="font-semibold text-slate-900 mb-1.5">Select Inventory Item</h4>
+                    <p className="text-sm text-slate-600 mb-4">
                       Choose an inventory item to create a detailed product with variants
                     </p>
 
@@ -1355,14 +1494,14 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                     ) : isLoadingCategories ? (
                       <div className="flex items-center justify-center py-4">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-500"></div>
-                        <span className="ml-3 text-sm text-blue-700">Loading categories...</span>
+                        <span className="ml-3 text-sm text-slate-500">Loading categories...</span>
                       </div>
                     ) : !selectedInventoryItem ? (
                       <div className="space-y-3">
                         {isLoadingInventory ? (
                           <div className="flex items-center justify-center py-4">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-500"></div>
-                            <span className="ml-3 text-sm text-blue-700">Loading inventory items...</span>
+                            <span className="ml-3 text-sm text-slate-500">Loading inventory items...</span>
                           </div>
                         ) : inventoryItems.length === 0 ? (
                           <p className="text-sm text-slate-600 italic py-2">
@@ -1387,11 +1526,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                               disabled={isLoadingCategories}
                             />
                             {isLoadingCategories ? (
-                              <p className="text-xs text-blue-700">
+                              <p className="text-xs text-slate-500">
                                 Please wait for categories to load before selecting an inventory item
                               </p>
                             ) : (
-                              <p className="text-xs text-blue-700">
+                              <p className="text-xs text-slate-500">
                                 Only inventory items without existing products are shown
                               </p>
                             )}
@@ -1399,7 +1538,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         )}
                       </div>
                     ) : (
-                      <div className="bg-white border border-blue-300 rounded-lg p-4">
+                      <div className="bg-white border border-brand-200 rounded-lg p-4">
                         <div className="flex justify-between items-start mb-3">
                           <div>
                             <h5 className="font-medium text-slate-900">{selectedInventoryItem.name}</h5>
@@ -1423,7 +1562,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                           </div>
                         </div>
                         <Link href={`/admin/dashboard/inventory/edit/${selectedInventoryItem.id}`}>
-                          <Button variant="outline" size="sm" className="mt-3">
+                          <Button variant="outline" size="sm" className="mt-3 hover:bg-brand-500 hover:text-white hover:border-brand-500 transition-colors">
                             Edit Inventory Item
                           </Button>
                         </Link>
@@ -1531,7 +1670,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
 
 
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Selling Unit, Base SKU, Base Color — 3 per row */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         Selling Unit (UOM)
@@ -1556,33 +1696,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Display Dimensions
-                      </label>
-                      <input
-                        type="text"
-                        name="dimensions"
-                        value={formData.dimensions}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                        placeholder="e.g., 230x250"
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Shown on product page.</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Dimension Unit
-                      </label>
-                      <Dropdown
-                        label=""
-                        value={formData.dimensionUnit}
-                        options={DIMENSION_UNITS}
-                        placeholder="Select Unit"
-                        onChange={(value) => setFormData(prev => ({ ...prev, dimensionUnit: value as string }))}
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Unit for the dimensions above.</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
                         Base SKU
                       </label>
                       <input
@@ -1595,39 +1708,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                       />
                       <p className="text-xs text-slate-500 mt-1">Auto-generated &amp; permanent — not editable.</p>
                     </div>
-                  </div>
-
-                  {/* Weight, Size and Color */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Display Weight
-                      </label>
-                      <input
-                        type="text"
-                        name="weight"
-                        value={formData.weight}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                        placeholder="e.g., 1.2 kg"
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Shown on product page.</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Default Size
-                      </label>
-                      <Dropdown
-                        value={formData.singleUnitSize || ''}
-                        options={standardSizes}
-                        placeholder="Select Size"
-                        onChange={(value) => setFormData(prev => ({ ...prev, singleUnitSize: value as string }))}
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Primary size for this product</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Default Color
+                        Base Color
                       </label>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
@@ -1648,7 +1731,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                           <input
                             type="text"
                             value={formData.singleUnitColor || ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, singleUnitColor: e.target.value }))}
+                            onChange={(e) => {
+                              const name = e.target.value
+                              const hex = getColorHex(name)
+                              setFormData(prev => ({ ...prev, singleUnitColor: name, ...(hex ? { singleUnitColorHex: hex } : {}) }))
+                            }}
                             placeholder="Color name"
                             className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                           />
@@ -1673,15 +1760,24 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                             placeholder="Select a tag"
                           />
                         </div>
-                        <Button type="button" onClick={addTag} className="bg-brand-500 text-white">
-                          Add
-                        </Button>
+                        {/* Span wrapper carries the tooltip so it still shows when
+                            the (disabled) button suppresses hover events. */}
+                        <span title={!selectedTag ? 'Please select a tag first' : undefined} className="inline-flex">
+                          <Button
+                            type="button"
+                            onClick={addTag}
+                            disabled={!selectedTag}
+                            className="bg-brand-500 text-white hover:bg-brand-600 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Add
+                          </Button>
+                        </span>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {formData.tags.map((tag) => (
                           <span
                             key={tag}
-                            className="inline-flex items-center px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-sm font-medium"
+                            className="inline-flex items-center px-3 py-1.5 bg-blue-50 text-slate-500 border border-blue-200 rounded-full text-sm font-medium"
                           >
                             {tag}
                             <button
@@ -1750,85 +1846,118 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Weight
+                        Weight (g)
                       </label>
                       <input
-                        type="text"
-                        name="fabricSpecifications.weight"
-                        value={formData.fabricSpecifications.weight}
+                        type="number"
+                        name="fabricSpecifications.weightValue"
+                        value={formData.fabricSpecifications.weightValue || ''}
                         onChange={handleInputChange}
                         className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                        placeholder="e.g., 200 GSM"
+                        placeholder="e.g., 200 (grams)"
+                        min="0"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Type of Weave
+                        Length (cm)
                       </label>
                       <input
-                        type="text"
-                        name="fabricSpecifications.weave"
-                        value={formData.fabricSpecifications.weave}
+                        type="number"
+                        name="fabricSpecifications.length"
+                        value={formData.fabricSpecifications.length || ''}
                         onChange={handleInputChange}
                         className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                        placeholder="e.g., Percale, Sateen"
+                        placeholder="e.g., 100"
+                        min="0"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Finish
+                        Breadth (cm)
+                      </label>
+                      <input
+                        type="number"
+                        name="fabricSpecifications.breadth"
+                        value={formData.fabricSpecifications.breadth || ''}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
+                        placeholder="e.g., 100"
+                        min="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        GSM <span className="text-xs font-normal text-slate-400">(auto-calculated)</span>
                       </label>
                       <input
                         type="text"
-                        name="fabricSpecifications.finish"
-                        value={formData.fabricSpecifications.finish}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                        placeholder="e.g., Pre-shrunk, Mercerized"
+                        readOnly
+                        aria-readonly="true"
+                        value={formData.fabricSpecifications.gsm || ''}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-semibold text-slate-700 bg-slate-100 cursor-not-allowed"
+                        placeholder="—"
+                        title="GSM = (Weight in g × 10000) ÷ (Length in cm × Breadth in cm)"
                       />
+                      <p className="mt-1 text-xs text-slate-400">GSM = (Weight × 10000) ÷ (Length × Breadth)</p>
                     </div>
                   </div>
 
-                  {/* Care Instructions */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Type of Weave
+                    </label>
+                    <input
+                      type="text"
+                      name="fabricSpecifications.weave"
+                      value={formData.fabricSpecifications.weave}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
+                      placeholder="e.g., Percale, Sateen, Twill"
+                    />
+                  </div>
+
+                  {/* Care Instructions — icon-based modal, same as the vendor form */}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
                       Care Instructions *
                     </label>
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newCareInstruction}
-                          onChange={(e) => setNewCareInstruction(e.target.value)}
-                          placeholder="Add care instruction"
-                          className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                          onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCareInstruction())}
-                        />
-                        <Button type="button" onClick={addCareInstruction} className="bg-brand-500 text-white">
-                          Add
-                        </Button>
+                    <button
+                      type="button"
+                      onClick={() => setCareModalOpen(true)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm text-left text-slate-500 hover:border-brand-400 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                    >
+                      {formData.fabricSpecifications.careInstructions.length > 0
+                        ? `${formData.fabricSpecifications.careInstructions.length} instruction(s) selected — click to edit`
+                        : 'Click to select care instructions…'}
+                    </button>
+                    {formData.fabricSpecifications.careInstructions.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {formData.fabricSpecifications.careInstructions.map((instruction, idx) => {
+                          const match = CARE_INSTRUCTIONS.find((c) => c.label === instruction)
+                          if (!match) {
+                            return (
+                              <span key={idx} className="inline-flex items-center text-xs px-2.5 py-1.5 bg-slate-50 text-slate-700 rounded-lg border border-slate-200">
+                                {instruction}
+                              </span>
+                            )
+                          }
+                          const iconColor = CATEGORY_COLORS[match.category] || 'text-slate-500'
+                          const chipStyle = CATEGORY_BORDER[match.category] || 'border-slate-200 bg-slate-50 text-slate-700'
+                          return (
+                            <span key={idx} className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border ${chipStyle}`}>
+                              <span className={iconColor}>
+                                <CareIcon paths={match.paths} className="w-4 h-4" />
+                              </span>
+                              {match.label}
+                            </span>
+                          )
+                        })}
                       </div>
-                      <div className="space-y-2">
-                        {formData.fabricSpecifications.careInstructions.map((instruction) => (
-                          <div
-                            key={instruction}
-                            className="flex items-center justify-between p-2 bg-slate-50 rounded-md"
-                          >
-                            <span className="text-sm">{instruction}</span>
-                            <button
-                              type="button"
-                              onClick={() => removeCareInstruction(instruction)}
-                              className="text-slate-700 hover:text-red-600"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1856,45 +1985,35 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
 
                   {formData.hasVariants && (
                     <>
-                      {/* Add New Variant */}
-                      <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 bg-gradient-to-br from-slate-50 to-white hover:border-slate-400 transition-colors">
+                      {/* Add / Edit Variant */}
+                      <div ref={addVariantSectionRef} className={`border-2 border-dashed rounded-xl p-6 bg-gradient-to-br from-slate-50 to-white transition-colors ${editVariantId ? 'border-brand-400 ring-2 ring-brand-500/20' : 'border-slate-300 hover:border-slate-400'}`}>
                         <div className="flex items-center gap-3 mb-6">
                           <div className="p-2 bg-brand-500 rounded-lg">
                             <Package className="h-5 w-5 text-white" />
                           </div>
                           <div>
-                            <h4 className="font-semibold text-slate-900">Add New Variant</h4>
-                            <p className="text-sm text-slate-600">Create a new product variant with specific attributes</p>
+                            <h4 className="font-semibold text-slate-900">{editVariantId ? 'Edit Variant' : 'Add New Variant'}</h4>
+                            <p className="text-sm text-slate-600">{editVariantId ? 'Update this variant’s details and save your changes' : 'Create a new product variant with specific attributes'}</p>
                           </div>
                         </div>
 
                         {/* Variant Details - Two Row Layout */}
                         <div className="space-y-6">
-                          {/* First Row: Basic Attributes */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {/* First Row: Variant Name, Color, SKU */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div className="space-y-2">
-                              <label className="block text-sm font-medium text-slate-700">Variant Name</label>
+                              <label className="block text-sm font-semibold text-slate-700">Variant Name</label>
                               <input
                                 type="text"
                                 value={newVariant.variantName || ''}
                                 onChange={(e) => setNewVariant(prev => ({ ...prev, variantName: e.target.value }))}
                                 placeholder="e.g., Premium Red"
-                                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm bg-white"
+                                className="w-full h-11 px-3.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 text-sm bg-white"
                               />
                             </div>
                             <div className="space-y-2">
-                              <label className="block text-sm font-medium text-slate-700">Size</label>
-                              <Dropdown
-                                value={newVariant.size || ''}
-                                options={standardSizes}
-                                placeholder="Select Size"
-                                onChange={(value) => setNewVariant(prev => ({ ...prev, size: value as string }))}
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <label className="block text-sm font-medium text-slate-700">Color *</label>
-                              <div className="flex items-center gap-3 p-3 border border-slate-300 rounded-lg bg-white">
+                              <label className="block text-sm font-semibold text-slate-700">Color *</label>
+                              <div className="flex items-center gap-3 h-11 px-3 border border-slate-300 rounded-lg bg-white">
                                 <input
                                   type="color"
                                   value={newVariant.colorHex || '#000000'}
@@ -1912,7 +2031,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                 <input
                                   type="text"
                                   value={newVariant.color || ''}
-                                  onChange={(e) => setNewVariant(prev => ({ ...prev, color: e.target.value }))}
+                                  onChange={(e) => {
+                                    const name = e.target.value
+                                    const hex = getColorHex(name)
+                                    setNewVariant(prev => ({ ...prev, color: name, ...(hex ? { colorHex: hex } : {}) }))
+                                  }}
                                   placeholder="Color name"
                                   className="flex-1 px-0 py-0 border-0 focus:outline-none focus:ring-0 text-sm bg-transparent"
                                 />
@@ -1920,13 +2043,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                             </div>
 
                             <div className="space-y-2">
-                              <label className="block text-sm font-medium text-slate-700">SKU</label>
+                              <label className="block text-sm font-semibold text-slate-700">SKU</label>
                               <input
                                 type="text"
                                 readOnly
                                 value={formData.baseSku ? `${formData.baseSku}-${variantAlphaSuffix(formData.variants.length + 1)}` : ''}
                                 placeholder="Auto-generated on save"
-                                className="w-full px-4 py-3 border border-slate-200 rounded-lg text-sm bg-slate-100 text-slate-600 cursor-not-allowed"
+                                className="w-full h-11 px-3.5 border border-slate-200 rounded-lg text-sm bg-slate-100 text-slate-600 cursor-not-allowed"
                               />
                               <p className="text-xs text-slate-500">Auto-generated from the product SKU — not editable.</p>
                             </div>
@@ -1935,7 +2058,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                           {/* Second Row: Pricing & Inventory & Image */}
                           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="space-y-2">
-                              <label className="block text-sm font-medium text-slate-700">Price *</label>
+                              <label className="block text-sm font-semibold text-slate-700">Price *</label>
                               <div className="relative">
                                 <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500 text-sm font-medium">₹</span>
                                 <input
@@ -1944,37 +2067,37 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                   onChange={(e) => setNewVariant(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
                                   placeholder="0.00"
                                   step="0.01"
-                                  className="w-full pl-8 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm bg-white"
+                                  className="w-full pl-8 pr-3.5 h-11 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 text-sm bg-white"
                                 />
                               </div>
                             </div>
 
                             <div className="space-y-2">
-                              <label className="block text-sm font-medium text-slate-700">Stock Quantity *</label>
+                              <label className="block text-sm font-semibold text-slate-700">Stock Quantity *</label>
                               <input
                                 type="number"
                                 value={newVariant.stock || ''}
                                 onChange={(e) => setNewVariant(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
                                 placeholder="0"
                                 min="0"
-                                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm bg-white"
+                                className="w-full h-11 px-3.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 text-sm bg-white"
                               />
                             </div>
 
                             <div className="space-y-2">
-                              <label className="block text-sm font-medium text-slate-700">Low Stock Threshold</label>
+                              <label className="block text-sm font-semibold text-slate-700">Low Stock Alert</label>
                               <input
                                 type="number"
                                 value={newVariant.lowStockThreshold ?? ''}
                                 onChange={(e) => setNewVariant(prev => ({ ...prev, lowStockThreshold: e.target.value === '' ? undefined : parseInt(e.target.value) }))}
                                 placeholder="Default"
                                 min="5"
-                                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm bg-white"
+                                className="w-full h-11 px-3.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 text-sm bg-white"
                               />
                             </div>
 
                             <div className="space-y-2">
-                              <label className="block text-sm font-medium text-slate-700">Variant Image</label>
+                              <label className="block text-sm font-semibold text-slate-700">Variant Image</label>
                               <div className="flex items-center gap-3">
                                 <div className="relative w-12 h-12 bg-slate-100 rounded-lg border border-slate-300 overflow-hidden flex-shrink-0">
                                   {newVariant.images && newVariant.images.length > 0 ? (
@@ -2018,7 +2141,16 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                           </div>
 
                           {/* Action Button */}
-                          <div className="flex justify-end pt-4 border-t border-slate-200">
+                          <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
+                            {editVariantId && (
+                              <Button
+                                type="button"
+                                onClick={cancelEditVariant}
+                                className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-6 py-2.5 font-medium"
+                              >
+                                Cancel
+                              </Button>
+                            )}
                             <Button
                               type="button"
                               onClick={addVariant}
@@ -2026,7 +2158,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                               className="bg-brand-500 text-white hover:bg-brand-600 disabled:bg-slate-400 disabled:cursor-not-allowed px-6 py-2.5 font-medium"
                             >
                               <Package className="h-4 w-4 mr-2" />
-                              Add Variant
+                              {editVariantId ? 'Update Variant' : 'Add Variant'}
                             </Button>
                           </div>
                         </div>
@@ -2044,17 +2176,16 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
 
                           {/* Variants Table */}
                           <div className="overflow-x-auto border border-slate-300 rounded-lg">
-                            <Table>
+                            <Table className="table-fixed w-full min-w-[720px] [&_th]:px-3 [&_th]:h-11 [&_td]:px-3 [&_td]:py-2">
                               <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                                 <TableRow>
-                                  <TableHead>Image</TableHead>
+                                  <TableHead className="w-16">Image</TableHead>
                                   <TableHead>Name</TableHead>
-                                  <TableHead>Size</TableHead>
-                                  <TableHead>Color</TableHead>
-                                  <TableHead>SKU</TableHead>
-                                  <TableHead>Price</TableHead>
-                                  <TableHead>Stock</TableHead>
-                                  <TableHead className="text-center">Action</TableHead>
+                                  <TableHead className="w-44">Color</TableHead>
+                                  <TableHead className="w-36">SKU</TableHead>
+                                  <TableHead className="w-32">Price</TableHead>
+                                  <TableHead className="w-28">Stock</TableHead>
+                                  <TableHead className="text-center w-20">Action</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -2091,18 +2222,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                       />
                                     </TableCell>
                                     <TableCell>
-                                      <select
-                                        value={variant.size}
-                                        onChange={(e) => updateVariant(variant.id, 'size', e.target.value)}
-                                        className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white"
-                                      >
-                                        <option value="">—</option>
-                                        {standardSizes.map(s => (
-                                          <option key={s} value={s}>{s}</option>
-                                        ))}
-                                      </select>
-                                    </TableCell>
-                                    <TableCell>
                                       <div className="flex items-center gap-2">
                                         <input
                                           type="color"
@@ -2115,8 +2234,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                           <input
                                             type="text"
                                             value={variant.color}
-                                            onChange={(e) => updateVariant(variant.id, 'color', e.target.value)}
-                                            className="text-slate-900 text-sm font-medium bg-transparent border-none p-0 focus:outline-none focus:ring-1 focus:ring-brand-500/40 rounded px-1"
+                                            onChange={(e) => {
+                                              const name = e.target.value
+                                              const hex = getColorHex(name)
+                                              updateVariant(variant.id, 'color', name)
+                                              if (hex) updateVariant(variant.id, 'colorHex', hex)
+                                            }}
+                                            className="w-full min-w-[90px] text-slate-900 text-sm font-medium bg-transparent border-none p-0 focus:outline-none focus:ring-1 focus:ring-brand-500/40 rounded px-1"
                                             placeholder="Color name"
                                           />
                                           <span className="text-slate-500 text-xs">{variant.colorHex || '#CCCCCC'}</span>
@@ -2159,14 +2283,24 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                       />
                                     </TableCell>
                                     <TableCell className="text-center">
-                                      <button
-                                        type="button"
-                                        onClick={() => removeVariant(variant.id)}
-                                        className="text-slate-600 hover:text-red-600 p-1 inline-block"
-                                        title="Remove variant"
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </button>
+                                      <div className="inline-flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleEditVariantRow(variant)}
+                                          className="text-slate-600 hover:text-brand-600 p-1 inline-block"
+                                          title="Edit variant"
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => removeVariant(variant.id)}
+                                          className="text-slate-600 hover:text-red-600 p-1 inline-block"
+                                          title="Remove variant"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </button>
+                                      </div>
                                     </TableCell>
                                   </TableRow>
                                 ))}
@@ -2256,17 +2390,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                     </div>
 
                     {formData.hasVariants && (
-                      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg shadow-sm">
+                      <div className="mt-6 p-4 bg-brand-50 border border-brand-200 rounded-lg shadow-sm">
                         <div className="flex justify-between items-center">
                           <div className="space-y-1">
-                            <span className="text-blue-800 font-semibold block">Total Aggregate Stock:</span>
-                            <span className="text-xs text-blue-600">Base Unit ({formData.totalStock}) + All Variants ({formData.variants.reduce((sum, v) => sum + v.stock, 0)})</span>
+                            <span className="text-slate-800 font-semibold block">Total Aggregate Stock:</span>
+                            <span className="text-xs text-slate-500">Base Unit ({formData.totalStock}) + All Variants ({formData.variants.reduce((sum, v) => sum + v.stock, 0)})</span>
                           </div>
                           <div className="text-right">
-                            <span className="text-3xl font-bold text-blue-900">
+                            <span className="text-3xl font-bold text-brand-600">
                               {formData.totalStock + formData.variants.reduce((sum, v) => sum + v.stock, 0)}
                             </span>
-                            <span className="text-sm font-medium text-blue-800 ml-1">Units</span>
+                            <span className="text-sm font-medium text-slate-600 ml-1">Units</span>
                           </div>
                         </div>
                       </div>
@@ -2335,7 +2469,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                       </div>
                       {(gstOthers || (formData.gstPercentage != null && !gstRates.some(r => r.isActive && r.percentage === formData.gstPercentage))) && (
                         <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">Custom Tax Rate (%)</label>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Custom Tax Rate</label>
                           <div className="relative">
                             <input
                               type="number"
@@ -2360,29 +2494,59 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                   </div>
                   {/* Single Price Section */}
                   <div className="border-2 border-slate-300 rounded-lg p-6">
-                    <h4 className="font-semibold text-slate-900 mb-4">Single Unit Pricing</h4>
+                    <h4 className="font-semibold text-slate-900 mb-4 flex items-center">
+                      <span className="w-2 h-2 bg-brand-600 rounded-full mr-2"></span>
+                      Product Pricing
+                    </h4>
 
-                    {/* Pricing Fields */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Base Price *
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-slate-500">₹</span>
-                          <input
-                            type="number"
-                            name="basePrice"
-                            value={formData.basePrice || ''}
-                            onChange={handleInputChange}
-                            required
-                            className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                            placeholder="0"
-                          />
+                    {/* Pricing Configuration — 4-column breakdown (matches vendor) */}
+                    {(() => {
+                      const gst = formData.gstPercentage ?? 0
+                      const taxAmt = formData.basePrice > 0 ? formData.basePrice * gst / 100 : 0
+                      const total = formData.basePrice > 0 ? formData.basePrice + taxAmt : 0
+                      const sellingPrice = total
+                      const readOnlyClass = 'flex min-h-[42px] w-full items-center gap-0.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2'
+                      const rupeeMark = <span className="text-sm text-slate-400 shrink-0">₹</span>
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                          {/* 1. Base Price */}
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Base Price *</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-2 text-slate-500">₹</span>
+                              <input
+                                type="number"
+                                name="basePrice"
+                                value={formData.basePrice || ''}
+                                onChange={handleInputChange}
+                                required
+                                className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
+                                placeholder="0"
+                              />
+                            </div>
+                            <p className="text-xs text-slate-600 mt-1">Price for single unit</p>
+                          </div>
+                          {/* 2. Tax Amount (read-only) */}
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Tax Amount</label>
+                            <div className={readOnlyClass}>{rupeeMark}<span className="text-sm font-semibold text-slate-700">{taxAmt.toFixed(2)}</span></div>
+                            <p className="text-xs text-slate-500 mt-1">{gst > 0 ? `${gst}% GST on base price` : 'No GST applied'}</p>
+                          </div>
+                          {/* 3. Total Amount (read-only) */}
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Total Amount</label>
+                            <div className={readOnlyClass}>{rupeeMark}<span className="text-sm font-bold tracking-tight text-brand-500">{total.toFixed(2)}</span></div>
+                            <p className="text-xs text-slate-500 mt-1">Base price + tax</p>
+                          </div>
+                          {/* 4. Selling Price (read-only, equals Total) */}
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Selling Price</label>
+                            <div className={readOnlyClass}>{rupeeMark}<span className="text-sm font-bold tracking-tight text-brand-500">{sellingPrice.toFixed(2)}</span></div>
+                            <p className="text-xs text-slate-500 mt-1">Final price for buyers</p>
+                          </div>
                         </div>
-                        <p className="text-xs text-slate-600 mt-1">Price for single unit</p>
-                      </div>
-                    </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Pricing Section */}
@@ -2489,7 +2653,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                 style={{ backgroundColor: variant.colorHex || '#ccc' }}
                               />
                               <span className="text-sm font-medium text-slate-900">
-                                {variant.size} - {variant.color}
+                                {[variant.size, variant.color].filter(Boolean).join(' - ') || '—'}
                               </span>
                               <span className="text-xs text-slate-500 font-mono">({variant.sku})</span>
                             </div>
@@ -3090,10 +3254,42 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                 </Card>
               </div>
             )}
+
+            {/* Tab navigation footer */}
+            <div className="flex items-center justify-between border-t border-slate-200 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={goToPrevTab}
+                disabled={activeTabIndex <= 0}
+              >
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Previous
+              </Button>
+              {activeTabIndex < productTabs.length - 1 ? (
+                <Button
+                  type="button"
+                  onClick={goToNextTab}
+                  className="bg-brand-500 text-white hover:bg-brand-600 transition-colors"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {isLoading ? 'Saving...' : (isEdit ? 'Update Product' : 'Create Product')}
+                </Button>
+              )}
+            </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
+          {/* Sidebar — sticks below the pinned header while the form scrolls */}
+          <div className="space-y-6 lg:sticky lg:top-[150px] lg:self-start">
             <Card>
               <CardHeader>
                 <CardTitle>Status & Availability</CardTitle>
@@ -3133,93 +3329,130 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {/* Cover Image Upload */}
-                  <div>
-                    <h4 className="text-sm font-medium text-slate-700 mb-2">Cover Image (1 image only)</h4>
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      className="border-2 border-dashed border-blue-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors cursor-pointer bg-blue-50 outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 focus-visible:border-blue-500"
-                      onClick={() => document.getElementById('cover-image-upload')?.click()}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
-                    >
-                      <Upload className="mx-auto h-8 w-8 text-blue-400" />
-                      <p className="mt-1 text-sm text-blue-600">Upload Cover Image</p>
-                      <p className="text-xs text-blue-500">PNG, JPG, GIF up to 10MB</p>
-                      <input
-                        id="cover-image-upload"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleImageUpload(e, 'cover')}
-                      />
+                  {/* Cover Image — upload box when empty, otherwise a live preview (matches the vendor form) */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium text-slate-700">Cover Image <span className="text-red-500">*</span></h4>
+                      <span className="text-xs text-slate-500">1 image only</span>
                     </div>
+                    {formData.images.filter(img => img.imageType === 'cover').length === 0 ? (
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className="border-2 border-dashed border-blue-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors cursor-pointer bg-blue-50 outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 focus-visible:border-blue-500"
+                        onClick={() => document.getElementById('cover-image-upload')?.click()}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
+                      >
+                        <Upload className="mx-auto h-8 w-8 text-blue-400" />
+                        <p className="mt-1 text-sm text-blue-600">Upload Cover Image</p>
+                        <p className="text-xs text-blue-500">PNG, JPG, GIF up to 10MB</p>
+                        <input
+                          id="cover-image-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleImageUpload(e, 'cover')}
+                        />
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center">
+                        <p className="text-sm text-green-800">✓ Cover image uploaded</p>
+                        <p className="text-xs text-green-600">Upload limit: 1/1</p>
+                      </div>
+                    )}
+
+                    {/* Cover Image Preview */}
+                    {formData.images.filter(img => img.imageType === 'cover').map((image) => (
+                      <div key={image.id} className="relative group">
+                        <img
+                          src={image.url}
+                          alt={image.alt}
+                          className="w-full h-32 object-cover rounded border-2 border-slate-800"
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => removeImage(image.id)}
+                            className="text-white hover:text-red-300 bg-red-600 p-2 rounded-full"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div className="absolute top-2 left-2 bg-brand-600 text-white text-xs px-2 py-1 rounded">Cover Image</div>
+                      </div>
+                    ))}
                   </div>
 
-                  {/* Gallery Images Upload */}
-                  <div>
-                    <h4 className="text-sm font-medium text-slate-700 mb-2">Gallery Images (Max 3 images)</h4>
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center hover:border-green-400 transition-colors cursor-pointer bg-green-50 outline-none focus-visible:ring-2 focus-visible:ring-green-400/40 focus-visible:border-green-500"
-                      onClick={() => document.getElementById('gallery-image-upload')?.click()}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
-                    >
-                      <Upload className="mx-auto h-8 w-8 text-green-400" />
-                      <p className="mt-1 text-sm text-green-600">Upload Gallery Images</p>
-                      <p className="text-xs text-green-500">PNG, JPG, GIF up to 10MB each</p>
-                      <input
-                        id="gallery-image-upload"
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleImageUpload(e, 'gallery')}
-                      />
+                  {/* Gallery Images */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium text-slate-700">Gallery Images (Max 3 images)</h4>
+                      <span className="text-xs text-slate-500">{formData.images.filter(img => img.imageType === 'gallery').length}/3 images</span>
                     </div>
-                  </div>
+                    {formData.images.filter(img => img.imageType === 'gallery').length < 3 ? (
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center hover:border-green-400 transition-colors cursor-pointer bg-green-50 outline-none focus-visible:ring-2 focus-visible:ring-green-400/40 focus-visible:border-green-500"
+                        onClick={() => document.getElementById('gallery-image-upload')?.click()}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
+                      >
+                        <Upload className="mx-auto h-8 w-8 text-green-400" />
+                        <p className="mt-1 text-sm text-green-600">Upload Gallery Images</p>
+                        <p className="text-xs text-green-500">
+                          {3 - formData.images.filter(img => img.imageType === 'gallery').length} slot{3 - formData.images.filter(img => img.imageType === 'gallery').length > 1 ? 's' : ''} remaining • Multiple selection allowed
+                        </p>
+                        <input
+                          id="gallery-image-upload"
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleImageUpload(e, 'gallery')}
+                        />
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center">
+                        <p className="text-sm text-green-800">✓ Gallery images full</p>
+                        <p className="text-xs text-green-600">Upload limit: 3/3 reached</p>
+                      </div>
+                    )}
 
-                  {/* Image Preview Grid */}
-                  {formData.images.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-medium text-slate-700 mb-2">Uploaded Images</h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        {formData.images.map((image) => (
+                    {/* Gallery Images Preview + empty slots */}
+                    {formData.images.filter(img => img.imageType === 'gallery').length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {formData.images.filter(img => img.imageType === 'gallery').map((image) => (
                           <div key={image.id} className="relative group">
-                            <img
-                              src={image.url}
-                              alt={image.alt}
-                              className="w-full h-20 object-cover rounded border"
-                            />
-                            <div className="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setImageType(image.id, image.imageType === 'cover' ? 'gallery' : 'cover')}
-                                className="text-white text-xs bg-brand-500 px-2 py-1 rounded hover:bg-brand-600"
-                              >
-                                {image.imageType === 'cover' ? 'Set Gallery' : 'Set Cover'}
-                              </button>
+                            <img src={image.url} alt={image.alt} className="w-full h-20 object-cover rounded border" />
+                            <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center gap-1">
+                              {formData.images.filter(img => img.imageType === 'cover').length === 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setImageType(image.id, 'cover')}
+                                  className="text-white text-xs bg-brand-600 px-1 py-1 rounded hover:bg-brand-700"
+                                >
+                                  Cover
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => removeImage(image.id)}
-                                className="text-white hover:text-red-300"
+                                className="text-white hover:text-red-300 bg-red-600 p-1 rounded"
                               >
-                                <X className="h-4 w-4" />
+                                <X className="h-3 w-3" />
                               </button>
                             </div>
-                            <div className="absolute top-1 left-1">
-                              {image.imageType === 'cover' ? (
-                                <div className="bg-blue-600 text-white text-xs px-1 rounded">Cover</div>
-                              ) : (
-                                <div className="bg-green-600 text-white text-xs px-1 rounded">Gallery</div>
-                              )}
-                            </div>
+                            <div className="absolute top-1 left-1 bg-slate-600 text-white text-xs px-1 rounded">Gallery</div>
+                          </div>
+                        ))}
+                        {Array.from({ length: 3 - formData.images.filter(img => img.imageType === 'gallery').length }).map((_, index) => (
+                          <div key={`empty-${index}`} className="w-full h-20 border-2 border-dashed border-slate-200 rounded flex items-center justify-center">
+                            <span className="text-[10px] text-slate-400">Empty</span>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -3322,6 +3555,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
           onUpdateImages={handleVariantImagesUpdate}
         />
       )}
+
+      <CareInstructionModal
+        isOpen={careModalOpen}
+        selected={formData.fabricSpecifications.careInstructions}
+        onAdd={handleAddCareInstructions}
+        onClose={() => setCareModalOpen(false)}
+      />
     </div>
   )
 }

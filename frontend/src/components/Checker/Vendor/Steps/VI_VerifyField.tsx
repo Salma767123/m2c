@@ -135,7 +135,7 @@ export function renderValue(value: any, type?: string, label?: string): React.Re
   }
   if (type === 'image' || (type !== 'document' && typeof value === 'string' && isImageUrl(value))) {
     return (
-      <img src={value} alt="Uploaded" className="w-32 h-32 object-cover rounded-lg border border-slate-200" />
+      <img src={value} alt="Uploaded" className="w-20 h-20 object-cover rounded-lg border border-slate-200" />
     )
   }
   if (type === 'document' && typeof value === 'string') {

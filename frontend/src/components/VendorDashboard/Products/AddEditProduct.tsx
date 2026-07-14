@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
-import { ArrowLeft, Save, X, Upload, Package, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Save, X, Upload, Package, Image as ImageIcon, ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
 import CareInstructionModal, { CareIcon, CARE_INSTRUCTIONS, CATEGORY_COLORS } from './CareInstructionModal'
 import ResultModal from '@/components/UI/ResultModal'
 import { centerNotice } from '@/components/UI/CenterNotice'
@@ -16,7 +16,7 @@ import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-
 import { productService, type ProductFormData as ServiceProductFormData } from '@/services/productService'
 import { gstSettingsService, type GSTSetting } from '@/services/gstSettingsService'
 import { categoryService, Category } from '@/services/categoryService'
-import { DIMENSION_UNITS, parseDimensions, combineDimensions } from '@/lib/dimensions'
+import { parseDimensions, combineDimensions } from '@/lib/dimensions'
 
 // 1 → A, 26 → Z, 27 → AA … (mirrors the backend variant-suffix logic).
 const variantAlphaSuffix = (n: number): string => {
@@ -72,7 +72,6 @@ const predefinedFabricTypes = [
 ]
 const fabricTypes = [...predefinedFabricTypes, 'Others']
 
-const standardSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'King', 'Queen', 'Full', 'Twin', 'Custom']
 const standardColors = ['White', 'Black', 'Gray', 'Navy', 'Beige', 'Brown', 'Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Purple']
 
 // Helper function to get color name from hex value
@@ -142,6 +141,10 @@ interface FabricSpecification {
   composition: string
   weightValue: string
   weightUnit: string
+  // Fabric dimensions (cm) used to auto-calculate GSM.
+  length: string
+  breadth: string
+  gsm: string
   weave: string
   careInstructions: string[]
 }
@@ -264,6 +267,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       composition: '',
       weightValue: '',
       weightUnit: 'GSM',
+      length: '',
+      breadth: '',
+      gsm: '',
       weave: '',
       careInstructions: []
     },
@@ -451,8 +457,36 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     colorHex: '#000000',
     sku: '',
     price: 0,
-    stock: 0
+    stock: 0,
+    images: []
   })
+
+  // Inline variant image upload (in the Add New Variant form) — direct file
+  // picker + success/failure popup, same as the admin form.
+  const handleNewVariantImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      centerNotice.error('File Too Large', `${file.name} exceeds the 5MB limit.`)
+      e.target.value = ''
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setNewVariant(prev => ({ ...prev, images: [event.target?.result as string] }))
+        centerNotice.success('Image Uploaded', 'Variant image added.')
+      } else {
+        centerNotice.error('Upload Failed', `Could not read ${file.name}.`)
+      }
+      e.target.value = ''
+    }
+    reader.onerror = () => {
+      centerNotice.error('Upload Failed', `Failed to read ${file.name}.`)
+      e.target.value = ''
+    }
+    reader.readAsDataURL(file)
+  }
 
   // SKU duplicate highlighting: error on the "Add Variant" SKU box, and ids of
   // already-added variants whose SKU clashes (highlighted red in the table).
@@ -542,6 +576,21 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     setFormData(prev => (prev.basePrice > 0 ? prev : { ...prev, basePrice: minPrice }))
   }, [formData.hasVariants, formData.variants])
 
+  // Auto-calculate GSM from fabric weight (g) and dimensions (cm):
+  //   GSM = (Weight × 10000) ÷ (Length × Breadth)
+  useEffect(() => {
+    const w = parseFloat(formData.fabricSpecifications.weightValue)
+    const l = parseFloat(formData.fabricSpecifications.length)
+    const b = parseFloat(formData.fabricSpecifications.breadth)
+    const gsm = w > 0 && l > 0 && b > 0 ? String(Math.round((w * 10000) / (l * b))) : ''
+    if (gsm !== formData.fabricSpecifications.gsm) {
+      setFormData(prev => ({
+        ...prev,
+        fabricSpecifications: { ...prev.fabricSpecifications, gsm, weightUnit: 'GSM' },
+      }))
+    }
+  }, [formData.fabricSpecifications.weightValue, formData.fabricSpecifications.length, formData.fabricSpecifications.breadth, formData.fabricSpecifications.gsm])
+
   // Load product data for editing
   useEffect(() => {
     if (isEdit && productId) {
@@ -588,6 +637,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   composition: fs.composition || '',
                   weightValue: fs.weightValue || fs.weight || '',
                   weightUnit: fs.weightUnit || 'GSM',
+                  length: fs.length || '',
+                  breadth: fs.breadth || '',
+                  gsm: fs.gsm || '',
                   weave: fs.weave || '',
                   careInstructions: Array.isArray(fs.careInstructions) ? fs.careInstructions : [],
                 }
@@ -764,31 +816,79 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       lowStockThreshold: 5,
     }))
   }
+  // Inline row-edit: load a variant back into the "Add New Variant" form so ALL
+  // its fields can be edited; saving then updates that row instead of adding.
+  // Mirrors the admin product form's edit flow.
+  const [editVariantId, setEditVariantId] = useState<string | null>(null)
+  const addVariantSectionRef = useRef<HTMLDivElement>(null)
+
+  const handleEditVariantRow = (variant: ProductVariant) => {
+    setNewVariant({
+      variantName: variant.variantName || '',
+      size: variant.size || '',
+      color: variant.color || '',
+      colorHex: variant.colorHex || '#000000',
+      sku: variant.sku || '',
+      price: variant.price || 0,
+      stock: variant.stock || 0,
+      lowStockThreshold: variant.lowStockThreshold,
+      images: variant.images || [],
+    })
+    setEditVariantId(variant.id || null)
+    setNewVariantSkuError('')
+    setTimeout(() => addVariantSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+  }
+
+  const cancelEditVariant = () => {
+    setEditVariantId(null)
+    setNewVariant({ variantName: '', size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0, lowStockThreshold: undefined, images: [] })
+  }
+
   const addVariant = () => {
     // SKU is auto-generated server-side; size is optional. Color is the only
     // required attribute to add a variant.
-    if (newVariant.color) {
-      setNewVariantSkuError('')
-      const variant: ProductVariant = {
-        id: Date.now().toString(),
-        variantName: (newVariant.variantName || '').trim(),
-        size: newVariant.size || '',
-        color: newVariant.color!,
-        colorHex: newVariant.colorHex || '#000000',
-        sku: '', // assigned by the backend on save
-        price: newVariant.price || 0,
-        stock: newVariant.stock || 0,
-        lowStockThreshold: newVariant.lowStockThreshold,
-        images: []
-      }
+    if (!newVariant.color) return
+    setNewVariantSkuError('')
 
+    // Edit mode: update the existing row in place instead of adding a new one.
+    if (editVariantId) {
       setFormData(prev => ({
         ...prev,
-        variants: [...prev.variants, variant]
+        variants: prev.variants.map(v => v.id === editVariantId ? {
+          ...v,
+          variantName: (newVariant.variantName || '').trim(),
+          color: newVariant.color!,
+          colorHex: newVariant.colorHex || '#000000',
+          price: newVariant.price || 0,
+          stock: newVariant.stock || 0,
+          lowStockThreshold: newVariant.lowStockThreshold,
+          images: newVariant.images || [],
+        } : v)
       }))
-
-      setNewVariant({ variantName: '', size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0, lowStockThreshold: undefined })
+      setEditVariantId(null)
+      setNewVariant({ variantName: '', size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0, lowStockThreshold: undefined, images: [] })
+      return
     }
+
+    const variant: ProductVariant = {
+      id: Date.now().toString(),
+      variantName: (newVariant.variantName || '').trim(),
+      size: newVariant.size || '',
+      color: newVariant.color!,
+      colorHex: newVariant.colorHex || '#000000',
+      sku: '', // assigned by the backend on save
+      price: newVariant.price || 0,
+      stock: newVariant.stock || 0,
+      lowStockThreshold: newVariant.lowStockThreshold,
+      images: newVariant.images || []
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      variants: [...prev.variants, variant]
+    }))
+
+    setNewVariant({ variantName: '', size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0, lowStockThreshold: undefined, images: [] })
   }
 
   const removeVariant = (variantId: string | undefined) => {
@@ -1039,9 +1139,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     if (formData.fabricSpecifications.careInstructions.length === 0) {
       newErrors.careInstructions = 'Please add at least one care instruction.'
     }
-    if (formData.fabricSpecifications.weightValue && !formData.fabricSpecifications.weightUnit) {
-      newErrors.fabricWeightUnit = 'Please select a unit of measurement.'
-    }
     if (formData.hasVariants && formData.variants.length === 0) {
       newErrors.variants = 'Please add at least one variant or disable variants.'
     }
@@ -1205,13 +1302,25 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         {/* Header */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center space-x-4">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              aria-label="Go back"
+              className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors shrink-0"
+            >
+              <ArrowLeft className="h-4 w-4 text-slate-600" />
+            </button>
             <h1 className="text-2xl font-bold text-slate-900">
               {isEdit ? 'Edit Product' : 'Add New Product'}
             </h1>
           </div>
           <div className="flex items-center gap-3">
             <Link href="/vendor/dashboard/products" className="shrink-0">
-              <Button type="button" variant="outline">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 transition-colors"
+              >
                 Cancel
               </Button>
             </Link>
@@ -1219,7 +1328,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               type="submit"
               form="product-form"
               disabled={isLoading}
-              className="bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20"
+              className="bg-brand-500 text-white hover:bg-brand-600 hover:shadow-md hover:shadow-brand-500/30 active:bg-brand-700 transition-all shadow-sm shadow-brand-500/20"
             >
               <Save className="h-4 w-4 mr-2" />
               {isLoading ? 'Saving...' : (isEdit ? 'Update Product' : 'Create Product')}
@@ -1352,22 +1461,46 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     )}
                   </div>
 
-                  {/* Inventory Item Name (when from inventory) */}
-                  {formData.isFromInventory && selectedInventoryItem && (
+                  {/* Inventory Item Name (when from inventory) + Category */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                    {formData.isFromInventory && selectedInventoryItem && (
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                          Inventory Item Name
+                        </label>
+                        <input
+                          type="text"
+                          value={selectedInventoryItem.name}
+                          disabled
+                          className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm bg-slate-100 text-slate-600"
+                          placeholder="Inventory item name"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Reference from inventory item</p>
+                      </div>
+                    )}
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Inventory Item Name
-                      </label>
-                      <input
-                        type="text"
-                        value={selectedInventoryItem.name}
-                        disabled
-                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm bg-slate-100 text-slate-600"
-                        placeholder="Inventory item name"
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Reference from inventory item</p>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Category *</label>
+                      <div id="vf-category" className={errors.category ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
+                        <Dropdown
+                          label=""
+                          value={formData.category}
+                          options={
+                            formData.isFromInventory && selectedInventoryItem?.category && !categories.includes(selectedInventoryItem.category)
+                              ? [...categories, selectedInventoryItem.category]
+                              : categories
+                          }
+                          placeholder="Select Category"
+                          buttonClassName="py-2.5 rounded-lg"
+                          onChange={(value) => { clearError('category'); setFormData(prev => ({ ...prev, category: value as string, subCategory: '' })) }}
+                          disabled={formData.isFromInventory && !isEdit}
+                        />
+                      </div>
+                      {errors.category && <p className="text-xs text-red-600 mt-1">{errors.category}</p>}
+                      {formData.isFromInventory && !isEdit && (
+                        <p className="text-xs text-slate-500 mt-1">From inventory item</p>
+                      )}
                     </div>
-                  )}
+                  </div>
 
                   {/* Product Name */}
                   <div>
@@ -1421,35 +1554,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Selling Unit, Base SKU, Base Color — 3 per row.
+                      Sub-Category is intentionally not collected here — the admin
+                      assigns it when approving/publishing the product. */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
                     <div>
-                      <div id="vf-category" className={errors.category ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
-                        <Dropdown
-                          label="Category *"
-                          value={formData.category}
-                          options={
-                            formData.isFromInventory && selectedInventoryItem?.category && !categories.includes(selectedInventoryItem.category)
-                              ? [...categories, selectedInventoryItem.category]
-                              : categories
-                          }
-                          placeholder="Select Category"
-                          onChange={(value) => { clearError('category'); setFormData(prev => ({ ...prev, category: value as string, subCategory: '' })) }}
-                          disabled={formData.isFromInventory && !isEdit}
-                        />
-                      </div>
-                      {errors.category && <p className="text-xs text-red-600 mt-1">{errors.category}</p>}
-                      {formData.isFromInventory && !isEdit && (
-                        <p className="text-xs text-slate-500 mt-1">From inventory item</p>
-                      )}
-                      {/* Sub-Category is intentionally not collected here — the
-                          admin assigns it when approving/publishing the product. */}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                    <div className="flex flex-col">
-                      <label className="block text-sm font-semibold text-slate-700 mb-2 leading-snug min-h-[2.5rem]">
-                        Unit of Measurement (UOM)
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Selling Unit (UOM)
                       </label>
                       <Dropdown
                         label=""
@@ -1469,36 +1580,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         onChange={(value) => setFormData(prev => ({ ...prev, uom: value as string }))}
                       />
                     </div>
-                    <div className="flex flex-col">
-                      <label className="block text-sm font-semibold text-slate-700 mb-2 leading-snug min-h-[2.5rem]">
-                        Dimensions
-                      </label>
-                      <input
-                        type="text"
-                        name="dimensions"
-                        value={formData.dimensions}
-                        onChange={handleInputChange}
-                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
-                        placeholder="e.g., 230x250"
-                      />
-                    </div>
-                    <div className="flex flex-col">
-                      <label className="block text-sm font-semibold text-slate-700 mb-2 leading-snug min-h-[2.5rem]">
-                        Dimension Unit
-                      </label>
-                      <Dropdown
-                        label=""
-                        value={formData.dimensionUnit}
-                        options={DIMENSION_UNITS}
-                        placeholder="Select Unit"
-                        buttonClassName="py-2.5 rounded-lg"
-                        onChange={(value) => setFormData(prev => ({ ...prev, dimensionUnit: value as string }))}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Base SKU, Size and Color */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
                         Base SKU
@@ -1515,19 +1596,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Default Size
-                      </label>
-                      <Dropdown
-                        value={formData.singleUnitSize || ''}
-                        options={standardSizes}
-                        placeholder="Select Size"
-                        onChange={(value) => setFormData(prev => ({ ...prev, singleUnitSize: value as string }))}
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Primary size for this product</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Default Color
+                        Base Color
                       </label>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
@@ -1577,9 +1646,18 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             placeholder="Select a tag"
                           />
                         </div>
-                        <Button type="button" onClick={addTag} className="bg-brand-500 text-white">
-                          Add
-                        </Button>
+                        {/* Span wrapper carries the tooltip so it still shows when
+                            the (disabled) button suppresses hover events. */}
+                        <span title={!selectedTag ? 'Please select a tag first' : undefined} className="inline-flex">
+                          <Button
+                            type="button"
+                            onClick={addTag}
+                            disabled={!selectedTag}
+                            className="bg-brand-500 text-white hover:bg-brand-600 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Add
+                          </Button>
+                        </span>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {formData.tags.map((tag) => (
@@ -1691,7 +1769,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Weight
+                        Weight (g)
                       </label>
                       <input
                         type="number"
@@ -1700,39 +1778,57 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         onFocus={(e) => e.currentTarget.select()}
                         onChange={handleInputChange}
                         className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
-                        placeholder="e.g., 200"
+                        placeholder="e.g., 200 (grams)"
                         min="0"
                       />
                     </div>
 
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Unit of Measurement
+                        Length (cm)
                       </label>
-                      <div className={errors.fabricWeightUnit ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
-                        <Dropdown
-                          value={formData.fabricSpecifications.weightUnit}
-                          options={[
-                            { value: 'GSM', label: 'GSM' },
-                            { value: 'kg', label: 'kg' },
-                            { value: 'g', label: 'g (Grams)' },
-                            { value: 'lb', label: 'lb (Pounds)' },
-                            { value: 'oz', label: 'oz (Ounces)' },
-                          ]}
-                          placeholder="Select Unit"
-                          onChange={(value) => {
-                            clearError('fabricWeightUnit');
-                            setFormData(prev => ({
-                              ...prev,
-                              fabricSpecifications: { ...prev.fabricSpecifications, weightUnit: value as string }
-                            }));
-                          }}
-                          buttonClassName="py-2.5 rounded-lg"
-                        />
-                      </div>
-                      {errors.fabricWeightUnit && (
-                        <p className="mt-1 text-xs text-red-600">{errors.fabricWeightUnit}</p>
-                      )}
+                      <input
+                        type="number"
+                        name="fabricSpecifications.length"
+                        value={formData.fabricSpecifications.length || ''}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onChange={handleInputChange}
+                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                        placeholder="e.g., 100"
+                        min="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Breadth (cm)
+                      </label>
+                      <input
+                        type="number"
+                        name="fabricSpecifications.breadth"
+                        value={formData.fabricSpecifications.breadth || ''}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onChange={handleInputChange}
+                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                        placeholder="e.g., 100"
+                        min="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        GSM <span className="text-xs font-normal text-slate-400">(auto-calculated)</span>
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        aria-readonly="true"
+                        value={formData.fabricSpecifications.gsm || ''}
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 bg-slate-100 cursor-not-allowed"
+                        placeholder="—"
+                        title="GSM = (Weight in g × 10000) ÷ (Length in cm × Breadth in cm)"
+                      />
+                      <p className="mt-1 text-xs text-slate-400">GSM = (Weight × 10000) ÷ (Length × Breadth)</p>
                     </div>
                   </div>
 
@@ -1832,21 +1928,21 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
                   {formData.hasVariants && (
                     <>
-                      {/* Add New Variant */}
-                      <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 bg-linear-to-br from-slate-50 to-white hover:border-slate-400 transition-colors">
+                      {/* Add / Edit Variant */}
+                      <div ref={addVariantSectionRef} className="border-2 border-dashed border-slate-300 rounded-xl p-6 bg-linear-to-br from-slate-50 to-white hover:border-slate-400 transition-colors">
                         <div className="flex items-center gap-3 mb-6">
                           <div className="p-2 bg-brand-500 rounded-lg">
                             <Package className="h-5 w-5 text-white" />
                           </div>
                           <div>
-                            <h4 className="font-semibold text-slate-900">Add New Variant</h4>
-                            <p className="text-sm text-slate-600">Create a new product variant with specific attributes</p>
+                            <h4 className="font-semibold text-slate-900">{editVariantId ? 'Edit Variant' : 'Add New Variant'}</h4>
+                            <p className="text-sm text-slate-600">{editVariantId ? 'Update this variant’s attributes' : 'Create a new product variant with specific attributes'}</p>
                           </div>
                         </div>
 
                         {/* Variant Details - Two Row Layout */}
                         <div className="space-y-6">
-                          {/* First Row: Basic Attributes */}
+                          {/* First Row: Variant Name, Color, SKU */}
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div className="space-y-2">
                               <label className="block text-sm font-semibold text-slate-700">Variant Name</label>
@@ -1856,17 +1952,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                 onChange={(e) => setNewVariant(prev => ({ ...prev, variantName: e.target.value }))}
                                 placeholder="e.g., Premium Red"
                                 className="w-full h-11 px-3.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <label className="block text-sm font-semibold text-slate-700">Size</label>
-                              <Dropdown
-                                value={newVariant.size || ''}
-                                options={standardSizes}
-                                placeholder="Select Size"
-                                buttonClassName="h-11 rounded-lg"
-                                onChange={(value) => setNewVariant(prev => ({ ...prev, size: value as string }))}
                               />
                             </div>
 
@@ -1901,10 +1986,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               </div>
                             </div>
 
-                          </div>
-
-                          {/* Second Row: SKU, Pricing & Inventory */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div className="space-y-2">
                               <label className="block text-sm font-semibold text-slate-700">SKU</label>
                               <input
@@ -1916,7 +1997,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               />
                               <p className="text-xs text-slate-500">Auto-generated — not editable.</p>
                             </div>
+                          </div>
 
+                          {/* Second Row: Price, Stock, Low Stock, Variant Image */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div className="space-y-2">
                               <label className="block text-sm font-semibold text-slate-700">Price *</label>
                               <div className="relative">
@@ -1957,12 +2041,61 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                 min="5"
                                 className="w-full h-11 px-3.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
                               />
-                              <p className="text-xs text-slate-500">Alerts when this variant hits this level (blank = product Min Stock)</p>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="block text-sm font-semibold text-slate-700">Variant Image</label>
+                              <div className="flex items-center gap-3 h-11">
+                                <div className="relative w-11 h-11 bg-slate-100 rounded-lg border border-slate-300 overflow-hidden flex-shrink-0">
+                                  {newVariant.images && newVariant.images.length > 0 ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={newVariant.images[0]} alt="Variant" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="flex items-center justify-center h-full text-slate-400">
+                                      <Upload className="w-5 h-5" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <input
+                                    type="file"
+                                    id="vendor-new-variant-image"
+                                    accept="image/*"
+                                    onChange={handleNewVariantImage}
+                                    className="hidden"
+                                  />
+                                  <label
+                                    htmlFor="vendor-new-variant-image"
+                                    className="inline-block px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                                  >
+                                    {newVariant.images && newVariant.images.length > 0 ? 'Change' : 'Choose Image'}
+                                  </label>
+                                  {newVariant.images && newVariant.images.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewVariant(prev => ({ ...prev, images: [] }))}
+                                      className="ml-2 text-xs text-red-600 hover:text-red-800"
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           </div>
 
                           {/* Action Button */}
-                          <div className="flex justify-end pt-4 border-t border-slate-200">
+                          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                            {editVariantId && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={cancelEditVariant}
+                                className="px-6 py-2.5 font-medium"
+                              >
+                                Cancel
+                              </Button>
+                            )}
                             <Button
                               type="button"
                               onClick={addVariant}
@@ -1970,7 +2103,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               className="bg-brand-500 text-white hover:bg-brand-600 disabled:bg-slate-400 disabled:cursor-not-allowed px-6 py-2.5 font-medium"
                             >
                               <Package className="h-4 w-4 mr-2" />
-                              Add Variant
+                              {editVariantId ? 'Update Variant' : 'Add Variant'}
                             </Button>
                           </div>
                         </div>
@@ -1988,22 +2121,47 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
                           {/* Variants Table */}
                           <div className="overflow-x-auto border border-slate-300 rounded-lg">
-                            <Table className="[&_th]:px-3 [&_th]:h-11 [&_td]:px-3 [&_td]:py-2">
-                              <TableHeader>
+                            <Table className="table-fixed w-full min-w-[720px] [&_th]:px-3 [&_th]:h-11 [&_td]:px-3 [&_td]:py-2">
+                              <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                                 <TableRow>
+                                  <TableHead className="w-16">Image</TableHead>
                                   <TableHead>Name</TableHead>
-                                  <TableHead>Size</TableHead>
-                                  <TableHead>Color</TableHead>
-                                  <TableHead>SKU</TableHead>
-                                  <TableHead>Price</TableHead>
-                                  <TableHead>Stock</TableHead>
-                                  <TableHead className="text-center">Image</TableHead>
-                                  <TableHead className="text-center">Action</TableHead>
+                                  <TableHead className="w-44">Color</TableHead>
+                                  <TableHead className="w-36">SKU</TableHead>
+                                  <TableHead className="w-32">Price</TableHead>
+                                  <TableHead className="w-28">Stock</TableHead>
+                                  <TableHead className="text-center w-20">Action</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {formData.variants.map((variant, idx) => (
                                   <TableRow key={variant.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50 hover:bg-slate-100'}>
+                                    {/* Image — clickable thumbnail (add / change) */}
+                                    <TableCell>
+                                      <label
+                                        className={`w-10 h-10 bg-slate-100 rounded border border-slate-200 overflow-hidden relative group block transition-all ${variant.id ? 'cursor-pointer hover:ring-2 hover:ring-brand-500' : 'opacity-50 cursor-not-allowed'}`}
+                                        title={variant.images && variant.images.length > 0 ? 'Change image' : 'Add image'}
+                                      >
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          disabled={!variant.id}
+                                          onChange={(e) => variant.id && handleVariantImageFile(variant.id, e)}
+                                        />
+                                        {variant.images && variant.images.length > 0 ? (
+                                          // eslint-disable-next-line @next/next/no-img-element
+                                          <img src={variant.images[0]} alt={`${variant.color || 'variant'} preview`} className="w-full h-full object-cover" />
+                                        ) : (
+                                          <div className="flex items-center justify-center h-full text-slate-300">
+                                            <Package className="w-4 h-4" />
+                                          </div>
+                                        )}
+                                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <ImageIcon className="w-4 h-4 text-white drop-shadow-sm" />
+                                        </div>
+                                      </label>
+                                    </TableCell>
                                     <TableCell>
                                       <input
                                         type="text"
@@ -2012,18 +2170,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                         placeholder="—"
                                         className="w-full min-w-[100px] px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white"
                                       />
-                                    </TableCell>
-                                    <TableCell>
-                                      <select
-                                        value={variant.size}
-                                        onChange={(e) => updateVariant(variant.id, 'size', e.target.value)}
-                                        className="w-full min-w-[72px] px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white"
-                                      >
-                                        <option value="">—</option>
-                                        {standardSizes.map(s => (
-                                          <option key={s} value={s}>{s}</option>
-                                        ))}
-                                      </select>
                                     </TableCell>
                                     <TableCell>
                                       <div className="flex items-center gap-2">
@@ -2083,45 +2229,26 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                         min="0"
                                       />
                                     </TableCell>
+                                    {/* Action — Pencil (edit variant in the form above) + remove */}
                                     <TableCell className="text-center">
-                                      <label
-                                        className={`inline-flex items-center gap-2 transition-colors ${variant.id ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
-                                        title={variant.images && variant.images.length > 0 ? "Change image" : "Add image"}
-                                      >
-                                        <input
-                                          type="file"
-                                          accept="image/*"
-                                          className="hidden"
-                                          disabled={!variant.id}
-                                          onChange={(e) => variant.id && handleVariantImageFile(variant.id, e)}
-                                        />
-                                        {variant.images && variant.images.length > 0 ? (
-                                          <>
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img
-                                              src={variant.images[0]}
-                                              alt={`${variant.color || 'variant'} preview`}
-                                              className="w-9 h-9 rounded-md object-cover border border-slate-200"
-                                            />
-                                            <span className="text-xs font-medium text-brand-500 hover:text-brand-700">Edit</span>
-                                          </>
-                                        ) : (
-                                          <span className="inline-flex items-center gap-1 text-slate-400 hover:text-slate-600">
-                                            <ImageIcon className="h-4 w-4" />
-                                            <span className="text-xs font-medium">Add</span>
-                                          </span>
-                                        )}
-                                      </label>
-                                    </TableCell>
-                                    <TableCell className="text-center">
-                                      <button
-                                        type="button"
-                                        onClick={() => removeVariant(variant.id)}
-                                        className="text-slate-600 hover:text-red-600 p-1 inline-block"
-                                        title="Remove variant"
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </button>
+                                      <div className="inline-flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleEditVariantRow(variant)}
+                                          className="text-slate-600 hover:text-brand-600 p-1 inline-block"
+                                          title="Edit variant"
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => removeVariant(variant.id)}
+                                          className="text-slate-600 hover:text-red-600 p-1 inline-block"
+                                          title="Remove variant"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </button>
+                                      </div>
                                     </TableCell>
                                   </TableRow>
                                 ))}

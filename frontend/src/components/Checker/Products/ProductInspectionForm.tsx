@@ -125,6 +125,9 @@ export default function ProductInspectionForm({
         client: "M2C",
         vendor: vendorName,
         serviceStartDate: new Date().toISOString().split("T")[0],
+        // Timestamp when the inspection was opened — surfaces as "Inspection
+        // Start Time" in the generated report (the complete time is report gen).
+        inspectionStartedAt: new Date().toISOString(),
         serviceType: "Pre-Shipment Inspection",
         vendorData: null as any,
         productData: null as any,

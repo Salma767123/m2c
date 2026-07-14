@@ -269,6 +269,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
         productName: product.name,
         vendorName: product.vendor?.companyName || fd.vendor,
         checker: assignedQc || null,
+        inspectionStartedAt: fd.inspectionStartedAt,
         generatedAt: new Date(),
       }
       const pdf = generateProductInspectionPdf(fd, meta, {})
