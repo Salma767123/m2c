@@ -44,12 +44,20 @@ const deleteFromCloudinary = async (publicId) => {
 // and return the secure URL. Otherwise returns the input unchanged.
 const uploadDataUriIfBase64 = async (url, options = {}) => {
   if (typeof url !== 'string' || !url.startsWith('data:')) return url;
-  const match = url.match(/^data:([^;]+);base64,(.+)$/);
+  // Tolerate optional parameters between the mime type and the ;base64 marker.
+  // jsPDF emits `data:application/pdf;filename=generated.pdf;base64,…`, which the
+  // old `^data:([^;]+);base64,` regex could not match — so signed PDFs bypassed
+  // this upload and the whole base64 string was persisted in MongoDB (F-07).
+  const match = url.match(/^data:([^;,]+)(?:;[^;,]+)*;base64,(.+)$/);
   if (!match) return url;
+  const mime = match[1];
   const buffer = Buffer.from(match[2], 'base64');
+  // Non-images (e.g. the signed PDF report) must not upload as resource_type
+  // 'image' — use 'auto' so Cloudinary stores them as deliverable raw assets.
+  const resourceType = mime.startsWith('image/') ? 'image' : 'auto';
   const result = await uploadToCloudinary(buffer, {
     folder: 'products',
-    resource_type: 'image',
+    resource_type: resourceType,
     ...options,
   });
   return result.secure_url;

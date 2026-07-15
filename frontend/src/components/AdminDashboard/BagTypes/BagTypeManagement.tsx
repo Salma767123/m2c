@@ -302,8 +302,6 @@ export default function BagTypeManagement() {
   const activeCount = stats.active;
   const inactiveCount = stats.inactive;
 
-  const rangeStart = pagination.total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const rangeEnd = Math.min(currentPage * PAGE_SIZE, pagination.total);
 
   // Per-bag sales lookup for table
   const salesMap = new Map(stats.perBagType.map(s => [s.bagTypeId, { sold: s.sold, revenue: s.revenue }]));
@@ -392,17 +390,6 @@ export default function BagTypeManagement() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Results summary */}
-      <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600 mb-4">
-        <span>
-          {loading
-            ? 'Loading bag types...'
-            : pagination.total === 0
-              ? '0 bag types'
-              : `Showing ${rangeStart}–${rangeEnd} of ${pagination.total} bag type${pagination.total === 1 ? '' : 's'}`}
-        </span>
-      </div>
 
       {/* Table */}
       <Card>

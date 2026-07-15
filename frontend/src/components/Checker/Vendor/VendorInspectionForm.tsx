@@ -80,7 +80,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
   const [verifications, setVerifications] = useState<Verifications>({})
   const [meta, setMeta] = useState<InspectorMeta>({
     inspectorName: '',
-    inspectionDate: new Date().toISOString().split('T')[0],
+    inspectionDate: new Date().toLocaleDateString('en-CA'), // local date, not UTC (F-09)
     overallResult: '',
     inspectorRemarks: '',
   })

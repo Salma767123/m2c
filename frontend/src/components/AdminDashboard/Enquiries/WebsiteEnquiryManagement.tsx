@@ -187,11 +187,6 @@ export default function WebsiteEnquiryManagement() {
       </Card>
 
       {/* Enquiries Table */}
-      {enquiries.length > 0 && (
-        <p className="text-sm text-slate-600">
-          Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, enquiries.length)} of {enquiries.length}
-        </p>
-      )}
       <Card>
         <CardContent className="p-0">
           {loading ? (

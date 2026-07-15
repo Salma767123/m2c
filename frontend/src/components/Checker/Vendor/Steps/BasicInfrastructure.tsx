@@ -24,7 +24,7 @@ export default function BasicInfrastructure({ formData, setFormData }: StepProps
                     <label className="block text-slate-700 font-semibold mb-3 text-sm">Machinery Available:</label>
                     <SelectField
                         value={formData.machineryAvailable}
-                        onChange={(value) => setFormData({ ...formData, machineryAvailable: value })}
+                        onChange={(value) => setFormData((prev: any) => ({ ...prev, machineryAvailable: value }))}
                         options={options}
                     />
                 </div>
@@ -32,7 +32,7 @@ export default function BasicInfrastructure({ formData, setFormData }: StepProps
                     <label className="block text-slate-700 font-semibold mb-3 text-sm">Electricity Availability:</label>
                     <SelectField
                         value={formData.electricityAvailable}
-                        onChange={(value) => setFormData({ ...formData, electricityAvailable: value })}
+                        onChange={(value) => setFormData((prev: any) => ({ ...prev, electricityAvailable: value }))}
                         options={options}
                     />
                 </div>
@@ -40,7 +40,7 @@ export default function BasicInfrastructure({ formData, setFormData }: StepProps
                     <label className="block text-slate-700 font-semibold mb-3 text-sm">Water Availability:</label>
                     <SelectField
                         value={formData.waterAvailable}
-                        onChange={(value) => setFormData({ ...formData, waterAvailable: value })}
+                        onChange={(value) => setFormData((prev: any) => ({ ...prev, waterAvailable: value }))}
                         options={options}
                     />
                 </div>
@@ -48,7 +48,7 @@ export default function BasicInfrastructure({ formData, setFormData }: StepProps
                     <label className="block text-slate-700 font-semibold mb-3 text-sm">Storage Area Available:</label>
                     <SelectField
                         value={formData.storageAreaAvailable}
-                        onChange={(value) => setFormData({ ...formData, storageAreaAvailable: value })}
+                        onChange={(value) => setFormData((prev: any) => ({ ...prev, storageAreaAvailable: value }))}
                         options={options}
                     />
                 </div>

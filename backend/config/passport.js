@@ -2,7 +2,10 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const { prisma } = require('./database');
 
-// Configure Google OAuth Strategy
+// Configure Google OAuth Strategy — only when credentials are configured, so
+// the backend can boot without them (they are optional in .env.example). Left
+// unconditional, passport-google-oauth20 throws "requires a clientID" (F-14).
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
@@ -166,6 +169,9 @@ passport.use(new GoogleStrategy({
     return done(error, null);
   }
 }));
+} else {
+  console.warn('⚠️  Google OAuth disabled — GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set.');
+}
 
 // Serialize user for session
 passport.serializeUser((user, done) => {

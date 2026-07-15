@@ -403,12 +403,6 @@ export default function ProductsTable() {
           </div>
         </div>
       </CardHeader>
-      {/* Showing */}
-      {!isLoading && pagination.totalCount > 0 && (
-        <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600 px-6 pb-2">
-          <span>Showing {(pagination.currentPage - 1) * pagination.limit + 1}–{Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)} of {pagination.totalCount}</span>
-        </div>
-      )}
 
       <CardContent>
         <Table>

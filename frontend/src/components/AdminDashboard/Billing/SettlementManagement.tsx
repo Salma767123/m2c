@@ -227,13 +227,6 @@ export default function SettlementManagement() {
         </div>
       </div>
 
-      {/* Showing */}
-      {!loading && filteredSettlements.length > 0 && (
-        <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
-          <span>Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredSettlements.length)} of {filteredSettlements.length}</span>
-        </div>
-      )}
-
       {/* Settlements Table */}
       <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (

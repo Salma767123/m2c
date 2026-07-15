@@ -55,9 +55,10 @@ interface DefectsProps {
     defectPhotos: any[]
   }
   setFormData: (data: any) => void
+  errors?: Record<string, string>
 }
 
-export default function Defects({ formData, setFormData }: DefectsProps) {
+export default function Defects({ formData, setFormData, errors = {} }: DefectsProps) {
   const defectPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const [cropQueue, setCropQueue] = useState<File[]>([])
   const [cropSrc, setCropSrc] = useState<string | null>(null)
@@ -81,10 +82,10 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
 
   const onDefectCropped = async (croppedFile: File) => {
     const dataUrl = await readAsDataUrl(croppedFile)
-    setFormData({
-      ...formData,
-      defectPhotos: [...(formData.defectPhotos || []), { name: cropFileName, data: dataUrl, url: dataUrl }]
-    })
+    setFormData((prev: any) => ({
+      ...prev,
+      defectPhotos: [...(prev.defectPhotos || []), { name: cropFileName, data: dataUrl, url: dataUrl }]
+    }))
     const cur = cropSrc
     if (cur?.startsWith('blob:')) URL.revokeObjectURL(cur)
     if (cropQueue.length > 0) {
@@ -100,7 +101,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
 
   const removeDefectPhoto = (photoIndex: number) => {
     const updatedPhotos = formData.defectPhotos.filter((_, i) => i !== photoIndex)
-    setFormData({ ...formData, defectPhotos: updatedPhotos })
+    setFormData((prev: any) => ({ ...prev, defectPhotos: updatedPhotos }))
   }
 
   return (
@@ -120,7 +121,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
             <label className="block text-sm font-medium text-slate-700 mb-2">Inspection Level</label>
             <SelectField
               value={formData.inspectionLevel}
-              onChange={(value) => setFormData({ ...formData, inspectionLevel: value })}
+              onChange={(value) => setFormData((prev: any) => ({ ...prev, inspectionLevel: value }))}
               options={["L-I", "L-II", "L-III"]}
             />
           </div>
@@ -128,8 +129,20 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
             <label className="block text-sm font-medium text-slate-700 mb-2">Sample Size</label>
             <input
               type="number"
+              min={1}
               value={formData.sampleSize || ''}
-              onChange={(e) => setFormData({ ...formData, sampleSize: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+              onChange={(e) => setFormData((prev: any) => ({ ...prev, sampleSize: e.target.value === '' ? 0 : parseInt(e.target.value) }))}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 ${errors.sampleSize ? 'border-red-400 bg-red-50/40' : 'border-slate-300'}`}
+            />
+            {errors.sampleSize && <p className="mt-1 text-xs text-red-600">{errors.sampleSize}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">AQL Level - Critical</label>
+            <input
+              type="number"
+              step="0.1"
+              value={formData.aqlCritical ?? ''}
+              onChange={(e) => setFormData((prev: any) => ({ ...prev, aqlCritical: e.target.value === '' ? 0 : parseFloat(e.target.value) }))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
             />
           </div>
@@ -139,7 +152,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
               type="number"
               step="0.1"
               value={formData.aqlMajor || ''}
-              onChange={(e) => setFormData({ ...formData, aqlMajor: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
+              onChange={(e) => setFormData((prev: any) => ({ ...prev, aqlMajor: e.target.value === '' ? 0 : parseFloat(e.target.value) }))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
             />
           </div>
@@ -149,7 +162,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
               type="number"
               step="0.1"
               value={formData.aqlMinor || ''}
-              onChange={(e) => setFormData({ ...formData, aqlMinor: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
+              onChange={(e) => setFormData((prev: any) => ({ ...prev, aqlMinor: e.target.value === '' ? 0 : parseFloat(e.target.value) }))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
             />
           </div>
@@ -159,8 +172,8 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
             <label className="block text-sm font-medium text-slate-700 mb-2">Max Allowed - Critical</label>
             <input
               type="number"
-              value={formData.maxAllowedCritical || ''}
-              onChange={(e) => setFormData({ ...formData, maxAllowedCritical: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+              value={formData.maxAllowedCritical ?? ''}
+              onChange={(e) => setFormData((prev: any) => ({ ...prev, maxAllowedCritical: e.target.value === '' ? 0 : parseInt(e.target.value) }))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
             />
           </div>
@@ -169,7 +182,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
             <input
               type="number"
               value={formData.maxAllowedMajor || ''}
-              onChange={(e) => setFormData({ ...formData, maxAllowedMajor: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+              onChange={(e) => setFormData((prev: any) => ({ ...prev, maxAllowedMajor: e.target.value === '' ? 0 : parseInt(e.target.value) }))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
             />
           </div>
@@ -178,7 +191,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
             <input
               type="number"
               value={formData.maxAllowedMinor || ''}
-              onChange={(e) => setFormData({ ...formData, maxAllowedMinor: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+              onChange={(e) => setFormData((prev: any) => ({ ...prev, maxAllowedMinor: e.target.value === '' ? 0 : parseInt(e.target.value) }))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
             />
           </div>
@@ -193,10 +206,10 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
           <div className="flex items-center justify-between">
             <button
               onClick={() =>
-                setFormData({
-                  ...formData,
-                  criticalDefects: Math.max(0, formData.criticalDefects - 1),
-                })
+                setFormData((prev: any) => ({
+                  ...prev,
+                  criticalDefects: Math.max(0, prev.criticalDefects - 1),
+                }))
               }
               className="p-3 bg-white border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors"
             >
@@ -205,10 +218,10 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
             <span className="text-5xl font-bold text-purple-700">{formData.criticalDefects}</span>
             <button
               onClick={() =>
-                setFormData({
-                  ...formData,
-                  criticalDefects: formData.criticalDefects + 1,
-                })
+                setFormData((prev: any) => ({
+                  ...prev,
+                  criticalDefects: prev.criticalDefects + 1,
+                }))
               }
               className="p-3 bg-white border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors"
             >
@@ -223,10 +236,10 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
           <div className="flex items-center justify-between">
             <button
               onClick={() =>
-                setFormData({
-                  ...formData,
-                  majorDefects: Math.max(0, formData.majorDefects - 1),
-                })
+                setFormData((prev: any) => ({
+                  ...prev,
+                  majorDefects: Math.max(0, prev.majorDefects - 1),
+                }))
               }
               className="p-3 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
             >
@@ -235,10 +248,10 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
             <span className="text-5xl font-bold text-red-700">{formData.majorDefects}</span>
             <button
               onClick={() =>
-                setFormData({
-                  ...formData,
-                  majorDefects: formData.majorDefects + 1,
-                })
+                setFormData((prev: any) => ({
+                  ...prev,
+                  majorDefects: prev.majorDefects + 1,
+                }))
               }
               className="p-3 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
             >
@@ -253,10 +266,10 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
           <div className="flex items-center justify-between">
             <button
               onClick={() =>
-                setFormData({
-                  ...formData,
-                  minorDefects: Math.max(0, formData.minorDefects - 1),
-                })
+                setFormData((prev: any) => ({
+                  ...prev,
+                  minorDefects: Math.max(0, prev.minorDefects - 1),
+                }))
               }
               className="p-3 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors"
             >
@@ -265,10 +278,10 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
             <span className="text-5xl font-bold text-amber-700">{formData.minorDefects}</span>
             <button
               onClick={() =>
-                setFormData({
-                  ...formData,
-                  minorDefects: formData.minorDefects + 1,
-                })
+                setFormData((prev: any) => ({
+                  ...prev,
+                  minorDefects: prev.minorDefects + 1,
+                }))
               }
               className="p-3 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors"
             >
@@ -284,7 +297,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
           <label className="block text-slate-700 font-semibold mb-3">Critical Defect Details:</label>
           <textarea
             value={formData.criticalDefectDetails}
-            onChange={(e) => setFormData({ ...formData, criticalDefectDetails: e.target.value })}
+            onChange={(e) => setFormData((prev: any) => ({ ...prev, criticalDefectDetails: e.target.value }))}
             placeholder="Describe critical defects found..."
             className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200 min-h-24"
           />
@@ -293,7 +306,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
           <label className="block text-slate-700 font-semibold mb-3">Major Defect Details:</label>
           <textarea
             value={formData.majorDefectDetails}
-            onChange={(e) => setFormData({ ...formData, majorDefectDetails: e.target.value })}
+            onChange={(e) => setFormData((prev: any) => ({ ...prev, majorDefectDetails: e.target.value }))}
             placeholder="Describe major defects found..."
             className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200 min-h-24"
           />
@@ -302,7 +315,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
           <label className="block text-slate-700 font-semibold mb-3">Minor Defect Details:</label>
           <textarea
             value={formData.minorDefectDetails}
-            onChange={(e) => setFormData({ ...formData, minorDefectDetails: e.target.value })}
+            onChange={(e) => setFormData((prev: any) => ({ ...prev, minorDefectDetails: e.target.value }))}
             placeholder="Describe minor defects found..."
             className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200 min-h-24"
           />
@@ -371,6 +384,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
       <div>
         <label className="block text-slate-700 font-semibold mb-3">Photo Evidence:</label>
         <p className="text-slate-600 text-sm mb-4">Major/minor defects, sealed samples with AQF tape</p>
+        {errors.defectPhotos && <p className="mb-3 text-xs text-red-600">{errors.defectPhotos}</p>}
         {(formData.defectPhotos || []).length === 0 && (
           <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50">
             <input

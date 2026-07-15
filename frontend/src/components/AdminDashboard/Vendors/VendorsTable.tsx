@@ -12,7 +12,7 @@ import DateRangeCalendar from '@/components/Shared/DateRangeCalendar'
 import {
   Edit, Eye, CheckCircle, XCircle, Search, Plus,
   ChevronLeft, ChevronRight, RotateCcw,
-  Building2, Clock, AlertTriangle,
+  Building2, Clock, AlertTriangle, Bell,
 } from 'lucide-react'
 import VendorService, { VendorProfile, VendorFilters } from '@/services/vendorService'
 import { formatDate } from '@/lib/utils'
@@ -91,6 +91,92 @@ const getInspectionBadge = (vendorStatus: string, latestInspection?: VendorProfi
   }
   const cfg = configs[status] ?? { label: status, className: 'bg-slate-100 text-slate-600 border border-slate-200' }
   return <Badge className={cfg.className}>{cfg.label}</Badge>
+}
+
+// ── Per-vendor "needs attention" alerts ──────────────────────────────────────
+// Each item is something an admin has to act on. When a vendor has ≥1 alert the
+// row is highlighted and a bell shows the list on hover. Every case below is
+// derived from real fields on the vendor list response — no invented signals.
+type VendorAlertTone = 'review' | 'approval' | 'rejection' | 'pending' | 'bank'
+type VendorAlert = { text: string; tone: VendorAlertTone }
+
+const ALERT_DOT: Record<VendorAlertTone, string> = {
+  review: 'bg-blue-500',
+  approval: 'bg-cyan-500',
+  rejection: 'bg-orange-500',
+  pending: 'bg-amber-500',
+  bank: 'bg-purple-500',
+}
+
+function getVendorAlerts(vendor: VendorProfile): VendorAlert[] {
+  const alerts: VendorAlert[] = []
+  const vStatus = (vendor.status || '').toUpperCase()
+  const finalized = ['APPROVED', 'REJECTED', 'SUSPENDED'].includes(vStatus)
+
+  // Lifecycle alerts apply only while the vendor is still in the approval
+  // pipeline — an Approved/Rejected/Suspended vendor has no pending review,
+  // confirmation or QC assignment left to do.
+  if (!finalized) {
+    // A checker/employee requested approval — admin must confirm or cancel.
+    if (vStatus === 'APPROVAL_PENDING') {
+      alerts.push({
+        tone: 'approval',
+        text: `Approval requested${vendor.approvalRequestedByName ? ` by ${vendor.approvalRequestedByName}` : ''} — confirm or cancel`,
+      })
+    }
+    // A rejection was requested — admin must confirm or cancel.
+    if (vStatus === 'REJECTION_PENDING') {
+      alerts.push({
+        tone: 'rejection',
+        text: `Rejection requested${vendor.rejectionRequestedByName ? ` by ${vendor.rejectionRequestedByName}` : ''} — confirm or cancel`,
+      })
+    }
+    // QC inspection report submitted and waiting for the admin's review/decision.
+    const insp = vendor.latestInspection?.status
+    if (insp === 'SUBMITTED' || insp === 'UNDER_ADMIN_REVIEW') {
+      const res = vendor.latestInspection?.result
+      const suffix = res === 'PASSED' ? ' (Pass)' : res === 'FAILED' ? ' (Fail)' : ''
+      alerts.push({ tone: 'review', text: `QC inspection report submitted${suffix} — review & decide` })
+    }
+    // Brand-new registration awaiting review / QC assignment.
+    if (vStatus === 'PENDING') {
+      alerts.push({ tone: 'pending', text: 'New vendor registration — review & assign a QC checker' })
+    }
+  }
+
+  // Bank verification is independent of the vendor's approval status — it must
+  // be done for payouts even after the vendor is approved, so it always shows.
+  if (vendor.bankDetails && vendor.bankDetails.isVerified === false) {
+    alerts.push({ tone: 'bank', text: 'Bank details submitted — needs verification' })
+  }
+
+  return alerts
+}
+
+// Bell + count badge that reveals the vendor's alert list on hover.
+function VendorAlertIndicator({ alerts }: { alerts: VendorAlert[] }) {
+  if (alerts.length === 0) return null
+  return (
+    <span className="relative group/alert inline-flex shrink-0">
+      <span className="relative inline-flex">
+        <Bell className="h-4 w-4 text-amber-500" />
+        <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold leading-[14px] text-center ring-2 ring-white">
+          {alerts.length}
+        </span>
+      </span>
+      <div className="pointer-events-none absolute left-0 top-full mt-2 z-40 hidden w-64 group-hover/alert:block">
+        <div className="rounded-xl border border-slate-200 bg-white shadow-xl p-3 space-y-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Needs attention</p>
+          {alerts.map((a, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <span className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${ALERT_DOT[a.tone]}`} />
+              <span className="text-xs text-slate-700 leading-snug">{a.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </span>
+  )
 }
 
 
@@ -536,18 +622,27 @@ export default function VendorsTable() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {displayedVendors.map((vendor) => (
+                  {displayedVendors.map((vendor) => {
+                    const alerts = getVendorAlerts(vendor)
+                    return (
                     <TableRow
                       key={vendor.id}
-                      className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0"
+                      className={`transition-colors duration-150 border-b border-slate-100 last:border-0 ${
+                        alerts.length > 0
+                          ? 'bg-amber-50/50 hover:bg-amber-50'
+                          : 'hover:bg-slate-50/60'
+                      }`}
                     >
-                      {/* Vendor ID */}
-                      <TableCell className="py-3 px-3 align-top">
-                        {vendor.vendorCode ? (
-                          <span className="text-xs font-mono font-semibold text-slate-700 whitespace-nowrap">{vendor.vendorCode}</span>
-                        ) : (
-                          <span className="text-xs text-slate-400 italic">—</span>
-                        )}
+                      {/* Vendor ID (+ needs-attention bell) */}
+                      <TableCell className={`py-3 px-3 align-top ${alerts.length > 0 ? 'border-l-2 border-l-amber-400' : ''}`}>
+                        <div className="flex items-center gap-3">
+                          <VendorAlertIndicator alerts={alerts} />
+                          {vendor.vendorCode ? (
+                            <span className="text-xs font-mono font-semibold text-slate-700 whitespace-nowrap">{vendor.vendorCode}</span>
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">—</span>
+                          )}
+                        </div>
                       </TableCell>
 
                       {/* Vendor */}
@@ -705,7 +800,8 @@ export default function VendorsTable() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>

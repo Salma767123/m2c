@@ -96,8 +96,6 @@ export default function HubToCustomer() {
   // Pagination
   const totalPages = Math.ceil(filteredOrders.length / PAGE_SIZE);
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const rangeStart = filteredOrders.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const rangeEnd = Math.min(currentPage * PAGE_SIZE, filteredOrders.length);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -175,15 +173,6 @@ export default function HubToCustomer() {
             />
           </div>
         </div>
-      </div>
-
-      {/* Results summary */}
-      <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
-        <span>
-          {filteredOrders.length === 0
-            ? '0 orders'
-            : `Showing ${rangeStart}–${rangeEnd} of ${filteredOrders.length} order${filteredOrders.length === 1 ? '' : 's'}`}
-        </span>
       </div>
 
       {/* Orders Table */}

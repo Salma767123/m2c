@@ -7,6 +7,7 @@ import type { PackagingItem, TestGroup } from './PI_data'
 import { ADDITIONAL_EVIDENCE_DEFS } from './PI_data'
 import { qcCheckerService } from '@/services/qcCheckerService'
 import { formatCheckerName } from '@/lib/checkerUtils'
+import { getBusinessTypeLabel } from './PI_Step1_GeneralInfo'
 
 // ── Code badge helper ────────────────────────────────────────────────────────
 const CODE_LABELS: Record<number, string> = {
@@ -100,12 +101,16 @@ interface Props {
     criticalDefects: number
     majorDefects: number
     minorDefects: number
+    maxAllowedCritical?: number
+    maxAllowedMajor?: number
+    maxAllowedMinor?: number
     criticalDefectDetails: string
     majorDefectDetails: string
     minorDefectDetails: string
     testGroups: TestGroup[]
     additionalEvidence: Record<string, any[]>
     inspectionStatus: string
+    reviewerRemarks?: string
     inspectorSignature?: string
   }
   setFormData: (d: any) => void
@@ -203,7 +208,7 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
         />
         <div className="space-y-1">
           <ReviewRow label="Company" value={v.companyName} />
-          <ReviewRow label="Business Type" value={v.businessType} />
+          <ReviewRow label="Business Type" value={getBusinessTypeLabel(v.businessType)} />
           <ReviewRow label="Product" value={p.name} />
           <ReviewRow label="Inspection Date" value={d.serviceStartDate} />
           <ReviewRow label="Service Type" value={d.serviceType} />
@@ -294,24 +299,50 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
           stepLabel="Step 4"
           onEdit={() => onEditStep('defects')}
         />
-        <div className="grid grid-cols-3 gap-3 mb-3">
-          <div className="border border-purple-200 bg-purple-50 rounded-xl p-3 text-center">
-            <p className="text-xl font-bold text-purple-700">{d.criticalDefects}</p>
-            <p className="text-xs text-purple-600 font-semibold">Critical</p>
-          </div>
-          <div className="border border-red-200 bg-red-50 rounded-xl p-3 text-center">
-            <p className="text-xl font-bold text-red-700">{d.majorDefects}</p>
-            <p className="text-xs text-red-600 font-semibold">Major</p>
-          </div>
-          <div className="border border-amber-200 bg-amber-50 rounded-xl p-3 text-center">
-            <p className="text-xl font-bold text-amber-700">{d.minorDefects}</p>
-            <p className="text-xs text-amber-600 font-semibold">Minor</p>
-          </div>
-        </div>
-        <div className="space-y-1">
-          <ReviewRow label="Inspection Level" value={d.inspectionLevel} />
-          <ReviewRow label="Sample Size" value={d.sampleSize} />
-        </div>
+        {(() => {
+          const rows = [
+            { key: 'C', label: 'Critical', found: Number(d.criticalDefects || 0), max: d.maxAllowedCritical, details: d.criticalDefectDetails, border: 'border-purple-200 bg-purple-50', text: 'text-purple-700', sub: 'text-purple-600' },
+            { key: 'Ma', label: 'Major', found: Number(d.majorDefects || 0), max: d.maxAllowedMajor, details: d.majorDefectDetails, border: 'border-red-200 bg-red-50', text: 'text-red-700', sub: 'text-red-600' },
+            { key: 'Mi', label: 'Minor', found: Number(d.minorDefects || 0), max: d.maxAllowedMinor, details: d.minorDefectDetails, border: 'border-amber-200 bg-amber-50', text: 'text-amber-700', sub: 'text-amber-600' },
+          ]
+          const failed = rows.some((r) => r.max != null && r.found > Number(r.max))
+          return (
+            <>
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                {rows.map((r) => {
+                  const exceeded = r.max != null && r.found > Number(r.max)
+                  return (
+                    <div key={r.key} className={`border ${r.border} rounded-xl p-3 text-center ${exceeded ? 'ring-2 ring-red-400' : ''}`}>
+                      <p className={`text-xl font-bold ${r.text}`}>{r.found}</p>
+                      <p className={`text-xs ${r.sub} font-semibold`}>{r.label}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Max {r.max ?? '—'}</p>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="space-y-1 mb-3">
+                <ReviewRow label="Inspection Level" value={d.inspectionLevel} />
+                <ReviewRow label="Sample Size" value={d.sampleSize} />
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-sm text-slate-500">AQL Result</span>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${failed ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                    {failed ? 'FAIL' : 'PASS'}
+                  </span>
+                </div>
+              </div>
+              {(d.criticalDefectDetails || d.majorDefectDetails || d.minorDefectDetails) && (
+                <div className="space-y-1.5">
+                  {rows.filter((r) => r.details).map((r) => (
+                    <div key={r.key} className="text-xs bg-slate-50 border border-slate-100 rounded-lg p-2">
+                      <span className="font-semibold text-slate-600">{r.label}: </span>
+                      <span className="text-slate-700">{r.details}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )
+        })()}
       </div>
 
       {/* ── Step 5: Testing ───────────────────────────────────────────────── */}
@@ -381,7 +412,7 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Inspection Date</p>
               <div className="px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-700 text-sm">
-                {d.serviceStartDate || new Date().toISOString().split('T')[0]}
+                {d.serviceStartDate || new Date().toLocaleDateString('en-CA')}
               </div>
             </div>
             <div>
@@ -417,7 +448,7 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
                       key={status}
                       type="button"
                       onClick={() => {
-                        setFormData({ ...d, inspectionStatus: status })
+                        setFormData((prev: any) => ({ ...prev, inspectionStatus: status }))
                         setShowStatusDropdown(false)
                       }}
                       className={`block w-full px-4 py-2.5 text-sm text-left transition-colors ${
@@ -433,6 +464,29 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
                 document.body
               )}
             </div>
+          </div>
+          {/* Reviewer remarks — required when the decision is a rejection so the
+              reject endpoint always receives a real reason (F-08). */}
+          <div className="mt-4">
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+              Reviewer Remarks {d.inspectionStatus === 'Rejected' && <span className="text-red-500">*</span>}
+            </label>
+            <textarea
+              value={d.reviewerRemarks || ''}
+              onChange={(e) => setFormData((prev: any) => ({ ...prev, reviewerRemarks: e.target.value }))}
+              rows={3}
+              placeholder={d.inspectionStatus === 'Rejected'
+                ? 'Reason for rejection (required)…'
+                : 'Optional notes explaining this decision…'}
+              className={`w-full px-4 py-3 border rounded-xl text-sm resize-y transition-all duration-200 ${
+                errors.reviewerRemarks
+                  ? 'border-red-500 bg-red-50/40 text-red-700'
+                  : 'border-slate-300 bg-white text-slate-700 focus:border-slate-400 focus:outline-none'
+              }`}
+            />
+            {errors.reviewerRemarks && (
+              <p className="mt-1.5 text-xs text-red-600">{errors.reviewerRemarks}</p>
+            )}
           </div>
         </div>
       </div>

@@ -73,20 +73,11 @@ function ColorField({ label = 'Color', color, hex }: { label?: string; color?: s
       <div className="flex items-center gap-2">
         {hex && <span className="w-4 h-4 rounded border border-slate-200 shrink-0" style={{ backgroundColor: hex }} />}
         <span className="text-sm font-medium text-slate-900">{color}</span>
+        {hex && <span className="text-xs text-slate-500 font-mono uppercase ml-auto">{hex}</span>}
       </div>
     </div>
   )
 }
-
-// Hoisted static array — allocated once, not re-created every render (Rule 6.3)
-const QC_SCORE_FIELDS = [
-  { key: 'shipperCartonRemark', label: 'Shipper Carton' },
-  { key: 'innerCartonRemark', label: 'Inner Carton' },
-  { key: 'retailPackagingRemark', label: 'Retail Packaging' },
-  { key: 'productTypeRemark', label: 'Product Type' },
-  { key: 'aqlWorkmanshipRemark', label: 'AQL Workmanship' },
-  { key: 'onSiteTestsRemark', label: 'On-site Tests' },
-] as const;
 
 interface VendorProductRequestViewProps {
   requestId: string
@@ -682,6 +673,9 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                       <span className="w-4 h-4 rounded border border-slate-200 shrink-0" style={{ backgroundColor: product.singleUnitColorHex }} />
                     )}
                     <span className="text-sm font-medium text-slate-900">{product.singleUnitColor}</span>
+                    {product.singleUnitColorHex && (
+                      <span className="text-xs text-slate-500 font-mono uppercase ml-auto">{product.singleUnitColorHex}</span>
+                    )}
                   </div>
                 </div>
               )}
@@ -907,48 +901,68 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
             <SpecSection icon={<CheckCircle className="h-4 w-4" />} title="QC Inspection Summary">
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-2">
-                  {product.qcInspectionData.finalDecision && (
-                    <div className={`p-2 rounded text-center ${product.qcInspectionData.finalDecision === 'Approved' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
-                      <p className="text-[10px] text-slate-500">Decision</p>
-                      <p className="text-xs font-semibold">{product.qcInspectionData.finalDecision}</p>
-                    </div>
-                  )}
-                  {product.qcInspectionData.inspectionDate && (
+                  {(() => {
+                    const decision = product.qcInspectionData.inspectionStatus || product.approvalStatus;
+                    if (!decision) return null;
+                    const isApproved = decision === 'Approved' || product.approvalStatus === 'QC_APPROVED' || product.approvalStatus === 'APPROVED';
+                    const isRejected = decision === 'Rejected' || product.approvalStatus === 'REJECTED';
+                    const cls = isApproved ? 'bg-green-50 text-green-800' : isRejected ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-800';
+                    return (
+                      <div className={`p-2 rounded text-center ${cls}`}>
+                        <p className="text-[10px] text-slate-500">Decision</p>
+                        <p className="text-xs font-semibold">{product.qcInspectionData.inspectionStatus || decision}</p>
+                      </div>
+                    );
+                  })()}
+                  {(product.qcInspectionData.serviceStartDate || product.qcInspectionData.inspectionDate) && (
                     <div className="p-2 rounded bg-slate-50 text-center">
                       <p className="text-[10px] text-slate-500">Inspected</p>
-                      <p className="text-xs font-semibold text-slate-800">{product.qcInspectionData.inspectionDate}</p>
+                      <p className="text-xs font-semibold text-slate-800">{product.qcInspectionData.serviceStartDate || product.qcInspectionData.inspectionDate}</p>
                     </div>
                   )}
                 </div>
-                {product.qcInspectionData.inspectionType && (
-                  <p className="text-xs text-slate-600">Type: {product.qcInspectionData.inspectionType}</p>
+                {product.qcInspectionData.serviceType && (
+                  <p className="text-xs text-slate-600">Type: {product.qcInspectionData.serviceType}</p>
                 )}
 
-                {/* Remark Scores */}
-                {(product.qcInspectionData.shipperCartonRemark || product.qcInspectionData.aqlWorkmanshipRemark) ? (
-                  <div role="list" aria-label="Quality inspection scores">
-                    <p className="text-[10px] font-medium text-slate-500 mb-1.5">Quality Scores</p>
-                    <div className="space-y-1">
-                      {QC_SCORE_FIELDS.map(({ key, label }) => {
-                        const score = product.qcInspectionData?.[key];
-                        if (!score) return null;
-                        const num = parseInt(score);
-                        const color = num >= 8 ? 'text-green-700 bg-green-50' : num >= 6 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50';
-                        return (
-                          <div key={key} role="listitem" className="flex items-center justify-between text-xs" aria-label={`${label}: ${score} out of 10`}>
+                {/* Findings summary — computed from the real inspection data */}
+                {(() => {
+                  const fd = product.qcInspectionData as any;
+                  const verifs = fd.productVerifications && typeof fd.productVerifications === 'object' ? Object.values(fd.productVerifications) : [];
+                  const verifiedCount = (verifs as any[]).filter((v) => v?.ok === true).length;
+                  const issueCount = (verifs as any[]).filter((v) => v?.ok === false).length;
+                  const pkg = Array.isArray(fd.packagingItems) ? fd.packagingItems : [];
+                  const allTests = (Array.isArray(fd.testGroups) ? fd.testGroups : []).flatMap((g: any) => Array.isArray(g.tests) ? g.tests : []);
+                  const passed = allTests.filter((t: any) => t.pass).length;
+                  const failed = allTests.filter((t: any) => t.fail).length;
+                  const crit = Number(fd.criticalDefects || 0), maj = Number(fd.majorDefects || 0), min = Number(fd.minorDefects || 0);
+                  const rows: [string, string, boolean][] = [
+                    ['Fields verified', `${verifiedCount}/${(verifs as any[]).length}`, false],
+                    ['Verification issues', issueCount ? String(issueCount) : 'None', issueCount > 0],
+                    ['Packaging items', String(pkg.length), false],
+                    ['On-site tests', allTests.length ? `${passed} pass · ${failed} fail` : '—', failed > 0],
+                    ['Defects (C/Ma/Mi)', `${crit} / ${maj} / ${min}`, crit > 0 || maj > 0],
+                  ];
+                  if ((verifs as any[]).length === 0 && pkg.length === 0 && allTests.length === 0) return null;
+                  return (
+                    <div>
+                      <p className="text-[10px] font-medium text-slate-500 mb-1.5">Inspection Findings</p>
+                      <div className="space-y-1">
+                        {rows.map(([label, value, warn]) => (
+                          <div key={label} className="flex items-center justify-between text-xs">
                             <span className="text-slate-600">{label}</span>
-                            <span className={`px-1.5 py-0.5 rounded font-semibold transition-colors duration-200 ${color}`}>{score}/10</span>
+                            <span className={`px-1.5 py-0.5 rounded font-semibold ${warn ? 'text-red-700 bg-red-50' : 'text-slate-700 bg-slate-50'}`}>{value}</span>
                           </div>
-                        );
-                      })}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ) : null}
+                  );
+                })()}
 
-                {product.qcInspectionData.finalRemarks && (
+                {product.qcInspectionData.reviewerRemarks && (
                   <div className="p-2 bg-slate-50 rounded">
-                    <p className="text-[10px] font-medium text-slate-500 mb-1">Remarks</p>
-                    <p className="text-xs text-slate-700">{product.qcInspectionData.finalRemarks}</p>
+                    <p className="text-[10px] font-medium text-slate-500 mb-1">Reviewer Remarks</p>
+                    <p className="text-xs text-slate-700">{product.qcInspectionData.reviewerRemarks}</p>
                   </div>
                 )}
 

@@ -1575,14 +1575,27 @@ const getProductDetails = async (req, res) => {
                         phoneNumber2: true,
                         businessEmail: true,
                         businessEmail2: true,
+                        businessAddress: true,
+                        addressLine2: true,
+                        addressLine3: true,
+                        landmark: true,
+                        businessCity: true,
+                        businessState: true,
+                        businessZipCode: true,
+                        businessCountry: true,
                         factoryAddress: true,
                         factoryCity: true,
                         factoryState: true,
                         factoryZipCode: true,
                         factoryCountry: true,
                         warehouseAddress: true,
+                        warehouseAddressLine2: true,
+                        warehouseAddressLine3: true,
+                        warehouseLandmark: true,
                         warehouseCity: true,
                         warehouseState: true,
+                        warehouseZipCode: true,
+                        warehouseCountry: true,
                         mainContact: true,
                     },
                 },
@@ -1732,7 +1745,7 @@ const approveProductByQc = async (req, res) => {
         }
 
         // ── Location verification — checker must be at the vendor factory ──
-        const { verifyCheckerAtVendor } = require('../utils/locationUtils');
+        const { verifyCheckerAtVendor, buildLocationStamp } = require('../utils/locationUtils');
         const geo = await verifyCheckerAtVendor({
             vendor: product.vendor,
             checkerLatitude,
@@ -1744,45 +1757,21 @@ const approveProductByQc = async (req, res) => {
             return res.status(geo.status).json(geo.body);
         }
 
-        // Calculate the inspection result from formData
+        // Derive the approval status from the checker's ACTUAL decision made
+        // on the Review step (formData.inspectionStatus). The legacy remark-code
+        // average is no longer used — the current inspection form never sends
+        // those fields, so it always defaulted to 10/10 → QC_APPROVED (F-02).
         let approvalStatus = 'QC_APPROVED';
         let productStatus = 'INACTIVE'; // Keep as INACTIVE until Admin finalizes with a price
-        
-        if (formData) {
-            // Extract remark codes from formData
-            const remarkFields = [
-                'shipperCartonRemark',
-                'innerCartonRemark',
-                'retailPackagingRemark',
-                'productTypeRemark',
-                'aqlWorkmanshipRemark',
-                'onSiteTestsRemark'
-            ];
-            
-            const remarkCodes = [];
-            remarkFields.forEach(field => {
-                const value = formData[field];
-                if (value && typeof value === 'string') {
-                    const code = parseInt(value.trim());
-                    if (!isNaN(code) && code >= 1 && code <= 10) {
-                        remarkCodes.push(code);
-                    }
-                }
-            });
-            
-            // Calculate average score
-            const average = remarkCodes.length > 0 
-                ? remarkCodes.reduce((sum, code) => sum + code, 0) / remarkCodes.length 
-                : 10;
-            
-            // Determine approval status based on average
-            if (average >= 8) {
-                approvalStatus = 'QC_APPROVED';
-            } else if (average >= 6) {
-                approvalStatus = 'REINSPECTION';
-            } else {
-                approvalStatus = 'REJECTED';
-            }
+
+        const decision = formData?.inspectionStatus;
+        if (decision === 'Rejected') {
+            approvalStatus = 'REJECTED';
+        } else if (decision === 'Re-Inspection' || decision === 'On Hold') {
+            approvalStatus = 'REINSPECTION';
+        } else {
+            // 'Approved' (or unset when arriving through this endpoint)
+            approvalStatus = 'QC_APPROVED';
         }
 
         const cleanFormData = formData
@@ -1801,7 +1790,7 @@ const approveProductByQc = async (req, res) => {
         });
 
         // Write audit log (with the verified-location snapshot)
-        const locationStamp = `Verified at factory — ${Math.round(geo.distanceM)}m from vendor (checker ${Number(checkerLatitude).toFixed(6)},${Number(checkerLongitude).toFixed(6)})`;
+        const locationStamp = buildLocationStamp(geo, checkerLatitude, checkerLongitude);
         await prisma.inspectionAuditLog.create({
             data: {
                 entityType: 'PRODUCT_INSPECTION',
@@ -1899,7 +1888,7 @@ const rejectProductByQc = async (req, res) => {
         }
 
         // ── Location verification — checker must be at the vendor factory ──
-        const { verifyCheckerAtVendor } = require('../utils/locationUtils');
+        const { verifyCheckerAtVendor, buildLocationStamp } = require('../utils/locationUtils');
         const geo = await verifyCheckerAtVendor({
             vendor: product.vendor,
             checkerLatitude,
@@ -1917,7 +1906,7 @@ const rejectProductByQc = async (req, res) => {
 
         const fromStatus = product.approvalStatus;
         const { remarks, notes } = req.body;
-        const locationStamp = `Verified at factory — ${Math.round(geo.distanceM)}m from vendor (checker ${Number(checkerLatitude).toFixed(6)},${Number(checkerLongitude).toFixed(6)})`;
+        const locationStamp = buildLocationStamp(geo, checkerLatitude, checkerLongitude);
 
         const updatedProduct = await prisma.product.update({
             where: { id: productId },

@@ -56,8 +56,8 @@ export default function LegalRegistration({ formData, setFormData, errors = {}, 
 
     const setDocVerification = (idx: number, field: "verified" | "remarks", value: string) => {
         const current = formData.docVerifications || {}
-        setFormData({
-            ...formData,
+        setFormData((prev: any) => ({
+            ...prev,
             docVerifications: {
                 ...current,
                 [idx]: {
@@ -66,7 +66,7 @@ export default function LegalRegistration({ formData, setFormData, errors = {}, 
                     [field]: value,
                 },
             },
-        })
+        }))
     }
 
     return (
@@ -98,7 +98,7 @@ export default function LegalRegistration({ formData, setFormData, errors = {}, 
                             <input
                                 type="text"
                                 value={formData.gstTaxId || ""}
-                                onChange={(e) => setFormData({ ...formData, gstTaxId: e.target.value })}
+                                onChange={(e) => setFormData((prev: any) => ({ ...prev, gstTaxId: e.target.value }))}
                                 placeholder="Not provided by vendor — enter if verified on-site"
                                 aria-invalid={!!errors.gstTaxId}
                                 className={`${inputCls(!!errors.gstTaxId)} font-mono`}
@@ -129,7 +129,7 @@ export default function LegalRegistration({ formData, setFormData, errors = {}, 
                             <input
                                 type="text"
                                 value={formData.businessRegistrationNumber || ""}
-                                onChange={(e) => setFormData({ ...formData, businessRegistrationNumber: e.target.value })}
+                                onChange={(e) => setFormData((prev: any) => ({ ...prev, businessRegistrationNumber: e.target.value }))}
                                 placeholder="Enter business registration / Udyam / ROC number"
                                 aria-invalid={!!errors.businessRegistrationNumber}
                                 className={`${inputCls(!!errors.businessRegistrationNumber)} font-mono`}
@@ -147,7 +147,7 @@ export default function LegalRegistration({ formData, setFormData, errors = {}, 
                     <input
                         type="text"
                         value={formData.factoryLicenseNumber || ""}
-                        onChange={(e) => setFormData({ ...formData, factoryLicenseNumber: e.target.value })}
+                        onChange={(e) => setFormData((prev: any) => ({ ...prev, factoryLicenseNumber: e.target.value }))}
                         placeholder="Enter factory operating license number"
                         aria-invalid={!!errors.factoryLicenseNumber}
                         className={`${inputCls(!!errors.factoryLicenseNumber)} font-mono`}

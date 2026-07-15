@@ -84,7 +84,7 @@ export default function FactoryDetails({ formData, setFormData, errors = {}, aut
                             <input
                                 type="text"
                                 value={formData.factoryName || ""}
-                                onChange={(e) => setFormData({ ...formData, factoryName: e.target.value })}
+                                onChange={(e) => setFormData((prev: any) => ({ ...prev, factoryName: e.target.value }))}
                                 placeholder="Not provided by vendor — enter if verified on-site"
                                 aria-invalid={!!errors.factoryName}
                                 className={inputCls(!!errors.factoryName)}
@@ -104,7 +104,7 @@ export default function FactoryDetails({ formData, setFormData, errors = {}, aut
                             <input
                                 type="text"
                                 value={formData.contactPersonName || ""}
-                                onChange={(e) => setFormData({ ...formData, contactPersonName: e.target.value })}
+                                onChange={(e) => setFormData((prev: any) => ({ ...prev, contactPersonName: e.target.value }))}
                                 placeholder="Not provided by vendor — enter if verified on-site"
                                 aria-invalid={!!errors.contactPersonName}
                                 className={inputCls(!!errors.contactPersonName)}
@@ -125,7 +125,7 @@ export default function FactoryDetails({ formData, setFormData, errors = {}, aut
                                 type="tel"
                                 inputMode="tel"
                                 value={formData.contactPhoneNumber || ""}
-                                onChange={(e) => setFormData({ ...formData, contactPhoneNumber: e.target.value })}
+                                onChange={(e) => setFormData((prev: any) => ({ ...prev, contactPhoneNumber: e.target.value }))}
                                 placeholder="+91 98765 43210"
                                 aria-invalid={!!errors.contactPhoneNumber}
                                 className={inputCls(!!errors.contactPhoneNumber)}
@@ -144,7 +144,7 @@ export default function FactoryDetails({ formData, setFormData, errors = {}, aut
                         <>
                             <textarea
                                 value={formData.factoryAddress || ""}
-                                onChange={(e) => setFormData({ ...formData, factoryAddress: e.target.value })}
+                                onChange={(e) => setFormData((prev: any) => ({ ...prev, factoryAddress: e.target.value }))}
                                 placeholder="Not provided by vendor — enter if verified on-site"
                                 aria-invalid={!!errors.factoryAddress}
                                 className={inputCls(!!errors.factoryAddress)}

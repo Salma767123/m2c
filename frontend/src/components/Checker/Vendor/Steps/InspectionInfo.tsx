@@ -30,8 +30,8 @@ export default function InspectionInfo({ formData, setFormData, errors = {} }: S
                     <input
                         type="date"
                         value={formData.inspectionDate || ""}
-                        onChange={(e) => setFormData({ ...formData, inspectionDate: e.target.value })}
-                        max={new Date().toISOString().split("T")[0]}
+                        onChange={(e) => setFormData((prev: any) => ({ ...prev, inspectionDate: e.target.value }))}
+                        max={new Date().toLocaleDateString("en-CA")}
                         aria-invalid={!!errors.inspectionDate}
                         className={inputCls(!!errors.inspectionDate)}
                     />
@@ -59,7 +59,7 @@ export default function InspectionInfo({ formData, setFormData, errors = {} }: S
                     </label>
                     <SelectField
                         value={formData.inspectionStatus || "Approved"}
-                        onChange={(value) => setFormData({ ...formData, inspectionStatus: value })}
+                        onChange={(value) => setFormData((prev: any) => ({ ...prev, inspectionStatus: value }))}
                         options={statusOptions}
                         hasError={!!errors.inspectionStatus}
                     />
@@ -71,7 +71,7 @@ export default function InspectionInfo({ formData, setFormData, errors = {} }: S
                     </label>
                     <textarea
                         value={formData.inspectorRemarks || ""}
-                        onChange={(e) => setFormData({ ...formData, inspectorRemarks: e.target.value })}
+                        onChange={(e) => setFormData((prev: any) => ({ ...prev, inspectorRemarks: e.target.value }))}
                         placeholder={isRejected ? "Required — reason for rejection" : "Enter any additional remarks (optional)"}
                         aria-invalid={!!errors.inspectorRemarks}
                         className={inputCls(!!errors.inspectorRemarks)}

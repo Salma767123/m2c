@@ -34,6 +34,41 @@ import {
 
 type Step = ValidationStep
 
+// ── Draft persistence (F-11) ──────────────────────────────────────────────────
+// Field inspections are long (39 tests + ~45 photos); a reload, crash or token
+// expiry used to discard everything. We snapshot the form to localStorage so it
+// can be resumed. Note: base64 photos are large and easily exceed the ~5MB
+// localStorage quota — when the full save fails we fall back to a lighter draft
+// that keeps all answers/text and drops the photo blobs (they must be re-added).
+const draftKeyFor = (productId: string) => `m2c:pi-draft:${productId}`
+
+// Deep-strip base64 data URIs (photos + drawn signatures) from a value, keeping
+// structure and all text so the lighter fallback draft still restores progress.
+function stripBase64Deep(v: any): any {
+    if (typeof v === "string") return v.startsWith("data:") ? "" : v
+    if (Array.isArray(v)) return v.map(stripBase64Deep)
+    if (v && typeof v === "object") {
+        const out: any = {}
+        for (const k of Object.keys(v)) out[k] = stripBase64Deep(v[k])
+        return out
+    }
+    return v
+}
+
+function loadDraft<T extends Record<string, any>>(productId: string, defaults: T): T {
+    if (typeof window === "undefined" || !productId) return defaults
+    try {
+        const raw = window.localStorage.getItem(draftKeyFor(productId))
+        if (!raw) return defaults
+        const saved = JSON.parse(raw)
+        // Re-fetched context (productData/vendorData) is never restored from the
+        // draft — the autofill effect refreshes it from the API on mount.
+        return { ...defaults, ...saved, productData: defaults.productData, vendorData: defaults.vendorData }
+    } catch {
+        return defaults
+    }
+}
+
 interface Props {
     productId: string
     productName: string
@@ -120,11 +155,13 @@ export default function ProductInspectionForm({
     // ── Form data ─────────────────────────────────────────────────────────────
     const prefilledRef = useRef<string | null>(null)
 
-    const [formData, setFormData] = useState(() => ({
+    const [formData, setFormData] = useState(() => loadDraft(productId, {
         // Step 1
         client: "M2C",
         vendor: vendorName,
-        serviceStartDate: new Date().toISOString().split("T")[0],
+        // Local calendar date (en-CA → YYYY-MM-DD). Using toISOString() here gave
+        // the UTC date, which is the previous day for IST times before 05:30 (F-09).
+        serviceStartDate: new Date().toLocaleDateString("en-CA"),
         // Timestamp when the inspection was opened — surfaces as "Inspection
         // Start Time" in the generated report (the complete time is report gen).
         inspectionStartedAt: new Date().toISOString(),
@@ -197,6 +234,38 @@ export default function ProductInspectionForm({
         aqlWorkmanshipRemark: "",
         onSiteTestsRemark: "",
     }))
+
+    // Persist a draft whenever the form changes (debounced). Falls back to a
+    // photo-stripped draft if the full snapshot exceeds the localStorage quota.
+    useEffect(() => {
+        if (typeof window === "undefined" || !productId) return
+        const key = draftKeyFor(productId)
+        const t = setTimeout(() => {
+            // Heavy re-fetched context is excluded — it is reloaded from the API.
+            const { productData: _pd, vendorData: _vd, ...rest } = formData as any
+            try {
+                window.localStorage.setItem(key, JSON.stringify(rest))
+            } catch {
+                try {
+                    window.localStorage.setItem(key, JSON.stringify(stripBase64Deep(rest)))
+                } catch {
+                    /* quota still exceeded — give up silently, nothing we can do */
+                }
+            }
+        }, 600)
+        return () => clearTimeout(t)
+    }, [formData, productId])
+
+    // Tell the checker once, on mount, if we recovered a saved draft.
+    useEffect(() => {
+        if (typeof window === "undefined" || !productId) return
+        try {
+            if (window.localStorage.getItem(draftKeyFor(productId))) {
+                showSuccessToast("Draft restored", "We recovered your in-progress inspection.")
+            }
+        } catch { /* ignore */ }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     // ── Autofill from API ─────────────────────────────────────────────────────
     useEffect(() => {
@@ -353,13 +422,21 @@ export default function ProductInspectionForm({
                 ),
             }
 
-            if (formData.finalDecision === "Approved") {
-                await qcCheckerService.approveProduct(productId, cleanedData)
+            // Route on the checker's ACTUAL decision from the Review step
+            // (inspectionStatus), not the hard-coded finalDecision. Only an
+            // explicit "Rejected" hits the reject endpoint; "Approved",
+            // "On Hold" and "Re-Inspection" go through approve, which derives
+            // the final approvalStatus from inspectionStatus on the backend.
+            if (formData.inspectionStatus === "Rejected") {
+                const reason = (formData.reviewerRemarks || "").trim() || "Rejected during QC product inspection"
+                await qcCheckerService.rejectProduct(productId, reason, cleanedData)
             } else {
-                await qcCheckerService.rejectProduct(productId, formData.reviewerRemarks, cleanedData)
+                await qcCheckerService.approveProduct(productId, cleanedData)
             }
 
             allowLeaveRef.current = true
+            // Inspection submitted — the draft is no longer needed.
+            try { window.localStorage.removeItem(draftKeyFor(productId)) } catch { /* ignore */ }
             showSuccessToast("Success", "Product inspection submitted successfully.")
             onComplete()
         } catch (error: any) {
@@ -476,7 +553,7 @@ export default function ProductInspectionForm({
                         <PI_Step3_PackagingInspection formData={formData} setFormData={setFormData} errors={errors.packagingInspection || {}} />
                     )}
                     {currentStep === "defects" && (
-                        <Defects formData={formData} setFormData={setFormData} />
+                        <Defects formData={formData} setFormData={setFormData} errors={errors.defects || {}} />
                     )}
                     {currentStep === "testing" && (
                         <PI_Step5_Testing formData={formData} setFormData={setFormData} errors={errors.testing || {}} />

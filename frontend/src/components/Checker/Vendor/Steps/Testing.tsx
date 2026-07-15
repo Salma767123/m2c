@@ -141,7 +141,7 @@ export default function Testing({ formData, setFormData, errors = {} }: TestingP
     const updatedPhotos = formData.testingPhotos.filter(
       (img: any) => img.id !== imageId
     )
-    setFormData({ ...formData, testingPhotos: updatedPhotos })
+    setFormData((prev: any) => ({ ...prev, testingPhotos: updatedPhotos }))
   }
 
   const defaultTests = [
@@ -170,7 +170,7 @@ export default function Testing({ formData, setFormData, errors = {} }: TestingP
     const updatedTests = tests.map(t =>
       t.id === testId ? { ...t, [field]: value } : t
     )
-    setFormData({ ...formData, tests: updatedTests })
+    setFormData((prev: any) => ({ ...prev, tests: updatedTests }))
   }
 
   // Toggle Pass/Fail in a single update so the two stay mutually exclusive and
@@ -189,7 +189,7 @@ export default function Testing({ formData, setFormData, errors = {} }: TestingP
         ? { ...t, fail: true, pass: false, rightPhotos: [] }
         : { ...t, fail: false }
     })
-    setFormData({ ...formData, tests: updatedTests })
+    setFormData((prev: any) => ({ ...prev, tests: updatedTests }))
   }
 
   const handleRightPhotoUpload = (testId: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -216,21 +216,21 @@ export default function Testing({ formData, setFormData, errors = {} }: TestingP
     }
     const target = cropTargetRef.current
     if (target?.type === 'general') {
-      setFormData({ ...formData, testingPhotos: [...(formData.testingPhotos || []), newPhoto] })
+      setFormData((prev: any) => ({ ...prev, testingPhotos: [...(prev.testingPhotos || []), newPhoto] }))
     } else if (target?.type === 'right' && target.testId) {
       const updatedTests = tests.map(t =>
         t.id === target.testId
           ? { ...t, rightPhotos: [...(t.rightPhotos || []), newPhoto] }
           : t
       )
-      setFormData({ ...formData, tests: updatedTests })
+      setFormData((prev: any) => ({ ...prev, tests: updatedTests }))
     } else if (target?.type === 'wrong' && target.testId) {
       const updatedTests = tests.map(t =>
         t.id === target.testId
           ? { ...t, wrongPhotos: [...(t.wrongPhotos || []), newPhoto] }
           : t
       )
-      setFormData({ ...formData, tests: updatedTests })
+      setFormData((prev: any) => ({ ...prev, tests: updatedTests }))
     }
     advanceCropQueue(cropSrc)
   }

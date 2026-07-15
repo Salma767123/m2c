@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
+import { Card, CardContent } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
@@ -405,18 +405,8 @@ export default function CategoryLists() {
         </CardContent>
       </Card>
 
-      {/* Showing */}
-      {filteredCategories.length > 0 && (
-        <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
-          <span>Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredCategories.length)} of {filteredCategories.length}</span>
-        </div>
-      )}
-
       {/* Categories Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Categories List</CardTitle>
-        </CardHeader>
         <CardContent className="p-0">
           {loading ? (
             <div className="flex items-center justify-center py-12">

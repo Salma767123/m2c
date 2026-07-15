@@ -2400,13 +2400,6 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
         </div>
       </div>
 
-      {/* Showing */}
-      {!initialLoading && pagination.total > 0 && (
-        <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
-          <span>Showing {(pagination.page - 1) * pagination.limit + 1}–{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}</span>
-        </div>
-      )}
-
       {/* Reviews Table */}
       <Card>
         {initialLoading ? (

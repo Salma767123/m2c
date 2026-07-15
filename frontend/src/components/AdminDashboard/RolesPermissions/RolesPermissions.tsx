@@ -235,9 +235,6 @@ export default function RolesPermissions() {
         <div className="p-6">
           {activeTab === 'roles' && (
             <>
-            <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600 mb-4">
-              <span>Showing {filteredRoles.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredRoles.length)} of {filteredRoles.length}</span>
-            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {paginatedRoles.map((role) => (
                 <Card key={role.id} className="border-slate-200 bg-white">

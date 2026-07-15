@@ -71,10 +71,10 @@ export default function Packaging({ formData, setFormData, errors = {} }: Packag
 
   const onPackagingCropped = async (croppedFile: File) => {
     const dataUrl = await readAsDataUrl(croppedFile)
-    setFormData({
-      ...formData,
-      packagingPhotos: [...(formData.packagingPhotos || []), { name: cropFileName, data: dataUrl, url: dataUrl }]
-    })
+    setFormData((prev: any) => ({
+      ...prev,
+      packagingPhotos: [...(prev.packagingPhotos || []), { name: cropFileName, data: dataUrl, url: dataUrl }]
+    }))
     const cur = cropSrc
     if (cur?.startsWith('blob:')) URL.revokeObjectURL(cur)
     if (cropQueue.length > 0) {
@@ -90,16 +90,16 @@ export default function Packaging({ formData, setFormData, errors = {} }: Packag
 
   const removePackagingPhoto = (photoIndex: number) => {
     const updatedPhotos = formData.packagingPhotos.filter((_, i) => i !== photoIndex)
-    setFormData({ ...formData, packagingPhotos: updatedPhotos })
+    setFormData((prev: any) => ({ ...prev, packagingPhotos: updatedPhotos }))
   }
 
   const handleRemarkChange = (remarkKey: string, value: string) => {
-    setFormData({ ...formData, [remarkKey]: value })
+    setFormData((prev: any) => ({ ...prev, [remarkKey]: value }))
   }
 
   const handleRemarkNumberSelect = (remarkKey: string, number: string) => {
     // Single selection - set the selected number directly
-    setFormData({ ...formData, [remarkKey]: number })
+    setFormData((prev: any) => ({ ...prev, [remarkKey]: number }))
   }
 
   const isRemarkNumberSelected = (remarkKey: string, number: string) => {

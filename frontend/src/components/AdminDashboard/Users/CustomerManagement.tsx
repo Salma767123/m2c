@@ -327,11 +327,6 @@ export default function CustomerManagement() {
         </CardContent>
       </Card>
       {/* Customers Table */}
-      {filteredCustomers.length > 0 && (
-        <div className="text-sm text-slate-600 mb-2">
-          Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredCustomers.length)} of {filteredCustomers.length}
-        </div>
-      )}
       <Card>
         <CardHeader>
           <CardTitle>Platform Customers</CardTitle>

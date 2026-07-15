@@ -72,10 +72,10 @@ export default function Preparation({ formData, setFormData, errors = {} }: Prep
 
   const onWarehouseCropped = async (croppedFile: File) => {
     const dataUrl = await readAsDataUrl(croppedFile)
-    setFormData({
-      ...formData,
-      warehousePhotoEvidences: [...(formData.warehousePhotoEvidences || []), { name: cropFileName, data: dataUrl, url: dataUrl }]
-    })
+    setFormData((prev: any) => ({
+      ...prev,
+      warehousePhotoEvidences: [...(prev.warehousePhotoEvidences || []), { name: cropFileName, data: dataUrl, url: dataUrl }]
+    }))
     const cur = cropSrc
     if (cur?.startsWith('blob:')) URL.revokeObjectURL(cur)
     if (cropQueue.length > 0) {
@@ -91,16 +91,16 @@ export default function Preparation({ formData, setFormData, errors = {} }: Prep
 
   const removeWarehousePhoto = (photoIndex: number) => {
     const updatedPhotos = formData.warehousePhotoEvidences.filter((_, i) => i !== photoIndex)
-    setFormData({ ...formData, warehousePhotoEvidences: updatedPhotos })
+    setFormData((prev: any) => ({ ...prev, warehousePhotoEvidences: updatedPhotos }))
   }
 
   const updateItem = (id: number, field: string, value: string | number) => {
-    setFormData({
-      ...formData,
-      items: formData.items.map(item =>
+    setFormData((prev: any) => ({
+      ...prev,
+      items: prev.items.map((item: any) =>
         item.id === id ? { ...item, [field]: value } : item
       )
-    })
+    }))
   }
 
   return (

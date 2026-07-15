@@ -1168,6 +1168,9 @@ const getAllVendors = async (req, res) => {
         certifications: true,
         documents: true,
         assignedQc: true,
+        // Bank verification status powers the "bank details need verification"
+        // row alert in the admin vendors table.
+        bankDetails: { select: { isVerified: true } },
         inspections: {
           orderBy: { createdAt: 'desc' },
           take: 1,

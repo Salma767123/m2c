@@ -55,7 +55,7 @@ export default function ProductionInfo({ formData, setFormData, errors = {}, aut
                             <input
                                 type="text"
                                 value={formData.categoryToInspect || ""}
-                                onChange={(e) => setFormData({ ...formData, categoryToInspect: e.target.value })}
+                                onChange={(e) => setFormData((prev: any) => ({ ...prev, categoryToInspect: e.target.value }))}
                                 placeholder="Not assigned by admin — enter category"
                                 aria-invalid={!!errors.categoryToInspect}
                                 className={inputCls(!!errors.categoryToInspect, "bg-white")}
@@ -71,7 +71,7 @@ export default function ProductionInfo({ formData, setFormData, errors = {}, aut
                     <input
                         type="text"
                         value={formData.productsManufactured || ""}
-                        onChange={(e) => setFormData({ ...formData, productsManufactured: e.target.value })}
+                        onChange={(e) => setFormData((prev: any) => ({ ...prev, productsManufactured: e.target.value }))}
                         placeholder="Enter products manufactured (e.g. Cotton T-shirts, Jeans)"
                         aria-invalid={!!errors.productsManufactured}
                         className={inputCls(!!errors.productsManufactured)}
@@ -86,7 +86,7 @@ export default function ProductionInfo({ formData, setFormData, errors = {}, aut
                         type="text"
                         inputMode="numeric"
                         value={formData.monthlyProductionCapacity || ""}
-                        onChange={(e) => setFormData({ ...formData, monthlyProductionCapacity: e.target.value })}
+                        onChange={(e) => setFormData((prev: any) => ({ ...prev, monthlyProductionCapacity: e.target.value }))}
                         placeholder="e.g. 50000"
                         aria-invalid={!!errors.monthlyProductionCapacity}
                         className={inputCls(!!errors.monthlyProductionCapacity)}
@@ -101,7 +101,7 @@ export default function ProductionInfo({ formData, setFormData, errors = {}, aut
                         type="text"
                         inputMode="numeric"
                         value={formData.numberOfProductionWorkers || ""}
-                        onChange={(e) => setFormData({ ...formData, numberOfProductionWorkers: e.target.value })}
+                        onChange={(e) => setFormData((prev: any) => ({ ...prev, numberOfProductionWorkers: e.target.value }))}
                         placeholder="e.g. 120"
                         aria-invalid={!!errors.numberOfProductionWorkers}
                         className={inputCls(!!errors.numberOfProductionWorkers)}

@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation"
 import type { LucideIcon } from "lucide-react"
 import {
   ArrowLeft, CheckCircle, XCircle,
-  AlertTriangle, Package, ClipboardList, Ruler,
+  AlertTriangle, ClipboardList,
   Box, Bug, FlaskConical, Camera, Star, Download, Clock, FileText
 } from "lucide-react"
 import { Badge } from "@/components/UI/Badge"
@@ -83,13 +83,16 @@ function PhotoGrid({ photos, label, onImageClick }: { photos: (string | PhotoIte
   )
 }
 
-const REMARK_LABELS: Record<string, string> = {
-  shipperCartonRemark: "Shipper Carton Packaging",
-  innerCartonRemark: "Inner Carton Packaging",
-  retailPackagingRemark: "Retail Packaging",
-  productTypeRemark: "Product Type (style, size, color, material, labeling)",
-  aqlWorkmanshipRemark: "AQL (Workmanship / Appearance / Function)",
-  onSiteTestsRemark: "On-site Tests",
+// Packaging remark-code → label (matches the inspection form + PDF generator).
+const REMARK_LABELS: Record<number, string> = {
+  1: "Critical Defect", 2: "Major Defect", 3: "Functional Fail",
+  4: "Safety Issue", 5: "Non-Conformance", 6: "Minor Issue",
+  7: "Re-inspection", 8: "Acceptable", 9: "Good", 10: "Excellent",
+}
+
+// Humanize a productVerifications key (e.g. "pv_spec_gsm" → "Spec Gsm").
+function humanizeVerKey(key: string): string {
+  return key.replace(/^pv_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 const statusColors: Record<string, string> = {
@@ -106,34 +109,6 @@ const statusLabels: Record<string, string> = {
   REJECTED: "Rejected",
   REINSPECTION: "Reinspection",
   PENDING: "Pending",
-}
-
-interface InspectionItem {
-  itemName?: string
-  itemDescription?: string
-  totalQuantity?: number
-  inspectionQuantity?: number
-}
-
-interface Measurement {
-  sampleName?: string
-  cartonLength?: number
-  cartonWidth?: number
-  cartonHeight?: number
-  productLength?: number
-  productWidth?: number
-  retailWeight?: number
-  cartonGrossWeight?: number
-}
-
-interface InspectionTest {
-  id?: string
-  label?: string
-  detail?: string
-  pass?: boolean
-  fail?: boolean
-  rightPhotos?: (string | PhotoItem)[]
-  wrongPhotos?: (string | PhotoItem)[]
 }
 
 interface ProductReport {
@@ -236,9 +211,16 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fd = (product.qcInspectionData || {}) as Record<string, any>
   const status = product.approvalStatus || "PENDING"
-  const items = Array.isArray(fd.items) ? (fd.items as InspectionItem[]) : []
-  const measurements = Array.isArray(fd.measurements) ? (fd.measurements as Measurement[]) : []
-  const tests = Array.isArray(fd.tests) ? (fd.tests as InspectionTest[]) : []
+
+  // ── New-schema inspection data (matches the 7-step form + PDF generator) ────
+  const productVerifications: [string, any][] = Object.entries(fd.productVerifications || {})
+  const packagingItems: any[] = Array.isArray(fd.packagingItems) ? fd.packagingItems : []
+  const testGroups: any[] = Array.isArray(fd.testGroups) ? fd.testGroups : []
+  const additionalEvidence: Record<string, any[]> =
+    fd.additionalEvidence && typeof fd.additionalEvidence === "object" ? fd.additionalEvidence : {}
+
+  // The checker's actual decision (Review step) — no more hard-coded 10/10.
+  const inspectionStatus: string = fd.inspectionStatus || ""
 
   // Sign-off artifacts from the rebuilt Documentation step.
   const signedDocuments = Array.isArray(fd.signedDocuments) ? fd.signedDocuments : []
@@ -246,19 +228,6 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
   const companyIdCards = Array.isArray(fd.companyIdCards) ? fd.companyIdCards : []
   // Legacy field kept for older reports only.
   const documentationPhotos = Array.isArray(fd.documentationPhotos) ? fd.documentationPhotos : []
-
-  // Overall result mirrors the Review step's remark-code average scoring.
-  const remarkCodes = Object.keys(REMARK_LABELS)
-    .map((k) => Number(fd[k]))
-    .filter((n) => !Number.isNaN(n) && n >= 1 && n <= 10)
-  const remarkAvg = remarkCodes.length ? remarkCodes.reduce((a, b) => a + b, 0) / remarkCodes.length : 10
-  const overallStatus = remarkAvg >= 8 ? "PASS" : remarkAvg >= 6 ? "RE-INSPECTION" : "REJECTED"
-  const overallStyle =
-    overallStatus === "PASS"
-      ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-      : overallStatus === "RE-INSPECTION"
-        ? "bg-amber-50 border-amber-200 text-amber-800"
-        : "bg-red-50 border-red-200 text-red-800"
 
   const handleDownloadPdf = async () => {
     setDownloading(true)
@@ -356,90 +325,87 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
         </div>
       </Section>
 
-      {/* Section 2: Preparation */}
-      <Section title="Section 2 — Preparation" icon={Package} accent="bg-brand-50 text-brand-700">
-        {items.length > 0 ? (
-          <div className="space-y-3 mb-4">
-            {items.map((item, i) => (
-              <div key={i} className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="flex-1">
-                  <p className="font-semibold text-slate-900 text-sm">{item.itemName || `Product ${i + 1}`}</p>
-                  {item.itemDescription && <p className="text-xs text-slate-500 mt-0.5">{item.itemDescription}</p>}
-                </div>
-                <div className="flex gap-4 text-xs text-center flex-shrink-0">
-                  <div><p className="font-bold text-slate-800">{item.totalQuantity ?? "—"}</p><p className="text-slate-500">Lot Quantity</p></div>
-                  <div><p className="font-bold text-brand-600">{item.inspectionQuantity ?? "—"}</p><p className="text-slate-500">Inspection Qty</p></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-slate-400 text-sm">No products recorded.</p>
-        )}
-        <PhotoGrid photos={fd.warehousePhotoEvidences} label="Warehouse Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
-      </Section>
-
-      {/* Section 3: Measurements */}
-      <Section title="Section 3 — Measurements" icon={Ruler} accent="bg-purple-50 text-purple-800">
-        {measurements.length > 0 ? (
+      {/* Section 2: Product Verification */}
+      <Section title="Section 2 — Product Verification" icon={ClipboardList} accent="bg-brand-50 text-brand-700">
+        {productVerifications.length > 0 ? (
           <div className="overflow-x-auto mb-4">
             <table className="w-full text-sm text-left border-collapse">
-              <thead className="bg-purple-50/50 text-purple-800 font-semibold">
+              <thead className="bg-brand-50/50 text-brand-700 font-semibold">
                 <tr>
-                  <th className="p-3 border-b text-xs uppercase tracking-wider">Sample Name</th>
-                  <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Carton (L×W×H) cm</th>
-                  <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Product (L×W) cm</th>
-                  <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Retail Wt (kg)</th>
-                  <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Gross Wt (kg)</th>
+                  <th className="p-3 border-b text-xs uppercase tracking-wider">Field</th>
+                  <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Status</th>
+                  <th className="p-3 border-b text-xs uppercase tracking-wider">Remarks</th>
                 </tr>
               </thead>
               <tbody>
-                {measurements.map((m, i) => (
+                {productVerifications.map(([key, entry]) => {
+                  const ok = entry?.ok
+                  return (
+                    <tr key={key} className="border-b border-slate-50 hover:bg-slate-50/50">
+                      <td className="p-3 font-medium text-slate-900">{humanizeVerKey(key)}</td>
+                      <td className="p-3 text-center">
+                        {ok === true ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><CheckCircle className="w-3.5 h-3.5" />Verified</span>
+                        ) : ok === false ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600"><XCircle className="w-3.5 h-3.5" />Not Verified</span>
+                        ) : (
+                          <span className="text-xs text-slate-400">Not Checked</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-slate-600">{entry?.remarks || "—"}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-slate-400 text-sm">No product fields were verified.</p>
+        )}
+        <PhotoGrid photos={fd.productEvidencePhotos} label="Product Evidence Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
+      </Section>
+
+      {/* Section 3: Packaging */}
+      <Section title="Section 3 — Packaging Inspection" icon={Box} accent="bg-teal-50 text-teal-800">
+        {packagingItems.length > 0 ? (
+          <div className="overflow-x-auto mb-4">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="bg-teal-50/50 text-teal-800 font-semibold">
+                <tr>
+                  <th className="p-3 border-b text-xs uppercase tracking-wider">Item</th>
+                  <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Inspected</th>
+                  <th className="p-3 border-b text-xs uppercase tracking-wider">Remark Code</th>
+                  <th className="p-3 border-b text-xs uppercase tracking-wider">Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {packagingItems.map((item, i) => (
                   <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50">
-                    <td className="p-3 font-medium text-slate-900">{m.sampleName || `#${i + 1}`}</td>
-                    <td className="p-3 text-center text-slate-600">
-                      {m.cartonLength ?? 0} × {m.cartonWidth ?? 0} × {m.cartonHeight ?? 0}
+                    <td className="p-3 font-medium text-slate-900">{(item.label || "").split("—")[0].trim() || `Item ${i + 1}`}</td>
+                    <td className="p-3 text-center">
+                      {item.verified === true ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><CheckCircle className="w-3.5 h-3.5" />Yes</span>
+                      ) : item.verified === false ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600"><XCircle className="w-3.5 h-3.5" />No</span>
+                      ) : <span className="text-xs text-slate-400">—</span>}
                     </td>
-                    <td className="p-3 text-center text-slate-600">
-                      {m.productLength ?? 0} × {m.productWidth ?? 0}
+                    <td className="p-3 text-slate-600">
+                      {item.remarkCode != null ? `${item.remarkCode} — ${REMARK_LABELS[item.remarkCode] || ""}` : "—"}
                     </td>
-                    <td className="p-3 font-bold text-center text-purple-600">{m.retailWeight ?? 0}</td>
-                    <td className="p-3 font-bold text-center text-purple-600">{m.cartonGrossWeight ?? 0}</td>
+                    <td className="p-3 text-slate-600">{item.remarks || "—"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <p className="text-slate-400 text-sm">No measurements recorded.</p>
+          <p className="text-slate-400 text-sm">No packaging items recorded.</p>
         )}
-        <PhotoGrid photos={fd.measurementPhotos} label="Measurement Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
-      </Section>
-
-      {/* Section 4: Packaging */}
-      <Section title="Section 4 — Packaging & Remarks" icon={Box} accent="bg-teal-50 text-teal-800">
-        <div className="space-y-3 mb-4">
-          {Object.entries(REMARK_LABELS).map(([key, label]) => {
-            const val = fd[key]
-            return (
-              <div key={key} className="flex items-center justify-between py-2.5 border-b border-slate-100 last:border-0">
-                <span className="text-sm text-slate-700">{label}</span>
-                <span className={`text-sm font-bold px-3 py-1 rounded-lg ${
-                  val && Number(val) >= 8 ? "bg-emerald-50 text-emerald-700" :
-                  val && Number(val) >= 6 ? "bg-amber-50 text-amber-700" :
-                  val ? "bg-red-50 text-red-700" : "text-slate-400"
-                }`}>
-                  {val ? `${val}/10` : "—"}
-                </span>
-              </div>
-            )
-          })}
-        </div>
         <PhotoGrid photos={fd.packagingPhotos} label="Packaging Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
       </Section>
 
-      {/* Section 5: Defects */}
-      <Section title="Section 5 — Defects & AQL" icon={Bug} accent="bg-orange-50 text-orange-800">
+      {/* Section 4: Defects */}
+      <Section title="Section 4 — Defects & AQL" icon={Bug} accent="bg-orange-50 text-orange-800">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
           <InfoRow label="Inspection Level" value={fd.inspectionLevel} />
           <InfoRow label="Sample Size" value={fd.sampleSize} />
@@ -493,106 +459,125 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
         <PhotoGrid photos={fd.defectPhotos} label="Defect Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
       </Section>
 
-      {/* Section 6: Testing */}
-      <Section title="Section 6 — On-site Testing" icon={FlaskConical} accent="bg-rose-50 text-rose-800">
-        {tests.length > 0 ? (
-          <div className="space-y-4">
-            {tests.map((test, i) => {
-              const passed = test.pass === true
-              const failed = test.fail === true
+      {/* Section 5: Testing */}
+      <Section title="Section 5 — On-site Testing" icon={FlaskConical} accent="bg-rose-50 text-rose-800">
+        {testGroups.length > 0 ? (
+          <div className="space-y-6">
+            {testGroups.map((group, gi) => {
+              const groupTests: any[] = Array.isArray(group.tests) ? group.tests : []
+              const gPass = groupTests.filter((t) => t.pass).length
+              const gFail = groupTests.filter((t) => t.fail).length
               return (
-                <div key={test.id || i} className="bg-slate-50 rounded-xl p-5 border border-slate-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="font-semibold text-slate-900 text-sm">{test.label || `Test ${i + 1}`}</p>
-                      {test.detail && <p className="text-xs text-slate-500 mt-0.5">{test.detail}</p>}
-                    </div>
-                    {passed && (
-                      <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
-                        <CheckCircle className="w-3.5 h-3.5" /> PASS
-                      </span>
-                    )}
-                    {failed && (
-                      <span className="flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-100 px-3 py-1 rounded-full">
-                        <XCircle className="w-3.5 h-3.5" /> FAIL
-                      </span>
-                    )}
-                    {!passed && !failed && (
-                      <span className="text-xs text-slate-400">No decision</span>
-                    )}
+                <div key={gi}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <p className="font-bold text-sm text-slate-800">{group.label || `Group ${gi + 1}`}</p>
+                    <span className="text-xs text-emerald-600 font-semibold">{gPass} passed</span>
+                    <span className="text-xs text-red-600 font-semibold">{gFail} failed</span>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(test.rightPhotos?.length ?? 0) > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-emerald-600 mb-2">Right/Correct Photos ({test.rightPhotos!.length})</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {test.rightPhotos!.map((p, j) => {
-                            const src = typeof p === "string" ? p : p?.data || p?.url
-                            return src ? (
-                              <img key={j} src={src} alt={`Right ${j + 1}`} onClick={() => setSelectedImage({src, alt: `Right ${j + 1}`})} onError={(e) => { e.currentTarget.style.display = "none" }} className="w-full h-24 object-cover rounded-lg border border-emerald-200 cursor-pointer transition-transform hover:scale-[1.02]" />
-                            ) : null
-                          })}
+                  <div className="space-y-4">
+                    {groupTests.map((test, i) => {
+                      const passed = test.pass === true
+                      const failed = test.fail === true
+                      const rightPhotos: any[] = Array.isArray(test.rightPhotos) ? test.rightPhotos : []
+                      const wrongPhotos: any[] = Array.isArray(test.wrongPhotos) ? test.wrongPhotos : []
+                      return (
+                        <div key={test.id || i} className="bg-slate-50 rounded-xl p-5 border border-slate-200">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <p className="font-semibold text-slate-900 text-sm">{test.label || `Test ${i + 1}`}</p>
+                              {test.remarks && <p className="text-xs text-slate-500 mt-0.5">{test.remarks}</p>}
+                            </div>
+                            {passed && (
+                              <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
+                                <CheckCircle className="w-3.5 h-3.5" /> PASS
+                              </span>
+                            )}
+                            {failed && (
+                              <span className="flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-100 px-3 py-1 rounded-full">
+                                <XCircle className="w-3.5 h-3.5" /> FAIL
+                              </span>
+                            )}
+                            {!passed && !failed && (
+                              <span className="text-xs text-slate-400">No decision</span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {rightPhotos.length > 0 && (
+                              <div>
+                                <p className="text-xs font-medium text-emerald-600 mb-2">Right/Correct Photos ({rightPhotos.length})</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {rightPhotos.map((p, j) => {
+                                    const src = typeof p === "string" ? p : p?.data || p?.url
+                                    return src ? (
+                                      <img key={j} src={src} alt={`Right ${j + 1}`} onClick={() => setSelectedImage({src, alt: `Right ${j + 1}`})} onError={(e) => { e.currentTarget.style.display = "none" }} className="w-full h-24 object-cover rounded-lg border border-emerald-200 cursor-pointer transition-transform hover:scale-[1.02]" />
+                                    ) : null
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                            {wrongPhotos.length > 0 && (
+                              <div>
+                                <p className="text-xs font-medium text-red-600 mb-2">Wrong/Incorrect Photos ({wrongPhotos.length})</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {wrongPhotos.map((p, j) => {
+                                    const src = typeof p === "string" ? p : p?.data || p?.url
+                                    return src ? (
+                                      <img key={j} src={src} alt={`Wrong ${j + 1}`} onClick={() => setSelectedImage({src, alt: `Wrong ${j + 1}`})} onError={(e) => { e.currentTarget.style.display = "none" }} className="w-full h-24 object-cover rounded-lg border border-red-200 cursor-pointer transition-transform hover:scale-[1.02]" />
+                                    ) : null
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    {(test.wrongPhotos?.length ?? 0) > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-red-600 mb-2">Wrong/Incorrect Photos ({test.wrongPhotos!.length})</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {test.wrongPhotos!.map((p, j) => {
-                            const src = typeof p === "string" ? p : p?.data || p?.url
-                            return src ? (
-                              <img key={j} src={src} alt={`Wrong ${j + 1}`} onClick={() => setSelectedImage({src, alt: `Wrong ${j + 1}`})} onError={(e) => { e.currentTarget.style.display = "none" }} className="w-full h-24 object-cover rounded-lg border border-red-200 cursor-pointer transition-transform hover:scale-[1.02]" />
-                            ) : null
-                          })}
-                        </div>
-                      </div>
-                    )}
+                      )
+                    })}
                   </div>
                 </div>
               )
             })}
+            {/* Additional evidence summary */}
+            {Object.entries(additionalEvidence).some(([, ph]) => Array.isArray(ph) && ph.length > 0) && (
+              <div className="pt-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Additional Evidence</p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(additionalEvidence)
+                    .filter(([, ph]) => Array.isArray(ph) && ph.length > 0)
+                    .map(([key, ph]) => (
+                      <span key={key} className="text-xs bg-slate-100 text-slate-700 rounded-lg px-2.5 py-1">
+                        {key.replace(/_/g, " ")}: {ph.length} photo(s)
+                      </span>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <p className="text-slate-400 text-sm">No tests recorded.</p>
         )}
-        <PhotoGrid photos={fd.testingPhotos} label="Testing Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
       </Section>
 
-      {/* Section 7: Review & Final Decision */}
-      <Section title="Section 7 — Review & Final Decision" icon={Star} accent="bg-amber-50 text-amber-800">
-        <div className="flex flex-wrap items-center gap-3 mb-5">
-          <span className="text-sm font-medium text-slate-700">Final Decision:</span>
-          {fd.finalDecision === "Approved" ? (
-            <span className="flex items-center gap-1.5 text-sm font-bold text-emerald-700 bg-emerald-100 px-4 py-1.5 rounded-full">
-              <CheckCircle className="w-4 h-4" /> Approved
-            </span>
-          ) : fd.finalDecision === "Rejected" ? (
-            <span className="flex items-center gap-1.5 text-sm font-bold text-red-700 bg-red-100 px-4 py-1.5 rounded-full">
-              <XCircle className="w-4 h-4" /> Rejected
-            </span>
-          ) : (
-            <span className="text-sm text-slate-400">{fd.finalDecision || "—"}</span>
-          )}
-        </div>
-
-        {/* Overall result — remark-code average scoring (mirrors Review step) */}
-        <div className={`rounded-xl border p-4 mb-4 ${overallStyle}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide opacity-80">Overall Result</p>
-              <p className="text-lg font-bold">{overallStatus}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs font-semibold uppercase tracking-wide opacity-80">Average Score</p>
-              <p className="text-lg font-bold">{remarkAvg.toFixed(1)}/10</p>
-            </div>
+      {/* Section 6: Review & Final Decision */}
+      <Section title="Section 6 — Review & Final Decision" icon={Star} accent="bg-amber-50 text-amber-800">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div className="rounded-xl border border-slate-200 p-4">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Inspector's Decision</p>
+            {inspectionStatus === "Approved" ? (
+              <span className="inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700 bg-emerald-100 px-4 py-1.5 rounded-full"><CheckCircle className="w-4 h-4" /> Approved</span>
+            ) : inspectionStatus === "Rejected" ? (
+              <span className="inline-flex items-center gap-1.5 text-sm font-bold text-red-700 bg-red-100 px-4 py-1.5 rounded-full"><XCircle className="w-4 h-4" /> Rejected</span>
+            ) : inspectionStatus ? (
+              <span className="inline-flex items-center gap-1.5 text-sm font-bold text-amber-700 bg-amber-100 px-4 py-1.5 rounded-full"><AlertTriangle className="w-4 h-4" /> {inspectionStatus}</span>
+            ) : (
+              <span className="text-sm text-slate-400">—</span>
+            )}
           </div>
-          {remarkCodes.length > 0 && (
-            <p className="text-xs mt-2 opacity-80">
-              Remark codes: {remarkCodes.join(", ")} · {remarkCodes.length} remark{remarkCodes.length > 1 ? "s" : ""}
-            </p>
-          )}
+          <div className="rounded-xl border border-slate-200 p-4">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Final Status</p>
+            <Badge className={`${statusColors[status] || "bg-gray-100 text-gray-700"} text-sm px-4 py-1.5`}>
+              {statusLabels[status] || status}
+            </Badge>
+          </div>
         </div>
 
         {fd.reviewerRemarks && (
@@ -603,8 +588,8 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
         )}
       </Section>
 
-      {/* Section 8: Documentation & Sign-off */}
-      <Section title="Section 8 — Documentation & Sign-off" icon={FileText} accent="bg-sky-50 text-sky-800">
+      {/* Section 7: Documentation & Sign-off */}
+      <Section title="Section 7 — Documentation & Sign-off" icon={FileText} accent="bg-sky-50 text-sky-800">
         {/* Client signature */}
         <div className="mb-5">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Client Signature</p>

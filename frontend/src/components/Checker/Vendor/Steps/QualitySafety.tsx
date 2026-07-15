@@ -24,7 +24,7 @@ export default function QualitySafety({ formData, setFormData }: StepProps) {
                     <label className="block text-slate-700 font-semibold mb-3 text-sm">Quality Check Process Available:</label>
                     <SelectField
                         value={formData.qualityCheckProcess}
-                        onChange={(value) => setFormData({ ...formData, qualityCheckProcess: value })}
+                        onChange={(value) => setFormData((prev: any) => ({ ...prev, qualityCheckProcess: value }))}
                         options={options}
                     />
                 </div>
@@ -32,7 +32,7 @@ export default function QualitySafety({ formData, setFormData }: StepProps) {
                     <label className="block text-slate-700 font-semibold mb-3 text-sm">Safety Equipment Available:</label>
                     <SelectField
                         value={formData.safetyEquipment}
-                        onChange={(value) => setFormData({ ...formData, safetyEquipment: value })}
+                        onChange={(value) => setFormData((prev: any) => ({ ...prev, safetyEquipment: value }))}
                         options={options}
                     />
                 </div>
@@ -40,7 +40,7 @@ export default function QualitySafety({ formData, setFormData }: StepProps) {
                     <label className="block text-slate-700 font-semibold mb-3 text-sm">Clean Working Environment:</label>
                     <SelectField
                         value={formData.cleanWorkingEnvironment}
-                        onChange={(value) => setFormData({ ...formData, cleanWorkingEnvironment: value })}
+                        onChange={(value) => setFormData((prev: any) => ({ ...prev, cleanWorkingEnvironment: value }))}
                         options={options}
                     />
                 </div>

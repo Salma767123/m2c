@@ -250,10 +250,6 @@ export default function QCReports() {
     const factoryHasFilters = Boolean(debouncedFactorySearch || factoryResult || factorySort !== DEFAULT_SORT || factoryPage !== 1)
     const productHasFilters = Boolean(debouncedProductSearch || productStatus || productSort !== DEFAULT_SORT || productPage !== 1)
 
-    const factoryRangeStart = factoryPagination.total === 0 ? 0 : (factoryPagination.page - 1) * factoryPagination.limit + 1
-    const factoryRangeEnd = Math.min(factoryPagination.page * factoryPagination.limit, factoryPagination.total)
-    const productRangeStart = productPagination.total === 0 ? 0 : (productPagination.page - 1) * productPagination.limit + 1
-    const productRangeEnd = Math.min(productPagination.page * productPagination.limit, productPagination.total)
 
     return (
         <div className="space-y-6">
@@ -329,15 +325,8 @@ export default function QCReports() {
                         </div>
                     </div>
 
-                    {/* Results summary + Clear link */}
-                    <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
-                        <span>
-                            {loadingFactory
-                                ? 'Loading reports...'
-                                : factoryPagination.total === 0
-                                    ? '0 reports'
-                                    : `Showing ${factoryRangeStart}–${factoryRangeEnd} of ${factoryPagination.total} report${factoryPagination.total === 1 ? '' : 's'}`}
-                        </span>
+                    {/* Clear link */}
+                    <div className="flex items-center justify-end gap-4 flex-wrap text-sm text-slate-600">
                         {factoryHasFilters && (
                             <button
                                 onClick={clearFactoryFilters}
@@ -527,15 +516,8 @@ export default function QCReports() {
                         </div>
                     </div>
 
-                    {/* Results summary + Clear link */}
-                    <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
-                        <span>
-                            {loadingProduct
-                                ? 'Loading reports...'
-                                : productPagination.total === 0
-                                    ? '0 reports'
-                                    : `Showing ${productRangeStart}–${productRangeEnd} of ${productPagination.total} report${productPagination.total === 1 ? '' : 's'}`}
-                        </span>
+                    {/* Clear link */}
+                    <div className="flex items-center justify-end gap-4 flex-wrap text-sm text-slate-600">
                         {productHasFilters && (
                             <button
                                 onClick={clearProductFilters}

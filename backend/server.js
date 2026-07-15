@@ -1,10 +1,14 @@
+// Load environment variables FIRST — before any module that reads process.env
+// at import time (e.g. config/passport instantiates GoogleStrategy on require),
+// otherwise .env-file values are undefined when those modules initialise (F-14).
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const session = require("express-session");
 const passport = require("./config/passport");
-require("dotenv").config();
 
 const { connectDB } = require("./config/database");
 const { initializeAdmin } = require("./utils/auth/initializeAdmin");

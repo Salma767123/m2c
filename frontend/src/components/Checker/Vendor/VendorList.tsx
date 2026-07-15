@@ -462,8 +462,6 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
   }
 
   const hasActiveFilters = Boolean(debouncedSearch || status || sort !== "assignedQcAt:desc" || dateFrom || inspectionStatus || selectedState || page !== 1)
-  const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1
-  const rangeEnd = Math.min(rangeStart + filteredVendors.length - 1, pagination.total)
 
   // Render the inspection form as soon as we have a vendorId in the URL — don't
   // wait for selectedVendorData, which requires the vendor list to have loaded first.
@@ -596,16 +594,9 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
         </div>
       </div>
 
-      {/* Results summary */}
-      <div className="mb-4 flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
-        <span>
-          {loading
-            ? "Loading vendors..."
-            : filteredVendors.length === 0
-            ? "0 vendors"
-            : `Showing ${rangeStart}–${rangeEnd} of ${pagination.total} vendor${pagination.total === 1 ? "" : "s"}`}
-        </span>
-        {hasActiveFilters && (
+      {/* Clear-filters action (vendor count summary intentionally omitted) */}
+      {hasActiveFilters && (
+        <div className="mb-4 flex items-center justify-end gap-4 flex-wrap">
           <button
             type="button"
             onClick={handleClearFilters}
@@ -614,8 +605,8 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
             <X className="w-3.5 h-3.5 text-white" />
             Clear Filters
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Error state */}
       {error && !loading && (
@@ -634,16 +625,16 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
       {loading && vendors.length === 0 && !error && (
         <div className="overflow-x-auto bg-white border border-slate-200/80 rounded-2xl shadow-xs scrollbar-none mb-6">
           <Table>
-            <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b-0">
-              <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Vendor</TableHead>
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Contact Info</TableHead>
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Location</TableHead>
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Assigned Date</TableHead>
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Inspection Status</TableHead>
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Status</TableHead>
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider text-right">Actions</TableHead>
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50">
+              <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Contact Info</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Location</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Assigned Date</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Inspection Status</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Status</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-5 text-[10px] uppercase tracking-wider text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -701,16 +692,16 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
       {!error && filteredVendors.length > 0 && (
         <div className="overflow-x-auto bg-white border border-slate-200/80 rounded-2xl shadow-xs scrollbar-none mb-6">
           <Table>
-            <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b-0">
-              <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Vendor</TableHead>
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Contact Info</TableHead>
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Location</TableHead>
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Assigned Date</TableHead>
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Inspection Status</TableHead>
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Status</TableHead>
-                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider text-right">Actions</TableHead>
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50">
+              <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Contact Info</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Location</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Assigned Date</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Inspection Status</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Status</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-5 text-[10px] uppercase tracking-wider text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

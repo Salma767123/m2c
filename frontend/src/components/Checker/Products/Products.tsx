@@ -245,10 +245,6 @@ export default function Products() {
     }
 
     const hasActiveFilters = Boolean(debouncedSearch || status || sort !== DEFAULT_SORT || dateFrom || page !== 1)
-    const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1
-    const rangeEnd = dateFrom
-        ? rangeStart + filteredProducts.length - 1
-        : Math.min(pagination.page * pagination.limit, pagination.total)
 
     if (selectedProduct) {
         return (
@@ -370,15 +366,9 @@ export default function Products() {
             </div>
 
             {/* Results summary */}
-            <div className="mb-4 flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
-                <span>
-                    {loading
-                        ? 'Loading products...'
-                        : filteredProducts.length === 0
-                            ? '0 products'
-                            : `Showing ${rangeStart}–${rangeEnd} of ${dateFrom ? filteredProducts.length : pagination.total} product${(dateFrom ? filteredProducts.length : pagination.total) === 1 ? '' : 's'}`}
-                </span>
-                {hasActiveFilters && (
+            {/* Clear-filters action (product count summary intentionally omitted) */}
+            {hasActiveFilters && (
+                <div className="mb-4 flex items-center justify-end gap-4 flex-wrap">
                     <button
                         type="button"
                         onClick={handleClearFilters}
@@ -387,8 +377,8 @@ export default function Products() {
                         <X className="w-3.5 h-3.5 text-white" />
                         Clear Filters
                     </button>
-                )}
-            </div>
+                </div>
+            )}
 
             {/* Error state */}
             {error && !loading && (
@@ -407,13 +397,13 @@ export default function Products() {
             {loading && products.length === 0 && !error && (
                 <div className="overflow-x-auto bg-white border border-slate-200/80 rounded-2xl shadow-xs scrollbar-none mb-6">
                     <Table>
-                        <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b-0">
-                            <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
-                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Product</TableHead>
-                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
-                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Category</TableHead>
-                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Approval</TableHead>
-                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider text-right">Actions</TableHead>
+                        <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50">
+                            <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
+                                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Product</TableHead>
+                                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Category</TableHead>
+                                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Approval</TableHead>
+                                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-5 text-[10px] uppercase tracking-wider text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -457,13 +447,13 @@ export default function Products() {
             {!error && filteredProducts.length > 0 && (
                 <div className="overflow-x-auto bg-white border border-slate-200/80 rounded-2xl shadow-xs scrollbar-none mb-6">
                     <Table>
-                        <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b-0">
-                            <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
-                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Product</TableHead>
-                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
-                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Category</TableHead>
-                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Approval</TableHead>
-                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider text-right">Actions</TableHead>
+                        <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50">
+                            <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
+                                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Product</TableHead>
+                                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Category</TableHead>
+                                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Approval</TableHead>
+                                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-5 text-[10px] uppercase tracking-wider text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>

@@ -77,10 +77,10 @@ export default function Measurements({ formData, setFormData, errors = {} }: Mea
 
   const onMeasurementCropped = async (croppedFile: File) => {
     const dataUrl = await readAsDataUrl(croppedFile)
-    setFormData({
-      ...formData,
-      measurementPhotos: [...(formData.measurementPhotos || []), { name: cropFileName, data: dataUrl, url: dataUrl }]
-    })
+    setFormData((prev: any) => ({
+      ...prev,
+      measurementPhotos: [...(prev.measurementPhotos || []), { name: cropFileName, data: dataUrl, url: dataUrl }]
+    }))
     const cur = cropSrc
     if (cur?.startsWith('blob:')) URL.revokeObjectURL(cur)
     if (cropQueue.length > 0) {
@@ -96,14 +96,14 @@ export default function Measurements({ formData, setFormData, errors = {} }: Mea
 
   const removeMeasurementPhoto = (photoIndex: number) => {
     const updatedPhotos = formData.measurementPhotos.filter((_, i) => i !== photoIndex)
-    setFormData({ ...formData, measurementPhotos: updatedPhotos })
+    setFormData((prev: any) => ({ ...prev, measurementPhotos: updatedPhotos }))
   }
 
   const updateMeasurement = (id: number, field: string, value: number) => {
     const updatedMeasurements = formData.measurements.map(m =>
       m.id === id ? { ...m, [field]: value } : m
     )
-    setFormData({ ...formData, measurements: updatedMeasurements })
+    setFormData((prev: any) => ({ ...prev, measurements: updatedMeasurements }))
   }
 
   const addSample = () => {
@@ -118,17 +118,17 @@ export default function Measurements({ formData, setFormData, errors = {} }: Mea
       retailWeight: 0,
       cartonGrossWeight: 0
     }
-    setFormData({
-      ...formData,
-      measurements: [...formData.measurements, newSample]
-    })
+    setFormData((prev: any) => ({
+      ...prev,
+      measurements: [...prev.measurements, newSample]
+    }))
   }
 
   const removeSample = (id: number) => {
-    setFormData({
-      ...formData,
-      measurements: formData.measurements.filter(m => m.id !== id)
-    })
+    setFormData((prev: any) => ({
+      ...prev,
+      measurements: prev.measurements.filter((m: any) => m.id !== id)
+    }))
   }
   return (
     <div className="space-y-8">

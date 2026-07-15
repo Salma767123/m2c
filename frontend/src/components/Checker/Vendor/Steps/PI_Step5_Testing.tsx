@@ -595,17 +595,17 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
   const evidence: Record<string, any[]> = formData.additionalEvidence || {}
 
   const toggleCollapse = (groupId: string) => {
-    setFormData({
-      ...formData,
+    setFormData((prev: any) => ({
+      ...prev,
       testGroups: groups.map((g) =>
         g.id === groupId ? { ...g, collapsed: !g.collapsed } : g
       ),
-    })
+    }))
   }
 
   const updateTest = (groupId: string, testId: string, patch: Partial<TestItem>) => {
-    setFormData({
-      ...formData,
+    setFormData((prev: any) => ({
+      ...prev,
       testGroups: groups.map((g) =>
         g.id === groupId
           ? {
@@ -614,7 +614,7 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
             }
           : g
       ),
-    })
+    }))
   }
 
   const addOtherTest = (groupId: string) => {
@@ -629,40 +629,40 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
       isOther: true,
       subject: '',
     }
-    setFormData({
-      ...formData,
+    setFormData((prev: any) => ({
+      ...prev,
       testGroups: groups.map((g) =>
         g.id === groupId ? { ...g, tests: [...g.tests, newItem] } : g
       ),
-    })
+    }))
   }
 
   const removeOtherTest = (groupId: string, testId: string) => {
-    setFormData({
-      ...formData,
+    setFormData((prev: any) => ({
+      ...prev,
       testGroups: groups.map((g) =>
         g.id === groupId ? { ...g, tests: g.tests.filter((t) => t.id !== testId) } : g
       ),
-    })
+    }))
   }
 
   const addEvidencePhoto = (id: string, photo: { name: string; data: string }) => {
-    setFormData({
-      ...formData,
+    setFormData((prev: any) => ({
+      ...prev,
       additionalEvidence: {
         ...evidence,
         [id]: [...(evidence[id] || []), photo],
       },
-    })
+    }))
   }
 
   const removeEvidence = (id: string, i: number) => {
     const next = [...(evidence[id] || [])]
     next.splice(i, 1)
-    setFormData({
-      ...formData,
+    setFormData((prev: any) => ({
+      ...prev,
       additionalEvidence: { ...evidence, [id]: next },
-    })
+    }))
   }
 
   // Summary counts

@@ -121,8 +121,6 @@ export default function VendorProductReviews() {
   // Pagination
   const totalPages = Math.ceil(filteredReviews.length / PAGE_SIZE);
   const paginatedReviews = filteredReviews.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const rangeStart = filteredReviews.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const rangeEnd = Math.min(currentPage * PAGE_SIZE, filteredReviews.length);
 
   const getStatusBadge = (status: string) => {
     const styles = {
@@ -251,17 +249,6 @@ export default function VendorProductReviews() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Results summary */}
-      <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600 mb-4">
-        <span>
-          {loading
-            ? 'Loading reviews...'
-            : filteredReviews.length === 0
-              ? '0 reviews'
-              : `Showing ${rangeStart}–${rangeEnd} of ${filteredReviews.length} review${filteredReviews.length === 1 ? '' : 's'}`}
-        </span>
-      </div>
 
       {/* Reviews Table */}
       <Card>

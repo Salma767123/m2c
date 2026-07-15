@@ -25,8 +25,8 @@ const TABLE_MIN_HEIGHT_PX = PAGE_SIZE * 65
 
 const RESULT_OPTIONS = [
   { value: "", label: "All results" },
-  { value: "PASSED", label: "Passed" },
-  { value: "FAILED", label: "Failed" },
+  { value: "PASSED", label: "Approved" },
+  { value: "FAILED", label: "Rejected" },
 ]
 
 const SORT_OPTIONS = [
@@ -162,17 +162,33 @@ export default function ReportsPage() {
   }, [inspections, dateFrom, dateTo])
 
   const hasActiveFilters = Boolean(debouncedSearch || result || sort !== DEFAULT_SORT || dateFrom || page !== 1)
-  const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1
-  const rangeEnd = dateFrom
-    ? rangeStart + filteredInspections.length - 1
-    : Math.min(pagination.page * pagination.limit, pagination.total)
 
+  // Mirrors the admin QC Reports badge exactly so the checker sees the same
+  // finalised outcome the admin does. Factory reports only ever contain
+  // COMPLETED inspections (admin approve → PASSED, final reject → FAILED), but
+  // the full lifecycle set is handled so nothing renders as a raw enum value.
   const getResultBadge = (r: string) => {
     switch (r) {
       case "PASSED":
-        return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Passed</Badge>
+      case "APPROVED":
+        return <Badge className="bg-green-50 text-green-700 border border-green-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Approved</Badge>
+      case "QC_APPROVED":
+        return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" />QC Approved</Badge>
+      case "REINSPECTION":
+      case "RE_INSPECTION":
+        return <Badge className="bg-amber-50 text-amber-700 border border-amber-200">Re-Inspection</Badge>
       case "FAILED":
-        return <Badge className="bg-red-100 text-red-800 border-red-200 flex items-center gap-1"><XCircle className="w-3 h-3" />Failed</Badge>
+      case "REJECTED":
+        return <Badge className="bg-red-50 text-red-700 border border-red-200 flex items-center gap-1"><XCircle className="w-3 h-3" />Rejected</Badge>
+      case "PENDING":
+      case "IN_PROGRESS":
+        return <Badge className="bg-brand-50 text-brand-700 border border-brand-200">In Progress</Badge>
+      case "SUBMITTED":
+        return <Badge className="bg-brand-50 text-brand-700 border border-brand-200">Submitted for Review</Badge>
+      case "UNDER_ADMIN_REVIEW":
+        return <Badge className="bg-yellow-50 text-yellow-700 border border-yellow-200">Under Admin Review</Badge>
+      case "COMPLETED":
+        return <Badge className="bg-green-50 text-green-700 border border-green-200">Completed</Badge>
       default:
         return <Badge className="bg-slate-100 text-slate-700">{r || "—"}</Badge>
     }
@@ -304,23 +320,17 @@ export default function ReportsPage() {
           </div>
 
           {/* Results summary */}
-          <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
-            <span>
-              {loading
-                ? "Loading reports..."
-                : (dateFrom ? filteredInspections.length : pagination.total) === 0
-                  ? "0 reports"
-                  : `Showing ${rangeStart}–${rangeEnd} of ${dateFrom ? filteredInspections.length : pagination.total} report${(dateFrom ? filteredInspections.length : pagination.total) === 1 ? "" : "s"}`}
-            </span>
-            {hasActiveFilters && (
+          {/* Clear-filters action (report count summary intentionally omitted) */}
+          {hasActiveFilters && (
+            <div className="flex items-center justify-end gap-4 flex-wrap text-sm">
               <button
                 onClick={handleClearFilters}
                 className="text-brand-600 hover:text-brand-700 font-medium underline underline-offset-2"
               >
                 Clear filters
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Error state */}
           {error && !loading && (
@@ -378,14 +388,14 @@ export default function ReportsPage() {
               </div>
             ) : (
               <Table>
-                <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b-0">
-                  <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
-                    <TableHead className="w-[24%] font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
-                    <TableHead className="w-[20%] font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor ID</TableHead>
-                    <TableHead className="w-[15%] font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Assigned Date</TableHead>
-                    <TableHead className="w-[15%] font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Completed On</TableHead>
-                    <TableHead className="w-[13%] font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Priority</TableHead>
-                    <TableHead className="w-[13%] font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Result</TableHead>
+                <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50">
+                  <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
+                    <TableHead className="w-[24%] font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                    <TableHead className="w-[20%] font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor ID</TableHead>
+                    <TableHead className="w-[15%] font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Assigned Date</TableHead>
+                    <TableHead className="w-[15%] font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Completed On</TableHead>
+                    <TableHead className="w-[13%] font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Priority</TableHead>
+                    <TableHead className="w-[13%] font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Result</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

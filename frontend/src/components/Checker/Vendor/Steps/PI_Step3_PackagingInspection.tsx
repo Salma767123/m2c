@@ -188,10 +188,12 @@ export default function PI_Step3_PackagingInspection({ formData, setFormData, er
     })
 
   const updateItem = (id: string, patch: Partial<PackagingItem>) => {
-    setFormData({
-      ...formData,
-      packagingItems: items.map((it) => (it.id === id ? { ...it, ...patch } : it)),
-    })
+    // Functional update — rapid successive edits (e.g. several remark-code taps
+    // in one tick) must not clobber each other via a stale `formData` (F-16).
+    setFormData((prev: any) => ({
+      ...prev,
+      packagingItems: (prev.packagingItems || []).map((it: PackagingItem) => (it.id === id ? { ...it, ...patch } : it)),
+    }))
   }
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,10 +207,10 @@ export default function PI_Step3_PackagingInspection({ formData, setFormData, er
 
   const onPackagingCropped = async (croppedFile: File) => {
     const data = await readAsDataUrl(croppedFile)
-    setFormData({
-      ...formData,
-      packagingPhotos: [...(formData.packagingPhotos || []), { name: cropFileName, data }],
-    })
+    setFormData((prev: any) => ({
+      ...prev,
+      packagingPhotos: [...(prev.packagingPhotos || []), { name: cropFileName, data }],
+    }))
     notifyUploadSuccess('Packaging Photo', cropFileName)
     const cur = cropSrc
     if (cur?.startsWith('blob:')) URL.revokeObjectURL(cur)
@@ -226,7 +228,7 @@ export default function PI_Step3_PackagingInspection({ formData, setFormData, er
   const removePhoto = (idx: number) => {
     const next = [...(formData.packagingPhotos || [])]
     next.splice(idx, 1)
-    setFormData({ ...formData, packagingPhotos: next })
+    setFormData((prev: any) => ({ ...prev, packagingPhotos: next }))
   }
 
   return (

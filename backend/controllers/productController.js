@@ -108,10 +108,12 @@ const createProduct = async (req, res) => {
 
     // Validate required fields. SKU is NOT required from the client — it is
     // auto-generated server-side (immutable, globally unique) below.
-    if (!name || !description || !category || !subCategory) {
+    // Sub-category is NOT required: vendors don't pick one — the admin assigns
+    // it when approving/publishing the product (schema field is optional).
+    if (!name || !description || !category) {
       return res.status(400).json({
         success: false,
-        message: 'Name, description, category, and sub-category are required'
+        message: 'Name, description, and category are required'
       });
     }
 

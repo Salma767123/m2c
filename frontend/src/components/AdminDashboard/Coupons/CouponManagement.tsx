@@ -343,13 +343,6 @@ const CouponManagement = () => {
         </div>
       </div>
 
-      {/* Showing */}
-      {!loading && filteredCoupons.length > 0 && (
-        <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
-          <span>Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredCoupons.length)} of {filteredCoupons.length}</span>
-        </div>
-      )}
-
       {/* Coupons Table */}
       <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (

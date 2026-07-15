@@ -327,18 +327,8 @@ export default function Inventory() {
         </CardContent>
       </Card>
 
-      {/* Showing */}
-      {!isLoading && totalItems > 0 && (
-        <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
-          <span>Showing {(currentPage - 1) * 10 + 1}–{Math.min(currentPage * 10, totalItems)} of {totalItems}</span>
-        </div>
-      )}
-
       {/* Inventory Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Inventory Items ({totalItems} total)</CardTitle>
-        </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center py-12">

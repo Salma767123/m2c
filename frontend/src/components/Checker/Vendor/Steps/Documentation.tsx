@@ -118,6 +118,9 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
         }
         : null,
       location: coords,
+      // Pass the inspection start time so the signed PDF prints it too — the
+      // report-page download already did, but buildMeta() omitted it (F-13).
+      inspectionStartedAt: formData?.inspectionStartedAt,
       generatedAt: new Date(),
     }
   }
@@ -139,10 +142,10 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
     if (!file) return
     const isPdf = file.type === "application/pdf"
     const data = isPdf ? await readFileAsDataUrl(file) : await compressImage(file)
-    setFormData({
-      ...formData,
+    setFormData((prev: any) => ({
+      ...prev,
       signedDocuments: [{ file, name: file.name, url: data, data, isPdf, id: Date.now() }],
-    })
+    }))
     if (e.target) e.target.value = ""
     setShowDocModal(false)
     setHasDownloaded(false)
@@ -157,7 +160,7 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
   }
 
   const removeManualDoc = () => {
-    setFormData({ ...formData, signedDocuments: [] })
+    setFormData((prev: any) => ({ ...prev, signedDocuments: [] }))
     setConfirmRemoveDoc(false)
   }
 
@@ -172,11 +175,11 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
       })
       const pdfDataUrl = doc.output("datauristring")
       const name = pdfFileName(meta, true)
-      setFormData({
-        ...formData,
+      setFormData((prev: any) => ({
+        ...prev,
         clientSignature: sigDataUrl,
         signedReport: [{ name, url: pdfDataUrl, data: pdfDataUrl, id: Date.now() }],
-      })
+      }))
       setShowSignModal(false)
     } finally {
       setGenerating(false)
@@ -190,7 +193,7 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
   }
 
   const removeSignedReport = () => {
-    setFormData({ ...formData, clientSignature: "", signedReport: [] })
+    setFormData((prev: any) => ({ ...prev, clientSignature: "", signedReport: [] }))
     setConfirmRemoveReport(false)
   }
 

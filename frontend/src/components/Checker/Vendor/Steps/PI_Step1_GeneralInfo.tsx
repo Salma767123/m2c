@@ -16,7 +16,7 @@ const FieldError = ({ message }: { message?: string }) =>
 
 // Mirrors the vendor registration form's business-type labels so the checker
 // sees "Private Limited Company" rather than the raw "pvt-ltd" value.
-function getBusinessTypeLabel(val?: string) {
+export function getBusinessTypeLabel(val?: string) {
   const map: Record<string, string> = {
     'proprietorship': 'Proprietorship',
     'pvt-ltd': 'Private Limited Company',
@@ -266,7 +266,7 @@ export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {
                       key={type}
                       type="button"
                       onClick={() => {
-                        setFormData({ ...formData, serviceType: type })
+                        setFormData((prev: any) => ({ ...prev, serviceType: type }))
                         setShowServiceTypeDropdown(false)
                       }}
                       className={`block w-full px-4 py-3 text-sm text-left transition-colors ${

@@ -233,11 +233,6 @@ export default function AdminSupport() {
       </Card>
 
       {/* Tickets Table */}
-      {filteredTickets.length > 0 && (
-        <p className="text-sm text-slate-600">
-          Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredTickets.length)} of {filteredTickets.length}
-        </p>
-      )}
       <Card>
         <Table>
           <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">

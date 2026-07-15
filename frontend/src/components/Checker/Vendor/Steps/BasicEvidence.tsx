@@ -77,13 +77,13 @@ export default function BasicEvidence({ formData, setFormData, errors = {} }: St
         const data = await readAsDataUrl(croppedFile)
         const entry: FactoryPhoto = { slotId: cropInfo.slotId, label: cropInfo.label, name: cropInfo.fileName, data, url: data }
         const others = photos.filter((p) => p.slotId !== cropInfo.slotId)
-        setFormData({ ...formData, factoryPhotos: [...others, entry] })
+        setFormData((prev: any) => ({ ...prev, factoryPhotos: [...others, entry] }))
         if (cropInfo.src.startsWith('blob:')) URL.revokeObjectURL(cropInfo.src)
         setCropInfo(null)
     }
 
     const handleSlotRemove = (slotId: FactoryImageSlotId) => {
-        setFormData({ ...formData, factoryPhotos: photos.filter((p) => p.slotId !== slotId) })
+        setFormData((prev: any) => ({ ...prev, factoryPhotos: photos.filter((p) => p.slotId !== slotId) }))
     }
 
     // Documents — unchanged generic multi-file upload (optional).
@@ -100,14 +100,14 @@ export default function BasicEvidence({ formData, setFormData, errors = {} }: St
                 return { name: file.name, data, url: null }
             })
         )
-        setFormData({ ...formData, documentsUpload: [...(formData.documentsUpload || []), ...newEntries] })
+        setFormData((prev: any) => ({ ...prev, documentsUpload: [...(prev.documentsUpload || []), ...newEntries] }))
         e.target.value = ""
     }
 
     const removeDoc = (index: number) => {
         const updated = [...(formData.documentsUpload || [])]
         updated.splice(index, 1)
-        setFormData({ ...formData, documentsUpload: updated })
+        setFormData((prev: any) => ({ ...prev, documentsUpload: updated }))
     }
 
     return (

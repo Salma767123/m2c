@@ -219,11 +219,6 @@ export default function QCCheckerList() {
       </Card>
 
       {/* Checkers Table */}
-      {!loading && checkers.length > 0 && (
-        <div className="text-sm text-slate-600 mb-2">
-          Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, checkers.length)} of {checkers.length}
-        </div>
-      )}
       <Card>
         {loading ? (
           <div className="p-12 text-center">

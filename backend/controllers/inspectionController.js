@@ -458,7 +458,7 @@ const completeInspection = async (req, res) => {
                 companyName: true,
             },
         });
-        const { verifyCheckerAtVendor } = require('../utils/locationUtils');
+        const { verifyCheckerAtVendor, buildLocationStamp } = require('../utils/locationUtils');
         const geo = await verifyCheckerAtVendor({
             vendor,
             checkerLatitude,
@@ -594,7 +594,7 @@ const completeInspection = async (req, res) => {
                 notes: formData.notes || null,
                 // Verified-location stamp at submit time — mirrors the
                 // product audit-log format so reports read consistently.
-                locationDetails: `Verified at factory — ${Math.round(geo.distanceM)}m from vendor (checker ${Number(checkerLatitude).toFixed(6)},${Number(checkerLongitude).toFixed(6)})`,
+                locationDetails: buildLocationStamp(geo, checkerLatitude, checkerLongitude),
                 inspectionData: persistedFormData,
                 cycleNumber: inspection.cycleNumber || 1,
             },

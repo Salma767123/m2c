@@ -258,10 +258,35 @@ async function verifyCheckerAtVendor({
   return { ok: true, vendorLat, vendorLng, distanceM };
 }
 
+/**
+ * Build an honest audit-trail location string from a verifyCheckerAtVendor
+ * result. Never asserts "Verified at factory" when the geofence was skipped or
+ * no GPS was captured — that fabricated a verification that never happened and
+ * printed NaN coordinates (F-06).
+ *
+ * @param {{ skipped?: boolean, distanceM?: number }} geo
+ * @param {number|null|undefined} checkerLatitude
+ * @param {number|null|undefined} checkerLongitude
+ * @returns {string}
+ */
+function buildLocationStamp(geo, checkerLatitude, checkerLongitude) {
+  if (!geo || geo.skipped) {
+    return "Location check skipped (geofence disabled)";
+  }
+  if (checkerLatitude == null || checkerLongitude == null) {
+    return "Location not captured (no GPS sent by checker)";
+  }
+  return (
+    `Verified at factory — ${Math.round(geo.distanceM || 0)}m from vendor ` +
+    `(checker ${Number(checkerLatitude).toFixed(6)},${Number(checkerLongitude).toFixed(6)})`
+  );
+}
+
 module.exports = {
   parseMapLinkCoordinates,
   haversineDistanceMeters,
   LOCATION_THRESHOLD_METERS,
   isGeofenceDisabled,
   verifyCheckerAtVendor,
+  buildLocationStamp,
 };

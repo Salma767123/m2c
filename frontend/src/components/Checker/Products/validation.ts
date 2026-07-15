@@ -64,7 +64,11 @@ export function getExpectedProductVerificationKeys(productData: any): string[] {
 
     if (p.fabricSpecifications && typeof p.fabricSpecifications === "object") {
         Object.entries(p.fabricSpecifications).forEach(([key, val]) => {
-            if (key === 'basis') return
+            // Mirror what Step 2 actually renders: `basis` is internal and
+            // `weightUnit` is hidden (implied by the GSM field), so neither has
+            // a control on screen — expecting them deadlocks the step (F-03).
+            // `careInstructions` IS rendered (separately) so it stays verifiable.
+            if (key === 'basis' || key === 'weightUnit') return
             if (notEmptyVal(val)) keys.push(`pv_spec_${key}`)
         })
     }
@@ -132,10 +136,22 @@ function validatePackagingInspection(d: any): StepErrors {
 }
 
 // ── Step 4: Defects ──────────────────────────────────────────────────────────
-// All defect fields have sensible numeric defaults (zero defects is a valid
-// result), so this step never blocks Next.
-function validateDefects(_d: any): StepErrors {
-    return {}
+// Zero defects is a valid PASS result, and counts exceeding the maximums are a
+// valid FAIL (the checker then rejects) — so neither blocks Next. We do require
+// a real sample size and photo evidence whenever defects were actually recorded,
+// so incomplete AQL data can't slip through silently (F-12).
+function validateDefects(d: any): StepErrors {
+    const e: StepErrors = {}
+    if (!d.sampleSize || Number(d.sampleSize) <= 0) {
+        e.sampleSize = "Enter the number of units sampled"
+    }
+    const totalDefects =
+        Number(d.criticalDefects || 0) + Number(d.majorDefects || 0) + Number(d.minorDefects || 0)
+    const photos = Array.isArray(d.defectPhotos) ? d.defectPhotos : []
+    if (totalDefects > 0 && photos.length === 0) {
+        e.defectPhotos = "Upload at least one defect photo when defects are recorded"
+    }
+    return e
 }
 
 // ── Step 5: Testing ──────────────────────────────────────────────────────────
@@ -176,6 +192,10 @@ function validateReview(d: any): StepErrors {
     const e: StepErrors = {}
     if (!d.inspectionStatus) {
         e.inspectionStatus = "Select an inspection status before continuing"
+    }
+    // A rejection must carry a written reason — the reject endpoint requires it (F-08).
+    if (d.inspectionStatus === "Rejected" && !(d.reviewerRemarks || "").trim()) {
+        e.reviewerRemarks = "A rejection reason is required"
     }
     return e
 }

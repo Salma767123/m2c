@@ -383,11 +383,6 @@ export default function UserManagement() {
       </Card>
 
       {/* Users Table */}
-      {filteredUsers.length > 0 && (
-        <div className="text-sm text-slate-600 mb-2">
-          Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length}
-        </div>
-      )}
       <Card>
         <CardHeader>
           <CardTitle>Internal Staff</CardTitle>

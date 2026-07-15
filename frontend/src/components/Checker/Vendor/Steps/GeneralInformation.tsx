@@ -85,7 +85,7 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
             value={formData.client}
             readOnly={clientLocked}
             aria-readonly={clientLocked || undefined}
-            onChange={(e) => !clientLocked && setFormData({ ...formData, client: e.target.value })}
+            onChange={(e) => !clientLocked && setFormData((prev: any) => ({ ...prev, client: e.target.value }))}
             placeholder="Enter company name"
             className={clientLocked ? READONLY_CLS : errors.client ? ERROR_CLS : EDITABLE_CLS}
           />
@@ -98,7 +98,7 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
             value={formData.vendor}
             readOnly={vendorLocked}
             aria-readonly={vendorLocked || undefined}
-            onChange={(e) => !vendorLocked && setFormData({ ...formData, vendor: e.target.value })}
+            onChange={(e) => !vendorLocked && setFormData((prev: any) => ({ ...prev, vendor: e.target.value }))}
             className={vendorLocked ? READONLY_CLS : errors.vendor ? ERROR_CLS : EDITABLE_CLS}
           />
           <FieldError message={errors.vendor} />
@@ -109,7 +109,7 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
             type="date"
             value={formData.serviceStartDate}
             min={new Date().toISOString().slice(0, 10)}
-            onChange={(e) => setFormData({ ...formData, serviceStartDate: e.target.value })}
+            onChange={(e) => setFormData((prev: any) => ({ ...prev, serviceStartDate: e.target.value }))}
             className={errors.serviceStartDate ? ERROR_CLS : EDITABLE_CLS}
           />
           <FieldError message={errors.serviceStartDate} />
@@ -131,7 +131,7 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
                     <button
                       key={type}
                       onClick={() => {
-                        setFormData({ ...formData, serviceType: type })
+                        setFormData((prev: any) => ({ ...prev, serviceType: type }))
                         setShowServiceTypeDropdown(false)
                       }}
                       className={`block w-full px-4 py-3 text-sm text-left transition-colors duration-150 ${

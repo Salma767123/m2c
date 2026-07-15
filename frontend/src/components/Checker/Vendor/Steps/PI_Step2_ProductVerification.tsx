@@ -104,10 +104,10 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
     : new Set()
 
   const onVerify = (key: string, ok: boolean | null, remarks: string) => {
-    setFormData({
-      ...formData,
+    setFormData((prev: any) => ({
+      ...prev,
       productVerifications: { ...verifications, [key]: { ok, remarks } },
-    })
+    }))
   }
 
   // ── Image viewer modal ───────────────────────────────────────────────────
@@ -136,10 +136,10 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
 
   const onEvidenceCropped = async (croppedFile: File) => {
     const data = await readAsDataUrl(croppedFile)
-    setFormData({
-      ...formData,
-      productEvidencePhotos: [...(formData.productEvidencePhotos || []), { name: cropFileName, data }],
-    })
+    setFormData((prev: any) => ({
+      ...prev,
+      productEvidencePhotos: [...(prev.productEvidencePhotos || []), { name: cropFileName, data }],
+    }))
     notifyUploadSuccess('Evidence Photo', cropFileName)
     const cur = cropSrc
     if (cur?.startsWith('blob:')) URL.revokeObjectURL(cur)
@@ -157,7 +157,7 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
   const removePhoto = (idx: number) => {
     const next = [...(formData.productEvidencePhotos || [])]
     next.splice(idx, 1)
-    setFormData({ ...formData, productEvidencePhotos: next })
+    setFormData((prev: any) => ({ ...prev, productEvidencePhotos: next }))
   }
 
   // ── Variant rows (price excluded) ────────────────────────────────────────
