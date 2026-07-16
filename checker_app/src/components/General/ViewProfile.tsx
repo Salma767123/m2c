@@ -7,6 +7,7 @@ import {
   Modal,
   Image,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import {
   ArrowLeft,
@@ -174,8 +175,12 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
   const hasSecondaryPhone = !!profile?.alternatePhone;
 
   return (
-    <View style={{ flex: 1, backgroundColor: brand[500], paddingTop: insets.top, paddingBottom: insets.bottom }}>
-      <View className="flex-1 bg-slate-50">
+    <View style={{ flex: 1, backgroundColor: brand[500], paddingTop: insets.top }}>
+      {/* Uniform red status bar — transparent + light icons removes the dark
+          scrim that made the top band look two-tone. */}
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      {/* bottom safe-area painted slate (not red) so no red "footer" strip shows. */}
+      <View className="flex-1 bg-slate-50" style={{ paddingBottom: insets.bottom }}>
         {/* Header — red AppBar (kept) */}
         <View className="bg-brand-500 px-4 pt-2 pb-4">
           <View className="flex-row items-center">
