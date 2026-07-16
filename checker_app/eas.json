@@ -20,7 +20,11 @@
         "EXPO_PUBLIC_API_URL": "https://backend-sigma-nine-jx4v8tvnai.vercel.app/api"
       }
     },
-    "production": {},
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://backend-sigma-nine-jx4v8tvnai.vercel.app/api"
+      }
+    },
     "production-apk": {
       "extends": "production",
       "android": {
