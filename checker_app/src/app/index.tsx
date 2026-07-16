@@ -54,7 +54,7 @@ export default function SplashScreen() {
           }}
         >
           <Image
-            source={require('../../assets/images/512.png')}
+            source={require('../../assets/images/m2c-logo.png')}
             style={{ width: 64, height: 64 }}
             resizeMode="contain"
           />

@@ -1,5 +1,5 @@
 // Shared RN UI + photo helpers for the Product Inspection steps.
-// Keeps the 7 step components consistent with the app's blue-accent card style
+// Keeps the 7 step components consistent with the app's brand-red accent card style
 // while mirroring the web QC portal's field semantics.
 
 import React, { useState } from 'react';
@@ -129,17 +129,20 @@ export function ErrorBanner({ message }: { message?: string }) {
 // ── Card (bordered white block with a slate header) ──────────────────────────
 export function Card({
   title,
+  icon,
   right,
   children,
 }: {
   title?: string;
+  icon?: React.ReactNode;
   right?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <View className="bg-white border border-slate-200 rounded-2xl overflow-hidden mb-4">
       {!!title && (
-        <View className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex-row items-center">
+        <View className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex-row items-center" style={{ columnGap: 8 }}>
+          {icon}
           <Text className="text-sm font-bold text-slate-800 flex-1">{title}</Text>
           {right}
         </View>
@@ -229,6 +232,7 @@ export function VerifyField({
   onChange,
   highlight = false,
   onView,
+  headerAction,
 }: {
   fieldKey: string;
   label: string;
@@ -239,6 +243,8 @@ export function VerifyField({
   onChange: (ok: boolean | null, remarks: string) => void;
   highlight?: boolean;
   onView?: () => void;
+  /** Optional node rendered on the right of the label (e.g. a colour swatch). */
+  headerAction?: React.ReactNode;
 }) {
   const v = verification ?? { ok: null, remarks: '' };
   const needsHighlight = highlight && v.ok === null;
@@ -255,13 +261,14 @@ export function VerifyField({
       <View className="p-3">
         <View className="flex-row items-center justify-between mb-1">
           <Text className="text-[11px] font-semibold text-slate-500 uppercase flex-1">{label}</Text>
+          {!!headerAction && <View className="ml-2">{headerAction}</View>}
           {!!onView && (
             <TouchableOpacity
               onPress={onView}
-              className="flex-row items-center bg-blue-50 border border-blue-100 rounded-lg px-2 py-0.5 ml-2"
+              className="flex-row items-center bg-brand-50 border border-brand-100 rounded-lg px-2 py-0.5 ml-2"
             >
-              <Eye size={12} color="#2563eb" />
-              <Text className="text-[11px] font-semibold text-blue-600 ml-1">View</Text>
+              <Eye size={12} color="#c41617" />
+              <Text className="text-[11px] font-semibold text-brand-600 ml-1">View</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -327,7 +334,7 @@ export function LoadingOverlay({ label }: { label: string }) {
   return (
     <View className="absolute inset-0 bg-black/50 items-center justify-center" style={{ zIndex: 100 }}>
       <View className="bg-white rounded-2xl p-8 mx-8 items-center">
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color="#e01a1b" />
         <Text className="text-base font-bold text-slate-900 mt-4 text-center">{label}</Text>
       </View>
     </View>

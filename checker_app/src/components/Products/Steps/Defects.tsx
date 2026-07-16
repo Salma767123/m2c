@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
-import { ChevronDown, ChevronUp, CheckCircle, AlertTriangle } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, CheckCircle, AlertTriangle, SlidersHorizontal, ClipboardCheck } from 'lucide-react-native';
 import { StepHeader, Card, PhotoGrid, RemarkInput, Photo } from './piShared';
 
 interface Props {
@@ -32,11 +32,13 @@ function NumField({
   value,
   onChange,
   step = 1,
+  error,
 }: {
   label: string;
   value: number;
   onChange: (n: number) => void;
   step?: number;
+  error?: string;
 }) {
   return (
     <View className="flex-1 min-w-[45%] mb-3">
@@ -49,8 +51,11 @@ function NumField({
           const n = step < 1 ? parseFloat(t) : parseInt(t, 10);
           onChange(isNaN(n) ? 0 : n);
         }}
-        className="px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white"
+        className={`px-3 py-2 border rounded-lg text-sm text-slate-900 bg-white ${
+          error ? 'border-red-400 bg-red-50' : 'border-slate-300'
+        }`}
       />
+      {!!error && <Text className="text-xs text-red-600 mt-1">{error}</Text>}
     </View>
   );
 }
@@ -93,7 +98,7 @@ function Counter({
   );
 }
 
-export default function Defects({ formData, setFormData }: Props) {
+export default function Defects({ formData, setFormData, errors = {} }: Props) {
   const set = (patch: Partial<Props['formData']>) => setFormData({ ...formData, ...patch });
 
   const pass =
@@ -117,7 +122,7 @@ export default function Defects({ formData, setFormData }: Props) {
       />
 
       {/* AQL Configuration */}
-      <Card title="AQL Configuration">
+      <Card title="AQL Configuration" icon={<SlidersHorizontal size={16} color="#e01a1b" />}>
         <Text className="text-xs font-medium text-slate-700 mb-1.5">Inspection Level</Text>
         <View className="flex-row mb-3" style={{ gap: 8 }}>
           {LEVELS.map((lvl) => {
@@ -127,7 +132,7 @@ export default function Defects({ formData, setFormData }: Props) {
                 key={lvl}
                 onPress={() => set({ inspectionLevel: lvl })}
                 className={`flex-1 py-2.5 rounded-lg border items-center ${
-                  selected ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'
+                  selected ? 'bg-brand-500 border-brand-500' : 'bg-white border-slate-300'
                 }`}
               >
                 <Text className={`text-sm font-semibold ${selected ? 'text-white' : 'text-slate-600'}`}>{lvl}</Text>
@@ -137,7 +142,8 @@ export default function Defects({ formData, setFormData }: Props) {
         </View>
 
         <View className="flex-row flex-wrap" style={{ columnGap: 12 }}>
-          <NumField label="Sample Size" value={formData.sampleSize} onChange={(n) => set({ sampleSize: n })} />
+          <NumField label="Sample Size" value={formData.sampleSize} onChange={(n) => set({ sampleSize: n })} error={errors.sampleSize} />
+          <NumField label="AQL Level - Critical" value={formData.aqlCritical} onChange={(n) => set({ aqlCritical: n })} step={0.1} />
           <NumField label="AQL Level - Major" value={formData.aqlMajor} onChange={(n) => set({ aqlMajor: n })} step={0.1} />
           <NumField label="AQL Level - Minor" value={formData.aqlMinor} onChange={(n) => set({ aqlMinor: n })} step={0.1} />
         </View>
@@ -168,7 +174,7 @@ export default function Defects({ formData, setFormData }: Props) {
       </View>
 
       {/* AQL Summary */}
-      <Card title="AQL Summary">
+      <Card title="AQL Summary" icon={<ClipboardCheck size={16} color="#e01a1b" />}>
         <View className="flex-row flex-wrap mb-3">
           <View className="w-1/2 items-center mb-3">
             <Text className="text-xs text-slate-600">Critical</Text>
@@ -199,12 +205,14 @@ export default function Defects({ formData, setFormData }: Props) {
       <View className="mb-2">
         <Text className="text-sm font-semibold text-slate-700 mb-1">Photo Evidence:</Text>
         <Text className="text-xs text-slate-500 mb-3">Major/minor defects, sealed samples with AQF tape</Text>
+        {!!errors.defectPhotos && <Text className="text-xs text-red-600 mb-2">{errors.defectPhotos}</Text>}
         <PhotoGrid
           photos={formData.defectPhotos || []}
           onAdd={addPhotos}
           onRemove={removePhoto}
           addLabel="Upload defect photo"
           allowMultiple
+          hasError={!!errors.defectPhotos}
         />
       </View>
 

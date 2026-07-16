@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
-import { CheckCircle2, XCircle, Minus, Pencil, ChevronDown, Check } from 'lucide-react-native';
+import { CheckCircle2, XCircle, Minus, Pencil, ChevronDown, Check, ClipboardList, Package, Box, AlertTriangle, FlaskConical, UserCheck } from 'lucide-react-native';
 import type { PackagingItem, TestGroup } from '../PI_data';
 import { ADDITIONAL_EVIDENCE_DEFS, CODE_LABELS, INSPECTION_STATUS_OPTIONS } from '../PI_data';
+import { getBusinessTypeLabel } from '@/components/Vendor/Steps/fieldHelpers';
+import { RemarkInput } from './piShared';
 
 function badgeCls(code: number) {
   if (code <= 5) return 'bg-red-100 border-red-200';
@@ -37,9 +39,16 @@ interface Props {
     criticalDefects: number;
     majorDefects: number;
     minorDefects: number;
+    maxAllowedCritical?: number;
+    maxAllowedMajor?: number;
+    maxAllowedMinor?: number;
+    criticalDefectDetails?: string;
+    majorDefectDetails?: string;
+    minorDefectDetails?: string;
     testGroups: TestGroup[];
     additionalEvidence: Record<string, any[]>;
     inspectionStatus: string;
+    reviewerRemarks?: string;
     inspectorSignature?: string;
   };
   setFormData: (d: any) => void;
@@ -47,17 +56,18 @@ interface Props {
   errors?: Record<string, string>;
 }
 
-function SectionHeader({ title, stepLabel, onEdit }: { title: string; stepLabel: string; onEdit: () => void }) {
+function SectionHeader({ title, stepLabel, onEdit, icon }: { title: string; stepLabel: string; onEdit: () => void; icon?: React.ReactNode }) {
   return (
-    <View className="flex-row items-center pb-2 border-b border-slate-200 mb-3">
+    <View className="flex-row items-center pb-2 border-b border-slate-200 mb-3" style={{ columnGap: 8 }}>
+      {icon}
       <Text className="text-sm font-bold text-slate-800 flex-1">{title}</Text>
       <Text className="text-xs text-slate-400 mr-2">{stepLabel}</Text>
       <TouchableOpacity
         onPress={onEdit}
-        className="flex-row items-center bg-blue-50 border border-blue-100 rounded-lg px-2.5 py-1"
+        className="flex-row items-center bg-brand-50 border border-brand-100 rounded-lg px-2.5 py-1"
       >
-        <Pencil size={11} color="#2563eb" />
-        <Text className="text-xs font-semibold text-blue-600 ml-1">Edit</Text>
+        <Pencil size={11} color="#c41617" />
+        <Text className="text-xs font-semibold text-brand-600 ml-1">Edit</Text>
       </TouchableOpacity>
     </View>
   );
@@ -145,9 +155,9 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
 
       {/* Step 1 */}
       <View className="mb-6">
-        <SectionHeader title="General Information" stepLabel="Step 1" onEdit={() => onEditStep('generalInformation')} />
+        <SectionHeader title="General Information" stepLabel="Step 1" onEdit={() => onEditStep('generalInformation')} icon={<ClipboardList size={16} color="#e01a1b" />} />
         <Row label="Company" value={v.companyName} />
-        <Row label="Business Type" value={v.businessType} />
+        <Row label="Business Type" value={getBusinessTypeLabel(v.businessType)} />
         <Row label="Product" value={p.name} />
         <Row label="Inspection Date" value={d.serviceStartDate} />
         <Row label="Service Type" value={d.serviceType} />
@@ -155,7 +165,7 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
 
       {/* Step 2 */}
       <View className="mb-6">
-        <SectionHeader title="Product Verification" stepLabel="Step 2" onEdit={() => onEditStep('productVerification')} />
+        <SectionHeader title="Product Verification" stepLabel="Step 2" onEdit={() => onEditStep('productVerification')} icon={<Package size={16} color="#e01a1b" />} />
         {verTotal === 0 ? (
           <Text className="text-sm text-slate-400 italic">No fields verified.</Text>
         ) : (
@@ -183,7 +193,7 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
 
       {/* Step 3 */}
       <View className="mb-6">
-        <SectionHeader title="Packaging Inspection" stepLabel="Step 3" onEdit={() => onEditStep('packagingInspection')} />
+        <SectionHeader title="Packaging Inspection" stepLabel="Step 3" onEdit={() => onEditStep('packagingInspection')} icon={<Box size={16} color="#e01a1b" />} />
         {pkgItems.map((item) => (
           <View key={item.id} className="border border-slate-100 rounded-xl px-3 py-2.5 mb-2 flex-row items-start justify-between" style={{ columnGap: 8 }}>
             <View className="flex-1">
@@ -205,28 +215,61 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
 
       {/* Step 4 */}
       <View className="mb-6">
-        <SectionHeader title="Defects" stepLabel="Step 4" onEdit={() => onEditStep('defects')} />
-        <View className="flex-row mb-3" style={{ gap: 8 }}>
-          <View className="flex-1 border border-purple-200 bg-purple-50 rounded-xl p-3 items-center">
-            <Text className="text-lg font-bold text-purple-700">{d.criticalDefects}</Text>
-            <Text className="text-xs text-purple-600 font-semibold">Critical</Text>
-          </View>
-          <View className="flex-1 border border-red-200 bg-red-50 rounded-xl p-3 items-center">
-            <Text className="text-lg font-bold text-red-700">{d.majorDefects}</Text>
-            <Text className="text-xs text-red-600 font-semibold">Major</Text>
-          </View>
-          <View className="flex-1 border border-amber-200 bg-amber-50 rounded-xl p-3 items-center">
-            <Text className="text-lg font-bold text-amber-700">{d.minorDefects}</Text>
-            <Text className="text-xs text-amber-600 font-semibold">Minor</Text>
-          </View>
-        </View>
-        <Row label="Inspection Level" value={d.inspectionLevel} />
-        <Row label="Sample Size" value={String(d.sampleSize)} />
+        <SectionHeader title="Defects" stepLabel="Step 4" onEdit={() => onEditStep('defects')} icon={<AlertTriangle size={16} color="#e01a1b" />} />
+        {(() => {
+          const rows = [
+            { key: 'C', label: 'Critical', found: Number(d.criticalDefects || 0), max: d.maxAllowedCritical, details: d.criticalDefectDetails, border: 'border-purple-200 bg-purple-50', text: 'text-purple-700', sub: 'text-purple-600' },
+            { key: 'Ma', label: 'Major', found: Number(d.majorDefects || 0), max: d.maxAllowedMajor, details: d.majorDefectDetails, border: 'border-red-200 bg-red-50', text: 'text-red-700', sub: 'text-red-600' },
+            { key: 'Mi', label: 'Minor', found: Number(d.minorDefects || 0), max: d.maxAllowedMinor, details: d.minorDefectDetails, border: 'border-amber-200 bg-amber-50', text: 'text-amber-700', sub: 'text-amber-600' },
+          ];
+          const failed = rows.some((r) => r.max != null && r.found > Number(r.max));
+          return (
+            <>
+              <View className="flex-row mb-3" style={{ gap: 8 }}>
+                {rows.map((r) => {
+                  const exceeded = r.max != null && r.found > Number(r.max);
+                  return (
+                    <View
+                      key={r.key}
+                      className={`flex-1 border ${r.border} rounded-xl p-3 items-center ${exceeded ? 'border-2 border-red-400' : ''}`}
+                    >
+                      <Text className={`text-lg font-bold ${r.text}`}>{r.found}</Text>
+                      <Text className={`text-xs ${r.sub} font-semibold`}>{r.label}</Text>
+                      <Text className="text-[10px] text-slate-500 mt-0.5">Max {r.max ?? '—'}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+              <Row label="Inspection Level" value={d.inspectionLevel} />
+              <Row label="Sample Size" value={String(d.sampleSize)} />
+              <View className="flex-row items-center justify-between py-2">
+                <Text className="text-sm text-slate-500 font-medium">AQL Result</Text>
+                <View className={`px-2.5 py-1 rounded-full ${failed ? 'bg-red-100' : 'bg-emerald-100'}`}>
+                  <Text className={`text-xs font-bold ${failed ? 'text-red-700' : 'text-emerald-700'}`}>
+                    {failed ? 'FAIL' : 'PASS'}
+                  </Text>
+                </View>
+              </View>
+              {(d.criticalDefectDetails || d.majorDefectDetails || d.minorDefectDetails) && (
+                <View style={{ rowGap: 6 }} className="mt-1">
+                  {rows.filter((r) => r.details).map((r) => (
+                    <View key={r.key} className="bg-slate-50 border border-slate-100 rounded-lg p-2">
+                      <Text className="text-xs">
+                        <Text className="font-semibold text-slate-600">{r.label}: </Text>
+                        <Text className="text-slate-700">{r.details}</Text>
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </>
+          );
+        })()}
       </View>
 
       {/* Step 5 */}
       <View className="mb-6">
-        <SectionHeader title="Testing" stepLabel="Step 5" onEdit={() => onEditStep('testing')} />
+        <SectionHeader title="Testing" stepLabel="Step 5" onEdit={() => onEditStep('testing')} icon={<FlaskConical size={16} color="#e01a1b" />} />
         {(d.testGroups || []).map((group) => {
           const gPass = group.tests.filter((t) => t.pass).length;
           const gFail = group.tests.filter((t) => t.fail).length;
@@ -267,7 +310,8 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
 
       {/* Inspector Details */}
       <View className="bg-white border border-slate-200 rounded-2xl overflow-hidden mb-4">
-        <View className="bg-slate-50 border-b border-slate-200 px-4 py-3">
+        <View className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex-row items-center" style={{ columnGap: 8 }}>
+          <UserCheck size={16} color="#e01a1b" />
           <Text className="text-sm font-bold text-slate-800">Inspector Details</Text>
         </View>
         <View className="p-4">
@@ -301,6 +345,23 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
             <ChevronDown size={16} color="#64748b" />
           </TouchableOpacity>
           {!!errors.inspectionStatus && <Text className="text-xs text-red-600 mt-1.5">{errors.inspectionStatus}</Text>}
+
+          {/* Reviewer remarks — required when the decision is a rejection so the
+              reject endpoint always receives a real reason (F-08). */}
+          <Text className="text-[11px] font-semibold text-slate-500 uppercase mb-1.5 mt-4">
+            Reviewer Remarks {d.inspectionStatus === 'Rejected' && <Text className="text-red-500">*</Text>}
+          </Text>
+          <RemarkInput
+            value={d.reviewerRemarks || ''}
+            onChangeText={(t) => setFormData({ ...d, reviewerRemarks: t })}
+            placeholder={
+              d.inspectionStatus === 'Rejected'
+                ? 'Reason for rejection (required)…'
+                : 'Optional notes explaining this decision…'
+            }
+            error={!!errors.reviewerRemarks}
+          />
+          {!!errors.reviewerRemarks && <Text className="text-xs text-red-600 mt-1.5">{errors.reviewerRemarks}</Text>}
         </View>
       </View>
 
@@ -328,7 +389,7 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
                   }`}
                 >
                   <Text className={`text-sm ${selected ? `${st.text} font-semibold` : 'text-slate-700'}`}>{status}</Text>
-                  {selected && <Check size={16} color="#2563eb" />}
+                  {selected && <Check size={16} color="#e01a1b" />}
                 </TouchableOpacity>
               );
             })}

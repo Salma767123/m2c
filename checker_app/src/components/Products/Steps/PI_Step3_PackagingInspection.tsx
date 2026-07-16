@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { CheckCircle2, XCircle } from 'lucide-react-native';
+import { CheckCircle2, XCircle, Camera } from 'lucide-react-native';
 import type { PackagingItem } from '../PI_data';
 import { CODE_LABELS } from '../PI_data';
 import { StepHeader, Card, ErrorBanner, PhotoGrid, RemarkInput, Photo } from './piShared';
@@ -188,7 +188,7 @@ export default function PI_Step3_PackagingInspection({ formData, setFormData, er
       ))}
 
       {/* Photo upload */}
-      <Card title="Packaging Photos" right={
+      <Card title="Packaging Photos" icon={<Camera size={16} color="#e01a1b" />} right={
         errors.packagingPhotos ? <Text className="text-xs text-red-600 font-medium">{errors.packagingPhotos}</Text> : undefined
       }>
         <PhotoGrid

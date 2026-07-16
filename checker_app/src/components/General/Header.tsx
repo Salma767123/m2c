@@ -76,7 +76,7 @@ export default function Header() {
               }}
             >
               <Image
-                source={require('../../../assets/images/logo2.png')}
+                source={require('../../../assets/images/m2c-logo.png')}
                 style={{ width: 56, height: 40 }}
                 resizeMode="contain"
               />

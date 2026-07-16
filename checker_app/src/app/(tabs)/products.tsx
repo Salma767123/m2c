@@ -9,6 +9,9 @@ import {
   RefreshControl,
   Modal,
   Image,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import {
   Search,
@@ -18,10 +21,11 @@ import {
   RefreshCw,
   X,
   ChevronDown,
+  ChevronUp,
   ChevronLeft,
   ChevronRight,
+  ArrowRight,
   Package,
-  CalendarDays,
   CheckCircle,
 } from 'lucide-react-native';
 import qcCheckerService from '../../services/qcCheckerService';
@@ -29,7 +33,12 @@ import { useDebounce } from '../../hooks/useDebounce';
 import { router, useLocalSearchParams } from 'expo-router';
 import DateRangeCalendar, { fmtDate } from '../../components/General/DateRangeCalendar';
 import { AppText, Button } from '@/components/UI';
-import { brand, colors } from '@/constants/design';
+import { brand, colors, elevation } from '@/constants/design';
+
+// Enable LayoutAnimation on Android so the filter section collapses smoothly.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const PAGE_SIZE = 12;
 const DEFAULT_SORT = 'createdAt:desc';
@@ -55,7 +64,7 @@ const SORT_OPTIONS = [
 const APPROVAL_STYLE: Record<string, { bg: string; text: string }> = {
   PENDING: { bg: 'bg-amber-100', text: 'text-amber-800' },
   REINSPECTION: { bg: 'bg-purple-100', text: 'text-purple-800' },
-  QC_APPROVED: { bg: 'bg-blue-100', text: 'text-blue-800' },
+  QC_APPROVED: { bg: 'bg-brand-100', text: 'text-brand-700' },
   APPROVED: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
   REJECTED: { bg: 'bg-red-100', text: 'text-red-800' },
 };
@@ -66,18 +75,10 @@ const STATUS_LABELS: Record<string, string> = {
   QC_APPROVED: 'Approved by QC',
   APPROVED: 'Approved by Admin',
   REJECTED: 'Rejected',
-  UNDER_REVIEW: 'Under Review',
 };
 
-const formatStatus = (status: string) =>
-  STATUS_LABELS[status] || status.replace(/_/g, ' ');
-
-const formatDate = (raw?: string) => {
-  if (!raw) return null;
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-};
+// Fall back to the raw enum key (mirrors web: no vendor-only UNDER_REVIEW label).
+const formatStatus = (status: string) => STATUS_LABELS[status] || status;
 
 interface Product {
   id: string;
@@ -201,22 +202,19 @@ export default function ProductsTab() {
   const hasActiveFilters = Boolean(
     debouncedSearch || status || dateFrom || dateTo || sort !== DEFAULT_SORT || page !== 1,
   );
-  // When a client-side date filter is active, counts reflect the filtered set.
-  const displayTotal = dateFrom ? filteredProducts.length : pagination.total;
-  const rangeStart = displayTotal === 0
-    ? 0
-    : dateFrom
-      ? 1
-      : (pagination.page - 1) * pagination.limit + 1;
-  const rangeEnd = dateFrom
-    ? filteredProducts.length
-    : Math.min(pagination.page * pagination.limit, pagination.total);
   const clearFilters = () => {
     setSearchInput(''); setStatus(''); setSort(DEFAULT_SORT); setDateFrom(''); setDateTo(''); setPage(1);
   };
 
   const statusLabel = STATUS_OPTIONS.find((o) => o.value === status)?.label || 'All statuses';
   const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label || 'Newest first';
+
+  // Collapsible filter section — toggled by the arrow button next to the title.
+  const [showFilters, setShowFilters] = useState(true);
+  const toggleFilters = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowFilters((v) => !v);
+  };
 
   const handleView = (p: Product) => {
     router.push({ pathname: '/products/[id]' as any, params: { id: p.id, name: p.name } });
@@ -231,11 +229,26 @@ export default function ProductsTab() {
 
   return (
     <View className="flex-1 bg-gray-50">
-      {/* Sticky header — page title + search + filters stay pinned; list scrolls under */}
-      <View className="px-4 pt-4 pb-3 bg-gray-50 border-b border-slate-200">
-        <Text className="text-2xl font-extrabold text-slate-900 mb-1">Assigned Products</Text>
-        <Text className="text-slate-600 text-sm mb-3">Review and approve or reject vendor products</Text>
+      {/* Sticky title + filter toggle arrow */}
+      <View className="px-4 pt-4 pb-2 bg-gray-50 flex-row items-start justify-between">
+        <View className="flex-1">
+          <Text className="text-2xl font-extrabold text-slate-900 mb-1">Assigned Products</Text>
+          <Text className="text-slate-600 text-sm">Review and approve or reject vendor products</Text>
+        </View>
+        <TouchableOpacity
+          onPress={toggleFilters}
+          accessibilityRole="button"
+          accessibilityLabel={showFilters ? 'Hide filters' : 'Show filters'}
+          className="w-9 h-9 rounded-full bg-white border border-slate-200 items-center justify-center mt-1"
+          style={elevation.card}
+        >
+          {showFilters ? <ChevronUp size={18} color="#475569" /> : <ChevronDown size={18} color="#475569" />}
+        </TouchableOpacity>
+      </View>
 
+      {/* Collapsible search + filters */}
+      {showFilters ? (
+        <View className="px-4 pt-1 pb-3 bg-gray-50 border-b border-slate-200">
         {/* Search */}
         <View className="mb-3 flex-row items-center bg-white border border-slate-200 rounded-xl px-4 py-3">
           <Search size={18} color="#94a3b8" />
@@ -281,22 +294,16 @@ export default function ProductsTab() {
           />
         </View>
 
-        {/* Summary + Clear */}
-        <View className="flex-row items-center justify-between">
-          <Text className="text-xs text-slate-600">
-            {loading && products.length === 0
-              ? ''
-              : displayTotal === 0
-                ? '0 products'
-                : `Showing ${rangeStart}–${rangeEnd} of ${displayTotal}`}
-          </Text>
-          {hasActiveFilters ? (
+        {/* Clear filters (product-count summary intentionally omitted, mirroring web) */}
+        {hasActiveFilters ? (
+          <View className="flex-row items-center justify-end">
             <TouchableOpacity onPress={clearFilters}>
               <Text className="text-xs font-semibold text-brand-600 underline">Clear filters</Text>
             </TouchableOpacity>
-          ) : null}
+          </View>
+        ) : null}
         </View>
-      </View>
+      ) : null}
 
       <ScrollView
         className="flex-1"
@@ -347,7 +354,6 @@ export default function ProductsTab() {
               const badge = APPROVAL_STYLE[p.approvalStatus] || { bg: 'bg-slate-100', text: 'text-slate-800' };
               const canInspect = p.approvalStatus === 'PENDING' || p.approvalStatus === 'REINSPECTION';
               const primaryImage = p.images?.find((img) => img.isPrimary) || p.images?.[0];
-              const created = formatDate(p.createdAt);
               return (
                 <View
                   key={p.id}
@@ -389,22 +395,26 @@ export default function ProductsTab() {
                       {p.vendor.ownerName ? ` · ${p.vendor.ownerName}` : ''}
                     </Text>
                     <Text className="text-xs text-slate-500">{p.category}</Text>
-                    {created ? (
-                      <View className="flex-row items-center" style={{ gap: 4 }}>
-                        <CalendarDays size={12} color="#94a3b8" />
-                        <Text className="text-[11px] text-slate-400">{created}</Text>
-                      </View>
-                    ) : null}
                   </View>
 
                   <View className="flex-row" style={{ columnGap: 8 }}>
-                    <View style={{ flex: 1 }}>
-                      <Button label="View" onPress={() => handleView(p)} icon={Eye} variant="secondary" fullWidth />
-                    </View>
+                    <TouchableOpacity
+                      onPress={() => handleView(p)}
+                      activeOpacity={0.8}
+                      accessibilityLabel="View Details"
+                      className="w-12 items-center justify-center bg-slate-100 rounded-lg py-2.5"
+                    >
+                      <Eye size={16} color="#475569" />
+                    </TouchableOpacity>
                     {canInspect ? (
-                      <View style={{ flex: 1 }}>
-                        <Button label="Inspect" onPress={() => handleStartInspection(p)} icon={FileText} variant="primary" fullWidth />
-                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleStartInspection(p)}
+                        activeOpacity={0.85}
+                        className="flex-1 flex-row items-center justify-center bg-brand-500 rounded-lg py-2.5"
+                      >
+                        <ArrowRight size={14} color="#ffffff" />
+                        <Text className="ml-1.5 text-sm font-bold text-white">Start Inspect</Text>
+                      </TouchableOpacity>
                     ) : null}
                   </View>
                 </View>

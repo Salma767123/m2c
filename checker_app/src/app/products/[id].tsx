@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -17,9 +17,6 @@ import {
   ArrowLeft,
   Package,
   Factory,
-  Mail,
-  Phone,
-  MapPin,
   Layers,
   FileText,
   Clock,
@@ -27,32 +24,68 @@ import {
   XCircle,
   UserCheck,
   RefreshCw,
+  RotateCw,
   AlertCircle,
-  ShieldCheck,
+  Ruler,
+  Truck,
   X,
   ClipboardList,
   Image as ImageIcon,
 } from 'lucide-react-native';
-import qcCheckerService, { AuditLogEntry } from '../../services/qcCheckerService';
-import AuditTimeline from '../../components/General/AuditTimeline';
+import qcCheckerService from '../../services/qcCheckerService';
 import { SectionCard, Button } from '@/components/UI';
 import { brand, elevation } from '@/constants/design';
 
 type Tab = 'overview' | 'images' | 'activity';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
-  { id: 'images', label: 'Images' },
+  { id: 'images', label: 'Images & Variants' },
   { id: 'activity', label: 'QC Activity' },
 ];
 
 const APPROVAL_STYLE: Record<string, { bg: string; text: string }> = {
   PENDING: { bg: '#fef3c7', text: '#92400e' },
   REINSPECTION: { bg: '#ffedd5', text: '#9a3412' },
-  UNDER_ADMIN_REVIEW: { bg: '#fef3c7', text: '#92400e' },
   QC_APPROVED: { bg: '#d1fae5', text: '#065f46' },
   APPROVED: { bg: '#d1fae5', text: '#065f46' },
   REJECTED: { bg: '#fee2e2', text: '#991b1b' },
 };
+
+// Friendly labels mirroring the web checker portal (raw enum → readable text).
+const APPROVAL_LABELS: Record<string, string> = {
+  PENDING: 'Pending',
+  REINSPECTION: 'Reinspection',
+  QC_APPROVED: 'Approved by QC',
+  APPROVED: 'Approved by Admin',
+  REJECTED: 'Rejected',
+};
+
+// Mirror the product form's UOM dropdown labels so the checker sees the full
+// term ("Pieces (pcs)") instead of the stored short code ("pcs").
+const UOM_LABELS: Record<string, string> = {
+  pcs: 'Pieces (pcs)', meters: 'Meters', kg: 'Kilograms (kg)', yards: 'Yards',
+  sets: 'Sets', rolls: 'Rolls', pairs: 'Pairs', dozen: 'Dozen',
+};
+const uomLabel = (uom?: string | null) => (uom ? UOM_LABELS[uom] || uom : '—');
+
+// Resolve a colour name (e.g. "red") to its hex when no hex is stored, so we
+// can always show a swatch + the code next to the name.
+const COLOR_NAME_HEX: Record<string, string> = {
+  black: '#000000', white: '#ffffff', gray: '#808080', grey: '#808080',
+  silver: '#c0c0c0', red: '#ff0000', green: '#008000', lime: '#00ff00',
+  blue: '#0000ff', navy: '#000080', yellow: '#ffff00', magenta: '#ff00ff',
+  cyan: '#00ffff', maroon: '#800000', olive: '#808000', purple: '#800080',
+  teal: '#008080', orange: '#ffa500', pink: '#ffc0cb', brown: '#a52a2a',
+  beige: '#f5f5dc',
+};
+const resolveHex = (name?: string | null, hex?: string | null): string | undefined => {
+  if (hex && /^#[0-9a-fA-F]{3,8}$/.test(hex.trim())) return hex.trim();
+  const n = (name || '').trim().toLowerCase();
+  return COLOR_NAME_HEX[n];
+};
+
+const SUPPORTED_WEIGHT_UNITS = ['kg', 'g', 'lb', 'oz'];
+const hasVal = (x: unknown) => x !== null && x !== undefined && x !== '';
 
 const fmt = (iso?: string | null) => {
   if (!iso) return '—';
@@ -61,11 +94,6 @@ const fmt = (iso?: string | null) => {
   } catch {
     return '—';
   }
-};
-
-const fmtPrice = (v?: number | null) => {
-  if (v === null || v === undefined) return '—';
-  return `₹${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const humanize = (key: string) =>
@@ -92,7 +120,6 @@ export default function ProductDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lightboxUri, setLightboxUri] = useState<string | null>(null);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -110,17 +137,11 @@ export default function ProductDetailScreen() {
     }
   }, [id, product]);
 
-  // Refetch product + audit trail on focus, so a returning user sees the
-  // latest approvalStatus and audit-log entries from their last action.
+  // Refetch product on focus, so a returning user sees the latest
+  // approvalStatus from their last action.
   useFocusEffect(
     useCallback(() => {
       load();
-      if (id) {
-        qcCheckerService
-          .getAuditTrail('PRODUCT_INSPECTION', id)
-          .then((res) => setAuditLogs(res.logs || []))
-          .catch(() => {});
-      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]),
   );
@@ -158,6 +179,9 @@ export default function ProductDetailScreen() {
   const v = product.vendor || {};
   const images: any[] = product.images || [];
   const variants: any[] = product.variants || [];
+  const fs: Record<string, any> | null | undefined = product.fabricSpecifications;
+  const dt = product.dispatchTimeline;
+  const careInstructions: string[] = Array.isArray(fs?.careInstructions) ? fs!.careInstructions : [];
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -165,7 +189,7 @@ export default function ProductDetailScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={brand[500]} colors={[brand[500]]} />
         }
@@ -180,7 +204,7 @@ export default function ProductDetailScreen() {
             <Text className="text-xs text-slate-500 font-mono">SKU: {product.baseSku}</Text>
             <View className="rounded-full px-2.5 py-0.5" style={{ backgroundColor: pill.bg }}>
               <Text className="text-[10px] font-bold" style={{ color: pill.text }}>
-                {product.approvalStatus}
+                {APPROVAL_LABELS[product.approvalStatus] || product.approvalStatus}
               </Text>
             </View>
           </View>
@@ -189,9 +213,9 @@ export default function ProductDetailScreen() {
         {/* Summary card */}
         <View className="mx-4 mt-4 rounded-2xl p-5" style={[{ backgroundColor: brand[500] }, elevation.card]}>
           <View className="flex-row flex-wrap" style={{ rowGap: 14, columnGap: 0 }}>
-            <SummaryStat label="Base Price" value={fmtPrice(product.basePrice)} />
-            <SummaryStat label="Total Stock" value={String(product.totalStock ?? 0)} />
-            <SummaryStat label="Variants" value={String(variants.length)} />
+            <SummaryStat label="Inspection Status" value={APPROVAL_LABELS[product.approvalStatus] || product.approvalStatus} />
+            <SummaryStat label="Inspection Cycle" value={`#${product.inspectionCycleNumber ?? 1}`} />
+            <SummaryStat label="Last Inspected" value={fmt(product.approvedAt)} />
             <SummaryStat label="Listed" value={fmt(product.createdAt)} />
           </View>
         </View>
@@ -221,7 +245,7 @@ export default function ProductDetailScreen() {
                 key={tab.id}
                 onPress={() => setActiveTab(tab.id)}
                 activeOpacity={0.7}
-                className={`mx-1 px-4 py-2 rounded-full ${isActive ? 'bg-slate-900' : 'bg-white border border-slate-200'}`}
+                className={`mx-1 px-4 py-2 rounded-full ${isActive ? 'bg-brand-500' : 'bg-white border border-slate-200'}`}
               >
                 <Text className={`text-sm font-bold ${isActive ? 'text-white' : 'text-slate-600'}`}>{tab.label}</Text>
               </TouchableOpacity>
@@ -240,18 +264,73 @@ export default function ProductDetailScreen() {
 
             <SectionCard icon={Package} title="Product">
               <InfoRow label="Category" value={product.category} />
-              <InfoRow label="Sub-category" value={product.subCategory} />
-              <InfoRow label="Base Price" value={fmtPrice(product.basePrice)} />
               <InfoRow label="Total Stock" value={String(product.totalStock ?? 0)} />
+              {product.singleUnitColor ? (
+                <InfoRow label="Base Color">
+                  <ColorValue name={product.singleUnitColor} hex={product.singleUnitColorHex} />
+                </InfoRow>
+              ) : null}
+              {product.uom ? <InfoRow label="Selling Unit (UOM)" value={uomLabel(product.uom)} /> : null}
+              {Array.isArray(product.tags) && product.tags.length > 0 ? (
+                <InfoRow label="Tags">
+                  <TagChips tags={product.tags} />
+                </InfoRow>
+              ) : null}
             </SectionCard>
 
             <SectionCard icon={Factory} title="Vendor">
               <InfoRow label="Company" value={v.companyName} />
               <InfoRow label="Owner" value={v.ownerName} />
-              <InfoRow label="Email" value={v.businessEmail || v.email} onPress={() => {}} />
-              <InfoRow label="Phone" value={v.businessPhone} />
-              <InfoRow label="Factory" value={[v.factoryCity, v.factoryState].filter(Boolean).join(', ')} />
+              <InfoRow label="Primary Email" value={v.businessEmail || v.email} onPress={() => {}} />
+              {v.businessEmail2 ? <InfoRow label="Secondary Email" value={v.businessEmail2} /> : null}
+              <InfoRow label="Primary Phone" value={v.businessPhone} />
+              {v.phoneNumber2 ? <InfoRow label="Secondary Phone" value={v.phoneNumber2} /> : null}
+              <InfoRow
+                label="Factory Location"
+                value={[v.factoryAddress, v.factoryCity, v.factoryState, v.factoryZipCode, v.factoryCountry].filter(Boolean).join(', ')}
+              />
             </SectionCard>
+
+            {/* Fabric & Specifications */}
+            {(product.fabricType || product.material || fs) ? (
+              <SectionCard icon={Ruler} title="Fabric & Specifications">
+                <InfoRow label="Fabric Type" value={product.fabricType} />
+                <InfoRow label="Material Description" value={product.material} />
+                {hasVal(fs?.composition) ? <InfoRow label="Composition" value={String(fs!.composition)} /> : null}
+                {hasVal(fs?.weightValue) ? <InfoRow label="Weight" value={`${fs!.weightValue} g`} /> : null}
+                {hasVal(fs?.length) ? <InfoRow label="Length" value={`${fs!.length} cm`} /> : null}
+                {hasVal(fs?.breadth) ? <InfoRow label="Breadth" value={`${fs!.breadth} cm`} /> : null}
+                {hasVal(fs?.gsm) ? <InfoRow label="GSM" value={`${fs!.gsm} GSM`} /> : null}
+                {!hasVal(fs?.gsm) && !hasVal(fs?.weightValue) && hasVal(fs?.weight) ? (
+                  <InfoRow label="Weight (GSM)" value={String(fs!.weight)} />
+                ) : null}
+                {hasVal(fs?.weave) ? <InfoRow label="Type of Weave" value={String(fs!.weave)} /> : null}
+                {careInstructions.length > 0 ? (
+                  <InfoRow label="Care Instructions">
+                    <TagChips tags={careInstructions} />
+                  </InfoRow>
+                ) : null}
+              </SectionCard>
+            ) : null}
+
+            {/* Dispatch & Shipping */}
+            {(dt || product.weight) ? (
+              <SectionCard icon={Truck} title="Dispatch & Shipping">
+                {product.weight ? (
+                  <InfoRow
+                    label="Shipping Weight"
+                    value={SUPPORTED_WEIGHT_UNITS.includes(product.weightUnit ?? '') ? `${product.weight} ${product.weightUnit}` : String(product.weight)}
+                  />
+                ) : null}
+                {dt ? (
+                  <>
+                    <InfoRow label="Processing Days" value={`${dt.processingDays} day${dt.processingDays !== 1 ? 's' : ''}`} />
+                    <InfoRow label="Shipping Days" value={`${dt.shippingDays} day${dt.shippingDays !== 1 ? 's' : ''}`} />
+                    <InfoRow label="Total Days" value={`${dt.totalDays} day${dt.totalDays !== 1 ? 's' : ''}`} />
+                  </>
+                ) : null}
+              </SectionCard>
+            ) : null}
 
             {product.description ? (
               <SectionCard icon={FileText} title="Description">
@@ -329,36 +408,14 @@ export default function ProductDetailScreen() {
 
                           {/* Details */}
                           <View className="flex-1 justify-center">
-                            {/* Size + Color row */}
-                            <View className="flex-row items-center mb-1.5" style={{ columnGap: 8 }}>
-                              {vr.size ? (
-                                <View className="bg-white border border-slate-200 rounded-lg px-2 py-0.5">
-                                  <Text className="text-xs font-bold text-slate-900">{vr.size}</Text>
-                                </View>
-                              ) : null}
-                              {vr.color ? (
-                                <View className="flex-row items-center bg-white border border-slate-200 rounded-lg px-2 py-0.5" style={{ columnGap: 4 }}>
-                                  {vr.colorHex ? (
-                                    <View
-                                      className="w-3 h-3 rounded-full border border-slate-300"
-                                      style={{ backgroundColor: vr.colorHex }}
-                                    />
-                                  ) : null}
-                                  <Text className="text-xs font-bold text-slate-900">{vr.color}</Text>
-                                </View>
-                              ) : null}
-                            </View>
-
-                            {/* SKU */}
-                            <Text className="text-[11px] font-mono text-slate-500 mb-1">
-                              {vr.sku}
+                            {/* Variant name */}
+                            <Text className="text-sm font-bold text-slate-900 mb-1.5">
+                              {vr.variantName?.trim() || '—'}
                             </Text>
 
-                            {/* Price + Stock */}
+                            {/* Color + Stock */}
                             <View className="flex-row items-center" style={{ columnGap: 10 }}>
-                              <Text className="text-sm font-extrabold text-slate-900">
-                                {fmtPrice(vr.price)}
-                              </Text>
+                              {vr.color ? <ColorValue name={vr.color} hex={vr.colorHex} /> : null}
                               <View className="bg-brand-50 rounded-md px-1.5 py-0.5">
                                 <Text className="text-[10px] font-bold text-brand-700">
                                   Stock: {vr.stock}
@@ -381,7 +438,11 @@ export default function ProductDetailScreen() {
           <View className="mx-4" style={{ rowGap: 14 }}>
             {(() => {
               const status = product.approvalStatus;
-              const hasAction = Boolean(product.approvedAt || product.rejectionReason || product.qcInspectionData);
+              const isReinspection = status === 'REINSPECTION';
+              const hasAction = Boolean(
+                product.approvedAt || product.rejectionReason || product.qcInspectionData ||
+                isReinspection || (product.inspectionCycleNumber && product.inspectionCycleNumber > 1),
+              );
               const isRejected = status === 'REJECTED';
               const isApproved = status === 'QC_APPROVED' || status === 'APPROVED';
               const qcSummary = summariseQcData(product.qcInspectionData);
@@ -410,7 +471,7 @@ export default function ProductDetailScreen() {
                         Status: {status}
                       </Text>
                       {product.approvedAt ? (
-                        <Text className="text-xs text-slate-600 mt-1">Decided on {fmt(product.approvedAt)}</Text>
+                        <Text className="text-xs text-slate-600 mt-1">Decision recorded on {fmt(product.approvedAt)}</Text>
                       ) : null}
                       {isRejected && product.rejectionReason ? (
                         <Text className="text-sm text-red-700 mt-2">
@@ -419,6 +480,23 @@ export default function ProductDetailScreen() {
                       ) : null}
                     </View>
                   </View>
+
+                  {/* Re-inspection info */}
+                  {isReinspection && product.inspectionCycleNumber > 1 ? (
+                    <View className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                      <Text className="text-sm font-bold text-amber-800">
+                        Re-Inspection Cycle #{product.inspectionCycleNumber}
+                      </Text>
+                      <Text className="text-xs text-amber-700 mt-1">
+                        Previous inspection was rejected. Please re-evaluate this product thoroughly.
+                      </Text>
+                      {Array.isArray(product.previousInspectionData) && product.previousInspectionData.length > 0 ? (
+                        <Text className="text-xs text-amber-600 mt-1">
+                          Previous reason: {product.previousInspectionData[product.previousInspectionData.length - 1]?.rejectionReason || 'N/A'}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
 
                   {qc ? (
                     <SectionCard icon={UserCheck} title="Assigned QC Checker">
@@ -438,27 +516,7 @@ export default function ProductDetailScreen() {
                   <SectionCard icon={Clock} title="Timeline">
                     <InfoRow label="Listed on" value={fmt(product.createdAt)} />
                     <InfoRow label="Last updated" value={fmt(product.updatedAt)} />
-                    {product.inspectionCycleNumber > 1 && (
-                      <InfoRow label="Inspection Cycle" value={`#${product.inspectionCycleNumber}`} />
-                    )}
                   </SectionCard>
-
-                  {/* Audit Trail */}
-                  {auditLogs.length > 0 && (
-                    <SectionCard
-                      icon={ShieldCheck}
-                      title="Audit Trail"
-                      right={
-                        <View className="rounded-full px-2.5 py-1 bg-white">
-                          <Text className="text-[10px] font-bold text-brand-600">
-                            {auditLogs.length} {auditLogs.length === 1 ? 'entry' : 'entries'}
-                          </Text>
-                        </View>
-                      }
-                    >
-                      <AuditTimeline logs={auditLogs} />
-                    </SectionCard>
-                  )}
                 </>
               );
             })()}
@@ -509,12 +567,14 @@ function Header({ onBack, insetsTop }: {
   );
 }
 
-function InfoRow({ label, value, onPress }: { label: string; value?: string | null; onPress?: () => void }) {
-  if (!value) return null;
+function InfoRow({ label, value, onPress, children }: { label: string; value?: string | null; onPress?: () => void; children?: React.ReactNode }) {
+  if (!children && !value) return null;
   const Content = (
     <View className="py-2">
       <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">{label}</Text>
-      <Text className="text-sm text-slate-900" style={{ lineHeight: 20 }} selectable={!onPress}>{value}</Text>
+      {children ? children : (
+        <Text className="text-sm text-slate-900" style={{ lineHeight: 20 }} selectable={!onPress}>{value}</Text>
+      )}
     </View>
   );
 
@@ -529,6 +589,30 @@ function SummaryStat({ label, value }: { label: string; value: string }) {
     <View style={{ width: '50%', marginBottom: 4 }}>
       <Text className="text-[10px] uppercase tracking-wider font-bold mb-0.5" style={{ color: 'rgba(255,255,255,0.75)' }}>{label}</Text>
       <Text className="text-base font-extrabold text-white">{value}</Text>
+    </View>
+  );
+}
+
+// Colour name + resolved swatch + hex code (e.g. ● red #ff0000), mirroring web.
+function ColorValue({ name, hex }: { name?: string | null; hex?: string | null }) {
+  const h = resolveHex(name, hex);
+  return (
+    <View className="flex-row items-center" style={{ columnGap: 6 }}>
+      {h ? <View className="w-3.5 h-3.5 rounded-full border border-slate-300" style={{ backgroundColor: h }} /> : null}
+      <Text className="text-sm text-slate-900">{name}</Text>
+      {h ? <Text className="text-xs font-mono uppercase text-slate-500">{h}</Text> : null}
+    </View>
+  );
+}
+
+function TagChips({ tags }: { tags: string[] }) {
+  return (
+    <View className="flex-row flex-wrap" style={{ columnGap: 6, rowGap: 6 }}>
+      {tags.map((tag) => (
+        <View key={tag} className="bg-slate-100 rounded-full px-2 py-0.5">
+          <Text className="text-xs text-slate-700">{tag}</Text>
+        </View>
+      ))}
     </View>
   );
 }

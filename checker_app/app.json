@@ -4,14 +4,14 @@
     "slug": "m2c_app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/1024.png",
+    "icon": "./assets/images/m2c-logo.png",
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/512.png",
+      "image": "./assets/images/m2c-logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#ffffff"
     },
     "notification": {
       "icon": "./assets/notification-icon.png",
@@ -22,10 +22,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#000000",
-        "foregroundImage": "./assets/images/logo3.png",
-        "backgroundImage": "./assets/images/logo3.png",
-        "monochromeImage": "./assets/images/logo3.png"
+        "backgroundColor": "#ffffff",
+        "foregroundImage": "./assets/images/m2c-logo.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -43,7 +41,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/logo3.png"
+      "favicon": "./assets/images/m2c-logo.png"
     },
     "plugins": [
       "expo-router",

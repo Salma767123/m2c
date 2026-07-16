@@ -36,7 +36,8 @@ export function getExpectedProductVerificationKeys(productData: any): string[] {
 
   if (notEmptyVal(p.name)) keys.push('pv_name');
   if (notEmptyVal(p.category)) keys.push('pv_category');
-  if (notEmptyVal(p.subCategory)) keys.push('pv_subCategory');
+  if (notEmptyVal(p.singleUnitColor)) keys.push('pv_baseColor');
+  if (notEmptyVal(p.uom)) keys.push('pv_uom');
   if (notEmptyVal(p.brand)) keys.push('pv_brand');
   if (notEmptyVal(p.description)) keys.push('pv_description');
 
@@ -56,15 +57,16 @@ export function getExpectedProductVerificationKeys(productData: any): string[] {
       if (notEmptyVal(v.color)) keys.push(`pv_var${vi}_color`);
       if (notEmptyVal(v.size)) keys.push(`pv_var${vi}_size`);
       if (notEmptyVal(v.material)) keys.push(`pv_var${vi}_material`);
-      if (notEmptyVal(v.sku)) keys.push(`pv_var${vi}_sku`);
       if (notEmptyVal(v.variantName)) keys.push(`pv_var${vi}_variantName`);
+      if (Array.isArray(v.images) && v.images[0]) keys.push(`pv_var${vi}_image`);
     });
   }
 
-  if (notEmptyVal(p.dimensions)) keys.push('pv_dimensions');
   if (p.fabricSpecifications && typeof p.fabricSpecifications === 'object') {
     Object.entries(p.fabricSpecifications).forEach(([key, val]) => {
-      if (key === 'basis') return;
+      // Mirror what Step 2 renders: `basis` is internal and `weightUnit` is
+      // hidden (implied by the GSM field) — neither has a control on screen.
+      if (key === 'basis' || key === 'weightUnit') return;
       if (notEmptyVal(val)) keys.push(`pv_spec_${key}`);
     });
   }
@@ -131,8 +133,22 @@ function validatePackagingInspection(d: any): StepErrors {
 }
 
 // ── Step 4: Defects ──────────────────────────────────────────────────────────
-function validateDefects(_d: any): StepErrors {
-  return {};
+// Zero defects is a valid PASS result, and counts exceeding the maximums are a
+// valid FAIL (the checker then rejects) — so neither blocks Next. We do require
+// a real sample size and photo evidence whenever defects were actually recorded,
+// so incomplete AQL data can't slip through silently (F-12).
+function validateDefects(d: any): StepErrors {
+  const e: StepErrors = {};
+  if (!d.sampleSize || Number(d.sampleSize) <= 0) {
+    e.sampleSize = 'Enter the number of units sampled';
+  }
+  const totalDefects =
+    Number(d.criticalDefects || 0) + Number(d.majorDefects || 0) + Number(d.minorDefects || 0);
+  const photos = Array.isArray(d.defectPhotos) ? d.defectPhotos : [];
+  if (totalDefects > 0 && photos.length === 0) {
+    e.defectPhotos = 'Upload at least one defect photo when defects are recorded';
+  }
+  return e;
 }
 
 // ── Step 5: Testing ──────────────────────────────────────────────────────────
@@ -171,6 +187,10 @@ function validateReview(d: any): StepErrors {
   const e: StepErrors = {};
   if (!d.inspectionStatus) {
     e.inspectionStatus = 'Select an inspection status before continuing';
+  }
+  // A rejection must carry a written reason — the reject endpoint requires it (F-08).
+  if (d.inspectionStatus === 'Rejected' && !(d.reviewerRemarks || '').trim()) {
+    e.reviewerRemarks = 'A rejection reason is required';
   }
   return e;
 }

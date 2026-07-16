@@ -106,7 +106,7 @@ export default function LoginScreen() {
               style={[{ borderCurve: 'continuous' }, elevation.raised]}
             >
               <Image
-                source={require('../../../assets/images/logo4.png')}
+                source={require('../../../assets/images/m2c-logo.png')}
                 className="w-48 h-36"
                 resizeMode="contain"
               />

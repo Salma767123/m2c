@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, Pressable, BackHandler } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Modal, Pressable, BackHandler } from 'react-native';
 import { ArrowLeft, ArrowRight, Check, RotateCcw, AlertTriangle } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import qcCheckerService from '@/services/qcCheckerService';
-import SelfieCaptureModal, { SelfieResult } from '@/components/General/SelfieCaptureModal';
 import { formatCheckerName } from '@/components/Vendor/Steps/fieldHelpers';
 
 import {
@@ -96,14 +95,19 @@ export default function ProductInspectionForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onCancel]);
 
-  // ── Selfie gates ─────────────────────────────
-  const [showBeforeSelfie, setShowBeforeSelfie] = useState(true);
-  const [beforeSelfie, setBeforeSelfie] = useState<SelfieResult | null>(null);
-  const [showAfterSelfie, setShowAfterSelfie] = useState(false);
-  const [afterSelfie, setAfterSelfie] = useState<SelfieResult | null>(null);
-
   // ── Form data ─────────────────────────────────────────────────────────────
   const prefilledRef = useRef<string | null>(null);
+  const startedRef = useRef<string | null>(null);
+
+  // Auto-start the inspection on mount (no selfie / GPS gate). Location is not
+  // sent and start errors are ignored — the form opens straight through.
+  useEffect(() => {
+    if (!productId || startedRef.current === productId) return;
+    startedRef.current = productId;
+    qcCheckerService.startProductInspection(productId).catch(() => {
+      /* ignore — start is best-effort, submission is the source of truth */
+    });
+  }, [productId]);
 
   const [formData, setFormData] = useState<any>(() => ({
     // Step 1
@@ -274,7 +278,7 @@ export default function ProductInspectionForm({
     return photos.map((p) => ({ name: p.name || 'image.jpg', data: p.data || p.uri || p.url || null }));
   };
 
-  const handleSubmit = async (afterSelfieOverride?: SelfieResult) => {
+  const handleSubmit = async () => {
     const all = validateAll(formData);
     if (Object.keys(all).length > 0) {
       setErrors(all);
@@ -284,13 +288,6 @@ export default function ProductInspectionForm({
         setCurrentStep(firstInvalid);
       }
       showErrorToast('Cannot submit yet', 'Some required fields are missing. Review the highlighted steps.');
-      return;
-    }
-
-    // Require after-selfie before submit
-    const resolvedAfterSelfie = afterSelfieOverride ?? afterSelfie;
-    if (!resolvedAfterSelfie) {
-      setShowAfterSelfie(true);
       return;
     }
 
@@ -317,40 +314,24 @@ export default function ProductInspectionForm({
         additionalEvidence: Object.fromEntries(
           Object.entries(formData.additionalEvidence || {}).map(([k, v]) => [k, cleanPhotos(v as any[])]),
         ),
-        // ── App-only additive keys (selfie + GPS) ──
-        beforeSelfieTakenAt: beforeSelfie?.takenAt,
-        beforeSelfiePhoto: beforeSelfie ? { name: 'before-selfie.jpg', data: beforeSelfie.dataUri } : undefined,
-        afterSelfieTakenAt: resolvedAfterSelfie.takenAt,
-        afterSelfiePhoto: { name: 'after-selfie.jpg', data: resolvedAfterSelfie.dataUri },
       };
 
-      // Freshest GPS = the after-selfie location (submit-time geofence).
-      const location =
-        resolvedAfterSelfie.latitude != null && resolvedAfterSelfie.longitude != null
-          ? { latitude: resolvedAfterSelfie.latitude, longitude: resolvedAfterSelfie.longitude }
-          : null;
-
-      if (formData.finalDecision === 'Approved') {
-        await qcCheckerService.approveProduct(productId, cleanedData, location);
+      // Route on the checker's ACTUAL decision from the Review step
+      // (inspectionStatus). Only an explicit "Rejected" hits the reject
+      // endpoint; everything else goes through approve, which derives the
+      // final approvalStatus from inspectionStatus on the backend.
+      if (formData.inspectionStatus === 'Rejected') {
+        const reason = (formData.reviewerRemarks || '').trim() || 'Rejected during QC product inspection';
+        await qcCheckerService.rejectProduct(productId, reason, cleanedData);
       } else {
-        await qcCheckerService.rejectProduct(productId, formData.reviewerRemarks, cleanedData, location);
+        await qcCheckerService.approveProduct(productId, cleanedData);
       }
 
       allowLeaveRef.current = true;
       showSuccessToast('Success', 'Product inspection submitted successfully.');
       onComplete();
     } catch (error: any) {
-      const errData = error?.data;
-      const code = errData?.error;
-      if (code === 'Location mismatch' || code === 'Location required' || code === 'Vendor location not set') {
-        Alert.alert(
-          code === 'Location mismatch' ? '📍 Location Mismatch' : '📍 Location Error',
-          errData.message || 'Location verification failed.',
-          [{ text: 'OK' }],
-        );
-      } else {
-        showErrorToast('Submission Failed', error.message || 'Unable to submit inspection.');
-      }
+      showErrorToast('Submission Failed', error.message || 'Unable to submit inspection.');
     } finally {
       setSubmitting(false);
     }
@@ -366,7 +347,7 @@ export default function ProductInspectionForm({
       case 'packagingInspection':
         return <PI_Step3_PackagingInspection formData={formData} setFormData={setFormData} errors={errors.packagingInspection || {}} />;
       case 'defects':
-        return <Defects formData={formData} setFormData={setFormData} />;
+        return <Defects formData={formData} setFormData={setFormData} errors={errors.defects || {}} />;
       case 'testing':
         return <PI_Step5_Testing formData={formData} setFormData={setFormData} errors={errors.testing || {}} />;
       case 'review':
@@ -380,49 +361,6 @@ export default function ProductInspectionForm({
 
   return (
     <View className="flex-1 bg-white">
-      {/* Before-inspection selfie gate */}
-      <SelfieCaptureModal
-        visible={showBeforeSelfie}
-        title="Before Inspection Selfie"
-        description="Take a selfie to verify your presence before starting the product inspection. This is mandatory."
-        onConfirm={async (result) => {
-          const loc =
-            result.latitude != null && result.longitude != null
-              ? { latitude: result.latitude, longitude: result.longitude }
-              : null;
-          try {
-            await qcCheckerService.startProductInspection(productId, loc);
-          } catch (startErr: any) {
-            const errData = startErr?.data;
-            const code = errData?.error;
-            if (code === 'Location mismatch' || code === 'Location required' || code === 'Vendor location not set') {
-              Alert.alert(
-                code === 'Location mismatch' ? '📍 Location Mismatch' : '📍 Location Error',
-                errData.message || 'Location verification failed.',
-                [{ text: 'Go Back', onPress: () => { allowLeaveRef.current = true; onCancel(); } }],
-              );
-              return;
-            }
-            console.warn('startProductInspection failed:', startErr?.message);
-          }
-          setBeforeSelfie(result);
-          setShowBeforeSelfie(false);
-        }}
-        onCancel={() => { allowLeaveRef.current = true; onCancel(); }}
-      />
-
-      {/* After-inspection selfie gate */}
-      <SelfieCaptureModal
-        visible={showAfterSelfie}
-        title="After Inspection Selfie"
-        description="Great work! Take a final selfie to confirm you completed the product inspection on-site."
-        onConfirm={(result) => {
-          setAfterSelfie(result);
-          setShowAfterSelfie(false);
-          handleSubmit(result);
-        }}
-      />
-
       {/* Header */}
       <View className="px-4 pt-2 pb-2 flex-row items-center">
         <TouchableOpacity onPress={() => requestExit(onCancel)} className="mr-3 p-1">
@@ -440,9 +378,9 @@ export default function ProductInspectionForm({
       </View>
 
       {reviewMode && (
-        <View className="mx-4 mb-2 flex-row items-center bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
-          <RotateCcw size={14} color="#1d4ed8" />
-          <Text className="text-xs font-medium text-blue-700 ml-2">
+        <View className="mx-4 mb-2 flex-row items-center bg-brand-50 border border-brand-100 rounded-xl px-3 py-2">
+          <RotateCcw size={14} color="#c41617" />
+          <Text className="text-xs font-medium text-brand-700 ml-2">
             Editing from Review — tap Save & Continue to return.
           </Text>
         </View>
@@ -460,13 +398,13 @@ export default function ProductInspectionForm({
                 <TouchableOpacity
                   key={step.id}
                   className={`flex-row items-center px-3 py-2 rounded-full ${
-                    stepHasErrors ? 'bg-red-50' : isActive ? 'bg-blue-100' : isPast ? 'bg-green-50' : 'bg-gray-100'
+                    stepHasErrors ? 'bg-red-50' : isActive ? 'bg-brand-50' : isPast ? 'bg-green-50' : 'bg-gray-100'
                   }`}
                   onPress={() => goToStep(step.id)}
                 >
                   <View
                     className={`w-5 h-5 rounded-full items-center justify-center mr-1.5 ${
-                      stepHasErrors ? 'bg-red-500' : isActive ? 'bg-blue-600' : isPast ? 'bg-green-500' : 'bg-gray-300'
+                      stepHasErrors ? 'bg-red-500' : isActive ? 'bg-brand-500' : isPast ? 'bg-green-500' : 'bg-gray-300'
                     }`}
                   >
                     {stepHasErrors ? (
@@ -479,7 +417,7 @@ export default function ProductInspectionForm({
                   </View>
                   <Text
                     className={`text-xs font-medium ${
-                      stepHasErrors ? 'text-red-600' : isActive ? 'text-blue-700' : isPast ? 'text-green-700' : 'text-gray-500'
+                      stepHasErrors ? 'text-red-600' : isActive ? 'text-brand-700' : isPast ? 'text-green-700' : 'text-gray-500'
                     }`}
                     numberOfLines={1}
                   >
@@ -533,7 +471,7 @@ export default function ProductInspectionForm({
             )}
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity className="flex-row items-center px-5 py-2.5 bg-blue-600 rounded-xl" onPress={nextStep}>
+          <TouchableOpacity className="flex-row items-center px-5 py-2.5 bg-brand-500 rounded-xl" onPress={nextStep}>
             <Text className="text-white font-semibold text-sm mr-1">{reviewMode ? 'Save & Continue' : 'Next'}</Text>
             <ArrowRight size={16} color="#fff" />
           </TouchableOpacity>
@@ -545,13 +483,13 @@ export default function ProductInspectionForm({
         <Pressable className="flex-1 bg-black/50 items-center justify-center px-6" onPress={cancelExit}>
           <Pressable className="bg-white rounded-2xl overflow-hidden w-full max-w-md" onPress={(e) => e.stopPropagation()}>
             <View className="p-5 flex-row items-start">
-              <View className="w-11 h-11 rounded-full bg-blue-50 items-center justify-center mr-3">
-                <AlertTriangle size={22} color="#2563eb" />
+              <View className="w-11 h-11 rounded-full bg-brand-50 items-center justify-center mr-3">
+                <AlertTriangle size={22} color="#e01a1b" />
               </View>
               <View className="flex-1">
                 <Text className="text-base font-bold text-slate-900">Exit inspection?</Text>
                 <Text className="text-sm text-slate-600 mt-1">
-                  Are you sure you want to exit? Your inspection progress will be lost and won't be saved.
+                  Are you sure you want to exit? Your inspection progress will be lost and won&apos;t be saved.
                 </Text>
               </View>
             </View>
@@ -559,7 +497,7 @@ export default function ProductInspectionForm({
               <TouchableOpacity onPress={cancelExit} className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white items-center">
                 <Text className="text-slate-700 font-semibold text-sm">Keep editing</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={confirmExit} className="flex-1 py-2.5 rounded-xl bg-blue-600 items-center">
+              <TouchableOpacity onPress={confirmExit} className="flex-1 py-2.5 rounded-xl bg-brand-500 items-center">
                 <Text className="text-white font-semibold text-sm">Yes, exit</Text>
               </TouchableOpacity>
             </View>

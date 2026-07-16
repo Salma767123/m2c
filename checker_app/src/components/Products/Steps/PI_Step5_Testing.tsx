@@ -7,6 +7,8 @@ import {
   XCircle,
   Plus,
   Trash2,
+  Images,
+  Camera,
 } from 'lucide-react-native';
 import type { TestGroup, TestItem } from '../PI_data';
 import { ADDITIONAL_EVIDENCE_DEFS } from '../PI_data';
@@ -118,13 +120,13 @@ function OtherTestRow({
 }) {
   const togglePass = () => onChange({ pass: test.pass ? null : true, fail: null });
   const toggleFail = () => onChange({ fail: test.fail ? null : true, pass: null });
-  const borderCls = test.pass ? 'border-emerald-200 bg-emerald-50' : test.fail ? 'border-red-200 bg-red-50' : 'border-blue-200 bg-blue-50';
+  const borderCls = test.pass ? 'border-emerald-200 bg-emerald-50' : test.fail ? 'border-red-200 bg-red-50' : 'border-brand-200 bg-brand-50';
 
   return (
     <View className={`border rounded-xl overflow-hidden mb-3 ${borderCls}`}>
       <View className="px-3 py-3">
         <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-xs font-bold text-blue-600 uppercase">Custom Test</Text>
+          <Text className="text-xs font-bold text-brand-600 uppercase">Custom Test</Text>
           <TouchableOpacity onPress={onRemove} className="p-1">
             <Trash2 size={15} color="#94a3b8" />
           </TouchableOpacity>
@@ -282,10 +284,10 @@ function TestGroupCard({
           ))}
           <TouchableOpacity
             onPress={onAddOther}
-            className="flex-row items-center justify-center px-4 py-2.5 rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/40"
+            className="flex-row items-center justify-center px-4 py-2.5 rounded-xl border-2 border-dashed border-brand-200 bg-brand-50/40"
           >
-            <Plus size={16} color="#2563eb" />
-            <Text className="text-sm font-semibold text-blue-600 ml-1.5">Add Others</Text>
+            <Plus size={16} color="#e01a1b" />
+            <Text className="text-sm font-semibold text-brand-600 ml-1.5">Add Others</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -392,11 +394,15 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
       ))}
 
       {/* Additional Evidence */}
-      <Text className="text-base font-bold text-slate-800 mb-3 mt-2">Additional Evidence</Text>
+      <View className="flex-row items-center mb-3 mt-2" style={{ columnGap: 8 }}>
+        <Images size={16} color="#e01a1b" />
+        <Text className="text-base font-bold text-slate-800">Additional Evidence</Text>
+      </View>
       {ADDITIONAL_EVIDENCE_DEFS.map((def) => (
         <Card
           key={def.id}
           title={def.label}
+          icon={<Camera size={16} color="#e01a1b" />}
           right={<Text className="text-xs text-slate-500">{(evidence[def.id] || []).length} photo{(evidence[def.id] || []).length !== 1 ? 's' : ''}</Text>}
         >
           <PhotoGrid
