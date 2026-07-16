@@ -13,6 +13,10 @@ export interface QCCheckerData {
   alternateEmail?: string | null;
   alternatePhone?: string | null;
   idProof?: string | null;
+  // Lightweight profile fetch (?light=1) returns these instead of the heavy
+  // base64 idProof blob; the blob is fetched on demand via getCheckerIdProof().
+  hasIdProof?: boolean;
+  idProofType?: 'pdf' | 'image' | null;
   phone: string;
   address?: string;
   city?: string;
@@ -162,10 +166,23 @@ class QCCheckerService {
   // Get current checker profile
   async getCheckerProfile(): Promise<{ success: boolean; data: QCCheckerData }> {
     try {
-      const response = await axios.get('/qc-checkers/me');
+      // ?light=1 strips the heavy base64 idProof/profilePhoto blobs so the
+      // profile screen loads fast on slow mobile connections. The ID proof is
+      // fetched on demand (getCheckerIdProof) only when the user taps "View".
+      const response = await axios.get('/qc-checkers/me', { params: { light: 1 } });
       return response.data;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to fetch profile');
+    }
+  }
+
+  // Fetch the current checker's ID proof (base64 data-URI or URL) on demand.
+  async getCheckerIdProof(): Promise<{ success: boolean; data: { idProof: string | null } }> {
+    try {
+      const response = await axios.get('/qc-checkers/me/id-proof');
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to fetch ID proof');
     }
   }
 

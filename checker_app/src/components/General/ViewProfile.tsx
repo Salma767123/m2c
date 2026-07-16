@@ -116,6 +116,9 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
   const [profile, setProfile] = useState<QCCheckerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [idProofLightbox, setIdProofLightbox] = useState(false);
+  // ID proof blob is fetched on demand (kept out of the initial profile load).
+  const [idProofData, setIdProofData] = useState<string | null>(null);
+  const [idProofLoading, setIdProofLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -137,17 +140,32 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
     };
   }, []);
 
+  // Lazily fetch the ID proof blob (base64/URL) — it's excluded from the initial
+  // profile load to keep that fast on slow connections. Cached after first fetch.
+  const ensureIdProof = async (): Promise<string | null> => {
+    if (idProofData) return idProofData;
+    const res = await qcCheckerService.getCheckerIdProof();
+    const val = res?.data?.idProof || null;
+    setIdProofData(val);
+    return val;
+  };
+
   // Open the ID proof: images go to an in-app lightbox, PDFs open in the
   // system browser (mirrors web's viewer behaviour).
   const openIdProof = async () => {
-    const idProof = profile?.idProof;
-    if (!idProof) return;
-    // Images (remote URL or base64 data URI) → in-app lightbox (Image handles both).
-    if (!isPdfIdProof(idProof)) {
-      setIdProofLightbox(true);
-      return;
-    }
+    if (!profile?.hasIdProof || idProofLoading) return;
+    setIdProofLoading(true);
     try {
+      const idProof = await ensureIdProof();
+      if (!idProof) {
+        Alert.alert('Unable to open', 'ID proof is not available.');
+        return;
+      }
+      // Images (remote URL or base64 data URI) → in-app lightbox.
+      if (!isPdfIdProof(idProof)) {
+        setIdProofLightbox(true);
+        return;
+      }
       if (idProof.startsWith('data:')) {
         // base64 data-URI PDF — WebBrowser can't open data: URIs, so write it
         // to a cache file and hand it to the OS share/open sheet.
@@ -167,6 +185,8 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
       }
     } catch (err: any) {
       Alert.alert('Unable to open', err?.message || 'Could not open the ID proof.');
+    } finally {
+      setIdProofLoading(false);
     }
   };
 
@@ -295,9 +315,10 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
                 >
                   ID Proof
                 </AppText>
-                {profile?.idProof ? (
+                {profile?.hasIdProof ? (
                   <TouchableOpacity
                     onPress={openIdProof}
+                    disabled={idProofLoading}
                     accessibilityRole="button"
                     activeOpacity={0.7}
                     className="self-start flex-row items-center rounded-xl border border-brand-200 bg-brand-50 px-4 py-3"
@@ -305,9 +326,13 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
                   >
                     <FileText size={16} color={brand[600]} strokeWidth={2.25} />
                     <AppText variant="titleMd" color={brand[600]}>
-                      {`View ID Proof${isPdfIdProof(profile.idProof) ? ' (PDF)' : ''}`}
+                      {`View ID Proof${profile.idProofType === 'pdf' ? ' (PDF)' : ''}`}
                     </AppText>
-                    <ExternalLink size={14} color={brand[600]} strokeWidth={2.25} />
+                    {idProofLoading ? (
+                      <ActivityIndicator size="small" color={brand[600]} />
+                    ) : (
+                      <ExternalLink size={14} color={brand[600]} strokeWidth={2.25} />
+                    )}
                   </TouchableOpacity>
                 ) : (
                   <View className="self-start rounded-xl border border-dashed border-slate-200 px-4 py-3">
@@ -345,9 +370,9 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
               </TouchableOpacity>
             </View>
             <View className="flex-1 items-center justify-center px-4 pb-8">
-              {profile?.idProof ? (
+              {idProofData ? (
                 <Image
-                  source={{ uri: proxiedDocUrl(profile.idProof) }}
+                  source={{ uri: proxiedDocUrl(idProofData) }}
                   style={{ width: '100%', height: '100%' }}
                   resizeMode="contain"
                 />

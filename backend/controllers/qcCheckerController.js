@@ -633,6 +633,22 @@ const getCheckerProfile = async (req, res) => {
             });
         }
 
+        // Lightweight mode (?light=1): strip the heavy base64 blobs (idProof PDF,
+        // profilePhoto) from the payload so the profile screen loads fast on slow
+        // mobile connections. We still surface whether an ID proof exists and its
+        // type so the UI can render the "View ID Proof" button; the actual blob is
+        // fetched on demand via GET /qc-checkers/me/id-proof.
+        const light = req.query.light === '1' || req.query.light === 'true';
+        if (light) {
+            const ip = checker.idProof;
+            checker.hasIdProof = !!ip;
+            checker.idProofType = ip
+                ? ((ip.startsWith('data:application/pdf') || ip.toLowerCase().endsWith('.pdf')) ? 'pdf' : 'image')
+                : null;
+            delete checker.idProof;
+            delete checker.profilePhoto;
+        }
+
         res.json({
             success: true,
             data: checker,
@@ -642,6 +658,38 @@ const getCheckerProfile = async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to get profile',
+        });
+    }
+};
+
+// Fetch the current checker's ID proof (base64 data-URI or URL) on demand. Kept
+// out of the main profile payload so the profile screen stays lightweight; only
+// fetched when the user taps "View ID Proof".
+const getCheckerIdProof = async (req, res) => {
+    try {
+        const checkerId = req.user?.checkerId || req.userId;
+
+        const checker = await prisma.qCChecker.findUnique({
+            where: { id: checkerId },
+            select: { idProof: true },
+        });
+
+        if (!checker) {
+            return res.status(404).json({
+                success: false,
+                error: 'Checker profile not found',
+            });
+        }
+
+        res.json({
+            success: true,
+            data: { idProof: checker.idProof || null },
+        });
+    } catch (error) {
+        console.error('Get checker ID proof error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get ID proof',
         });
     }
 };
@@ -2000,6 +2048,7 @@ module.exports = {
     resendCredentials,
     qcCheckerLogin,
     getCheckerProfile,
+    getCheckerIdProof,
     getAssignedVendors,
     getVendorDetails,
     getActiveInspectionForVendor,

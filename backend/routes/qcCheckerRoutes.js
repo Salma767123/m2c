@@ -8,6 +8,7 @@ const {
     resendCredentials,
     qcCheckerLogin,
     getCheckerProfile,
+    getCheckerIdProof,
     getAssignedVendors,
     getVendorDetails,
     getActiveInspectionForVendor,
@@ -38,6 +39,7 @@ router.post('/login', loginLimiter, qcCheckerLogin);
 // QC CHECKER SELF ROUTES (Authenticated QC Checker)
 // ============================================
 router.get('/me', authenticateToken, getCheckerProfile);
+router.get('/me/id-proof', authenticateToken, getCheckerIdProof);
 router.put('/me', authenticateToken, updateCheckerProfile);
 router.get('/vendors', authenticateToken, getAssignedVendors);
 router.get('/vendors/:vendorId/details', authenticateToken, getVendorDetails);
