@@ -4,7 +4,7 @@ import {
   ArrowLeft, FileText, CheckCircle2, XCircle, AlertCircle, AlertTriangle,
   Building2, ShieldCheck, Factory, Settings, ClipboardList, Package,
   Download, ExternalLink, Camera, Clock, MapPin, Tags, Briefcase, User,
-  Warehouse, Phone, Award, Eye,
+  Warehouse, Phone, Award, Eye, Landmark,
 } from 'lucide-react-native';
 import qcCheckerService from '../../services/qcCheckerService';
 import { downloadFactoryReportPdf } from '@/lib/reportPdf';
@@ -41,6 +41,28 @@ function stepForKey(key: string): string {
   if (key.startsWith('w_')) return 'Step 2 – Warehouse & Factory';
   if (key.startsWith('o_')) return 'Step 3 – Owner Profile';
   return 'Other';
+}
+
+// Turns a verification field key (e.g. "mf_spinning_spinningMachines") into a
+// readable label. Mirrors the web resolver (lib/inspectionFieldLabel.ts) so the
+// mobile "Issues Found" field names match the web report / PDF exactly.
+function fieldLabelForKey(key: string): string {
+  const rest = key.replace(/^(certDoc_|cert_|vt_|mf_|ct_|c_|w_|o_)/, '');
+  const spaced = rest.replace(/_/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+  const WORD: Record<string, string> = {
+    wh: 'Warehouse', legal: 'Legal', prod: 'Product', img: 'Image',
+    cat: 'Category', photo: 'Photo', spec: 'Spec', var: 'Variant',
+    std: 'Standard', dims: 'Dimensions', sku: 'SKU', uom: 'UOM',
+    gst: 'GST', id: 'ID', qc: 'QC',
+  };
+  const words = spaced.split(/\s+/).filter(Boolean).map((w) => {
+    const lower = w.toLowerCase();
+    if (WORD[lower]) return WORD[lower];
+    if (/^\d+$/.test(w)) return String(Number(w) + 1);
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  });
+  const deduped = words.filter((w, i) => i === 0 || w.toLowerCase() !== words[i - 1].toLowerCase());
+  return deduped.join(' ') || key;
 }
 
 function buildName(...parts: (string | undefined | null)[]): string {
@@ -252,7 +274,7 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
         <Text className="mt-4 text-gray-600 text-sm text-center">{error || 'Inspection not found'}</Text>
         {onBack ? (
           <TouchableOpacity onPress={onBack} className="mt-4">
-            <Text className="text-blue-600 text-sm font-medium underline">Go back</Text>
+            <Text className="text-brand-600 text-sm font-medium underline">Go back</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -277,6 +299,19 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
     }
   };
   const resultStyle = inspection.result ? getResultStyle(inspection.result) : { bg: 'bg-gray-100', text: 'text-gray-800' };
+
+  // Workflow status badge (mirrors web: COMPLETED / IN_PROGRESS / SCHEDULED),
+  // shown alongside the PASSED/FAILED result badge. Brand-red for in-progress
+  // (no blue accents per the mobile UI spec).
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case 'COMPLETED': return { bg: 'bg-green-100', text: 'text-green-800' };
+      case 'IN_PROGRESS': return { bg: 'bg-red-50', text: 'text-red-700' };
+      case 'SCHEDULED': return { bg: 'bg-amber-100', text: 'text-amber-800' };
+      default: return { bg: 'bg-gray-100', text: 'text-gray-800' };
+    }
+  };
+  const statusStyle = inspection.status ? getStatusStyle(inspection.status) : null;
 
   const handleDownloadPdf = async () => {
     setDownloading(true);
@@ -311,7 +346,7 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
 
   return (
     <>
-      <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: 16, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View className="flex-row items-center mb-4">
           {onBack ? (
@@ -320,18 +355,25 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
             </TouchableOpacity>
           ) : null}
           <View className="flex-1">
-            <Text className="text-2xl font-extrabold text-gray-900 mb-1">Inspection Report</Text>
+            <Text className="text-2xl font-extrabold text-gray-900 mb-1">Factory Inspection Report</Text>
             <Text className="text-gray-500 text-xs font-mono">
               {vendor.companyName || fd.vendorName || 'Unknown'} {'•'} REF: {reportId.slice(-8).toUpperCase()}
             </Text>
           </View>
-          {inspection.result ? (
-            <View className={`px-3 py-1.5 rounded-full ${resultStyle.bg} flex-row items-center`}>
-              {inspection.result === 'PASSED' ? <CheckCircle2 size={12} color="#059669" /> : null}
-              {inspection.result === 'FAILED' ? <XCircle size={12} color="#dc2626" /> : null}
-              <Text className={`text-[10px] font-bold ml-1 ${resultStyle.text}`}>{inspection.result}</Text>
-            </View>
-          ) : null}
+          <View className="flex-row items-center" style={{ columnGap: 6 }}>
+            {statusStyle ? (
+              <View className={`px-3 py-1.5 rounded-full ${statusStyle.bg}`}>
+                <Text className={`text-[10px] font-bold ${statusStyle.text}`}>{inspection.status}</Text>
+              </View>
+            ) : null}
+            {inspection.result ? (
+              <View className={`px-3 py-1.5 rounded-full ${resultStyle.bg} flex-row items-center`}>
+                {inspection.result === 'PASSED' ? <CheckCircle2 size={12} color="#059669" /> : null}
+                {inspection.result === 'FAILED' ? <XCircle size={12} color="#dc2626" /> : null}
+                <Text className={`text-[10px] font-bold ml-1 ${resultStyle.text}`}>{inspection.result}</Text>
+              </View>
+            ) : null}
+          </View>
         </View>
 
         {/* Preview + Download */}
@@ -368,9 +410,9 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
         {/* ── NEW FORMAT (8-step vendor verification form) ── */}
         {isNewFormat ? (
           <>
-            {/* 1 — Company Information */}
-            <Section title="1 — Company Information" icon={Briefcase}
-              accent={{ bg: 'bg-blue-50', iconColor: '#1e40af', text: 'text-blue-900' }}
+            {/* Company Information */}
+            <Section title="Company Information" icon={Briefcase}
+              accent={{ bg: 'bg-brand-50', iconColor: '#c41617', text: 'text-brand-700' }}
               badge={<StepBadge prefixes={['c_']} vf={vf} />}>
               <CardGrid>
                 <VCard label="Company Name" value={vendor.companyName} k="c_companyName" vf={vf} />
@@ -386,52 +428,8 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
               </CardGrid>
             </Section>
 
-            {/* 2 — Warehouse & Factory Details */}
-            <Section title="2 — Warehouse & Factory Details" icon={Warehouse}
-              accent={{ bg: 'bg-teal-50', iconColor: '#0f766e', text: 'text-teal-900' }}
-              badge={<StepBadge prefixes={['w_']} vf={vf} />}>
-              <SubHead title="Warehouse Address" />
-              <CardGrid>
-                <VCard label="Ownership Type" value={OWN_TYPE[vendor.ownershipType] || vendor.ownershipType} k="w_ownershipType" vf={vf} />
-                <VCard label="Warehousing Capacity" value={vendor.warehouseSize} k="w_warehouseSize" vf={vf} />
-                {vendor.warehouseAddress ? <VCard label="Address Line 1" value={vendor.warehouseAddress} k="w_warehouseAddress" vf={vf} /> : null}
-                {vendor.warehouseAddressLine2 ? <VCard label="Address Line 2" value={vendor.warehouseAddressLine2} k="w_warehouseAddressLine2" vf={vf} /> : null}
-                {vendor.warehouseLandmark ? <VCard label="Landmark" value={vendor.warehouseLandmark} k="w_warehouseLandmark" vf={vf} /> : null}
-                {vendor.warehouseCity ? <VCard label="City" value={vendor.warehouseCity} k="w_warehouseCity" vf={vf} /> : null}
-                {vendor.warehouseState ? <VCard label="State" value={vendor.warehouseState} k="w_warehouseState" vf={vf} /> : null}
-                {vendor.warehouseZipCode ? <VCard label="ZIP / Postal Code" value={vendor.warehouseZipCode} k="w_warehouseZipCode" vf={vf} /> : null}
-                {vendor.warehouseCountry ? <VCard label="Country" value={vendor.warehouseCountry} k="w_warehouseCountry" vf={vf} /> : null}
-              </CardGrid>
-              {(vendor.factoryAddress || vendor.factoryCity) ? (
-                <>
-                  <SubHead title="Factory Address" />
-                  <CardGrid>
-                    {vendor.factoryAddress ? <VCard label="Factory Address" value={vendor.factoryAddress} k="w_factoryAddress" vf={vf} /> : null}
-                    {vendor.factoryCity ? <VCard label="City" value={vendor.factoryCity} k="w_factoryCity" vf={vf} /> : null}
-                    {vendor.factoryState ? <VCard label="State" value={vendor.factoryState} k="w_factoryState" vf={vf} /> : null}
-                    {vendor.mapLink ? <VCard label="Map / Location Link" value={vendor.mapLink} k="w_mapLink" vf={vf} /> : null}
-                  </CardGrid>
-                </>
-              ) : null}
-              {(() => {
-                const factoryImgs = Array.isArray(vendor.documents)
-                  ? vendor.documents.filter((d: any) => d.type === 'OTHER' && d.documentUrl) : [];
-                if (!factoryImgs.length) return null;
-                const photos = factoryImgs.map((d: any, i: number) => ({
-                  src: d.documentUrl, caption: d.name || `Photo ${i + 1}`,
-                  isImage: /\.(png|jpe?g|gif|webp)(\?|$)/i.test(d.documentUrl),
-                }));
-                return (
-                  <>
-                    <SubHead title="Factory Photos (Vendor-Uploaded)" />
-                    <PhotoGallery photos={photos} onTap={setLightboxUri} />
-                  </>
-                );
-              })()}
-            </Section>
-
-            {/* 3 — Owner Profile */}
-            <Section title="3 — Owner Profile" icon={User}
+            {/* Owner Profile — web puts the owner before the address sections */}
+            <Section title="Owner Profile" icon={User}
               accent={{ bg: 'bg-violet-50', iconColor: '#6d28d9', text: 'text-violet-900' }}
               badge={<StepBadge prefixes={['o_']} vf={vf} />}>
               <SubHead title="Owner Identity" />
@@ -444,6 +442,8 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
                 {vendor.ownerPhone2 ? <VCard label="Secondary Phone" value={vendor.ownerPhone2} k="o_ownerPhone2" vf={vf} /> : null}
                 <VCard label="Primary Email" value={vendor.ownerEmail} k="o_ownerEmail" vf={vf} />
                 {vendor.ownerEmail2 ? <VCard label="Secondary Email" value={vendor.ownerEmail2} k="o_ownerEmail2" vf={vf} /> : null}
+                {vendor.ownerLocalLandline ? <VCard label="Local Landline" value={vendor.ownerLocalLandline} k="o_ownerLocalLandline" vf={vf} /> : null}
+                {vendor.ownerIntlLandline ? <VCard label="International Landline" value={vendor.ownerIntlLandline} k="o_ownerIntlLandline" vf={vf} /> : null}
                 <VCard label="Business Start Date" value={vendor.businessStartDate} k="o_businessStartDate" vf={vf} />
                 <VCard label="Number of Employees" value={EMP_COUNT[vendor.employeeCount] || vendor.employeeCount} k="o_employeeCount" vf={vf} />
               </CardGrid>
@@ -458,6 +458,8 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
                         <VCard label="Designation" value={owner.designation} k={`o_add_${idx}_designation`} vf={vf} />
                         {owner.email ? <VCard label="Email" value={owner.email} k={`o_add_${idx}_email`} vf={vf} /> : null}
                         {owner.phone ? <VCard label="Phone" value={owner.phone} k={`o_add_${idx}_phone`} vf={vf} /> : null}
+                        {owner.localLandline ? <VCard label="Local Landline" value={owner.localLandline} k={`o_add_${idx}_localLandline`} vf={vf} /> : null}
+                        {owner.intlLandline ? <VCard label="International Landline" value={owner.intlLandline} k={`o_add_${idx}_intlLandline`} vf={vf} /> : null}
                       </CardGrid>
                     </View>
                   ))}
@@ -465,8 +467,67 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
               ) : null}
             </Section>
 
-            {/* 4 — Vendor & Products */}
-            <Section title="4 — Vendor & Products" icon={Tags}
+            {/* Legal Address & Factory Site — factory address block (renders only
+                when factory data is present, so no empty card on the thin mobile
+                projection). */}
+            {(() => {
+              const factoryImgs = Array.isArray(vendor.documents)
+                ? vendor.documents.filter((d: any) => d.type === 'OTHER' && d.documentUrl) : [];
+              const hasFactory = vendor.factoryAddress || vendor.factoryCity || vendor.factoryState
+                || vendor.factoryOwnershipType || vendor.factorySize || vendor.mapLink || factoryImgs.length > 0;
+              if (!hasFactory) return null;
+              const photos = factoryImgs.map((d: any, i: number) => ({
+                src: d.documentUrl, caption: d.name || `Photo ${i + 1}`,
+                isImage: /\.(png|jpe?g|gif|webp)(\?|$)/i.test(d.documentUrl),
+              }));
+              return (
+                <Section title="Legal Address & Factory Site" icon={Factory}
+                  accent={{ bg: 'bg-teal-50', iconColor: '#0f766e', text: 'text-teal-900' }}
+                  badge={<StepBadge prefixes={['w_']} vf={vf} />}>
+                  <CardGrid>
+                    {(vendor.factoryOwnershipType || vendor.ownershipType)
+                      ? <VCard label="Ownership Type" value={OWN_TYPE[vendor.factoryOwnershipType || vendor.ownershipType] || (vendor.factoryOwnershipType || vendor.ownershipType)} k="w_ownershipType" vf={vf} /> : null}
+                    {vendor.factorySize ? <VCard label="Warehousing Capacity" value={vendor.factorySize} k="w_factorySize" vf={vf} /> : null}
+                    {vendor.factoryAddress ? <VCard label="Address Line 1" value={vendor.factoryAddress} k="w_factoryAddress" vf={vf} /> : null}
+                    {vendor.addressLine2 ? <VCard label="Address Line 2" value={vendor.addressLine2} k="w_addressLine2" vf={vf} /> : null}
+                    {vendor.addressLine3 ? <VCard label="Address Line 3" value={vendor.addressLine3} k="w_addressLine3" vf={vf} /> : null}
+                    {vendor.landmark ? <VCard label="Landmark" value={vendor.landmark} k="w_landmark" vf={vf} /> : null}
+                    {vendor.factoryCity ? <VCard label="City" value={vendor.factoryCity} k="w_factoryCity" vf={vf} /> : null}
+                    {vendor.factoryState ? <VCard label="State" value={vendor.factoryState} k="w_factoryState" vf={vf} /> : null}
+                    {vendor.factoryZipCode ? <VCard label="ZIP / Postal Code" value={vendor.factoryZipCode} k="w_factoryZipCode" vf={vf} /> : null}
+                    {vendor.factoryCountry ? <VCard label="Country" value={vendor.factoryCountry} k="w_factoryCountry" vf={vf} /> : null}
+                    {vendor.mapLink ? <VCard label="Map / Location Link" value={vendor.mapLink} k="w_mapLink" vf={vf} /> : null}
+                  </CardGrid>
+                  {photos.length > 0 ? (
+                    <>
+                      <SubHead title={`Factory Images (${photos.length})`} />
+                      <PhotoGallery photos={photos} onTap={setLightboxUri} />
+                    </>
+                  ) : null}
+                </Section>
+              );
+            })()}
+
+            {/* Warehouse Details */}
+            <Section title="Warehouse Details" icon={Warehouse}
+              accent={{ bg: 'bg-teal-50', iconColor: '#0f766e', text: 'text-teal-900' }}
+              badge={<StepBadge prefixes={['w_']} vf={vf} />}>
+              <CardGrid>
+                <VCard label="Ownership Type" value={OWN_TYPE[vendor.ownershipType] || vendor.ownershipType} k="w_ownershipType" vf={vf} />
+                <VCard label="Warehousing Capacity" value={vendor.warehouseSize} k="w_warehouseSize" vf={vf} />
+                {vendor.warehouseAddress ? <VCard label="Address Line 1" value={vendor.warehouseAddress} k="w_warehouseAddress" vf={vf} /> : null}
+                {vendor.warehouseAddressLine2 ? <VCard label="Address Line 2" value={vendor.warehouseAddressLine2} k="w_warehouseAddressLine2" vf={vf} /> : null}
+                {vendor.warehouseAddressLine3 ? <VCard label="Address Line 3" value={vendor.warehouseAddressLine3} k="w_warehouseAddressLine3" vf={vf} /> : null}
+                {vendor.warehouseLandmark ? <VCard label="Landmark" value={vendor.warehouseLandmark} k="w_warehouseLandmark" vf={vf} /> : null}
+                {vendor.warehouseCity ? <VCard label="City" value={vendor.warehouseCity} k="w_warehouseCity" vf={vf} /> : null}
+                {vendor.warehouseState ? <VCard label="State" value={vendor.warehouseState} k="w_warehouseState" vf={vf} /> : null}
+                {vendor.warehouseZipCode ? <VCard label="ZIP / Postal Code" value={vendor.warehouseZipCode} k="w_warehouseZipCode" vf={vf} /> : null}
+                {vendor.warehouseCountry ? <VCard label="Country" value={vendor.warehouseCountry} k="w_warehouseCountry" vf={vf} /> : null}
+              </CardGrid>
+            </Section>
+
+            {/* Products & Services */}
+            <Section title="Products & Services" icon={Tags}
               accent={{ bg: 'bg-indigo-50', iconColor: '#4338ca', text: 'text-indigo-900' }}
               badge={<StepBadge prefixes={['vt_']} vf={vf} />}>
               <SubHead title="Vendor Classification" />
@@ -507,14 +568,14 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
               ) : null}
             </Section>
 
-            {/* 5 — Manufacturing Facilities (conditional) */}
+            {/* Manufacturing & Logistics (conditional) */}
             {(() => {
               const enabledFacilities: Record<string, boolean> = vendor.enabledFacilities || {};
               const facilityDetails: Record<string, any> = vendor.facilityDetails || {};
               const active = Object.keys(FACILITY_LABELS).filter((f) => enabledFacilities[f]);
               if (!vendor.productionCapacity && active.length === 0) return null;
               return (
-                <Section title="5 — Manufacturing Facilities" icon={Factory}
+                <Section title="Manufacturing & Logistics" icon={Factory}
                   accent={{ bg: 'bg-orange-50', iconColor: '#c2410c', text: 'text-orange-900' }}
                   badge={<StepBadge prefixes={['mf_']} vf={vf} />}>
                   {vendor.productionCapacity ? (
@@ -554,12 +615,12 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
               );
             })()}
 
-            {/* 6 — Certifications & Quality Control (conditional) */}
+            {/* Certifications (conditional) */}
             {(() => {
               const certifications: any[] = Array.isArray(vendor.certifications) ? vendor.certifications : [];
               if (!certifications.length && !vendor.complianceStandards && !vendor.packagingCapabilities) return null;
               return (
-                <Section title="6 — Certifications & Quality Control" icon={Award}
+                <Section title="Certifications" icon={Award}
                   accent={{ bg: 'bg-emerald-50', iconColor: '#047857', text: 'text-emerald-900' }}
                   badge={<StepBadge prefixes={['cert_', 'certDoc_']} vf={vf} />}>
                   {certifications.length > 0 ? (
@@ -572,6 +633,7 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
                             <Text className="text-xs font-bold text-slate-600 mb-2">Certificate #{idx + 1}: {cert.name}</Text>
                             <CardGrid>
                               <VCard label="Certificate Name" value={cert.name} k={`${prefix}_name`} vf={vf} />
+                              {cert.issuedBy ? <VCard label="Issued By" value={cert.issuedBy} k={`${prefix}_issuedBy`} vf={vf} /> : null}
                               {cert.expiryDate ? <VCard label="Expiry Date" value={cert.expiryDate} k={`${prefix}_expiryDate`} vf={vf} /> : null}
                               {cert.description ? <VCard label="Description" value={cert.description} k={`${prefix}_description`} vf={vf} /> : null}
                             </CardGrid>
@@ -593,8 +655,8 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
               );
             })()}
 
-            {/* 7 — Contact & Trade Information */}
-            <Section title="7 — Contact & Trade Information" icon={Phone}
+            {/* Contact & Trade */}
+            <Section title="Contact & Trade" icon={Phone}
               accent={{ bg: 'bg-purple-50', iconColor: '#7e22ce', text: 'text-purple-900' }}
               badge={<StepBadge prefixes={['ct_']} vf={vf} />}>
               <SubHead title="Business Contact Details" />
@@ -617,18 +679,24 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
                   </CardGrid>
                 </>
               ) : null}
-              {vendor.bankDetails ? (
-                <>
-                  <SubHead title="Banking Details" />
-                  <CardGrid>
-                    <VCard label="Bank Name" value={vendor.bankDetails.bankName} k="ct_bankName" vf={vf} />
-                    <VCard label="Account Type" value={vendor.bankDetails.accountType} k="ct_accountType" vf={vf} />
-                    <VCard label="IFSC Code" value={vendor.bankDetails.ifscCode} k="ct_ifscCode" vf={vf} />
-                    {vendor.bankDetails.accountNumber ? <VCard label="Account Number" value={`****${String(vendor.bankDetails.accountNumber).slice(-4)}`} k="ct_accountNumber" vf={vf} /> : null}
-                  </CardGrid>
-                </>
-              ) : null}
             </Section>
+
+            {/* Bank Details — its own section, mirroring web (renders only when
+                bank data is present on the vendor object). */}
+            {vendor.bankDetails ? (
+              <Section title="Bank Details" icon={Landmark}
+                accent={{ bg: 'bg-slate-50', iconColor: '#334155', text: 'text-slate-700' }}>
+                <CardGrid>
+                  {vendor.bankDetails.accountHolderName ? <VCard label="Account Holder Name" value={vendor.bankDetails.accountHolderName} k="ct_accountHolderName" vf={vf} /> : null}
+                  <VCard label="Bank Name" value={vendor.bankDetails.bankName} k="ct_bankName" vf={vf} />
+                  {vendor.bankDetails.accountNumber ? <VCard label="Account Number" value={`****${String(vendor.bankDetails.accountNumber).slice(-4)}`} k="ct_accountNumber" vf={vf} /> : null}
+                  <VCard label="Account Type" value={vendor.bankDetails.accountType} k="ct_accountType" vf={vf} />
+                  <VCard label="IFSC Code" value={vendor.bankDetails.ifscCode} k="ct_ifscCode" vf={vf} />
+                  {vendor.bankDetails.swiftCode ? <VCard label="SWIFT / BIC" value={vendor.bankDetails.swiftCode} k="ct_swiftCode" vf={vf} /> : null}
+                  {vendor.bankDetails.iban ? <VCard label="IBAN" value={vendor.bankDetails.iban} k="ct_iban" vf={vf} /> : null}
+                </CardGrid>
+              </Section>
+            ) : null}
 
             {/* Verification Summary */}
             {(() => {
@@ -666,6 +734,7 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
                         <XCircle size={16} color="#ef4444" style={{ marginTop: 2 }} />
                         <View className="flex-1">
                           <Text className="text-xs font-bold text-red-700">{stepForKey(key)}</Text>
+                          <Text className="text-sm font-semibold text-red-900 mt-0.5">{fieldLabelForKey(key)}</Text>
                           {v.remarks
                             ? <Text className="text-sm text-red-800 mt-0.5">{v.remarks}</Text>
                             : <Text className="text-sm text-red-600 italic mt-0.5">No remarks provided.</Text>}
@@ -689,9 +758,9 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
                 </View>
               </View>
               {(fd.inspectorRemarks || inspection.notes) ? (
-                <View className="bg-blue-50 border border-blue-100 rounded-xl p-4 mt-2">
-                  <Text className="text-[10px] font-bold text-blue-700 uppercase mb-1">Inspector Remarks</Text>
-                  <Text className="text-sm text-blue-900" selectable>{fd.inspectorRemarks || inspection.notes}</Text>
+                <View className="bg-brand-50 border border-brand-100 rounded-xl p-4 mt-2">
+                  <Text className="text-[10px] font-bold text-brand-700 uppercase mb-1">Inspector Remarks</Text>
+                  <Text className="text-sm text-brand-700" selectable>{fd.inspectorRemarks || inspection.notes}</Text>
                 </View>
               ) : null}
             </Section>
@@ -876,7 +945,7 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
                   </View>
                   {item.aqlLevel ? (
                     <View className="items-center ml-3">
-                      <Text className="font-bold text-blue-600 text-sm">{item.aqlLevel}</Text>
+                      <Text className="font-bold text-brand-600 text-sm">{item.aqlLevel}</Text>
                       <Text className="text-[10px] text-slate-500">AQL</Text>
                     </View>
                   ) : null}

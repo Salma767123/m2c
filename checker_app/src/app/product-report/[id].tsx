@@ -1,66 +1,88 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
+  View, ScrollView, TouchableOpacity, ActivityIndicator,
   Image, Modal, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import {
-  ArrowLeft, CheckCircle, XCircle, AlertCircle, Eye,
-  Download, Clock,
+  ArrowLeft, CheckCircle, XCircle, AlertCircle, AlertTriangle, Eye,
+  Download, Clock, ClipboardList, Box, Bug, FlaskConical, Star,
+  FileText, Camera,
 } from 'lucide-react-native';
 import qcCheckerService from '../../services/qcCheckerService';
 import { downloadProductReportPdf } from '@/lib/reportPdf';
+import { AppText, SectionCard, StatusBadge, Button } from '@/components/UI';
+import { brand, colors, success, danger, amber, slate } from '@/constants/design';
 
-const REMARK_LABELS: Record<string, string> = {
-  shipperCartonRemark: 'Shipper Carton',
-  innerCartonRemark: 'Inner Carton',
-  retailPackagingRemark: 'Retail Packaging',
-  productTypeRemark: 'Product Type',
-  aqlWorkmanshipRemark: 'AQL Workmanship',
-  onSiteTestsRemark: 'On-site Tests',
+// Packaging remark-code → label (matches the inspection form + PDF generator).
+const REMARK_LABELS: Record<number, string> = {
+  1: 'Critical Defect', 2: 'Major Defect', 3: 'Functional Fail',
+  4: 'Safety Issue', 5: 'Non-Conformance', 6: 'Minor Issue',
+  7: 'Re-inspection', 8: 'Acceptable', 9: 'Good', 10: 'Excellent',
 };
 
-const STATUS_STYLE: Record<string, { bg: string; text: string }> = {
-  QC_APPROVED: { bg: '#d1fae5', text: '#065f46' },
-  APPROVED: { bg: '#d1fae5', text: '#065f46' },
-  REJECTED: { bg: '#fee2e2', text: '#991b1b' },
-  REINSPECTION: { bg: '#fef3c7', text: '#92400e' },
-  PENDING: { bg: '#f1f5f9', text: '#334155' },
-};
-
+// Friendly status labels — mirror the web checker portal.
 const STATUS_LABELS: Record<string, string> = {
-  QC_APPROVED: 'QC Approved', APPROVED: 'Approved', REJECTED: 'Rejected',
-  REINSPECTION: 'Reinspection', PENDING: 'Pending',
+  QC_APPROVED: 'Approved by QC',
+  APPROVED: 'Approved by Admin',
+  REJECTED: 'Rejected',
+  REINSPECTION: 'Reinspection',
+  PENDING: 'Pending',
 };
+
+// Humanize a productVerifications key (e.g. "pvFrontView" → "Pv Front View").
+function humanizeVerKey(key: string): string {
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, (c) => c.toUpperCase())
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <View className="py-2">
-      <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">{label}</Text>
-      <Text className="text-sm text-slate-900" style={{ lineHeight: 20 }} selectable>{value ?? '—'}</Text>
+      <AppText variant="labelSm" color={colors.textFaint} style={{ textTransform: 'uppercase' }}>
+        {label}
+      </AppText>
+      <AppText variant="bodyMd" color={colors.text} style={{ marginTop: 2 }} selectable>
+        {value ?? '—'}
+      </AppText>
     </View>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-4">
-      <View className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-        <Text className="text-sm font-bold text-slate-900">{title}</Text>
+// A green/red/muted pill used across the verification + packaging rows.
+function OkPill({
+  ok, yesLabel, noLabel, nullLabel,
+}: { ok: boolean | null | undefined; yesLabel: string; noLabel: string; nullLabel: string }) {
+  if (ok === true) {
+    return (
+      <View className="flex-row items-center rounded-full px-2 py-0.5" style={{ backgroundColor: success[50] }}>
+        <CheckCircle size={12} color={success[600]} />
+        <AppText variant="labelSm" color={success[600]} style={{ marginLeft: 4 }}>{yesLabel}</AppText>
       </View>
-      <View className="p-4">{children}</View>
-    </View>
-  );
+    );
+  }
+  if (ok === false) {
+    return (
+      <View className="flex-row items-center rounded-full px-2 py-0.5" style={{ backgroundColor: danger[50] }}>
+        <XCircle size={12} color={danger[500]} />
+        <AppText variant="labelSm" color={danger[500]} style={{ marginLeft: 4 }}>{noLabel}</AppText>
+      </View>
+    );
+  }
+  return <AppText variant="labelSm" color={colors.textFaint}>{nullLabel}</AppText>;
 }
 
-function PhotoGrid({ photos, label, onTap }: { photos: any[]; label: string; onTap: (uri: string) => void }) {
+function PhotoGrid({ photos, label, onTap }: { photos: any[] | undefined | null; label: string; onTap: (uri: string) => void }) {
   if (!photos || photos.length === 0) return null;
   return (
     <View className="mt-3">
-      <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+      <AppText variant="labelSm" color={colors.textMuted} style={{ textTransform: 'uppercase', marginBottom: 8 }}>
         {label} ({photos.length})
-      </Text>
+      </AppText>
       <View className="flex-row flex-wrap" style={{ gap: 8 }}>
         {photos.map((p: any, i: number) => {
           const src = typeof p === 'string' ? p : p?.data || p?.url || null;
@@ -70,7 +92,9 @@ function PhotoGrid({ photos, label, onTap }: { photos: any[]; label: string; onT
             </TouchableOpacity>
           ) : (
             <View key={i} className="w-20 h-20 bg-slate-100 rounded-xl border border-dashed border-slate-300 items-center justify-center">
-              <Text className="text-[9px] text-slate-500 text-center px-1">{(typeof p !== 'string' && p?.name) || `${i + 1}`}</Text>
+              <AppText variant="labelSm" color={colors.textMuted} numberOfLines={2} style={{ textAlign: 'center', paddingHorizontal: 4 }}>
+                {(typeof p !== 'string' && p?.name) || `${i + 1}`}
+              </AppText>
             </View>
           );
         })}
@@ -112,8 +136,8 @@ export default function ProductReportDetailScreen() {
   if (loading) {
     return (
       <View className="flex-1 bg-white items-center justify-center">
-        <ActivityIndicator size="large" color="#222222" />
-        <Text className="mt-4 text-slate-600 text-sm">Loading report...</Text>
+        <ActivityIndicator size="large" color={brand[500]} />
+        <AppText variant="bodyMd" color={colors.textSecondary} style={{ marginTop: 16 }}>Loading report…</AppText>
       </View>
     );
   }
@@ -123,12 +147,14 @@ export default function ProductReportDetailScreen() {
       <View className="flex-1 bg-white">
         <View className="flex-row items-center px-4 pb-3" style={{ paddingTop: insets.top + 8, backgroundColor: '#fff' }}>
           <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 items-center justify-center rounded-full bg-slate-100">
-            <ArrowLeft size={20} color="#0f172a" />
+            <ArrowLeft size={20} color={slate[900]} />
           </TouchableOpacity>
         </View>
         <View className="flex-1 items-center justify-center px-8">
-          <AlertCircle size={40} color="#f59e0b" />
-          <Text className="mt-4 text-slate-600 text-center">{error || 'Not found'}</Text>
+          <AlertCircle size={40} color={amber[500]} />
+          <AppText variant="bodyMd" color={colors.textSecondary} style={{ marginTop: 16, textAlign: 'center' }}>
+            {error || 'Not found'}
+          </AppText>
         </View>
       </View>
     );
@@ -136,10 +162,23 @@ export default function ProductReportDetailScreen() {
 
   const fd = (product.qcInspectionData || {}) as Record<string, any>;
   const status = product.approvalStatus || 'PENDING';
-  const pill = STATUS_STYLE[status] || STATUS_STYLE.PENDING;
-  const items = Array.isArray(fd.items) ? fd.items : [];
-  const measurements = Array.isArray(fd.measurements) ? fd.measurements : [];
-  const tests = Array.isArray(fd.tests) ? fd.tests : [];
+  const statusLabel = STATUS_LABELS[status] || status;
+
+  // ── New-schema inspection data (matches the 7-step form + PDF generator) ────
+  const productVerifications: [string, any][] = Object.entries(fd.productVerifications || {});
+  const packagingItems: any[] = Array.isArray(fd.packagingItems) ? fd.packagingItems : [];
+  const testGroups: any[] = Array.isArray(fd.testGroups) ? fd.testGroups : [];
+  const additionalEvidence: Record<string, any[]> =
+    fd.additionalEvidence && typeof fd.additionalEvidence === 'object' ? fd.additionalEvidence : {};
+
+  // The checker's actual decision (Review step).
+  const inspectionStatus: string = fd.inspectionStatus || '';
+
+  // Sign-off artifacts from the rebuilt Documentation step.
+  const signedDocuments = Array.isArray(fd.signedDocuments) ? fd.signedDocuments : [];
+  const signedReport = Array.isArray(fd.signedReport) ? fd.signedReport : [];
+  const companyIdCards = Array.isArray(fd.companyIdCards) ? fd.companyIdCards : [];
+  const documentationPhotos = Array.isArray(fd.documentationPhotos) ? fd.documentationPhotos : [];
 
   const handleDownloadPdf = async () => {
     setDownloading(true);
@@ -168,39 +207,47 @@ export default function ProductReportDetailScreen() {
       {/* Header */}
       <View className="bg-white border-b border-slate-100 flex-row items-center justify-between px-4 pb-3" style={{ paddingTop: insets.top + 8 }}>
         <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 items-center justify-center rounded-full bg-slate-100">
-          <ArrowLeft size={20} color="#0f172a" />
+          <ArrowLeft size={20} color={slate[900]} />
         </TouchableOpacity>
-        <Text className="text-base font-bold text-slate-900">Product Report</Text>
-        <View className="rounded-full px-3 py-1" style={{ backgroundColor: pill.bg }}>
-          <Text className="text-[10px] font-bold" style={{ color: pill.text }}>
-            {STATUS_LABELS[status] || status}
-          </Text>
-        </View>
+        <AppText variant="titleLg" color={colors.text}>Product Report</AppText>
+        <StatusBadge status={status} label={statusLabel} />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-        {/* Product name */}
-        <Text className="text-xl font-extrabold text-slate-900 mb-0.5">{product.name}</Text>
-        <Text className="text-xs text-slate-500 mb-4">SKU: {product.baseSku || 'N/A'}</Text>
+        {/* Title + SKU subtitle */}
+        <AppText variant="headlineLg" color={colors.text}>Product Inspection Report</AppText>
+        <AppText variant="bodySm" color={colors.textMuted} style={{ marginBottom: 16, marginTop: 2 }}>
+          {product.name} • SKU: {product.baseSku || 'N/A'}
+        </AppText>
 
         {/* Preview + Download PDF */}
         <View className="flex-row mb-4" style={{ columnGap: 8 }}>
-          <TouchableOpacity onPress={handlePreviewPdf} disabled={previewing || downloading} activeOpacity={0.85}
-            className="flex-row items-center justify-center rounded-xl py-3 border border-slate-300 bg-white"
-            style={{ flex: 1, opacity: previewing || downloading ? 0.6 : 1 }}>
-            <Eye size={16} color="#0f172a" />
-            <Text className="text-slate-900 font-bold text-sm ml-2">{previewing ? 'Opening...' : 'Preview'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleDownloadPdf} disabled={downloading || previewing} activeOpacity={0.85}
-            className="flex-row items-center justify-center rounded-xl py-3"
-            style={{ flex: 1, backgroundColor: '#222', opacity: downloading || previewing ? 0.6 : 1 }}>
-            <Download size={16} color="#fff" />
-            <Text className="text-white font-bold text-sm ml-2">{downloading ? 'Generating...' : 'Download PDF'}</Text>
-          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Button
+              label={previewing ? 'Opening…' : 'Preview'}
+              icon={Eye}
+              variant="secondary"
+              fullWidth
+              loading={previewing}
+              disabled={downloading}
+              onPress={handlePreviewPdf}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              label={downloading ? 'Generating…' : 'Download PDF'}
+              icon={Download}
+              variant="primary"
+              fullWidth
+              loading={downloading}
+              disabled={previewing}
+              onPress={handleDownloadPdf}
+            />
+          </View>
         </View>
 
         {/* Summary banner */}
-        <View className="rounded-2xl p-4 mb-4 flex-row flex-wrap" style={{ backgroundColor: '#222' }}>
+        <View className="rounded-2xl p-4 mb-4 flex-row flex-wrap" style={{ backgroundColor: brand[500] }}>
           {[
             ['Product', product.name],
             ['Vendor', product.vendor?.companyName],
@@ -208,8 +255,8 @@ export default function ProductReportDetailScreen() {
             ['Inspected On', product.updatedAt ? new Date(product.updatedAt).toLocaleDateString('en-IN') : '—'],
           ].map(([label, val], i) => (
             <View key={i} className="w-1/2 mb-3">
-              <Text className="text-[10px] font-bold uppercase mb-0.5" style={{ color: '#9ca3af' }}>{label}</Text>
-              <Text className="text-sm font-semibold text-white">{val || '—'}</Text>
+              <AppText variant="labelSm" color="rgba(255,255,255,0.75)" style={{ textTransform: 'uppercase' }}>{label}</AppText>
+              <AppText variant="titleMd" color="#fff" style={{ marginTop: 2 }}>{val || '—'}</AppText>
             </View>
           ))}
         </View>
@@ -217,213 +264,358 @@ export default function ProductReportDetailScreen() {
         {/* Rejection reason */}
         {product.rejectionReason ? (
           <View className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-            <Text className="text-[10px] font-bold text-red-700 uppercase mb-1">Rejection Reason</Text>
-            <Text className="text-sm text-red-900" selectable>{product.rejectionReason}</Text>
+            <AppText variant="labelSm" color={danger[700]} style={{ textTransform: 'uppercase', marginBottom: 4 }}>Rejection Reason</AppText>
+            <AppText variant="bodyMd" color={danger[700]} selectable>{product.rejectionReason}</AppText>
           </View>
         ) : null}
 
-        {/* S1: General Information */}
-        <Section title="Section 1 — General Information">
-          <InfoRow label="Client" value={fd.client} />
-          <InfoRow label="Vendor" value={fd.vendor} />
-          <InfoRow label="Factory" value={fd.factory} />
-          <InfoRow label="Service Location" value={fd.serviceLocation} />
-          <InfoRow label="Service Start Date" value={fd.serviceStartDate} />
-          <InfoRow label="Service Type" value={fd.serviceType} />
-        </Section>
+        <View style={{ rowGap: 16 }}>
+          {/* S1: General Information */}
+          <SectionCard icon={ClipboardList} title="Section 1 — General Information">
+            <InfoRow label="Client" value={fd.client} />
+            <InfoRow label="Vendor" value={fd.vendor} />
+            <InfoRow label="Factory" value={fd.factory} />
+            <InfoRow label="Service Location" value={fd.serviceLocation} />
+            <InfoRow label="Service Start Date" value={fd.serviceStartDate} />
+            <InfoRow label="Service Type" value={fd.serviceType} />
+          </SectionCard>
 
-        {/* S2: Preparation */}
-        <Section title="Section 2 — Preparation">
-          {items.length > 0 ? items.map((it: any, i: number) => (
-            <View key={i} className="bg-slate-50 rounded-xl p-3 border border-slate-200 mb-2">
-              <Text className="text-sm font-semibold text-slate-900">{it.itemName || `Item ${i + 1}`}</Text>
-              {it.itemDescription ? <Text className="text-xs text-slate-500 mt-0.5">{it.itemDescription}</Text> : null}
-              <View className="flex-row mt-2" style={{ columnGap: 16 }}>
-                <Text className="text-xs text-slate-600">Total: <Text className="font-bold">{it.totalQuantity ?? '—'}</Text></Text>
-                <Text className="text-xs text-slate-600">Inspection: <Text className="font-bold">{it.inspectionQuantity ?? '—'}</Text></Text>
-              </View>
-            </View>
-          )) : <Text className="text-sm text-slate-400">No items recorded.</Text>}
-          <PhotoGrid photos={fd.warehousePhotoEvidences} label="Warehouse Photos" onTap={setLightboxUri} />
-        </Section>
-
-        {/* S3: Measurements */}
-        <Section title="Section 3 — Measurements">
-          {measurements.length > 0 ? measurements.map((m: any, i: number) => (
-            <View key={i} className="bg-slate-50 rounded-xl p-3 border border-slate-200 mb-2">
-              <Text className="text-xs font-bold text-slate-700 mb-1">{m.sampleName || `Sample #${i + 1}`}</Text>
-              <View className="flex-row flex-wrap" style={{ columnGap: 12, rowGap: 4 }}>
-                {[['Carton L', m.cartonLength], ['W', m.cartonWidth], ['H', m.cartonHeight],
-                  ['Product L', m.productLength], ['W', m.productWidth],
-                  ['Retail Wt', m.retailWeight], ['Gross Wt', m.cartonGrossWeight]].map(([l, v], j) => (
-                  <Text key={j} className="text-[10px] text-slate-600">{l}: <Text className="font-bold">{v ?? '—'}</Text></Text>
+          {/* S2: Product Verification */}
+          <SectionCard icon={ClipboardList} title="Section 2 — Product Verification">
+            {productVerifications.length > 0 ? (
+              <View>
+                {/* header row */}
+                <View className="flex-row items-center pb-2 border-b border-slate-200">
+                  <AppText variant="labelSm" color={colors.textMuted} style={{ flex: 2, textTransform: 'uppercase' }}>Field</AppText>
+                  <AppText variant="labelSm" color={colors.textMuted} style={{ width: 92, textTransform: 'uppercase' }}>Status</AppText>
+                </View>
+                {productVerifications.map(([key, entry]) => (
+                  <View key={key} className="py-2.5 border-b border-slate-100">
+                    <View className="flex-row items-center">
+                      <AppText variant="titleMd" color={colors.text} style={{ flex: 2 }}>{humanizeVerKey(key)}</AppText>
+                      <View style={{ width: 92 }}>
+                        <OkPill ok={entry?.ok} yesLabel="Verified" noLabel="Not Verified" nullLabel="Not Checked" />
+                      </View>
+                    </View>
+                    {entry?.remarks ? (
+                      <AppText variant="bodySm" color={colors.textSecondary} style={{ marginTop: 4 }}>{entry.remarks}</AppText>
+                    ) : null}
+                  </View>
                 ))}
               </View>
-            </View>
-          )) : <Text className="text-sm text-slate-400">No measurements recorded.</Text>}
-          <PhotoGrid photos={fd.measurementPhotos} label="Measurement Photos" onTap={setLightboxUri} />
-        </Section>
+            ) : (
+              <AppText variant="bodyMd" color={colors.textFaint}>No product fields were verified.</AppText>
+            )}
+            <PhotoGrid photos={fd.productEvidencePhotos} label="Product Evidence Photos" onTap={setLightboxUri} />
+          </SectionCard>
 
-        {/* S4: Packaging & Remarks */}
-        <Section title="Section 4 — Packaging & Remarks">
-          {Object.entries(REMARK_LABELS).map(([key, label]) => {
-            const val = fd[key];
-            const num = Number(val);
-            const color = val ? (num >= 8 ? '#059669' : num >= 6 ? '#d97706' : '#dc2626') : '#94a3b8';
-            return (
-              <View key={key} className="flex-row items-center justify-between py-2.5 border-b border-slate-100">
-                <Text className="text-sm text-slate-700 flex-1">{label}</Text>
-                <Text className="text-sm font-bold" style={{ color }}>{val ? `${val}/10` : '—'}</Text>
+          {/* S3: Packaging Inspection */}
+          <SectionCard icon={Box} title="Section 3 — Packaging Inspection">
+            {packagingItems.length > 0 ? (
+              <View>
+                {packagingItems.map((item: any, i: number) => (
+                  <View key={i} className="py-2.5 border-b border-slate-100">
+                    <View className="flex-row items-center justify-between">
+                      <AppText variant="titleMd" color={colors.text} style={{ flex: 1, marginRight: 8 }}>
+                        {(item.label || '').split('—')[0].trim() || `Item ${i + 1}`}
+                      </AppText>
+                      <OkPill ok={item.verified} yesLabel="Yes" noLabel="No" nullLabel="—" />
+                    </View>
+                    <View className="flex-row mt-1.5" style={{ columnGap: 12 }}>
+                      <AppText variant="bodySm" color={colors.textSecondary}>
+                        Remark Code: <AppText variant="labelMd" color={colors.text}>
+                          {item.remarkCode != null ? `${item.remarkCode} — ${REMARK_LABELS[item.remarkCode] || ''}` : '—'}
+                        </AppText>
+                      </AppText>
+                    </View>
+                    {item.remarks ? (
+                      <AppText variant="bodySm" color={colors.textSecondary} style={{ marginTop: 4 }}>{item.remarks}</AppText>
+                    ) : null}
+                  </View>
+                ))}
               </View>
-            );
-          })}
-          <PhotoGrid photos={fd.packagingPhotos} label="Packaging Photos" onTap={setLightboxUri} />
-        </Section>
+            ) : (
+              <AppText variant="bodyMd" color={colors.textFaint}>No packaging items recorded.</AppText>
+            )}
+            <PhotoGrid photos={fd.packagingPhotos} label="Packaging Photos" onTap={setLightboxUri} />
+          </SectionCard>
 
-        {/* S5: Defects & AQL */}
-        <Section title="Section 5 — Defects & AQL">
-          <View className="flex-row mb-3" style={{ columnGap: 16 }}>
-            <InfoRow label="Inspection Level" value={fd.inspectionLevel} />
-            <InfoRow label="Sample Size" value={fd.sampleSize} />
-          </View>
-          {[
-            { label: 'Critical', aql: fd.aqlCritical, max: fd.maxAllowedCritical, found: fd.criticalDefects, details: fd.criticalDefectDetails, detailColor: '#fee2e2' },
-            { label: 'Major', aql: fd.aqlMajor, max: fd.maxAllowedMajor, found: fd.majorDefects, details: fd.majorDefectDetails, detailColor: '#fef3c7' },
-            { label: 'Minor', aql: fd.aqlMinor, max: fd.maxAllowedMinor, found: fd.minorDefects, details: fd.minorDefectDetails, detailColor: '#f1f5f9' },
-          ].map((r) => {
-            const exceeded = r.found != null && r.max != null && Number(r.found) > Number(r.max);
-            return (
-              <View key={r.label} className="mb-2">
-                <View className="flex-row items-center justify-between py-2 border-b border-slate-100">
-                  <Text className="text-sm font-semibold text-slate-700 w-16">{r.label}</Text>
-                  <Text className="text-xs text-slate-500">AQL: {r.aql ?? '—'}</Text>
-                  <Text className="text-xs text-slate-500">Max: {r.max ?? '—'}</Text>
-                  <Text className="text-xs font-bold text-slate-900">Found: {r.found ?? '—'}</Text>
-                  {r.found != null ? (
-                    exceeded
-                      ? <XCircle size={14} color="#dc2626" />
-                      : <CheckCircle size={14} color="#059669" />
-                  ) : null}
+          {/* S4: Defects & AQL */}
+          <SectionCard icon={Bug} title="Section 4 — Defects & AQL">
+            <View className="flex-row mb-3" style={{ columnGap: 24 }}>
+              <InfoRow label="Inspection Level" value={fd.inspectionLevel} />
+              <InfoRow label="Sample Size" value={fd.sampleSize} />
+            </View>
+
+            {/* table header */}
+            <View className="flex-row items-center pb-2 border-b border-slate-200">
+              <AppText variant="labelSm" color={colors.textMuted} style={{ flex: 1.4, textTransform: 'uppercase' }}>Type</AppText>
+              <AppText variant="labelSm" color={colors.textMuted} style={{ flex: 1, textAlign: 'center', textTransform: 'uppercase' }}>AQL</AppText>
+              <AppText variant="labelSm" color={colors.textMuted} style={{ flex: 1, textAlign: 'center', textTransform: 'uppercase' }}>Max</AppText>
+              <AppText variant="labelSm" color={colors.textMuted} style={{ flex: 1, textAlign: 'center', textTransform: 'uppercase' }}>Found</AppText>
+              <AppText variant="labelSm" color={colors.textMuted} style={{ flex: 1.6, textTransform: 'uppercase' }}>Status</AppText>
+            </View>
+            {[
+              { label: 'Critical', aql: fd.aqlCritical, max: fd.maxAllowedCritical, found: fd.criticalDefects },
+              { label: 'Major', aql: fd.aqlMajor, max: fd.maxAllowedMajor, found: fd.majorDefects },
+              { label: 'Minor', aql: fd.aqlMinor, max: fd.maxAllowedMinor, found: fd.minorDefects },
+            ].map((row) => {
+              const exceeded = row.found != null && row.max != null && Number(row.found) > Number(row.max);
+              return (
+                <View key={row.label} className="flex-row items-center py-2.5 border-b border-slate-100">
+                  <AppText variant="titleMd" color={colors.text} style={{ flex: 1.4 }}>{row.label}</AppText>
+                  <AppText variant="bodySm" color={colors.textSecondary} style={{ flex: 1, textAlign: 'center' }}>{row.aql ?? '—'}</AppText>
+                  <AppText variant="bodySm" color={colors.textSecondary} style={{ flex: 1, textAlign: 'center' }}>{row.max ?? '—'}</AppText>
+                  <AppText variant="bodySm" color={colors.textSecondary} style={{ flex: 1, textAlign: 'center' }}>{row.found ?? '—'}</AppText>
+                  <View style={{ flex: 1.6 }}>
+                    {row.found != null ? (
+                      exceeded ? (
+                        <View className="flex-row items-center">
+                          <XCircle size={13} color={danger[500]} />
+                          <AppText variant="labelSm" color={danger[500]} style={{ marginLeft: 3 }}>Exceeded</AppText>
+                        </View>
+                      ) : (
+                        <View className="flex-row items-center">
+                          <CheckCircle size={13} color={success[600]} />
+                          <AppText variant="labelSm" color={success[600]} style={{ marginLeft: 3 }}>Within Limit</AppText>
+                        </View>
+                      )
+                    ) : (
+                      <AppText variant="labelSm" color={colors.textFaint}>—</AppText>
+                    )}
+                  </View>
                 </View>
-                {r.details ? (
-                  <View className="rounded-lg p-3 mt-1" style={{ backgroundColor: r.detailColor }}>
-                    <Text className="text-xs text-slate-900" selectable>{r.details}</Text>
+              );
+            })}
+
+            {/* Defect details blocks */}
+            {(fd.criticalDefectDetails || fd.majorDefectDetails || fd.minorDefectDetails) ? (
+              <View className="mt-3" style={{ rowGap: 8 }}>
+                {fd.criticalDefectDetails ? (
+                  <View className="rounded-lg p-3 border border-red-100" style={{ backgroundColor: danger[50] }}>
+                    <AppText variant="labelSm" color={danger[700]} style={{ textTransform: 'uppercase', marginBottom: 4 }}>Critical Defect Details</AppText>
+                    <AppText variant="bodySm" color={danger[700]} selectable>{fd.criticalDefectDetails}</AppText>
+                  </View>
+                ) : null}
+                {fd.majorDefectDetails ? (
+                  <View className="rounded-lg p-3 border border-amber-100" style={{ backgroundColor: amber[50] }}>
+                    <AppText variant="labelSm" color={amber[700]} style={{ textTransform: 'uppercase', marginBottom: 4 }}>Major Defect Details</AppText>
+                    <AppText variant="bodySm" color={amber[700]} selectable>{fd.majorDefectDetails}</AppText>
+                  </View>
+                ) : null}
+                {fd.minorDefectDetails ? (
+                  <View className="rounded-lg p-3 border border-slate-200" style={{ backgroundColor: slate[50] }}>
+                    <AppText variant="labelSm" color={colors.textSecondary} style={{ textTransform: 'uppercase', marginBottom: 4 }}>Minor Defect Details</AppText>
+                    <AppText variant="bodySm" color={colors.text} selectable>{fd.minorDefectDetails}</AppText>
                   </View>
                 ) : null}
               </View>
-            );
-          })}
-          <PhotoGrid photos={fd.defectPhotos} label="Defect Photos" onTap={setLightboxUri} />
-        </Section>
+            ) : null}
+            <PhotoGrid photos={fd.defectPhotos} label="Defect Photos" onTap={setLightboxUri} />
+          </SectionCard>
 
-        {/* S6: Testing */}
-        <Section title="Section 6 — On-site Testing">
-          {tests.length > 0 ? (
-            <View style={{ rowGap: 10 }}>
-              {tests.map((t: any, i: number) => (
-                <View key={t.id || i} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                  <View className="flex-row items-center justify-between mb-2">
-                    <View className="flex-1 mr-2">
-                      <Text className="text-sm font-semibold text-slate-900">{t.label || `Test ${i + 1}`}</Text>
-                      {t.detail ? <Text className="text-xs text-slate-500 mt-0.5">{t.detail}</Text> : null}
+          {/* S5: On-site Testing */}
+          <SectionCard icon={FlaskConical} title="Section 5 — On-site Testing">
+            {testGroups.length > 0 ? (
+              <View style={{ rowGap: 20 }}>
+                {testGroups.map((group: any, gi: number) => {
+                  const groupTests: any[] = Array.isArray(group.tests) ? group.tests : [];
+                  const gPass = groupTests.filter((t) => t.pass).length;
+                  const gFail = groupTests.filter((t) => t.fail).length;
+                  return (
+                    <View key={gi}>
+                      <View className="flex-row items-center flex-wrap mb-2" style={{ columnGap: 10, rowGap: 2 }}>
+                        <AppText variant="titleMd" color={colors.text}>{group.label || `Group ${gi + 1}`}</AppText>
+                        <AppText variant="labelSm" color={success[600]}>{gPass} passed</AppText>
+                        <AppText variant="labelSm" color={danger[500]}>{gFail} failed</AppText>
+                      </View>
+                      <View style={{ rowGap: 10 }}>
+                        {groupTests.map((test: any, i: number) => {
+                          const passed = test.pass === true;
+                          const failed = test.fail === true;
+                          return (
+                            <View key={test.id || i} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                              <View className="flex-row items-center justify-between">
+                                <View className="flex-1 mr-2">
+                                  <AppText variant="titleMd" color={colors.text}>{test.label || `Test ${i + 1}`}</AppText>
+                                  {test.remarks ? (
+                                    <AppText variant="bodySm" color={colors.textMuted} style={{ marginTop: 2 }}>{test.remarks}</AppText>
+                                  ) : null}
+                                </View>
+                                {passed ? (
+                                  <View className="flex-row items-center rounded-full px-2.5 py-1" style={{ backgroundColor: success[100] }}>
+                                    <CheckCircle size={12} color={success[600]} />
+                                    <AppText variant="labelSm" color={success[600]} style={{ marginLeft: 4 }}>PASS</AppText>
+                                  </View>
+                                ) : failed ? (
+                                  <View className="flex-row items-center rounded-full px-2.5 py-1" style={{ backgroundColor: danger[100] }}>
+                                    <XCircle size={12} color={danger[500]} />
+                                    <AppText variant="labelSm" color={danger[500]} style={{ marginLeft: 4 }}>FAIL</AppText>
+                                  </View>
+                                ) : (
+                                  <AppText variant="labelSm" color={colors.textFaint}>No decision</AppText>
+                                )}
+                              </View>
+                              <PhotoGrid photos={test.rightPhotos} label="Right/Correct Photos" onTap={setLightboxUri} />
+                              <PhotoGrid photos={test.wrongPhotos} label="Wrong/Incorrect Photos" onTap={setLightboxUri} />
+                            </View>
+                          );
+                        })}
+                      </View>
                     </View>
-                    {t.pass ? (
-                      <View className="flex-row items-center bg-emerald-100 rounded-full px-2.5 py-1">
-                        <CheckCircle size={12} color="#059669" />
-                        <Text className="text-[10px] font-bold text-emerald-700 ml-1">PASS</Text>
-                      </View>
-                    ) : t.fail ? (
-                      <View className="flex-row items-center bg-red-100 rounded-full px-2.5 py-1">
-                        <XCircle size={12} color="#dc2626" />
-                        <Text className="text-[10px] font-bold text-red-700 ml-1">FAIL</Text>
-                      </View>
-                    ) : <Text className="text-xs text-slate-400">No decision</Text>}
+                  );
+                })}
+
+                {/* Additional evidence summary */}
+                {Object.entries(additionalEvidence).some(([, ph]) => Array.isArray(ph) && ph.length > 0) ? (
+                  <View>
+                    <AppText variant="labelSm" color={colors.textMuted} style={{ textTransform: 'uppercase', marginBottom: 8 }}>Additional Evidence</AppText>
+                    <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                      {Object.entries(additionalEvidence)
+                        .filter(([, ph]) => Array.isArray(ph) && ph.length > 0)
+                        .map(([key, ph]) => (
+                          <View key={key} className="bg-slate-100 rounded-lg px-2.5 py-1">
+                            <AppText variant="labelSm" color={colors.textSecondary}>
+                              {key.replace(/_/g, ' ')}: {ph.length} photo(s)
+                            </AppText>
+                          </View>
+                        ))}
+                    </View>
                   </View>
-                  <PhotoGrid photos={t.rightPhotos} label="Correct Photos" onTap={setLightboxUri} />
-                  <PhotoGrid photos={t.wrongPhotos} label="Incorrect Photos" onTap={setLightboxUri} />
+                ) : null}
+              </View>
+            ) : (
+              <AppText variant="bodyMd" color={colors.textFaint}>No tests recorded.</AppText>
+            )}
+          </SectionCard>
+
+          {/* S6: Review & Final Decision */}
+          <SectionCard icon={Star} title="Section 6 — Review & Final Decision">
+            <View style={{ rowGap: 12 }}>
+              <View className="rounded-xl border border-slate-200 p-4">
+                <AppText variant="labelSm" color={colors.textMuted} style={{ textTransform: 'uppercase', marginBottom: 8 }}>Inspector&apos;s Decision</AppText>
+                {inspectionStatus === 'Approved' ? (
+                  <View className="flex-row items-center self-start rounded-full px-3 py-1.5" style={{ backgroundColor: success[100] }}>
+                    <CheckCircle size={16} color={success[600]} />
+                    <AppText variant="titleMd" color={success[600]} style={{ marginLeft: 6 }}>Approved</AppText>
+                  </View>
+                ) : inspectionStatus === 'Rejected' ? (
+                  <View className="flex-row items-center self-start rounded-full px-3 py-1.5" style={{ backgroundColor: danger[100] }}>
+                    <XCircle size={16} color={danger[500]} />
+                    <AppText variant="titleMd" color={danger[500]} style={{ marginLeft: 6 }}>Rejected</AppText>
+                  </View>
+                ) : inspectionStatus ? (
+                  <View className="flex-row items-center self-start rounded-full px-3 py-1.5" style={{ backgroundColor: amber[100] }}>
+                    <AlertTriangle size={16} color={amber[600]} />
+                    <AppText variant="titleMd" color={amber[600]} style={{ marginLeft: 6 }}>{inspectionStatus}</AppText>
+                  </View>
+                ) : (
+                  <AppText variant="bodyMd" color={colors.textFaint}>—</AppText>
+                )}
+              </View>
+              <View className="rounded-xl border border-slate-200 p-4">
+                <AppText variant="labelSm" color={colors.textMuted} style={{ textTransform: 'uppercase', marginBottom: 8 }}>Final Status</AppText>
+                <StatusBadge status={status} label={statusLabel} />
+              </View>
+            </View>
+
+            {fd.reviewerRemarks ? (
+              <View className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-3">
+                <AppText variant="labelSm" color={colors.textSecondary} style={{ textTransform: 'uppercase', marginBottom: 4 }}>Reviewer Remarks</AppText>
+                <AppText variant="bodyMd" color={colors.text} selectable>{fd.reviewerRemarks}</AppText>
+              </View>
+            ) : null}
+          </SectionCard>
+
+          {/* S7: Documentation & Sign-off */}
+          <SectionCard icon={FileText} title="Section 7 — Documentation & Sign-off">
+            {/* Client signature */}
+            <View className="mb-4">
+              <AppText variant="labelSm" color={colors.textMuted} style={{ textTransform: 'uppercase', marginBottom: 8 }}>Client Signature</AppText>
+              {fd.clientSignature ? (
+                <TouchableOpacity onPress={() => setLightboxUri(fd.clientSignature)} className="self-start border border-slate-200 rounded-lg bg-white px-3 py-2">
+                  <Image source={{ uri: fd.clientSignature }} style={{ width: 180, height: 72 }} resizeMode="contain" />
+                </TouchableOpacity>
+              ) : (
+                <AppText variant="bodyMd" color={colors.textFaint}>Not captured</AppText>
+              )}
+            </View>
+
+            {/* Digitally-signed report (PDF) */}
+            {signedReport.length > 0 ? (
+              <View className="mb-4">
+                <AppText variant="labelSm" color={colors.textMuted} style={{ textTransform: 'uppercase', marginBottom: 8 }}>Digitally-Signed Report</AppText>
+                <View style={{ rowGap: 8 }}>
+                  {signedReport.map((doc: any, i: number) => (
+                    <View key={i} className="flex-row items-center bg-brand-50 border border-brand-100 rounded-lg px-3 py-2">
+                      <FileText size={14} color={brand[600]} />
+                      <AppText variant="labelMd" color={brand[600]} style={{ marginLeft: 8 }} numberOfLines={1}>
+                        {doc?.name || `Signed Report ${i + 1}`}
+                      </AppText>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-          ) : <Text className="text-sm text-slate-400">No tests recorded.</Text>}
-          <PhotoGrid photos={fd.testingPhotos} label="General Testing Photos" onTap={setLightboxUri} />
-        </Section>
-
-        {/* S7: Documentation */}
-        <Section title="Section 7 — Documentation">
-          <InfoRow label="Inspector Signature" value={fd.inspectorSignature} />
-          <PhotoGrid photos={fd.documentationPhotos} label="Documentation Photos" onTap={setLightboxUri} />
-          <PhotoGrid photos={fd.photocopyDocuments} label="Photocopy Documents" onTap={setLightboxUri} />
-          <PhotoGrid photos={fd.companyIdCards} label="Company ID Cards" onTap={setLightboxUri} />
-        </Section>
-
-        {/* S8: Selfie Verification */}
-        {(fd.beforeSelfiePhoto || fd.afterSelfiePhoto) ? (
-          <Section title="Selfie Verification">
-            <View className="flex-row flex-wrap">
-              {([
-                { key: 'before', photo: fd.beforeSelfiePhoto, takenAt: fd.beforeSelfieTakenAt, label: 'Before Inspection' },
-                { key: 'after',  photo: fd.afterSelfiePhoto,  takenAt: fd.afterSelfieTakenAt,  label: 'After Inspection'  },
-              ] as const).map(({ key, photo, takenAt, label }) => {
-                const src = photo?.data || photo?.url || (typeof photo === 'string' ? photo : null);
-                if (!src) return null;
-                return (
-                  <View key={key} style={{ width: '44%', marginRight: 12, marginBottom: 12 }}>
-                    <TouchableOpacity
-                      onPress={() => setLightboxUri(src)}
-                      activeOpacity={0.85}
-                      className="rounded-2xl overflow-hidden border-2 border-violet-200"
-                      style={{ aspectRatio: 0.85 }}
-                    >
-                      <Image source={{ uri: src }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                      {/* violet overlay label */}
-                      <View className="absolute bottom-0 left-0 right-0 px-2 py-1" style={{ backgroundColor: 'rgba(109,40,217,0.65)' }}>
-                        <Text className="text-white text-[10px] font-bold text-center">{label}</Text>
-                      </View>
-                    </TouchableOpacity>
-                    {takenAt ? (
-                      <View className="flex-row items-center mt-1.5">
-                        <Clock size={10} color="#9ca3af" />
-                        <Text className="text-[10px] text-slate-400 ml-1">
-                          {new Date(takenAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                );
-              })}
-            </View>
-          </Section>
-        ) : null}
-
-        {/* S9: Review & Decision */}
-        <Section title="Section 8 — Review & Final Decision">
-          <View className="flex-row items-center mb-3" style={{ columnGap: 10 }}>
-            <Text className="text-sm text-slate-700">Final Decision:</Text>
-            {fd.finalDecision === 'Approved' ? (
-              <View className="flex-row items-center bg-emerald-100 rounded-full px-3 py-1">
-                <CheckCircle size={14} color="#059669" />
-                <Text className="text-sm font-bold text-emerald-700 ml-1.5">Approved</Text>
               </View>
-            ) : fd.finalDecision === 'Rejected' ? (
-              <View className="flex-row items-center bg-red-100 rounded-full px-3 py-1">
-                <XCircle size={14} color="#dc2626" />
-                <Text className="text-sm font-bold text-red-700 ml-1.5">Rejected</Text>
+            ) : null}
+
+            {/* Manually-signed document scans */}
+            <PhotoGrid photos={signedDocuments} label="Signed Documents" onTap={setLightboxUri} />
+            {/* Company ID cards */}
+            <PhotoGrid photos={companyIdCards} label="Company ID Cards" onTap={setLightboxUri} />
+            {/* Legacy general documentation photos (older reports only) */}
+            {documentationPhotos.length > 0 ? (
+              <PhotoGrid photos={documentationPhotos} label="General Documentation Photos" onTap={setLightboxUri} />
+            ) : null}
+
+            {signedReport.length === 0 && signedDocuments.length === 0 && companyIdCards.length === 0 && !fd.clientSignature && documentationPhotos.length === 0 ? (
+              <AppText variant="bodyMd" color={colors.textFaint}>No documentation captured.</AppText>
+            ) : null}
+          </SectionCard>
+
+          {/* Selfie Verification */}
+          {(fd.beforeSelfiePhoto || fd.afterSelfiePhoto) ? (
+            <SectionCard icon={Camera} title="Selfie Verification">
+              <View className="flex-row flex-wrap">
+                {([
+                  { key: 'before', photo: fd.beforeSelfiePhoto, takenAt: fd.beforeSelfieTakenAt, label: 'Before Inspection' },
+                  { key: 'after', photo: fd.afterSelfiePhoto, takenAt: fd.afterSelfieTakenAt, label: 'After Inspection' },
+                ] as const).map(({ key, photo, takenAt, label }) => {
+                  const src = photo?.data || photo?.url || (typeof photo === 'string' ? photo : null);
+                  if (!src) return null;
+                  return (
+                    <View key={key} style={{ width: '44%', marginRight: 12, marginBottom: 12 }}>
+                      <TouchableOpacity
+                        onPress={() => setLightboxUri(src)}
+                        activeOpacity={0.85}
+                        className="rounded-2xl overflow-hidden border-2 border-violet-200"
+                        style={{ aspectRatio: 0.85 }}
+                      >
+                        <Image source={{ uri: src }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                        <View className="absolute bottom-0 left-0 right-0 px-2 py-1" style={{ backgroundColor: 'rgba(109,40,217,0.65)' }}>
+                          <AppText variant="labelSm" color="#fff" style={{ textAlign: 'center' }}>{label}</AppText>
+                        </View>
+                      </TouchableOpacity>
+                      {takenAt ? (
+                        <View className="flex-row items-center mt-1.5">
+                          <Clock size={10} color={colors.textFaint} />
+                          <AppText variant="labelSm" color={colors.textFaint} style={{ marginLeft: 4 }}>
+                            {new Date(takenAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                          </AppText>
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })}
               </View>
-            ) : <Text className="text-sm text-slate-400">{fd.finalDecision || '—'}</Text>}
-          </View>
-          {fd.reviewerRemarks ? (
-            <View className="bg-neutral-50 border border-neutral-200 rounded-xl p-4">
-              <Text className="text-[10px] font-bold text-neutral-700 uppercase mb-1">Reviewer Remarks</Text>
-              <Text className="text-sm text-neutral-900" style={{ lineHeight: 20 }} selectable>{fd.reviewerRemarks}</Text>
-            </View>
+            </SectionCard>
           ) : null}
-        </Section>
 
-        {/* Timestamps */}
-        <View className="bg-white rounded-xl border border-slate-200 p-4">
-          <InfoRow label="Product Listed" value={product.createdAt ? new Date(product.createdAt).toLocaleString('en-IN') : undefined} />
-          <InfoRow label="Inspected On" value={product.updatedAt ? new Date(product.updatedAt).toLocaleString('en-IN') : undefined} />
-          <InfoRow label="Approval Status" value={STATUS_LABELS[status] || status} />
+          {/* Timestamps */}
+          <View className="bg-white rounded-xl border border-slate-200 p-4">
+            <InfoRow label="Product Listed" value={product.createdAt ? new Date(product.createdAt).toLocaleString('en-IN') : undefined} />
+            <InfoRow label="Inspected On" value={product.updatedAt ? new Date(product.updatedAt).toLocaleString('en-IN') : undefined} />
+            <InfoRow label="Approval Status" value={statusLabel} />
+          </View>
         </View>
       </ScrollView>
 

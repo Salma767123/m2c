@@ -47,15 +47,16 @@ export default function SplashScreen() {
           style={{
             width: 88,
             height: 88,
-            borderRadius: 22,
+            borderRadius: 44,
             backgroundColor: '#ffffff',
             alignItems: 'center',
             justifyContent: 'center',
+            overflow: 'hidden',
           }}
         >
           <Image
             source={require('../../assets/images/m2c-logo.png')}
-            style={{ width: 64, height: 64 }}
+            style={{ width: 72, height: 72 }}
             resizeMode="contain"
           />
         </View>

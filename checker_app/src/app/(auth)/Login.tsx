@@ -102,12 +102,12 @@ export default function LoginScreen() {
           {/* Logo Section */}
           <View className="items-center mb-8 mt-4" style={{ gap: 16 }}>
             <View
-              className="bg-white rounded-2xl p-4"
-              style={[{ borderCurve: 'continuous' }, elevation.raised]}
+              className="bg-white rounded-full items-center justify-center overflow-hidden"
+              style={[{ width: 160, height: 160 }, elevation.raised]}
             >
               <Image
                 source={require('../../../assets/images/m2c-logo.png')}
-                className="w-48 h-36"
+                style={{ width: 132, height: 132 }}
                 resizeMode="contain"
               />
             </View>

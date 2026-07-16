@@ -69,15 +69,19 @@ export default function Header() {
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
             <View
               style={{
+                width: 44,
+                height: 44,
                 backgroundColor: colors.white,
-                borderRadius: radius.md,
-                padding: 6,
+                borderRadius: radius.full,
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
                 marginRight: space.md,
               }}
             >
               <Image
                 source={require('../../../assets/images/m2c-logo.png')}
-                style={{ width: 56, height: 40 }}
+                style={{ width: 36, height: 36 }}
                 resizeMode="contain"
               />
             </View>
