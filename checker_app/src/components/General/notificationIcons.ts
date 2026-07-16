@@ -3,8 +3,8 @@
 // Mirrors the web reference (frontend/src/components/Shared/NotificationModal.tsx
 // ICON_MAP + BG_MAP) with the SAME icon choices and semantic colors, so the
 // mobile modal and the foreground banner stay visually consistent with web.
-// Web uses a `brand`-red for the two ASSIGNED types; mobile has no brand token,
-// so those map to the app's blue (#2563eb / #dbeafe).
+// The two vendor/product ASSIGNED types use brand red (#e01a1b), matching web
+// and the app's red theme. Info-style types (QC/enquiry/scheduled) stay blue.
 
 import {
   Bell,
@@ -24,6 +24,7 @@ export interface NotificationIconStyle {
 
 // Semantic palettes (hex kept in one place for reuse).
 const BLUE: Omit<NotificationIconStyle, 'Icon'> = { color: '#2563eb', bg: '#dbeafe' };
+const BRAND: Omit<NotificationIconStyle, 'Icon'> = { color: '#e01a1b', bg: '#fff1f1' };
 const ORANGE: Omit<NotificationIconStyle, 'Icon'> = { color: '#ea580c', bg: '#ffedd5' };
 const TEAL: Omit<NotificationIconStyle, 'Icon'> = { color: '#0d9488', bg: '#ccfbf1' };
 const GREEN: Omit<NotificationIconStyle, 'Icon'> = { color: '#16a34a', bg: '#dcfce7' };
@@ -39,9 +40,10 @@ export const DEFAULT_ICON_STYLE: NotificationIconStyle = {
 };
 
 export const TYPE_ICON: Record<string, NotificationIconStyle> = {
-  // Assignments / new work — blue
-  VENDOR_ASSIGNED: { Icon: Factory, ...BLUE },
-  PRODUCT_ASSIGNED: { Icon: Package, ...BLUE },
+  // Assignments / new work — vendor/product assignments use brand red (match
+  // web); QC/enquiry/scheduled stay info-blue (web uses blue for those too).
+  VENDOR_ASSIGNED: { Icon: Factory, ...BRAND },
+  PRODUCT_ASSIGNED: { Icon: Package, ...BRAND },
   QC_ASSIGNED: { Icon: Star, ...BLUE },
   NEW_ENQUIRY: { Icon: Star, ...BLUE },
   INSPECTION_SCHEDULED: { Icon: Calendar, ...BLUE },
