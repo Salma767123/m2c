@@ -99,22 +99,51 @@ const REMARK_CODE_LABELS: Record<number, string> = {
   7: 'Re-inspection', 8: 'Acceptable', 9: 'Good', 10: 'Excellent',
 };
 
-// Friendly final-status labels — mirror the web checker portal / detail screen.
-const PRODUCT_STATUS_LABELS: Record<string, string> = {
-  QC_APPROVED: 'Approved by QC',
-  APPROVED: 'Approved by Admin',
-  REJECTED: 'Rejected',
-  REINSPECTION: 'Reinspection',
-  PENDING: 'Pending',
+// productVerifications key → clean label (handles both "pv_front_view" and
+// "pvFrontView"); mirrors the web PDF's humanizer.
+const humanizePvKey = (key: string): string =>
+  key
+    .replace(/^pv_/i, '')
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+
+// Full form when known; otherwise Title-Case the raw value (mirror web PDF).
+const businessTypeLabel = (v?: string | null): string => {
+  if (blank(v)) return '—';
+  const key = String(v).trim().toLowerCase();
+  return BUSINESS_TYPE[key] || key.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
-// camelCase productVerifications key → "Front View" (mirror detail screen).
-const humanizeVerKey = (key: string): string =>
-  key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()).replace(/\s+/g, ' ').trim();
+const OWNER_DESIGNATION: Record<string, string> = {
+  proprietor: 'Proprietor', ceo: 'CEO', director: 'Director',
+  'managing-director': 'Managing Director', founder: 'Founder', other: 'Other',
+};
+const resolveOwnerDesignation = (v?: string | null): string => (!v ? '' : OWNER_DESIGNATION[v] ?? v);
 
-// additional-evidence key → Title Case (mirror detail screen / web PDF).
-const humanizeEvidenceKey = (key: string): string =>
-  key.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\b\w/g, (c) => c.toUpperCase());
+// title + name (mirror web formatCheckerName).
+const formatCheckerName = (c?: { title?: string | null; name?: string | null } | null): string =>
+  !c ? '' : [c.title, c.name].filter(Boolean).join(' ');
+
+// Main contact name from mainContact object or owner fields (mirror web).
+const resolveContactName = (v: any): string => {
+  if (!v) return '—';
+  const mc = v.mainContact && typeof v.mainContact === 'object' ? v.mainContact : null;
+  if (mc) {
+    const parts = [mc.title, mc.firstName, mc.middleName, mc.lastName].filter(Boolean);
+    return parts.length ? parts.join(' ') : mc.name || '—';
+  }
+  const ownerParts = [v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName].filter(Boolean);
+  return ownerParts.length ? ownerParts.join(' ') : v.ownerName || '—';
+};
+
+const fmtDateTime = (d: Date): string =>
+  d.toLocaleString('en-US', {
+    year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true,
+  });
+const fmtTime = (d: Date): string =>
+  d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
 function stepForKey(key: string): string {
   if (key.startsWith('certDoc_') || key.startsWith('cert_')) return 'Step 6 – Certifications';
@@ -589,227 +618,252 @@ function buildSelfieHtml(fd: any): string {
   return `<div class="section"><div class="sh"><span>Selfie Verification</span></div><div style="display:flex;gap:16px;padding:16px">${tiles}</div></div>`;
 }
 
-// ── Product report HTML (new 7-step schema — mirrors the detail screen/web) ──
+// ── Product report HTML — faithful HTML port of the web PDF ─────────────────
+// Mirrors frontend/src/lib/productInspectionReportPdf.ts (sections A–J, light-
+// red header band, photo counts as text, attached-document thumbnails, inline
+// signature block) so the mobile download matches the web download.
 function buildProductHtml(report: any, variant: ReportVariant, checkerName?: string): string {
   const fd: Record<string, any> = (report?.qcInspectionData || {}) as Record<string, any>;
-  const status = report?.approvalStatus || 'PENDING';
-  const statusLabel = PRODUCT_STATUS_LABELS[status] || status;
+  const v: Record<string, any> = fd.vendorData && typeof fd.vendorData === 'object' ? fd.vendorData : {};
+  const p: Record<string, any> = fd.productData && typeof fd.productData === 'object' ? fd.productData : {};
+  const checker: Record<string, any> = report?.assignedQc || (checkerName ? { name: checkerName } : {});
+  const productName = report?.name || 'Product';
+  const vendorName = report?.vendor?.companyName || fd.vendor || '';
+  const generatedAt = new Date();
+  const startTimeStr = fd.inspectionStartedAt ? fmtTime(new Date(fd.inspectionStartedAt)) : '—';
+  const completeTimeStr = fmtTime(generatedAt);
 
-  // New-schema inspection data (same fields the report detail screen reads).
-  const productVerifications: [string, any][] = Object.entries(fd.productVerifications || {});
-  const packagingItems: any[] = Array.isArray(fd.packagingItems) ? fd.packagingItems : [];
+  // Local table helpers (web-like: light-red header, grid borders, zebra rows).
+  const secTitle = (t: string) => `<div class="sec-title">${esc(t)}</div>`;
+  const gridTable = (head: string[], rows: (string | number)[][]) =>
+    `<table class="wtab"><thead><tr>${head
+      .map((h) => `<th>${esc(h)}</th>`)
+      .join('')}</tr></thead><tbody>${rows
+      .map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`)
+      .join('')}</tbody></table>`;
+  const note = (t: string) => `<p class="note">${esc(t)}</p>`;
+  const italic = (t: string) => `<p class="note"><i>${esc(t)}</i></p>`;
+
+  let body = '';
+
+  // ── A. General Information ──
+  const generalRows: [string, string][] = [
+    ['Company Name', val(v.companyName || fd.vendor || vendorName)],
+    ['Business Type', businessTypeLabel(v.businessType)],
+    ['Primary Phone', val(v.businessPhone)],
+    ['Secondary Phone', val(v.phoneNumber2)],
+    ['Primary Email', val(v.businessEmail)],
+    ['Inspection Date', val(fd.serviceStartDate)],
+    ['Service Type', val(fd.serviceType)],
+  ].filter(([l, vv]) => !(l.startsWith('Secondary') && vv === '—')) as [string, string][];
+  body += secTitle('A. General Information') + gridTable(['Field', 'Value'], generalRows);
+
+  // ── B. Main Contact Person (only when there's data) ──
+  const mc = v.mainContact && typeof v.mainContact === 'object' ? v.mainContact : null;
+  const contactRows: [string, string][] = [
+    ['Full Name', resolveContactName(v)],
+    ['Designation', val(mc ? mc.customDesignation || mc.designation : resolveOwnerDesignation(v.designation))],
+    ['Department', val(mc ? mc.customDepartment || mc.department : undefined)],
+    ['Primary Phone', val(mc ? mc.phone1 || mc.phone : v.ownerPhone)],
+    ['Secondary Phone', val(mc ? mc.phone2 : v.ownerPhone2)],
+    ['Primary Email', val(mc ? mc.email1 || mc.email : v.ownerEmail)],
+    ['Secondary Email', val(mc ? mc.email2 : v.ownerEmail2)],
+  ].filter(([l, vv]) => !(l.startsWith('Secondary') && vv === '—')) as [string, string][];
+  if (contactRows.some(([, vv]) => vv !== '—')) {
+    body += secTitle('B. Main Contact Person') + gridTable(['Field', 'Value'], contactRows);
+  }
+
+  // ── C. Product Being Inspected ──
+  if (p.name || p.category || report?.name || report?.category) {
+    const productRows: [string, string][] = [
+      ['Product Name', val(p.name || report?.name)],
+      ['Category', val(p.category || report?.category)],
+      ['Sub-Category', val(p.subCategory)],
+    ].filter(([l, vv]) => !(l === 'Sub-Category' && vv === '—')) as [string, string][];
+    body += secTitle('C. Product Being Inspected') + gridTable(['Field', 'Value'], productRows);
+  }
+
+  // ── D. Product Verification ──
+  body += secTitle('D. Product Verification');
+  const verEntries = Object.entries(fd.productVerifications || {});
+  if (verEntries.length === 0) {
+    body += italic('No product fields were verified.');
+  } else {
+    const rows = verEntries.map(([key, e]: [string, any]) => [
+      humanizePvKey(key),
+      e?.ok === true ? 'Verified' : e?.ok === false ? 'Not Verified' : 'Not Checked',
+      val(e?.remarks),
+    ]);
+    body += gridTable(['Field', 'Status', 'Remarks'], rows);
+  }
+  const evCount = (fd.productEvidencePhotos || []).length;
+  if (evCount > 0) body += note(`Photo Evidence: ${evCount} photo(s) attached`);
+
+  // ── E. Packaging Inspection ──
+  body += secTitle('E. Packaging Inspection');
+  const pkgItems: any[] = Array.isArray(fd.packagingItems) ? fd.packagingItems : [];
+  if (pkgItems.length === 0) {
+    body += italic('No packaging items recorded.');
+  } else {
+    const rows = pkgItems.map((item: any) => {
+      const code = item.remarkCode != null ? `${item.remarkCode} — ${REMARK_CODE_LABELS[item.remarkCode] || ''}` : '—';
+      return [
+        (item.label || '').split('—')[0].trim(),
+        item.verified === true ? 'Yes' : item.verified === false ? 'No' : '—',
+        code,
+        val(item.remarks),
+      ];
+    });
+    body += gridTable(['Item', 'Inspected', 'Remark Code', 'Remarks'], rows);
+  }
+  const pkgCount = (fd.packagingPhotos || []).length;
+  if (pkgCount > 0) body += note(`Packaging Photos: ${pkgCount} photo(s) attached`);
+
+  // ── F. Defects — AQL Summary ──
+  body += secTitle('F. Defects — AQL Summary');
+  body += gridTable(['Field', 'Value'], [
+    ['Inspection Level', val(fd.inspectionLevel)],
+    ['Sample Size', val(fd.sampleSize)],
+    ['AQL Critical', val(fd.aqlCritical)],
+    ['AQL Major', val(fd.aqlMajor)],
+    ['AQL Minor', val(fd.aqlMinor)],
+  ]);
+  body += gridTable(['Severity', 'Found', 'Max Allowed', 'Details'], [
+    ['Critical', String(fd.criticalDefects ?? 0), String(fd.maxAllowedCritical ?? 0), val(fd.criticalDefectDetails)],
+    ['Major', String(fd.majorDefects ?? 0), String(fd.maxAllowedMajor ?? 0), val(fd.majorDefectDetails)],
+    ['Minor', String(fd.minorDefects ?? 0), String(fd.maxAllowedMinor ?? 0), val(fd.minorDefectDetails)],
+  ]);
+  const defCount = (fd.defectPhotos || []).length;
+  if (defCount > 0) body += note(`Defect Photos: ${defCount} photo(s) attached`);
+
+  // ── G. Testing ──
   const testGroups: any[] = Array.isArray(fd.testGroups) ? fd.testGroups : [];
-  const additionalEvidence: Record<string, any[]> =
-    fd.additionalEvidence && typeof fd.additionalEvidence === 'object' ? fd.additionalEvidence : {};
-  const inspectionStatus: string = fd.inspectionStatus || '';
+  if (testGroups.length > 0) {
+    body += secTitle('G. Testing');
+    for (const group of testGroups) {
+      const tests: any[] = Array.isArray(group.tests) ? group.tests : [];
+      const gPass = tests.filter((t) => t.pass).length;
+      const gFail = tests.filter((t) => t.fail).length;
+      body += `<div class="grp">${esc(group.label || 'Group')}  (${gPass} passed, ${gFail} failed)</div>`;
+      const rows = tests.map((t: any) => [
+        t.isOther
+          ? `${val(t.label || t.subject)}${t.subject && t.label ? ` (${t.subject})` : ''}  [Custom]`
+          : val(t.label),
+        t.pass === true ? 'Pass' : t.fail === true ? 'Fail' : '—',
+        val(t.remarks),
+        String((t.rightPhotos || []).length),
+        String((t.wrongPhotos || []).length),
+      ]);
+      body += gridTable(['Test', 'Result', 'Remarks', 'Pass Photos', 'Fail Photos'], rows);
+    }
+    const additionalEvidence: Record<string, any[]> = fd.additionalEvidence || {};
+    const evRows = Object.entries(additionalEvidence)
+      .filter(([, photos]) => Array.isArray(photos) && photos.length > 0)
+      .map(([key, photos]) => [key.replace(/_/g, ' '), `${(photos as any[]).length} photo(s)`]);
+    if (evRows.length > 0) {
+      body += `<div class="grp">Additional Evidence</div>` + gridTable(['Category', 'Photos'], evRows);
+    }
+  }
 
-  let sections = '';
-
-  // Section 1 — General Information
-  sections += kvSection('Section 1 — General Information', [
-    ['Client', fd.client],
-    ['Vendor', fd.vendor],
-    ['Factory', fd.factory],
-    ['Service Location', fd.serviceLocation],
-    ['Service Start Date', fd.serviceStartDate],
-    ['Service Type', fd.serviceType],
+  // ── H. Inspector Details ──
+  const loc = fd.location || fd.gpsLocation || null;
+  const gps =
+    loc && loc.latitude != null && loc.longitude != null
+      ? `${Number(loc.latitude).toFixed(6)}, ${Number(loc.longitude).toFixed(6)}`
+      : 'Not available';
+  body += secTitle('H. Inspector Details');
+  body += gridTable(['Field', 'Value'], [
+    ['Inspector Name', val(formatCheckerName(checker) || fd.inspectorSignature)],
+    ['Checker ID', val(checker.checkerId)],
+    ['Email', val(checker.email)],
+    ['Phone', val(checker.phone)],
+    ['Inspection Date', val(fd.serviceStartDate)],
+    ['Inspection Start Time', startTimeStr],
+    ['Inspection Complete Time', completeTimeStr],
+    ['Inspection Status', val(fd.inspectionStatus)],
+    ['GPS Location', gps],
+    ['Report Generated', fmtDateTime(generatedAt)],
   ]);
 
-  // Section 2 — Product Verification
-  const verHtml =
-    productVerifications.length > 0
-      ? `<table class="grid-table"><tr><th>Field</th><th>Status</th><th>Remarks</th></tr>${productVerifications
-          .map(([key, entry]: [string, any]) => {
-            const st = entry?.ok === true ? 'Verified' : entry?.ok === false ? 'Not Verified' : 'Not Checked';
-            const stColor = entry?.ok === true ? '#059669' : entry?.ok === false ? '#dc2626' : '#94a3b8';
-            return `<tr><td>${esc(humanizeVerKey(key))}</td><td style="font-weight:700;color:${stColor}">${st}</td><td>${esc(
-              val(entry?.remarks),
-            )}</td></tr>`;
-          })
-          .join('')}</table>`
-      : '<p style="color:#94a3b8;padding:0 12px">No product fields were verified.</p>';
-  sections += `<div class="section"><div class="sh"><span>Section 2 — Product Verification</span></div><div style="padding:12px">${verHtml}</div>${photoBlock(
-    fd.productEvidencePhotos,
-    'Product Evidence Photos',
-  )}</div>`;
-
-  // Section 3 — Packaging Inspection
-  const pkgHtml =
-    packagingItems.length > 0
-      ? `<table class="grid-table"><tr><th>Item</th><th>Inspected</th><th>Remark Code</th><th>Remarks</th></tr>${packagingItems
-          .map((item: any) => {
-            const name = (item.label || '').split('—')[0].trim() || '—';
-            const inspected = item.verified === true ? 'Yes' : item.verified === false ? 'No' : '—';
-            const code =
-              item.remarkCode != null ? `${item.remarkCode} — ${REMARK_CODE_LABELS[item.remarkCode] || ''}` : '—';
-            return `<tr><td>${esc(name)}</td><td>${inspected}</td><td>${esc(code)}</td><td>${esc(
-              val(item.remarks),
-            )}</td></tr>`;
-          })
-          .join('')}</table>`
-      : '<p style="color:#94a3b8;padding:0 12px">No packaging items recorded.</p>';
-  sections += `<div class="section"><div class="sh"><span>Section 3 — Packaging Inspection</span></div><div style="padding:12px">${pkgHtml}</div>${photoBlock(
-    fd.packagingPhotos,
-    'Packaging Photos',
-  )}</div>`;
-
-  // Section 4 — Defects & AQL
-  const defectRows = [
-    { label: 'Critical', aql: fd.aqlCritical, max: fd.maxAllowedCritical, found: fd.criticalDefects },
-    { label: 'Major', aql: fd.aqlMajor, max: fd.maxAllowedMajor, found: fd.majorDefects },
-    { label: 'Minor', aql: fd.aqlMinor, max: fd.maxAllowedMinor, found: fd.minorDefects },
-  ]
-    .map((r) => {
-      const exceeded = r.found != null && r.max != null && Number(r.found) > Number(r.max);
-      return `<tr><td>${r.label}</td><td>${r.aql ?? '—'}</td><td>${r.max ?? '—'}</td><td>${r.found ?? '—'}</td><td style="font-weight:600;color:${
-        r.found != null ? (exceeded ? '#dc2626' : '#059669') : '#94a3b8'
-      }">${r.found != null ? (exceeded ? '✗ Exceeded' : '✓ Within Limit') : '—'}</td></tr>`;
-    })
-    .join('');
-  const defectDetails =
-    (fd.criticalDefectDetails ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;margin:8px 0"><p style="font-size:10px;font-weight:700;color:#991b1b;text-transform:uppercase;margin:0 0 4px">Critical Defect Details</p><p style="margin:0;font-size:12px;color:#7f1d1d">${esc(fd.criticalDefectDetails)}</p></div>` : '') +
-    (fd.majorDefectDetails ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;margin:8px 0"><p style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;margin:0 0 4px">Major Defect Details</p><p style="margin:0;font-size:12px;color:#78350f">${esc(fd.majorDefectDetails)}</p></div>` : '') +
-    (fd.minorDefectDetails ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin:8px 0"><p style="font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;margin:0 0 4px">Minor Defect Details</p><p style="margin:0;font-size:12px;color:#1e293b">${esc(fd.minorDefectDetails)}</p></div>` : '');
-  sections += `<div class="section"><div class="sh"><span>Section 4 — Defects & AQL</span></div><div style="padding:12px"><table>${kvRow(
-    'Inspection Level',
-    fd.inspectionLevel,
-  )}${kvRow('Sample Size', fd.sampleSize)}</table><table class="grid-table" style="margin-top:12px"><tr><th>Type</th><th>AQL Level</th><th>Max Allowed</th><th>Found</th><th>Status</th></tr>${defectRows}</table>${defectDetails}${photoBlock(
-    fd.defectPhotos,
-    'Defect Photos',
-  )}</div></div>`;
-
-  // Section 5 — On-site Testing
-  let testsHtml = '';
-  if (testGroups.length > 0) {
-    testsHtml = testGroups
-      .map((group: any, gi: number) => {
-        const groupTests: any[] = Array.isArray(group.tests) ? group.tests : [];
-        const gPass = groupTests.filter((t) => t.pass).length;
-        const gFail = groupTests.filter((t) => t.fail).length;
-        const testCards = groupTests
-          .map((t: any, i: number) => {
-            const name = t.label || (t.isOther ? t.subject : '') || `Test ${i + 1}`;
-            const badge = t.isOther
-              ? ' <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;color:#e01a1b;background:#fff1f1;border:1px solid #fecdd3;border-radius:4px;padding:1px 5px">CUSTOM</span>'
-              : '';
-            const subjectLine =
-              t.isOther && t.subject ? `<div style="font-size:11px;color:#6b7280;margin-top:2px">Subject: ${esc(t.subject)}</div>` : '';
-            const remarkLine = t.remarks ? `<div style="font-size:11px;color:#6b7280;margin-top:2px">${esc(t.remarks)}</div>` : '';
-            const pill = `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;color:${
-              t.pass ? '#059669' : t.fail ? '#dc2626' : '#6b7280'
-            };background:${t.pass ? '#d1fae5' : t.fail ? '#fee2e2' : '#f1f5f9'}">${t.pass ? 'PASS' : t.fail ? 'FAIL' : 'No decision'}</span>`;
-            return `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:10px"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px"><div><strong>${esc(
-              name,
-            )}</strong>${badge}${subjectLine}${remarkLine}</div>${pill}</div>${photoBlock(
-              t.rightPhotos,
-              'Right/Correct Photos',
-            )}${photoBlock(t.wrongPhotos, 'Wrong/Incorrect Photos')}</div>`;
-          })
-          .join('');
-        return `<div style="margin-bottom:14px"><div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:6px">${esc(
-          group.label || `Group ${gi + 1}`,
-        )} <span style="font-size:11px;font-weight:600;color:#059669">${gPass} passed</span> <span style="font-size:11px;font-weight:600;color:#dc2626">${gFail} failed</span></div>${testCards}</div>`;
-      })
-      .join('');
-    // Additional evidence photo grids
-    const evidenceHtml = Object.entries(additionalEvidence)
-      .filter(([, ph]) => Array.isArray(ph) && ph.length > 0)
-      .map(([key, ph]) => photoBlock(ph as any[], humanizeEvidenceKey(key)))
-      .join('');
-    if (evidenceHtml) {
-      testsHtml += `<div class="subhead">Additional Evidence</div>${evidenceHtml}`;
-    }
-  } else {
-    testsHtml = '<p style="color:#94a3b8">No tests recorded.</p>';
-  }
-  sections += `<div class="section"><div class="sh"><span>Section 5 — On-site Testing</span></div><div style="padding:12px">${testsHtml}</div></div>`;
-
-  // Section 6 — Review & Final Decision
-  const decColor =
-    inspectionStatus === 'Approved' ? '#059669' : inspectionStatus === 'Rejected' ? '#dc2626' : '#d97706';
-  const decBg =
-    inspectionStatus === 'Approved' ? '#d1fae5' : inspectionStatus === 'Rejected' ? '#fee2e2' : '#fef3c7';
-  const decisionPill = inspectionStatus
-    ? `<span style="font-size:13px;font-weight:700;padding:4px 14px;border-radius:20px;color:${decColor};background:${decBg}">${esc(
-        inspectionStatus,
-      )}</span>`
-    : '<span style="color:#94a3b8">—</span>';
-  sections += `<div class="section"><div class="sh"><span>Section 6 — Review &amp; Final Decision</span></div><div style="padding:12px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-size:13px;color:#334155">Inspector's Decision:</span>${decisionPill}</div><table>${kvRow(
-    'Final Status',
-    statusLabel,
-  )}</table>${
-    fd.reviewerRemarks
-      ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-top:8px"><p style="font-size:10px;font-weight:600;color:#374151;text-transform:uppercase;margin:0 0 4px">Reviewer Remarks</p><p style="margin:0;font-size:13px">${esc(fd.reviewerRemarks)}</p></div>`
-      : ''
-  }</div></div>`;
-
-  // Section 7 — Documentation & Sign-off
-  const signedReport = Array.isArray(fd.signedReport) ? fd.signedReport : [];
-  const signedDocuments = Array.isArray(fd.signedDocuments) ? fd.signedDocuments : [];
-  const companyIdCards = Array.isArray(fd.companyIdCards) ? fd.companyIdCards : [];
-  const documentationPhotos = Array.isArray(fd.documentationPhotos) ? fd.documentationPhotos : [];
-  let docHtml = '';
-  if (fd.clientSignature && String(fd.clientSignature).startsWith('http')) {
-    docHtml += `<div class="subhead">Client Signature</div><div style="padding:0 16px 12px"><img src="${fd.clientSignature}" style="height:70px;object-fit:contain;border:1px solid #e2e8f0;border-radius:8px;background:#fff;padding:6px" alt="Client signature"/></div>`;
-  }
-  if (signedReport.length > 0) {
-    docHtml += `<div class="subhead">Digitally-Signed Report</div><div style="padding:0 16px 8px">${signedReport
+  // ── J. Attached Documents (thumbnails) ──
+  const docImages: any[] = [
+    ...(Array.isArray(fd.documentationPhotos) ? fd.documentationPhotos : []),
+    ...(Array.isArray(fd.signedDocuments) ? fd.signedDocuments : []),
+  ].filter((d: any) => d && (d.data || d.url) && !d.isPdf);
+  if (docImages.length > 0) {
+    body += secTitle('J. Attached Documents');
+    body += `<div class="thumbs">${docImages
       .map(
-        (d: any, i: number) =>
-          `<div style="font-size:12px;color:#e01a1b;background:#fff1f1;border:1px solid #fecdd3;border-radius:8px;padding:8px 12px;margin-bottom:6px">${esc(
-            d?.name || `Signed Report ${i + 1}`,
-          )}</div>`,
+        (img: any) =>
+          `<div class="thumb"><img src="${img.data || img.url}" alt="${esc(
+            String(img.name || 'document'),
+          )}"/><div class="cap">${esc(String(img.name || 'document').slice(0, 30))}</div></div>`,
       )
       .join('')}</div>`;
   }
-  docHtml += photoBlock(signedDocuments, 'Signed Documents');
-  docHtml += photoBlock(companyIdCards, 'Company ID Cards');
-  docHtml += photoBlock(documentationPhotos, 'General Documentation Photos');
-  if (!docHtml.trim()) {
-    docHtml = '<p style="color:#94a3b8;padding:12px">No documentation captured.</p>';
-  }
-  sections += `<div class="section"><div class="sh"><span>Section 7 — Documentation &amp; Sign-off</span></div>${docHtml}</div>`;
 
-  // Selfie Verification + Timestamps
-  const selfieHtml = buildSelfieHtml(fd);
-  sections += kvSection('Timestamps', [
-    ['Product Listed', report?.createdAt ? new Date(report.createdAt).toLocaleString('en-IN') : undefined],
-    ['Inspected On', report?.updatedAt ? new Date(report.updatedAt).toLocaleString('en-IN') : undefined],
-    ['Approval Status', statusLabel],
-  ]);
+  // ── Signature block (inline, matches web) ──
+  const statusColors: Record<string, string> = {
+    Approved: '#16a34a', Rejected: '#dc2626', 'On Hold': '#ca8a04', 'Re-Inspection': '#ea580c',
+  };
+  const status = fd.inspectionStatus;
+  const sig = fd.clientSignature && String(fd.clientSignature).startsWith('http') ? fd.clientSignature : null;
+  const sigBlock = `
+  <div class="sigwrap">
+    <div class="sigcol">
+      <div class="sigrow"><b>Inspector:</b> ${esc(val(formatCheckerName(checker) || fd.inspectorSignature))}</div>
+      <div class="sigrow"><b>Inspection Date:</b> ${esc(val(fd.serviceStartDate))}</div>
+      <div class="sigrow"><b>Inspection Start Time:</b> ${esc(startTimeStr)}</div>
+      <div class="sigrow"><b>Inspection Complete Time:</b> ${esc(completeTimeStr)}</div>
+      ${status ? `<div class="sigrow" style="margin-top:6px;font-weight:700;color:${statusColors[status] || '#334155'}">Status: ${esc(status)}</div>` : ''}
+    </div>
+    <div class="sigcol">
+      ${
+        sig
+          ? `<div class="sigrow"><b>Client Signature:</b></div><img src="${sig}" style="height:50px;object-fit:contain;margin-top:6px" alt="Client signature"/><div style="font-size:9px;color:#64748b;font-style:italic;margin-top:4px">Digitally signed &middot; ${esc(fmtDateTime(generatedAt))}</div>`
+          : `<div class="sigrow"><b>Client Signature &amp; Seal:</b></div><div style="border-bottom:1px solid #94a3b8;height:44px;margin-top:24px"></div>`
+      }
+    </div>
+  </div>`;
 
-  const dateStr = report?.updatedAt
-    ? new Date(report.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
-    : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
+  const internal = variant === 'internal' ? internalBanner(checkerName) : '';
 
-  const closing =
-    variant === 'canonical'
-      ? signaturePage('Product Inspection Report', dateStr, checkerName || fd.inspectorSignature)
-      : internalBanner(checkerName);
+  const STYLES_PRODUCT = `
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 0; padding: 40px; color: #334155; font-size: 11px; }
+    .pdf-head { background:#fff5f5; border-bottom:2px solid #e01a1b; padding:16px 40px; margin:-40px -40px 20px; display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; }
+    .pdf-head h1 { color:#e01a1b; font-size:20px; font-weight:700; margin:0; }
+    .pdf-head .sub { color:#334155; font-size:11px; margin-top:5px; }
+    .pdf-head .gen { color:#64748b; font-size:9px; white-space:nowrap; padding-top:4px; }
+    .sec-title { color:#e01a1b; font-weight:700; font-size:12px; border-bottom:1.2px solid #e01a1b; padding-bottom:5px; margin:18px 0 8px; }
+    .wtab { width:100%; border-collapse:collapse; margin-bottom:6px; }
+    .wtab th { background:#fff5f5; color:#e01a1b; border:0.7px solid #e01a1b; font-size:9px; font-weight:700; text-align:left; padding:5px 6px; text-transform:uppercase; }
+    .wtab td { border:0.5px solid #e2e8f0; color:#334155; font-size:9.5px; padding:5px 6px; vertical-align:top; }
+    .wtab tbody tr:nth-child(even) td { background:#f8fafc; }
+    .note { color:#64748b; font-size:9px; margin:4px 0 10px; }
+    .grp { font-size:10px; font-weight:700; color:#334155; margin:10px 0 4px; }
+    .thumbs { display:flex; flex-wrap:wrap; gap:10px; }
+    .thumb { width:31%; }
+    .thumb img { width:100%; height:110px; object-fit:cover; border:0.5px solid #e2e8f0; border-radius:4px; }
+    .thumb .cap { font-size:7px; color:#64748b; margin-top:2px; word-break:break-all; }
+    .sigwrap { margin-top:26px; border-top:0.7px solid #e01a1b; padding-top:16px; display:flex; gap:24px; }
+    .sigcol { flex:1; }
+    .sigrow { font-size:10px; margin-bottom:8px; color:#334155; }
+    .wfoot { margin-top:30px; padding-top:8px; border-top:0.5px solid #eee; font-size:8px; color:#64748b; }
+  `;
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${STYLES}</style></head><body>
-  ${m2cHeader()}
-  <h1 style="font-size:20px">Product Inspection Report</h1>
-  <p style="font-size:12px;color:#6b7280;margin:0 0 16px">${esc(report?.name)}${
-    report?.vendor?.companyName ? `  &middot;  ${esc(report.vendor.companyName)}` : ''
-  }</p>
-  <div class="banner">
-    <div class="banner-item"><div class="banner-label">Product</div><div class="banner-value">${esc(report?.name)}</div></div>
-    <div class="banner-item"><div class="banner-label">Vendor</div><div class="banner-value">${esc(report?.vendor?.companyName)}</div></div>
-    <div class="banner-item"><div class="banner-label">Category</div><div class="banner-value">${esc(report?.category)}</div></div>
-    <div class="banner-item"><div class="banner-label">Inspected On</div><div class="banner-value">${
-      report?.updatedAt ? esc(new Date(report.updatedAt).toLocaleDateString('en-IN')) : '—'
-    }</div></div>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${STYLES_PRODUCT}</style></head><body>
+  <div class="pdf-head">
+    <div>
+      <h1>Product Inspection Report</h1>
+      <div class="sub">${esc(productName)}${vendorName ? `  &middot;  ${esc(vendorName)}` : ''}</div>
+    </div>
+    <div class="gen">Generated: ${esc(fmtDateTime(generatedAt))}</div>
   </div>
-  ${
-    report?.rejectionReason
-      ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;margin-bottom:16px"><p style="font-size:10px;font-weight:700;color:#991b1b;text-transform:uppercase;margin:0 0 4px">Rejection Reason</p><p style="font-size:13px;color:#7f1d1d;margin:0">${esc(report.rejectionReason)}</p></div>`
-      : ''
-  }
-  ${sections}
-  ${selfieHtml}
-  ${closing}
-  ${m2cFooter()}
+  ${body}
+  ${sigBlock}
+  ${internal}
+  <div class="wfoot">M2C — Confidential Inspection Report</div>
   </body></html>`;
 }
 
