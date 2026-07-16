@@ -493,6 +493,9 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
                           {product.baseSku ? (
                             <Text className="text-xs text-slate-500">SKU: {product.baseSku}</Text>
                           ) : null}
+                          {product.vendor?.companyName ? (
+                            <Text className="text-xs text-slate-500" numberOfLines={1}>{product.vendor.companyName}</Text>
+                          ) : null}
                           {product.createdAt ? (
                             <View className="flex-row items-center" style={{ gap: 4 }}>
                               <CalendarDays size={11} color="#94a3b8" />

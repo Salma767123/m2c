@@ -26,7 +26,8 @@ const TONES: Record<Tone, { iconBg: string; icon: string }> = {
 
 // Border via className (NativeWind) — inline borderWidth doesn't render on
 // this build. Thin slate line + soft shadow = clean, not a heavy outline.
-const BOX = 'w-full bg-white rounded-2xl border border-slate-200 p-4';
+// 48% width → two cards per row in the dashboard's flex-wrap grid.
+const BOX = 'w-[48%] mb-3 bg-white rounded-2xl border border-slate-200 p-4';
 
 export default function StatCard({ label, value, icon: Icon, trend, color, onPress }: StatCardProps) {
   const t = TONES[color];
