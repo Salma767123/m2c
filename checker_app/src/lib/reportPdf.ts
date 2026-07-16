@@ -92,14 +92,29 @@ const FACILITY_LABELS: Record<string, string> = {
   printing: 'Printing', stitching: 'Stitching', finishing: 'Finishing',
 };
 
-const PRODUCT_REMARK_LABELS: Record<string, string> = {
-  shipperCartonRemark: 'Shipper Carton Packaging',
-  innerCartonRemark: 'Inner Carton Packaging',
-  retailPackagingRemark: 'Retail Packaging',
-  productTypeRemark: 'Product Type (style, size, color, material, labeling)',
-  aqlWorkmanshipRemark: 'AQL (Workmanship / Appearance / Function)',
-  onSiteTestsRemark: 'On-site Tests',
+// Packaging remark-code labels (1–10) — mirror the product report detail screen.
+const REMARK_CODE_LABELS: Record<number, string> = {
+  1: 'Critical Defect', 2: 'Major Defect', 3: 'Functional Fail',
+  4: 'Safety Issue', 5: 'Non-Conformance', 6: 'Minor Issue',
+  7: 'Re-inspection', 8: 'Acceptable', 9: 'Good', 10: 'Excellent',
 };
+
+// Friendly final-status labels — mirror the web checker portal / detail screen.
+const PRODUCT_STATUS_LABELS: Record<string, string> = {
+  QC_APPROVED: 'Approved by QC',
+  APPROVED: 'Approved by Admin',
+  REJECTED: 'Rejected',
+  REINSPECTION: 'Reinspection',
+  PENDING: 'Pending',
+};
+
+// camelCase productVerifications key → "Front View" (mirror detail screen).
+const humanizeVerKey = (key: string): string =>
+  key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()).replace(/\s+/g, ' ').trim();
+
+// additional-evidence key → Title Case (mirror detail screen / web PDF).
+const humanizeEvidenceKey = (key: string): string =>
+  key.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\b\w/g, (c) => c.toUpperCase());
 
 function stepForKey(key: string): string {
   if (key.startsWith('certDoc_') || key.startsWith('cert_')) return 'Step 6 – Certifications';
@@ -574,24 +589,19 @@ function buildSelfieHtml(fd: any): string {
   return `<div class="section"><div class="sh"><span>Selfie Verification</span></div><div style="display:flex;gap:16px;padding:16px">${tiles}</div></div>`;
 }
 
-// ── Product report HTML (web parity) ────────────────────────────────────────
+// ── Product report HTML (new 7-step schema — mirrors the detail screen/web) ──
 function buildProductHtml(report: any, variant: ReportVariant, checkerName?: string): string {
   const fd: Record<string, any> = (report?.qcInspectionData || {}) as Record<string, any>;
-  const items = Array.isArray(fd.items) ? fd.items : [];
-  const measurements = Array.isArray(fd.measurements) ? fd.measurements : [];
-  const tests = Array.isArray(fd.tests) ? fd.tests : [];
   const status = report?.approvalStatus || 'PENDING';
+  const statusLabel = PRODUCT_STATUS_LABELS[status] || status;
 
-  const remarkCodes = Object.keys(PRODUCT_REMARK_LABELS)
-    .map((k) => Number(fd[k]))
-    .filter((n) => !Number.isNaN(n) && n >= 1 && n <= 10);
-  const remarkAvg = remarkCodes.length ? remarkCodes.reduce((a, b) => a + b, 0) / remarkCodes.length : 10;
-  const overallStatus = remarkAvg >= 8 ? 'PASS' : remarkAvg >= 6 ? 'RE-INSPECTION' : 'REJECTED';
-
-  const remarkColor = (v: any) => {
-    const n = Number(v);
-    return n >= 8 ? '#059669' : n >= 6 ? '#d97706' : '#dc2626';
-  };
+  // New-schema inspection data (same fields the report detail screen reads).
+  const productVerifications: [string, any][] = Object.entries(fd.productVerifications || {});
+  const packagingItems: any[] = Array.isArray(fd.packagingItems) ? fd.packagingItems : [];
+  const testGroups: any[] = Array.isArray(fd.testGroups) ? fd.testGroups : [];
+  const additionalEvidence: Record<string, any[]> =
+    fd.additionalEvidence && typeof fd.additionalEvidence === 'object' ? fd.additionalEvidence : {};
+  const inspectionStatus: string = fd.inspectionStatus || '';
 
   let sections = '';
 
@@ -605,53 +615,45 @@ function buildProductHtml(report: any, variant: ReportVariant, checkerName?: str
     ['Service Type', fd.serviceType],
   ]);
 
-  // Section 2 — Preparation
-  const itemsHtml =
-    items.length > 0
-      ? items
-          .map(
-            (it: any) =>
-              `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:8px"><div style="font-weight:600">${esc(
-                it.itemName,
-              )}</div>${it.itemDescription ? `<div style="font-size:11px;color:#6b7280;margin-top:2px">${esc(it.itemDescription)}</div>` : ''}<div style="margin-top:6px;font-size:11px;color:#475569">Lot Qty: <strong>${it.totalQuantity ?? '—'}</strong> &nbsp; Inspection Qty: <strong>${it.inspectionQuantity ?? '—'}</strong></div></div>`,
-          )
-          .join('')
-      : '<p style="color:#94a3b8;padding:0 12px">No products recorded.</p>';
-  sections += `<div class="section"><div class="sh"><span>Section 2 — Preparation</span></div><div style="padding:12px">${itemsHtml}${photoBlock(
-    fd.warehousePhotoEvidences,
-    'Warehouse Photos',
-  )}</div></div>`;
-
-  // Section 3 — Measurements
-  const measHtml =
-    measurements.length > 0
-      ? `<table class="grid-table"><tr><th>Sample</th><th>Carton L×W×H (cm)</th><th>Product L×W (cm)</th><th>Retail Wt (kg)</th><th>Gross Wt (kg)</th></tr>${measurements
-          .map(
-            (m: any, i: number) =>
-              `<tr><td>${esc(m.sampleName) || `#${i + 1}`}</td><td>${m.cartonLength ?? 0} × ${m.cartonWidth ?? 0} × ${m.cartonHeight ?? 0}</td><td>${m.productLength ?? 0} × ${m.productWidth ?? 0}</td><td>${m.retailWeight ?? 0}</td><td>${m.cartonGrossWeight ?? 0}</td></tr>`,
-          )
+  // Section 2 — Product Verification
+  const verHtml =
+    productVerifications.length > 0
+      ? `<table class="grid-table"><tr><th>Field</th><th>Status</th><th>Remarks</th></tr>${productVerifications
+          .map(([key, entry]: [string, any]) => {
+            const st = entry?.ok === true ? 'Verified' : entry?.ok === false ? 'Not Verified' : 'Not Checked';
+            const stColor = entry?.ok === true ? '#059669' : entry?.ok === false ? '#dc2626' : '#94a3b8';
+            return `<tr><td>${esc(humanizeVerKey(key))}</td><td style="font-weight:700;color:${stColor}">${st}</td><td>${esc(
+              val(entry?.remarks),
+            )}</td></tr>`;
+          })
           .join('')}</table>`
-      : '<p style="color:#94a3b8">No measurements recorded.</p>';
-  sections += `<div class="section"><div class="sh"><span>Section 3 — Measurements</span></div><div style="padding:12px">${measHtml}${photoBlock(
-    fd.measurementPhotos,
-    'Measurement Photos',
-  )}</div></div>`;
+      : '<p style="color:#94a3b8;padding:0 12px">No product fields were verified.</p>';
+  sections += `<div class="section"><div class="sh"><span>Section 2 — Product Verification</span></div><div style="padding:12px">${verHtml}</div>${photoBlock(
+    fd.productEvidencePhotos,
+    'Product Evidence Photos',
+  )}</div>`;
 
-  // Section 4 — Packaging & Remarks
-  const pkgHtml = Object.entries(PRODUCT_REMARK_LABELS)
-    .map(([k, l]) => {
-      const vv = fd[k];
-      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #f1f5f9"><span style="font-size:13px;color:#334155">${esc(
-        l,
-      )}</span><span style="font-size:13px;font-weight:700;color:${vv ? remarkColor(vv) : '#94a3b8'}">${vv ? `${vv}/10` : '—'}</span></div>`;
-    })
-    .join('');
-  sections += `<div class="section"><div class="sh"><span>Section 4 — Packaging & Remarks</span></div><div>${pkgHtml}${photoBlock(
+  // Section 3 — Packaging Inspection
+  const pkgHtml =
+    packagingItems.length > 0
+      ? `<table class="grid-table"><tr><th>Item</th><th>Inspected</th><th>Remark Code</th><th>Remarks</th></tr>${packagingItems
+          .map((item: any) => {
+            const name = (item.label || '').split('—')[0].trim() || '—';
+            const inspected = item.verified === true ? 'Yes' : item.verified === false ? 'No' : '—';
+            const code =
+              item.remarkCode != null ? `${item.remarkCode} — ${REMARK_CODE_LABELS[item.remarkCode] || ''}` : '—';
+            return `<tr><td>${esc(name)}</td><td>${inspected}</td><td>${esc(code)}</td><td>${esc(
+              val(item.remarks),
+            )}</td></tr>`;
+          })
+          .join('')}</table>`
+      : '<p style="color:#94a3b8;padding:0 12px">No packaging items recorded.</p>';
+  sections += `<div class="section"><div class="sh"><span>Section 3 — Packaging Inspection</span></div><div style="padding:12px">${pkgHtml}</div>${photoBlock(
     fd.packagingPhotos,
     'Packaging Photos',
-  )}</div></div>`;
+  )}</div>`;
 
-  // Section 5 — Defects & AQL
+  // Section 4 — Defects & AQL
   const defectRows = [
     { label: 'Critical', aql: fd.aqlCritical, max: fd.maxAllowedCritical, found: fd.criticalDefects },
     { label: 'Major', aql: fd.aqlMajor, max: fd.maxAllowedMajor, found: fd.majorDefects },
@@ -668,7 +670,7 @@ function buildProductHtml(report: any, variant: ReportVariant, checkerName?: str
     (fd.criticalDefectDetails ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;margin:8px 0"><p style="font-size:10px;font-weight:700;color:#991b1b;text-transform:uppercase;margin:0 0 4px">Critical Defect Details</p><p style="margin:0;font-size:12px;color:#7f1d1d">${esc(fd.criticalDefectDetails)}</p></div>` : '') +
     (fd.majorDefectDetails ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;margin:8px 0"><p style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;margin:0 0 4px">Major Defect Details</p><p style="margin:0;font-size:12px;color:#78350f">${esc(fd.majorDefectDetails)}</p></div>` : '') +
     (fd.minorDefectDetails ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin:8px 0"><p style="font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;margin:0 0 4px">Minor Defect Details</p><p style="margin:0;font-size:12px;color:#1e293b">${esc(fd.minorDefectDetails)}</p></div>` : '');
-  sections += `<div class="section"><div class="sh"><span>Section 5 — Defects & AQL</span></div><div style="padding:12px"><table>${kvRow(
+  sections += `<div class="section"><div class="sh"><span>Section 4 — Defects & AQL</span></div><div style="padding:12px"><table>${kvRow(
     'Inspection Level',
     fd.inspectionLevel,
   )}${kvRow('Sample Size', fd.sampleSize)}</table><table class="grid-table" style="margin-top:12px"><tr><th>Type</th><th>AQL Level</th><th>Max Allowed</th><th>Found</th><th>Status</th></tr>${defectRows}</table>${defectDetails}${photoBlock(
@@ -676,42 +678,73 @@ function buildProductHtml(report: any, variant: ReportVariant, checkerName?: str
     'Defect Photos',
   )}</div></div>`;
 
-  // Section 6 — On-site Testing
-  const testsHtml =
-    tests.length > 0
-      ? tests
-          .map(
-            (t: any, i: number) =>
-              `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:10px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div><strong>${esc(
-                t.label || `Test ${i + 1}`,
-              )}</strong>${t.detail ? `<div style="font-size:11px;color:#6b7280;margin-top:2px">${esc(t.detail)}</div>` : ''}</div><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;color:${
-                t.pass ? '#059669' : t.fail ? '#dc2626' : '#6b7280'
-              };background:${t.pass ? '#d1fae5' : t.fail ? '#fee2e2' : '#f1f5f9'}">${t.pass ? 'PASS' : t.fail ? 'FAIL' : 'N/A'}</span></div>${photoBlock(
-                t.rightPhotos,
-                'Right/Correct Photos',
-              )}${photoBlock(t.wrongPhotos, 'Wrong/Incorrect Photos')}</div>`,
-          )
-          .join('')
-      : '<p style="color:#94a3b8">No tests recorded.</p>';
-  sections += `<div class="section"><div class="sh"><span>Section 6 — On-site Testing</span></div><div style="padding:12px">${testsHtml}${photoBlock(
-    fd.testingPhotos,
-    'Testing Photos',
-  )}</div></div>`;
+  // Section 5 — On-site Testing
+  let testsHtml = '';
+  if (testGroups.length > 0) {
+    testsHtml = testGroups
+      .map((group: any, gi: number) => {
+        const groupTests: any[] = Array.isArray(group.tests) ? group.tests : [];
+        const gPass = groupTests.filter((t) => t.pass).length;
+        const gFail = groupTests.filter((t) => t.fail).length;
+        const testCards = groupTests
+          .map((t: any, i: number) => {
+            const name = t.label || (t.isOther ? t.subject : '') || `Test ${i + 1}`;
+            const badge = t.isOther
+              ? ' <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;color:#e01a1b;background:#fff1f1;border:1px solid #fecdd3;border-radius:4px;padding:1px 5px">CUSTOM</span>'
+              : '';
+            const subjectLine =
+              t.isOther && t.subject ? `<div style="font-size:11px;color:#6b7280;margin-top:2px">Subject: ${esc(t.subject)}</div>` : '';
+            const remarkLine = t.remarks ? `<div style="font-size:11px;color:#6b7280;margin-top:2px">${esc(t.remarks)}</div>` : '';
+            const pill = `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;color:${
+              t.pass ? '#059669' : t.fail ? '#dc2626' : '#6b7280'
+            };background:${t.pass ? '#d1fae5' : t.fail ? '#fee2e2' : '#f1f5f9'}">${t.pass ? 'PASS' : t.fail ? 'FAIL' : 'No decision'}</span>`;
+            return `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:10px"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px"><div><strong>${esc(
+              name,
+            )}</strong>${badge}${subjectLine}${remarkLine}</div>${pill}</div>${photoBlock(
+              t.rightPhotos,
+              'Right/Correct Photos',
+            )}${photoBlock(t.wrongPhotos, 'Wrong/Incorrect Photos')}</div>`;
+          })
+          .join('');
+        return `<div style="margin-bottom:14px"><div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:6px">${esc(
+          group.label || `Group ${gi + 1}`,
+        )} <span style="font-size:11px;font-weight:600;color:#059669">${gPass} passed</span> <span style="font-size:11px;font-weight:600;color:#dc2626">${gFail} failed</span></div>${testCards}</div>`;
+      })
+      .join('');
+    // Additional evidence photo grids
+    const evidenceHtml = Object.entries(additionalEvidence)
+      .filter(([, ph]) => Array.isArray(ph) && ph.length > 0)
+      .map(([key, ph]) => photoBlock(ph as any[], humanizeEvidenceKey(key)))
+      .join('');
+    if (evidenceHtml) {
+      testsHtml += `<div class="subhead">Additional Evidence</div>${evidenceHtml}`;
+    }
+  } else {
+    testsHtml = '<p style="color:#94a3b8">No tests recorded.</p>';
+  }
+  sections += `<div class="section"><div class="sh"><span>Section 5 — On-site Testing</span></div><div style="padding:12px">${testsHtml}</div></div>`;
 
-  // Section 7 — Review & Final Decision
-  sections += `<div class="section"><div class="sh"><span>Section 7 — Review & Final Decision</span></div><div style="padding:12px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-size:13px;color:#334155">Final Decision:</span><span style="font-size:13px;font-weight:700;padding:4px 14px;border-radius:20px;color:${
-    fd.finalDecision === 'Approved' ? '#059669' : fd.finalDecision === 'Rejected' ? '#dc2626' : '#334155'
-  };background:${fd.finalDecision === 'Approved' ? '#d1fae5' : fd.finalDecision === 'Rejected' ? '#fee2e2' : '#f1f5f9'}">${esc(
-    fd.finalDecision,
-  )}</span></div><div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between"><div><div style="font-size:10px;text-transform:uppercase;color:#64748b">Overall Result</div><div style="font-size:16px;font-weight:700">${overallStatus}</div></div><div style="text-align:right"><div style="font-size:10px;text-transform:uppercase;color:#64748b">Average Score</div><div style="font-size:16px;font-weight:700">${remarkAvg.toFixed(
-    1,
-  )}/10</div></div></div>${
+  // Section 6 — Review & Final Decision
+  const decColor =
+    inspectionStatus === 'Approved' ? '#059669' : inspectionStatus === 'Rejected' ? '#dc2626' : '#d97706';
+  const decBg =
+    inspectionStatus === 'Approved' ? '#d1fae5' : inspectionStatus === 'Rejected' ? '#fee2e2' : '#fef3c7';
+  const decisionPill = inspectionStatus
+    ? `<span style="font-size:13px;font-weight:700;padding:4px 14px;border-radius:20px;color:${decColor};background:${decBg}">${esc(
+        inspectionStatus,
+      )}</span>`
+    : '<span style="color:#94a3b8">—</span>';
+  sections += `<div class="section"><div class="sh"><span>Section 6 — Review &amp; Final Decision</span></div><div style="padding:12px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-size:13px;color:#334155">Inspector's Decision:</span>${decisionPill}</div><table>${kvRow(
+    'Final Status',
+    statusLabel,
+  )}</table>${
     fd.reviewerRemarks
-      ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px"><p style="font-size:10px;font-weight:600;color:#374151;text-transform:uppercase;margin:0 0 4px">Reviewer Remarks</p><p style="margin:0;font-size:13px">${esc(fd.reviewerRemarks)}</p></div>`
+      ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-top:8px"><p style="font-size:10px;font-weight:600;color:#374151;text-transform:uppercase;margin:0 0 4px">Reviewer Remarks</p><p style="margin:0;font-size:13px">${esc(fd.reviewerRemarks)}</p></div>`
       : ''
   }</div></div>`;
 
-  // Section 8 — Documentation & Sign-off
+  // Section 7 — Documentation & Sign-off
+  const signedReport = Array.isArray(fd.signedReport) ? fd.signedReport : [];
   const signedDocuments = Array.isArray(fd.signedDocuments) ? fd.signedDocuments : [];
   const companyIdCards = Array.isArray(fd.companyIdCards) ? fd.companyIdCards : [];
   const documentationPhotos = Array.isArray(fd.documentationPhotos) ? fd.documentationPhotos : [];
@@ -719,21 +752,31 @@ function buildProductHtml(report: any, variant: ReportVariant, checkerName?: str
   if (fd.clientSignature && String(fd.clientSignature).startsWith('http')) {
     docHtml += `<div class="subhead">Client Signature</div><div style="padding:0 16px 12px"><img src="${fd.clientSignature}" style="height:70px;object-fit:contain;border:1px solid #e2e8f0;border-radius:8px;background:#fff;padding:6px" alt="Client signature"/></div>`;
   }
+  if (signedReport.length > 0) {
+    docHtml += `<div class="subhead">Digitally-Signed Report</div><div style="padding:0 16px 8px">${signedReport
+      .map(
+        (d: any, i: number) =>
+          `<div style="font-size:12px;color:#e01a1b;background:#fff1f1;border:1px solid #fecdd3;border-radius:8px;padding:8px 12px;margin-bottom:6px">${esc(
+            d?.name || `Signed Report ${i + 1}`,
+          )}</div>`,
+      )
+      .join('')}</div>`;
+  }
   docHtml += photoBlock(signedDocuments, 'Signed Documents');
   docHtml += photoBlock(companyIdCards, 'Company ID Cards');
   docHtml += photoBlock(documentationPhotos, 'General Documentation Photos');
-  if (docHtml.trim()) {
-    sections += `<div class="section"><div class="sh"><span>Section 8 — Documentation & Sign-off</span></div>${docHtml}</div>`;
+  if (!docHtml.trim()) {
+    docHtml = '<p style="color:#94a3b8;padding:12px">No documentation captured.</p>';
   }
+  sections += `<div class="section"><div class="sh"><span>Section 7 — Documentation &amp; Sign-off</span></div>${docHtml}</div>`;
 
-  // Timestamps
+  // Selfie Verification + Timestamps
+  const selfieHtml = buildSelfieHtml(fd);
   sections += kvSection('Timestamps', [
     ['Product Listed', report?.createdAt ? new Date(report.createdAt).toLocaleString('en-IN') : undefined],
     ['Inspected On', report?.updatedAt ? new Date(report.updatedAt).toLocaleString('en-IN') : undefined],
-    ['Approval Status', status],
+    ['Approval Status', statusLabel],
   ]);
-
-  const selfieHtml = buildSelfieHtml(fd);
 
   const dateStr = report?.updatedAt
     ? new Date(report.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -747,7 +790,9 @@ function buildProductHtml(report: any, variant: ReportVariant, checkerName?: str
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${STYLES}</style></head><body>
   ${m2cHeader()}
   <h1 style="font-size:20px">Product Inspection Report</h1>
-  <p style="font-size:12px;color:#6b7280;margin:0 0 16px">${esc(report?.name)} &bull; SKU: ${esc(report?.baseSku || 'N/A')}</p>
+  <p style="font-size:12px;color:#6b7280;margin:0 0 16px">${esc(report?.name)}${
+    report?.vendor?.companyName ? `  &middot;  ${esc(report.vendor.companyName)}` : ''
+  }</p>
   <div class="banner">
     <div class="banner-item"><div class="banner-label">Product</div><div class="banner-value">${esc(report?.name)}</div></div>
     <div class="banner-item"><div class="banner-label">Vendor</div><div class="banner-value">${esc(report?.vendor?.companyName)}</div></div>
