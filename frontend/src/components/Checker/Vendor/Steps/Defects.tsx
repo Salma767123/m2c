@@ -129,10 +129,12 @@ export default function Defects({ formData, setFormData, errors = {} }: DefectsP
             <label className="block text-sm font-medium text-slate-700 mb-2">Sample Size</label>
             <input
               type="number"
+              onFocus={(e) => e.currentTarget.select()}
               min={1}
               value={formData.sampleSize || ''}
               onChange={(e) => setFormData((prev: any) => ({ ...prev, sampleSize: e.target.value === '' ? 0 : parseInt(e.target.value) }))}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 ${errors.sampleSize ? 'border-red-400 bg-red-50/40' : 'border-slate-300'}`}
+              data-invalid={errors.sampleSize ? 'true' : undefined}
+              className={`scroll-mt-24 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 ${errors.sampleSize ? 'border-red-400 bg-red-50/40' : 'border-slate-300'}`}
             />
             {errors.sampleSize && <p className="mt-1 text-xs text-red-600">{errors.sampleSize}</p>}
           </div>
@@ -140,6 +142,7 @@ export default function Defects({ formData, setFormData, errors = {} }: DefectsP
             <label className="block text-sm font-medium text-slate-700 mb-2">AQL Level - Critical</label>
             <input
               type="number"
+              onFocus={(e) => e.currentTarget.select()}
               step="0.1"
               value={formData.aqlCritical ?? ''}
               onChange={(e) => setFormData((prev: any) => ({ ...prev, aqlCritical: e.target.value === '' ? 0 : parseFloat(e.target.value) }))}
@@ -150,6 +153,7 @@ export default function Defects({ formData, setFormData, errors = {} }: DefectsP
             <label className="block text-sm font-medium text-slate-700 mb-2">AQL Level - Major</label>
             <input
               type="number"
+              onFocus={(e) => e.currentTarget.select()}
               step="0.1"
               value={formData.aqlMajor || ''}
               onChange={(e) => setFormData((prev: any) => ({ ...prev, aqlMajor: e.target.value === '' ? 0 : parseFloat(e.target.value) }))}
@@ -160,6 +164,7 @@ export default function Defects({ formData, setFormData, errors = {} }: DefectsP
             <label className="block text-sm font-medium text-slate-700 mb-2">AQL Level - Minor</label>
             <input
               type="number"
+              onFocus={(e) => e.currentTarget.select()}
               step="0.1"
               value={formData.aqlMinor || ''}
               onChange={(e) => setFormData((prev: any) => ({ ...prev, aqlMinor: e.target.value === '' ? 0 : parseFloat(e.target.value) }))}
@@ -172,6 +177,7 @@ export default function Defects({ formData, setFormData, errors = {} }: DefectsP
             <label className="block text-sm font-medium text-slate-700 mb-2">Max Allowed - Critical</label>
             <input
               type="number"
+              onFocus={(e) => e.currentTarget.select()}
               value={formData.maxAllowedCritical ?? ''}
               onChange={(e) => setFormData((prev: any) => ({ ...prev, maxAllowedCritical: e.target.value === '' ? 0 : parseInt(e.target.value) }))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
@@ -181,6 +187,7 @@ export default function Defects({ formData, setFormData, errors = {} }: DefectsP
             <label className="block text-sm font-medium text-slate-700 mb-2">Max Allowed - Major</label>
             <input
               type="number"
+              onFocus={(e) => e.currentTarget.select()}
               value={formData.maxAllowedMajor || ''}
               onChange={(e) => setFormData((prev: any) => ({ ...prev, maxAllowedMajor: e.target.value === '' ? 0 : parseInt(e.target.value) }))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
@@ -190,6 +197,7 @@ export default function Defects({ formData, setFormData, errors = {} }: DefectsP
             <label className="block text-sm font-medium text-slate-700 mb-2">Max Allowed - Minor</label>
             <input
               type="number"
+              onFocus={(e) => e.currentTarget.select()}
               value={formData.maxAllowedMinor || ''}
               onChange={(e) => setFormData((prev: any) => ({ ...prev, maxAllowedMinor: e.target.value === '' ? 0 : parseInt(e.target.value) }))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
@@ -386,7 +394,12 @@ export default function Defects({ formData, setFormData, errors = {} }: DefectsP
         <p className="text-slate-600 text-sm mb-4">Major/minor defects, sealed samples with AQF tape</p>
         {errors.defectPhotos && <p className="mb-3 text-xs text-red-600">{errors.defectPhotos}</p>}
         {(formData.defectPhotos || []).length === 0 && (
-          <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50">
+          <div
+            data-invalid={errors.defectPhotos ? 'true' : undefined}
+            className={`scroll-mt-24 border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
+              errors.defectPhotos ? 'border-red-300 bg-red-50/40 hover:border-red-400' : 'border-slate-300 hover:border-brand-400 bg-slate-50/50'
+            }`}
+          >
             <input
               ref={defectPhotoInputRef}
               type="file"

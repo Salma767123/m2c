@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import { Button } from "@/components/UI/Button"
 import Link from 'next/link'
 import { Badge } from "@/components/UI/Badge"
+import ApproveProductModal, { type ApprovableProduct } from "./ApproveProductModal"
 import {
   Table,
   TableBody,
@@ -13,11 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/UI/Table"
-import { Eye, Edit, Trash2, CheckCircle, XCircle, Filter, ChevronLeft, ChevronRight } from "lucide-react"
+import { Eye, Edit, Trash2, CheckCircle, XCircle, Filter, ChevronLeft, ChevronRight, Package, Clock, ShieldCheck, AlertTriangle } from "lucide-react"
 import { formatDate, formatPrice } from "@/lib/utils"
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Dropdown from '@/components/UI/Dropdown'
-import { adminProductService } from '@/services/adminProductService'
+import DateRangeCalendar from '@/components/Shared/DateRangeCalendar'
+import { adminProductService, AdminProductCounts } from '@/services/adminProductService'
 import { hasPermission } from '@/lib/auth'
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 
@@ -105,9 +107,14 @@ export default function ProductsTable() {
   const [filters, setFilters] = useState({
     approvalStatus: '',
     status: '',
-    search: ''
+    search: '',
+    dateFrom: '',
+    dateTo: ''
   })
   const [searchInput, setSearchInput] = useState('') // Separate state for input
+  const [counts, setCounts] = useState<AdminProductCounts>({
+    total: 0, PENDING: 0, QC_APPROVED: 0, APPROVED: 0, REJECTED: 0, REINSPECTION: 0
+  })
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -118,10 +125,6 @@ export default function ProductsTable() {
   const [deleting, setDeleting] = useState(false)
   const [showApprovalModal, setShowApprovalModal] = useState(false)
   const [approvingProduct, setApprovingProduct] = useState<Product | null>(null)
-  const [adminPrice, setAdminPrice] = useState<string>('')
-  const [originalPrice, setOriginalPrice] = useState<string>('')
-  const [variantPrices, setVariantPrices] = useState<Record<string, string>>({})
-  const [variantOriginalPrices, setVariantOriginalPrices] = useState<Record<string, string>>({})
 
   // Debounce search input
   useEffect(() => {
@@ -152,13 +155,16 @@ export default function ProductsTable() {
         limit: pagination.limit,
         ...(filters.approvalStatus && { approvalStatus: filters.approvalStatus as any }),
         ...(filters.status && { status: filters.status as any }),
-        ...(filters.search && { search: filters.search })
+        ...(filters.search && { search: filters.search }),
+        ...(filters.dateFrom && { dateFrom: filters.dateFrom }),
+        ...(filters.dateTo && { dateTo: filters.dateTo })
       }
 
       const response = await adminProductService.getAllProducts(params)
 
       if (response.success) {
         setProducts(response.data.products)
+        if (response.data.counts) setCounts(response.data.counts)
         setPagination(prev => ({
           ...prev,
           totalPages: response.data.pagination.totalPages,
@@ -176,109 +182,11 @@ export default function ProductsTable() {
   const handleApproveClick = (productId: string) => {
     const product = products.find(p => p.id === productId)
     if (!product) return
-
+    // The shared ApproveProductModal initialises its own pricing state from the product.
     setApprovingProduct(product)
-    setAdminPrice(product.basePrice.toString())
-    setOriginalPrice(product.originalPrice?.toString() || '')
-
-    if (product.variants && product.variants.length > 0) {
-      const initialPrices: Record<string, string> = {}
-      const initialOriginalPrices: Record<string, string> = {}
-      product.variants.forEach(v => {
-        initialPrices[v.id] = v.price.toString()
-        initialOriginalPrices[v.id] = v.originalPrice?.toString() || ''
-      })
-      setVariantPrices(initialPrices)
-      setVariantOriginalPrices(initialOriginalPrices)
-    } else {
-      setVariantPrices({})
-      setVariantOriginalPrices({})
-    }
-
     setShowApprovalModal(true)
   }
 
-  const handleApproveSubmit = async () => {
-    if (!approvingProduct) return
-
-    const hasVariants = approvingProduct.variants && approvingProduct.variants.length > 0
-
-    // Validate base admin price
-    if (!adminPrice || parseFloat(adminPrice) <= 0) {
-      showErrorToast('Invalid Price', 'Please enter a valid admin selling price')
-      return
-    }
-
-    // Validate original price (required)
-    if (!originalPrice || parseFloat(originalPrice) <= 0) {
-      showErrorToast('Invalid Price', 'Please enter a valid original price')
-      return
-    }
-
-    if (parseFloat(originalPrice) <= parseFloat(adminPrice)) {
-      showErrorToast('Invalid Price', 'Original price must be greater than selling price')
-      return
-    }
-
-    if (hasVariants) {
-      const invalidVariants = approvingProduct.variants!.filter(v =>
-        !variantPrices[v.id] || parseFloat(variantPrices[v.id]) <= 0
-      )
-      if (invalidVariants.length > 0) {
-        showErrorToast('Invalid Prices', 'Please enter valid admin prices for all variants')
-        return
-      }
-
-      const invalidOriginalPrices = approvingProduct.variants!.filter(v =>
-        !variantOriginalPrices[v.id] || parseFloat(variantOriginalPrices[v.id]) <= 0
-      )
-      if (invalidOriginalPrices.length > 0) {
-        showErrorToast('Invalid Prices', 'Please enter valid original prices for all variants')
-        return
-      }
-
-      const invalidDiscounts = approvingProduct.variants!.filter(v =>
-        parseFloat(variantOriginalPrices[v.id]) <= parseFloat(variantPrices[v.id])
-      )
-      if (invalidDiscounts.length > 0) {
-        showErrorToast('Invalid Prices', 'Original price must be greater than admin price for all variants')
-        return
-      }
-    }
-
-    try {
-      const variantPricesNum = hasVariants
-        ? Object.fromEntries(
-            Object.entries(variantPrices).map(([id, price]) => [id, parseFloat(price)])
-          )
-        : undefined
-
-      const variantOriginalPricesNum = hasVariants
-        ? Object.fromEntries(
-            Object.entries(variantOriginalPrices)
-              .filter(([, price]) => price && parseFloat(price) > 0)
-              .map(([id, price]) => [id, parseFloat(price)])
-          )
-        : undefined
-
-      const response = await adminProductService.approveProduct(
-        approvingProduct.id,
-        parseFloat(adminPrice),
-        variantPricesNum,
-        originalPrice ? parseFloat(originalPrice) : undefined,
-        variantOriginalPricesNum && Object.keys(variantOriginalPricesNum).length > 0 ? variantOriginalPricesNum : undefined
-      )
-
-      if (response.success) {
-        showSuccessToast('Product Approved', 'Product has been approved successfully')
-        setShowApprovalModal(false)
-        setApprovingProduct(null)
-        loadProducts()
-      }
-    } catch (error: any) {
-      showErrorToast('Approval Failed', error.message || 'Unable to approve product')
-    }
-  }
 
   const handleRejectProduct = async (productId: string) => {
     const reason = prompt('Please provide a reason for rejection:')
@@ -320,6 +228,20 @@ export default function ProductsTable() {
     }
   }
 
+  const handleMetricClick = (key: string) => {
+    setFilters(prev => ({ ...prev, approvalStatus: prev.approvalStatus === key ? '' : key }))
+    setPagination(prev => ({ ...prev, currentPage: 1 }))
+  }
+
+  const metricCards = [
+    { key: '',             label: 'All Products',   subtitle: 'Total submissions',  count: counts.total,       Icon: Package,       iconBg: 'bg-brand-50',   iconColor: 'text-brand-500',   countColor: 'text-slate-900',   activeClass: 'border-brand-400 bg-brand-50/50' },
+    { key: 'PENDING',      label: 'Pending',        subtitle: 'Awaiting review',    count: counts.PENDING,     Icon: Clock,         iconBg: 'bg-amber-50',   iconColor: 'text-amber-500',   countColor: 'text-amber-700',   activeClass: 'border-amber-400 bg-amber-50/60' },
+    { key: 'QC_APPROVED',  label: 'QC Approved',    subtitle: 'Ready for approval', count: counts.QC_APPROVED, Icon: ShieldCheck,   iconBg: 'bg-blue-50',    iconColor: 'text-blue-500',    countColor: 'text-blue-700',    activeClass: 'border-blue-400 bg-blue-50/60' },
+    { key: 'APPROVED',     label: 'Approved',       subtitle: 'Live on platform',   count: counts.APPROVED,    Icon: CheckCircle,   iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500', countColor: 'text-emerald-700', activeClass: 'border-emerald-400 bg-emerald-50/60' },
+    { key: 'REJECTED',     label: 'Rejected',       subtitle: 'Declined requests',  count: counts.REJECTED,    Icon: XCircle,       iconBg: 'bg-red-50',     iconColor: 'text-red-500',     countColor: 'text-red-700',     activeClass: 'border-red-400 bg-red-50/60' },
+    { key: 'REINSPECTION', label: 'Re-Inspection',  subtitle: 'Needs re-review',    count: counts.REINSPECTION,Icon: AlertTriangle, iconBg: 'bg-orange-50',  iconColor: 'text-orange-500',  countColor: 'text-orange-700',  activeClass: 'border-orange-400 bg-orange-50/60' },
+  ]
+
   return (
     <Card>
       <CardHeader>
@@ -334,6 +256,32 @@ export default function ProductsTable() {
           )}
         </div>
         
+        {/* Metric Cards — click a card to filter by approval status */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-4">
+          {metricCards.map(({ key, label, subtitle, count, Icon, iconBg, iconColor, countColor, activeClass }) => {
+            const isActive = filters.approvalStatus === key
+            return (
+              <button
+                key={key || 'all'}
+                type="button"
+                onClick={() => handleMetricClick(key)}
+                className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : 'border-slate-200/80 hover:border-slate-300'}`}
+              >
+                <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+                  <span className="text-sm font-medium text-slate-500">{label}</span>
+                  <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace('50', '100') : iconBg} transition-transform duration-150 group-hover:scale-110`}>
+                    <Icon className={`h-4 w-4 ${iconColor}`} />
+                  </div>
+                </div>
+                <div className="px-4 pb-4">
+                  <div className={`text-2xl font-bold ${countColor}`}>{count}</div>
+                  <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
         {/* Search and Filters Row */}
         <div className="flex items-center space-x-3 mt-4">
           {/* Search Input */}
@@ -374,6 +322,15 @@ export default function ProductsTable() {
 
           {/* Filters */}
           <div className="flex items-center space-x-2">
+            <DateRangeCalendar
+              from={filters.dateFrom}
+              to={filters.dateTo}
+              placeholder="Created Date"
+              onChange={(f, t) => {
+                setFilters(prev => ({ ...prev, dateFrom: f, dateTo: t }))
+                setPagination(prev => ({ ...prev, currentPage: 1 }))
+              }}
+            />
             <Dropdown
               label=""
               value={filters.approvalStatus}
@@ -508,7 +465,7 @@ export default function ProductsTable() {
                   <div className="flex items-center space-x-2">
                     {hasPermission('all_products:view') && (
                       <Link href={`/admin/dashboard/products/vendor-requests/view/${product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}--${product.id}`}>
-                        <Button variant="ghost" size="sm" className="hover:bg-slate-50">
+                        <Button variant="ghost" size="sm" title="View Details" className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors">
                           <Eye className="h-4 w-4" />
                         </Button>
                       </Link>
@@ -518,7 +475,7 @@ export default function ProductsTable() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="hover:bg-green-50 text-green-600"
+                        className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
                         onClick={() => handleApproveClick(product.id)}
                         title="Approve & Set Price"
                       >
@@ -530,7 +487,7 @@ export default function ProductsTable() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="hover:bg-red-50 text-red-600"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
                         onClick={() => handleRejectProduct(product.id)}
                         title="Reject"
                       >
@@ -540,7 +497,7 @@ export default function ProductsTable() {
 
                     {hasPermission('all_products:edit') && (
                       <Link href={`/admin/dashboard/products/edit/${product.id}`}>
-                        <Button variant="ghost" size="sm" className="hover:bg-slate-50">
+                        <Button variant="ghost" size="sm" title="Edit Product" className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors">
                           <Edit className="h-4 w-4" />
                         </Button>
                       </Link>
@@ -549,7 +506,8 @@ export default function ProductsTable() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="hover:bg-red-50 text-red-600"
+                        title="Delete Product"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
                         onClick={() => handleDeleteClick(product.id, product.name)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -574,150 +532,12 @@ export default function ProductsTable() {
         )}
       </CardContent>
 
-      {/* Approval Modal */}
-      {showApprovalModal && approvingProduct && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Approve Product</h3>
-            <div className="mb-4 p-3 bg-slate-50 rounded-lg">
-              <p className="text-sm font-medium text-slate-700">Product: {approvingProduct.name}</p>
-              <p className="text-sm text-slate-600">Vendor: {approvingProduct.vendor.companyName}</p>
-              <p className="text-sm text-slate-500">Vendor Base Price: ₹{approvingProduct.basePrice}</p>
-            </div>
-
-            {/* Base Pricing - always shown */}
-            <div className="mb-4 grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Admin Selling Price (₹) *
-                </label>
-                <div className="mb-2 text-sm text-slate-600">
-                  Vendor Base Price: ₹{approvingProduct.basePrice}
-                </div>
-                <input
-                  type="number"
-                  value={adminPrice || ''}
-                  onChange={(e) => setAdminPrice(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                  placeholder="Enter selling price"
-                  step="0.01"
-                  min="0"
-                />
-                <p className="text-xs text-slate-500 mt-1">Final selling price customers see.</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Original Price (₹) *
-                </label>
-                <div className="mb-2 text-sm text-slate-600">
-                  For showing strikethrough discount
-                </div>
-                <input
-                  type="number"
-                  value={originalPrice || ''}
-                  onChange={(e) => setOriginalPrice(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                  placeholder="Enter original price"
-                  step="0.01"
-                  min="0"
-                />
-                {originalPrice && parseFloat(originalPrice) > parseFloat(adminPrice) && (
-                  <p className="text-xs text-green-600 mt-1">
-                    {Math.round(((parseFloat(originalPrice) - parseFloat(adminPrice)) / parseFloat(adminPrice)) * 100)}% off
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Variant: per-variant admin prices */}
-            {approvingProduct.variants && approvingProduct.variants.length > 0 && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-3">
-                  Set Prices for Each Variant
-                </label>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {approvingProduct.variants.map((variant) => (
-                    <div key={variant.id} className="p-3 border border-slate-200 rounded-lg bg-white">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">
-                            {variant.color || '—'}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            Vendor Price: ₹{variant.price} | Stock: {variant.stock}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-2 grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-slate-600 mb-1">
-                            Admin Price (₹) *
-                          </label>
-                          <input
-                            type="number"
-                            value={variantPrices[variant.id] || ''}
-                            onChange={(e) => setVariantPrices(prev => ({
-                              ...prev,
-                              [variant.id]: e.target.value
-                            }))}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm"
-                            placeholder="Selling price"
-                            step="0.01"
-                            min="0"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-slate-600 mb-1">
-                            Original Price (₹) *
-                          </label>
-                          <input
-                            type="number"
-                            value={variantOriginalPrices[variant.id] || ''}
-                            onChange={(e) => setVariantOriginalPrices(prev => ({
-                              ...prev,
-                              [variant.id]: e.target.value
-                            }))}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm"
-                            placeholder="Original price"
-                            step="0.01"
-                            min="0"
-                          />
-                          {variantOriginalPrices[variant.id] && variantPrices[variant.id] && parseFloat(variantOriginalPrices[variant.id]) > parseFloat(variantPrices[variant.id]) && (
-                            <p className="text-xs text-green-600 mt-1">
-                              {Math.round(((parseFloat(variantOriginalPrices[variant.id]) - parseFloat(variantPrices[variant.id])) / parseFloat(variantPrices[variant.id])) * 100)}% off
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-slate-500 mt-2">
-                  Set admin selling price and original price for each variant. Discount % is auto-calculated.
-                </p>
-              </div>
-            )}
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowApprovalModal(false)
-                  setApprovingProduct(null)
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleApproveSubmit}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                Approve Product
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ApproveProductModal
+        product={approvingProduct as unknown as ApprovableProduct}
+        open={showApprovalModal}
+        onClose={() => { setShowApprovalModal(false); setApprovingProduct(null) }}
+        onApproved={loadProducts}
+      />
       <DeleteConfirmModal
         show={!!deleteTarget}
         title="Delete Product"

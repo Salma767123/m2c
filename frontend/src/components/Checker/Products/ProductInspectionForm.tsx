@@ -324,13 +324,38 @@ export default function ProductInspectionForm({
         window.scrollTo({ top: 0, behavior: "smooth" })
     }
 
+    // On a validation failure, jump to the exact field/section that failed (marked
+    // with data-invalid="true" by the step) and pulse a highlight — instead of
+    // scrolling the whole page to the top. Runs after a short delay so the error
+    // DOM (and any step change) has rendered. Falls back to the top if the step
+    // hasn't marked a specific field.
+    const scrollToFirstError = () => {
+        const FLASH = ["ring-4", "ring-red-500", "ring-offset-2", "ring-offset-white", "rounded-2xl"]
+        // Poll for the invalid element: the step may need a render (and a
+        // collapsed group may need to expand) before `data-invalid` is in the
+        // DOM, so a single check can miss it and fall back to the top.
+        let attempts = 0
+        const tryFind = () => {
+            const el = rootRef.current?.querySelector<HTMLElement>('[data-invalid="true"]')
+            if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "center" })
+                el.classList.add(...FLASH)
+                window.setTimeout(() => el.classList.remove(...FLASH), 2200)
+                return
+            }
+            if (attempts++ < 8) { window.setTimeout(tryFind, 80); return }
+            scrollToTop()
+        }
+        window.setTimeout(tryFind, 60)
+    }
+
     // ── Navigation ────────────────────────────────────────────────────────────
     const nextStep = () => {
         const stepErrors = validateStep(currentStep, formData)
         setErrors((prev) => ({ ...prev, [currentStep]: stepErrors }))
         if (hasErrors(stepErrors)) {
             showErrorToast("Please complete this step", firstErrorMessage(stepErrors) || "Some required fields are missing.")
-            scrollToTop()
+            scrollToFirstError()
             return
         }
 
@@ -391,7 +416,7 @@ export default function ProductInspectionForm({
             const firstInvalid = steps.find((s) => all[s.id as Step])?.id
             if (firstInvalid) setCurrentStep(firstInvalid as Step)
             showErrorToast("Cannot submit yet", "Some required fields are missing. Review the highlighted steps.")
-            scrollToTop()
+            scrollToFirstError()
             return
         }
 

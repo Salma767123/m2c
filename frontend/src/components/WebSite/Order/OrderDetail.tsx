@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import { formatPrice } from '@/lib/currency'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
+import Reveal from "@/components/WebSite/Shared/Reveal"
 import orderService, { Order as APIOrder } from "@/services/orderService"
 import ReviewModal from "./ReviewModal"
 import reviewService from "@/services/reviewService"
@@ -54,7 +55,7 @@ const getStatusColorClass = (status: string) => {
   const normalized = getNormalizedStatus(status)
   switch (normalized) {
     case 'received': return 'bg-green-100 text-green-800'
-    case 'shipped': return 'bg-blue-100 text-blue-800'
+    case 'shipped': return 'bg-[#e01a1b]/10 text-[#e01a1b]'
     case 'processing': return 'bg-yellow-100 text-yellow-800'
     case 'cancelled': return 'bg-red-100 text-red-800'
     default: return 'bg-slate-100 text-slate-800'
@@ -202,12 +203,12 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                   <div className="flex gap-3 justify-center">
                     <button
                       onClick={fetchOrder}
-                      className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors"
+                      className="btn-shine bg-[#e01a1b] text-white px-6 py-3 rounded-full font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300"
                     >
                       Try Again
                     </button>
                     <Link href="/order">
-                      <button className="border border-slate-300 text-slate-700 px-6 py-3 rounded-xl hover:bg-slate-50 transition-colors">
+                      <button className="border border-slate-300 text-slate-700 px-6 py-3 rounded-full hover:border-[#e01a1b] hover:text-[#e01a1b] transition-colors">
                         Back to Orders
                       </button>
                     </Link>
@@ -219,7 +220,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                   <h3 className="text-xl font-semibold text-slate-900 mb-2">Order Not Found</h3>
                   <p className="text-slate-600 mb-6">The order you&apos;re looking for doesn&apos;t exist or has been removed.</p>
                   <Link href="/order">
-                    <button className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors">
+                    <button className="btn-shine bg-[#e01a1b] text-white px-6 py-3 rounded-full font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300">
                       Back to Orders
                     </button>
                   </Link>
@@ -239,19 +240,19 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
     <div className="min-h-screen bg-white py-4 sm:py-6 lg:py-8 font-sans">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         <Link href="/order">
-          <button className="flex items-center gap-2 text-white bg-[#222222] px-3 py-2 sm:p-3 text-sm sm:text-base rounded-md mb-4 transition-colors">
+          <button className="inline-flex items-center gap-2 text-white bg-[#1a1a1a] px-3 py-2 sm:px-4 sm:py-2.5 text-sm sm:text-base rounded-full mb-4 hover:bg-[#e01a1b] transition-colors">
             <ArrowLeft className="w-4 h-4" />
             Back to Orders
           </button>
         </Link>
 
         {/* Header — Order-page style with icon */}
-        <div className="mb-5 sm:mb-6 lg:mb-8">
+        <Reveal className="mb-5 sm:mb-6 lg:mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <Package className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-blue-600 shrink-0" />
+              <Package className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-[#e01a1b] shrink-0" />
               <div className="min-w-0">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1">Order Details</h1>
+                <h1 className="font-playfair text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#1a1a1a] tracking-tight mb-1">Order Details</h1>
                 <p className="text-xs sm:text-sm text-slate-600 break-all">Order #{orderDetails.orderId}</p>
               </div>
             </div>
@@ -262,7 +263,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
               </div>
             </div>
           </div>
-        </div>
+        </Reveal>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
           {/* Order Items */}
@@ -292,14 +293,14 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                         {isStatusCurrent(orderDetails.status, 'processing') ? "Current" : isStatusReached(orderDetails.status, 'shipped') ? "Complete" : "Pending"}
                       </span>
                     </div>
-                    <div className={`flex-1 h-0.5 mt-4 sm:mt-5 mx-1 sm:mx-4 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-blue-300" : "bg-slate-300"
+                    <div className={`flex-1 h-0.5 mt-4 sm:mt-5 mx-1 sm:mx-4 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-[#e01a1b]/40" : "bg-slate-300"
                       }`}></div>
                     <div className="flex flex-col items-center min-w-0 shrink-0">
-                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-1.5 sm:mb-2 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-blue-500" : "bg-slate-300"
+                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-1.5 sm:mb-2 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-[#e01a1b]" : "bg-slate-300"
                         }`}>
                         <Truck className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                       </div>
-                      <span className={`text-xs sm:text-sm font-medium text-center ${isStatusReached(orderDetails.status, 'shipped') ? "text-blue-600" : "text-slate-500"
+                      <span className={`text-xs sm:text-sm font-medium text-center ${isStatusReached(orderDetails.status, 'shipped') ? "text-[#e01a1b]" : "text-slate-500"
                         }`}>Shipped</span>
                       <span className="text-[10px] sm:text-xs text-slate-500">
                         {isStatusCurrent(orderDetails.status, 'shipped') ? "Current" : isStatusReached(orderDetails.status, 'received') ? "Complete" : "Pending"}
@@ -331,7 +332,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
               <CardContent className="p-4 sm:p-5 lg:p-6">
                 <div className="space-y-4 sm:space-y-6">
                   {orderDetails.items.map((item) => (
-                    <div key={item.id} className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 border border-slate-200 rounded-xl hover:shadow-md transition-shadow">
+                    <div key={item.id} className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 border border-slate-200 rounded-2xl ring-1 ring-black/5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 hover:ring-[#e01a1b]/20 transition-all duration-500">
                       <div className="relative w-16 h-16 sm:w-20 sm:h-20 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
                         {item.productImage ? (
                           <Image
@@ -381,7 +382,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                   <div className="flex flex-wrap gap-2 sm:gap-3">
                     <button
                       onClick={handleDownloadInvoice}
-                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border border-slate-300 text-slate-700 rounded-lg sm:rounded-xl hover:bg-slate-50 transition-colors text-sm sm:text-base"
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border border-slate-300 text-slate-700 rounded-full hover:border-[#e01a1b] hover:text-[#e01a1b] transition-colors text-sm sm:text-base"
                     >
                       <Download className="w-4 h-4 shrink-0" />
                       Download Invoice
@@ -395,7 +396,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                       ) : (
                         <button
                           onClick={() => setReviewModalState({ isOpen: true, orderId: orderDetails.id, items: orderDetails.items })}
-                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-900 text-white rounded-lg sm:rounded-xl hover:bg-gray-800 transition-colors"
+                          className="btn-shine flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 bg-[#e01a1b] text-white rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300"
                         >
                           <Star className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
                           <span className="font-medium text-sm">Write a Review</span>
@@ -459,7 +460,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 </CardHeader>
                 <CardContent className="p-4 sm:p-5 lg:p-6 space-y-3 sm:space-y-4">
                   <div className="flex items-center gap-3">
-                    <Calendar className="w-5 h-5 text-blue-600 shrink-0" />
+                    <Calendar className="w-5 h-5 text-[#e01a1b] shrink-0" />
                     <div>
                       <p className="font-medium text-slate-900">
                         {normalizedStatus === "received" ? "Delivered" : "Estimated Delivery"}
@@ -489,7 +490,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                     </div>
                   )}
                   <div className="flex items-center gap-3">
-                    <CreditCard className="w-5 h-5 text-purple-600 shrink-0" />
+                    <CreditCard className="w-5 h-5 text-[#e01a1b] shrink-0" />
                     <div>
                       <p className="font-medium text-slate-900">Payment Method</p>
                       <p className="text-sm text-slate-600">{orderDetails.paymentMethod || "N/A"}</p>

@@ -1,22 +1,27 @@
-"use client";   
+"use client";
 import { Shield, Eye, Lock, Users, Mail } from 'lucide-react';
+import Reveal from '@/components/WebSite/Shared/Reveal';
 
 function Privacy() {
   return (
-    <div className="min-h-screen bg-gray-50 py-8 sm:py-10 lg:py-12">
+    <div className="min-h-screen bg-[#f7f7f5] py-8 sm:py-10 lg:py-12">
       <div className="max-w-[95%] sm:max-w-[92%] lg:max-w-[89%] mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 lg:p-8">
-          <div className="text-center mb-6 sm:mb-8">
-            <Shield className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-blue-600 mb-3 sm:mb-4" />
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Privacy Policy</h1>
+        <div className="bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_10px_40px_rgba(0,0,0,0.06)] p-4 sm:p-6 lg:p-8">
+          <Reveal className="text-center mb-6 sm:mb-8">
+            <Shield className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-[#e01a1b] mb-3 sm:mb-4" />
+            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
+              <span className="h-px w-6 bg-[#e01a1b]" />
+              Your Privacy
+            </span>
+            <h1 className="font-playfair text-2xl sm:text-3xl md:text-4xl font-semibold text-[#1a1a1a] tracking-tight">Privacy Policy</h1>
             <p className="text-sm sm:text-base text-gray-600 mt-2">Last updated: December 2024</p>
-          </div>
+          </Reveal>
 
           <div className="space-y-8">
             <section>
               <div className="flex items-center mb-4">
-                <Eye className="h-6 w-6 text-blue-600 mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">Information We Collect</h2>
+                <Eye className="h-6 w-6 text-[#e01a1b] mr-3" />
+                <h2 className="text-xl font-semibold text-[#1a1a1a]">Information We Collect</h2>
               </div>
               <p className="text-gray-700 mb-4">
                 We collect information you provide directly to us, such as when you create an account, 
@@ -32,8 +37,8 @@ function Privacy() {
 
             <section>
               <div className="flex items-center mb-4">
-                <Lock className="h-6 w-6 text-blue-600 mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">How We Use Your Information</h2>
+                <Lock className="h-6 w-6 text-[#e01a1b] mr-3" />
+                <h2 className="text-xl font-semibold text-[#1a1a1a]">How We Use Your Information</h2>
               </div>
               <ul className="list-disc list-inside text-gray-700 space-y-2">
                 <li>Process and fulfill your orders</li>
@@ -46,8 +51,8 @@ function Privacy() {
 
             <section>
               <div className="flex items-center mb-4">
-                <Users className="h-6 w-6 text-blue-600 mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">Information Sharing</h2>
+                <Users className="h-6 w-6 text-[#e01a1b] mr-3" />
+                <h2 className="text-xl font-semibold text-[#1a1a1a]">Information Sharing</h2>
               </div>
               <p className="text-gray-700 mb-4">
                 We do not sell, trade, or rent your personal information to third parties. We may share 
@@ -62,13 +67,13 @@ function Privacy() {
 
             <section>
               <div className="flex items-center mb-4">
-                <Mail className="h-6 w-6 text-blue-600 mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">Contact Us</h2>
+                <Mail className="h-6 w-6 text-[#e01a1b] mr-3" />
+                <h2 className="text-xl font-semibold text-[#1a1a1a]">Contact Us</h2>
               </div>
               <p className="text-gray-700">
                 If you have any questions about this Privacy Policy, please contact us at:
               </p>
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <div className="mt-4 p-4 bg-[#f7f7f5] rounded-xl ring-1 ring-black/5 border-l-2 border-[#e01a1b]">
                 <p className="text-gray-700">Email: privacy@yourstore.com</p>
                 <p className="text-gray-700">Phone: (555) 123-4567</p>
               </div>

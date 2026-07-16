@@ -128,7 +128,7 @@ export default function RolesPermissions() {
       <div className="rounded p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-black">Roles & Permissions</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Roles & Permissions</h1>
             <p className="text-slate-600 mt-1">Manage user roles and system permissions</p>
           </div>
           {canCreate && (
@@ -150,7 +150,7 @@ export default function RolesPermissions() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-sm">Total Roles</p>
-                <p className="text-xl font-bold text-black">{roles.length}</p>
+                <p className="text-xl font-bold text-slate-900">{roles.length}</p>
               </div>
               <Shield className="w-5 h-5 text-slate-400" />
             </div>
@@ -162,7 +162,7 @@ export default function RolesPermissions() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-sm">Active Users</p>
-                <p className="text-xl font-bold text-black">{roles.reduce((sum, role) => sum + role.userCount, 0)}</p>
+                <p className="text-xl font-bold text-slate-900">{roles.reduce((sum, role) => sum + role.userCount, 0)}</p>
               </div>
               <Users className="w-5 h-5 text-slate-400" />
             </div>
@@ -174,7 +174,7 @@ export default function RolesPermissions() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-sm">Permissions</p>
-                <p className="text-xl font-bold text-black">{permissions.length}</p>
+                <p className="text-xl font-bold text-slate-900">{permissions.length}</p>
               </div>
               <Lock className="w-5 h-5 text-slate-400" />
             </div>
@@ -186,7 +186,7 @@ export default function RolesPermissions() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-600 text-sm">System Roles</p>
-                <p className="text-xl font-bold text-black">{roles.filter(r => r.isSystem).length}</p>
+                <p className="text-xl font-bold text-slate-900">{roles.filter(r => r.isSystem).length}</p>
               </div>
               <Crown className="w-5 h-5 text-slate-400" />
             </div>
@@ -207,7 +207,7 @@ export default function RolesPermissions() {
                 key={key}
                 onClick={() => setActiveTab(key as any)}
                 className={`py-4 px-2 border-b-2 font-medium text-sm ${activeTab === key
-                    ? 'border-black text-black'
+                    ? 'border-brand-500 text-brand-600'
                     : 'border-transparent text-slate-500 hover:text-slate-700'
                   }`}
               >
@@ -226,7 +226,7 @@ export default function RolesPermissions() {
               placeholder="Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full border border-slate-300 rounded focus:ring-2 focus:ring-black focus:border-transparent"
+              className="pl-10 pr-4 py-2 w-full border border-slate-300 rounded focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
             />
           </div>
         </div>
@@ -241,7 +241,7 @@ export default function RolesPermissions() {
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-2">
-                        <CardTitle className="text-lg font-semibold text-black mb-0">
+                        <CardTitle className="text-lg font-semibold text-slate-900 mb-0">
                           {role.name}
                         </CardTitle>
                         {role.isSystem && (
@@ -257,12 +257,12 @@ export default function RolesPermissions() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-slate-50 rounded p-2">
                         <span className="text-xs text-slate-500">Users</span>
-                        <div className="text-lg font-bold text-black">{role.userCount}</div>
+                        <div className="text-lg font-bold text-slate-900">{role.userCount}</div>
                       </div>
 
                       <div className="bg-slate-50 rounded p-2">
                         <span className="text-xs text-slate-500">Permissions</span>
-                        <div className="text-lg font-bold text-black">{role.permissions.length}</div>
+                        <div className="text-lg font-bold text-slate-900">{role.permissions.length}</div>
                       </div>
                     </div>
 
@@ -327,7 +327,7 @@ export default function RolesPermissions() {
               {permissionModules.map((mod) => (
                 <Card key={mod.key} className="border-slate-200">
                   <CardHeader className="bg-slate-50 border-b border-slate-200">
-                    <CardTitle className="text-lg font-semibold text-black">
+                    <CardTitle className="text-lg font-semibold text-slate-900">
                       {mod.name} ({mod.submodules.length} submodules)
                     </CardTitle>
                   </CardHeader>
@@ -351,7 +351,7 @@ export default function RolesPermissions() {
                           {mod.submodules.map((sub) => (
                             <tr key={sub.key} className="border-b border-slate-100 last:border-b-0">
                               <td className="px-4 py-3">
-                                <div className="font-medium text-black">{sub.name}</div>
+                                <div className="font-medium text-slate-900">{sub.name}</div>
                                 <div className="text-xs text-slate-500 mt-0.5">{sub.description}</div>
                               </td>
                               {PERMISSION_ACTIONS.map((action) => (
@@ -396,7 +396,7 @@ export default function RolesPermissions() {
           {activeTab === 'users' && (
             <Card className="border-slate-200">
               <CardHeader className="bg-slate-50 border-b border-slate-200">
-                <CardTitle className="text-lg font-semibold text-black">User Assignments</CardTitle>
+                <CardTitle className="text-lg font-semibold text-slate-900">User Assignments</CardTitle>
               </CardHeader>
               <CardContent className="p-6">
                 {/* Per-role user count summary drawn from the live API */}
@@ -439,7 +439,7 @@ export default function RolesPermissions() {
               <div className="flex items-center space-x-3 mb-4">
                 <AlertCircle className="w-6 h-6 text-slate-600" />
                 <div>
-                  <h3 className="text-lg font-semibold text-black">Delete Role</h3>
+                  <h3 className="text-lg font-semibold text-slate-900">Delete Role</h3>
                   <p className="text-sm text-slate-600">This action cannot be undone</p>
                 </div>
               </div>

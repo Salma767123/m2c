@@ -301,21 +301,12 @@ export default function VendorOrderManagement() {
         </div>
       </div>
 
-      {/* Results summary */}
-      <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
-        <span>
-          {filteredShipments.length === 0
-            ? '0 orders'
-            : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filteredShipments.length)} of ${filteredShipments.length} order${filteredShipments.length === 1 ? '' : 's'}`}
-        </span>
-      </div>
-
-      {/* Orders Table */}
+      {/* Orders Table (order count summary intentionally omitted) */}
       <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 overflow-hidden">
         <div className="overflow-x-auto">
         <Table>
-          <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b [&_tr]:border-slate-200/80 [&_th]:!text-slate-500 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
-            <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
+          <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
+            <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
               <TableHead>Order ID</TableHead>
               <TableHead>Product</TableHead>
               <TableHead>SKU Code</TableHead>
@@ -359,7 +350,7 @@ export default function VendorOrderManagement() {
                     <TableCell>
                       <button
                         onClick={() => handleViewOrder(s.id)}
-                        className="p-1.5 text-slate-500 hover:text-brand-500 hover:bg-brand-50 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
                         title="View Order"
                       >
                         <Eye className="h-4 w-4" />

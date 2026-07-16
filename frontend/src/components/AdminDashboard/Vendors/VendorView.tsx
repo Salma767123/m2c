@@ -9,6 +9,8 @@ import { Badge } from '@/components/UI/Badge'
 import { LoadingSpinner } from '@/components/UI/LoadingSpinner'
 import {
   ArrowLeft,
+  Plus,
+  X,
   Building2,
   Globe,
   Mail,
@@ -52,6 +54,7 @@ import { downloadDoc } from '@/lib/docDownload'
 import DocViewerModal from '@/components/UI/DocViewerModal'
 import { FACILITY_META, withUnit } from '@/components/Checker/Vendor/Steps/VI_Step5_Manufacturing'
 import { Country } from 'country-state-city'
+import { formatOrderAmount } from "@/lib/currency";
 
 // Map country name → ISO code so we can render flag *images* (via flagcdn).
 // Flag emoji don't render on Windows, which shows the bare ISO letters instead.
@@ -504,7 +507,14 @@ export default function VendorView({ vendorId }: VendorViewProps) {
         {activeTab === 'contact-trade' && <ContactTradeTab vendor={vendor} />}
         {activeTab === 'products' && <ProductsTab vendor={vendor} />}
         {activeTab === 'facilities' && <FacilitiesTab vendor={vendor} />}
-        {activeTab === 'bank-details' && <BankDetailsTab vendor={vendor} onVerify={handleVerifyBankDetails} loading={actionLoading === 'verify-bank'} />}
+        {activeTab === 'bank-details' && (
+          <BankDetailsTab
+            vendor={vendor}
+            onVerify={handleVerifyBankDetails}
+            loading={actionLoading === 'verify-bank'}
+            onBankSaved={(saved) => setVendor({ ...vendor, bankDetails: saved })}
+          />
+        )}
         {activeTab === 'reviews' && <ReviewsTab vendor={vendor} />}
       </div>
 
@@ -1761,104 +1771,279 @@ function DocFileCard({ doc, docLabel, onView }: { doc: any; docLabel?: string; o
   )
 }
 
-function BankDetailsTab({ vendor, onVerify, loading }: { vendor: VendorProfile, onVerify?: () => void, loading?: boolean }) {
+/** Same IFSC rule the vendor portal and the backend enforce. */
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/
+
+/**
+ * Admin bank-details form — mirrors the vendor portal's own form
+ * (VendorDashboard/Settings/BankDetails) so both capture identical fields.
+ */
+function BankDetailsFormModal({
+  vendorId,
+  existing,
+  onClose,
+  onSaved,
+}: {
+  vendorId: string
+  existing?: any
+  onClose: () => void
+  onSaved: (saved: any) => void
+}) {
+  const [form, setForm] = useState({
+    accountHolderName: existing?.accountHolderName || '',
+    bankName: existing?.bankName || '',
+    accountNumber: existing?.accountNumber || '',
+    // A legacy row may hold the IFSC in the SWIFT column — surface it here so
+    // the admin can save it back into the correct field.
+    ifscCode: existing?.ifscCode || (IFSC_REGEX.test(String(existing?.swiftCode || '')) ? existing.swiftCode : '') || '',
+    accountType: (existing?.accountType || 'savings').toLowerCase(),
+    branchName: existing?.branchName || '',
+    branchAddress: existing?.branchAddress || '',
+  })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
+  const [apiError, setApiError] = useState('')
+
+  const set = (k: string, v: string) => {
+    setForm(prev => ({ ...prev, [k]: v }))
+    setErrors(prev => ({ ...prev, [k]: '' }))
+  }
+
+  const validate = () => {
+    const e: Record<string, string> = {}
+    if (!form.accountHolderName.trim()) e.accountHolderName = 'Account holder name is required'
+    if (!form.bankName.trim()) e.bankName = 'Bank name is required'
+    if (!form.accountNumber.trim()) e.accountNumber = 'Account number is required'
+    if (!form.ifscCode.trim()) e.ifscCode = 'IFSC code is required'
+    else if (!IFSC_REGEX.test(form.ifscCode.toUpperCase())) e.ifscCode = 'Invalid IFSC code format (e.g. HDFC0001234)'
+    if (!form.accountType) e.accountType = 'Account type is required'
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  const handleSave = async () => {
+    if (!validate()) return
+    setSaving(true)
+    setApiError('')
+    try {
+      const res = await VendorService.upsertVendorBankDetailsByAdmin(vendorId, {
+        ...form,
+        ifscCode: form.ifscCode.toUpperCase(),
+      })
+      onSaved(res.bankDetails)
+      onClose()
+    } catch (err: any) {
+      setApiError(err?.response?.data?.error || err?.message || 'Failed to save bank details')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const field = (name: string, label: string, opts: { required?: boolean; placeholder?: string; mono?: boolean } = {}) => (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 mb-1">
+        {label} {opts.required && <span className="text-brand-500">*</span>}
+      </label>
+      <input
+        type="text"
+        value={(form as any)[name]}
+        onChange={e => set(name, e.target.value)}
+        placeholder={opts.placeholder}
+        className={`w-full px-3 py-2 border rounded-lg text-sm outline-none transition-colors ${opts.mono ? 'font-mono' : ''} ${
+          errors[name] ? 'border-red-400 focus:ring-2 focus:ring-red-200' : 'border-slate-300 focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500'
+        }`}
+      />
+      {errors[name] && <p className="text-xs text-red-600 mt-1">{errors[name]}</p>}
+    </div>
+  )
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 sticky top-0 bg-white rounded-t-2xl">
+          <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-brand-500" />
+            {existing ? 'Edit Bank Details' : 'Add Bank Details'}
+          </h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500" aria-label="Close">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {apiError && (
+            <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{apiError}</div>
+          )}
+
+          {existing?.isVerified && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+              These details are currently verified. Changing the account number, IFSC or holder name will reset them to unverified.
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {field('accountHolderName', 'Account Holder Name', { required: true, placeholder: 'As printed on the passbook' })}
+            {field('bankName', 'Bank Name', { required: true, placeholder: 'e.g. ICICI Bank' })}
+            {field('accountNumber', 'Account Number', { required: true, mono: true })}
+            {field('ifscCode', 'IFSC Code', { required: true, mono: true, placeholder: 'HDFC0001234' })}
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Account Type <span className="text-brand-500">*</span>
+              </label>
+              <select
+                value={form.accountType}
+                onChange={e => set('accountType', e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+              >
+                <option value="savings">Savings</option>
+                <option value="current">Current</option>
+              </select>
+            </div>
+
+            {field('branchName', 'Branch Name', { placeholder: 'e.g. Anna Nagar' })}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Branch Address</label>
+            <textarea
+              value={form.branchAddress}
+              onChange={e => set('branchAddress', e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl sticky bottom-0">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving} className="bg-brand-500 hover:bg-brand-600 text-white">
+            {saving ? 'Saving...' : existing ? 'Save Changes' : 'Add Bank Details'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BankDetailsTab({ vendor, onVerify, loading, onBankSaved }: { vendor: VendorProfile, onVerify?: () => void, loading?: boolean, onBankSaved?: (b: any) => void }) {
   // Check if bank details strictly exist either as an object or as a nested object
   // Based on the VendorProfile interface, it's bankDetails?: any
   // But often it might be nested or direct properties
 
   const bankDetails = vendor.bankDetails
+  const [showForm, setShowForm] = useState(false)
+  const canEdit = hasPermission('vendor_management:edit')
+
+  const formModal = showForm ? (
+    <BankDetailsFormModal
+      vendorId={vendor.id}
+      existing={bankDetails}
+      onClose={() => setShowForm(false)}
+      onSaved={saved => onBankSaved?.(saved)}
+    />
+  ) : null
 
   if (!bankDetails) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <CreditCard className="h-5 w-5" />
-            <span>Bank Information</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-slate-500">
-            <CreditCard className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-            <p>No bank details available for this vendor.</p>
-          </div>
-        </CardContent>
-      </Card>
+      <>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center space-x-2">
+                <CreditCard className="h-5 w-5" />
+                <span>Bank Information</span>
+              </span>
+              {canEdit && (
+                <Button size="sm" onClick={() => setShowForm(true)} className="bg-brand-500 hover:bg-brand-600 text-white">
+                  <Plus className="h-4 w-4 mr-1.5" /> Add Bank Details
+                </Button>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8 text-slate-500">
+              <CreditCard className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+              <p>No bank details available for this vendor.</p>
+            </div>
+          </CardContent>
+        </Card>
+        {formModal}
+      </>
     )
   }
 
   return (
+    <>
+    {formModal}
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <CreditCard className="h-5 w-5" />
-          <span>Bank Information</span>
+        <CardTitle className="flex items-center justify-between">
+          <span className="flex items-center space-x-2">
+            <CreditCard className="h-5 w-5" />
+            <span>Bank Information</span>
+          </span>
+          {canEdit && (
+            <Button size="sm" variant="outline" onClick={() => setShowForm(true)}>
+              <Edit className="h-4 w-4 mr-1.5" /> Edit
+            </Button>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
+        {/*
+          Every field the vendor can submit (Vendor Portal → Settings → Bank
+          Details) is rendered unconditionally. Previously the optional ones
+          (IFSC, account type, branch) were hidden when empty, so a partially
+          captured vendor looked identical to a fully captured one and admins
+          couldn't tell "not provided" from "not displayed".
+        */}
+        {(() => {
+          const Field = ({ label, value, mono = false, hint }: { label: string; value?: string | null; mono?: boolean; hint?: string }) => (
             <div>
-              <p className="text-sm text-slate-500">Account Holder Name</p>
-              <p className="font-medium text-lg">{bankDetails.accountHolderName || 'N/A'}</p>
+              <p className="text-sm text-slate-500">{label}</p>
+              {value ? (
+                <p className={`font-medium ${mono ? 'font-mono' : ''} break-words`}>{value}</p>
+              ) : (
+                <p className="font-medium text-slate-400 italic">Not provided</p>
+              )}
+              {hint && value && <p className="text-xs text-amber-600 mt-0.5">{hint}</p>}
             </div>
+          );
 
-            <div>
-              <p className="text-sm text-slate-500">Bank Name</p>
-              <p className="font-medium">{bankDetails.bankName || 'N/A'}</p>
+          // SWIFT/BIC and IBAN are not displayed: nothing collects them anymore
+          // (the vendor portal and the admin bank modal both capture IFSC only),
+          // so they were permanently "Not provided".
+          //
+          // The swiftCode column is still read here for one reason: legacy rows
+          // captured an Indian IFSC in it (the older banking form only offered
+          // SWIFT/IBAN). Surface that value under IFSC — flagged — instead of
+          // losing it now that the SWIFT field is gone.
+          const looksLikeIfsc = (v?: string | null) => !!v && /^[A-Z]{4}0[A-Z0-9]{6}$/i.test(v.trim());
+          const swiftIsActuallyIfsc = looksLikeIfsc(bankDetails.swiftCode) && !bankDetails.ifscCode;
+
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <Field label="Account Holder Name" value={bankDetails.accountHolderName} />
+                <Field label="Bank Name" value={bankDetails.bankName} />
+                <Field label="Account Number" value={bankDetails.accountNumber} mono />
+                <Field label="Account Type" value={bankDetails.accountType} />
+              </div>
+
+              <div className="space-y-4">
+                <Field
+                  label="IFSC Code"
+                  value={bankDetails.ifscCode || (swiftIsActuallyIfsc ? bankDetails.swiftCode : null)}
+                  mono
+                  hint={swiftIsActuallyIfsc ? 'Recorded in the SWIFT field on an older form — verify before payout.' : undefined}
+                />
+                <Field label="Branch Name" value={bankDetails.branchName} />
+                <Field label="Branch Address" value={bankDetails.branchAddress} />
+              </div>
             </div>
-
-            <div>
-              <p className="text-sm text-slate-500">Account Number</p>
-              <p className="font-medium font-mono">{bankDetails.accountNumber || 'N/A'}</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {bankDetails.swiftCode && (
-              <div>
-                <p className="text-sm text-slate-500">SWIFT / BIC Code</p>
-                <p className="font-medium font-mono">{bankDetails.swiftCode}</p>
-              </div>
-            )}
-
-            {bankDetails.iban && (
-              <div>
-                <p className="text-sm text-slate-500">IBAN</p>
-                <p className="font-medium font-mono break-all">{bankDetails.iban}</p>
-              </div>
-            )}
-
-            {bankDetails.ifscCode && (
-              <div>
-                <p className="text-sm text-slate-500">IFSC Code</p>
-                <p className="font-medium font-mono">{bankDetails.ifscCode}</p>
-              </div>
-            )}
-
-            {!bankDetails.swiftCode && !bankDetails.iban && !bankDetails.ifscCode && (
-              <div>
-                <p className="text-sm text-slate-500">Routing Code</p>
-                <p className="font-medium text-slate-400">Not provided</p>
-              </div>
-            )}
-
-            {bankDetails.accountType && (
-              <div>
-                <p className="text-sm text-slate-500">Account Type</p>
-                <p className="font-medium capitalize">{bankDetails.accountType}</p>
-              </div>
-            )}
-
-            {(bankDetails.branchName || bankDetails.branchAddress) && (
-              <div>
-                <p className="text-sm text-slate-500">Branch Details</p>
-                {bankDetails.branchName && <p className="font-medium">{bankDetails.branchName}</p>}
-                {bankDetails.branchAddress && <p className="text-sm text-slate-800">{bankDetails.branchAddress}</p>}
-              </div>
-            )}
-          </div>
-        </div>
+          );
+        })()}
 
         {bankDetails.isVerified !== undefined && (
           <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between">
@@ -1893,6 +2078,7 @@ function BankDetailsTab({ vendor, onVerify, loading }: { vendor: VendorProfile, 
         )}
       </CardContent>
     </Card>
+    </>
   )
 }
 
@@ -2156,6 +2342,10 @@ interface ReviewItem {
   customerName: string
   orderDate: string
   totalAmount: number
+  // Carried from the parent Order: order items are priced in whatever currency the
+  // buyer was charged, so the amount cannot be rendered as ₹ unconditionally.
+  currency?: 'INR' | 'USD'
+  exchangeRate?: number | null
   quantity: number
 }
 
@@ -2216,6 +2406,8 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
               customerName: order.customerName,
               orderDate: order.orderDate,
               totalAmount: item.totalPrice,
+              currency: order.currency,
+              exchangeRate: order.exchangeRate,
               quantity: item.quantity,
             })
           })
@@ -2628,7 +2820,15 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-slate-500">Amount</label>
-                  <p className="text-slate-900 font-medium">&#8377;{selectedReview.totalAmount.toFixed(2)}</p>
+                  <p className="text-slate-900 font-medium">
+                    {(() => {
+                      const { charged, inrEquivalent } = formatOrderAmount(
+                        selectedReview.totalAmount, selectedReview.currency, selectedReview.exchangeRate);
+                      return (<>{charged}{inrEquivalent && (
+                        <span className="block text-xs font-normal text-slate-500">&#8776; {inrEquivalent}</span>
+                      )}</>);
+                    })()}
+                  </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-slate-500">Order Date</label>

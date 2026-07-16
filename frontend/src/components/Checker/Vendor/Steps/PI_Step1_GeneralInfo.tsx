@@ -242,8 +242,9 @@ export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {
             <button
               ref={serviceTypeBtnRef}
               type="button"
+              data-invalid={errors.serviceType ? 'true' : undefined}
               onClick={() => setShowServiceTypeDropdown(!showServiceTypeDropdown)}
-              className={`w-full px-4 py-3 border rounded-xl bg-white text-left flex items-center justify-between text-sm transition-all duration-200 ${
+              className={`scroll-mt-24 w-full px-4 py-3 border rounded-xl bg-white text-left flex items-center justify-between text-sm transition-all duration-200 ${
                 errors.serviceType
                   ? 'border-red-500 bg-red-50/40'
                   : 'border-slate-300 hover:border-slate-400'

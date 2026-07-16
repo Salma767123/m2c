@@ -29,15 +29,15 @@ export default function ProfileTab({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6">
+    <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 border border-slate-200 p-4 sm:p-5 lg:p-6">
       <div className="flex items-center gap-2 sm:gap-3 mb-5 sm:mb-6">
-        <User className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
-        <h2 className="text-lg sm:text-xl font-bold text-slate-900">Profile Information</h2>
+        <User className="w-5 h-5 sm:w-6 sm:h-6 text-[#e01a1b]" />
+        <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a]">Profile Information</h2>
       </div>
 
       <div className="border-2 border-dashed border-slate-200 p-4 sm:p-5 rounded-lg">
         <div className="flex items-center gap-2 mb-3 sm:mb-4">
-          <User2 className="w-5 h-5 text-gray-600" />
+          <User2 className="w-5 h-5 text-[#e01a1b]" />
           <h3 className="text-base sm:text-lg font-semibold text-slate-900">Personal Information</h3>
         </div>
 
@@ -51,7 +51,7 @@ export default function ProfileTab({
               disabled={!isEditing}
               placeholder="Enter your first name"
               autoComplete="given-name"
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:bg-slate-50 disabled:text-slate-500"
+              className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
           <div>
@@ -63,7 +63,7 @@ export default function ProfileTab({
               disabled={!isEditing}
               placeholder="Enter your last name"
               autoComplete="family-name"
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:bg-slate-50 disabled:text-slate-500"
+              className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
           <div>
@@ -78,7 +78,7 @@ export default function ProfileTab({
               disabled={!isEditing}
               placeholder="Enter your email address"
               autoComplete="email"
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:bg-slate-50 disabled:text-slate-500"
+              className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
           <div>
@@ -93,7 +93,7 @@ export default function ProfileTab({
               disabled={!isEditing}
               placeholder="Enter your phone number"
               autoComplete="tel"
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:bg-slate-50 disabled:text-slate-500"
+              className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
           <div>

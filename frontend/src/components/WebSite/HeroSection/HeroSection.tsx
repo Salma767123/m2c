@@ -139,7 +139,9 @@ export default function HeroSection() {
               src={slide.imageUrl}
               alt={slide.altText || `Banner slide ${index + 1}`}
               fill
-              className="object-contain md:object-cover object-center"
+              className={`object-contain md:object-cover object-center ${
+                index === currentSlide ? "animate-ken-burns" : ""
+              }`}
               priority={index === 0}
               sizes="100vw"
               unoptimized={slide.imageUrl.startsWith("http")}
@@ -147,28 +149,61 @@ export default function HeroSection() {
           </div>
         ))}
 
+        {/* Subtle edge vignette for a premium, framed look (desktop) */}
+        <div className="pointer-events-none absolute inset-0 z-[5] hidden md:block bg-linear-to-t from-black/15 via-transparent to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-24 hidden md:block bg-linear-to-t from-black/20 to-transparent" />
+
         {/* Navigation Controls */}
         <button
           onClick={prevSlide}
-          className={`absolute left-2 sm:left-4 lg:left-6 top-1/2 transform -translate-y-1/2 z-20 bg-white/90 text-gray-800 hover:bg-white hover:text-gray-700 p-1.5 sm:p-2 lg:p-3 rounded-full transition-all duration-300 hover:scale-110 shadow-xl backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 ${
+          className={`group absolute left-2 sm:left-4 lg:left-6 top-1/2 transform -translate-y-1/2 z-20 bg-white/80 text-gray-900 hover:bg-[#e01a1b] hover:text-white p-1.5 sm:p-2 lg:p-3.5 rounded-full transition-all duration-300 hover:scale-110 hover:shadow-[0_8px_24px_rgba(224,26,27,0.35)] shadow-lg backdrop-blur-md border border-white/60 focus:outline-none focus:ring-2 focus:ring-[#e01a1b] focus:ring-offset-2 ${
             currentSlide === 0 ? "hidden" : "block"
           }`}
           aria-label="Previous slide"
           disabled={currentSlide === 0}
         >
-          <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
+          <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-transform duration-300 group-hover:-translate-x-0.5" />
         </button>
 
         <button
           onClick={nextSlide}
-          className={`absolute right-2 sm:right-4 lg:right-6 top-1/2 transform -translate-y-1/2 z-20 bg-white/90 text-gray-800 hover:bg-white hover:text-gray-700 p-1.5 sm:p-2 lg:p-3 rounded-full transition-all duration-300 hover:scale-110 shadow-xl backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 ${
+          className={`group absolute right-2 sm:right-4 lg:right-6 top-1/2 transform -translate-y-1/2 z-20 bg-white/80 text-gray-900 hover:bg-[#e01a1b] hover:text-white p-1.5 sm:p-2 lg:p-3.5 rounded-full transition-all duration-300 hover:scale-110 hover:shadow-[0_8px_24px_rgba(224,26,27,0.35)] shadow-lg backdrop-blur-md border border-white/60 focus:outline-none focus:ring-2 focus:ring-[#e01a1b] focus:ring-offset-2 ${
             currentSlide === slides.length - 1 ? "hidden" : "block"
           }`}
           aria-label="Next slide"
           disabled={currentSlide === slides.length - 1}
         >
-          <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
+          <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-transform duration-300 group-hover:translate-x-0.5" />
         </button>
+
+        {/* Slide indicators — elegant pills, active one shows an auto-play progress fill */}
+        {slides.length > 1 && (
+          <div className="absolute bottom-2.5 sm:bottom-4 lg:bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 sm:gap-2">
+            {slides.map((slide, index) => (
+              <button
+                key={slide.id}
+                onClick={() => goToSlide(index)}
+                aria-label={`Go to slide ${index + 1}`}
+                aria-current={index === currentSlide}
+                className={`relative h-1.5 sm:h-2 rounded-full overflow-hidden transition-all duration-500 ${
+                  index === currentSlide
+                    ? "w-7 sm:w-10 bg-white/50"
+                    : "w-1.5 sm:w-2 bg-white/50 hover:bg-white/80"
+                }`}
+              >
+                {index === currentSlide && (
+                  <span
+                    key={`${slide.id}-${isAutoPlaying}`}
+                    className={`absolute inset-0 rounded-full bg-[#e01a1b] ${
+                      isAutoPlaying ? "animate-hero-progress" : ""
+                    }`}
+                    style={!isAutoPlaying ? { transform: "scaleX(1)", transformOrigin: "left" } : undefined}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Touch/Swipe Area for Mobile */}
         <div

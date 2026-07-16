@@ -303,8 +303,8 @@ export default function Products() {
             </div>
           ) : (
             <Table>
-              <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b [&_tr]:border-slate-200/80 [&_th]:!text-slate-500 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
-                <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
+              <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
+                <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
                   <TableHead>Product</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Variants</TableHead>

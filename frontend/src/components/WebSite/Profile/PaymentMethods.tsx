@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { CreditCard, Plus, Trash2, Edit, Shield, Check } from 'lucide-react'
+import Reveal from '@/components/WebSite/Shared/Reveal'
 
 interface PaymentMethod {
   id: string
@@ -168,15 +169,15 @@ export default function PaymentMethods() {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6">
+    <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 border border-slate-200 p-4 sm:p-5 lg:p-6">
       <div className="flex items-center justify-between flex-wrap gap-3 mb-5 sm:mb-6">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600 shrink-0" />
-          <h2 className="text-lg sm:text-xl font-bold text-slate-900">Payment Methods</h2>
+          <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 text-[#e01a1b] shrink-0" />
+          <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a]">Payment Methods</h2>
         </div>
         <button
           onClick={() => setShowAddCard(true)}
-          className="flex items-center gap-2 bg-gray-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-gray-700 transition-colors"
+          className="btn-shine flex items-center gap-2 bg-[#e01a1b] text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-full font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] transition-all"
         >
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">Add Payment Method</span>

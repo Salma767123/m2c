@@ -6,11 +6,13 @@ import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
-import { Plus, Edit, Trash2, Eye, Search, Filter, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
+import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar'
+import { Plus, Edit, Trash2, Eye, Search, Filter, ChevronLeft, ChevronRight, GripVertical, Folders, CheckCircle, XCircle, GitMerge, Layers, Package } from 'lucide-react'
 import Link from 'next/link'
 import { categoryService, Category, CategoryStats } from '@/services/categoryService'
 import { hasPermission } from '@/lib/auth'
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
+import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { useToast } from '@/hooks/use-toast'
 import {
   DndContext,
@@ -32,6 +34,18 @@ import { CSS } from '@dnd-kit/utilities'
 
 const PAGE_SIZE = 10
 
+// Vendor-proposed categories sit in PENDING until an admin approves or merges
+// them (they are never shown on the website), so they get their own badge.
+function getCategoryStatusBadge(status: Category['status']) {
+  if (status === 'PENDING') {
+    return <Badge className="bg-amber-50 text-amber-700 border border-amber-200">Pending Review</Badge>
+  }
+  if (status === 'ACTIVE') {
+    return <Badge className="bg-green-50 text-green-700 border border-green-200">active</Badge>
+  }
+  return <Badge variant="secondary">inactive</Badge>
+}
+
 function getPageRange(current: number, total: number): Array<number | '…'> {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
   const pages: Array<number | '…'> = [1];
@@ -49,7 +63,9 @@ export default function CategoryLists() {
   const [stats, setStats] = useState<CategoryStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE' | 'INACTIVE'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'ACTIVE' | 'INACTIVE'>('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [currentPage, setCurrentPage] = useState(1)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
@@ -72,6 +88,11 @@ export default function CategoryLists() {
     loadStats()
     setCurrentPage(1)
   }, [searchTerm, statusFilter])
+
+  // Date filtering is client-side, so just reset the page (no server reload).
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [dateFrom, dateTo])
 
   const loadCategories = async () => {
     try {
@@ -114,12 +135,20 @@ export default function CategoryLists() {
     }
   }
 
-  // Filter categories based on search and status
+  // Filter categories based on search, status and last-updated date
   const filteredCategories = categories.filter(category => {
     const matchesSearch = category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          category.description.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === 'all' || category.status === statusFilter
-    return matchesSearch && matchesStatus
+
+    let matchesDate = true
+    if (dateFrom || dateTo) {
+      const d = category.updatedAt ? fmtDate(new Date(category.updatedAt)) : ''
+      if (!d) matchesDate = false
+      else if (dateFrom && d < dateFrom) matchesDate = false
+      else if (dateTo && d > dateTo) matchesDate = false
+    }
+    return matchesSearch && matchesStatus && matchesDate
   })
 
   const totalPages = Math.max(1, Math.ceil(filteredCategories.length / PAGE_SIZE))
@@ -140,6 +169,107 @@ export default function CategoryLists() {
 
   const handleDeleteClick = (category: Category) => {
     setDeleteTarget({ id: category.id, name: category.name })
+  }
+
+  // ── Vendor-proposed (PENDING) category review ────────────────────────────
+  const [pendingBusyId, setPendingBusyId] = useState<string | null>(null)
+  const [mergeTarget, setMergeTarget] = useState<Category | null>(null)
+  const [mergeIntoId, setMergeIntoId] = useState('')
+
+  const refresh = async () => { await loadCategories(); await loadStats() }
+
+  const handleApprovePending = async (category: Category) => {
+    try {
+      setPendingBusyId(category.id)
+      const res = await categoryService.approvePendingCategory(category.id)
+      showSuccessToast('Category Approved', res.message)
+      await refresh()
+    } catch (error: any) {
+      showErrorToast('Approve Failed', error?.response?.data?.error || error?.message || 'Failed to approve category')
+    } finally {
+      setPendingBusyId(null)
+    }
+  }
+
+  const handleRejectPending = async (category: Category) => {
+    try {
+      setPendingBusyId(category.id)
+      const res = await categoryService.rejectPendingCategory(category.id)
+      showSuccessToast('Category Rejected', res.message)
+      await refresh()
+    } catch (error: any) {
+      showErrorToast('Reject Failed', error?.response?.data?.error || error?.message || 'Failed to reject category')
+    } finally {
+      setPendingBusyId(null)
+    }
+  }
+
+  const confirmMerge = async () => {
+    if (!mergeTarget || !mergeIntoId) return
+    try {
+      setPendingBusyId(mergeTarget.id)
+      const res = await categoryService.mergePendingCategory(mergeTarget.id, mergeIntoId)
+      showSuccessToast('Category Merged', res.message)
+      setMergeTarget(null)
+      setMergeIntoId('')
+      await refresh()
+    } catch (error: any) {
+      showErrorToast('Merge Failed', error?.response?.data?.error || error?.message || 'Failed to merge category')
+    } finally {
+      setPendingBusyId(null)
+    }
+  }
+
+  // Merge targets: any live (ACTIVE) category other than the one being merged.
+  const mergeOptions = categories
+    .filter((c) => c.status === 'ACTIVE' && c.id !== mergeTarget?.id)
+    .map((c) => ({ value: c.id, label: c.name }))
+
+  // Rendered inside both row variants (plain + drag-sortable) so the review
+  // actions only ever exist in one place.
+  const renderPendingActions = (category: Category) => {
+    if (category.status !== 'PENDING') return null
+    const busy = pendingBusyId === category.id
+    return (
+      <>
+        {hasPermission('categories:edit') && (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              title="Approve — publish this vendor-proposed category"
+              onClick={() => handleApprovePending(category)}
+              className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+            >
+              <CheckCircle className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              title="Merge into an existing category"
+              onClick={() => { setMergeTarget(category); setMergeIntoId('') }}
+              className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 transition-colors"
+            >
+              <GitMerge className="h-4 w-4" />
+            </Button>
+          </>
+        )}
+        {hasPermission('categories:delete') && (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={busy}
+            title="Reject this vendor-proposed category"
+            onClick={() => handleRejectPending(category)}
+            className="text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
+          >
+            <XCircle className="h-4 w-4" />
+          </Button>
+        )}
+      </>
+    )
   }
 
   const confirmDelete = async () => {
@@ -265,28 +395,24 @@ export default function CategoryLists() {
             <span className="text-sm font-medium text-slate-900">{category.productCount}</span>
           </TableCell>
           <TableCell>
-            <Badge 
-              variant={category.status === 'ACTIVE' ? 'default' : 'secondary'}
-              className={category.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border border-green-200 border-green-200' : ''}
-            >
-              {category.status.toLowerCase()}
-            </Badge>
+            {getCategoryStatusBadge(category.status)}
           </TableCell>
           <TableCell className="text-sm text-slate-500">
             {new Date(category.updatedAt).toLocaleDateString()}
           </TableCell>
           <TableCell className="text-right">
             <div className="flex items-center justify-end space-x-2">
+              {renderPendingActions(category)}
               {hasPermission('categories:view') && (
                 <Link href={`/admin/dashboard/categories/view/${category.id}`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" title="View Details" className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors">
                     <Eye className="h-4 w-4" />
                   </Button>
                 </Link>
               )}
               {hasPermission('categories:edit') && (
                 <Link href={`/admin/dashboard/categories/edit/${category.id}`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" title="Edit Category" className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors">
                     <Edit className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -296,7 +422,8 @@ export default function CategoryLists() {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleDeleteClick(category)}
-                  className="text-red-600 hover:text-red-800"
+                  title="Delete Category"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -307,7 +434,7 @@ export default function CategoryLists() {
       )
     }
 
-    return <SortableCategoryRow key={category.id} category={category} toggleExpanded={toggleExpanded} expandedCategories={expandedCategories} handleDeleteClick={handleDeleteClick} />;
+    return <SortableCategoryRow key={category.id} category={category} toggleExpanded={toggleExpanded} expandedCategories={expandedCategories} handleDeleteClick={handleDeleteClick} renderPendingActions={renderPendingActions} />;
   }
 
   return (
@@ -328,50 +455,27 @@ export default function CategoryLists() {
         )}
       </div>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-slate-900">{stats?.total || 0}</div>
-              <div className="text-sm text-slate-500">Main Categories</div>
-              <div className="text-xs text-slate-400 mt-1">Root level categories</div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {stats?.active || 0}
+      {/* Summary Stats — styled like the Vendor Product Requests metrics */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Main Categories',     subtitle: 'Root level categories',        value: stats?.total || 0,        Icon: Folders,     iconBg: 'bg-brand-50',   iconColor: 'text-brand-500',   countColor: 'text-slate-900' },
+          { label: 'Active Categories',   subtitle: 'Currently visible',            value: stats?.active || 0,       Icon: CheckCircle, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500', countColor: 'text-emerald-700' },
+          { label: 'Total Subcategories', subtitle: 'Nested under main categories',  value: stats?.subcategories || 0, Icon: Layers,      iconBg: 'bg-blue-50',    iconColor: 'text-blue-500',    countColor: 'text-blue-700' },
+          { label: 'Total Products',      subtitle: 'Across all categories',        value: categories.reduce((sum, c) => sum + c.productCount, 0), Icon: Package, iconBg: 'bg-purple-50', iconColor: 'text-purple-500', countColor: 'text-purple-700' },
+        ].map(({ label, subtitle, value, Icon, iconBg, iconColor, countColor }) => (
+          <div key={label} className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+            <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+              <span className="text-sm font-medium text-slate-500">{label}</span>
+              <div className={`p-1.5 rounded-lg ${iconBg}`}>
+                <Icon className={`h-4 w-4 ${iconColor}`} />
               </div>
-              <div className="text-sm text-slate-500">Active Categories</div>
-              <div className="text-xs text-slate-400 mt-1">Currently visible</div>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {stats?.subcategories || 0}
-              </div>
-              <div className="text-sm text-slate-500">Total Subcategories</div>
-              <div className="text-xs text-slate-400 mt-1">Nested under main categories</div>
+            <div className="px-4 pb-4">
+              <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
+              <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {categories.reduce((sum, c) => sum + c.productCount, 0)}
-              </div>
-              <div className="text-sm text-slate-500">Total Products</div>
-              <div className="text-xs text-slate-400 mt-1">Across all categories</div>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        ))}
       </div>
 
       {/* Filters */}
@@ -391,14 +495,21 @@ export default function CategoryLists() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <DateRangeCalendar
+                from={dateFrom}
+                to={dateTo}
+                placeholder="Last Updated"
+                onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
+              />
               <Dropdown
                 value={statusFilter}
                 options={[
                   { value: 'all', label: 'All Status' },
+                  { value: 'PENDING', label: 'Pending Review' },
                   { value: 'ACTIVE', label: 'Active' },
                   { value: 'INACTIVE', label: 'Inactive' }
                 ]}
-                onChange={(value) => setStatusFilter(value as 'all' | 'ACTIVE' | 'INACTIVE')}
+                onChange={(value) => setStatusFilter(value as 'all' | 'PENDING' | 'ACTIVE' | 'INACTIVE')}
               />
             </div>
           </div>
@@ -481,11 +592,52 @@ export default function CategoryLists() {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      {/* Merge a vendor-proposed category into an existing one — every product
+          on the pending name is repointed at the target, then it is dropped. */}
+      {mergeTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" onClick={() => setMergeTarget(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900">Merge Category</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Move <span className="font-semibold text-slate-700">&quot;{mergeTarget.name}&quot;</span> into an existing
+              category. Its {mergeTarget.productCount} product(s) will be re-assigned and the proposed
+              category removed.
+            </p>
+
+            <label className="mt-4 block text-sm font-medium text-slate-700 mb-2">Merge into</label>
+            <Dropdown
+              value={mergeIntoId}
+              options={mergeOptions}
+              placeholder={mergeOptions.length ? 'Select a category' : 'No active categories available'}
+              onChange={(v) => setMergeIntoId((Array.isArray(v) ? v[0] : v) || '')}
+            />
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setMergeTarget(null)}
+                className="border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 transition-colors"
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={!mergeIntoId || pendingBusyId === mergeTarget.id}
+                onClick={confirmMerge}
+                className="bg-brand-500 text-white hover:bg-brand-600 hover:shadow-md hover:shadow-brand-500/30 active:bg-brand-700 transition-all"
+              >
+                <GitMerge className="h-4 w-4 mr-2" />
+                {pendingBusyId === mergeTarget.id ? 'Merging…' : 'Merge'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function SortableCategoryRow({ category, toggleExpanded, expandedCategories, handleDeleteClick }: any) {
+function SortableCategoryRow({ category, toggleExpanded, expandedCategories, handleDeleteClick, renderPendingActions }: any) {
   const {
     attributes,
     listeners,
@@ -565,28 +717,24 @@ function SortableCategoryRow({ category, toggleExpanded, expandedCategories, han
         <span className="text-sm font-medium text-slate-900">{category.productCount}</span>
       </TableCell>
       <TableCell>
-        <Badge 
-          variant={category.status === 'ACTIVE' ? 'default' : 'secondary'}
-          className={category.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border border-green-200 border-green-200' : ''}
-        >
-          {category.status.toLowerCase()}
-        </Badge>
+        {getCategoryStatusBadge(category.status)}
       </TableCell>
       <TableCell className="text-sm text-slate-500">
         {new Date(category.updatedAt).toLocaleDateString()}
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end space-x-2">
+          {renderPendingActions?.(category)}
           {hasPermission('categories:view') && (
             <Link href={`/admin/dashboard/categories/view/${category.id}`}>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" title="View Details" className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors">
                 <Eye className="h-4 w-4" />
               </Button>
             </Link>
           )}
           {hasPermission('categories:edit') && (
             <Link href={`/admin/dashboard/categories/edit/${category.id}`}>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" title="Edit Category" className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors">
                 <Edit className="h-4 w-4" />
               </Button>
             </Link>
@@ -596,7 +744,8 @@ function SortableCategoryRow({ category, toggleExpanded, expandedCategories, han
               variant="ghost"
               size="sm"
               onClick={() => handleDeleteClick(category)}
-              className="text-red-600 hover:text-red-800"
+              title="Delete Category"
+              className="text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
             >
               <Trash2 className="h-4 w-4" />
             </Button>

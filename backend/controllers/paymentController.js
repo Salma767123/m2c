@@ -40,13 +40,38 @@ const createRazorpayOrder = async (req, res) => {
       key_secret: paymentSettings.razorpayKeySecret
     });
 
+    /*
+      The Razorpay account settles in INR, so every order must be created in
+      INR. The storefront quotes non-India shoppers in USD, so a USD total has
+      to be converted here — never passed through as a rupee figure. (Doing it
+      server-side keeps the rate authoritative: the client can't influence what
+      we actually charge.)
+
+      ExchangeRate.rate is "1 USD = X INR", and admin price updates derive every
+      product's USD price from its INR price using this same rate, so converting
+      back lands on the original rupee amount.
+    */
+    let chargeAmount = amount;
+    if (currency === 'USD') {
+      const fx = await prisma.exchangeRate.findUnique({ where: { currency: 'USD' } });
+      const rate = fx?.rate || 83.50; // mirrors the frontend fallback
+      chargeAmount = amount * rate;
+    } else if (currency !== 'INR') {
+      return res.status(400).json({
+        success: false,
+        error: `Unsupported currency: ${currency}`
+      });
+    }
+
     // Create Razorpay order
     const options = {
-      amount: Math.round(amount * 100), // Amount in paise (smallest currency unit)
-      currency: currency,
+      amount: Math.round(chargeAmount * 100), // Amount in paise (smallest currency unit)
+      currency: 'INR',
       receipt: `receipt_${Date.now()}`,
       notes: {
-        userId: userId
+        userId: userId,
+        quotedAmount: String(amount),
+        quotedCurrency: currency
       }
     };
 

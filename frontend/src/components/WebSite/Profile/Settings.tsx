@@ -66,10 +66,10 @@ export default function SettingsTab() {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6">
+    <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 border border-slate-200 p-4 sm:p-5 lg:p-6">
       <div className="flex items-center gap-2 sm:gap-3 mb-5 sm:mb-6">
-        <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
-        <h2 className="text-lg sm:text-xl font-bold text-slate-900">Settings</h2>
+        <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-[#e01a1b]" />
+        <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a]">Settings</h2>
       </div>
 
       {/* Appearance Settings */}
@@ -221,21 +221,21 @@ export default function SettingsTab() {
       </div> */}
 
       {/* Danger Zone */}
-      <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
+      <div className="border border-red-200 rounded-2xl p-6 bg-red-50">
         <div className="flex items-center gap-3 mb-4">
-          <AlertTriangle className="w-6 h-6 text-gray-600" />
-          <h3 className="text-lg font-semibold text-gray-900">Danger Zone</h3>
+          <AlertTriangle className="w-6 h-6 text-red-600" />
+          <h3 className="text-lg font-semibold text-red-900">Danger Zone</h3>
         </div>
-        
+
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-medium text-gray-900">Delete Account</h4>
-              <p className="text-sm text-gray-700">Permanently delete your account and all data</p>
+              <h4 className="font-medium text-red-900">Delete Account</h4>
+              <p className="text-sm text-red-700">Permanently delete your account and all data</p>
             </div>
             <button
               onClick={handleDeleteAccount}
-              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+              className="bg-red-600 text-white px-4 py-2 rounded-full hover:bg-red-700 transition-colors flex items-center gap-2"
             >
               <Trash2 className="w-4 h-4" />
               Delete Account
@@ -246,7 +246,7 @@ export default function SettingsTab() {
 
       {/* Save Button */}
       <div className="mt-8 pt-6 border-t border-slate-200">
-        <button className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors">
+        <button className="btn-shine inline-flex items-center justify-center gap-2 bg-[#e01a1b] text-white rounded-full px-6 py-3 font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300">
           Save Settings
         </button>
       </div>

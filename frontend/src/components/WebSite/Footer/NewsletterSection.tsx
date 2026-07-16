@@ -13,7 +13,7 @@ const NewsletterSection = () => {
   };
 
   return (
-    <div className="bg-[#222222] text-white border-b border-gray-800">
+    <div className="relative overflow-hidden bg-linear-to-br from-[#5c1114] via-[#8d1618] to-[#2a0709] text-white border-b border-white/10">
       <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-10 lg:py-12">
         <div className="text-center">
           <h3 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold mb-2 sm:mb-3 md:mb-4">

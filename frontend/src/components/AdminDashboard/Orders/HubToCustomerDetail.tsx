@@ -5,6 +5,7 @@ import { ArrowLeft, Package, CreditCard, User, MapPin, Truck, Star, CheckCircle,
 import { useRouter } from "next/navigation";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order, VendorShipment } from "@/services/orderService";
+import { formatOrderAmount } from "@/lib/currency";
 import { hasPermission } from "@/lib/auth";
 import { getCountryName, getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants";
 
@@ -69,6 +70,18 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
   }
 
   const { status } = order;
+  // Every figure below is stored in the currency the buyer was charged in, so a .com
+  // order holds USD. Show that as the source of truth, with an INR equivalent from the
+  // order's own rate snapshot (never the live rate, which would rewrite history).
+  const money = (amount?: number) => {
+    const { charged, inrEquivalent } = formatOrderAmount(amount || 0, order.currency, order.exchangeRate);
+    return (
+      <>
+        {charged}
+        {inrEquivalent && <span className="block text-xs font-normal text-slate-500">≈ {inrEquivalent}</span>}
+      </>
+    );
+  };
 
   // Check shipment readiness for multi-vendor orders
   const shipments = order.shipments || [];
@@ -277,31 +290,31 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           <div>
             <p className="text-sm text-slate-600">Subtotal</p>
             <p className="text-base font-medium text-slate-900 mt-1">
-              ₹{order.subtotal?.toLocaleString() || 0}
+              {money(order.subtotal)}
             </p>
           </div>
           <div>
             <p className="text-sm text-slate-600">Tax</p>
             <p className="text-base font-medium text-slate-900 mt-1">
-              ₹{order.tax?.toLocaleString() || 0}
+              {money(order.tax)}
             </p>
           </div>
           <div>
             <p className="text-sm text-slate-600">Shipping</p>
             <p className="text-base font-medium text-slate-900 mt-1">
-              ₹{order.shippingCost?.toLocaleString() || 0}
+              {money(order.shippingCost)}
             </p>
           </div>
           <div>
             <p className="text-sm text-slate-600">Discount</p>
             <p className="text-base font-medium text-green-600 mt-1">
-              -₹{order.discount?.toLocaleString() || 0}
+              -{money(order.discount)}
             </p>
           </div>
           <div>
             <p className="text-sm text-slate-600">Total Amount</p>
             <p className="text-lg font-bold text-slate-900 mt-1">
-              ₹{order.totalAmount?.toLocaleString() || 0}
+              {money(order.totalAmount)}
             </p>
           </div>
         </div>
@@ -346,13 +359,13 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
                   <div>
                     <p className="text-sm text-slate-600">Unit Price</p>
                     <p className="text-base font-medium text-slate-900">
-                      ₹{item.unitPrice?.toLocaleString() || 0}
+                      {money(item.unitPrice)}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-slate-600">Total Price</p>
                     <p className="text-base font-medium text-slate-900">
-                      ₹{item.totalPrice?.toLocaleString() || (item.unitPrice * item.quantity).toLocaleString()}
+                      {money(item.totalPrice ?? item.unitPrice * item.quantity)}
                     </p>
                   </div>
                 </div>
@@ -375,7 +388,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
               <p className="font-medium text-slate-900">{order.bagTypeName}</p>
               <p className="text-sm text-slate-600 mt-0.5">Customer requested this bag with their order</p>
             </div>
-            <p className="text-lg font-bold text-slate-900 shrink-0">₹{order.bagTypePrice.toFixed(2)}</p>
+            <p className="text-lg font-bold text-slate-900 shrink-0">{money(order.bagTypePrice)}</p>
           </div>
         </div>
       )}

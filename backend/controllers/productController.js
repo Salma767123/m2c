@@ -1019,7 +1019,7 @@ const getAvailableInventoryItems = async (req, res) => {
 const approveProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { adminPrice, variantPrices, originalPrice, variantOriginalPrices, priceINR, priceUSD, originalPriceINR, originalPriceUSD, priceVisibility, variantPricesINR, variantPricesUSD, variantOriginalPricesINR, variantOriginalPricesUSD, variantVisibilities, subCategory } = req.body;
+    const { adminPrice, variantPrices, originalPrice, variantOriginalPrices, priceINR, priceUSD, originalPriceINR, originalPriceUSD, priceVisibility, variantPricesINR, variantPricesUSD, variantOriginalPricesINR, variantOriginalPricesUSD, variantVisibilities, subCategory, categoryAction, categoryMergeTargetId } = req.body;
     const adminId = req.user.id;
 
     // Find the product with variants
@@ -1059,6 +1059,64 @@ const approveProduct = async (req, res) => {
         message: 'Product must be approved by QC (QC_APPROVED) before Admin approval'
       });
     }
+
+    // ── Vendor-proposed category gate ──────────────────────────────────────
+    // A product may sit on a category the vendor invented (status PENDING), which
+    // is invisible to the storefront. Approving it as-is would publish a product
+    // nobody can reach by browsing, so the admin must resolve the category in the
+    // same action: approve it into the taxonomy, or merge it into an existing one.
+    const pendingCategory = await prisma.category.findFirst({
+      where: { name: product.category, status: 'PENDING' },
+      select: { id: true, name: true, createdByVendorId: true },
+    });
+
+    if (pendingCategory) {
+      if (categoryAction === 'approve') {
+        await prisma.category.update({
+          where: { id: pendingCategory.id },
+          data: { status: 'ACTIVE', updatedBy: adminId },
+        });
+      } else if (categoryAction === 'merge') {
+        if (!categoryMergeTargetId) {
+          return res.status(400).json({
+            success: false,
+            code: 'CATEGORY_PENDING_REVIEW',
+            message: 'categoryMergeTargetId is required to merge the pending category',
+            data: { categoryId: pendingCategory.id, categoryName: pendingCategory.name },
+          });
+        }
+        const target = await prisma.category.findUnique({ where: { id: categoryMergeTargetId } });
+        if (!target || target.status !== 'ACTIVE') {
+          return res.status(400).json({
+            success: false,
+            message: 'Merge target must be an existing active category',
+          });
+        }
+        // Repoint every product on the pending name (this one included), then
+        // drop the now-unused proposal.
+        await prisma.product.updateMany({
+          where: { category: pendingCategory.name },
+          data: { category: target.name },
+        });
+        await prisma.category.delete({ where: { id: pendingCategory.id } });
+        // Keep the in-memory copy consistent with what we just wrote.
+        product.category = target.name;
+      } else {
+        // No decision supplied — tell the client what needs resolving so it can
+        // prompt, rather than silently publishing an unbrowsable product.
+        return res.status(400).json({
+          success: false,
+          code: 'CATEGORY_PENDING_REVIEW',
+          message: `"${pendingCategory.name}" is a vendor-proposed category awaiting review. Approve it or merge it into an existing category before publishing this product.`,
+          data: { categoryId: pendingCategory.id, categoryName: pendingCategory.name },
+        });
+      }
+    }
+
+    // Live exchange rate — fetched up-front because the variant pricing branch
+    // below auto-calculates USD prices and needs it before the base-price block.
+    const { getCurrentExchangeRate } = require('./exchangeRateController');
+    const exchangeRate = await getCurrentExchangeRate();
 
     // Prepare update data
     const updateData = {
@@ -1165,9 +1223,6 @@ const approveProduct = async (req, res) => {
     // Centralized pricing: adminFixedPrice IS the selling price
     // priceINR = adminFixedPrice (synced automatically)
     // priceUSD = adminFixedPrice / exchangeRate (auto-calculated)
-    const { getCurrentExchangeRate } = require('./exchangeRateController');
-    const exchangeRate = await getCurrentExchangeRate();
-
     const sellingPrice = updateData.adminFixedPrice || (priceINR ? parseFloat(priceINR) : null);
     if (sellingPrice) {
       updateData.adminFixedPrice = sellingPrice;
@@ -2188,7 +2243,9 @@ const getAllProductsForAdmin = async (req, res) => {
       status,
       search,
       vendorId,
-      category
+      category,
+      dateFrom,
+      dateTo
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -2218,6 +2275,13 @@ const getAllProductsForAdmin = async (req, res) => {
         { description: { contains: search, mode: 'insensitive' } },
         { baseSku: { contains: search, mode: 'insensitive' } }
       ];
+    }
+
+    // Created-date range filter (YYYY-MM-DD)
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+      if (dateTo) where.createdAt.lte = new Date(`${dateTo}T23:59:59.999Z`);
     }
 
     // Get products with pagination
@@ -2265,12 +2329,30 @@ const getAllProductsForAdmin = async (req, res) => {
       prisma.product.count({ where })
     ]);
 
+    // Per-approval-status counts for the metric cards. Ignore the approvalStatus
+    // filter itself (so selecting one card doesn't shrink the others) while still
+    // respecting search / status / vendor / category / date filters.
+    const countsWhere = { ...where };
+    delete countsWhere.approvalStatus;
+    const grouped = await prisma.product.groupBy({
+      by: ['approvalStatus'],
+      where: countsWhere,
+      _count: { _all: true }
+    });
+    const counts = { total: 0, PENDING: 0, QC_APPROVED: 0, APPROVED: 0, REJECTED: 0, REINSPECTION: 0 };
+    for (const g of grouped) {
+      const n = g._count._all;
+      if (counts[g.approvalStatus] !== undefined) counts[g.approvalStatus] = n;
+      counts.total += n;
+    }
+
     const totalPages = Math.ceil(totalCount / parseInt(limit));
 
     res.json({
       success: true,
       data: {
         products,
+        counts,
         pagination: {
           currentPage: parseInt(page),
           totalPages,

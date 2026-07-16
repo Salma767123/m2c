@@ -238,8 +238,8 @@ export default function LoginForm({ onGoogleAuth }: LoginFormProps) {
           value={loginData.email}
           onChange={handleLoginChange}
           onBlur={() => validateEmail(loginData.email)}
-          className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border rounded-lg focus:ring-2 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${
-            emailError ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-200"
+          className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border rounded-xl focus:outline-none focus:ring-2 focus:border-[#e01a1b] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${
+            emailError ? "border-red-500 focus:ring-red-200" : "border-gray-200 focus:ring-[#e01a1b]/40"
           }`}
           placeholder="Enter your email address"
           required
@@ -264,8 +264,8 @@ export default function LoginForm({ onGoogleAuth }: LoginFormProps) {
             name="password"
             value={loginData.password}
             onChange={handleLoginChange}
-            className={`w-full px-3 sm:px-4 py-2 sm:py-3 pr-10 sm:pr-12 text-sm sm:text-base border rounded-lg focus:ring-2 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${
-              passwordError ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-200"
+            className={`w-full px-3 sm:px-4 py-2 sm:py-3 pr-10 sm:pr-12 text-sm sm:text-base border rounded-xl focus:outline-none focus:ring-2 focus:border-[#e01a1b] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${
+              passwordError ? "border-red-500 focus:ring-red-200" : "border-gray-200 focus:ring-[#e01a1b]/40"
             }`}
             placeholder="Enter your password"
             required
@@ -294,21 +294,21 @@ export default function LoginForm({ onGoogleAuth }: LoginFormProps) {
             name="rememberMe"
             checked={loginData.rememberMe}
             onChange={handleLoginChange}
-            className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            className="w-3 h-3 sm:w-4 sm:h-4 text-[#e01a1b] border-gray-300 rounded focus:ring-[#e01a1b]"
           />
           <span className="ml-1.5 sm:ml-2 text-xs sm:text-sm text-gray-700">Remember me</span>
         </label>
-        <a href="/forgot-password" className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">
+        <a href="/forgot-password" className="link-underline brand text-xs sm:text-sm text-[#e01a1b] hover:text-[#c41617] font-medium transition-colors">
           Forgot password?
         </a>
       </div>
 
       {/* Sign In Button */}
       <div className="flex justify-center pt-2 sm:pt-4">
-        <Button 
+        <Button
           type="submit"
           disabled={isLoading}
-          className="w-full max-w-sm bg-gray-900 hover:bg-gray-700 text-white py-2.5 sm:py-3 text-sm sm:text-base font-semibold rounded-lg shadow-md transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg flex items-center justify-center"
+          className="btn-shine w-full max-w-sm bg-[#e01a1b] hover:bg-[#c41617] text-white py-2.5 sm:py-3 text-sm sm:text-base font-semibold rounded-full shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] transition-all duration-300 hover:-translate-y-0.5 flex items-center justify-center"
         >
           <Lock className="w-4 h-4 mr-2" />
           {isLoading ? 'Signing in...' : 'Sign In'}
@@ -331,7 +331,7 @@ export default function LoginForm({ onGoogleAuth }: LoginFormProps) {
           type="button"
           variant="outline"
           onClick={onGoogleAuth}
-          className="w-full max-w-sm border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 py-2.5 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-md flex items-center justify-center"
+          className="w-full max-w-sm border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 py-2.5 sm:py-3 text-sm sm:text-base font-semibold rounded-full transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md flex items-center justify-center"
         >
           <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>

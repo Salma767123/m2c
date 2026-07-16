@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, Eye, RefreshCw, FileText, Receipt, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Eye, RefreshCw, FileText, Receipt, ChevronLeft, ChevronRight, CheckCircle, Clock, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/UI/Table";
 import Dropdown from "@/components/UI/Dropdown";
+import DateRangeCalendar, { fmtDate as isoDate } from "@/components/Shared/DateRangeCalendar";
 import { orderService, Order } from "@/services/orderService";
+import { formatOrderAmount } from "@/lib/currency";
 import { showErrorToast } from "@/lib/toast-utils";
 import { hasPermission } from "@/lib/auth";
 
@@ -16,8 +18,19 @@ import { hasPermission } from "@/lib/auth";
 const fmtDate = (d: string) =>
   new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
-const fmtINR = (n: number) =>
-  "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Show what the customer was actually charged, plus an INR equivalent for USD
+// orders so admins can compare a .com invoice against a .in one. Mirrors the
+// Money cell used across the Orders module; the equivalent uses the rate
+// snapshotted on the order, so it never drifts when the live rate is edited.
+function Money({ amount, order }: { amount: number; order: { currency?: "INR" | "USD"; exchangeRate?: number | null } }) {
+  const { charged, inrEquivalent } = formatOrderAmount(amount, order.currency, order.exchangeRate);
+  return (
+    <div className="whitespace-nowrap">
+      <span className="font-semibold text-slate-900">{charged}</span>
+      {inrEquivalent && <span className="block text-xs font-normal text-slate-500">≈ {inrEquivalent}</span>}
+    </div>
+  );
+}
 
 // Map payment status → invoice status label
 const invoiceStatus = (paymentStatus?: string): "Paid" | "Pending" | "Overdue" => {
@@ -56,6 +69,8 @@ export default function InvoiceManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
   const statusOptions = ["All", "Paid", "Pending", "Overdue"];
@@ -98,7 +113,17 @@ export default function InvoiceManagement() {
     const status = invoiceStatus(order.paymentStatus);
     const matchStatus = statusFilter === "All" || status === statusFilter;
 
-    return matchSearch && matchStatus;
+    // Invoice-date range filter (YYYY-MM-DD strings compare lexicographically)
+    let matchDate = true;
+    if (dateFrom || dateTo) {
+      const src = order.orderDate || order.createdAt;
+      const od = src ? isoDate(new Date(src)) : "";
+      if (!od) matchDate = false;
+      else if (dateFrom && od < dateFrom) matchDate = false;
+      else if (dateTo && od > dateTo) matchDate = false;
+    }
+
+    return matchSearch && matchStatus && matchDate;
   });
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
@@ -128,19 +153,36 @@ export default function InvoiceManagement() {
   return (
     <div className="space-y-6">
 
-      {/* ── Stats ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* ── Stats (click a card to filter the table below) ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Total Invoices", value: ordersWithInvoice.length, color: "text-slate-900" },
-          { label: "Paid", value: paid, color: "text-green-600" },
-          { label: "Pending", value: pending, color: "text-yellow-600" },
-          { label: "Overdue", value: overdue, color: "text-red-600" },
-        ].map(s => (
-          <div key={s.label} className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-            <p className="text-sm text-slate-600">{s.label}</p>
-            <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
-          </div>
-        ))}
+          { key: "All", label: "Total Invoices", subtitle: "All invoices", value: ordersWithInvoice.length, Icon: Receipt, iconBg: "bg-brand-50", iconColor: "text-brand-500", countColor: "text-slate-900", activeClass: "border-brand-400 bg-brand-50/50" },
+          { key: "Paid", label: "Paid", subtitle: "Settled", value: paid, Icon: CheckCircle, iconBg: "bg-emerald-50", iconColor: "text-emerald-500", countColor: "text-emerald-700", activeClass: "border-emerald-400 bg-emerald-50/60" },
+          { key: "Pending", label: "Pending", subtitle: "Awaiting payment", value: pending, Icon: Clock, iconBg: "bg-amber-50", iconColor: "text-amber-500", countColor: "text-amber-700", activeClass: "border-amber-400 bg-amber-50/60" },
+          { key: "Overdue", label: "Overdue", subtitle: "Past due", value: overdue, Icon: AlertTriangle, iconBg: "bg-red-50", iconColor: "text-red-500", countColor: "text-red-700", activeClass: "border-red-400 bg-red-50/60" },
+        ].map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
+          const isActive = statusFilter === key;
+          const toggle = () => { setStatusFilter(prev => (prev === key ? "All" : key)); setCurrentPage(1); };
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={toggle}
+              className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : "border-slate-200/80 hover:border-slate-300"}`}
+            >
+              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+                <span className="text-sm font-medium text-slate-500">{label}</span>
+                <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace("50", "100") : iconBg} transition-transform duration-150 group-hover:scale-110`}>
+                  <Icon className={`h-4 w-4 ${iconColor}`} />
+                </div>
+              </div>
+              <div className="px-4 pb-4">
+                <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* ── Filters ── */}
@@ -162,6 +204,14 @@ export default function InvoiceManagement() {
               options={statusOptions}
               onChange={v => { setStatusFilter(v as string); setCurrentPage(1); }}
               placeholder="Filter by Status"
+            />
+          </div>
+          <div className="shrink-0">
+            <DateRangeCalendar
+              from={dateFrom}
+              to={dateTo}
+              onChange={(from, to) => { setDateFrom(from); setDateTo(to); setCurrentPage(1); }}
+              placeholder="Invoice Date"
             />
           </div>
           <button
@@ -202,7 +252,7 @@ export default function InvoiceManagement() {
                   <TableCell colSpan={8} className="text-center py-12 text-slate-400">
                     <Receipt className="h-10 w-10 mx-auto mb-3 opacity-30" />
                     <p>No invoices found</p>
-                    {!searchTerm && statusFilter === "All" && (
+                    {!searchTerm && statusFilter === "All" && !dateFrom && !dateTo && (
                       <p className="text-xs mt-1 text-slate-400">New orders will appear here once placed</p>
                     )}
                   </TableCell>
@@ -232,7 +282,7 @@ export default function InvoiceManagement() {
                       <TableCell className="text-sm text-slate-600">
                         {fmtDate(order.orderDate || order.createdAt)}
                       </TableCell>
-                      <TableCell className="font-semibold">{fmtINR(order.totalAmount)}</TableCell>
+                      <TableCell><Money amount={order.totalAmount} order={order} /></TableCell>
                       <TableCell className="text-sm text-slate-600">{order.paymentMethod || "—"}</TableCell>
                       <TableCell>
                         <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColor(status)}`}>

@@ -9,6 +9,7 @@ import { cartService } from '@/services/cartService';
 import { userAuthService } from '@/services/userAuthService';
 import Image from 'next/image';
 import { formatPrice, getRegionalPrice, getRegionalOriginalPrice } from '@/lib/currency';
+import Reveal from '@/components/WebSite/Shared/Reveal';
 
 const Wishlist = () => {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
@@ -152,7 +153,7 @@ const Wishlist = () => {
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 <Heart className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-red-500 fill-current shrink-0" />
                 <div className="min-w-0">
-                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">My Wishlist</h1>
+                  <h1 className="font-playfair text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#1a1a1a] tracking-tight mb-1 sm:mb-2">My Wishlist</h1>
                   <p className="text-sm sm:text-base text-slate-600">Items you've saved for later</p>
                 </div>
               </div>
@@ -172,7 +173,7 @@ const Wishlist = () => {
             </p>
             <Link
               href="/products"
-              className="inline-flex items-center gap-2 bg-gray-800 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl hover:bg-gray-900 transition-colors font-semibold text-sm sm:text-base"
+              className="btn-shine inline-flex items-center gap-2 bg-[#e01a1b] text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 font-semibold text-sm sm:text-base"
             >
               <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
               Start Shopping
@@ -192,7 +193,7 @@ const Wishlist = () => {
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <Heart className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-red-500 fill-current shrink-0" />
               <div className="min-w-0">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1 sm:mb-2 truncate">My Wishlist</h1>
+                <h1 className="font-playfair text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#1a1a1a] tracking-tight mb-1 sm:mb-2 truncate">My Wishlist</h1>
                 <p className="text-sm sm:text-base text-slate-600">Items you've saved for later</p>
               </div>
             </div>
@@ -215,7 +216,7 @@ const Wishlist = () => {
           </button>
           <Link
             href="/products"
-            className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 text-sm sm:text-base bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
+            className="btn-shine flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 text-sm sm:text-base bg-[#e01a1b] text-white rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300"
           >
             <ShoppingCart className="w-4 h-4" />
             Continue Shopping
@@ -232,22 +233,22 @@ const Wishlist = () => {
             const regionalOriginalPrice = getRegionalOriginalPrice(item.product) || item.product.originalPrice;
 
             return (
-              <div key={item.id} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6 hover:shadow-md transition-shadow">
+              <Reveal key={item.id} className="group bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] hover:-translate-y-1.5 hover:ring-[#e01a1b]/20 transition-all duration-500 p-4 sm:p-5 lg:p-6">
                 <div className="flex items-start gap-3 sm:gap-4">
                   {/* Product Image */}
                   <Link
                     href={productHref}
-                    className="relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shrink-0"
+                    className="relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0"
                   >
                     <Image
                       src={item.product.image || '/placeholder.png'}
                       alt={item.product.name}
                       fill
                       sizes="(max-width: 640px) 96px, (max-width: 1024px) 112px, 128px"
-                      className="object-cover"
+                      className="object-cover transition-transform duration-[900ms] ease-out group-hover:scale-110"
                     />
                     {item.product.discount ? (
-                      <div className="absolute top-1 left-1 bg-gray-800 text-white px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-semibold">
+                      <div className="absolute top-1 left-1 bg-[#e01a1b] text-white px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-semibold">
                         {item.product.discount}% OFF
                       </div>
                     ) : null}
@@ -265,11 +266,11 @@ const Wishlist = () => {
 
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="min-w-0 flex-1">
-                        <span className="inline-block text-xs bg-blue-100 text-blue-700 px-2 py-0.5 sm:py-1 rounded-full mb-1.5">
+                        <span className="inline-block text-xs bg-[#e01a1b]/10 text-[#c41617] font-medium px-2 py-0.5 sm:py-1 rounded-full mb-1.5">
                           {item.product.category}
                         </span>
                         <h3 className="text-base sm:text-lg font-semibold text-slate-900 break-words">
-                          <Link href={productHref} className="hover:text-gray-600 transition-colors">
+                          <Link href={productHref} className="hover:text-[#e01a1b] transition-colors">
                             {item.product.name}
                           </Link>
                         </h3>
@@ -314,7 +315,7 @@ const Wishlist = () => {
                     <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-slate-200">
                       {item.product.hasVariants ? (
                         <Link href={productHref} className="w-full sm:w-auto">
-                          <button className="w-full flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors whitespace-nowrap">
+                          <button className="btn-shine w-full flex items-center justify-center gap-2 px-4 sm:px-5 py-2 text-sm bg-[#e01a1b] text-white rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] transition-all duration-300 whitespace-nowrap">
                             <ShoppingCart className="w-4 h-4" />
                             Choose Options
                           </button>
@@ -323,8 +324,8 @@ const Wishlist = () => {
                         <button
                           onClick={() => addToCart(item.productId, item.product!.name)}
                           disabled={!inStock}
-                          className={`w-full sm:w-auto flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm rounded-lg transition-colors whitespace-nowrap ${inStock
-                            ? 'bg-gray-800 text-white hover:bg-gray-900'
+                          className={`w-full sm:w-auto flex items-center justify-center gap-2 px-4 sm:px-5 py-2 text-sm rounded-full transition-all duration-300 whitespace-nowrap ${inStock
+                            ? 'btn-shine bg-[#e01a1b] text-white hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)]'
                             : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                         >
                           <ShoppingCart className="w-4 h-4" />
@@ -337,7 +338,7 @@ const Wishlist = () => {
                         <button
                           onClick={() => shareProduct(item.productId, item.product!.name)}
                           aria-label="Share product"
-                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition-colors"
                         >
                           <Share2 className="w-4 h-4" />
                           <span>Share</span>
@@ -346,7 +347,7 @@ const Wishlist = () => {
                         <button
                           onClick={() => removeFromWishlist(item.productId)}
                           aria-label="Remove from wishlist"
-                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                           <span>Remove</span>
@@ -355,14 +356,14 @@ const Wishlist = () => {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Reveal>
             );
           })}
         </div>
 
         {/* Wishlist Tips */}
-        <div className="mt-6 sm:mt-8 lg:mt-12 bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6">
-          <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3 sm:mb-4">Wishlist Tips</h3>
+        <div className="mt-6 sm:mt-8 lg:mt-12 bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-4 sm:p-5 lg:p-6">
+          <h3 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a] tracking-tight mb-3 sm:mb-4">Wishlist Tips</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
             <div className="text-center">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">

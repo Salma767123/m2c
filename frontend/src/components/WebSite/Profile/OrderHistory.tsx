@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Package, Eye, Download, Star, Truck, CheckCircle, Clock, AlertCircle, ChevronLeft, ChevronRight, ShoppingBag } from 'lucide-react'
 import orderService, { Order as APIOrder } from '@/services/orderService'
+import Reveal from '@/components/WebSite/Shared/Reveal'
 
 const ORDERS_PER_PAGE = 5
 
@@ -144,7 +145,7 @@ export default function OrderHistory() {
         <p>{error}</p>
         <button
           onClick={fetchOrders}
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="btn-shine inline-flex items-center justify-center mt-4 px-4 py-2 bg-[#e01a1b] text-white rounded-full font-semibold hover:bg-[#c41617] transition-colors"
         >
           Try Again
         </button>
@@ -153,11 +154,11 @@ export default function OrderHistory() {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+    <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 border border-slate-200 p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Package className="w-6 h-6 text-blue-600" />
-          <h2 className="text-xl font-bold text-slate-900">Order History</h2>
+          <Package className="w-6 h-6 text-[#e01a1b]" />
+          <h2 className="font-playfair text-xl font-semibold text-[#1a1a1a]">Order History</h2>
         </div>
         {orders.length > 0 && (
           <span className="text-sm text-slate-500">{orders.length} order{orders.length !== 1 ? 's' : ''} total</span>
@@ -170,7 +171,7 @@ export default function OrderHistory() {
           <h3 className="text-lg font-semibold text-slate-900 mb-2">No orders yet</h3>
           <p className="text-slate-600 mb-6">Start shopping to see your orders here</p>
           <Link href="/products">
-            <button className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+            <button className="btn-shine inline-flex items-center justify-center bg-[#e01a1b] text-white px-6 py-3 rounded-full font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300">
               Start Shopping
             </button>
           </Link>
@@ -182,8 +183,8 @@ export default function OrderHistory() {
           </div>
 
           <div className="space-y-4 sm:space-y-6">
-            {paginatedOrders.map((order) => (
-              <div key={order.id} className="border border-slate-200 rounded-lg p-4 sm:p-5 lg:p-6 hover:shadow-md transition-shadow">
+            {paginatedOrders.map((order, index) => (
+              <Reveal key={order.id} delay={index * 90} className="border border-slate-200 rounded-2xl ring-1 ring-black/5 p-4 sm:p-5 lg:p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] hover:-translate-y-1 hover:ring-[#e01a1b]/20 transition-all duration-500">
                 {/* Order Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3 sm:gap-4">
                   <div className="flex items-start sm:items-center flex-wrap gap-2 sm:gap-4 min-w-0">
@@ -249,26 +250,26 @@ export default function OrderHistory() {
                 {/* Order Actions */}
                 <div className="flex flex-wrap gap-2 sm:gap-3 pt-4 border-t border-slate-200">
                   <Link href={`/order/${order.orderId}`} className="flex-1 sm:flex-none">
-                    <button className="w-full flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    <button className="btn-shine w-full flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-[#e01a1b] text-white rounded-full font-semibold hover:bg-[#c41617] transition-colors">
                       <Eye className="w-4 h-4" />
                       View Details
                     </button>
                   </Link>
                   {formatStatus(order.status) === 'Delivered' && (
-                    <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors">
+                    <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition-colors">
                       <Star className="w-4 h-4" />
                       Write Review
                     </button>
                   )}
                   <button
                     onClick={() => handleDownloadInvoice(order.id)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     Invoice
                   </button>
                 </div>
-              </div>
+              </Reveal>
             ))}
           </div>
 
@@ -295,7 +296,7 @@ export default function OrderHistory() {
                       onClick={() => setCurrentPage(page as number)}
                       aria-current={page === currentPage ? 'page' : undefined}
                       className={`min-w-8 h-8 sm:min-w-9 sm:h-9 px-1.5 sm:px-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${currentPage === page
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-[#e01a1b] text-white'
                         : 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
                         }`}
                     >

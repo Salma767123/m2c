@@ -154,8 +154,8 @@ export default function SEOSettingsTab() {
 
     return (
         <div className="space-y-6">
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
+            <div className="p-4 bg-brand-50 border border-brand-200 rounded-lg">
+                <p className="text-sm text-brand-800">
                     <strong>SEO Management:</strong> Configure meta tags for each page to improve search engine visibility and social media sharing.
                 </p>
             </div>
@@ -305,7 +305,7 @@ export default function SEOSettingsTab() {
                                             tabIndex={0}
                                             onClick={() => fileInputRef.current?.click()}
                                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
-                                            className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 focus-visible:border-blue-500"
+                                            className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-brand-400 hover:bg-brand-50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-400/40 focus-visible:border-brand-500"
                                         >
                                             <Image className="w-12 h-12 text-slate-400 mx-auto mb-3" />
                                             <p className="text-slate-600 font-medium">Click to upload Open Graph image</p>
@@ -339,15 +339,15 @@ export default function SEOSettingsTab() {
                                 </div>
                             </div>
 
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div className="bg-brand-50 border border-brand-200 rounded-lg p-4">
                                 <button
                                     type="button"
-                                    className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+                                    className="flex items-center gap-2 text-brand-600 hover:text-brand-700 font-medium"
                                 >
                                     <Sparkles className="w-4 h-4" />
                                     Generate SEO with AI
                                 </button>
-                                <p className="text-xs text-blue-600 mt-1">
+                                <p className="text-xs text-brand-600 mt-1">
                                     Let AI help you create optimized SEO content for this page
                                 </p>
                             </div>

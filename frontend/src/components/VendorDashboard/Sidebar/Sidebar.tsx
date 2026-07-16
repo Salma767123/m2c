@@ -13,6 +13,7 @@ import {
   User,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   BarChart3,
   MessageSquare,
   Settings,
@@ -161,21 +162,46 @@ export default function VendorSidebar({ isCollapsed = false, onToggleCollapse }:
   };
 
   return (
-    <div className="flex h-full w-64 flex-col font-sans bg-white border-r border-slate-200 shadow-xs">
+    <div className={cn(
+      "flex h-full flex-col font-sans bg-white border-r border-slate-200 shadow-xs transition-all duration-300",
+      isCollapsed ? "w-20" : "w-64",
+    )}>
       {/* Logo */}
-      <div className="flex h-20 items-center justify-center border-b border-slate-200 px-6">
-        <Link
-          href="/vendor/dashboard"
-          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-        >
-          <div className="w-8 h-8 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0">
-            <Store className="w-4 h-4 text-brand-500" />
-          </div>
-          <div>
-            <h1 className="text-base font-bold text-slate-900 leading-tight">M2C MarkDowns</h1>
-            <p className="text-[9px] font-bold uppercase tracking-wider text-brand-500 mt-0.5">Vendor Portal</p>
-          </div>
-        </Link>
+      <div className="flex h-20 items-center justify-center border-b border-slate-200 px-6 relative">
+        {!isCollapsed ? (
+          <Link
+            href="/vendor/dashboard"
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+          >
+            <div className="w-8 h-8 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0">
+              <Store className="w-4 h-4 text-brand-500" />
+            </div>
+            <div>
+              <h1 className="text-base font-bold text-slate-900 leading-tight">M2C MarkDowns</h1>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-brand-500 mt-0.5">Vendor Portal</p>
+            </div>
+          </Link>
+        ) : (
+          <Link
+            href="/vendor/dashboard"
+            className="flex items-center justify-center hover:opacity-80 transition-opacity"
+          >
+            <div className="w-8 h-8 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0">
+              <Store className="w-4 h-4 text-brand-500" />
+            </div>
+          </Link>
+        )}
+
+        {/* Collapse Toggle Button — Desktop only */}
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className="hidden lg:flex absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 bg-brand-500 text-white rounded-full items-center justify-center hover:bg-brand-600 transition-colors shadow-md z-10"
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <ChevronLeft className={cn("h-4 w-4 transition-transform duration-300", isCollapsed && "rotate-180")} />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -197,21 +223,44 @@ export default function VendorSidebar({ isCollapsed = false, onToggleCollapse }:
                   itemIsActive
                     ? "bg-brand-50/60 border-brand-500 text-brand-700 font-bold shadow-xs shadow-brand-500/5"
                     : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+                  isCollapsed && "justify-center",
                 )}
+                title={isCollapsed ? item.title : undefined}
               >
                 <Icon
                   className={cn(
-                    "mr-3 h-5 w-5 transition-colors",
+                    "h-5 w-5 transition-colors",
                     itemIsActive ? "text-brand-500" : "text-slate-400 group-hover:text-slate-600",
+                    !isCollapsed && "mr-3",
                   )}
                 />
-                <span className="font-medium">{item.title}</span>
+                {!isCollapsed && <span className="font-medium">{item.title}</span>}
               </Link>
             );
           }
 
           // If item has subItems, render as expandable section
           const parentHasActiveChild = item.subItems ? hasAnyActiveChild(item.subItems) : false;
+
+          // Collapsed mode: expandable sections render as an icon-only link to
+          // the first sub-item (dropdowns don't fit a 20-wide rail).
+          if (isCollapsed && item.subItems && item.subItems.length > 0) {
+            return (
+              <Link
+                key={item.title}
+                href={item.subItems[0].href}
+                className={cn(
+                  "w-full flex items-center justify-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
+                  parentHasActiveChild
+                    ? "bg-brand-50/60 text-brand-700"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+                )}
+                title={item.title}
+              >
+                <Icon className={cn("h-5 w-5 transition-colors", parentHasActiveChild ? "text-brand-500" : "text-slate-400")} />
+              </Link>
+            );
+          }
 
           return (
             <div key={item.title} className="space-y-1">
@@ -288,22 +337,28 @@ export default function VendorSidebar({ isCollapsed = false, onToggleCollapse }:
 
       {/* Footer */}
       <div className="border-t border-slate-200 p-4">
-        <div className="flex items-start gap-3">
+        <div className={cn("flex items-start gap-3", isCollapsed && "justify-center")}>
           {vendor?.companyLogo ? (
             <img
               src={vendor.companyLogo}
               alt={vendor.companyName || 'Company logo'}
               className="h-10 w-10 rounded-full object-cover shadow-md shrink-0 border border-slate-200"
+              title={isCollapsed ? (vendor.companyName || 'Vendor Store') : undefined}
             />
           ) : (
-            <div className="h-10 w-10 rounded-full bg-linear-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-md shrink-0">
+            <div
+              className="h-10 w-10 rounded-full bg-linear-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-md shrink-0"
+              title={isCollapsed ? (vendor?.companyName || 'Vendor Store') : undefined}
+            >
               <User className="h-5 w-5 text-white" />
             </div>
           )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-slate-900 break-words leading-snug">{vendor?.companyName || 'Vendor Store'}</p>
-            <p className="text-xs text-slate-500 mt-0.5">Vendor Store</p>
-          </div>
+          {!isCollapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-900 break-words leading-snug">{vendor?.companyName || 'Vendor Store'}</p>
+              <p className="text-xs text-slate-500 mt-0.5">Vendor Store</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

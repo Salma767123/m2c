@@ -2,6 +2,8 @@
 
 import ProductCard from '../ProductCard/ProductCard';
 import Category from '@/components/WebSite/CategoryCopy/Category';
+import Reveal from '@/components/WebSite/Shared/Reveal';
+import SectionBackdrop from '@/components/WebSite/Shared/SectionBackdrop';
 import { Search, Filter, ChevronDown, Star, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 function getPageRange(current: number, total: number): Array<number | '…'> {
@@ -243,7 +245,7 @@ const Products = () => {
               setCurrentPage(1);
               if (isMobileDrawer) closeMobileFilters();
             }}
-            className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+            className="rounded border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
           />
           <span className="ml-2 text-sm font-medium text-gray-700">In Stock Only</span>
         </label>
@@ -259,7 +261,7 @@ const Products = () => {
               placeholder="Min"
               value={priceRange.min || ''}
               onChange={(e) => setPriceRange({ ...priceRange, min: Number(e.target.value) || 0 })}
-              className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-amber-500 focus:border-amber-500"
+              className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-[#e01a1b] focus:border-[#e01a1b]"
             />
             <span className="text-gray-500">to</span>
             <input
@@ -267,12 +269,12 @@ const Products = () => {
               placeholder="Max"
               value={priceRange.max < 100000 ? priceRange.max : ''}
               onChange={(e) => setPriceRange({ ...priceRange, max: Number(e.target.value) || 100000 })}
-              className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-amber-500 focus:border-amber-500"
+              className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-[#e01a1b] focus:border-[#e01a1b]"
             />
           </div>
           <button
             onClick={() => { setCurrentPage(1); if (isMobileDrawer) closeMobileFilters(); }}
-            className="w-full bg-amber-600 text-white px-4 py-2 rounded text-sm hover:bg-amber-700"
+            className="btn-shine w-full bg-[#e01a1b] text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#c41617] transition-all duration-300"
           >
             Apply Price Filter
           </button>
@@ -296,7 +298,7 @@ const Products = () => {
                 setCurrentPage(1);
                 if (isMobileDrawer) closeMobileFilters();
               }}
-              className="rounded-full border-gray-300 text-amber-600 focus:ring-amber-500"
+              className="rounded-full border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
             />
             <span className="ml-2 text-sm text-gray-700 font-medium">All Categories</span>
           </label>
@@ -315,7 +317,7 @@ const Products = () => {
                     setCurrentPage(1);
                     if (isMobileDrawer) closeMobileFilters();
                   }}
-                  className="rounded-full border-gray-300 text-amber-600 focus:ring-amber-500"
+                  className="rounded-full border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
                 />
                 <span className="ml-2 text-sm text-gray-700 font-medium">{cat.name}</span>
               </label>
@@ -337,7 +339,7 @@ const Products = () => {
                           setCurrentPage(1);
                           if (isMobileDrawer) closeMobileFilters();
                         }}
-                        className="rounded-full border-gray-300 text-amber-600 focus:ring-amber-500"
+                        className="rounded-full border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
                       />
                       <span className="ml-2 text-sm text-gray-600">{sub.name}</span>
                     </label>
@@ -365,7 +367,7 @@ const Products = () => {
                   setCurrentPage(1);
                   if (isMobileDrawer) closeMobileFilters();
                 }}
-                className="border-gray-300 text-amber-600 focus:ring-amber-500"
+                className="border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
               />
               <div className="ml-2 flex items-center">
                 <div className="flex">
@@ -391,7 +393,7 @@ const Products = () => {
                 setCurrentPage(1);
                 if (isMobileDrawer) closeMobileFilters();
               }}
-              className="border-gray-300 text-amber-600 focus:ring-amber-500"
+              className="border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
             />
             <span className="ml-2 text-sm text-gray-700">All Ratings</span>
           </label>
@@ -403,17 +405,21 @@ const Products = () => {
   return (
     <div className='font-sans'>
       {/* Hero Section */}
-      <section className="relative bg-gray-100 py-6 sm:py-8 font-sans">
+      <section className="relative bg-[#f7f7f5] py-6 sm:py-8 font-sans">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold text-gray-800 mb-4 sm:mb-6">
+          <Reveal className="text-center">
+            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
+              <span className="h-px w-6 bg-[#e01a1b]" />
+              Shop
+            </span>
+            <h1 className="font-playfair text-2xl sm:text-3xl lg:text-5xl font-semibold text-[#1a1a1a] mb-4 sm:mb-6 tracking-tight">
               Our Product Collection
             </h1>
             <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto">
               Discover authentic, handcrafted textiles made by skilled artisans using traditional techniques
               passed down through generations.
             </p>
-          </div>
+          </Reveal>
         </div>
       </section>
 
@@ -432,7 +438,7 @@ const Products = () => {
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full pl-10 pr-4 py-2 text-gray-600 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                className="w-full pl-10 pr-4 py-2 text-gray-600 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#e01a1b] focus:border-[#e01a1b]"
               />
             </div>
 
@@ -441,7 +447,7 @@ const Products = () => {
               {/* Filter Toggle */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#e01a1b] focus:border-[#e01a1b]"
               >
                 <Filter className="mr-2 h-4 w-4" />
                 Filters {activeFiltersCount > 0 && `(${activeFiltersCount})`}
@@ -453,7 +459,7 @@ const Products = () => {
               <div className="relative" ref={sortDropdownRef}>
                 <button
                   onClick={() => setShowSortDropdown(!showSortDropdown)}
-                  className="inline-flex items-center justify-between min-w-35 sm:min-w-45 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  className="inline-flex items-center justify-between min-w-35 sm:min-w-45 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#e01a1b] focus:border-[#e01a1b]"
                 >
                   <span className="truncate">
                     {sortBy === 'createdAt' && 'Newest First'}
@@ -502,8 +508,9 @@ const Products = () => {
       </section>
 
       {/* Main Content with Sidebar */}
-      <section className="bg-white py-6 sm:py-8 lg:py-12">
-        <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden bg-linear-to-b from-[#faf9f7] via-white to-[#fdf6f6] py-6 sm:py-8 lg:py-12">
+        <SectionBackdrop />
+        <div className="relative max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex lg:gap-8">
 
             {/* Backdrop for mobile filter drawer — CSS-driven via lg:hidden */}
@@ -533,7 +540,7 @@ const Products = () => {
                     {activeFiltersCount > 0 && (
                       <button
                         onClick={() => { clearAllFilters(); closeMobileFilters(); }}
-                        className="text-sm text-amber-600 hover:text-amber-700 font-medium"
+                        className="text-sm text-[#e01a1b] hover:text-[#c41617] font-medium"
                       >
                         Clear All
                       </button>
@@ -560,7 +567,7 @@ const Products = () => {
                     {activeFiltersCount > 0 && (
                       <button
                         onClick={clearAllFilters}
-                        className="text-sm text-amber-600 hover:text-amber-700 font-medium"
+                        className="text-sm text-[#e01a1b] hover:text-[#c41617] font-medium"
                       >
                         Clear All
                       </button>
@@ -593,13 +600,13 @@ const Products = () => {
                   <div className="text-gray-400 mb-4">
                     <Search className="w-12 h-12 sm:w-16 sm:h-16 mx-auto" />
                   </div>
-                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">No products found</h3>
+                  <h3 className="font-playfair text-lg sm:text-xl md:text-2xl font-semibold text-[#1a1a1a] mb-2 tracking-tight">No products found</h3>
                   <p className="text-sm sm:text-base text-gray-600 mb-4">
                     Try adjusting your search terms or filters to find what you're looking for.
                   </p>
                   <button
                     onClick={clearAllFilters}
-                    className="bg-amber-600 text-white px-6 py-2 rounded-lg hover:bg-amber-700 transition-colors text-sm sm:text-base"
+                    className="btn-shine inline-flex items-center justify-center bg-[#e01a1b] text-white px-6 py-3 rounded-full font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 text-sm sm:text-base"
                   >
                     Clear All Filters
                   </button>
@@ -607,8 +614,10 @@ const Products = () => {
               ) : (
                 <>
                   <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
-                    {filteredProducts.map((product) => (
-                      <ProductCard key={product.id} product={product} />
+                    {filteredProducts.map((product, index) => (
+                      <Reveal key={product.id} delay={index * 90}>
+                        <ProductCard product={product} />
+                      </Reveal>
                     ))}
                   </div>
 
@@ -633,7 +642,7 @@ const Products = () => {
                               onClick={() => setCurrentPage(p as number)}
                               aria-current={p === currentPage ? 'page' : undefined}
                               className={`min-w-8 h-8 sm:min-w-9 sm:h-9 px-1.5 sm:px-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
-                                p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'
+                                p === currentPage ? 'bg-[#e01a1b] text-white' : 'text-slate-700 hover:bg-slate-100'
                               }`}
                             >
                               {p}

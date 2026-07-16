@@ -13,6 +13,7 @@ import {
 import ProfileTab from '@/components/WebSite/Profile/ProfileTab';
 import AddressBook from '@/components/WebSite/Profile/AddressBook';
 import OrderHistory from '@/components/WebSite/Profile/OrderHistory';
+import Reveal from '@/components/WebSite/Shared/Reveal';
 // import Notifications from '@/components/WebSite/Profile/Notifications';
 import type { UserProfile } from '@/components/WebSite/Profile/types';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
@@ -196,24 +197,28 @@ const Profile = () => {
     <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8 font-sans ">
       <div className="max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         {/* Page Header — Order-page style with icon + count */}
-        <div className="mb-5 sm:mb-6 lg:mb-8">
+        <Reveal className="mb-5 sm:mb-6 lg:mb-8">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <User className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-blue-600 shrink-0" />
+              <User className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-[#e01a1b] shrink-0" />
               <div className="min-w-0">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">My Account</h1>
+                <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-1.5">
+                  <span className="h-px w-6 bg-[#e01a1b]" />
+                  Your Account
+                </span>
+                <h1 className="font-playfair text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#1a1a1a] tracking-tight mb-1 sm:mb-2">My Account</h1>
                 <p className="text-sm sm:text-base text-slate-600">Manage your profile and account settings</p>
               </div>
             </div>
           </div>
-        </div>
+        </Reveal>
 
         <div className="flex flex-col lg:flex-row gap-5 sm:gap-6 lg:gap-8">
           {/* Sidebar */}
-          <div className="lg:w-64 shrink-0">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 sm:p-4">
+          <Reveal className="lg:w-64 shrink-0" delay={90}>
+            <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 border border-slate-200 p-3 sm:p-4">
               {/* User Profile Card in Sidebar */}
-              <div className="bg-linear-to-b from-gray-50 to-gray-100 rounded-lg p-4 mb-6 border border-gray-200">
+              <div className="bg-linear-to-b from-gray-50 to-gray-100 rounded-xl p-4 mb-6 border border-gray-200">
                 <div className="mb-3">
                   <h3 className="font-semibold text-slate-900 text-sm">
                     {userProfile.firstName} {userProfile.lastName}
@@ -223,7 +228,7 @@ const Profile = () => {
                 {!isEditing ? (
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-[#e01a1b] bg-white border border-[#e01a1b]/30 rounded-full hover:bg-[#e01a1b] hover:text-white transition-colors"
                   >
                     <SquarePen className="w-3.5 h-3.5" />
                     Edit Profile
@@ -233,7 +238,7 @@ const Profile = () => {
                     <button
                       onClick={handleSave}
                       disabled={isSaving}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-green-600 rounded-full hover:bg-green-700 transition-colors disabled:opacity-50"
                     >
                       <Save className="w-3.5 h-3.5" />
                       {isSaving ? 'Saving...' : 'Save'}
@@ -241,7 +246,7 @@ const Profile = () => {
                     <button
                       onClick={handleCancel}
                       disabled={isSaving}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-full hover:bg-slate-50 transition-colors disabled:opacity-50"
                     >
                       <X className="w-3.5 h-3.5" />
                       Cancel
@@ -257,9 +262,9 @@ const Profile = () => {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg transition-colors ${
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left rounded-xl transition-colors ${
                         activeTab === tab.id
-                          ? 'bg-gray-50 text-gray-600 border border-gray-200'
+                          ? 'bg-[#e01a1b]/10 text-[#e01a1b] border border-[#e01a1b]/20'
                           : 'text-slate-700 hover:bg-slate-50'
                       }`}
                     >
@@ -271,23 +276,23 @@ const Profile = () => {
                 
                 <hr className="my-4 border-slate-200" />
                 
-                <button 
+                <button
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-xl text-slate-700 hover:bg-[#e01a1b]/10 hover:text-[#e01a1b] transition-colors"
                 >
                   <LogOut className="w-5 h-5" />
                   <span className="font-medium">Sign Out</span>
                 </button>
               </nav>
             </div>
-          </div>
+          </Reveal>
 
           {/* Main Content */}
-          <div className="flex-1">
+          <Reveal className="flex-1" delay={180}>
             {activeTab === 'profile' && renderProfileTab()}
             {activeTab === 'addresses' && <AddressBook />}
             {activeTab === 'orders' && <OrderHistory />}
-          </div>
+          </Reveal>
         </div>
       </div>
     </div>

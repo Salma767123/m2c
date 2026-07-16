@@ -1,21 +1,26 @@
 import { FileText, Scale, AlertTriangle, CreditCard, Truck, RefreshCw } from 'lucide-react';
+import Reveal from '@/components/WebSite/Shared/Reveal';
 
 const Terms = () => {
   return (
-    <div className="min-h-screen bg-gray-50 py-8 sm:py-10 lg:py-12">
+    <div className="min-h-screen bg-[#f7f7f5] py-8 sm:py-10 lg:py-12">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 lg:p-8">
-          <div className="text-center mb-6 sm:mb-8">
-            <Scale className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-blue-600 mb-3 sm:mb-4" />
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Terms of Service</h1>
+        <div className="bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_10px_40px_rgba(0,0,0,0.06)] p-4 sm:p-6 lg:p-8">
+          <Reveal className="text-center mb-6 sm:mb-8">
+            <Scale className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-[#e01a1b] mb-3 sm:mb-4" />
+            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
+              <span className="h-px w-6 bg-[#e01a1b]" />
+              Our Agreement
+            </span>
+            <h1 className="font-playfair text-2xl sm:text-3xl md:text-4xl font-semibold text-[#1a1a1a] tracking-tight">Terms of Service</h1>
             <p className="text-sm sm:text-base text-gray-600 mt-2">Last updated: December 2024</p>
-          </div>
+          </Reveal>
 
           <div className="space-y-8">
             <section>
               <div className="flex items-center mb-4">
-                <FileText className="h-6 w-6 text-blue-600 mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">Acceptance of Terms</h2>
+                <FileText className="h-6 w-6 text-[#e01a1b] mr-3" />
+                <h2 className="text-xl font-semibold text-[#1a1a1a]">Acceptance of Terms</h2>
               </div>
               <p className="text-gray-700">
                 By accessing and using this website, you accept and agree to be bound by the terms 
@@ -26,8 +31,8 @@ const Terms = () => {
 
             <section>
               <div className="flex items-center mb-4">
-                <CreditCard className="h-6 w-6 text-blue-600 mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">Payment Terms</h2>
+                <CreditCard className="h-6 w-6 text-[#e01a1b] mr-3" />
+                <h2 className="text-xl font-semibold text-[#1a1a1a]">Payment Terms</h2>
               </div>
               <ul className="list-disc list-inside text-gray-700 space-y-2">
                 <li>All prices are listed in USD and are subject to change without notice</li>
@@ -39,8 +44,8 @@ const Terms = () => {
 
             <section>
               <div className="flex items-center mb-4">
-                <Truck className="h-6 w-6 text-blue-600 mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">Shipping and Delivery</h2>
+                <Truck className="h-6 w-6 text-[#e01a1b] mr-3" />
+                <h2 className="text-xl font-semibold text-[#1a1a1a]">Shipping and Delivery</h2>
               </div>
               <ul className="list-disc list-inside text-gray-700 space-y-2">
                 <li>We ship to addresses within the United States</li>
@@ -52,8 +57,8 @@ const Terms = () => {
 
             <section>
               <div className="flex items-center mb-4">
-                <RefreshCw className="h-6 w-6 text-blue-600 mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">Returns and Refunds</h2>
+                <RefreshCw className="h-6 w-6 text-[#e01a1b] mr-3" />
+                <h2 className="text-xl font-semibold text-[#1a1a1a]">Returns and Refunds</h2>
               </div>
               <p className="text-gray-700 mb-4">
                 Please refer to our Returns Policy for detailed information about returns, 
@@ -63,8 +68,8 @@ const Terms = () => {
 
             <section>
               <div className="flex items-center mb-4">
-                <AlertTriangle className="h-6 w-6 text-blue-600 mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">Limitation of Liability</h2>
+                <AlertTriangle className="h-6 w-6 text-[#e01a1b] mr-3" />
+                <h2 className="text-xl font-semibold text-[#1a1a1a]">Limitation of Liability</h2>
               </div>
               <p className="text-gray-700">
                 In no event shall our company be liable for any direct, indirect, punitive, 
@@ -76,8 +81,8 @@ const Terms = () => {
 
             <section>
               <div className="flex items-center mb-4">
-                <Scale className="h-6 w-6 text-blue-600 mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">Governing Law</h2>
+                <Scale className="h-6 w-6 text-[#e01a1b] mr-3" />
+                <h2 className="text-xl font-semibold text-[#1a1a1a]">Governing Law</h2>
               </div>
               <p className="text-gray-700">
                 These terms and conditions are governed by and construed in accordance with the 

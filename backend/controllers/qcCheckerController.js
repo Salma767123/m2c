@@ -1508,9 +1508,10 @@ const getProductReports = async (req, res) => {
                     category: true,
                     approvalStatus: true,
                     rejectionReason: true,
+                    createdAt: true,
                     updatedAt: true,
                     vendor: {
-                        select: { companyName: true, ownerName: true },
+                        select: { companyName: true, ownerName: true, vendorCode: true },
                     },
                     images: {
                         where: { isPrimary: true },
@@ -1785,7 +1786,11 @@ const approveProductByQc = async (req, res) => {
             data: {
                 approvalStatus,
                 status: productStatus,
-                qcInspectionData: cleanFormData
+                qcInspectionData: cleanFormData,
+                // Stamp the QC submission time so "Last Inspected" reflects the
+                // actual inspection date (approvedAt is only set later, on the
+                // admin's final decision).
+                lastReviewedAt: new Date()
             }
         });
 

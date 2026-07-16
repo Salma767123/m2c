@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { convertINRtoUSD } from '@/lib/currency'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/UI/Badge'
 import { LoadingSpinner } from '@/components/UI/LoadingSpinner'
@@ -9,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import Dropdown from '@/components/UI/Dropdown'
 import DateRangeCalendar from '@/components/Shared/DateRangeCalendar'
 import { Breadcrumb } from '../Breadcrumb/Breadcrumb'
+import ApproveProductModal, { type ApprovableProduct } from './ApproveProductModal'
 import {
   Eye, Check, X, Search, Package, UserPlus, UserCog, CheckCircle,
   ChevronLeft, ChevronRight, Clock, ShoppingBag, AlertTriangle, XCircle,
@@ -50,8 +50,10 @@ interface VendorProductRequest {
   images?: Array<{ url: string; isPrimary: boolean }>
   variants?: Array<{
     id: string
+    variantName?: string
     size: string
     color: string
+    colorHex?: string
     price: number
     originalPrice?: number
     stock: number
@@ -126,21 +128,6 @@ export default function VendorProductRequests() {
   const [showApprovalModal, setShowApprovalModal] = useState(false)
   const [approvingRequest, setApprovingRequest] = useState<VendorProductRequest | null>(null)
 
-  // Approval pricing state
-  const [adminPrice, setAdminPrice] = useState<string>('')
-  const [originalPrice, setOriginalPrice] = useState<string>('')
-  const [variantPrices, setVariantPrices] = useState<Record<string, string>>({})
-  const [variantOriginalPrices, setVariantOriginalPrices] = useState<Record<string, string>>({})
-  const [priceINR, setPriceINR] = useState('')
-  const [priceUSD, setPriceUSD] = useState('')
-  const [originalPriceINR, setOriginalPriceINR] = useState('')
-  const [originalPriceUSD, setOriginalPriceUSD] = useState('')
-  const [priceVisibility, setPriceVisibility] = useState<'IN_ONLY' | 'COM_ONLY' | 'BOTH'>('BOTH')
-  const [variantPricesINR, setVariantPricesINR] = useState<Record<string, string>>({})
-  const [variantPricesUSD, setVariantPricesUSD] = useState<Record<string, string>>({})
-  const [variantOriginalPricesINR, setVariantOriginalPricesINR] = useState<Record<string, string>>({})
-  const [variantOriginalPricesUSD, setVariantOriginalPricesUSD] = useState<Record<string, string>>({})
-  const [variantVisibilities, setVariantVisibilities] = useState<Record<string, string>>({})
 
   // ── Data loading ──────────────────────────────────────────────────────────
   const loadRequests = useCallback(async (page: number) => {
@@ -220,76 +207,9 @@ export default function VendorProductRequests() {
   const handleApproveClick = (requestId: string) => {
     const request = requests.find(r => r.id === requestId)
     if (!request) return
+    // The shared ApproveProductModal initialises its own pricing state.
     setApprovingRequest(request)
-    setAdminPrice(request.basePrice.toString())
-    setOriginalPrice(request.originalPrice?.toString() || '')
-    if (request.variants && request.variants.length > 0) {
-      const initialPrices: Record<string, string> = {}
-      const initialOriginalPrices: Record<string, string> = {}
-      request.variants.forEach(v => {
-        initialPrices[v.id] = v.price.toString()
-        initialOriginalPrices[v.id] = v.originalPrice?.toString() || ''
-      })
-      setVariantPrices(initialPrices)
-      setVariantOriginalPrices(initialOriginalPrices)
-    } else {
-      setVariantPrices({}); setVariantOriginalPrices({})
-    }
     setShowApprovalModal(true)
-  }
-
-  const handleApproveSubmit = async () => {
-    if (!approvingRequest) return
-    const hasVariants = approvingRequest.variants && approvingRequest.variants.length > 0
-    if (!adminPrice || parseFloat(adminPrice) <= 0) {
-      showErrorToast('Invalid Price', 'Please enter a valid admin selling price'); return
-    }
-    if (!originalPrice || parseFloat(originalPrice) <= 0) {
-      showErrorToast('Invalid Price', 'Please enter a valid original price'); return
-    }
-    if (parseFloat(originalPrice) <= parseFloat(adminPrice)) {
-      showErrorToast('Invalid Price', 'Original price must be greater than selling price'); return
-    }
-    if (hasVariants) {
-      const invalidVariants = approvingRequest.variants!.filter(v => !variantPrices[v.id] || parseFloat(variantPrices[v.id]) <= 0)
-      if (invalidVariants.length > 0) { showErrorToast('Invalid Prices', 'Please enter valid admin prices for all variants'); return }
-      const invalidOriginalPrices = approvingRequest.variants!.filter(v => !variantOriginalPrices[v.id] || parseFloat(variantOriginalPrices[v.id]) <= 0)
-      if (invalidOriginalPrices.length > 0) { showErrorToast('Invalid Prices', 'Please enter valid original prices for all variants'); return }
-      const invalidDiscounts = approvingRequest.variants!.filter(v => parseFloat(variantOriginalPrices[v.id]) <= parseFloat(variantPrices[v.id]))
-      if (invalidDiscounts.length > 0) { showErrorToast('Invalid Prices', 'Original price must be greater than admin price for all variants'); return }
-    }
-    try {
-      const toNumMap = (m: Record<string, string>) =>
-        Object.fromEntries(Object.entries(m).filter(([, v]) => v).map(([id, v]) => [id, parseFloat(v)]))
-      const variantPricesNum = hasVariants ? Object.fromEntries(Object.entries(variantPrices).map(([id, price]) => [id, parseFloat(price)])) : undefined
-      const variantOriginalPricesNum = hasVariants ? Object.fromEntries(Object.entries(variantOriginalPrices).filter(([, price]) => price && parseFloat(price) > 0).map(([id, price]) => [id, parseFloat(price)])) : undefined
-      const multiCurrency = {
-        priceINR: priceINR ? parseFloat(priceINR) : undefined,
-        priceUSD: priceUSD ? parseFloat(priceUSD) : undefined,
-        originalPriceINR: originalPriceINR ? parseFloat(originalPriceINR) : undefined,
-        originalPriceUSD: originalPriceUSD ? parseFloat(originalPriceUSD) : undefined,
-        priceVisibility,
-        variantPricesINR: Object.keys(variantPricesINR).length > 0 ? toNumMap(variantPricesINR) : undefined,
-        variantPricesUSD: Object.keys(variantPricesUSD).length > 0 ? toNumMap(variantPricesUSD) : undefined,
-        variantOriginalPricesINR: Object.keys(variantOriginalPricesINR).length > 0 ? toNumMap(variantOriginalPricesINR) : undefined,
-        variantOriginalPricesUSD: Object.keys(variantOriginalPricesUSD).length > 0 ? toNumMap(variantOriginalPricesUSD) : undefined,
-        variantVisibilities: Object.keys(variantVisibilities).length > 0 ? variantVisibilities : undefined,
-      }
-      const response = await adminProductService.approveProduct(
-        approvingRequest.id, parseFloat(adminPrice), variantPricesNum,
-        originalPrice ? parseFloat(originalPrice) : undefined,
-        variantOriginalPricesNum && Object.keys(variantOriginalPricesNum).length > 0 ? variantOriginalPricesNum : undefined,
-        multiCurrency
-      )
-      if (response.success) {
-        showSuccessToast('Product Approved', 'The vendor product has been approved successfully.')
-        setShowApprovalModal(false); setApprovingRequest(null)
-        setPriceINR(''); setPriceUSD(''); setOriginalPriceINR(''); setOriginalPriceUSD('')
-        setPriceVisibility('BOTH'); setVariantPricesINR({}); setVariantPricesUSD({})
-        setVariantOriginalPricesINR({}); setVariantOriginalPricesUSD({}); setVariantVisibilities({})
-        loadRequests(pagination.currentPage); loadStatusCounts()
-      }
-    } catch (error: any) { showErrorToast('Approval Failed', error.message || 'Unable to approve product.') }
   }
 
   const handleRejectClick = (requestId: string) => { setRejectingRequestId(requestId); setShowRejectionModal(true) }
@@ -638,129 +558,13 @@ export default function VendorProductRequests() {
       </div>
 
       {/* ══ Approval Modal ══════════════════════════════════════════════════ */}
-      {showApprovalModal && approvingRequest && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-bold text-slate-900">Approve Product</h3>
-              <button type="button" onClick={() => { setShowApprovalModal(false); setApprovingRequest(null) }} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <p className="text-sm font-semibold text-slate-900">{approvingRequest.name}</p>
-              <p className="text-sm text-slate-600">{approvingRequest.vendor.companyName}</p>
-              <p className="text-xs text-slate-400">Vendor Base Price: ₹{approvingRequest.basePrice}</p>
-            </div>
+      <ApproveProductModal
+        product={approvingRequest as unknown as ApprovableProduct}
+        open={showApprovalModal}
+        onClose={() => { setShowApprovalModal(false); setApprovingRequest(null) }}
+        onApproved={() => { loadRequests(pagination.currentPage); loadStatusCounts() }}
+      />
 
-            <div className="mb-4 grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Admin Selling Price (₹) *</label>
-                <p className="text-xs text-slate-500 mb-1.5">Vendor Base: ₹{approvingRequest.basePrice}</p>
-                <input type="number" value={adminPrice || ''} onChange={(e) => setAdminPrice(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none text-sm"
-                  placeholder="Enter selling price" step="0.01" min="0" />
-                <p className="text-xs text-slate-400 mt-1">Final price customers see.</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Original Price (₹) *</label>
-                <p className="text-xs text-slate-500 mb-1.5">For strikethrough discount</p>
-                <input type="number" value={originalPrice || ''} onChange={(e) => setOriginalPrice(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none text-sm"
-                  placeholder="Enter original price" step="0.01" min="0" />
-                {originalPrice && parseFloat(originalPrice) > parseFloat(adminPrice) && (
-                  <p className="text-xs text-emerald-600 mt-1">{Math.round(((parseFloat(originalPrice) - parseFloat(adminPrice)) / parseFloat(adminPrice)) * 100)}% off</p>
-                )}
-              </div>
-            </div>
-
-            <div className="mb-4 p-4 border border-blue-200 bg-blue-50 rounded-xl">
-              <h4 className="text-sm font-semibold text-blue-900 mb-3">Currency Pricing</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-white rounded-lg p-3 border border-blue-100">
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Selling Price (.in)</p>
-                  <p className="text-lg font-bold text-slate-900">₹{adminPrice || '—'}</p>
-                </div>
-                <div className="bg-white rounded-lg p-3 border border-blue-100">
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Selling Price (.com)</p>
-                  <p className="text-lg font-bold text-slate-900">{adminPrice ? `$${convertINRtoUSD(parseFloat(adminPrice)).toFixed(2)}` : '—'}</p>
-                  <p className="text-[10px] text-emerald-600">Auto-calculated from exchange rate</p>
-                </div>
-              </div>
-              <p className="text-xs font-medium text-slate-600 mb-2 mt-4 border-b border-blue-200 pb-1">Original Prices (MRP)</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Original ₹ (MRP)</label>
-                  <input id="base-original-inr" type="number" value={originalPriceINR || ''} onChange={(e) => setOriginalPriceINR(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 text-sm"
-                    placeholder="MRP for .in domain" step="0.01" min="0" />
-                  <p className="text-[10px] text-slate-400 mt-1">Strikethrough on .in</p>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Original $ (MRP)</label>
-                  <div className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-sm text-slate-500">
-                    {originalPriceINR ? `$${convertINRtoUSD(parseFloat(originalPriceINR)).toFixed(2)}` : 'Auto-calculated'}
-                  </div>
-                  <p className="text-[10px] text-emerald-600 mt-1">Auto from exchange rate</p>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Visibility</label>
-                  <select value={priceVisibility} onChange={(e) => setPriceVisibility(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 text-sm">
-                    <option value="BOTH">Both (.in + .com)</option>
-                    <option value="IN_ONLY">.in Only (India)</option>
-                    <option value="COM_ONLY">.com Only (International)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {approvingRequest.variants && approvingRequest.variants.length > 0 && (
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-slate-700 mb-3">Set Prices for Each Variant</label>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {approvingRequest.variants.map((variant) => (
-                    <div key={variant.id} className="p-3 border border-slate-200 rounded-xl bg-slate-50/50">
-                      <div className="mb-2">
-                        <p className="text-sm font-medium text-slate-900">{[variant.size, variant.color].filter(Boolean).join(' – ') || '—'}</p>
-                        <p className="text-xs text-slate-500">Vendor Price: ₹{variant.price} · Stock: {variant.stock}</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-slate-600 mb-1">Admin Price (₹) *</label>
-                          <input type="number" value={variantPrices[variant.id] || ''} onChange={(e) => setVariantPrices(prev => ({ ...prev, [variant.id]: e.target.value }))}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 text-sm"
-                            placeholder="Selling price" step="0.01" min="0" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-slate-600 mb-1">Original Price (₹) *</label>
-                          <input type="number" value={variantOriginalPrices[variant.id] || ''} onChange={(e) => setVariantOriginalPrices(prev => ({ ...prev, [variant.id]: e.target.value }))}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 text-sm"
-                            placeholder="Original price" step="0.01" min="0" />
-                          {variantOriginalPrices[variant.id] && variantPrices[variant.id] && parseFloat(variantOriginalPrices[variant.id]) > parseFloat(variantPrices[variant.id]) && (
-                            <p className="text-xs text-emerald-600 mt-1">{Math.round(((parseFloat(variantOriginalPrices[variant.id]) - parseFloat(variantPrices[variant.id])) / parseFloat(variantPrices[variant.id])) * 100)}% off</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
-              <button type="button" onClick={() => { setShowApprovalModal(false); setApprovingRequest(null) }}
-                className="px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-                Cancel
-              </button>
-              <button type="button" onClick={handleApproveSubmit}
-                className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors shadow-xs">
-                Approve Product
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ══ Rejection Modal ══════════════════════════════════════════════════ */}
       {showRejectionModal && (
@@ -835,16 +639,12 @@ export default function VendorProductRequests() {
               )}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">QC Checker</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none text-sm"
+                <Dropdown
                   value={selectedQcChecker}
-                  onChange={(e) => setSelectedQcChecker(e.target.value)}
-                >
-                  <option value="">Select a QC Checker</option>
-                  {qcCheckers.map(qc => (
-                    <option key={qc.id} value={qc.id}>{formatCheckerName(qc)}</option>
-                  ))}
-                </select>
+                  onChange={(v) => setSelectedQcChecker(v as string)}
+                  placeholder="Select a QC Checker"
+                  options={qcCheckers.map(qc => ({ value: qc.id, label: formatCheckerName(qc) }))}
+                />
               </div>
               <div className="flex justify-end gap-3">
                 <button type="button" onClick={() => { setShowAssignModal(false); setAssigningRequestId(null); setSelectedQcChecker('') }}

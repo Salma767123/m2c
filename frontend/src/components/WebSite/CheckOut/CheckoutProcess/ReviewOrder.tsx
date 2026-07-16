@@ -3,6 +3,7 @@
 import { Calendar } from "lucide-react"
 import { CheckoutFormData } from "../Checkout"
 import { getCountryName, getCountryFlag, getStateName, formatPhoneForDisplay } from "./constants"
+import Reveal from "@/components/WebSite/Shared/Reveal"
 
 interface ReviewOrderProps {
   formData: CheckoutFormData
@@ -11,15 +12,17 @@ interface ReviewOrderProps {
 export default function ReviewOrder({ formData }: ReviewOrderProps) {
   return (
     <div className="space-y-6">
-      <div className="bg-slate-50 rounded-xl p-6">
-        <h3 className="font-semibold text-slate-900 mb-4">Shipping Information</h3>
+      <Reveal className="bg-slate-50 rounded-2xl ring-1 ring-black/5 p-6">
+        <h3 className="font-playfair text-lg font-semibold text-[#1a1a1a] mb-4">Shipping Information</h3>
         <div className="text-sm text-slate-600 space-y-1">
           <p className="font-semibold text-gray-900 border-b border-gray-100 pb-1 mb-2">
-            {formData.firstName} {formData.lastName}
+            {[formData.firstName, formData.middleName, formData.lastName].filter(Boolean).join(" ")}
           </p>
           <div className="space-y-0.5">
             <p>{formData.address}</p>
             {formData.addressLine2 && <p>{formData.addressLine2}</p>}
+            {formData.addressLine3 && <p>{formData.addressLine3}</p>}
+            {formData.landmark && <p className="text-slate-500">Landmark: {formData.landmark}</p>}
             <p>{formData.city}, {getStateName(formData.state, formData.country)} {formData.zipCode}</p>
             <p className="flex items-center gap-1.5 mt-1 text-slate-500 font-medium italic">
               Shipping to: {getCountryName(formData.country)} {getCountryFlag(formData.country)}
@@ -36,10 +39,10 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
             </div>
           </div>
         </div>
-      </div>
+      </Reveal>
 
-      <div className="bg-slate-50 rounded-xl p-6">
-        <h3 className="font-semibold text-slate-900 mb-4">Payment Method</h3>
+      <Reveal delay={90} className="bg-slate-50 rounded-2xl ring-1 ring-black/5 p-6">
+        <h3 className="font-playfair text-lg font-semibold text-[#1a1a1a] mb-4">Payment Method</h3>
         <div className="text-sm text-slate-600">
           {formData.paymentMethod === "razorpay" && (
             <>
@@ -54,9 +57,9 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
             </>
           )}
         </div>
-      </div>
+      </Reveal>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+      <Reveal delay={180} className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
         <div className="flex items-center gap-3">
           <Calendar className="w-5 h-5 text-blue-600" />
           <div>
@@ -66,7 +69,7 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
             </p>
           </div>
         </div>
-      </div>
+      </Reveal>
     </div>
   )
 }

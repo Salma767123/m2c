@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { ArrowLeft, Save, Package, AlertTriangle, Plus } from 'lucide-react'
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
+import DatePickerField from '@/components/UI/DatePickerField'
 import inventoryService, { CreateInventoryData, VendorCategories } from '@/services/inventoryService'
 import { showErrorToast } from '@/lib/toast-utils'
 
@@ -283,6 +284,11 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
     if (name === 'manufacturingDate') clearError('lastRestocked')
   }
 
+  // Adapter so DatePickerField (which emits a bare value) flows through the same
+  // handleInputChange logic (manufacturing/last-restocked cross-validation, etc.).
+  const handleDateChange = (fieldName: string) => (value: string) =>
+    handleInputChange({ target: { name: fieldName, value, type: 'date' } } as unknown as React.ChangeEvent<HTMLInputElement>)
+
   const clearError = (name: string) => {
     setErrors(prev => {
       if (!prev[name]) return prev
@@ -554,10 +560,10 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
                 <p className="text-sm text-slate-600">This will be the master product data</p>
               </CardHeader>
               <CardContent className="space-y-4 p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Product Name *
+                      Item Name *
                     </label>
                     <input
                       id="vf-name"
@@ -570,7 +576,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
                           ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
                           : 'border-slate-200 focus:ring-brand-500/40 focus:border-brand-500'
                       }`}
-                      placeholder="Enter product name"
+                      placeholder="Enter item name"
                     />
                     {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
                   </div>
@@ -589,9 +595,6 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
                     />
                     <p className="mt-1 text-xs text-slate-500">Auto-generated &amp; permanent — not editable.</p>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <div id="vf-category" className={errors.category ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
                       <Dropdown
@@ -755,16 +758,12 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
                         <label className="block text-sm font-medium text-slate-700 mb-2">
                           Last Restocked
                         </label>
-                        <input
-                          type="date"
+                        <DatePickerField
                           name="lastRestocked"
                           value={formData.lastRestocked}
-                          onChange={handleInputChange}
+                          onChange={handleDateChange('lastRestocked')}
                           max={todayStr}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.lastRestocked
-                            ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
-                            : 'border-slate-200 focus:ring-brand-500/40 focus:border-slate-500'
-                          }`}
+                          hasError={!!errors.lastRestocked}
                         />
                         {errors.lastRestocked && (
                           <p className="text-xs text-red-600 mt-1">{errors.lastRestocked}</p>
@@ -805,17 +804,13 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
                         <label className="block text-sm font-medium text-slate-700 mb-2">
                           Manufacturing Date
                         </label>
-                        <input
+                        <DatePickerField
                           id="vf-manufacturingDate"
-                          type="date"
                           name="manufacturingDate"
                           value={formData.manufacturingDate}
-                          onChange={handleInputChange}
+                          onChange={handleDateChange('manufacturingDate')}
                           max={todayStr}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.manufacturingDate
-                            ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
-                            : 'border-slate-200 focus:ring-brand-500/40 focus:border-slate-500'
-                            }`}
+                          hasError={!!errors.manufacturingDate}
                         />
                         {errors.manufacturingDate && (
                           <p className="text-xs text-red-600 mt-1">{errors.manufacturingDate}</p>
@@ -825,19 +820,15 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
                         <label className="block text-sm font-medium text-slate-700 mb-2">
                           Last Restocked
                         </label>
-                        <input
+                        <DatePickerField
                           id="vf-lastRestocked"
-                          type="date"
                           name="lastRestocked"
                           value={formData.lastRestocked}
-                          onChange={handleInputChange}
+                          onChange={handleDateChange('lastRestocked')}
                           min={formData.manufacturingDate || undefined}
                           max={todayStr}
                           disabled={!formData.manufacturingDate}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors disabled:bg-slate-100 disabled:cursor-not-allowed ${errors.lastRestocked
-                            ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
-                            : 'border-slate-200 focus:ring-brand-500/40 focus:border-slate-500'
-                            }`}
+                          hasError={!!errors.lastRestocked}
                         />
                         {errors.lastRestocked ? (
                           <p className="text-xs text-red-600 mt-1">{errors.lastRestocked}</p>

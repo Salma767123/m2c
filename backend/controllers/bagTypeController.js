@@ -58,13 +58,13 @@ const getBagTypes = async (req, res) => {
             prisma.order.aggregate({
                 where: { bagTypeId: { not: null } },
                 _count: true,
-                _sum: { bagTypePrice: true },
+                _sum: { bagTypePriceINR: true },
             }),
             prisma.order.groupBy({
                 by: ['bagTypeId'],
                 where: { bagTypeId: { not: null } },
                 _count: true,
-                _sum: { bagTypePrice: true },
+                _sum: { bagTypePriceINR: true },
             }),
         ]);
 
@@ -82,11 +82,11 @@ const getBagTypes = async (req, res) => {
                 active: activeCount,
                 inactive: inactiveCount,
                 totalBagsSold: salesAgg._count || 0,
-                totalRevenue: salesAgg._sum?.bagTypePrice || 0,
+                totalRevenue: salesAgg._sum?.bagTypePriceINR || 0,
                 perBagType: salesPerBag.map(s => ({
                     bagTypeId: s.bagTypeId,
                     sold: s._count,
-                    revenue: s._sum?.bagTypePrice || 0,
+                    revenue: s._sum?.bagTypePriceINR || 0,
                 })),
             },
         });

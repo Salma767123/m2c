@@ -1600,6 +1600,8 @@ function validateAddressPayload(body) {
     phone,
     address,
     addressLine2,
+    addressLine3,
+    landmark,
     city,
     state,
     zipCode,
@@ -1624,6 +1626,8 @@ function validateAddressPayload(body) {
   if (!address || String(address).trim().length < 3) return "Address is required (min 3 chars)";
   if (String(address).trim().length > 100) return "Address must be 100 characters or less";
   if (addressLine2 && String(addressLine2).length > 100) return "Address Line 2 too long";
+  if (addressLine3 && String(addressLine3).length > 100) return "Address Line 3 too long";
+  if (landmark && String(landmark).length > 100) return "Landmark must be 100 characters or less";
 
   if (!city || !String(city).trim()) return "City is required";
   if (String(city).trim().length > 50) return "City must be 50 characters or less";
@@ -1668,6 +1672,8 @@ function normalizeAddressData(body) {
     phone: phoneE164,
     address: String(body.address).trim(),
     addressLine2: body.addressLine2 ? String(body.addressLine2).trim() : "",
+    addressLine3: body.addressLine3 ? String(body.addressLine3).trim() : "",
+    landmark: body.landmark ? String(body.landmark).trim() : "",
     city: String(body.city).trim(),
     state: canonicalState,
     zipCode: String(body.zipCode).trim().toUpperCase(),

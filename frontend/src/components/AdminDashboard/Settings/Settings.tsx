@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Mail, Phone, MapPin, Building2, Shield, Save, FileText, CreditCard, Upload, Image as ImageIcon, DollarSign, Key, Eye, EyeOff, Percent, Warehouse, Globe } from "lucide-react";
+import { User, Mail, Phone, MapPin, Building2, Shield, Save, FileText, CreditCard, Upload, Image as ImageIcon, DollarSign, Key, Eye, EyeOff, Percent, Warehouse, Globe, Camera } from "lucide-react";
+import ImageCropModal from "@/components/UI/ImageCropModal";
+import Dropdown from "@/components/UI/Dropdown";
 import GSTSettingsTab from "./GSTSettingsTab";
 import HubSettingsTab from "./HubSettingsTab";
 import SEOSettingsTab from "./SEOSettingsTab";
@@ -14,7 +16,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { paymentSettingsService } from "@/services/paymentSettingsService";
 import { adminProfileService } from "@/services/adminProfileService";
 import { companyInfoService } from "@/services/companyInfoService";
-import { hasPermission } from "@/lib/auth";
+import { hasPermission, getStoredAuth, storeAuth } from "@/lib/auth";
 
 type UserRole = "super_admin" | "admin" | "employee";
 
@@ -51,14 +53,37 @@ export default function Settings() {
 
   // Profile form state
   const [profileData, setProfileData] = useState({
-    name: currentUser.name,
+    title: "",
+    firstName: "",
+    middleName: "",
+    lastName: "",
     email: currentUser.email,
     phone: currentUser.phone,
     address: currentUser.address,
+    addressLine2: "",
+    addressLine3: "",
+    landmark: "",
     city: currentUser.city,
     state: currentUser.state,
     zipCode: currentUser.zipCode,
+    country: "India",
   });
+
+  // Composed display name (Title First Middle Last) for the header card etc.
+  const displayName =
+    [profileData.title, profileData.firstName, profileData.middleName, profileData.lastName]
+      .map((p) => (p || "").trim())
+      .filter(Boolean)
+      .join(" ")
+      .trim() || currentUser.name;
+
+  const TITLE_OPTIONS = ["", "Mr.", "Mrs.", "Ms.", "Dr."];
+
+  // Profile photo (upload + crop). `profileImage` is the saved URL or a freshly
+  // cropped base64 preview; the crop modal opens with the chosen file.
+  const [profileImage, setProfileImage] = useState<string>("");
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [cropFileName, setCropFileName] = useState("");
 
   // Company info state (only for super_admin and admin)
   const [companyInfo, setCompanyInfo] = useState({
@@ -130,15 +155,29 @@ export default function Settings() {
         setLoadingProfile(true);
         const profileResponse = await adminProfileService.getProfile();
         if (profileResponse.success && profileResponse.data) {
+          const d = profileResponse.data;
+          // Legacy records only have `name` — split it as a best-effort fallback
+          // so First/Last aren't blank until the admin re-saves the structured form.
+          const nameParts = (d.name || "").trim().split(/\s+/).filter(Boolean);
+          const fallbackFirst = nameParts[0] || "";
+          const fallbackLast = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
           setProfileData({
-            name: profileResponse.data.name || "",
-            email: profileResponse.data.email || "",
-            phone: profileResponse.data.phoneNumber || "",
-            address: profileResponse.data.address || "",
-            city: profileResponse.data.city || "",
-            state: profileResponse.data.state || "",
-            zipCode: profileResponse.data.zipCode || "",
+            title: d.title || "",
+            firstName: d.firstName || fallbackFirst,
+            middleName: d.middleName || "",
+            lastName: d.lastName || fallbackLast,
+            email: d.email || "",
+            phone: d.phoneNumber || "",
+            address: d.address || "",
+            addressLine2: d.addressLine2 || "",
+            addressLine3: d.addressLine3 || "",
+            landmark: d.landmark || "",
+            city: d.city || "",
+            state: d.state || "",
+            zipCode: d.zipCode || "",
+            country: d.country || "India",
           });
+          setProfileImage(d.image || "");
         }
       } catch (error) {
         console.error('Failed to fetch profile:', error);
@@ -220,16 +259,36 @@ export default function Settings() {
     try {
       setLoadingProfile(true);
       const response = await adminProfileService.updateProfile({
-        name: profileData.name,
+        title: profileData.title,
+        firstName: profileData.firstName,
+        middleName: profileData.middleName,
+        lastName: profileData.lastName,
         phoneNumber: profileData.phone,
         address: profileData.address,
+        addressLine2: profileData.addressLine2,
+        addressLine3: profileData.addressLine3,
+        landmark: profileData.landmark,
         city: profileData.city,
         state: profileData.state,
         zipCode: profileData.zipCode,
-        country: "India" // Default country
+        country: profileData.country || "India",
+        image: profileImage,
       });
 
       if (response.success) {
+        // Reflect the persisted (Cloudinary) URL so we stop re-uploading base64.
+        const savedImage = response.data?.image ?? profileImage;
+        if (response.data?.image !== undefined) setProfileImage(response.data.image || "");
+        // Sync the stored auth user + tell the header/sidebar to refresh their
+        // avatar and name immediately (they read from stored auth).
+        try {
+          const auth = getStoredAuth();
+          if (auth?.user) {
+            const updatedUser = { ...auth.user, name: response.data?.name || displayName, image: savedImage || undefined };
+            storeAuth(auth.token, updatedUser, true);
+            window.dispatchEvent(new CustomEvent("admin-profile-updated", { detail: updatedUser }));
+          }
+        } catch { /* non-fatal — header refreshes on next load */ }
         showSuccessToast("Profile Updated", response.message || "Your profile has been updated successfully.");
       }
     } catch (error: any) {
@@ -237,6 +296,25 @@ export default function Settings() {
     } finally {
       setLoadingProfile(false);
     }
+  };
+
+  // Profile photo: open the cropper with the selected file, then keep the
+  // cropped base64 as a preview (uploaded to Cloudinary on Save).
+  const handleProfilePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setCropFileName(file.name);
+    setCropSrc(URL.createObjectURL(file));
+  };
+
+  const handleProfilePhotoCropped = (croppedFile: File) => {
+    const reader = new FileReader();
+    reader.onload = () => setProfileImage(reader.result as string);
+    reader.readAsDataURL(croppedFile);
+    if (cropSrc?.startsWith("blob:")) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
+    setCropFileName("");
   };
 
   const handleCompanyInfoUpdate = async (e: React.FormEvent) => {
@@ -434,7 +512,7 @@ export default function Settings() {
 
       {/* Tabs */}
       <div className="mb-6 border-b border-slate-200">
-        <div className="flex gap-4">
+        <div className="flex gap-4 overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200 [&_button]:shrink-0 [&_button]:whitespace-nowrap">
           <button
             onClick={() => setActiveTab("profile")}
             className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "profile"
@@ -549,22 +627,38 @@ export default function Settings() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center">
-                  {currentUser.avatar ? (
-                    <img src={currentUser.avatar} alt="Avatar" className="w-full h-full rounded-full object-cover" />
-                  ) : (
-                    <User className="h-10 w-10 text-slate-400" />
+                <label
+                  className={`relative w-20 h-20 rounded-full shrink-0 group ${isReadOnly ? '' : 'cursor-pointer'}`}
+                  title={isReadOnly ? undefined : 'Upload profile photo'}
+                >
+                  <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center overflow-hidden border border-slate-200">
+                    {profileImage ? (
+                      <img src={profileImage} alt="Profile" className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                      <User className="h-10 w-10 text-slate-400" />
+                    )}
+                  </div>
+                  {!isReadOnly && (
+                    <>
+                      <span className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Camera className="h-6 w-6 text-white" />
+                      </span>
+                      <span className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full bg-brand-500 border-2 border-white flex items-center justify-center shadow-sm">
+                        <Camera className="h-3 w-3 text-white" />
+                      </span>
+                      <input type="file" accept="image/*" className="hidden" onChange={handleProfilePhotoSelect} />
+                    </>
                   )}
-                </div>
+                </label>
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900">{profileData.name || currentUser.name}</h2>
+                  <h2 className="text-xl font-bold text-slate-900">{displayName}</h2>
                   <p className="text-slate-600">{profileData.email || currentUser.email}</p>
                   <div className="mt-2">
                     <span
                       className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${currentUser.role === "super_admin"
                         ? "bg-purple-50 text-purple-700 border border-purple-200"
                         : currentUser.role === "admin"
-                          ? "bg-blue-50 text-blue-700 border border-blue-200"
+                          ? "bg-brand-50 text-brand-700 border border-brand-200"
                           : "bg-green-50 text-green-700 border border-green-200"
                         }`}
                     >
@@ -586,21 +680,56 @@ export default function Settings() {
             <CardContent className="p-6">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">Personal Information</h3>
               <form onSubmit={handleProfileUpdate}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Name row */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Title</label>
+                    <Dropdown
+                      id="title"
+                      value={profileData.title}
+                      options={TITLE_OPTIONS.filter(Boolean)}
+                      placeholder="Select"
+                      disabled={isReadOnly}
+                      onChange={(v: string | string[]) => setProfileData({ ...profileData, title: (Array.isArray(v) ? v[0] : v) || "" })}
+                    />
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Full Name <span className="text-red-500">*</span>
+                      First Name <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                       <input
                         type="text"
-                        value={profileData.name}
-                        onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                        value={profileData.firstName}
+                        onChange={(e) => setProfileData({ ...profileData, firstName: e.target.value })}
                         disabled={isReadOnly}
                         className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Middle Name</label>
+                    <input
+                      type="text"
+                      value={profileData.middleName}
+                      onChange={(e) => setProfileData({ ...profileData, middleName: e.target.value })}
+                      disabled={isReadOnly}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Last Name</label>
+                    <input
+                      type="text"
+                      value={profileData.lastName}
+                      onChange={(e) => setProfileData({ ...profileData, lastName: e.target.value })}
+                      disabled={isReadOnly}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
+                    />
                   </div>
 
                   <div>
@@ -635,18 +764,56 @@ export default function Settings() {
                     </div>
                   </div>
 
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Address</label>
+                  {/* Address rows */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Address Line 1</label>
                     <div className="relative">
-                      <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                       <input
                         type="text"
+                        placeholder="Street address, building"
                         value={profileData.address}
                         onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
                         disabled={isReadOnly}
                         className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Address Line 2</label>
+                    <input
+                      type="text"
+                      placeholder="Apartment, suite (optional)"
+                      value={profileData.addressLine2}
+                      onChange={(e) => setProfileData({ ...profileData, addressLine2: e.target.value })}
+                      disabled={isReadOnly}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Address Line 3</label>
+                    <input
+                      type="text"
+                      placeholder="Area, locality (optional)"
+                      value={profileData.addressLine3}
+                      onChange={(e) => setProfileData({ ...profileData, addressLine3: e.target.value })}
+                      disabled={isReadOnly}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Landmark</label>
+                    <input
+                      type="text"
+                      placeholder="Nearby landmark (optional)"
+                      value={profileData.landmark}
+                      onChange={(e) => setProfileData({ ...profileData, landmark: e.target.value })}
+                      disabled={isReadOnly}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
+                    />
                   </div>
 
                   <div>
@@ -672,7 +839,7 @@ export default function Settings() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">ZIP Code</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Pincode</label>
                     <input
                       type="text"
                       value={profileData.zipCode}
@@ -680,6 +847,20 @@ export default function Settings() {
                       disabled={isReadOnly}
                       className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Country</label>
+                    <div className="relative">
+                      <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <input
+                        type="text"
+                        value={profileData.country}
+                        onChange={(e) => setProfileData({ ...profileData, country: e.target.value })}
+                        disabled={isReadOnly}
+                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -706,6 +887,21 @@ export default function Settings() {
               </p>
             </div>
           )}
+
+          {/* Profile photo cropper */}
+          <ImageCropModal
+            src={cropSrc}
+            fileName={cropFileName}
+            title="Crop Profile Photo"
+            cropShape="round"
+            showGrid={false}
+            onCancel={() => {
+              if (cropSrc?.startsWith("blob:")) URL.revokeObjectURL(cropSrc);
+              setCropSrc(null);
+              setCropFileName("");
+            }}
+            onCropped={handleProfilePhotoCropped}
+          />
         </div>
       )}
 
@@ -716,8 +912,8 @@ export default function Settings() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <ImageIcon className="w-5 h-5 text-blue-600" />
+                <div className="p-2 bg-brand-100 rounded-lg">
+                  <ImageIcon className="w-5 h-5 text-brand-600" />
                 </div>
                 <h3 className="text-lg font-semibold text-slate-900">Company Logo</h3>
               </div>
@@ -778,7 +974,7 @@ export default function Settings() {
                     )}
                   </div>
                   {logoPreview && (
-                    <p className="text-xs text-blue-600 mt-2">Preview - Click "Save Logo" to upload</p>
+                    <p className="text-xs text-brand-600 mt-2">Preview - Click "Save Logo" to upload</p>
                   )}
                 </div>
               </div>
@@ -1155,8 +1351,8 @@ export default function Settings() {
           </Card>
 
           {currentUser.role === "admin" && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800">
+            <div className="p-4 bg-brand-50 border border-brand-200 rounded-lg">
+              <p className="text-sm text-brand-800">
                 <strong>Note:</strong> Company information can only be edited by Super Admin. Contact your Super Admin to make changes.
               </p>
             </div>
@@ -1181,8 +1377,8 @@ export default function Settings() {
           ) : (
             <>
               {/* Info Box */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
+              <div className="p-4 bg-brand-50 border border-brand-200 rounded-lg">
+                <p className="text-sm text-brand-800">
                   <strong>Important:</strong> Only one payment gateway can be active at a time. When you enable one gateway, the other will be automatically disabled.
                 </p>
               </div>
@@ -1349,7 +1545,7 @@ export default function Settings() {
                           href="https://dashboard.razorpay.com"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:text-blue-800 underline"
+                          className="text-sm text-brand-600 hover:text-brand-800 underline"
                         >
                           Open Razorpay Dashboard →
                         </a>
@@ -1488,7 +1684,7 @@ export default function Settings() {
                           href="https://dashboard.payu.in"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:text-blue-800 underline"
+                          className="text-sm text-brand-600 hover:text-brand-800 underline"
                         >
                           Open PayU Dashboard →
                         </a>
@@ -1499,8 +1695,8 @@ export default function Settings() {
               </Card>
 
               {currentUser.role === "admin" && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">
+                <div className="p-4 bg-brand-50 border border-brand-200 rounded-lg">
+                  <p className="text-sm text-brand-800">
                     <strong>Note:</strong> Payment gateway settings can only be modified by Super Admin. Contact your Super Admin to make changes.
                   </p>
                 </div>

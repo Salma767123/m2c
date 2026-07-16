@@ -5,9 +5,11 @@ import { Star, Search, Eye, AlertCircle, RefreshCw, Package, ChevronLeft, Chevro
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
+import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalendar";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import adminReviewService, { AdminOrderReview } from "@/services/adminReviewService";
 import { hasPermission } from "@/lib/auth";
+import { formatOrderAmount } from "@/lib/currency";
 
 const PAGE_SIZE = 10;
 
@@ -38,6 +40,10 @@ interface VendorProductReview {
   customerName: string;
   orderDate: string;
   totalAmount: number;
+  // Carried from the parent Order: order items are priced in whatever currency the
+  // buyer was charged, so the amount cannot be rendered as ₹ unconditionally.
+  currency?: 'INR' | 'USD';
+  exchangeRate?: number | null;
   quantity: number;
   productImage: string;
 }
@@ -47,16 +53,19 @@ export default function VendorProductReviews() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [selectedReview, setSelectedReview] = useState<VendorProductReview | null>(null);
   const [stats, setStats] = useState({ total: 0, approved: 0, rejected: 0, averageRating: 0 });
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Fetch the FULL review set (no status/search params) so the metric cards
+  // reflect global totals. Search + status + date filtering is applied
+  // client-side below, so clicking a card never shrinks the other counts.
   const fetchReviews = useCallback(async () => {
     try {
       setLoading(true);
       const response = await adminReviewService.getAllAdminReviews({
-        search: searchTerm || undefined,
-        status: filterStatus !== "all" ? filterStatus : undefined,
         limit: 100,
       });
 
@@ -84,6 +93,8 @@ export default function VendorProductReviews() {
               customerName: order.customerName,
               orderDate: order.orderDate,
               totalAmount: item.totalPrice,
+              currency: order.currency,
+              exchangeRate: order.exchangeRate,
               quantity: item.quantity,
               productImage: item.productImage || "",
             });
@@ -98,7 +109,7 @@ export default function VendorProductReviews() {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, filterStatus]);
+  }, []);
 
   useEffect(() => {
     fetchReviews();
@@ -110,13 +121,36 @@ export default function VendorProductReviews() {
       review.productSKU.toLowerCase().includes(searchTerm.toLowerCase()) ||
       review.orderId.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === "all" || review.status === filterStatus;
-    return matchesSearch && matchesFilter;
+
+    // Reviewed-date range filter (YYYY-MM-DD strings compare lexicographically)
+    let matchesDate = true;
+    if (dateFrom || dateTo) {
+      const rd = review.reviewedDate ? fmtDate(new Date(review.reviewedDate)) : "";
+      if (!rd) matchesDate = false;
+      else if (dateFrom && rd < dateFrom) matchesDate = false;
+      else if (dateTo && rd > dateTo) matchesDate = false;
+    }
+
+    return matchesSearch && matchesFilter && matchesDate;
   });
+
+  const applyStatus = (key: string) => setFilterStatus((prev) => (prev === key ? "all" : key));
+
+  // Metric cards — styled like the Vendor Product Requests module. The first
+  // three filter the table; the last two are read-only derived metrics.
+  const approvalRate = stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0;
+  const metricCards = [
+    { key: "all",      label: "Total Reviews", subtitle: "All reviews",   value: stats.total,    Icon: MessageSquare, iconBg: "bg-brand-50",   iconColor: "text-brand-500",   countColor: "text-slate-900",  activeClass: "border-brand-400 bg-brand-50/50" },
+    { key: "approved", label: "Approved",      subtitle: "Passed QC",     value: stats.approved, Icon: CheckCircle,   iconBg: "bg-emerald-50", iconColor: "text-emerald-500", countColor: "text-emerald-700", activeClass: "border-emerald-400 bg-emerald-50/60" },
+    { key: "rejected", label: "Rejected",      subtitle: "Failed QC",     value: stats.rejected, Icon: XCircle,       iconBg: "bg-red-50",     iconColor: "text-red-500",     countColor: "text-red-700",    activeClass: "border-red-400 bg-red-50/60" },
+    { key: null,       label: "Approval Rate", subtitle: "Of all reviews", value: `${approvalRate}%`, Icon: Percent, iconBg: "bg-blue-50",    iconColor: "text-blue-500",    countColor: "text-blue-700",   activeClass: "" },
+    { key: null,       label: "Avg. Rating",   subtitle: "Out of 5",      value: stats.averageRating ? stats.averageRating.toFixed(1) : "0.0", Icon: Star, iconBg: "bg-amber-50", iconColor: "text-amber-500", countColor: "text-amber-700", activeClass: "" },
+  ];
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterStatus]);
+  }, [searchTerm, filterStatus, dateFrom, dateTo]);
 
   // Pagination
   const totalPages = Math.ceil(filteredReviews.length / PAGE_SIZE);
@@ -156,68 +190,40 @@ export default function VendorProductReviews() {
         <p className="text-slate-600 mt-1">Quality check reviews given by admin after receiving products from vendors</p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-slate-600">Total Reviews</div>
-                <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
-              </div>
-              <MessageSquare className="h-8 w-8 text-blue-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-slate-600">Approved</div>
-                <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-slate-600">Rejected</div>
-                <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
-              </div>
-              <XCircle className="h-8 w-8 text-red-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-slate-600">Approval Rate</div>
-                <div className="text-2xl font-bold text-emerald-600">
-                  {stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0}%
+      {/* Stats — click the first three cards to filter the table below */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+        {metricCards.map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
+          const clickable = key !== null;
+          const isActive = clickable && filterStatus === key;
+          const body = (
+            <>
+              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+                <span className="text-sm font-medium text-slate-500">{label}</span>
+                <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace("50", "100") : iconBg} transition-transform duration-150 ${clickable ? "group-hover:scale-110" : ""}`}>
+                  <Icon className={`h-4 w-4 ${iconColor}`} />
                 </div>
               </div>
-              <Percent className="h-8 w-8 text-emerald-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-slate-600">Avg. Rating</div>
-                <div className="text-2xl font-bold text-yellow-600 flex items-center gap-1">
-                  {stats.averageRating ? stats.averageRating.toFixed(1) : '0.0'}
-                  <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                </div>
+              <div className="px-4 pb-4">
+                <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
               </div>
-              <Star className="h-8 w-8 text-yellow-400 opacity-50" />
+            </>
+          );
+          return clickable ? (
+            <button
+              key={label}
+              type="button"
+              onClick={() => applyStatus(key)}
+              className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : "border-slate-200/80 hover:border-slate-300"}`}
+            >
+              {body}
+            </button>
+          ) : (
+            <div key={label} className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+              {body}
             </div>
-          </CardContent>
-        </Card>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -244,6 +250,14 @@ export default function VendorProductReviews() {
                 ]}
                 onChange={(val) => setFilterStatus(val as string)}
                 placeholder="Filter by status"
+              />
+            </div>
+            <div className="shrink-0">
+              <DateRangeCalendar
+                from={dateFrom}
+                to={dateTo}
+                onChange={(from, to) => { setDateFrom(from); setDateTo(to); }}
+                placeholder="Reviewed Date"
               />
             </div>
           </div>
@@ -475,7 +489,15 @@ export default function VendorProductReviews() {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-slate-700">Amount</label>
-                  <p className="text-slate-900 font-medium">₹{selectedReview.totalAmount.toFixed(2)}</p>
+                  <p className="text-slate-900 font-medium">
+                    {(() => {
+                      const { charged, inrEquivalent } = formatOrderAmount(
+                        selectedReview.totalAmount, selectedReview.currency, selectedReview.exchangeRate);
+                      return (<>{charged}{inrEquivalent && (
+                        <span className="block text-xs font-normal text-slate-500">≈ {inrEquivalent}</span>
+                      )}</>);
+                    })()}
+                  </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-slate-700">Order Date</label>

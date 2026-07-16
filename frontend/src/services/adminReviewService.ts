@@ -28,6 +28,10 @@ export interface AdminOrderReview {
         customerEmail: string;
         customerPhone: string;
         totalAmount: number;
+        /** Currency the buyer was actually charged in — 'INR' on .in, 'USD' on .com. */
+        currency?: 'INR' | 'USD';
+        /** INR-per-USD rate snapshotted at purchase. Null on INR/pre-snapshot orders. */
+        exchangeRate?: number | null;
         status: string;
         orderDate: string;
         items: Array<{

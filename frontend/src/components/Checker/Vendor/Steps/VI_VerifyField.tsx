@@ -228,7 +228,8 @@ export default function VerifyField({ fieldKey, label, value, verifications, onC
   return (
     <div
       id={`vf-${fieldKey}`}
-      className={`rounded-xl border transition-colors ${
+      data-invalid={needsHighlight ? 'true' : undefined}
+      className={`scroll-mt-24 rounded-xl border transition-colors ${
         needsHighlight
           ? 'border-red-500 bg-red-50/40 ring-2 ring-red-400 ring-offset-1'
           : v.ok === true

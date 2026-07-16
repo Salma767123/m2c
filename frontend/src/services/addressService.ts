@@ -10,6 +10,8 @@ export interface SavedAddress {
   phone: string;
   address: string;
   addressLine2?: string;
+  addressLine3?: string;
+  landmark?: string;
   city: string;
   state: string;
   zipCode: string;
@@ -25,6 +27,8 @@ export interface AddressPayload {
   phone: string;
   address: string;
   addressLine2?: string;
+  addressLine3?: string;
+  landmark?: string;
   city: string;
   state: string;
   zipCode: string;

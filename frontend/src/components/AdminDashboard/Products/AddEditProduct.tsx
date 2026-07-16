@@ -2502,9 +2502,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                     {/* Pricing Configuration — 4-column breakdown (matches vendor) */}
                     {(() => {
                       const gst = formData.gstPercentage ?? 0
-                      const taxAmt = formData.basePrice > 0 ? formData.basePrice * gst / 100 : 0
-                      const total = formData.basePrice > 0 ? formData.basePrice + taxAmt : 0
-                      const sellingPrice = total
+                      // Mirror the storefront exactly: getRegionalPrice() in lib/currency.ts resolves
+                      // priceINR → adminFixedPrice → basePrice, and checkout then adds GST on top of
+                      // that. Anything else shown here would not be the amount the customer is charged.
+                      const buyerPrice = formData.priceINR || formData.adminFixedPrice || formData.basePrice || 0
+                      const priceSource = formData.priceINR ? 'Price on .in' : formData.adminFixedPrice ? 'Admin Fixed Price' : 'Base Price'
+                      const taxAmt = buyerPrice * gst / 100
+                      const finalPrice = buyerPrice + taxAmt
                       const readOnlyClass = 'flex min-h-[42px] w-full items-center gap-0.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2'
                       const rupeeMark = <span className="text-sm text-slate-400 shrink-0">₹</span>
                       return (
@@ -2524,25 +2528,25 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                 placeholder="0"
                               />
                             </div>
-                            <p className="text-xs text-slate-600 mt-1">Price for single unit</p>
+                            <p className="text-xs text-slate-600 mt-1">Vendor price for single unit</p>
                           </div>
-                          {/* 2. Tax Amount (read-only) */}
+                          {/* 2. Buyer Price (read-only) — what the storefront actually displays */}
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Buyer Price</label>
+                            <div className={readOnlyClass}>{rupeeMark}<span className="text-sm font-semibold text-slate-700">{buyerPrice.toFixed(2)}</span></div>
+                            <p className="text-xs text-slate-500 mt-1">{buyerPrice > 0 ? `Shown on site · from ${priceSource}` : 'Set a price below'}</p>
+                          </div>
+                          {/* 3. Tax Amount (read-only) — GST checkout adds on top of Buyer Price */}
                           <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">Tax Amount</label>
                             <div className={readOnlyClass}>{rupeeMark}<span className="text-sm font-semibold text-slate-700">{taxAmt.toFixed(2)}</span></div>
-                            <p className="text-xs text-slate-500 mt-1">{gst > 0 ? `${gst}% GST on base price` : 'No GST applied'}</p>
+                            <p className="text-xs text-slate-500 mt-1">{gst > 0 ? `${gst}% GST on buyer price` : 'No GST applied'}</p>
                           </div>
-                          {/* 3. Total Amount (read-only) */}
+                          {/* 4. Final Price (read-only) — matches the checkout total per unit */}
                           <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Total Amount</label>
-                            <div className={readOnlyClass}>{rupeeMark}<span className="text-sm font-bold tracking-tight text-brand-500">{total.toFixed(2)}</span></div>
-                            <p className="text-xs text-slate-500 mt-1">Base price + tax</p>
-                          </div>
-                          {/* 4. Selling Price (read-only, equals Total) */}
-                          <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Selling Price</label>
-                            <div className={readOnlyClass}>{rupeeMark}<span className="text-sm font-bold tracking-tight text-brand-500">{sellingPrice.toFixed(2)}</span></div>
-                            <p className="text-xs text-slate-500 mt-1">Final price for buyers</p>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Final Price</label>
+                            <div className={readOnlyClass}>{rupeeMark}<span className="text-sm font-bold tracking-tight text-brand-500">{finalPrice.toFixed(2)}</span></div>
+                            <p className="text-xs text-slate-500 mt-1">Buyer price + tax · charged at checkout</p>
                           </div>
                         </div>
                       )
@@ -2550,7 +2554,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                   </div>
 
                   {/* Pricing Section */}
-                  <div className="border-2 border-blue-200 rounded-lg p-6 bg-blue-50/30">
+                  <div className="border-2 border-brand-200 rounded-lg p-6 bg-brand-50/30">
                     <h4 className="font-semibold text-slate-900 mb-1">Selling Price & Currency</h4>
                     <p className="text-xs text-slate-500 mb-4">Set the admin selling price in INR. USD price is auto-calculated from the centralized exchange rate.</p>
 
@@ -2575,7 +2579,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                     </div>
 
                     {/* Currency Preview */}
-                    <p className="text-xs font-medium text-slate-600 mb-2 border-b border-blue-200 pb-1">Currency Pricing</p>
+                    <p className="text-xs font-medium text-slate-600 mb-2 border-b border-brand-200 pb-1">Currency Pricing</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="bg-slate-50 rounded-md p-3 border border-slate-200">
                         <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Price on .in</p>
@@ -2589,7 +2593,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                     </div>
 
                     {/* Original Prices (MRP) */}
-                    <p className="text-xs font-medium text-slate-600 mb-2 mt-4 border-b border-blue-200 pb-1">Original Prices (MRP)</p>
+                    <p className="text-xs font-medium text-slate-600 mb-2 mt-4 border-b border-brand-200 pb-1">Original Prices (MRP)</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                       <div>
                         <label htmlFor="edit-original-inr" className="block text-sm font-medium text-slate-700 mb-2">Original ₹ (MRP)</label>
@@ -2617,22 +2621,22 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                       </div>
                       <div>
                         <label htmlFor="edit-visibility" className="block text-sm font-medium text-slate-700 mb-2">Visibility</label>
-                        <select
+                        <Dropdown
                           id="edit-visibility"
                           value={formData.priceVisibility || 'BOTH'}
-                          onChange={(e) => setFormData(prev => ({ ...prev, priceVisibility: e.target.value as 'IN_ONLY' | 'COM_ONLY' | 'BOTH' }))}
-                          className="w-full px-3 py-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors duration-200"
-                        >
-                          <option value="BOTH">Both (.in + .com)</option>
-                          <option value="IN_ONLY">.in Only (India)</option>
-                          <option value="COM_ONLY">.com Only (International)</option>
-                        </select>
+                          onChange={(v) => setFormData(prev => ({ ...prev, priceVisibility: v as 'IN_ONLY' | 'COM_ONLY' | 'BOTH' }))}
+                          options={[
+                            { value: 'BOTH', label: 'Both (.in + .com)' },
+                            { value: 'IN_ONLY', label: '.in Only (India)' },
+                            { value: 'COM_ONLY', label: '.com Only (International)' },
+                          ]}
+                        />
                         <p className="text-[10px] text-slate-500 mt-1">Where product appears</p>
                       </div>
                     </div>
 
-                    <div className="mt-3 p-3 bg-blue-100/50 rounded-lg">
-                      <p className="text-xs text-blue-800">
+                    <div className="mt-3 p-3 bg-brand-50 border border-brand-100 rounded-lg">
+                      <p className="text-xs text-brand-700">
                         <strong>Price priority:</strong> Admin Selling Price (₹) → Base Price. USD is auto-calculated from exchange rate.
                         Customers on .in see INR price, .com see USD price. If not set, falls back to admin fixed price, then base price.
                       </p>
@@ -2688,15 +2692,15 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                               </div>
                               <div>
                                 <label className="block text-xs font-medium text-slate-700 mb-1">Visibility</label>
-                                <select
+                                <Dropdown
                                   value={variant.priceVisibility || 'BOTH'}
-                                  onChange={(e) => updateVariant(variant.id, 'priceVisibility', e.target.value)}
-                                  className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                                >
-                                  <option value="BOTH">Both</option>
-                                  <option value="IN_ONLY">.in</option>
-                                  <option value="COM_ONLY">.com</option>
-                                </select>
+                                  onChange={(v) => updateVariant(variant.id, 'priceVisibility', v as string)}
+                                  options={[
+                                    { value: 'BOTH', label: 'Both' },
+                                    { value: 'IN_ONLY', label: '.in' },
+                                    { value: 'COM_ONLY', label: '.com' },
+                                  ]}
+                                />
                               </div>
                             </div>
 
@@ -2731,26 +2735,51 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                             </div>
 
                             {/* Variant Currency Preview */}
-                            <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-100">
-                              <p className="text-[10px] font-medium text-blue-600 mb-1.5">Currency Pricing</p>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="bg-white rounded p-2 border border-blue-100">
-                                  <p className="text-[10px] text-slate-500">Price (.in)</p>
-                                  <p className="text-sm font-bold">₹{variant.adminFixedPrice || variant.price || '—'}</p>
-                                  {variant.originalPrice ? (
-                                    <p className="text-[10px] text-slate-400 line-through">₹{variant.originalPrice}</p>
-                                  ) : null}
+                            {(() => {
+                              const vGst = formData.gstPercentage ?? 0
+                              // Mirror the storefront chain (getRegionalPrice) and checkout's per-item
+                              // GST, which taxes the variant's own price using the product-level rate.
+                              const inr = variant.priceINR || variant.adminFixedPrice || variant.price || 0
+                              const usd = variant.priceUSD || (inr ? convertINRtoUSD(inr) : 0)
+                              const inrTax = inr * vGst / 100
+                              const usdTax = usd * vGst / 100
+                              return (
+                                <div className="mt-3 p-2 bg-brand-50 rounded-lg border border-brand-100">
+                                  <p className="text-[10px] font-medium text-brand-600 mb-1.5">Currency Pricing</p>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="bg-white rounded p-2 border border-brand-100">
+                                      <p className="text-[10px] text-slate-500">Price (.in)</p>
+                                      <p className="text-sm font-bold">{inr ? `₹${inr}` : '—'}</p>
+                                      {variant.originalPrice ? (
+                                        <p className="text-[10px] text-slate-400 line-through">₹{variant.originalPrice}</p>
+                                      ) : null}
+                                      {vGst > 0 && inr > 0 ? (
+                                        <div className="mt-1.5 border-t border-slate-100 pt-1.5">
+                                          <p className="text-[10px] text-slate-500">+ {vGst}% GST ₹{inrTax.toFixed(2)}</p>
+                                          <p className="text-[10px] text-slate-500 mt-1">Final</p>
+                                          <p className="text-lg font-bold tracking-tight text-brand-500 leading-tight">₹{(inr + inrTax).toFixed(2)}</p>
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                    <div className="bg-white rounded p-2 border border-brand-100">
+                                      <p className="text-[10px] text-slate-500">Price (.com)</p>
+                                      <p className="text-sm font-bold">{usd ? `$${usd.toFixed(2)}` : '—'}</p>
+                                      {variant.originalPrice ? (
+                                        <p className="text-[10px] text-slate-400 line-through">${variant.originalPriceUSD ? variant.originalPriceUSD.toFixed(2) : convertINRtoUSD(variant.originalPrice).toFixed(2)}</p>
+                                      ) : null}
+                                      <p className="text-[8px] text-green-600">Auto from exchange rate</p>
+                                      {vGst > 0 && usd > 0 ? (
+                                        <div className="mt-1.5 border-t border-slate-100 pt-1.5">
+                                          <p className="text-[10px] text-slate-500">+ {vGst}% GST ${usdTax.toFixed(2)}</p>
+                                          <p className="text-[10px] text-slate-500 mt-1">Final</p>
+                                          <p className="text-lg font-bold tracking-tight text-brand-500 leading-tight">${(usd + usdTax).toFixed(2)}</p>
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="bg-white rounded p-2 border border-blue-100">
-                                  <p className="text-[10px] text-slate-500">Price (.com)</p>
-                                  <p className="text-sm font-bold">{variant.priceUSD ? `$${variant.priceUSD.toFixed(2)}` : (variant.adminFixedPrice || variant.price) ? `$${convertINRtoUSD(variant.adminFixedPrice || variant.price).toFixed(2)}` : '—'}</p>
-                                  {variant.originalPrice ? (
-                                    <p className="text-[10px] text-slate-400 line-through">${variant.originalPriceUSD ? variant.originalPriceUSD.toFixed(2) : convertINRtoUSD(variant.originalPrice).toFixed(2)}</p>
-                                  ) : null}
-                                  <p className="text-[8px] text-green-600">Auto from exchange rate</p>
-                                </div>
-                              </div>
-                            </div>
+                              )
+                            })()}
                           </div>
                         ))}
                       </div>
@@ -2889,9 +2918,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                     </div>
                   </div>
 
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-900 mb-2">Delivery Timeline Summary</h4>
-                    <p className="text-sm text-blue-800">
+                  <div className="bg-brand-50 border border-brand-200 rounded-lg p-4">
+                    <h4 className="font-medium text-brand-700 mb-2">Delivery Timeline Summary</h4>
+                    <p className="text-sm text-brand-700">
                       Orders will be processed in <strong>{formData.dispatchTimeline.processingDays} day(s)</strong> and
                       delivered within <strong>{formData.dispatchTimeline.totalDays} day(s)</strong> from order confirmation.
                     </p>
@@ -2928,18 +2957,18 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Unit of Measurement *</label>
-                        <select
+                        <Dropdown
                           value={formData.logisticsConfig?.weightUom || 'KG'}
-                          onChange={(e) => setFormData(prev => ({
+                          onChange={(v) => setFormData(prev => ({
                             ...prev,
-                            logisticsConfig: { ...prev.logisticsConfig!, weightUom: e.target.value }
+                            logisticsConfig: { ...prev.logisticsConfig!, weightUom: v as string }
                           }))}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                        >
-                          <option value="KG">Kilogram (KG)</option>
-                          <option value="GRAM">Gram (g)</option>
-                          <option value="TON">Ton</option>
-                        </select>
+                          options={[
+                            { value: 'KG', label: 'Kilogram (KG)' },
+                            { value: 'GRAM', label: 'Gram (g)' },
+                            { value: 'TON', label: 'Ton' },
+                          ]}
+                        />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Max Shippable Weight</label>
@@ -3030,23 +3059,23 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Unit</label>
-                        <select
+                        <Dropdown
                           value={formData.logisticsConfig?.dimensions?.unit || 'CM'}
-                          onChange={(e) => setFormData(prev => ({
+                          onChange={(v) => setFormData(prev => ({
                             ...prev,
                             logisticsConfig: {
                               ...prev.logisticsConfig!,
                               dimensions: {
                                 ...(prev.logisticsConfig?.dimensions || { length: 0, width: 0, height: 0, unit: 'CM' }),
-                                unit: e.target.value
+                                unit: v as string
                               }
                             }
                           }))}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                        >
-                          <option value="CM">CM</option>
-                          <option value="IN">Inches</option>
-                        </select>
+                          options={[
+                            { value: 'CM', label: 'CM' },
+                            { value: 'IN', label: 'Inches' },
+                          ]}
+                        />
                       </div>
                     </div>
                   </CardContent>
@@ -3190,20 +3219,22 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                               placeholder="Max KG"
                             />
                           </div>
-                          <select
-                            value={range.recommendedTransport}
-                            onChange={(e) => {
-                              setFormData(prev => {
-                                const ranges = [...(prev.logisticsConfig?.weightRanges || [])];
-                                ranges[idx] = { ...ranges[idx], recommendedTransport: e.target.value };
-                                return { ...prev, logisticsConfig: { ...prev.logisticsConfig!, weightRanges: ranges } };
-                              });
-                            }}
-                            className="px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                          >
-                            <option value="AIR">Air</option>
-                            <option value="SHIP">Ship</option>
-                          </select>
+                          <div className="min-w-[120px]">
+                            <Dropdown
+                              value={range.recommendedTransport}
+                              onChange={(v) => {
+                                setFormData(prev => {
+                                  const ranges = [...(prev.logisticsConfig?.weightRanges || [])];
+                                  ranges[idx] = { ...ranges[idx], recommendedTransport: v as string };
+                                  return { ...prev, logisticsConfig: { ...prev.logisticsConfig!, weightRanges: ranges } };
+                                });
+                              }}
+                              options={[
+                                { value: 'AIR', label: 'Air' },
+                                { value: 'SHIP', label: 'Ship' },
+                              ]}
+                            />
+                          </div>
                           <button
                             type="button"
                             onClick={() => {

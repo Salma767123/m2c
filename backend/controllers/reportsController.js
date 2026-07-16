@@ -72,11 +72,13 @@ const getOverviewReport = async (req, res) => {
             // Revenue aggregates
             prisma.order.aggregate({
                 where: { createdAt: dateFilter, paymentStatus: 'PAID' },
-                _sum: { totalAmount: true },
+                _sum: { totalAmountINR: true },
+                _count: true,
             }),
             prisma.order.aggregate({
                 where: { createdAt: prevDateFilter, paymentStatus: 'PAID' },
-                _sum: { totalAmount: true },
+                _sum: { totalAmountINR: true },
+                _count: true,
             }),
 
             // New customers registered
@@ -106,6 +108,8 @@ const getOverviewReport = async (req, res) => {
                     orderId: true,
                     customerName: true,
                     totalAmount: true,
+                    currency: true,
+                    exchangeRate: true,
                     status: true,
                     createdAt: true,
                     items: { select: { vendorName: true }, take: 1 },
@@ -116,9 +120,10 @@ const getOverviewReport = async (req, res) => {
             prisma.orderItem.groupBy({
                 by: ['vendorId', 'vendorName'],
                 where: { order: { createdAt: dateFilter, paymentStatus: 'PAID' } },
-                _sum: { totalPrice: true },
+                _sum: { totalPriceINR: true },
                 _count: { id: true },
-                orderBy: { _sum: { totalPrice: 'desc' } },
+                // Ordering by the raw sum would rank an INR vendor ~83x above a USD one.
+                orderBy: { _sum: { totalPriceINR: 'desc' } },
                 take: 5,
             }),
 
@@ -126,7 +131,7 @@ const getOverviewReport = async (req, res) => {
             prisma.orderItem.groupBy({
                 by: ['productId'],
                 where: { order: { createdAt: dateFilter } },
-                _sum: { totalPrice: true, quantity: true },
+                _sum: { totalPriceINR: true, quantity: true },
                 _count: { id: true },
             }),
 
@@ -136,14 +141,19 @@ const getOverviewReport = async (req, res) => {
                     createdAt: { gte: new Date(new Date().setMonth(new Date().getMonth() - 6)) },
                     paymentStatus: 'PAID',
                 },
-                select: { totalAmount: true, createdAt: true },
+                select: { totalAmountINR: true, createdAt: true },
             }),
         ]);
 
-        const currentRev = currentRevenue._sum.totalAmount || 0;
-        const prevRev = prevRevenue._sum.totalAmount || 0;
-        const avgOrderValue = currentOrders > 0 ? (currentRev / currentOrders) : 0;
-        const prevAvgOrderValue = prevOrders > 0 ? ((prevRev) / prevOrders) : 0;
+        const currentRev = currentRevenue._sum.totalAmountINR || 0;
+        const prevRev = prevRevenue._sum.totalAmountINR || 0;
+        // Divide PAID revenue by the PAID order count. currentOrders/prevOrders count
+        // every order regardless of payment status, so using them here dragged AOV down
+        // by every unpaid order — wrong independently of the currency issue.
+        const paidOrderCount = currentRevenue._count || 0;
+        const prevPaidOrderCount = prevRevenue._count || 0;
+        const avgOrderValue = paidOrderCount > 0 ? (currentRev / paidOrderCount) : 0;
+        const prevAvgOrderValue = prevPaidOrderCount > 0 ? (prevRev / prevPaidOrderCount) : 0;
 
         // Build monthly revenue chart data
         const monthMap = {};
@@ -152,7 +162,7 @@ const getOverviewReport = async (req, res) => {
             const d = new Date(order.createdAt);
             const key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
             if (!monthMap[key]) monthMap[key] = { month: monthNames[d.getMonth()], revenue: 0, orders: 0 };
-            monthMap[key].revenue += order.totalAmount;
+            monthMap[key].revenue += (order.totalAmountINR || 0);
             monthMap[key].orders += 1;
         });
         const revenueChartData = Object.values(monthMap).slice(-6);
@@ -193,6 +203,8 @@ const getOverviewReport = async (req, res) => {
                         customer: o.customerName,
                         vendor: o.items[0]?.vendorName || '-',
                         amount: o.totalAmount,
+                        currency: o.currency,
+                        exchangeRate: o.exchangeRate,
                         status: o.status,
                         date: o.createdAt,
                     })),
@@ -200,7 +212,7 @@ const getOverviewReport = async (req, res) => {
                         rank: i + 1,
                         id: v.vendorId,
                         name: v.vendorName,
-                        revenue: v._sum.totalPrice || 0,
+                        revenue: v._sum.totalPriceINR || 0,
                         orders: v._count.id,
                     })),
                 },
@@ -229,33 +241,34 @@ const getSalesReport = async (req, res) => {
         ] = await Promise.all([
             prisma.order.findMany({
                 where: { createdAt: { gte: start, lte: end }, paymentStatus: 'PAID' },
-                select: { totalAmount: true, subtotal: true, tax: true, discount: true, createdAt: true },
+                select: { totalAmountINR: true, subtotal: true, taxINR: true, discountINR: true, createdAt: true },
             }),
             prisma.order.findMany({
                 where: { createdAt: { gte: prevStart, lte: prevEnd }, paymentStatus: 'PAID' },
-                select: { totalAmount: true },
+                select: { totalAmountINR: true },
             }),
             // Daily sales breakdown
             prisma.order.findMany({
                 where: { createdAt: { gte: start, lte: end } },
-                select: { totalAmount: true, createdAt: true, paymentStatus: true },
+                select: { totalAmountINR: true, createdAt: true, paymentStatus: true },
                 orderBy: { createdAt: 'asc' },
             }),
             // Top selling products
             prisma.orderItem.groupBy({
                 by: ['productId', 'productName'],
                 where: { order: { createdAt: { gte: start, lte: end } } },
-                _sum: { totalPrice: true, quantity: true },
+                _sum: { totalPriceINR: true, quantity: true },
                 _count: { id: true },
-                orderBy: { _sum: { totalPrice: 'desc' } },
+                // Ordering by the raw sum would rank INR products ~83x above USD ones.
+                orderBy: { _sum: { totalPriceINR: 'desc' } },
                 take: 10,
             }),
         ]);
 
-        const totalRevenue = paidOrders.reduce((s, o) => s + o.totalAmount, 0);
-        const prevRevenue = prevPaidOrders.reduce((s, o) => s + o.totalAmount, 0);
-        const totalTax = paidOrders.reduce((s, o) => s + o.tax, 0);
-        const totalDiscount = paidOrders.reduce((s, o) => s + o.discount, 0);
+        const totalRevenue = paidOrders.reduce((s, o) => s + (o.totalAmountINR || 0), 0);
+        const prevRevenue = prevPaidOrders.reduce((s, o) => s + (o.totalAmountINR || 0), 0);
+        const totalTax = paidOrders.reduce((s, o) => s + (o.taxINR || 0), 0);
+        const totalDiscount = paidOrders.reduce((s, o) => s + (o.discountINR || 0), 0);
 
         // Group daily sales
         const dayMap = {};
@@ -264,7 +277,7 @@ const getSalesReport = async (req, res) => {
             const d = new Date(o.createdAt);
             const key = dayNames[d.getDay()];
             if (!dayMap[key]) dayMap[key] = { day: key, sales: 0, orders: 0 };
-            if (o.paymentStatus === 'PAID') dayMap[key].sales += o.totalAmount;
+            if (o.paymentStatus === 'PAID') dayMap[key].sales += (o.totalAmountINR || 0);
             dayMap[key].orders += 1;
         });
 
@@ -284,7 +297,7 @@ const getSalesReport = async (req, res) => {
                 tables: {
                     topProducts: topProducts.map(p => ({
                         name: p.productName,
-                        revenue: p._sum.totalPrice || 0,
+                        revenue: p._sum.totalPriceINR || 0,
                         quantity: p._sum.quantity || 0,
                         orders: p._count.id,
                     })),
@@ -457,9 +470,10 @@ const getVendorsReport = async (req, res) => {
             prisma.orderItem.groupBy({
                 by: ['vendorId', 'vendorName'],
                 where: { order: { createdAt: { gte: start, lte: end } } },
-                _sum: { totalPrice: true },
+                _sum: { totalPriceINR: true },
                 _count: { id: true },
-                orderBy: { _sum: { totalPrice: 'desc' } },
+                // Ordering by the raw sum would rank INR vendors ~83x above USD ones.
+                orderBy: { _sum: { totalPriceINR: 'desc' } },
                 take: 10,
             }),
             prisma.vendor.count({ where: { createdAt: { gte: start, lte: end } } }),
@@ -477,7 +491,7 @@ const getVendorsReport = async (req, res) => {
                         rank: i + 1,
                         id: v.vendorId,
                         name: v.vendorName,
-                        revenue: v._sum.totalPrice || 0,
+                        revenue: v._sum.totalPriceINR || 0,
                         orders: v._count.id,
                     })),
                 },
@@ -516,8 +530,8 @@ const getProductsReport = async (req, res) => {
             prisma.orderItem.groupBy({
                 by: ['productId', 'productName'],
                 where: { order: { createdAt: { gte: start, lte: end } } },
-                _sum: { totalPrice: true, quantity: true },
-                orderBy: { _sum: { totalPrice: 'desc' } },
+                _sum: { totalPriceINR: true, quantity: true },
+                orderBy: { _sum: { totalPriceINR: 'desc' } },
                 take: 10,
             }),
         ]);
@@ -535,7 +549,7 @@ const getProductsReport = async (req, res) => {
                     lowStockProducts,
                     topSellingProducts: topSellingProducts.map(p => ({
                         name: p.productName,
-                        revenue: p._sum.totalPrice || 0,
+                        revenue: p._sum.totalPriceINR || 0,
                         quantity: p._sum.quantity || 0,
                     })),
                 },
@@ -568,9 +582,10 @@ const getCustomersReport = async (req, res) => {
             prisma.order.groupBy({
                 by: ['customerId', 'customerName', 'customerEmail'],
                 where: { createdAt: { gte: start, lte: end }, paymentStatus: 'PAID' },
-                _sum: { totalAmount: true },
+                _sum: { totalAmountINR: true },
                 _count: { id: true },
-                orderBy: { _sum: { totalAmount: 'desc' } },
+                // Ordering by the raw sum would rank INR customers ~83x above USD ones.
+                orderBy: { _sum: { totalAmountINR: 'desc' } },
                 take: 10,
             }),
         ]);
@@ -587,7 +602,7 @@ const getCustomersReport = async (req, res) => {
                         rank: i + 1,
                         name: c.customerName,
                         email: c.customerEmail,
-                        revenue: c._sum.totalAmount || 0,
+                        revenue: c._sum.totalAmountINR || 0,
                         orders: c._count.id,
                     })),
                 },
@@ -612,7 +627,7 @@ const getFinancialReport = async (req, res) => {
             where: {
                 createdAt: { gte: new Date(new Date().setMonth(new Date().getMonth() - 6)), lte: end },
             },
-            select: { totalAmount: true, tax: true, discount: true, shippingCost: true, subtotal: true, paymentStatus: true, createdAt: true },
+            select: { totalAmountINR: true, taxINR: true, discountINR: true, shippingCostINR: true, subtotal: true, paymentStatus: true, createdAt: true },
         });
 
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -622,17 +637,17 @@ const getFinancialReport = async (req, res) => {
             const key = `${monthNames[d.getMonth()]}`;
             if (!monthMap[key]) monthMap[key] = { month: key, revenue: 0, expenses: 0, profit: 0 };
             if (o.paymentStatus === 'PAID') {
-                monthMap[key].revenue += o.totalAmount;
-                monthMap[key].expenses += o.tax + o.shippingCost;
-                monthMap[key].profit += o.totalAmount - o.tax - o.shippingCost;
+                monthMap[key].revenue += (o.totalAmountINR || 0);
+                monthMap[key].expenses += (o.taxINR || 0) + (o.shippingCostINR || 0);
+                monthMap[key].profit += (o.totalAmountINR || 0) - (o.taxINR || 0) - (o.shippingCostINR || 0);
             }
         });
 
         const periodOrders = orders6M.filter(o => new Date(o.createdAt) >= start);
-        const totalRevenue = periodOrders.filter(o => o.paymentStatus === 'PAID').reduce((s, o) => s + o.totalAmount, 0);
-        const totalTax = periodOrders.reduce((s, o) => s + o.tax, 0);
-        const totalShipping = periodOrders.reduce((s, o) => s + o.shippingCost, 0);
-        const totalDiscount = periodOrders.reduce((s, o) => s + o.discount, 0);
+        const totalRevenue = periodOrders.filter(o => o.paymentStatus === 'PAID').reduce((s, o) => s + (o.totalAmountINR || 0), 0);
+        const totalTax = periodOrders.reduce((s, o) => s + (o.taxINR || 0), 0);
+        const totalShipping = periodOrders.reduce((s, o) => s + (o.shippingCostINR || 0), 0);
+        const totalDiscount = periodOrders.reduce((s, o) => s + (o.discountINR || 0), 0);
 
         res.json({
             success: true,
@@ -765,14 +780,15 @@ const getQcProductReports = async (req, res) => {
             prisma.product.count({ where }),
         ]);
 
-        // Strip the heavy qcInspectionData JSON (can contain base64 photos) — surface only finalDecision.
+        // Strip the heavy qcInspectionData JSON (can contain base64 photos) — surface
+        // only the QC checker's actual decision. Prefer inspectionStatus (the real
+        // Review-step decision); the legacy finalDecision was hard-coded "Approved".
         const slim = products.map((p) => {
-            const finalDecision = p.qcInspectionData && typeof p.qcInspectionData === 'object'
-                ? p.qcInspectionData.finalDecision || null
-                : null;
+            const qc = p.qcInspectionData && typeof p.qcInspectionData === 'object' ? p.qcInspectionData : null;
+            const qcDecision = qc ? (qc.inspectionStatus || qc.finalDecision || null) : null;
             // eslint-disable-next-line no-unused-vars
             const { qcInspectionData, ...rest } = p;
-            return { ...rest, finalDecision };
+            return { ...rest, qcDecision, finalDecision: qcDecision };
         });
 
         res.json({

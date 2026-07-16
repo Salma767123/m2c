@@ -22,6 +22,7 @@ import { wishlistService } from "@/services/wishlistService";
 import { userAuthService } from "@/services/userAuthService";
 import { categoryService } from "@/services/categoryService";
 import NotificationDropdown from "@/components/Shared/NotificationDropdown";
+import { USER_CATEGORIES } from "@/components/Shared/NotificationModal";
 import CompanyLogo from "@/components/Shared/CompanyLogo";
 import { subscribeToAuthChange, dispatchAuthChange } from "@/lib/authEvents";
 
@@ -294,6 +295,8 @@ const Header = () => {
 
   return (
     <div className="sticky top-0 z-50 font-sans">
+      {/* Brand accent bar — a live sliver of primary colour across the top */}
+      <div className="h-1 w-full animate-brand-bar" />
       {/* Main Header */}
       <header className="bg-white shadow-lg border-b border-gray-100 transition-all duration-300">
         <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
@@ -325,16 +328,18 @@ const Header = () => {
             {/* Section 3: Action Icons (30% on desktop, 50% on mobile/tablet) */}
             <div className="w-[50%] md:w-[30%] flex items-center justify-end gap-1 sm:gap-1.5 md:gap-3 shrink-0">
               {/* Notifications (logged-in users only) */}
-              {isUserLoggedIn && <NotificationDropdown />}
+              {isUserLoggedIn && (
+                <NotificationDropdown categories={USER_CATEGORIES} colorScheme="brand" />
+              )}
 
               {/* Wishlist */}
               <Link
                 href="/wishlist"
-                className="relative p-2 text-[#222222] hover:text-white hover:bg-[#212121] rounded-lg transition-all duration-200 transform hover:scale-105"
+                className="relative p-2 text-[#222222] hover:text-white hover:bg-[#e01a1b] rounded-lg transition-all duration-200 transform hover:scale-105"
               >
                 <Heart className="w-5 h-5 md:w-6 md:h-6" />
                 {wishlistCount > 0 && (
-                  <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 bg-[#212121] text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-medium text-xs">
+                  <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 bg-[#e01a1b] text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-medium text-xs shadow-[0_2px_6px_rgba(224,26,27,0.5)] ring-2 ring-white">
                     {wishlistCount > 99 ? '99+' : wishlistCount}
                   </span>
                 )}
@@ -343,11 +348,11 @@ const Header = () => {
               {/* Cart */}
               <Link
                 href="/cart"
-                className="relative p-2 text-[#222222] hover:text-white hover:bg-[#212121] rounded-lg transition-all duration-200 transform hover:scale-105"
+                className="relative p-2 text-[#222222] hover:text-white hover:bg-[#e01a1b] rounded-lg transition-all duration-200 transform hover:scale-105"
               >
                 <ShoppingCart className="w-5 h-5 md:w-6 md:h-6" />
                 {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 bg-[#212121] text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-medium text-xs">
+                  <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 bg-[#e01a1b] text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-medium text-xs shadow-[0_2px_6px_rgba(224,26,27,0.5)] ring-2 ring-white">
                     {cartCount > 99 ? '99+' : cartCount}
                   </span>
                 )}
@@ -356,7 +361,7 @@ const Header = () => {
               {/* Search Icon */}
               <button
                 onClick={() => setShowSearchModal(true)}
-                className="p-2 text-[#222222] hover:text-white hover:bg-[#212121] rounded-lg transition-all duration-200 transform hover:scale-110"
+                className="p-2 text-[#222222] hover:text-white hover:bg-[#e01a1b] rounded-lg transition-all duration-200 transform hover:scale-110"
                 aria-label="Search"
               >
                 <Search className="w-5 h-5 md:w-6 md:h-6" />
@@ -368,7 +373,7 @@ const Header = () => {
                   onClick={() =>
                     setIsLanguageCurrencyOpen(!isLanguageCurrencyOpen)
                   }
-                  className="p-2 text-[#222222] hover:text-white hover:bg-[#212121] rounded-xl transition-all duration-200 transform hover:scale-110"
+                  className="p-2 text-[#222222] hover:text-white hover:bg-[#e01a1b] rounded-xl transition-all duration-200 transform hover:scale-110"
                   aria-label="Language and Currency"
                 >
                   <Globe className="w-5 h-5 md:w-6 md:h-6" />
@@ -494,7 +499,7 @@ const Header = () => {
                           setShowLanguageDropdown(false);
                           setShowCurrencyDropdown(false);
                         }}
-                        className="w-full bg-[#222222] hover:bg-gray-400 text-white font-semibold py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-xs sm:text-sm"
+                        className="btn-shine w-full bg-[#e01a1b] hover:bg-[#c41617] text-white font-semibold py-2.5 sm:py-3 px-3 sm:px-4 rounded-full transition-all duration-300 shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#e01a1b] focus:ring-offset-2 text-xs sm:text-sm"
                       >
                         Save Preferences
                       </button>
@@ -605,7 +610,7 @@ const Header = () => {
               <Link
                 href="/"
                 className={`block px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${isActiveLink("/")
-                  ? "bg-linear-to-r from-gray-500 to-gray-600 text-white shadow-md"
+                  ? "bg-[#e01a1b] text-white shadow-[0_4px_12px_rgba(224,26,27,0.3)]"
                   : "text-slate-700 hover:bg-slate-100 hover:text-gray-600"
                   }`}
                 onClick={() => setIsMenuOpen(false)}
@@ -616,7 +621,7 @@ const Header = () => {
               <Link
                 href="/products"
                 className={`block px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${isActiveLink("/products")
-                  ? "bg-linear-to-r from-gray-500 to-gray-600 text-white shadow-md"
+                  ? "bg-[#e01a1b] text-white shadow-[0_4px_12px_rgba(224,26,27,0.3)]"
                   : "text-slate-700 hover:bg-slate-100 hover:text-gray-600"
                   }`}
                 onClick={() => setIsMenuOpen(false)}
@@ -627,7 +632,7 @@ const Header = () => {
               <Link
                 href="/about"
                 className={`block px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${isActiveLink("/about")
-                  ? "bg-linear-to-r from-gray-500 to-gray-600 text-white shadow-md"
+                  ? "bg-[#e01a1b] text-white shadow-[0_4px_12px_rgba(224,26,27,0.3)]"
                   : "text-slate-700 hover:bg-slate-100 hover:text-gray-600"
                   }`}
                 onClick={() => setIsMenuOpen(false)}
@@ -638,7 +643,7 @@ const Header = () => {
               <Link
                 href="/contact"
                 className={`block px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${isActiveLink("/contact")
-                  ? "bg-linear-to-r from-gray-500 to-gray-600 text-white shadow-md"
+                  ? "bg-[#e01a1b] text-white shadow-[0_4px_12px_rgba(224,26,27,0.3)]"
                   : "text-slate-700 hover:bg-slate-100 hover:text-gray-600"
                   }`}
                 onClick={() => setIsMenuOpen(false)}
@@ -649,7 +654,7 @@ const Header = () => {
               <Link
                 href="/order"
                 className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${isActiveLink("/order")
-                  ? "bg-linear-to-r from-gray-500 to-gray-600 text-white shadow-md"
+                  ? "bg-[#e01a1b] text-white shadow-[0_4px_12px_rgba(224,26,27,0.3)]"
                   : "text-slate-700 hover:bg-slate-100 hover:text-gray-600"
                   }`}
                 onClick={() => setIsMenuOpen(false)}

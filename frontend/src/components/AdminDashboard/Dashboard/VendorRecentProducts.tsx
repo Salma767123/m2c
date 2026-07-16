@@ -1,6 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Badge } from '@/components/UI/Badge'
-import { Package } from 'lucide-react'
+import { Package, ArrowRight } from 'lucide-react'
+import Link from 'next/link'
+
+// Mirrors the All Products / Vendor Requests view route: a readable slug plus
+// the product id, separated by a double dash.
+const productHref = (item: { id: string; name?: string }) => {
+  const slug = (item.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  return `/admin/dashboard/products/vendor-requests/view/${slug}--${item.id}`
+}
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -24,13 +32,17 @@ export default function VendorRecentProducts({ products }: { products: any[] }) 
       <CardContent>
         <div className="space-y-4">
           {products && products.map((item) => (
-            <div key={item.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+            <Link
+              key={item.id}
+              href={productHref(item)}
+              className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors group"
+            >
               <div className="flex items-center justify-center w-10 h-10 bg-brand-500 rounded-lg shrink-0">
                 <Package className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <p className="font-semibold text-sm text-slate-900 truncate">{item.name}</p>
+                  <p className="font-semibold text-sm text-slate-900 truncate group-hover:text-brand-600 transition-colors">{item.name}</p>
                   {getStatusBadge(item.status)}
                 </div>
                 <p className="text-xs text-slate-600 mb-1">{item.vendorName || 'N/A'}</p>
@@ -40,10 +52,11 @@ export default function VendorRecentProducts({ products }: { products: any[] }) 
                   <span>{new Date(item.createdAt).toLocaleDateString()}</span>
                 </div>
               </div>
-              <div className="text-right shrink-0">
+              <div className="text-right shrink-0 flex items-center gap-2">
                 <p className="font-bold text-slate-900">${item.price}</p>
+                <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-brand-500 transition-colors" />
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </CardContent>

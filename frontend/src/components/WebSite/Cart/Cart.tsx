@@ -11,6 +11,7 @@ import bagTypeService, { BagType } from "@/services/bagTypeService"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, getCurrency } from "@/lib/currency"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
+import Reveal from "@/components/WebSite/Shared/Reveal"
 
 /** Map BagType's `price` field to `basePrice` so getRegionalPrice() resolves correctly */
 const getBagRegionalPrice = (bag: { price: number; priceINR?: number | null; priceUSD?: number | null }) =>
@@ -339,9 +340,9 @@ export default function Order() {
           <div className="mb-5 sm:mb-6 lg:mb-8">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <ShoppingCart className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-blue-600 shrink-0" />
+                <ShoppingCart className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-[#e01a1b] shrink-0" />
                 <div className="min-w-0">
-                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">Shopping Cart</h1>
+                  <h1 className="font-playfair text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#1a1a1a] mb-1 sm:mb-2">Shopping Cart</h1>
                   <p className="text-sm sm:text-base text-slate-600">Review your items and proceed to checkout</p>
                 </div>
               </div>
@@ -511,7 +512,7 @@ export default function Order() {
         <div className="mb-5 sm:mb-6 lg:mb-8">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <ShoppingCart className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-blue-600 shrink-0" />
+              <ShoppingCart className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-[#e01a1b] shrink-0" />
               <div className="min-w-0">
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">Shopping Cart</h1>
                 <p className="text-sm sm:text-base text-slate-600">Review your items and proceed to checkout</p>
@@ -569,7 +570,7 @@ export default function Order() {
                             <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-1 break-words">{item.name}</h3>
                             <p className="hidden sm:block text-sm text-slate-600 mb-2 line-clamp-2">{item.description}</p>
                             <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mb-2">
-                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 sm:py-1 rounded-full">
+                              <span className="text-xs bg-[#e01a1b]/10 text-[#e01a1b] px-2 py-0.5 sm:py-1 rounded-full">
                                 {item.category}
                               </span>
                               {item.rating !== undefined && (
@@ -673,16 +674,16 @@ export default function Order() {
 
             {/* Empty State — Order-page style polished card */}
             {cartItems.length === 0 && (
-              <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 lg:p-12 text-center">
+              <Reveal className="bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-6 sm:p-8 lg:p-12 text-center">
                 <ShoppingCart className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 text-slate-300 mx-auto mb-3 sm:mb-4" />
-                <h3 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">Your cart is empty</h3>
+                <h3 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a] mb-2">Your cart is empty</h3>
                 <p className="text-sm sm:text-base text-slate-600 mb-5 sm:mb-6">Add some items to get started</p>
                 <Link href="/products">
-                  <button className="bg-blue-600 text-white px-5 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+                  <button className="btn-shine inline-flex items-center justify-center gap-2 bg-[#e01a1b] text-white px-6 py-3 text-sm sm:text-base rounded-full font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300">
                     Continue Shopping
                   </button>
                 </Link>
-              </div>
+              </Reveal>
             )}
           </div>
 
@@ -691,18 +692,18 @@ export default function Order() {
             <div className="lg:col-span-1">
               {/* Promo Code */}
               <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6 mb-4 sm:mb-6">
-                <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3 sm:mb-4">Promo Code</h3>
+                <h3 className="font-playfair text-base sm:text-lg font-semibold text-[#1a1a1a] mb-3 sm:mb-4">Promo Code</h3>
                 <div className="flex gap-2 sm:gap-3">
                   <input
                     type="text"
                     placeholder="Enter promo code"
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
-                    className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-slate-300 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                    className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-slate-300 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] outline-none"
                   />
                   <button
                     onClick={applyPromoCode}
-                    className="px-4 sm:px-6 py-2.5 sm:py-3 bg-[#222222] hover:bg-[#313131] text-white font-medium rounded-lg sm:rounded-xl transition-colors text-sm sm:text-base shrink-0"
+                    className="px-4 sm:px-6 py-2.5 sm:py-3 bg-[#1a1a1a] hover:bg-[#e01a1b] text-white font-medium rounded-lg sm:rounded-xl transition-colors text-sm sm:text-base shrink-0"
                   >
                     Apply
                   </button>
@@ -743,8 +744,8 @@ export default function Order() {
               {availableBagTypes.length > 0 && (
                 <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6 mb-4 sm:mb-6">
                   <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                    <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-slate-700" />
-                    <h3 className="text-base sm:text-lg font-semibold text-slate-900">Add a Bag ({availableBagTypes.length})</h3>
+                    <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-[#e01a1b]" />
+                    <h3 className="font-playfair text-base sm:text-lg font-semibold text-[#1a1a1a]">Add a Bag ({availableBagTypes.length})</h3>
                   </div>
                   <div className="space-y-3 max-h-[280px] overflow-y-auto">
                     {/* No bag option */}
@@ -752,14 +753,14 @@ export default function Order() {
                       onClick={() => handleBagSelection(null)}
                       className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
                         !selectedBagTypeId
-                          ? 'border-[#222222] bg-slate-50'
+                          ? 'border-[#e01a1b] bg-slate-50'
                           : 'border-slate-200 hover:border-slate-300'
                       }`}
                     >
                       <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                        !selectedBagTypeId ? 'border-[#222222]' : 'border-slate-300'
+                        !selectedBagTypeId ? 'border-[#e01a1b]' : 'border-slate-300'
                       }`}>
-                        {!selectedBagTypeId && <div className="w-2 h-2 rounded-full bg-[#222222]" />}
+                        {!selectedBagTypeId && <div className="w-2 h-2 rounded-full bg-[#e01a1b]" />}
                       </div>
                       <span className="text-sm text-slate-600">No bag needed</span>
                     </button>
@@ -771,14 +772,14 @@ export default function Order() {
                         onClick={() => handleBagSelection(bag.id)}
                         className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
                           selectedBagTypeId === bag.id
-                            ? 'border-[#222222] bg-slate-50'
+                            ? 'border-[#e01a1b] bg-slate-50'
                             : 'border-slate-200 hover:border-slate-300'
                         }`}
                       >
                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                          selectedBagTypeId === bag.id ? 'border-[#222222]' : 'border-slate-300'
+                          selectedBagTypeId === bag.id ? 'border-[#e01a1b]' : 'border-slate-300'
                         }`}>
-                          {selectedBagTypeId === bag.id && <div className="w-2 h-2 rounded-full bg-[#222222]" />}
+                          {selectedBagTypeId === bag.id && <div className="w-2 h-2 rounded-full bg-[#e01a1b]" />}
                         </div>
                         {bag.image ? (
                           <Image src={bag.image} alt={bag.name} width={40} height={40} className="w-10 h-10 object-cover rounded-lg border border-slate-200 shrink-0" />
@@ -800,7 +801,7 @@ export default function Order() {
 
               <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden lg:sticky lg:top-8">
                 <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-linear-to-r from-slate-50 to-white">
-                  <h2 className="text-lg sm:text-xl font-bold text-slate-900">Order Summary</h2>
+                  <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a]">Order Summary</h2>
                 </div>
 
                 <div className="p-4 sm:p-5 lg:p-6">
@@ -874,10 +875,10 @@ export default function Order() {
                     </button>
                   ) : (
                     <Link href="/checkout">
-                      <button className="w-full bg-[#313131] text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2 group mb-4">
+                      <button className="btn-shine w-full bg-[#e01a1b] text-white font-semibold py-4 px-6 rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2 group mb-4">
                         <CreditCard className="w-5 h-5" />
                         Proceed to Checkout
-                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
                       </button>
                     </Link>
                   )}
@@ -889,7 +890,7 @@ export default function Order() {
                       <span>Secure checkout with SSL encryption</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm text-slate-600">
-                      <Truck className="w-5 h-5 text-blue-600" />
+                      <Truck className="w-5 h-5 text-[#e01a1b]" />
                       <span>Free shipping on orders over $100</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm text-slate-600">

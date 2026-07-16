@@ -25,13 +25,15 @@ const getDashboardStats = async (req, res) => {
             prisma.user.count(),
             prisma.order.count(),
 
-            // 2. Total income via aggregate (no full table scan)
-            prisma.order.aggregate({ _sum: { totalAmount: true } }),
+            // 2. Total income via aggregate (no full table scan).
+            // Sums the INR twin, not totalAmount — the latter is stored in each order's
+            // own currency, so summing it adds $ to ₹. See utils/orderCurrency.js.
+            prisma.order.aggregate({ _sum: { totalAmountINR: true } }),
 
             // 3. Monthly earnings — only fetch current year orders (not ALL orders)
             prisma.order.findMany({
                 where: { createdAt: { gte: yearStart, lt: yearEnd } },
-                select: { totalAmount: true, createdAt: true },
+                select: { totalAmountINR: true, createdAt: true },
             }),
 
             // 4. Recent orders
@@ -44,7 +46,7 @@ const getDashboardStats = async (req, res) => {
             // 5. Top selling products (single groupBy — no duplicate)
             prisma.orderItem.groupBy({
                 by: ['productId', 'productName'],
-                _sum: { quantity: true, totalPrice: true },
+                _sum: { quantity: true, totalPriceINR: true },
                 orderBy: { _sum: { quantity: 'desc' } },
                 take: 6,
             }),
@@ -74,17 +76,17 @@ const getDashboardStats = async (req, res) => {
             // 9. Sales by category (reuse single groupBy + product lookup)
             prisma.orderItem.groupBy({
                 by: ['productId'],
-                _sum: { quantity: true, totalPrice: true },
+                _sum: { quantity: true, totalPriceINR: true },
             }),
         ]);
 
-        const totalIncome = totalIncomeAgg._sum.totalAmount || 0;
+        const totalIncome = totalIncomeAgg._sum.totalAmountINR || 0;
 
         // Monthly earnings — computed from current year orders only (not all orders)
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const monthlyEarnings = Array(12).fill(0);
         for (const order of monthlyOrders) {
-            monthlyEarnings[new Date(order.createdAt).getMonth()] += (order.totalAmount || 0);
+            monthlyEarnings[new Date(order.createdAt).getMonth()] += (order.totalAmountINR || 0);
         }
         const earningsData = months.map((name, i) => ({ name, total: monthlyEarnings[i] }));
 
@@ -99,7 +101,7 @@ const getDashboardStats = async (req, res) => {
         let totalSalesOverall = 0;
         for (const cs of categorySales) {
             const cat = prodCatMap.get(cs.productId) || 'Others';
-            const amount = cs._sum.totalPrice || 0;
+            const amount = cs._sum.totalPriceINR || 0;
             categoryMap[cat] = (categoryMap[cat] || 0) + amount;
             totalSalesOverall += amount;
         }
@@ -115,12 +117,13 @@ const getDashboardStats = async (req, res) => {
             salesByCategory,
             recentOrders: recentOrders.map(o => ({
                 id: o.id, orderId: o.orderId, customerName: o.customerName, customerEmail: o.customerEmail,
-                totalAmount: o.totalAmount, status: o.status, date: o.createdAt,
+                totalAmount: o.totalAmount, currency: o.currency, exchangeRate: o.exchangeRate,
+                status: o.status, date: o.createdAt,
                 productName: o.items?.[0]?.productName || 'Multiple Items',
             })),
             topProducts: topProducts.map(item => ({
                 id: item.productId, name: item.productName,
-                sales: item._sum.quantity, revenue: item._sum.totalPrice,
+                sales: item._sum.quantity, revenue: item._sum.totalPriceINR,
             })),
             recentVendors,
             recentProducts: recentProducts.map(p => ({

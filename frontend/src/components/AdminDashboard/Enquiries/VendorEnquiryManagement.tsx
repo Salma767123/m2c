@@ -8,7 +8,8 @@ import { Badge } from '@/components/UI/Badge';
 import { Button } from '@/components/UI/Button';
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
 import Dropdown from '@/components/UI/Dropdown';
-import { Mail, Phone, Building2, FileText, Eye, Trash2, CheckCircle, XCircle, Search, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
+import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar';
+import { Mail, Phone, Building2, FileText, Eye, Trash2, CheckCircle, XCircle, Search, Globe, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { hasPermission } from '@/lib/auth';
 
@@ -33,21 +34,27 @@ export default function VendorEnquiryManagement() {
   const [showModal, setShowModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmModal, setConfirmModal] = useState<{ show: boolean; type: 'approve' | 'reject' | 'delete'; id: string; name: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Fetch the FULL enquiry set so the metric cards reflect global totals.
+  // Search + status + date filtering is applied client-side below.
   useEffect(() => {
     fetchEnquiries();
-  }, [statusFilter, searchTerm]);
+  }, []);
+
+  // Reset to first page whenever the client-side search/filter changes.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchTerm, dateFrom, dateTo]);
 
   const fetchEnquiries = async () => {
     try {
       setLoading(true);
-      const response = await enquiryService.getAllEnquiries({
-        status: statusFilter === 'all' ? undefined : statusFilter,
-        search: searchTerm || undefined
-      });
+      const response = await enquiryService.getAllEnquiries({});
       setEnquiries(response.data);
     } catch (error: any) {
       showErrorToast('Error', error.message || 'Failed to fetch enquiries');
@@ -115,8 +122,33 @@ export default function VendorEnquiryManagement() {
     rejected: enquiries.filter(e => e.status === 'rejected').length
   };
 
-  const totalPages = Math.ceil(enquiries.length / PAGE_SIZE);
-  const paginatedItems = enquiries.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  // Client-side search + status + created-date filtering (stats stay global).
+  const filteredEnquiries = enquiries.filter((e) => {
+    const q = searchTerm.trim().toLowerCase();
+    if (q) {
+      const hay = `${e.name} ${e.companyName} ${e.email} ${e.phone} ${e.gstNumber}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (statusFilter !== 'all' && e.status !== statusFilter) return false;
+    if (dateFrom || dateTo) {
+      const d = e.createdAt ? fmtDate(new Date(e.createdAt)) : '';
+      if (!d) return false;
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo && d > dateTo) return false;
+    }
+    return true;
+  });
+
+  const totalPages = Math.ceil(filteredEnquiries.length / PAGE_SIZE);
+  const paginatedItems = filteredEnquiries.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  // Metric cards — styled like the Vendor Product Requests module; click to filter.
+  const metricCards = [
+    { key: 'all',      label: 'Total',    subtitle: 'All enquiries',   value: stats.total,    Icon: FileText,    iconBg: 'bg-brand-50',   iconColor: 'text-brand-500',   countColor: 'text-slate-900',   activeClass: 'border-brand-400 bg-brand-50/50' },
+    { key: 'pending',  label: 'Pending',  subtitle: 'Awaiting review', value: stats.pending,  Icon: Clock,       iconBg: 'bg-amber-50',   iconColor: 'text-amber-500',   countColor: 'text-amber-700',   activeClass: 'border-amber-400 bg-amber-50/60' },
+    { key: 'approved', label: 'Approved', subtitle: 'Registered',      value: stats.approved, Icon: CheckCircle, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500', countColor: 'text-emerald-700', activeClass: 'border-emerald-400 bg-emerald-50/60' },
+    { key: 'rejected', label: 'Rejected', subtitle: 'Declined',        value: stats.rejected, Icon: XCircle,     iconBg: 'bg-red-50',     iconColor: 'text-red-500',     countColor: 'text-red-700',     activeClass: 'border-red-400 bg-red-50/60' },
+  ];
 
   return (
     <div className="space-y-6">
@@ -126,21 +158,31 @@ export default function VendorEnquiryManagement() {
         <p className="text-slate-600">Manage vendor registration requests</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Total', value: stats.total, color: 'bg-slate-100' },
-          { label: 'Pending', value: stats.pending, color: 'bg-yellow-100' },
-          { label: 'Approved', value: stats.approved, color: 'bg-green-100' },
-          { label: 'Rejected', value: stats.rejected, color: 'bg-red-100' }
-        ].map((stat) => (
-          <Card key={stat.label}>
-            <CardContent className="p-4">
-              <div className="text-sm text-slate-600">{stat.label}</div>
-              <div className="text-2xl font-bold">{stat.value}</div>
-            </CardContent>
-          </Card>
-        ))}
+      {/* Stats Cards — click a card to filter the table below by that status */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {metricCards.map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
+          const isActive = statusFilter === key;
+          const toggle = () => setStatusFilter((prev) => (prev === key ? 'all' : key));
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={toggle}
+              className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : 'border-slate-200/80 hover:border-slate-300'}`}
+            >
+              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+                <span className="text-sm font-medium text-slate-500">{label}</span>
+                <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace('50', '100') : iconBg} transition-transform duration-150 group-hover:scale-110`}>
+                  <Icon className={`h-4 w-4 ${iconColor}`} />
+                </div>
+              </div>
+              <div className="px-4 pb-4">
+                <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -154,10 +196,18 @@ export default function VendorEnquiryManagement() {
                   type="text"
                   placeholder="Search by name, company, email..."
                   value={searchTerm}
-                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40"
                 />
               </div>
+            </div>
+            <div className="shrink-0">
+              <DateRangeCalendar
+                from={dateFrom}
+                to={dateTo}
+                placeholder="Enquiry Date"
+                onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
+              />
             </div>
             <div className="w-full md:w-64">
               <Dropdown
@@ -168,7 +218,7 @@ export default function VendorEnquiryManagement() {
                   { value: 'approved', label: 'Approved' },
                   { value: 'rejected', label: 'Rejected' },
                 ]}
-                onChange={(value) => { setStatusFilter(value as string); setCurrentPage(1); }}
+                onChange={(value) => setStatusFilter(value as string)}
                 placeholder="Filter by Status"
               />
             </div>
@@ -181,7 +231,7 @@ export default function VendorEnquiryManagement() {
         <CardContent className="p-0">
           {loading ? (
             <div className="p-8 text-center text-slate-500">Loading...</div>
-          ) : enquiries.length === 0 ? (
+          ) : filteredEnquiries.length === 0 ? (
             <div className="p-8 text-center text-slate-500">No enquiries found</div>
           ) : (
             <div className="overflow-x-auto">
@@ -224,49 +274,42 @@ export default function VendorEnquiryManagement() {
                       </td>
                       <td className="px-6 py-4">{getStatusBadge(enquiry.status)}</td>
                       <td className="px-6 py-4">
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-1">
                           {hasPermission('vendor_enquiries:view') && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
+                            <button
                               onClick={() => handleViewEnquiry(enquiry)}
                               title="View Details"
+                              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                             >
                               <Eye className="w-4 h-4" />
-                            </Button>
+                            </button>
                           )}
                           {enquiry.status === 'pending' && hasPermission('vendor_enquiries:approve') && (
                             <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
+                              <button
                                 onClick={() => handleApproveClick(enquiry.id, enquiry.name)}
-                                className="text-green-600 hover:text-green-700"
                                 title="Approve"
+                                className="p-2 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
                               >
                                 <CheckCircle className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
+                              </button>
+                              <button
                                 onClick={() => handleRejectClick(enquiry.id, enquiry.name)}
-                                className="text-red-600 hover:text-red-700"
                                 title="Reject"
+                                className="p-2 rounded-lg text-orange-500 hover:text-orange-700 hover:bg-orange-50 transition-colors"
                               >
                                 <XCircle className="w-4 h-4" />
-                              </Button>
+                              </button>
                             </>
                           )}
                           {hasPermission('vendor_enquiries:delete') && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
+                            <button
                               onClick={() => handleDeleteClick(enquiry.id, enquiry.name)}
-                              className="text-red-600 hover:text-red-700"
                               title="Delete"
+                              className="p-2 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
                             >
                               <Trash2 className="w-4 h-4" />
-                            </Button>
+                            </button>
                           )}
                         </div>
                       </td>

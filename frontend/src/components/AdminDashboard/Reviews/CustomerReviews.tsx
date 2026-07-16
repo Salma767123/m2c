@@ -7,6 +7,7 @@ import DeleteConfirmModal from "../../UI/DeleteConfirmModal";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
+import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalendar";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import reviewService, { AdminReview } from "@/services/reviewService";
 import { hasPermission } from "@/lib/auth";
@@ -30,6 +31,8 @@ export default function CustomerReviews() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [selectedReview, setSelectedReview] = useState<AdminReview | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -146,8 +149,35 @@ export default function CustomerReviews() {
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(reviews.length / PAGE_SIZE));
-  const paginatedReviews = reviews.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  // Client-side review-date range filter (status/search are handled server-side).
+  const displayedReviews = reviews.filter((review) => {
+    if (!dateFrom && !dateTo) return true;
+    const rd = review.createdAt ? fmtDate(new Date(review.createdAt)) : "";
+    if (!rd) return false;
+    if (dateFrom && rd < dateFrom) return false;
+    if (dateTo && rd > dateTo) return false;
+    return true;
+  });
+
+  // Reset to first page when the date range changes.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateFrom, dateTo]);
+
+  const applyStatus = (key: string) => setFilterStatus((prev) => (prev === key ? "all" : key));
+
+  // Metric cards — styled like the Vendor Product Requests module. The first
+  // four filter the table; Avg. Rating is a read-only derived metric.
+  const metricCards = [
+    { key: "all",      label: "Total Reviews", subtitle: "All reviews",           value: stats.total,    Icon: MessageSquare, iconBg: "bg-brand-50",   iconColor: "text-brand-500",   countColor: "text-slate-900",  activeClass: "border-brand-400 bg-brand-50/50" },
+    { key: "pending",  label: "Pending",       subtitle: "Awaiting moderation",   value: stats.pending,  Icon: Clock,         iconBg: "bg-amber-50",   iconColor: "text-amber-500",   countColor: "text-amber-700",  activeClass: "border-amber-400 bg-amber-50/60" },
+    { key: "approved", label: "Approved",      subtitle: "Published",             value: stats.approved, Icon: CheckCircle,   iconBg: "bg-emerald-50", iconColor: "text-emerald-500", countColor: "text-emerald-700", activeClass: "border-emerald-400 bg-emerald-50/60" },
+    { key: "rejected", label: "Rejected",      subtitle: "Hidden",                value: stats.rejected, Icon: XCircle,       iconBg: "bg-red-50",     iconColor: "text-red-500",     countColor: "text-red-700",    activeClass: "border-red-400 bg-red-50/60" },
+    { key: null,       label: "Avg. Rating",   subtitle: "Out of 5",              value: stats.averageRating ? Number(stats.averageRating).toFixed(1) : "0.0", Icon: Star, iconBg: "bg-amber-50", iconColor: "text-amber-500", countColor: "text-amber-700", activeClass: "" },
+  ];
+
+  const totalPages = Math.max(1, Math.ceil(displayedReviews.length / PAGE_SIZE));
+  const paginatedReviews = displayedReviews.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const renderStars = (rating: number) => {
     return (
@@ -185,65 +215,39 @@ export default function CustomerReviews() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-slate-600">Total Reviews</div>
-                <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
-              </div>
-              <MessageSquare className="h-8 w-8 text-blue-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-slate-600">Pending</div>
-                <div className="text-2xl font-bold text-amber-600">{stats.pending}</div>
-              </div>
-              <Clock className="h-8 w-8 text-amber-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-slate-600">Approved</div>
-                <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-slate-600">Rejected</div>
-                <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
-              </div>
-              <XCircle className="h-8 w-8 text-red-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-slate-600">Avg. Rating</div>
-                <div className="text-2xl font-bold text-yellow-600 flex items-center gap-1">
-                  {stats.averageRating}
-                  <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+        {metricCards.map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
+          const clickable = key !== null;
+          const isActive = clickable && filterStatus === key;
+          const body = (
+            <>
+              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+                <span className="text-sm font-medium text-slate-500">{label}</span>
+                <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace("50", "100") : iconBg} transition-transform duration-150 ${clickable ? "group-hover:scale-110" : ""}`}>
+                  <Icon className={`h-4 w-4 ${iconColor}`} />
                 </div>
               </div>
-              <Star className="h-8 w-8 text-yellow-400 opacity-50" />
+              <div className="px-4 pb-4">
+                <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              </div>
+            </>
+          );
+          return clickable ? (
+            <button
+              key={label}
+              type="button"
+              onClick={() => applyStatus(key)}
+              className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : "border-slate-200/80 hover:border-slate-300"}`}
+            >
+              {body}
+            </button>
+          ) : (
+            <div key={label} className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+              {body}
             </div>
-          </CardContent>
-        </Card>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -271,6 +275,14 @@ export default function CustomerReviews() {
                 ]}
                 onChange={(val) => setFilterStatus(val as string)}
                 placeholder="Filter by status"
+              />
+            </div>
+            <div className="shrink-0">
+              <DateRangeCalendar
+                from={dateFrom}
+                to={dateTo}
+                onChange={(from, to) => { setDateFrom(from); setDateTo(to); }}
+                placeholder="Review Date"
               />
             </div>
             <button
@@ -402,7 +414,7 @@ export default function CustomerReviews() {
                       <MessageSquare className="h-12 w-12 text-slate-300 mx-auto mb-3" />
                       <p className="text-slate-500 font-medium">No reviews found</p>
                       <p className="text-slate-400 text-sm mt-1">
-                        {searchTerm || filterStatus !== "all"
+                        {searchTerm || filterStatus !== "all" || dateFrom || dateTo
                           ? "Try adjusting your search or filter criteria"
                           : "Customer reviews will appear here once submitted"}
                       </p>

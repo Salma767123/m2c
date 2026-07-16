@@ -73,7 +73,7 @@ export default function AddressSelector({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 id="saved-address-heading" className="text-sm font-semibold text-slate-900">
+        <h3 id="saved-address-heading" className="font-playfair text-base font-semibold text-[#1a1a1a]">
           Ship to a saved address
         </h3>
         <span className="text-xs text-slate-500">{addresses.length} saved</span>
@@ -99,10 +99,10 @@ export default function AddressSelector({
               tabIndex={disabled ? -1 : tabIndex}
               onClick={() => { if (!disabled) onSelect(addr.id); }}
               onKeyDown={(e) => { if (!disabled) handleKeyDown(e, idx, () => onSelect(addr.id)); }}
-              className={`relative text-left border-2 rounded-xl p-4 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-gray-500 ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${
+              className={`relative text-left border-2 rounded-2xl p-4 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${
                 selected
-                  ? "border-gray-800 bg-gradient-to-br from-gray-50 to-white shadow-sm"
-                  : "border-slate-200 bg-white hover:border-slate-400"
+                  ? "border-[#e01a1b] bg-gradient-to-br from-[#e01a1b]/5 to-white shadow-sm"
+                  : "border-slate-200 bg-white hover:border-[#e01a1b]/40"
               }`}
             >
               <div className="absolute top-3 right-3 flex items-center gap-1.5">
@@ -117,7 +117,7 @@ export default function AddressSelector({
                   </button>
                 )}
                 {selected && (
-                  <span className="w-5 h-5 bg-gray-800 text-white rounded-full flex items-center justify-center">
+                  <span className="w-5 h-5 bg-[#e01a1b] text-white rounded-full flex items-center justify-center">
                     <Check className="w-3 h-3" />
                   </span>
                 )}
@@ -128,7 +128,7 @@ export default function AddressSelector({
                   {meta.label}
                 </span>
                 {addr.isDefault && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-gray-800 text-white rounded-full">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-[#e01a1b] text-white rounded-full">
                     <Star className="w-2.5 h-2.5 fill-white" />
                     Default
                   </span>
@@ -153,10 +153,10 @@ export default function AddressSelector({
           onClick={onChooseNew}
           onKeyDown={(e) => handleKeyDown(e, addresses.length, onChooseNew)}
           disabled={disabled}
-          className={`relative text-left border-2 border-dashed rounded-xl p-4 transition-all focus:outline-none focus:ring-2 focus:ring-gray-500 flex items-center justify-center gap-2 min-h-[140px] disabled:opacity-60 disabled:cursor-not-allowed ${
+          className={`relative text-left border-2 border-dashed rounded-2xl p-4 transition-all focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 flex items-center justify-center gap-2 min-h-[140px] disabled:opacity-60 disabled:cursor-not-allowed ${
             useNewAddress
-              ? "border-gray-800 bg-gray-50 text-gray-900"
-              : "border-slate-300 bg-white text-slate-600 hover:border-slate-500 hover:text-slate-900"
+              ? "border-[#e01a1b] bg-[#e01a1b]/5 text-[#e01a1b]"
+              : "border-slate-300 bg-white text-slate-600 hover:border-[#e01a1b]/40 hover:text-[#1a1a1a]"
           }`}
         >
           <Plus className="w-5 h-5" />

@@ -129,6 +129,9 @@ export interface ProductDetailData {
   approvalStatus: string
   approvedAt?: string | null
   approvedBy?: string | null
+  /** When the QC checker last submitted/reviewed the inspection — the true
+   *  "last inspected" time (approvedAt is only set on the later admin decision). */
+  lastReviewedAt?: string | null
   rejectionReason?: string | null
   qcInspectionData?: Record<string, unknown> | null
   inspectionCycleNumber?: number

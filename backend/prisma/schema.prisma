@@ -37,9 +37,17 @@ model Admin {
   fcmTokens Json[] @default([]) // Array of { token, device, lastUsed }
 
   // Additional admin profile fields
+  // Structured name parts (compose into `name` for display). Optional so
+  // existing records that only have `name` keep working.
+  title        String? // Mr / Mrs / Ms / Dr …
+  firstName    String?
+  middleName   String?
+  lastName     String?
   phoneNumber  String?
   address      String?
   addressLine2 String?
+  addressLine3 String?
+  landmark     String?
   city         String?
   state        String?
   zipCode      String?
@@ -154,6 +162,8 @@ model Address {
   phone        String?
   address      String
   addressLine2 String?
+  addressLine3 String?
+  landmark     String?
   city         String
   state        String
   zipCode      String
@@ -655,16 +665,28 @@ model Category {
   sortOrder Int            @default(0)
   status    CategoryStatus @default(ACTIVE)
 
+  // Vendor-proposed ("custom") category provenance. `isCustom` marks rows that
+  // originated from a vendor rather than the admin taxonomy; the vendor that
+  // proposed it can see/select it while it is still PENDING.
+  isCustom          Boolean @default(false)
+  createdByVendorId String? @db.ObjectId
+
   // System fields
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   createdBy String?  @db.ObjectId // Admin who created
   updatedBy String?  @db.ObjectId // Admin who last updated
 
+  @@index([status])
+  @@index([createdByVendorId])
   @@map("categories")
 }
 
 enum CategoryStatus {
+  // Awaiting admin review — a vendor proposed this category ("Other" path on
+  // registration Step 4). Never surfaced on the public website; the proposing
+  // vendor can still pick it, and the admin approves or merges it.
+  PENDING
   ACTIVE
   INACTIVE
 }
@@ -965,6 +987,22 @@ model Order {
 
   // Currency
   currency String @default("INR") // INR or USD
+  // Snapshot of ExchangeRate.rate (INR per 1 USD) at the moment of purchase.
+  // ExchangeRate holds a single mutable row per currency, so it CANNOT be used to
+  // convert a past order — admin edits would silently rewrite historical amounts.
+  // Null on pre-snapshot orders and on INR orders, where no conversion applies.
+  exchangeRate Float?
+
+  // INR-normalised twins of the money fields above, frozen at write time using
+  // exchangeRate. For INR orders these equal their originals. Reports and every
+  // cross-order aggregate MUST sum these, never the originals — the originals are
+  // mixed-currency, so SUM(totalAmount) adds $10 to ₹500 and returns 510.
+  // See utils/orderCurrency.js. Null means "not convertible", never zero.
+  totalAmountINR  Float?
+  taxINR          Float?
+  shippingCostINR Float?
+  discountINR     Float?
+  bagTypePriceINR Float?
 
   // Payment Information
   paymentStatus PaymentStatus @default(PENDING)
@@ -1033,6 +1071,11 @@ model OrderItem {
   quantity   Int
   unitPrice  Float
   totalPrice Float
+  // INR-normalised twin of totalPrice, frozen at write time from the parent order's
+  // exchangeRate. OrderItem has no currency column of its own — it inherits the
+  // parent Order's — so product/vendor/category revenue groupBys cannot even filter
+  // by currency without a join. They aggregate this instead. See utils/orderCurrency.js.
+  totalPriceINR Float?
 
   // Vendor Information
   vendorId   String @db.ObjectId
@@ -1665,6 +1708,24 @@ model Settlement {
   orderId          String    @db.ObjectId
   billingNumber    String // e.g. same as order invoice number
   period           String // e.g. "February 2024"
+
+  // ── Vendor payout breakdown ────────────────────────────────────────────────
+  // M2C BUYS from the vendor and resells to the customer, so the vendor makes a
+  // taxable supply to M2C and must be paid their GST on top of their goods value.
+  // This is a DIFFERENT tax from Order.tax (which is charged to the customer on
+  // M2C's higher selling price). Same HSN rate, different base.
+  //
+  // Nullable because settlements created before this breakdown existed stored a
+  // base-only figure in `amount`; readers fall back to `baseAmount ?? amount`
+  // and `taxAmount ?? 0` rather than requiring a data migration.
+  /// Vendor's goods value = basePrice x qty, before their GST.
+  baseAmount       Float?
+  /// Vendor's GST on baseAmount. 0 for vendors with no GSTIN (unregistered).
+  taxAmount        Float?
+  /// Rate applied — set only when every line shares one rate; null when mixed.
+  gstPercentage    Float?
+
+  /// GROSS payable to the vendor = baseAmount + taxAmount.
   amount           Float
   dueDate          DateTime?
   status           String    @default("Pending") // Pending, Processing, Paid, Failed

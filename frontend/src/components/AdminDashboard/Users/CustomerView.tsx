@@ -6,6 +6,7 @@ import { userManagementService } from '@/services/userManagementService'
 import { getCountryName, getStateName, formatPhoneForDisplay } from '@/components/WebSite/CheckOut/CheckoutProcess/constants'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Badge } from '@/components/UI/Badge'
+import { formatOrderAmount } from '@/lib/currency'
 import {
   ArrowLeft,
   Mail,
@@ -267,7 +268,9 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
                           </Badge>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="font-bold text-slate-900">₹{order.totalAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                          <span className="font-bold text-slate-900">
+                            {formatOrderAmount(order.totalAmount || 0, (order as any).currency, (order as any).exchangeRate).charged}
+                          </span>
                           <button
                             onClick={() => router.push(`/admin/dashboard/orders/view/${order.id}`)}
                             className="p-1.5 hover:bg-slate-200 rounded-md transition-colors"

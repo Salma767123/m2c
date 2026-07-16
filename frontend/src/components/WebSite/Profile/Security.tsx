@@ -72,16 +72,16 @@ export default function Security({
   ]
 
   const getStatusColor = (status: string) => {
-    return status === 'success' 
-      ? 'text-green-600 bg-green-100' 
-      : 'text-gray-600 bg-gray-100'
+    return status === 'success'
+      ? 'text-green-600 bg-green-100'
+      : 'text-red-600 bg-red-100'
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+    <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 border border-slate-200 p-6">
       <div className="flex items-center gap-3 mb-6">
-        <Shield className="w-6 h-6 text-gray-600" />
-        <h2 className="text-xl font-bold text-slate-900">Security Settings</h2>
+        <Shield className="w-6 h-6 text-[#e01a1b]" />
+        <h2 className="font-playfair text-xl font-semibold text-[#1a1a1a]">Security Settings</h2>
       </div>
 
       {/* Password Section */}
@@ -93,7 +93,7 @@ export default function Security({
           </div>
           <button
             onClick={() => setShowPasswordChange(!showPasswordChange)}
-            className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+            className="btn-shine inline-flex items-center justify-center bg-[#e01a1b] text-white px-4 py-2 rounded-full font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300"
           >
             Change Password
           </button>
@@ -109,7 +109,7 @@ export default function Security({
                     type={showCurrentPassword ? 'text' : 'password'}
                     value={passwords.current}
                     onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
-                    className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                    className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b]"
                     placeholder="Enter current password"
                   />
                   <button
@@ -129,7 +129,7 @@ export default function Security({
                     type={showNewPassword ? 'text' : 'password'}
                     value={passwords.new}
                     onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
-                    className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                    className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b]"
                     placeholder="Enter new password"
                   />
                   <button
@@ -149,7 +149,7 @@ export default function Security({
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={passwords.confirm}
                     onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
-                    className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                    className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b]"
                     placeholder="Confirm new password"
                   />
                   <button
@@ -165,13 +165,13 @@ export default function Security({
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={handlePasswordChange}
-                  className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                  className="btn-shine inline-flex items-center justify-center bg-[#e01a1b] text-white px-4 py-2 rounded-full font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300"
                 >
                   Update Password
                 </button>
                 <button
                   onClick={() => setShowPasswordChange(false)}
-                  className="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors"
+                  className="bg-slate-100 text-slate-700 px-4 py-2 rounded-full hover:bg-slate-200 transition-colors"
                 >
                   Cancel
                 </button>
@@ -265,7 +265,7 @@ export default function Security({
           ))}
         </div>
         
-        <button className="mt-4 text-gray-600 hover:text-gray-700 text-sm font-medium">
+        <button className="mt-4 text-[#e01a1b] hover:text-[#c41617] text-sm font-semibold">
           View All Activity
         </button>
       </div>

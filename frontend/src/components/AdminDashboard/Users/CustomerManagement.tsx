@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { userManagementService, Customer } from '@/services/userManagementService';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
+import { Card, CardContent } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
 import { Badge } from '@/components/UI/Badge';
 import {
@@ -16,12 +16,12 @@ import {
 import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb';
 import { hasPermission } from '@/lib/auth';
 import Dropdown from '@/components/UI/Dropdown';
+import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar';
 import { useRouter } from 'next/navigation';
 import {
   Users as UsersIcon,
   UserPlus,
   Search,
-  Filter,
   Eye,
   ShieldCheck,
   Mail,
@@ -57,6 +57,8 @@ export default function CustomerManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   // const [loyaltyFilter, setLoyaltyFilter] = useState<string>('all'); // TODO: Re-enable when loyalty system is implemented
   const [currentPage, setCurrentPage] = useState(1);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -67,8 +69,9 @@ export default function CustomerManagement() {
     fetchCustomersRef.current = fetchCustomers;
   });
 
+  // Initial load + 30s polling. Filtering is client-side, so this only needs to
+  // run once (plus on tab re-focus) — it no longer refetches per keystroke/filter.
   useEffect(() => {
-    setCurrentPage(1);
     fetchCustomers();
 
     let timer: ReturnType<typeof setInterval> | null = null;
@@ -98,18 +101,20 @@ export default function CustomerManagement() {
       stopPolling();
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [searchTerm, statusFilter]);
+  }, []);
 
+  // Reset to the first page whenever the client-side search/filter changes.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, dateFrom, dateTo]);
+
+  // Always fetch the FULL customer set so the metric cards reflect global,
+  // up-to-date totals. Search + status/metric filtering is applied client-side
+  // below, so the stats never shrink to the currently-filtered subset.
   const fetchCustomers = async () => {
     try {
       setLoading(true);
-      // Wait for debounce if using searchTerm, but here we just call directly
-      // In a real scenario we'd debounce the search
-      const data = await userManagementService.getCustomers({
-        search: searchTerm,
-        status: statusFilter,
-        // loyalty: loyaltyFilter // TODO: Re-enable when loyalty system is implemented
-      });
+      const data = await userManagementService.getCustomers();
       setCustomers(data);
       setLastUpdated(new Date());
     } catch (error) {
@@ -135,7 +140,47 @@ export default function CustomerManagement() {
   const suspendedCustomers = customers.filter(customer => customer.status === 'suspended').length;
   const pendingCustomers = customers.filter(customer => customer.status === 'pending').length;
 
-  const filteredCustomers = customers; // filtering is done backend side now
+  // Clickable metric cards — each key maps to a client-side filter applied to the
+  // table below. 'all' clears the filter; the status keys match the derived
+  // customer.status; the two date-based keys reuse the exact metric definitions.
+  const statCards = [
+    { key: 'all',          title: 'Total Customers',  value: totalCustomers,     subtitle: 'Registered customers',  Icon: UsersIcon,   iconBg: 'bg-brand-50',   iconColor: 'text-brand-500',   countColor: 'text-slate-900',   activeClass: 'border-brand-400 bg-brand-50/50' },
+    { key: 'newThisMonth', title: 'New This Month',    value: newThisMonth,       subtitle: 'Joined this month',     Icon: UserPlus,    iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500', countColor: 'text-emerald-700', activeClass: 'border-emerald-400 bg-emerald-50/60' },
+    { key: 'activeToday',  title: 'Active Today',      value: activeToday,        subtitle: 'Logged in today',       Icon: Activity,    iconBg: 'bg-indigo-50',  iconColor: 'text-indigo-500',  countColor: 'text-indigo-700',  activeClass: 'border-indigo-400 bg-indigo-50/60' },
+    { key: 'active',       title: 'Active Customers',  value: activeCustomers,    subtitle: 'Verified accounts',     Icon: UserCheck,   iconBg: 'bg-teal-50',    iconColor: 'text-teal-500',    countColor: 'text-teal-700',    activeClass: 'border-teal-400 bg-teal-50/60' },
+    { key: 'suspended',    title: 'Suspended',         value: suspendedCustomers, subtitle: 'Restricted access',     Icon: UserX,       iconBg: 'bg-red-50',     iconColor: 'text-red-500',     countColor: 'text-red-700',     activeClass: 'border-red-400 bg-red-50/60' },
+    { key: 'pending',      title: 'Pending',           value: pendingCustomers,   subtitle: 'Awaiting verification', Icon: ShoppingBag, iconBg: 'bg-amber-50',   iconColor: 'text-amber-500',   countColor: 'text-amber-700',   activeClass: 'border-amber-400 bg-amber-50/60' },
+  ] as const;
+
+  const now = new Date();
+  const filteredCustomers = customers.filter((customer) => {
+    const q = searchTerm.trim().toLowerCase();
+    if (q) {
+      const haystack = `${customer.firstName} ${customer.lastName} ${customer.email} ${customer.phone}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    // Join-date range filter (YYYY-MM-DD strings compare lexicographically)
+    if (dateFrom || dateTo) {
+      const joined = customer.joinDate ? fmtDate(new Date(customer.joinDate)) : '';
+      if (!joined) return false;
+      if (dateFrom && joined < dateFrom) return false;
+      if (dateTo && joined > dateTo) return false;
+    }
+    switch (statusFilter) {
+      case 'active':
+      case 'suspended':
+      case 'pending':
+        return customer.status === statusFilter;
+      case 'newThisMonth': {
+        const j = new Date(customer.joinDate);
+        return j.getMonth() === now.getMonth() && j.getFullYear() === now.getFullYear();
+      }
+      case 'activeToday':
+        return new Date(customer.lastLogin).toDateString() === now.toDateString();
+      default:
+        return true; // 'all'
+    }
+  });
 
   const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / PAGE_SIZE));
   const paginatedCustomers = filteredCustomers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -192,145 +237,72 @@ export default function CustomerManagement() {
         <div className="flex items-center gap-3">
         </div>
       </div>
-      {/* Stats Cards */}
-      <div className="grid gap-6 lg:grid-cols-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
-            <UsersIcon className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalCustomers}</div>
-            <p className="text-xs text-slate-600">Registered customers</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">New This Month</CardTitle>
-            <UserPlus className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{newThisMonth}</div>
-            <p className="text-xs text-slate-600">Joined in the last 30 days</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Today</CardTitle>
-            <Activity className="h-4 w-4 text-indigo-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-indigo-600">{activeToday}</div>
-            <p className="text-xs text-slate-600">Currently shopping</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
-            <UserCheck className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{activeCustomers}</div>
-            <p className="text-xs text-slate-600">Verified accounts</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Suspended</CardTitle>
-            <UserX className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{suspendedCustomers}</div>
-            <p className="text-xs text-slate-600">Restricted access</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <ShoppingBag className="h-4 w-4 text-yellow-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{pendingCustomers}</div>
-            <p className="text-xs text-slate-600">Awaiting verification</p>
-          </CardContent>
-        </Card>
+      {/* Stats Cards — click a card to filter the table below by that metric */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        {statCards.map(({ key, title, value, subtitle, Icon, iconBg, iconColor, countColor, activeClass }) => {
+          const isActive = statusFilter === key;
+          const toggle = () => setStatusFilter((prev) => (key === 'all' || prev === key ? 'all' : key));
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={toggle}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
+              className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : 'border-slate-200/80 hover:border-slate-300'}`}
+            >
+              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+                <span className="text-sm font-medium text-slate-500">{title}</span>
+                <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace('50', '100') : iconBg} transition-transform duration-150 group-hover:scale-110`}>
+                  <Icon className={`h-4 w-4 ${iconColor}`} />
+                </div>
+              </div>
+              <div className="px-4 pb-4">
+                <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Filters */}
-      <Card className="bg-white rounded-xl shadow-sm border border-slate-200">
-        <CardContent className="p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <Filter className="w-5 h-5 text-slate-600" />
-            <h3 className="text-lg font-semibold text-slate-900">Filter Customers</h3>
+      {/* Filter Toolbar */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 relative min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search by name, email, or phone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none w-full transition-all bg-white text-sm"
+            />
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                <Search className="w-4 h-4 inline mr-2" />
-                Search Customers
-              </label>
-              <input
-                type="text"
-                placeholder="Search by name, email, or phone..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 placeholder:text-slate-400"
-              />
-            </div>
-
-            <div>
-              <Dropdown
-                label="Customer Status"
-                id="statusFilter"
-                value={statusFilter}
-                options={[
-                  { value: 'all', label: 'All Status' },
-                  { value: 'active', label: 'Active' },
-                                    { value: 'suspended', label: 'Suspended' },
-                  { value: 'pending', label: 'Pending' }
-                ]}
-                onChange={(value) => setStatusFilter(value as string)}
-                placeholder="Select status"
-              />
-            </div>
-
-            {/* TODO: Re-enable when loyalty system is implemented
-            <div>
-              <Dropdown
-                label="Loyalty Tier"
-                id="loyaltyFilter"
-                value={loyaltyFilter}
-                options={[
-                  { value: 'all', label: 'All Tiers' },
-                  { value: 'Bronze', label: 'Bronze' },
-                  { value: 'Silver', label: 'Silver' },
-                  { value: 'Gold', label: 'Gold' },
-                  { value: 'Platinum', label: 'Platinum' }
-                ]}
-                onChange={(value) => setLoyaltyFilter(value as string)}
-                placeholder="Select loyalty tier"
-              />
-            </div>
-            */}
+          <div className="w-44 shrink-0">
+            <Dropdown
+              value={['active', 'suspended', 'pending'].includes(statusFilter) ? statusFilter : 'all'}
+              options={[
+                { value: 'all', label: 'All Status' },
+                { value: 'active', label: 'Active' },
+                { value: 'suspended', label: 'Suspended' },
+                { value: 'pending', label: 'Pending' }
+              ]}
+              onChange={(value) => setStatusFilter(value as string)}
+              placeholder="All Status"
+            />
           </div>
-          {lastUpdated && (
-            <p className="text-xs text-slate-500 mt-4 text-right">
-              Auto-updates every 30s &middot; Last updated {lastUpdated.toLocaleTimeString("en-IN")}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+          <div className="shrink-0">
+            <DateRangeCalendar
+              from={dateFrom}
+              to={dateTo}
+              onChange={(from, to) => { setDateFrom(from); setDateTo(to); }}
+              placeholder="Join Date"
+            />
+          </div>
+        </div>
+      </div>
       {/* Customers Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Platform Customers</CardTitle>
-        </CardHeader>
         <CardContent>
           <Table>
             <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">

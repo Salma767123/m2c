@@ -21,6 +21,8 @@ export interface Coupon {
     popupTitle?: string;
     popupMessage?: string;
     applicableCategories?: string[];
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export interface PopupCoupon {
