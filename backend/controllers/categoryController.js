@@ -19,6 +19,24 @@ const generateSlug = (name) => {
     .trim();
 };
 
+// ── Category visibility ──────────────────────────────────────────────────────
+// The category GET routes are public (the storefront calls them anonymously)
+// but the admin panel calls the SAME endpoints with a token. Only an admin may
+// see non-ACTIVE rows: vendor-proposed PENDING categories and disabled INACTIVE
+// ones must never reach the website.
+const isAdminRequest = (req) => (req.user?.role || '').toUpperCase() === 'ADMIN';
+
+// Apply the status filter for a public-facing list query. Admins may filter
+// explicitly via ?status=; everyone else is hard-limited to ACTIVE.
+const applyStatusVisibility = (where, req, status) => {
+  if (isAdminRequest(req)) {
+    if (status && status !== 'all') where.status = status.toUpperCase();
+  } else {
+    where.status = 'ACTIVE';
+  }
+  return where;
+};
+
 // Helper function to build category tree
 const buildCategoryTree = (categories) => {
   const categoryMap = new Map();
@@ -70,9 +88,9 @@ const getAllCategories = async (req, res) => {
       ];
     }
 
-    if (status && status !== 'all') {
-      where.status = status.toUpperCase();
-    }
+    // Anonymous/storefront callers only ever see ACTIVE; admins see all statuses
+    // (and may filter explicitly, e.g. ?status=pending for the review queue).
+    applyStatusVisibility(where, req, status);
 
     // Handle parent filtering logic
     if (parentId) {
@@ -183,6 +201,15 @@ const getCategoryById = async (req, res) => {
     });
 
     if (!category) {
+      return res.status(404).json({
+        success: false,
+        error: 'Category not found'
+      });
+    }
+
+    // A non-ACTIVE category (vendor-proposed PENDING / disabled INACTIVE) is
+    // invisible to the storefront even when its id is known directly.
+    if (!isAdminRequest(req) && category.status !== 'ACTIVE') {
       return res.status(404).json({
         success: false,
         error: 'Category not found'
@@ -689,6 +716,156 @@ const deleteCategory = async (req, res) => {
   }
 };
 
+// ============================================================================
+// Vendor-proposed (PENDING) category review
+// ============================================================================
+
+// Approve a vendor-proposed category — it becomes part of the live taxonomy.
+// The admin can fill in the presentation fields the vendor could not supply
+// (description / image / SEO / parent) in the same call.
+const approvePendingCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, image, metaTitle, metaDescription, parentId, sortOrder } = req.body;
+
+    const category = await prisma.category.findUnique({ where: { id } });
+    if (!category) {
+      return res.status(404).json({ success: false, error: 'Category not found' });
+    }
+    if (category.status !== 'PENDING') {
+      return res.status(400).json({ success: false, error: 'Only pending categories can be approved' });
+    }
+
+    // Renaming on approval must also carry the products that already reference
+    // the old name (product.category stores the NAME, not an id).
+    const finalName = typeof name === 'string' && name.trim() ? name.trim() : category.name;
+    const renamed = finalName !== category.name;
+    if (renamed) {
+      const clash = await prisma.category.findFirst({
+        where: { name: { equals: finalName, mode: 'insensitive' }, id: { not: id } },
+      });
+      if (clash) {
+        return res.status(409).json({
+          success: false,
+          error: `"${finalName}" already exists — use merge instead of rename.`,
+        });
+      }
+    }
+
+    const updated = await prisma.category.update({
+      where: { id },
+      data: {
+        name: finalName,
+        status: 'ACTIVE',
+        ...(typeof description === 'string' && description.trim() && { description: description.trim() }),
+        ...(image !== undefined && { image: await resolveCategoryImage(image) }),
+        ...(metaTitle !== undefined && { metaTitle }),
+        ...(metaDescription !== undefined && { metaDescription }),
+        ...(parentId !== undefined && { parentId: parentId || null }),
+        ...(sortOrder !== undefined && { sortOrder: parseInt(sortOrder, 10) || 0 }),
+        updatedBy: req.user?.id || null,
+      },
+    });
+
+    let productsRenamed = 0;
+    if (renamed) {
+      const r = await prisma.product.updateMany({
+        where: { category: category.name },
+        data: { category: finalName },
+      });
+      productsRenamed = r.count;
+    }
+
+    res.json({
+      success: true,
+      message: `Category "${updated.name}" approved and is now live.`,
+      data: { category: updated, productsRenamed },
+    });
+  } catch (error) {
+    console.error('Approve pending category error:', error);
+    res.status(500).json({ success: false, error: 'Failed to approve category' });
+  }
+};
+
+// Merge a vendor-proposed category into an existing one (the duplicate case:
+// vendor typed "terry towel", taxonomy already has "TERRY TOWELS"). Every
+// product pointing at the pending name is repointed at the target, then the
+// pending row is removed.
+const mergePendingCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { targetCategoryId } = req.body;
+
+    if (!targetCategoryId) {
+      return res.status(400).json({ success: false, error: 'targetCategoryId is required' });
+    }
+    if (targetCategoryId === id) {
+      return res.status(400).json({ success: false, error: 'Cannot merge a category into itself' });
+    }
+
+    const [category, target] = await Promise.all([
+      prisma.category.findUnique({ where: { id } }),
+      prisma.category.findUnique({ where: { id: targetCategoryId } }),
+    ]);
+
+    if (!category) return res.status(404).json({ success: false, error: 'Category not found' });
+    if (!target) return res.status(404).json({ success: false, error: 'Target category not found' });
+    if (category.status !== 'PENDING') {
+      return res.status(400).json({ success: false, error: 'Only pending categories can be merged' });
+    }
+    if (target.status !== 'ACTIVE') {
+      return res.status(400).json({ success: false, error: 'Target category must be active' });
+    }
+
+    // Repoint products (product.category holds the category NAME).
+    const moved = await prisma.product.updateMany({
+      where: { category: category.name },
+      data: { category: target.name },
+    });
+
+    // A pending row is vendor-proposed and has no subcategories/products of its
+    // own left, so it is safe to drop once its products are repointed.
+    await prisma.category.delete({ where: { id } });
+
+    res.json({
+      success: true,
+      message: `Merged "${category.name}" into "${target.name}" — ${moved.count} product(s) moved.`,
+      data: { mergedInto: target.name, productsMoved: moved.count },
+    });
+  } catch (error) {
+    console.error('Merge pending category error:', error);
+    res.status(500).json({ success: false, error: 'Failed to merge category' });
+  }
+};
+
+// Reject a vendor-proposed category outright. Blocked while products still
+// reference it — the admin must merge those first (or the vendor re-categorises).
+const rejectPendingCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const category = await prisma.category.findUnique({ where: { id } });
+    if (!category) return res.status(404).json({ success: false, error: 'Category not found' });
+    if (category.status !== 'PENDING') {
+      return res.status(400).json({ success: false, error: 'Only pending categories can be rejected' });
+    }
+
+    const inUse = await prisma.product.count({ where: { category: category.name } });
+    if (inUse > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `${inUse} product(s) still use "${category.name}". Merge it into an existing category instead.`,
+      });
+    }
+
+    await prisma.category.delete({ where: { id } });
+    res.json({ success: true, message: `Rejected "${category.name}".` });
+  } catch (error) {
+    console.error('Reject pending category error:', error);
+    res.status(500).json({ success: false, error: 'Failed to reject category' });
+  }
+};
+
 // Get category statistics
 const getCategoryStats = async (req, res) => {
   try {
@@ -823,7 +1000,8 @@ const getSubcategories = async (req, res) => {
     }
 
     const subcategories = await prisma.category.findMany({
-      where: { parentId },
+      // Storefront only sees ACTIVE subcategories; admins see every status.
+      where: applyStatusVisibility({ parentId }, req, req.query.status),
       orderBy: { sortOrder: 'asc' },
       include: {
         _count: {
@@ -1549,9 +1727,8 @@ const searchCategories = async (req, res) => {
       ]
     };
 
-    if (status && status !== 'all') {
-      where.status = status.toUpperCase();
-    }
+    // Public search must not surface PENDING/INACTIVE categories.
+    applyStatusVisibility(where, req, status);
 
     const categories = await prisma.category.findMany({
       where,
@@ -1622,8 +1799,13 @@ const getCategoryTree = async (req, res) => {
 
     const where = {};
 
-    if (includeInactive === 'false') {
-      where.status = status.toUpperCase();
+    // Non-admins are always pinned to ACTIVE (an anonymous caller must not be
+    // able to ask for ?status=PENDING / includeInactive=true and see the
+    // vendor-proposed or disabled taxonomy).
+    if (isAdminRequest(req)) {
+      if (includeInactive === 'false') where.status = status.toUpperCase();
+    } else {
+      where.status = 'ACTIVE';
     }
 
     // Get all categories
@@ -1802,6 +1984,9 @@ const duplicateCategory = async (req, res) => {
 };
 
 module.exports = {
+  approvePendingCategory,
+  mergePendingCategory,
+  rejectPendingCategory,
   getAllCategories,
   getCategoryById,
   createCategory,

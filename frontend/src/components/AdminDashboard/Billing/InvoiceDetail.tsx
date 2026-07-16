@@ -6,6 +6,7 @@ import { ArrowLeft, Printer, RefreshCw, FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order } from "@/services/orderService";
+import { formatPrice } from "@/lib/currency";
 import axios from "@/lib/axios";
 import { hasPermission } from "@/lib/auth";
 import { getCountryName, getStateName } from "@/components/WebSite/CheckOut/CheckoutProcess/constants";
@@ -16,9 +17,6 @@ interface InvoiceDetailProps {
 
 const fmtDate = (d?: string) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-
-const fmtINR = (n: number) =>
-  "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const payStatusColor = (s?: string) => {
   if (!s) return "text-yellow-600";
@@ -108,6 +106,10 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
       </div>
     );
   }
+
+  // Every figure on an invoice is denominated in the currency the customer was
+  // actually charged in — never assume INR (a .com order is billed in USD).
+  const money = (n: number) => formatPrice(n, order.currency === "USD" ? "USD" : "INR");
 
   const addr = typeof order.shippingAddress === "string"
     ? JSON.parse(order.shippingAddress)
@@ -273,8 +275,8 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-500">{item.sku || "—"}</td>
                     <td className="px-4 py-3 text-center">{item.quantity}</td>
-                    <td className="px-4 py-3 text-right">{fmtINR(item.unitPrice)}</td>
-                    <td className="px-4 py-3 text-right font-semibold">{fmtINR(item.totalPrice)}</td>
+                    <td className="px-4 py-3 text-right">{money(item.unitPrice)}</td>
+                    <td className="px-4 py-3 text-right font-semibold">{money(item.totalPrice)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -286,35 +288,35 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
             <div className="w-64 space-y-2 text-sm">
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Subtotal</span>
-                <span className="font-medium">{fmtINR(order.subtotal)}</span>
+                <span className="font-medium">{money(order.subtotal)}</span>
               </div>
               {order.shippingCost > 0 && (
                 <div className="flex justify-between py-1 border-b border-slate-100">
                   <span className="text-slate-500">Shipping</span>
-                  <span className="font-medium">{fmtINR(order.shippingCost)}</span>
+                  <span className="font-medium">{money(order.shippingCost)}</span>
                 </div>
               )}
               {order.tax > 0 && (
                 <div className="flex justify-between py-1 border-b border-slate-100">
                   <span className="text-slate-500">Tax (GST)</span>
-                  <span className="font-medium">{fmtINR(order.tax)}</span>
+                  <span className="font-medium">{money(order.tax)}</span>
                 </div>
               )}
               {order.discount > 0 && (
                 <div className="flex justify-between py-1 border-b border-slate-100">
                   <span className="text-green-600">Discount</span>
-                  <span className="font-medium text-green-600">− {fmtINR(order.discount)}</span>
+                  <span className="font-medium text-green-600">− {money(order.discount)}</span>
                 </div>
               )}
               {order.bagTypePrice && order.bagTypePrice > 0 && (
                 <div className="flex justify-between py-1 border-b border-slate-100">
                   <span className="text-slate-600">Bag ({order.bagTypeName})</span>
-                  <span className="font-medium">{fmtINR(order.bagTypePrice)}</span>
+                  <span className="font-medium">{money(order.bagTypePrice)}</span>
                 </div>
               )}
               <div className="flex justify-between py-3 px-4 bg-brand-500 text-white rounded-lg mt-2">
                 <span className="font-bold text-base">Grand Total</span>
-                <span className="font-bold text-base">{fmtINR(order.totalAmount)}</span>
+                <span className="font-bold text-base">{money(order.totalAmount)}</span>
               </div>
             </div>
           </div>

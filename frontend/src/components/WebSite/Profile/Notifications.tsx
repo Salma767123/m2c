@@ -63,10 +63,10 @@ export default function Notifications({ editedProfile, setEditedProfile }: Notif
   ]
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6">
+    <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 border border-slate-200 p-4 sm:p-5 lg:p-6">
       <div className="flex items-center gap-2 sm:gap-3 mb-5 sm:mb-6">
-        <Bell className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
-        <h2 className="text-lg sm:text-xl font-bold text-slate-900">Notification Preferences</h2>
+        <Bell className="w-5 h-5 sm:w-6 sm:h-6 text-[#e01a1b]" />
+        <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a]">Notification Preferences</h2>
       </div>
 
       {/* Global Settings */}
@@ -101,10 +101,10 @@ export default function Notifications({ editedProfile, setEditedProfile }: Notif
         {notificationCategories.map((category) => {
           const Icon = category.icon
           return (
-            <div key={category.id} className="border border-slate-200 rounded-lg p-4">
+            <div key={category.id} className="border border-slate-200 rounded-2xl p-4 transition-all duration-300 hover:ring-1 hover:ring-[#e01a1b]/20 hover:shadow-[0_10px_28px_rgba(0,0,0,0.06)]">
               <div className="flex items-start gap-4">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <Icon className="w-5 h-5 text-gray-600" />
+                <div className="p-2 bg-[#e01a1b]/10 rounded-lg">
+                  <Icon className="w-5 h-5 text-[#e01a1b]" />
                 </div>
                 <div className="flex-1">
                   <h4 className="font-semibold text-slate-900 mb-1">{category.title}</h4>
@@ -124,7 +124,7 @@ export default function Notifications({ editedProfile, setEditedProfile }: Notif
                           disabled={!editedProfile.preferences.emailNotifications}
                           className="sr-only peer"
                         />
-                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-gray-600 peer-disabled:opacity-50"></div>
+                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#e01a1b]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#e01a1b] peer-disabled:opacity-50"></div>
                       </label>
                     </div>
 
@@ -140,7 +140,7 @@ export default function Notifications({ editedProfile, setEditedProfile }: Notif
                           onChange={() => {}}
                           className="sr-only peer"
                         />
-                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-gray-600"></div>
+                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#e01a1b]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#e01a1b]"></div>
                       </label>
                     </div>
                   </div>
@@ -181,7 +181,7 @@ export default function Notifications({ editedProfile, setEditedProfile }: Notif
 
       {/* Save Button */}
       <div className="mt-6 pt-6 border-t border-slate-200">
-        <button className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors">
+        <button className="btn-shine inline-flex items-center justify-center gap-2 bg-[#e01a1b] text-white px-6 py-3 rounded-full font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300">
           Save Notification Preferences
         </button>
       </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Dropdown from "@/components/UI/Dropdown"
 import { CheckoutFormData } from "../Checkout"
 import {
   EMAIL_REGEX,
@@ -43,6 +44,8 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
   if (formData.phone) preFilledFields.push("phone")
   if (formData.address) preFilledFields.push("address")
   if (formData.addressLine2) preFilledFields.push("address line 2")
+  if (formData.addressLine3) preFilledFields.push("address line 3")
+  if (formData.landmark) preFilledFields.push("landmark")
   if (formData.city) preFilledFields.push("city")
   if (formData.state) preFilledFields.push("state")
   if (formData.zipCode) preFilledFields.push(postalRule.label.toLowerCase())
@@ -59,6 +62,13 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
       newErrors.firstName = "First name must be 2-50 characters"
     else if (!NAME_REGEX.test(data.firstName.trim()))
       newErrors.firstName = "Letters, spaces, hyphens and apostrophes only"
+
+    // Middle name is optional, but must look like a name when provided.
+    if (data.middleName && data.middleName.trim()) {
+      if (data.middleName.trim().length > 50) newErrors.middleName = "Middle name must be 50 characters or less"
+      else if (!NAME_REGEX.test(data.middleName.trim()))
+        newErrors.middleName = "Letters, spaces, hyphens and apostrophes only"
+    }
 
     if (!data.lastName.trim()) newErrors.lastName = "Last name is required"
     else if (data.lastName.trim().length < 2 || data.lastName.trim().length > 50)
@@ -79,6 +89,12 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
 
     if (data.addressLine2 && data.addressLine2.trim().length > 100)
       newErrors.addressLine2 = "Address Line 2 must be 100 characters or less"
+
+    if (data.addressLine3 && data.addressLine3.trim().length > 100)
+      newErrors.addressLine3 = "Address Line 3 must be 100 characters or less"
+
+    if (data.landmark && data.landmark.trim().length > 100)
+      newErrors.landmark = "Landmark must be 100 characters or less"
 
     if (!data.city.trim()) newErrors.city = "City is required"
     else if (data.city.trim().length < 2 || data.city.trim().length > 50)
@@ -147,31 +163,31 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
     setTouched((prev) => ({ ...prev, state: false, zipCode: false, phone: false }))
   }
 
+  // Show an error once the user has touched the field, OR when an already-present
+  // (e.g. profile auto-filled) value is invalid. Without the second case, bad
+  // auto-filled data silently disables Continue with nothing on screen to explain why.
+  const showError = (field: keyof CheckoutFormData): boolean => {
+    if (!errors[field]) return false
+    if (touched[field]) return true
+    const val = formData[field]
+    return typeof val === "string" && val.trim().length > 0
+  }
+
   const renderError = (field: keyof CheckoutFormData) =>
-    touched[field] && errors[field] ? (
+    showError(field) ? (
       <p className="text-red-500 text-xs mt-1" id={`${field}-error`}>{errors[field]}</p>
     ) : null
 
   const describedBy = (field: keyof CheckoutFormData) =>
-    touched[field] && errors[field] ? `${field}-error` : undefined
+    showError(field) ? `${field}-error` : undefined
 
   const inputStyle = (field: keyof CheckoutFormData) => {
-    const base = "w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-gray-500 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed outline-none transition-colors"
-    return touched[field] && errors[field]
+    const base = "w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#e01a1b]/40 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed outline-none transition-colors"
+    return showError(field)
       ? `${base} border-red-500 focus:border-red-500`
-      : `${base} border-slate-300 focus:border-gray-500`
+      : `${base} border-slate-300 focus:border-[#e01a1b]`
   }
 
-  const selectStyle = (field: keyof CheckoutFormData) =>
-    `${inputStyle(field)} bg-white appearance-none pr-10`
-
-  const ChevronIcon = (
-    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-      </svg>
-    </div>
-  )
 
   return (
     <div className="space-y-6">
@@ -208,7 +224,8 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
         {renderError("country")}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      {/* Name — First / Middle / Last */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-2">First Name <span className="text-red-500">*</span></label>
           <input
@@ -222,10 +239,27 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
             disabled={disabled}
             autoComplete="given-name"
             aria-required="true"
-            aria-invalid={!!(touched.firstName && errors.firstName)}
+            aria-invalid={showError("firstName")}
             aria-describedby={describedBy("firstName")}
           />
           {renderError("firstName")}
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">Middle Name <span className="text-slate-400 font-normal">(Optional)</span></label>
+          <input
+            type="text"
+            maxLength={50}
+            value={formData.middleName || ""}
+            onChange={(e) => handleChange("middleName", e.target.value)}
+            onBlur={() => handleBlur("middleName")}
+            className={inputStyle("middleName")}
+            placeholder="Middle name"
+            disabled={disabled}
+            autoComplete="additional-name"
+            aria-invalid={showError("middleName")}
+            aria-describedby={describedBy("middleName")}
+          />
+          {renderError("middleName")}
         </div>
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name <span className="text-red-500">*</span></label>
@@ -240,54 +274,57 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
             disabled={disabled}
             autoComplete="family-name"
             aria-required="true"
-            aria-invalid={!!(touched.lastName && errors.lastName)}
+            aria-invalid={showError("lastName")}
             aria-describedby={describedBy("lastName")}
           />
           {renderError("lastName")}
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-2">Email Address <span className="text-red-500">*</span></label>
-        <input
-          type="email"
-          maxLength={254}
-          value={formData.email}
-          onChange={(e) => handleChange("email", e.target.value)}
-          onBlur={() => handleBlur("email")}
-          className={inputStyle("email")}
-          placeholder="john.doe@example.com"
-          disabled={disabled}
-          autoComplete="email"
-          aria-required="true"
-          aria-invalid={!!(touched.email && errors.email)}
-          aria-describedby={describedBy("email")}
-        />
-        {renderError("email")}
+      {/* Contact — Email / Phone */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">Email Address <span className="text-red-500">*</span></label>
+          <input
+            type="email"
+            maxLength={254}
+            value={formData.email}
+            onChange={(e) => handleChange("email", e.target.value)}
+            onBlur={() => handleBlur("email")}
+            className={inputStyle("email")}
+            placeholder="john.doe@example.com"
+            disabled={disabled}
+            autoComplete="email"
+            aria-required="true"
+            aria-invalid={showError("email")}
+            aria-describedby={describedBy("email")}
+          />
+          {renderError("email")}
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
+            Phone Number <span className="text-red-500">*</span>
+            {country && <span className="text-slate-400 font-normal ml-2">({country.phoneCode})</span>}
+          </label>
+          <input
+            type="tel"
+            maxLength={20}
+            value={formData.phone}
+            onChange={(e) => handleChange("phone", e.target.value)}
+            onBlur={() => handleBlur("phone")}
+            className={inputStyle("phone")}
+            placeholder={phoneExample || "Phone number"}
+            disabled={disabled}
+            autoComplete="tel"
+            aria-required="true"
+            aria-invalid={showError("phone")}
+            aria-describedby={describedBy("phone")}
+          />
+          {renderError("phone")}
+        </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-2">
-          Phone Number <span className="text-red-500">*</span>
-          {country && <span className="text-slate-400 font-normal ml-2">({country.phoneCode})</span>}
-        </label>
-        <input
-          type="tel"
-          maxLength={20}
-          value={formData.phone}
-          onChange={(e) => handleChange("phone", e.target.value)}
-          onBlur={() => handleBlur("phone")}
-          className={inputStyle("phone")}
-          placeholder={phoneExample || "Phone number"}
-          disabled={disabled}
-          autoComplete="tel"
-          aria-required="true"
-          aria-invalid={!!(touched.phone && errors.phone)}
-          aria-describedby={describedBy("phone")}
-        />
-        {renderError("phone")}
-      </div>
-
+      {/* Address Line 1 — full width (long field) */}
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-2">Address Line 1 <span className="text-red-500">*</span></label>
         <input
@@ -301,28 +338,64 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
           disabled={disabled}
           autoComplete="address-line1"
           aria-required="true"
-          aria-invalid={!!(touched.address && errors.address)}
+          aria-invalid={showError("address")}
           aria-describedby={describedBy("address")}
         />
         {renderError("address")}
       </div>
 
-      <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-2">Address Line 2 (Optional)</label>
-        <input
-          type="text"
-          maxLength={100}
-          value={formData.addressLine2 || ""}
-          onChange={(e) => handleChange("addressLine2", e.target.value)}
-          onBlur={() => handleBlur("addressLine2")}
-          className={inputStyle("addressLine2")}
-          placeholder="Apt, Suite, Unit, etc."
-          disabled={disabled}
-          autoComplete="address-line2"
-          aria-invalid={!!(touched.addressLine2 && errors.addressLine2)}
-          aria-describedby={describedBy("addressLine2")}
-        />
-        {renderError("addressLine2")}
+      {/* Address Line 2 / Line 3 / Landmark */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">Address Line 2 <span className="text-slate-400 font-normal">(Optional)</span></label>
+          <input
+            type="text"
+            maxLength={100}
+            value={formData.addressLine2 || ""}
+            onChange={(e) => handleChange("addressLine2", e.target.value)}
+            onBlur={() => handleBlur("addressLine2")}
+            className={inputStyle("addressLine2")}
+            placeholder="Apt, Suite, Unit"
+            disabled={disabled}
+            autoComplete="address-line2"
+            aria-invalid={showError("addressLine2")}
+            aria-describedby={describedBy("addressLine2")}
+          />
+          {renderError("addressLine2")}
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">Address Line 3 <span className="text-slate-400 font-normal">(Optional)</span></label>
+          <input
+            type="text"
+            maxLength={100}
+            value={formData.addressLine3 || ""}
+            onChange={(e) => handleChange("addressLine3", e.target.value)}
+            onBlur={() => handleBlur("addressLine3")}
+            className={inputStyle("addressLine3")}
+            placeholder="Area, Locality"
+            disabled={disabled}
+            autoComplete="address-line3"
+            aria-invalid={showError("addressLine3")}
+            aria-describedby={describedBy("addressLine3")}
+          />
+          {renderError("addressLine3")}
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">Landmark <span className="text-slate-400 font-normal">(Optional)</span></label>
+          <input
+            type="text"
+            maxLength={100}
+            value={formData.landmark || ""}
+            onChange={(e) => handleChange("landmark", e.target.value)}
+            onBlur={() => handleBlur("landmark")}
+            className={inputStyle("landmark")}
+            placeholder="Near park, opposite mall"
+            disabled={disabled}
+            aria-invalid={showError("landmark")}
+            aria-describedby={describedBy("landmark")}
+          />
+          {renderError("landmark")}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5">
@@ -339,7 +412,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
             disabled={disabled}
             autoComplete="address-level2"
             aria-required="true"
-            aria-invalid={!!(touched.city && errors.city)}
+            aria-invalid={showError("city")}
             aria-describedby={describedBy("city")}
           />
           {renderError("city")}
@@ -349,25 +422,16 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
             State / Province <span className="text-red-500">*</span>
           </label>
           {hasStateList ? (
-            <div className="relative">
-              <select
-                value={formData.state}
-                onChange={(e) => handleChange("state", e.target.value)}
-                onBlur={() => handleBlur("state")}
-                className={selectStyle("state")}
-                disabled={disabled}
-                autoComplete="address-level1"
-                aria-required="true"
-                aria-invalid={!!(touched.state && errors.state)}
-                aria-describedby={describedBy("state")}
-              >
-                <option value="">Select State / Province</option>
-                {states.map((s) => (
-                  <option key={s.isoCode} value={s.isoCode}>{s.name}</option>
-                ))}
-              </select>
-              {ChevronIcon}
-            </div>
+            <Dropdown
+              id="shipping-state"
+              value={formData.state}
+              options={states.map((s) => ({ value: s.isoCode, label: s.name }))}
+              placeholder="Select State / Province"
+              onChange={(val) => handleChange("state", val as string)}
+              onBlur={() => handleBlur("state")}
+              disabled={disabled}
+              error={!!(touched.state && errors.state)}
+            />
           ) : (
             <input
               type="text"
@@ -380,7 +444,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
               disabled={disabled}
               autoComplete="address-level1"
               aria-required="true"
-              aria-invalid={!!(touched.state && errors.state)}
+              aria-invalid={showError("state")}
               aria-describedby={describedBy("state")}
             />
           )}
@@ -401,7 +465,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
             disabled={disabled}
             autoComplete="postal-code"
             aria-required="true"
-            aria-invalid={!!(touched.zipCode && errors.zipCode)}
+            aria-invalid={showError("zipCode")}
             aria-describedby={describedBy("zipCode")}
           />
           {renderError("zipCode")}

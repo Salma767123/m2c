@@ -104,6 +104,11 @@ function humanizeVerKey(key: string): string {
     return key.replace(/^pv_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+// camelCase / snake_case evidence key → Title Case (e.g. "factoryFrontView" → "Factory Front View").
+function humanizeEvidenceKey(key: string): string {
+    return key.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function ProductInspectionDetail({ productId }: Props) {
     const router = useRouter()
@@ -447,7 +452,11 @@ export default function ProductInspectionDetail({ productId }: Props) {
                                                     <div key={test.id || i} className="bg-slate-50 rounded-xl p-5 border border-slate-200">
                                                         <div className="flex items-center justify-between mb-3">
                                                             <div>
-                                                                <p className="font-semibold text-slate-900 text-sm">{test.label || `Test ${i + 1}`}</p>
+                                                                <p className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+                                                                    {test.label || (test.isOther ? test.subject : "") || `Test ${i + 1}`}
+                                                                    {test.isOther && <span className="text-[10px] font-bold uppercase tracking-wide text-brand-600 bg-brand-50 border border-brand-100 px-1.5 py-0.5 rounded">Custom</span>}
+                                                                </p>
+                                                                {test.isOther && test.subject && <p className="text-xs text-slate-500 mt-0.5">Subject: {test.subject}</p>}
                                                                 {test.remarks && <p className="text-xs text-slate-500 mt-0.5">{test.remarks}</p>}
                                                             </div>
                                                             {passed && (
@@ -515,16 +524,17 @@ export default function ProductInspectionDetail({ productId }: Props) {
                             })}
                             {Object.entries(additionalEvidence).some(([, ph]) => Array.isArray(ph) && ph.length > 0) && (
                                 <div className="pt-2">
-                                    <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Additional Evidence</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {Object.entries(additionalEvidence)
-                                            .filter(([, ph]) => Array.isArray(ph) && ph.length > 0)
-                                            .map(([key, ph]) => (
-                                                <span key={key} className="text-xs bg-slate-100 text-slate-700 rounded-lg px-2.5 py-1">
-                                                    {key.replace(/_/g, ' ')}: {ph.length} photo(s)
-                                                </span>
-                                            ))}
-                                    </div>
+                                    <p className="text-xs font-semibold text-slate-500 uppercase mb-3">Additional Evidence</p>
+                                    {Object.entries(additionalEvidence)
+                                        .filter(([, ph]) => Array.isArray(ph) && ph.length > 0)
+                                        .map(([key, ph]) => (
+                                            <PhotoGallery
+                                                key={key}
+                                                photos={ph}
+                                                title={humanizeEvidenceKey(key)}
+                                                onImageClick={(src, alt) => setSelectedImage({ src, alt })}
+                                            />
+                                        ))}
                                 </div>
                             )}
                         </div>

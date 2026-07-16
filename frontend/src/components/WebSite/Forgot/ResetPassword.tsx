@@ -16,6 +16,7 @@ import {
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Link from 'next/link'
 import axios from '@/lib/axios'
+import Reveal from '@/components/WebSite/Shared/Reveal'
 
 interface ResetPasswordData {
   password: string
@@ -175,42 +176,45 @@ export default function ResetPassword() {
   if (passwordReset) {
     return (
       <div className="min-h-screen bg-linear-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md shadow-xl">
-          <CardHeader className="text-center pb-4">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-            <CardTitle className="text-2xl font-bold text-gray-900">
-              Password Reset Successful!
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="text-center">
-              <p className="text-gray-600 mb-6">
-                Your password has been successfully reset. You can now log in with your new password.
-              </p>
-            </div>
-            
-            <Button
-              onClick={handleLoginRedirect}
-              className="w-full"
-            >
-              Continue to Login
-            </Button>
-          </CardContent>
-        </Card>
+        <Reveal className="w-full max-w-md">
+          <Card className="w-full rounded-2xl ring-1 ring-black/5 shadow-[0_18px_40px_rgba(0,0,0,0.12)]">
+            <CardHeader className="text-center pb-4">
+              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <CardTitle className="font-playfair text-2xl font-semibold text-[#1a1a1a] tracking-tight">
+                Password Reset Successful!
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="text-center">
+                <p className="text-gray-600 mb-6">
+                  Your password has been successfully reset. You can now log in with your new password.
+                </p>
+              </div>
+
+              <Button
+                onClick={handleLoginRedirect}
+                className="btn-shine w-full bg-[#e01a1b] hover:bg-[#c41617] text-white rounded-full shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] transition-all duration-300 hover:-translate-y-0.5"
+              >
+                Continue to Login
+              </Button>
+            </CardContent>
+          </Card>
+        </Reveal>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-xl bg-white">
+    <div className="min-h-screen bg-gradient-to-br from-[#1a1a1a] via-[#a11315] to-[#e01a1b] flex items-center justify-center p-4">
+      <Reveal className="w-full max-w-md">
+      <Card className="w-full rounded-2xl ring-1 ring-black/5 shadow-[0_18px_40px_rgba(0,0,0,0.18)] bg-white">
         <CardHeader className="text-center pb-4">
-          <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <Shield className="w-8 h-8 text-gray-600" />
+          <div className="mx-auto w-16 h-16 bg-[#e01a1b]/10 rounded-full flex items-center justify-center mb-4">
+            <Shield className="w-8 h-8 text-[#e01a1b]" />
           </div>
-          <CardTitle className="text-2xl font-bold text-gray-900">
+          <CardTitle className="font-playfair text-2xl font-semibold text-[#1a1a1a] tracking-tight">
             Reset Your Password
           </CardTitle>
           <p className="text-gray-600 mt-2">
@@ -233,8 +237,8 @@ export default function ResetPassword() {
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 pl-11 pr-11 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                    errors.password ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                  className={`w-full px-4 py-3 pl-11 pr-11 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-colors ${
+                    errors.password ? 'border-red-300 bg-red-50' : 'border-gray-200'
                   }`}
                   placeholder="Enter your new password"
                   disabled={isLoading}
@@ -299,8 +303,8 @@ export default function ResetPassword() {
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 pl-11 pr-11 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                    errors.confirmPassword ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                  className={`w-full px-4 py-3 pl-11 pr-11 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-colors ${
+                    errors.confirmPassword ? 'border-red-300 bg-red-50' : 'border-gray-200'
                   }`}
                   placeholder="Confirm your new password"
                   disabled={isLoading}
@@ -324,7 +328,7 @@ export default function ResetPassword() {
 
             <Button
               type="submit"
-              className="w-full bg-black text-white"
+              className="btn-shine w-full bg-[#e01a1b] hover:bg-[#c41617] text-white rounded-full shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] transition-all duration-300 hover:-translate-y-0.5"
               disabled={isLoading || passwordStrength.score < 3}
             >
               {isLoading ? (
@@ -341,9 +345,9 @@ export default function ResetPassword() {
             </Button>
 
             <div className="text-center">
-              <Link 
+              <Link
                 href="/login"
-                className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                className="link-underline brand inline-flex items-center text-sm font-medium text-[#e01a1b] hover:text-[#c41617] transition-colors"
               >
                 <ArrowLeft className="w-4 h-4 mr-1" />
                 Back to Login
@@ -352,6 +356,7 @@ export default function ResetPassword() {
           </form>
         </CardContent>
       </Card>
+      </Reveal>
     </div>
   )
 }

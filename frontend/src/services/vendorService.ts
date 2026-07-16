@@ -1108,6 +1108,32 @@ class VendorService {
     }
   }
 
+  // Admin: Create/update a vendor's bank details (same fields as the vendor portal).
+  // Named ...ByAdmin to distinguish it from the vendor-authenticated
+  // `upsertVendorBankDetails` further down, which hits /vendor-settings.
+  static async upsertVendorBankDetailsByAdmin(
+    vendorId: string,
+    payload: {
+      accountHolderName: string;
+      bankName: string;
+      accountNumber: string;
+      ifscCode: string;
+      accountType: string;
+      branchName?: string;
+      branchAddress?: string;
+    },
+  ) {
+    const token = this.getAdminToken();
+    if (!token) {
+      throw new Error('No admin authentication token found');
+    }
+
+    const response = await axiosInstance.put(`/vendors/${vendorId}/bank-details`, payload, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  }
+
   // Admin: Verify vendor bank details
   static async verifyVendorBankDetails(vendorId: string) {
     const token = this.getAdminToken();

@@ -436,8 +436,8 @@ export default function Inventory() {
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b [&_tr]:border-slate-200/80 [&_th]:!text-slate-500 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
-              <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
+              <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
                 <TableHead>Product</TableHead>
                 <TableHead>SKU</TableHead>
                 <TableHead>Product Status</TableHead>
@@ -516,7 +516,7 @@ export default function Inventory() {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => setViewItem(item)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                           title="View Details"
                         >
                           <Eye className="h-4 w-4" />
@@ -533,7 +533,7 @@ export default function Inventory() {
                           }}
                           className={`p-1.5 rounded-lg transition-colors ${
                             item.hasProductCreated && item.productApprovalStatus === 'APPROVED'
-                              ? 'text-slate-500 hover:text-brand-600 hover:bg-brand-50'
+                              ? 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'
                               : 'text-slate-300'
                           }`}
                           title="Update Stock"
@@ -542,7 +542,7 @@ export default function Inventory() {
                         </button>
                         <button
                           onClick={() => handleViewHistory(item)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                           title="Stock History"
                         >
                           <History className="h-4 w-4" />
@@ -557,7 +557,7 @@ export default function Inventory() {
                           </button>
                         ) : (
                           <Link href={`/vendor/dashboard/inventory/edit/${item.id}`}>
-                            <span className="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-brand-50 transition-colors inline-flex" title="Edit">
+                            <span className="p-1.5 rounded-lg text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors inline-flex" title="Edit">
                               <Edit className="h-4 w-4" />
                             </span>
                           </Link>
@@ -568,7 +568,7 @@ export default function Inventory() {
                           className={`p-1.5 rounded-lg transition-colors ${
                             item.hasProductCreated
                               ? 'text-slate-300 cursor-not-allowed'
-                              : 'text-slate-500 hover:text-red-600 hover:bg-red-50'
+                              : 'text-red-500 hover:text-red-700 hover:bg-red-50'
                           }`}
                           title={item.hasProductCreated ? 'Has linked product' : 'Delete'}
                         >

@@ -5,6 +5,10 @@ const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
 const { notifications } = require('../utils/notificationService');
 const { checkAndAlertLowStock } = require('../utils/lowStockAlert');
 const { withRetry } = require('../utils/dbRetry');
+const { resolveUsdRate, toINR, resolveUnitPrice } = require('../utils/orderCurrency');
+
+/** Round a money value to 2 decimals, avoiding float artefacts (e.g. 115.19999). */
+const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
 // Create new order
 const createOrder = async (req, res) => {
@@ -116,6 +120,10 @@ const createOrder = async (req, res) => {
         }
 
         // 3. Validate Stock and Calculate Totals
+        // Resolve the FX rate up front: every money field written below needs an INR
+        // twin, and those must all share one rate for the order to be internally
+        // consistent. Snapshotting also stops admin rate edits rewriting this order.
+        const orderExchangeRate = currency === 'USD' ? await resolveUsdRate(prisma) : null;
         let subtotal = 0;
         const orderItemsData = [];
         const stockUpdates = [];
@@ -171,32 +179,41 @@ const createOrder = async (req, res) => {
                 });
             }
 
-            // Pick regional price based on currency: priceINR/priceUSD → adminFixedPrice → basePrice
-            let unitPrice;
-            if (currency === 'USD') {
-                unitPrice = variant
-                    ? (variant.priceUSD || variant.adminFixedPrice || variant.price)
-                    : (product.priceUSD || product.adminFixedPrice || product.basePrice);
-            } else {
-                unitPrice = variant
-                    ? (variant.priceINR || variant.adminFixedPrice || variant.price)
-                    : (product.priceINR || product.adminFixedPrice || product.basePrice);
-            }
-            const itemTotal = unitPrice * item.quantity;
+            // Price the line in the order's currency. Shared with the storefront's
+            // getRegionalPrice() chain — see resolveUnitPrice() for why a USD order
+            // must convert from INR rather than fall through to an INR field.
+            const unitPrice = resolveUnitPrice(variant || product, currency, orderExchangeRate);
+            // Round per line as well: the invoice prints each item's totalPrice,
+            // so the printed item lines must sum to the printed subtotal.
+            const itemTotal = round2(unitPrice * item.quantity);
             subtotal += itemTotal;
 
-            // Calculate Vendor Settlement using vendor's base price
+            // Calculate Vendor Settlement using vendor's base price.
+            //
+            // M2C buys from the vendor and resells, so the vendor makes a taxable
+            // supply TO M2C and must be paid GST on their own goods value. The GST
+            // rate is fixed by the product's HSN code, so it is the same rate the
+            // customer pays — only the base differs (vendor's basePrice, not the
+            // admin selling price). Unregistered vendors (no GSTIN) charge no tax.
             const vendorPrice = product.basePrice || 0;
             const vendorItemTotal = vendorPrice * item.quantity;
+            const vendorGstRate = product.vendor?.gstNumber ? (product.gstPercentage || 0) : 0;
+            const vendorItemTax = vendorItemTotal * vendorGstRate / 100;
 
             if (product.vendorId) {
                 if (!vendorTotals[product.vendorId]) {
                     vendorTotals[product.vendorId] = {
-                        amount: 0,
+                        baseAmount: 0,
+                        taxAmount: 0,
+                        // Collects every rate seen for this vendor — a settlement spanning
+                        // products on different HSN rates cannot report a single rate.
+                        rates: new Set(),
                         vendorName: product.vendor.companyName || product.vendor.ownerName || 'Unknown Vendor'
                     };
                 }
-                vendorTotals[product.vendorId].amount += vendorItemTotal;
+                vendorTotals[product.vendorId].baseAmount += vendorItemTotal;
+                vendorTotals[product.vendorId].taxAmount += vendorItemTax;
+                vendorTotals[product.vendorId].rates.add(vendorGstRate);
             }
 
             // Prepare Order Item Data
@@ -207,6 +224,7 @@ const createOrder = async (req, res) => {
                 quantity: item.quantity,
                 unitPrice: unitPrice,
                 totalPrice: itemTotal,
+                totalPriceINR: toINR(itemTotal, currency, orderExchangeRate),
                 vendorId: product.vendorId,
                 vendorName: product.vendor.companyName || product.vendor.ownerName,
                 sku: variant ? variant.sku : product.baseSku,
@@ -233,10 +251,10 @@ const createOrder = async (req, res) => {
         // 4. Resolve bag type pricing (bag was already fetched + validated in
         // the parallel pre-flight above).
         const bagTypeName = bagType ? bagType.name : null;
+        // Same chain as the line items — a bag priced only in INR must be converted
+        // for a USD order, never charged as-is.
         const bagTypePrice = bagType
-            ? (currency === 'USD'
-                ? (bagType.priceUSD || bagType.price)
-                : (bagType.priceINR || bagType.price))
+            ? resolveUnitPrice(bagType, currency, orderExchangeRate)
             : 0;
 
         // 5. Create Order
@@ -246,7 +264,30 @@ const createOrder = async (req, res) => {
         const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
         const orderDisplayId = `ORD-${new Date().getFullYear()}-${timestamp}${random}`;
 
-        const totalAmount = subtotal + shippingCost + tax - discount + bagTypePrice;
+        /*
+          Money must be rounded to 2dp BEFORE it is summed, not after.
+
+          These values are stored and then printed line-by-line on the invoice,
+          which formats each to 2dp. Summing the raw floats and rounding only
+          for display made the invoice fail to add up: a 4 × $4.19 order with
+          12% GST and a 10% coupon stored tax=2.0112, discount=1.676 and
+          total=17.0952 — printed as "16.76 + 2.01 − 1.68" but a Grand Total of
+          "17.10" (the lines sum to 17.09). On a tax document the components
+          must reconcile exactly against the total.
+
+          Rounding each component first makes the stored total identical to the
+          sum of the printed lines. It also collapses float artefacts such as
+          discount = 1.6760000000000002.
+        */
+        const roundedSubtotal = round2(subtotal);
+        const roundedShipping = round2(shippingCost);
+        const roundedTax = round2(tax);
+        const roundedDiscount = round2(discount);
+        const roundedBagPrice = round2(bagTypePrice);
+
+        const totalAmount = round2(
+            roundedSubtotal + roundedShipping + roundedTax - roundedDiscount + roundedBagPrice
+        );
 
         // Group vendor totals for Settlements (Now calculated in the main cart loop)
 
@@ -273,16 +314,26 @@ const createOrder = async (req, res) => {
                     customerEmail: user.email,
                     customerPhone: shippingAddress.phone || user.phoneNumber || "",
                     shippingAddress,
-                    subtotal,
-                    shippingCost,
-                    tax,
-                    discount,
+                    // Persist the rounded components so what's stored is exactly
+                    // what the invoice prints, and subtotal + tax − discount
+                    // reconciles against totalAmount.
+                    subtotal: roundedSubtotal,
+                    shippingCost: roundedShipping,
+                    tax: roundedTax,
+                    discount: roundedDiscount,
                     totalAmount,
                     bagTypeId: bagTypeId || undefined,
                     bagTypeName,
-                    bagTypePrice,
+                    bagTypePrice: roundedBagPrice,
                     couponCode: couponCode || null,
                     currency,
+                    exchangeRate: orderExchangeRate,
+                    // INR twins — every cross-order aggregate sums these, not the originals.
+                    totalAmountINR: round2(toINR(totalAmount, currency, orderExchangeRate)),
+                    taxINR: round2(toINR(roundedTax, currency, orderExchangeRate)),
+                    shippingCostINR: round2(toINR(roundedShipping, currency, orderExchangeRate)),
+                    discountINR: round2(toINR(roundedDiscount, currency, orderExchangeRate)),
+                    bagTypePriceINR: round2(toINR(roundedBagPrice, currency, orderExchangeRate)),
                     paymentStatus: paymentMethod === 'COD' ? 'PENDING' : 'PAID',
                     paymentMethod,
                     paymentId,
@@ -428,6 +479,14 @@ const createOrder = async (req, res) => {
                 const vData = vendorTotals[vid];
                 const seqStr = String(i + 1).padStart(3, '0');
                 const setNum = `SET-${new Date().getFullYear()}-${timestamp}-${seqStr}`;
+
+                // Round money to paise once, at the record boundary — accumulating
+                // rounded per-item tax would drift on multi-line settlements.
+                const baseAmount = round2(vData.baseAmount);
+                const taxAmount = round2(vData.taxAmount);
+                // Only report a rate when the whole settlement shares one.
+                const uniformRate = vData.rates.size === 1 ? [...vData.rates][0] : null;
+
                 settlementRecords.push({
                     settlementNumber: setNum,
                     vendorId: vid,
@@ -435,7 +494,11 @@ const createOrder = async (req, res) => {
                     orderId: newOrder.id,
                     billingNumber: invoiceNo || orderDisplayId,
                     period: datePeriod,
-                    amount: vData.amount,
+                    baseAmount,
+                    taxAmount,
+                    gstPercentage: uniformRate,
+                    // Gross payable — what actually leaves M2C's bank.
+                    amount: round2(baseAmount + taxAmount),
                     status: 'Pending',
                     dueDate: null,
                 });

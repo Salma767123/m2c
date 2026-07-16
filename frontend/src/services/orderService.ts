@@ -65,6 +65,10 @@ export interface VendorShipment {
         shippingCost?: number;
         tax?: number;
         discount?: number;
+        /** Currency the buyer was actually charged in — 'INR' on .in, 'USD' on .com. */
+        currency?: 'INR' | 'USD';
+        /** INR-per-USD rate snapshotted at purchase. Null on INR/pre-snapshot orders. */
+        exchangeRate?: number | null;
         paymentStatus?: string;
         paymentMethod?: string;
         paymentId?: string;
@@ -92,6 +96,10 @@ export interface Order {
     shippingCost: number;
     tax: number;
     discount: number;
+    /** Currency the buyer was actually charged in — 'INR' on .in, 'USD' on .com. */
+    currency?: 'INR' | 'USD';
+    /** INR-per-USD rate snapshotted at purchase. Null on INR/pre-snapshot orders. */
+    exchangeRate?: number | null;
     bagTypeId?: string;
     bagTypeName?: string;
     bagTypePrice?: number;

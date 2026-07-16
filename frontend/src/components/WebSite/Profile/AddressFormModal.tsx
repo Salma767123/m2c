@@ -199,7 +199,7 @@ export default function AddressFormModal({
 
   const fieldError = (k: keyof FormState) => (touched[k] && errors[k] ? errors[k] : undefined);
   const inputCls = (k: keyof FormState) =>
-    `w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-gray-500 outline-none transition-colors disabled:bg-slate-100 ${
+    `w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] outline-none transition-colors disabled:bg-slate-100 ${
       fieldError(k) ? "border-red-500 focus:border-red-500" : "border-slate-300 focus:border-gray-500"
     }`;
   const selectCls = (k: keyof FormState) => `${inputCls(k)} bg-white appearance-none pr-10`;
@@ -249,7 +249,7 @@ export default function AddressFormModal({
                       disabled={submitting}
                       className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
                         active
-                          ? "border-gray-800 bg-gray-50 text-gray-900"
+                          ? "border-[#e01a1b] bg-[#fff1f1] text-[#c41617]"
                           : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
                       }`}
                     >
@@ -487,14 +487,14 @@ export default function AddressFormModal({
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="flex-1 sm:flex-none px-4 sm:px-5 py-2 sm:py-2.5 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-50 text-sm sm:text-base"
+              className="flex-1 sm:flex-none px-4 sm:px-5 py-2 sm:py-2.5 border border-slate-300 text-slate-700 font-medium rounded-full hover:bg-white transition-colors disabled:opacity-50 text-sm sm:text-base"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting || !isValid}
-              className="flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2.5 bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white font-semibold rounded-lg disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm text-sm sm:text-base"
+              className="btn-shine flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2.5 bg-[#e01a1b] hover:bg-[#c41617] text-white font-semibold rounded-full shadow-[0_6px_20px_rgba(224,26,27,0.3)] transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm text-sm sm:text-base"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
               {editing ? "Save Changes" : "Add Address"}

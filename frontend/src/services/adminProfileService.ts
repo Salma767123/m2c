@@ -3,9 +3,16 @@ import axios from '@/lib/axios';
 export interface AdminProfile {
   id: string;
   name: string;
+  title?: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
   email: string;
   phoneNumber?: string;
   address?: string;
+  addressLine2?: string;
+  addressLine3?: string;
+  landmark?: string;
   city?: string;
   state?: string;
   zipCode?: string;
@@ -16,13 +23,22 @@ export interface AdminProfile {
 }
 
 export interface UpdateProfileData {
-  name: string;
+  name?: string;
+  title?: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
   phoneNumber?: string;
   address?: string;
+  addressLine2?: string;
+  addressLine3?: string;
+  landmark?: string;
   city?: string;
   state?: string;
   zipCode?: string;
   country?: string;
+  /** Cropped profile photo — base64 data URI (uploaded server-side) or existing URL. */
+  image?: string;
 }
 
 export const adminProfileService = {

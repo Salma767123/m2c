@@ -859,19 +859,16 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         tradeLicenseNumber: vendor.tradeLicenseNumber || "",
         businessRegistrationNumber: vendor.businessRegistrationNumber || "",
         taxIdentificationNumber: vendor.taxIdentificationNumber || "",
-        // Bank detail load — match the columns the backend now writes
-        // (swiftCode → swiftCode column, NOT ifscCode). Older rows may
-        // still have a SWIFT value mistakenly stored as `ifscCode` from
-        // the pre-Step-7-fix era; fall back to that so legacy data still
-        // populates the form correctly.
+        // Bank detail load — map each column to itself. The previous version
+        // fell back to `ifscCode` for the swiftCode field, which silently
+        // relocated an Indian IFSC into the SWIFT column on the next save.
+        // This form renders no bank inputs, so it only round-trips these
+        // values; the backend now ignores keys that aren't sent.
         bankingDetails: vendor.bankDetails
           ? {
               bankName: vendor.bankDetails.bankName || "",
               accountNumber: vendor.bankDetails.accountNumber || "",
-              swiftCode:
-                vendor.bankDetails.swiftCode ||
-                vendor.bankDetails.ifscCode ||
-                "",
+              swiftCode: vendor.bankDetails.swiftCode || "",
               iban: vendor.bankDetails.iban || "",
             }
           : {

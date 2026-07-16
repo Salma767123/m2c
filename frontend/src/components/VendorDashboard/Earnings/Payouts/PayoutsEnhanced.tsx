@@ -483,8 +483,8 @@ export default function PayoutsEnhanced() {
         ) : (
           <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b [&_tr]:border-slate-200/80 [&_th]:!text-slate-500 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
-              <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
+              <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
                 <TableHead>Settlement No.</TableHead>
                 <TableHead>Billing/Order No.</TableHead>
                 <TableHead>Amount</TableHead>
@@ -510,9 +510,19 @@ export default function PayoutsEnhanced() {
                       <div className="text-sm text-slate-900">{settlement.billingNumber}</div>
                     </TableCell>
                     <TableCell>
+                      {/* Gross received, split into goods + GST so it can be
+                          reconciled against the vendor's own tax invoice. */}
                       <div className="font-semibold text-slate-900">
                         ₹{settlement.amount.toLocaleString('en-IN')}
                       </div>
+                      {settlement.taxAmount ? (
+                        <div className="text-xs text-slate-500 whitespace-nowrap">
+                          ₹{(settlement.baseAmount ?? 0).toLocaleString('en-IN')}
+                          {' + '}
+                          {settlement.gstPercentage != null ? `${settlement.gstPercentage}% GST` : 'GST'}
+                          {' '}₹{settlement.taxAmount.toLocaleString('en-IN')}
+                        </div>
+                      ) : null}
                     </TableCell>
                     <TableCell>
                       <div className="text-sm text-slate-900">{settlement.period}</div>

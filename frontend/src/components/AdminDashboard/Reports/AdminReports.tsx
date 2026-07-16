@@ -21,6 +21,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { hasPermission } from '@/lib/auth';
+import { formatOrderAmount } from "@/lib/currency";
 
 type ReportTab = 'overview' | 'sales' | 'orders' | 'settlement' | 'financial' | 'vendors' | 'products' | 'customers';
 
@@ -204,6 +205,9 @@ export default function AdminReports() {
   useEffect(() => { fetchReport(); }, [fetchReport]);
 
   const fmt = (n?: number) => `₹${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+  // Per-order amounts carry the order's own currency; fmt() above is for INR-only
+  // aggregates and must not be used for them.
+  const fmtOrder = (o: any) => formatOrderAmount(o.amount || 0, o.currency, o.exchangeRate).charged;
   const fmtN = (n?: number) => (n || 0).toLocaleString('en-IN');
 
   return (
@@ -373,7 +377,7 @@ export default function AdminReports() {
                       <TableCell className="font-medium text-slate-900">{o.id}</TableCell>
                       <TableCell className="text-slate-600">{o.customer}</TableCell>
                       <TableCell className="text-slate-600">{o.vendor}</TableCell>
-                      <TableCell className="font-semibold">{fmt(o.amount)}</TableCell>
+                      <TableCell className="font-semibold">{fmtOrder(o)}</TableCell>
                       <TableCell><StatusBadge status={o.status} /></TableCell>
                       <TableCell className="text-slate-500 text-sm">{new Date(o.date).toLocaleDateString('en-IN')}</TableCell>
                     </TableRow>
@@ -563,7 +567,7 @@ export default function AdminReports() {
                       <TableCell className="font-medium text-slate-900">{o.id}</TableCell>
                       <TableCell className="text-slate-600">{o.customer}</TableCell>
                       <TableCell className="text-slate-600">{o.vendor}</TableCell>
-                      <TableCell className="font-semibold">{fmt(o.amount)}</TableCell>
+                      <TableCell className="font-semibold">{fmtOrder(o)}</TableCell>
                       <TableCell><StatusBadge status={o.status} /></TableCell>
                       <TableCell><StatusBadge status={o.paymentStatus} /></TableCell>
                       <TableCell className="text-slate-500 text-sm">{new Date(o.date).toLocaleDateString('en-IN')}</TableCell>

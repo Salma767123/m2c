@@ -104,6 +104,11 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
   const registeredFieldsRef = useRef<string[]>([])
   const [highlightedKeys, setHighlightedKeys] = useState<Set<string>>(new Set())
   const pendingScrollRef = useRef<string | null>(null)
+  // Client-side fallback for the report's "Inspection Start Time": the backend
+  // only stamps inspection.startedAt on the SCHEDULED→IN_PROGRESS transition, so
+  // it can be null. Capture when the checker opened this form so the time always
+  // shows on the generated report.
+  const formOpenedAtRef = useRef<string>(new Date().toISOString())
 
   const handleRegisterFields = useCallback((keys: string[]) => {
     registeredFieldsRef.current = keys
@@ -535,7 +540,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
           docData={docData}
           onDocDataChange={(patch) => setDocData(prev => ({ ...prev, ...patch }))}
           factoryEvidence={factoryEvidence}
-          inspectionStartedAt={inspection?.startedAt ?? null}
+          inspectionStartedAt={inspection?.startedAt ?? formOpenedAtRef.current}
         />
       )
       default: return null

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Package } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { categoryService } from '@/services/categoryService';
+import Reveal from '@/components/WebSite/Shared/Reveal';
 
 interface Category {
   id: string;
@@ -117,26 +118,34 @@ export default function Categories() {
         />
         <div className="absolute inset-0 bg-black/60" />
         <div className="relative z-10 flex items-center justify-center min-h-40 sm:min-h-52 md:min-h-60 lg:min-h-80 px-3 sm:px-4 py-5 sm:py-6 md:py-8">
-          <div className="text-center text-white">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold font-sans mb-2 sm:mb-4">
+          <Reveal className="text-center text-white">
+            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-white/80 mb-3">
+              <span className="h-px w-6 bg-[#e01a1b]" />
+              Our Collections
+            </span>
+            <h1 className="font-playfair text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold mb-2 sm:mb-4 tracking-tight">
               Shop by Categories
             </h1>
             <p className="text-sm sm:text-lg md:text-xl max-w-2xl mx-auto">
               Discover our wide range of traditional textile products organized by categories
             </p>
-          </div>
+          </Reveal>
         </div>
       </div>
 
       {/* Categories Content */}
       <div className="py-8 sm:py-10 lg:py-12">
         <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="text-start mb-6 sm:mb-8 lg:mb-12">
-            <h2 className="text-xl sm:text-2xl font-bold font-sans text-gray-700">Browse Our Collections</h2>
+          <Reveal className="text-start mb-6 sm:mb-8 lg:mb-12">
+            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
+              <span className="h-px w-6 bg-[#e01a1b]" />
+              Categories
+            </span>
+            <h2 className="font-playfair text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a1a1a] tracking-tight">Browse Our Collections</h2>
             <p className="text-sm sm:text-base lg:text-lg text-gray-600 max-w-2xl">
               Find exactly what you're looking for in our carefully curated categories.
             </p>
-          </div>
+          </Reveal>
 
           {categories.length === 0 ? (
             <div className="text-center py-12 sm:py-16 lg:py-20">
@@ -148,68 +157,69 @@ export default function Categories() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
-              {categories.map((category) => (
-                <Link
-                  key={category.id}
-                  href={`/categories/${category.slug}`}
-                  className="group text-center"
-                >
-                  {/* Category Image */}
-                  <div className="relative w-full aspect-square mb-4 overflow-hidden rounded-md bg-linear-to-br from-gray-100 to-gray-200">
-                    {category.image ? (
-                      <Image
-                        src={category.image}
-                        alt={category.name}
-                        fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        className="object-cover group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                        }}
-                      />
-                    ) : null}
-                    {!category.image && (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Package className="w-16 h-16 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
+              {categories.map((category, index) => (
+                <Reveal key={category.id} delay={index * 90}>
+                  <Link
+                    href={`/categories/${category.slug}`}
+                    className="group block text-center"
+                  >
+                    {/* Category Image */}
+                    <div className="relative w-full aspect-square mb-4 overflow-hidden rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] group-hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] group-hover:-translate-y-1.5 group-hover:ring-[#e01a1b]/20 transition-all duration-500 bg-linear-to-br from-gray-100 to-gray-200">
+                      {category.image ? (
+                        <Image
+                          src={category.image}
+                          alt={category.name}
+                          fill
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          className="object-cover group-hover:scale-110 transition-transform duration-[900ms] ease-out"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
+                        />
+                      ) : null}
+                      {!category.image && (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package className="w-16 h-16 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Category Name */}
-                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
-                    {category.name}
-                  </h3>
-                  {category.subcategoryCount !== undefined && category.subcategoryCount > 0 && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      {category.subcategoryCount} subcategories
-                    </p>
-                  )}
-                </Link>
+                    {/* Category Name */}
+                    <h3 className="text-lg font-semibold text-[#1a1a1a] group-hover:text-[#e01a1b] transition-colors">
+                      {category.name}
+                    </h3>
+                    {category.subcategoryCount !== undefined && category.subcategoryCount > 0 && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        {category.subcategoryCount} subcategories
+                      </p>
+                    )}
+                  </Link>
+                </Reveal>
               ))}
             </div>
           )}
 
-          <div className="mt-10 sm:mt-12 lg:mt-16 bg-white rounded-xl shadow-lg p-5 sm:p-6 lg:p-8 text-center">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Need Help?</h2>
+          <Reveal className="mt-10 sm:mt-12 lg:mt-16 bg-[#f7f7f5] rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-5 sm:p-6 lg:p-8 text-center">
+            <h2 className="font-playfair text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a1a1a] mb-3 sm:mb-4 tracking-tight">Need Help?</h2>
             <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
               Use our search feature or contact our support team for assistance finding specific products.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
               <Link
                 href="/products"
-                className="bg-gray-700 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg hover:bg-gray-400 transition-colors font-medium text-sm sm:text-base"
+                className="btn-shine inline-flex items-center justify-center gap-2 bg-[#e01a1b] text-white px-6 py-3 rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 font-semibold text-sm sm:text-base"
               >
                 Search Products
               </Link>
               <Link
                 href="/contact"
-                className="border-2 border-gray-700 text-gray-700 px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg hover:bg-gray-700 hover:text-white transition-colors font-medium text-sm sm:text-base"
+                className="inline-flex items-center justify-center gap-2 border border-[#e01a1b] text-[#e01a1b] px-6 py-3 rounded-full hover:bg-[#e01a1b] hover:text-white transition-all duration-300 font-semibold text-sm sm:text-base"
               >
                 Contact Support
               </Link>
             </div>
-          </div>
+          </Reveal>
         </div>
       </div>
     </div>

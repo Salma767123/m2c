@@ -3,6 +3,7 @@ import { Badge } from '@/components/UI/Badge'
 import { useRouter } from 'next/navigation'
 import { Eye } from 'lucide-react'
 import { hasPermission } from '@/lib/auth'
+import { formatOrderAmount } from "@/lib/currency";
 
 const getStatusBadge = (status: string) => {
   const s = status?.toUpperCase().replace(/ /g, '_') || ''
@@ -80,7 +81,13 @@ export default function RecentOrders({ orders }: { orders: any[] }) {
                     {new Date(order.date).toLocaleDateString('en-IN')}
                   </td>
                   <td className="px-4 py-4 text-sm text-slate-900 font-semibold text-right whitespace-nowrap">
-                    ₹{order.totalAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {(() => {
+                      const { charged, inrEquivalent } = formatOrderAmount(
+                        order.totalAmount || 0, (order as any).currency, (order as any).exchangeRate);
+                      return (<>{charged}{inrEquivalent && (
+                        <span className="block text-xs font-normal text-slate-500">≈ {inrEquivalent}</span>
+                      )}</>);
+                    })()}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
                     {getStatusBadge(order.status)}

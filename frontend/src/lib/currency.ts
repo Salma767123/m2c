@@ -32,6 +32,36 @@ export function formatPrice(price: number, currency?: Currency): string {
 }
 
 /**
+ * Format an order amount for admin/back-office screens.
+ *
+ * `charged` is the source of truth: it is what the customer's card was actually
+ * debited, what a refund must be issued in, and what the payment gateway reconciles
+ * against. It is never converted away.
+ *
+ * `inrEquivalent` is a reporting convenience for USD orders only — the business
+ * settles vendors, files GST and reports revenue in INR, so admins need a common
+ * unit to compare a .in order against a .com one. It is deliberately derived from
+ * the rate SNAPSHOT stored on the order (Order.exchangeRate), never the live rate:
+ * ExchangeRate holds one mutable row, so using today's rate would make a past
+ * order's INR value drift every time an admin edits it.
+ *
+ * Returns null for inrEquivalent when no conversion applies (INR orders) or when
+ * the order predates the snapshot — showing nothing beats inventing a number.
+ */
+export function formatOrderAmount(
+  amount: number,
+  currency?: string | null,
+  exchangeRate?: number | null
+): { charged: string; inrEquivalent: string | null } {
+  const c: Currency = currency === 'USD' ? 'USD' : 'INR'
+  const charged = formatPrice(amount, c)
+  if (c !== 'USD' || !exchangeRate || exchangeRate <= 0) {
+    return { charged, inrEquivalent: null }
+  }
+  return { charged, inrEquivalent: formatPrice(amount * exchangeRate, 'INR') }
+}
+
+/**
  * Set the cached exchange rate (called once on app load).
  */
 export function setExchangeRate(rate: number): void {
@@ -48,23 +78,42 @@ export function convertINRtoUSD(inrPrice: number): number {
 }
 
 /**
+ * Convert USD to INR using the cached exchange rate.
+ * Fallback: 83.50 — the same default the server applies.
+ *
+ * Used to tell a USD shopper what they'll actually be billed: the Razorpay
+ * account settles in INR, so paymentController converts the order total
+ * before creating the payment. Both sides read the same ExchangeRate row
+ * (and the same 83.50 fallback), so this figure matches the real charge —
+ * but the server's value is the authoritative one.
+ */
+export function convertUSDtoINR(usdPrice: number): number {
+  const rate = cachedExchangeRate || 83.50
+  return Math.round(usdPrice * rate * 100) / 100
+}
+
+/**
  * Pick the correct price based on region.
  * Priority: priceINR/priceUSD → adminFixedPrice → basePrice
  * For US: if priceUSD missing, auto-convert from INR using exchange rate
  */
 export function getRegionalPrice(product: {
   basePrice?: number;
+  // Variants are passed in here too, and they store the vendor price as `price`
+  // (Product.basePrice vs ProductVariant.price). Without this the vendor price is
+  // invisible to the fallback chain and an admin-unpriced variant resolves to 0.
+  price?: number;
   adminFixedPrice?: number | null;
   priceINR?: number | null;
   priceUSD?: number | null;
 }): number {
   const region = getRegion()
+  const inrPrice = product.priceINR || product.adminFixedPrice || product.basePrice || product.price || 0
   if (region === 'IN') {
-    return product.priceINR || product.adminFixedPrice || product.basePrice || 0
+    return inrPrice
   }
   // US region: use priceUSD if set, otherwise auto-convert INR
   if (product.priceUSD) return product.priceUSD
-  const inrPrice = product.priceINR || product.adminFixedPrice || product.basePrice || 0
   return inrPrice > 0 ? convertINRtoUSD(inrPrice) : 0
 }
 

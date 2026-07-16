@@ -5,6 +5,7 @@ const { prisma } = require('../config/database');
 const { normalizeCategoryValues } = require('../utils/categoryResolver');
 const { generateVendorCode, reconcileAndGenerate } = require('../utils/vendorCodeGenerator');
 const { parseMapLinkCoordinates } = require('../utils/locationUtils');
+const { syncVendorCustomCategories } = require('../utils/customCategories');
 const {
   sendVendorApprovalEmail,
   sendVendorRejectionEmail,
@@ -828,6 +829,11 @@ const registerVendor = async (req, res) => {
     }
 
     const vendor = await createVendorWithCode();
+
+    // Register any vendor-proposed ("Other") categories as PENDING rows in the
+    // master taxonomy so they show up in the admin Categories review queue.
+    // Invisible to the storefront until an admin approves or merges them.
+    await syncVendorCustomCategories(vendor.id, resolvedAdditionalCategories);
 
     // ── Certifications (Step 6) ─────────────────────────────────────────
     // Two sources feed into VendorCertification:
@@ -1873,32 +1879,37 @@ const updateVendorById = async (req, res) => {
     // update — admin edits to bankName/accountNumber/swiftCode/iban were
     // silently dropped. Use upsert so the row is created on first save
     // and updated thereafter.
+    //
+    // IMPORTANT: only write the columns the caller actually sent. This block
+    // used to null every column that was absent from the payload, which
+    // destroyed data: the admin vendor form renders no bank inputs but still
+    // round-trips a 4-key `bankingDetails` object, so any admin pressing Save
+    // wiped accountHolderName / ifscCode / accountType / branchName /
+    // branchAddress that the vendor had entered via the vendor portal.
+    // A partial payload must never be treated as "clear the rest".
     if (parsedBankingDetails && parsedBankingDetails.bankName) {
+      const BANK_FIELDS = [
+        'bankName', 'accountNumber', 'swiftCode', 'iban', 'ifscCode',
+        'accountType', 'accountHolderName', 'branchName', 'branchAddress',
+      ];
+
+      const provided = {};
+      for (const key of BANK_FIELDS) {
+        const value = parsedBankingDetails[key];
+        if (value === undefined) continue;        // not sent → leave column untouched
+        provided[key] = value === '' ? null : value; // explicitly cleared → null
+      }
+
       await prisma.vendorBankDetails.upsert({
         where: { vendorId },
         create: {
           vendorId,
+          // bankName / accountNumber are non-nullable in the schema.
           bankName: parsedBankingDetails.bankName,
           accountNumber: parsedBankingDetails.accountNumber || '',
-          swiftCode: parsedBankingDetails.swiftCode || null,
-          iban: parsedBankingDetails.iban || null,
-          ifscCode: parsedBankingDetails.ifscCode || null,
-          accountType: parsedBankingDetails.accountType || null,
-          accountHolderName: parsedBankingDetails.accountHolderName || null,
-          branchName: parsedBankingDetails.branchName || null,
-          branchAddress: parsedBankingDetails.branchAddress || null,
+          ...provided,
         },
-        update: {
-          bankName: parsedBankingDetails.bankName,
-          accountNumber: parsedBankingDetails.accountNumber || '',
-          swiftCode: parsedBankingDetails.swiftCode || null,
-          iban: parsedBankingDetails.iban || null,
-          ifscCode: parsedBankingDetails.ifscCode || null,
-          accountType: parsedBankingDetails.accountType || null,
-          accountHolderName: parsedBankingDetails.accountHolderName || null,
-          branchName: parsedBankingDetails.branchName || null,
-          branchAddress: parsedBankingDetails.branchAddress || null,
-        },
+        update: provided,
       });
     }
 
@@ -2179,6 +2190,12 @@ const updateVendorById = async (req, res) => {
           data: trimmedUpdate,
         })
       : existingVendor;
+
+    // Keep the master taxonomy in step when the vendor's "Other" categories are
+    // edited — new names land as PENDING for admin review (existing ones reuse).
+    if (resolvedAdditionalCategories !== undefined) {
+      await syncVendorCustomCategories(vendorId, resolvedAdditionalCategories);
+    }
 
     // Handle certifications update
     if (parsedSelectedCertifications && Array.isArray(parsedSelectedCertifications)) {
@@ -3078,6 +3095,87 @@ const assignQc = async (req, res) => {
   }
 };
 
+/**
+ * Create or update a vendor's bank details (Admin only).
+ *
+ * Mirrors the vendor portal's own bank form (vendorSettingsController
+ * .upsertVendorBankDetails) so admins capture exactly the same fields.
+ *
+ * Difference from the vendor-facing endpoint: the vendor is blocked from
+ * editing once details are verified ("contact admin for modifications") —
+ * this IS that admin path, so verified rows are editable here. Re-saving a
+ * verified row resets it to unverified, because the account it was verified
+ * against may no longer be the one on file.
+ */
+const upsertVendorBankDetailsByAdmin = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const {
+      bankName,
+      accountNumber,
+      ifscCode,
+      accountType,
+      accountHolderName,
+      branchName,
+      branchAddress,
+    } = req.body;
+
+    if (!bankName || !accountNumber || !ifscCode || !accountType || !accountHolderName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bank name, account number, IFSC code, account type, and account holder name are required',
+      });
+    }
+
+    const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+    if (!ifscRegex.test(String(ifscCode).toUpperCase())) {
+      return res.status(400).json({ success: false, error: 'Invalid IFSC code format' });
+    }
+
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+    if (!vendor) {
+      return res.status(404).json({ success: false, error: 'Vendor not found' });
+    }
+
+    const existing = await prisma.vendorBankDetails.findUnique({ where: { vendorId } });
+
+    const data = {
+      bankName,
+      accountNumber,
+      ifscCode: String(ifscCode).toUpperCase(),
+      accountType,
+      accountHolderName,
+      branchName: branchName || null,
+      branchAddress: branchAddress || null,
+    };
+
+    // Details changed → the previous verification no longer applies.
+    const accountChanged = existing && (
+      existing.accountNumber !== data.accountNumber ||
+      existing.ifscCode !== data.ifscCode ||
+      existing.accountHolderName !== data.accountHolderName
+    );
+
+    const bankDetails = await prisma.vendorBankDetails.upsert({
+      where: { vendorId },
+      create: { vendorId, ...data },
+      update: {
+        ...data,
+        ...(accountChanged ? { isVerified: false, verifiedAt: null, verifiedBy: null } : {}),
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Bank details saved successfully',
+      bankDetails,
+    });
+  } catch (error) {
+    console.error('Admin upsert vendor bank details error:', error);
+    res.status(500).json({ success: false, error: 'Failed to save bank details' });
+  }
+};
+
 // Verify vendor bank details (Admin only)
 const verifyVendorBankDetails = async (req, res) => {
   try {
@@ -3133,5 +3231,6 @@ module.exports = {
   vendorLogin,
   testVendorEmail,
   assignQc,
-  verifyVendorBankDetails
+  verifyVendorBankDetails,
+  upsertVendorBankDetailsByAdmin
 };

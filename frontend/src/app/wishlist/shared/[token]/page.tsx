@@ -7,6 +7,7 @@ import Header from '@/components/WebSite/Header/Header';
 import Footer from '@/components/WebSite/Footer/Footer';
 import Breadcrumb from '@/components/WebSite/Navigation/Breadcrumb';
 import { wishlistService, WishlistItem } from '@/services/wishlistService';
+import { formatPrice, getRegionalPrice, getRegionalOriginalPrice } from '@/lib/currency';
 import { Heart, ShoppingCart, Star } from 'lucide-react';
 
 export default function SharedWishlistPage() {
@@ -102,7 +103,7 @@ export default function SharedWishlistPage() {
                             </span>
                           )}
                           {!product.inStock && (
-                            <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                               <span className="bg-white text-gray-800 px-3 py-1 rounded text-sm font-medium">Out of Stock</span>
                             </div>
                           )}
@@ -126,14 +127,20 @@ export default function SharedWishlistPage() {
                           )}
 
                           <div className="flex items-center gap-2">
+                            {/* Go through the same regional chain as every other product
+                                card. This hand-rolled the price instead, stamping a '$' on
+                                the raw INR figure and ignoring priceUSD entirely. */}
                             <span className="text-lg font-bold text-gray-900">
-                              ${(product.adminFixedPrice ?? product.basePrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {formatPrice(getRegionalPrice(product))}
                             </span>
-                            {product.originalPrice && product.originalPrice > (product.adminFixedPrice ?? product.basePrice) && (
-                              <span className="text-sm text-gray-400 line-through">
-                                ${product.originalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                            )}
+                            {(() => {
+                              const original = getRegionalOriginalPrice(product)
+                              return original && original > getRegionalPrice(product) ? (
+                                <span className="text-sm text-gray-400 line-through">
+                                  {formatPrice(original)}
+                                </span>
+                              ) : null
+                            })()}
                           </div>
                         </div>
 

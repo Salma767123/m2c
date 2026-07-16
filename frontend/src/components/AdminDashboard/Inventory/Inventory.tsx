@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
+import { useState, useEffect, Fragment } from 'react'
+import { Card, CardContent } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
 import {
@@ -14,13 +14,25 @@ import {
 } from '@/components/UI/Table'
 import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb'
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
-import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Filter, Loader2, History, Edit, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Filter, Loader2, History, Edit, Trash2, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
+import DateRangeCalendar from '@/components/Shared/DateRangeCalendar'
 import axiosInstance from '@/lib/axios'
 import inventoryService from '@/services/inventoryService'
 import { hasPermission } from '@/lib/auth'
 import StockHistoryModal from '@/components/Shared/StockHistoryModal'
+
+interface InventoryVariant {
+  id: string
+  variantName?: string | null
+  size?: string | null
+  color?: string | null
+  sku: string
+  stock: number
+  lowStockThreshold?: number | null
+  effectiveThreshold: number
+}
 
 interface InventoryItem {
   id: string
@@ -41,6 +53,8 @@ interface InventoryItem {
   updatedAt: string
   hasProductCreated: boolean
   productApprovalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | null
+  hasVariants?: boolean
+  variants?: InventoryVariant[]
 }
 
 function getPageRange(current: number, total: number): Array<number | '…'> {
@@ -79,10 +93,19 @@ const getApprovalBadge = (item: InventoryItem) => {
 
 export default function Inventory() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
+  const toggleExpanded = (id: string) => setExpandedItems(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  // Last-Restocked date-range filter (client-side, inclusive).
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
@@ -154,8 +177,19 @@ export default function Inventory() {
   // Get unique categories for filter
   const categories = ['all', ...Array.from(new Set(inventoryItems.map(item => item.category)))]
 
-  // Filter items by status (client-side for now)
+  // Keep a row when its Last Restocked date falls within the selected range.
+  const inDateRange = (d?: string | null) => {
+    if (!dateFrom && !dateTo) return true
+    if (!d) return false
+    const day = new Date(d).toLocaleDateString('en-CA') // local YYYY-MM-DD
+    if (dateFrom && day < dateFrom) return false
+    if (dateTo && day > dateTo) return false
+    return true
+  }
+
+  // Filter items by status + Last-Restocked date range (client-side for now)
   const filteredItems = inventoryItems.filter(item => {
+    if (!inDateRange(item.lastRestocked)) return false
     if (statusFilter === 'all') return true
     if (statusFilter === 'out_of_stock') return item.currentStock === 0
     if (statusFilter === 'low_stock') return item.currentStock <= item.lowStockAlert && item.currentStock > 0
@@ -236,51 +270,45 @@ export default function Inventory() {
         )}
       </div>
 
-      {/* Inventory Stats */}
-      <div className="grid gap-6 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-            <Package className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalItems}</div>
-            <p className="text-xs text-slate-600">Unique products</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Low Stock</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-yellow-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.lowStockItems}</div>
-            <p className="text-xs text-slate-600">Need restocking</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Out of Stock</CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.outOfStockItems}</div>
-            <p className="text-xs text-slate-600">Urgent attention</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Stock Units</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalStockUnits.toLocaleString()}</div>
-            <p className="text-xs text-slate-600">Total units</p>
-          </CardContent>
-        </Card>
+      {/* Inventory Stats — click the first three to filter the table by stock status */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { key: 'all',          label: 'Total Items',       subtitle: 'Unique products',  value: stats.totalItems,                       Icon: Package,       iconBg: 'bg-brand-50',   iconColor: 'text-brand-500',   countColor: 'text-slate-900',   activeClass: 'border-brand-400 bg-brand-50/50' },
+          { key: 'low_stock',    label: 'Low Stock',         subtitle: 'Need restocking',  value: stats.lowStockItems,                    Icon: AlertTriangle, iconBg: 'bg-amber-50',   iconColor: 'text-amber-500',   countColor: 'text-amber-700',   activeClass: 'border-amber-400 bg-amber-50/60' },
+          { key: 'out_of_stock', label: 'Out of Stock',      subtitle: 'Urgent attention', value: stats.outOfStockItems,                  Icon: TrendingDown,  iconBg: 'bg-red-50',     iconColor: 'text-red-500',     countColor: 'text-red-700',     activeClass: 'border-red-400 bg-red-50/60' },
+          { key: null,           label: 'Total Stock Units', subtitle: 'Total units',      value: stats.totalStockUnits.toLocaleString(), Icon: TrendingUp,    iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500', countColor: 'text-emerald-700', activeClass: '' },
+        ].map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
+          const clickable = key !== null
+          const isActive = clickable && statusFilter === key
+          const body = (
+            <>
+              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+                <span className="text-sm font-medium text-slate-500">{label}</span>
+                <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace('50', '100') : iconBg} transition-transform duration-150 ${clickable ? 'group-hover:scale-110' : ''}`}>
+                  <Icon className={`h-4 w-4 ${iconColor}`} />
+                </div>
+              </div>
+              <div className="px-4 pb-4">
+                <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              </div>
+            </>
+          )
+          return clickable ? (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setStatusFilter((prev) => (prev === key ? 'all' : (key as typeof statusFilter)))}
+              className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : 'border-slate-200/80 hover:border-slate-300'}`}
+            >
+              {body}
+            </button>
+          ) : (
+            <div key={label} className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+              {body}
+            </div>
+          )
+        })}
       </div>
 
       {/* Filters */}
@@ -300,6 +328,12 @@ export default function Inventory() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <DateRangeCalendar
+                from={dateFrom}
+                to={dateTo}
+                placeholder="Last Restocked"
+                onChange={(f, t) => { setDateFrom(f); setDateTo(t); setCurrentPage(1) }}
+              />
               <div className="flex items-center gap-2">
                 <Dropdown
                   id="statusFilter"
@@ -337,18 +371,19 @@ export default function Inventory() {
             </div>
           ) : (
             <>
-              <Table>
+              <div className="overflow-x-auto">
+              <Table className="min-w-[1040px] [&_td]:px-4 [&_td]:py-3 [&_td]:align-middle [&_th]:px-4">
                 <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                   <TableRow>
-                    <TableHead>Product</TableHead>
+                    <TableHead className="min-w-[220px]">Product</TableHead>
                     <TableHead>SKU</TableHead>
                     <TableHead>Vendor</TableHead>
                     <TableHead>Product Status</TableHead>
-                    <TableHead>Current Stock</TableHead>
-                    <TableHead>Min Stock</TableHead>
+                    <TableHead className="text-center">Current Stock</TableHead>
+                    <TableHead className="text-center">Min Stock</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Last Restocked</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -362,95 +397,159 @@ export default function Inventory() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredItems.map((item) => (
-                      <TableRow key={item.id}>
+                    filteredItems.map((item) => {
+                      const variants = item.variants || []
+                      const canExpand = variants.length > 0
+                      const isExpanded = expandedItems.has(item.id)
+                      return (
+                      <Fragment key={item.id}>
+                      <TableRow className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors duration-150">
                         <TableCell>
-                          <div>
-                            <div className="font-medium">{item.name}</div>
-                            <div className="text-sm text-slate-500">
-                              {item.category}{item.subcategory ? ` / ${item.subcategory}` : ''}
+                          <div className="flex items-start gap-2">
+                            {canExpand ? (
+                              <button
+                                onClick={() => toggleExpanded(item.id)}
+                                className="mt-0.5 p-0.5 rounded text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-colors shrink-0"
+                                aria-label={isExpanded ? 'Collapse variants' : 'Expand variants'}
+                              >
+                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              </button>
+                            ) : <span className="w-5 shrink-0" />}
+                            <div>
+                              <div className="font-medium flex items-center gap-2">
+                                {item.name}
+                                {canExpand && (
+                                  <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 border border-brand-100 px-1.5 py-0.5 rounded-full">
+                                    {variants.length} variants
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-sm text-slate-500">
+                                {item.category}{item.subcategory ? ` / ${item.subcategory}` : ''}
+                              </div>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono text-sm">{item.sku}</TableCell>
+                        <TableCell className="font-mono text-xs text-slate-600 whitespace-nowrap">{item.sku}</TableCell>
                         <TableCell>
-                          <div>
-                            <div className="font-medium">{item.vendor.companyName}</div>
-                            <div className="text-xs text-slate-500">{item.vendor.email}</div>
+                          <div className="min-w-[160px]">
+                            <div className="font-medium text-slate-900 truncate max-w-[220px]">{item.vendor.companyName}</div>
+                            <div className="text-xs text-slate-500 truncate max-w-[220px]">{item.vendor.email}</div>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           {getApprovalBadge(item)}
                         </TableCell>
-                        <TableCell>
-                          <span className={item.currentStock <= item.lowStockAlert ? 'text-red-600 font-bold' : 'text-slate-900'}>
+                        <TableCell className="text-center">
+                          <span className={`font-semibold ${item.currentStock <= item.lowStockAlert ? 'text-red-600' : 'text-slate-900'}`}>
                             {item.currentStock}
                           </span>
                         </TableCell>
-                        <TableCell className="text-sm text-slate-600">
+                        <TableCell className="text-sm text-slate-600 text-center">
                           {item.lowStockAlert}
                         </TableCell>
-                        <TableCell>{getStatusBadge(item.currentStock, item.lowStockAlert)}</TableCell>
-                        <TableCell className="text-sm text-slate-600">
+                        <TableCell className="whitespace-nowrap">{getStatusBadge(item.currentStock, item.lowStockAlert)}</TableCell>
+                        <TableCell className="text-sm text-slate-600 whitespace-nowrap">
                           {item.lastRestocked ? new Date(item.lastRestocked).toLocaleDateString() : 'Never'}
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center justify-end gap-1 whitespace-nowrap">
                             {hasPermission('inventory:update_stock') && (
                               item.hasProductCreated && item.productApprovalStatus === 'APPROVED' ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
+                                <button
                                   onClick={() => handleUpdateStock(item)}
+                                  className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-700 border border-slate-200 hover:text-brand-600 hover:border-brand-300 hover:bg-brand-50 transition-colors whitespace-nowrap"
                                 >
                                   Update Stock
-                                </Button>
+                                </button>
                               ) : (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
+                                <button
                                   disabled
-                                  className="opacity-50 cursor-not-allowed"
+                                  className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 border border-slate-200 opacity-60 cursor-not-allowed whitespace-nowrap"
                                   title={!item.hasProductCreated ? 'Create a product first' : `Product status: ${item.productApprovalStatus}`}
                                 >
                                   Update Stock
-                                </Button>
+                                </button>
                               )
                             )}
                             {hasPermission('inventory:view') && (
-                              <Button
-                                variant="outline"
-                                size="sm"
+                              <button
                                 onClick={() => handleViewHistory(item)}
+                                title="Stock History"
+                                className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                               >
                                 <History className="h-4 w-4" />
-                              </Button>
+                              </button>
                             )}
                             {hasPermission('inventory:edit') && (
                               <Link href={`/admin/dashboard/inventory/edit/${item.id}`}>
-                                <Button variant="outline" size="sm">
+                                <button
+                                  title="Edit Item"
+                                  className="p-2 rounded-lg text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                                >
                                   <Edit className="h-4 w-4" />
-                                </Button>
+                                </button>
                               </Link>
                             )}
                             {hasPermission('inventory:delete') && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className={`${item.hasProductCreated ? 'opacity-50 cursor-not-allowed' : 'text-red-600 hover:text-red-700 hover:bg-red-50'}`}
+                              <button
                                 onClick={() => handleDeleteClick(item)}
                                 title={item.hasProductCreated ? "Cannot delete: Product created from this item" : "Delete item"}
+                                className={`p-2 rounded-lg transition-colors ${item.hasProductCreated ? 'text-slate-300 cursor-not-allowed' : 'text-red-500 hover:text-red-700 hover:bg-red-50'}`}
                               >
                                 <Trash2 className="h-4 w-4" />
-                              </Button>
+                              </button>
                             )}
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))
+                      {canExpand && isExpanded && (
+                        <TableRow className="bg-slate-50/40 hover:bg-slate-50/40">
+                          <TableCell colSpan={9} className="!py-0">
+                            <div className="px-6 py-3">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-brand-500/70 mb-2">
+                                Variants ({variants.length})
+                              </p>
+                              <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="border-b border-slate-100 text-[10px] uppercase tracking-wider text-slate-400">
+                                      <th className="text-left px-4 py-2 font-semibold">Variant</th>
+                                      <th className="text-left px-4 py-2 font-semibold">SKU</th>
+                                      <th className="text-left px-4 py-2 font-semibold">Stock</th>
+                                      <th className="text-left px-4 py-2 font-semibold">Min Stock</th>
+                                      <th className="text-left px-4 py-2 font-semibold">Status</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {variants.map((v) => {
+                                      const vName = [v.variantName, v.size, v.color].filter(Boolean).join(' · ') || 'Variant'
+                                      return (
+                                        <tr key={v.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors">
+                                          <td className="px-4 py-2 font-medium text-slate-800">{vName}</td>
+                                          <td className="px-4 py-2 font-mono text-xs text-slate-500">{v.sku}</td>
+                                          <td className="px-4 py-2">
+                                            <span className={v.stock <= v.effectiveThreshold ? 'text-red-600 font-bold' : 'text-slate-900'}>{v.stock}</span>
+                                          </td>
+                                          <td className="px-4 py-2 text-slate-600">{v.effectiveThreshold}</td>
+                                          <td className="px-4 py-2">{getStatusBadge(v.stock, v.effectiveThreshold)}</td>
+                                        </tr>
+                                      )
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      </Fragment>
+                      )
+                    })
                   )}
                 </TableBody>
               </Table>
+              </div>
 
               {/* Pagination */}
               {totalPages > 1 && (

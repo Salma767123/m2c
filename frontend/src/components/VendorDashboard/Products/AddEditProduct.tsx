@@ -2121,13 +2121,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
                           {/* Variants Table */}
                           <div className="overflow-x-auto border border-slate-300 rounded-lg">
-                            <Table className="table-fixed w-full min-w-[720px] [&_th]:px-3 [&_th]:h-11 [&_td]:px-3 [&_td]:py-2">
+                            <Table className="table-fixed w-full min-w-[900px] [&_th]:px-3 [&_th]:h-11 [&_td]:px-3 [&_td]:py-2 [&_td]:align-middle">
                               <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                                 <TableRow>
-                                  <TableHead className="w-16">Image</TableHead>
-                                  <TableHead>Name</TableHead>
-                                  <TableHead className="w-44">Color</TableHead>
-                                  <TableHead className="w-36">SKU</TableHead>
+                                  <TableHead className="w-14">Image</TableHead>
+                                  <TableHead className="w-40">Name</TableHead>
+                                  <TableHead className="w-48">Color</TableHead>
+                                  <TableHead className="w-40">SKU</TableHead>
                                   <TableHead className="w-32">Price</TableHead>
                                   <TableHead className="w-28">Stock</TableHead>
                                   <TableHead className="text-center w-20">Action</TableHead>
@@ -2168,27 +2168,27 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                         value={variant.variantName || ''}
                                         onChange={(e) => updateVariant(variant.id, 'variantName', e.target.value)}
                                         placeholder="—"
-                                        className="w-full min-w-[100px] px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white"
+                                        className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white"
                                       />
                                     </TableCell>
                                     <TableCell>
-                                      <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-2 min-w-0">
                                         <input
                                           type="color"
                                           value={variant.colorHex || '#CCCCCC'}
                                           onChange={(e) => updateVariant(variant.id, 'colorHex', e.target.value)}
-                                          className="w-6 h-6 rounded border border-slate-300 cursor-pointer"
+                                          className="w-6 h-6 rounded border border-slate-300 cursor-pointer shrink-0"
                                           title="Click to change color"
                                         />
-                                        <div className="flex flex-col">
+                                        <div className="flex flex-col min-w-0 flex-1">
                                           <input
                                             type="text"
                                             value={variant.color}
                                             onChange={(e) => updateVariant(variant.id, 'color', e.target.value)}
-                                            className="w-full min-w-[90px] text-slate-900 text-sm font-medium bg-transparent border-none p-0 focus:outline-none focus:ring-1 focus:ring-slate-300 rounded px-1"
+                                            className="w-full text-slate-900 text-sm font-medium bg-transparent border-none p-0 focus:outline-none focus:ring-1 focus:ring-slate-300 rounded px-1 truncate"
                                             placeholder="Color name"
                                           />
-                                          <span className="text-slate-500 text-xs">{variant.colorHex || '#CCCCCC'}</span>
+                                          <span className="text-slate-500 text-xs px-1 truncate">{variant.colorHex || '#CCCCCC'}</span>
                                         </div>
                                       </div>
                                     </TableCell>
@@ -2198,12 +2198,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                         readOnly
                                         value={variant.sku || (formData.baseSku ? `${formData.baseSku}-${variantAlphaSuffix(idx + 1)}` : '')}
                                         placeholder="Auto-generated on save"
-                                        className="w-full min-w-[110px] px-2 py-1.5 border border-slate-200 rounded-md text-xs font-mono bg-slate-100 text-slate-600 cursor-not-allowed"
+                                        className="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs font-mono bg-slate-100 text-slate-600 cursor-not-allowed truncate"
                                         title="Auto-generated — not editable"
                                       />
                                     </TableCell>
                                     <TableCell>
-                                      <div className="relative min-w-[96px]">
+                                      <div className="relative">
                                         <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-slate-500 text-xs">₹</span>
                                         <input
                                           type="number"
@@ -2222,7 +2222,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                         value={variant.stock || ''}
                                         onFocus={(e) => e.currentTarget.select()}
                                         onChange={(e) => updateVariant(variant.id, 'stock', parseInt(e.target.value) || 0)}
-                                        className={`w-20 px-2 py-1.5 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white ${variant.stock > 20 ? 'border-green-300 text-green-800' :
+                                        className={`w-full px-2 py-1.5 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white ${variant.stock > 20 ? 'border-green-300 text-green-800' :
                                           variant.stock > 5 ? 'border-yellow-300 text-yellow-800' :
                                             'border-red-300 text-red-800'
                                           }`}
@@ -2429,7 +2429,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                           {/* Custom Tax Rate — always rendered to prevent layout shift; hidden when not applicable */}
                           <div className={showCustom ? '' : 'invisible pointer-events-none'}>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Custom Tax Rate</label>
-                            <div className="relative">
+                            <div className="flex items-center gap-1.5 w-full max-w-[160px] pl-3 pr-2.5 py-2.5 border border-slate-300 rounded-lg bg-white transition-colors focus-within:ring-2 focus-within:ring-brand-500/40 focus-within:border-brand-500">
                               <input
                                 type="number"
                                 min="0"
@@ -2443,9 +2443,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                 }))}
                                 placeholder="e.g., 12"
                                 tabIndex={showCustom ? undefined : -1}
-                                className="w-full pr-8 pl-3 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
+                                className="w-full min-w-0 border-0 bg-transparent p-0 text-sm text-slate-900 placeholder:text-slate-400 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
-                              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-800 pointer-events-none select-none">%</span>
+                              <span className="text-sm font-bold text-slate-800 select-none shrink-0">%</span>
                             </div>
                             <p className="text-xs text-slate-500 mt-1">Enter a custom tax percentage</p>
                           </div>
@@ -2967,7 +2967,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                           alt={image.alt}
                           className="w-full h-32 object-cover rounded border-2 border-slate-800"
                         />
-                        <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center">
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center">
                           <button
                             type="button"
                             onClick={() => removeImage(image.id)}
@@ -3038,7 +3038,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               alt={image.alt}
                               className="w-full h-20 object-cover rounded border"
                             />
-                            <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center gap-1">
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center gap-1">
                               {formData.images.filter(img => img.imageType === 'cover').length === 0 && (
                                 <button
                                   type="button"

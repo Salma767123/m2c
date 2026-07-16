@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
-  Eye, Package, CheckCircle, XCircle, Download,
+  Package, CheckCircle, XCircle,
   Search, X, ChevronLeft, ChevronRight, RotateCw,
 } from "lucide-react"
 import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalendar"
@@ -50,8 +50,9 @@ interface ProductReportSummary {
   category?: string
   approvalStatus?: string
   rejectionReason?: string
+  createdAt?: string
   updatedAt?: string
-  vendor?: { companyName?: string }
+  vendor?: { companyName?: string; vendorCode?: string }
   images?: { url: string }[]
 }
 
@@ -193,7 +194,7 @@ export default function ProductReportsTab() {
           <input
             id="product-report-search"
             type="text"
-            placeholder="Search by product, SKU, or vendor..."
+            placeholder="Search by product, or vendor..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="w-full pl-12 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white shadow-xs"
@@ -315,16 +316,20 @@ export default function ProductReportsTab() {
               <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Product</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor ID</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Category</TableHead>
-                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">SKU</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Submitted</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Inspected On</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Result</TableHead>
-                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredProducts.map((product) => (
-                <TableRow key={product.id} className="hover:bg-slate-50/50">
+                <TableRow
+                  key={product.id}
+                  onClick={() => router.push(`/checker/dashboard/report/product/${product.id}`)}
+                  className="hover:bg-slate-50/50 cursor-pointer"
+                >
                   <TableCell>
                     <div className="flex items-center gap-3">
                       {product.images?.[0]?.url ? (
@@ -345,15 +350,14 @@ export default function ProductReportsTab() {
                   <TableCell className="text-slate-600 text-sm">
                     {product.vendor?.companyName || "—"}
                   </TableCell>
+                  <TableCell className="text-slate-600 text-sm font-mono">
+                    {product.vendor?.vendorCode || "—"}
+                  </TableCell>
                   <TableCell className="text-slate-600 text-sm">{product.category || "—"}</TableCell>
-                  <TableCell>
-                    {product.baseSku ? (
-                      <span className="font-mono text-sm text-slate-600 bg-slate-50 px-2 py-1 rounded-md border border-slate-200">
-                        {product.baseSku}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 text-sm">—</span>
-                    )}
+                  <TableCell className="text-slate-600 text-sm">
+                    {product.createdAt
+                      ? new Date(product.createdAt).toLocaleDateString("en-IN")
+                      : "—"}
                   </TableCell>
                   <TableCell className="text-slate-600 text-sm">
                     {product.updatedAt
@@ -361,25 +365,6 @@ export default function ProductReportsTab() {
                       : "—"}
                   </TableCell>
                   <TableCell>{getStatusBadge(product.approvalStatus || "")}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => router.push(`/checker/dashboard/report/product/${product.id}`)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
-                        title="View Report"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        View Report
-                      </button>
-                      <button
-                        onClick={() => router.push(`/checker/dashboard/report/product/${product.id}?download=true`)}
-                        className="flex items-center justify-center w-8 h-8 text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
-                        title="Download PDF"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

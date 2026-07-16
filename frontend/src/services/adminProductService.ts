@@ -112,10 +112,20 @@ export interface AdminProduct {
   }>;
 }
 
+export interface AdminProductCounts {
+  total: number;
+  PENDING: number;
+  QC_APPROVED: number;
+  APPROVED: number;
+  REJECTED: number;
+  REINSPECTION: number;
+}
+
 export interface AdminProductsResponse {
   success: boolean;
   data: {
     products: AdminProduct[];
+    counts?: AdminProductCounts;
     pagination: {
       currentPage: number;
       totalPages: number;
@@ -141,6 +151,8 @@ class AdminProductService {
     approvalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION';
     status?: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
     search?: string;
+    dateFrom?: string;
+    dateTo?: string;
     vendorId?: string;
     category?: string;
   }): Promise<AdminProductsResponse> {
@@ -211,12 +223,24 @@ class AdminProductService {
       variantOriginalPricesUSD?: Record<string, number>;
       variantVisibilities?: Record<string, string>;
     },
-    subCategory?: string
-  ): Promise<{ success: boolean; data?: AdminProduct; message?: string }> {
+    subCategory?: string,
+    /**
+     * Resolution for a vendor-proposed (PENDING) category. The backend refuses
+     * to publish a product sitting on one without a decision — 'approve' adds it
+     * to the live taxonomy, 'merge' folds it into `categoryMergeTargetId`.
+     */
+    categoryResolution?: { action: 'approve' | 'merge'; targetCategoryId?: string }
+  ): Promise<{ success: boolean; data?: AdminProduct; message?: string; code?: string }> {
     try {
       const payload: any = {};
       if (subCategory !== undefined) {
         payload.subCategory = subCategory;
+      }
+      if (categoryResolution) {
+        payload.categoryAction = categoryResolution.action;
+        if (categoryResolution.targetCategoryId) {
+          payload.categoryMergeTargetId = categoryResolution.targetCategoryId;
+        }
       }
       if (adminPrice !== undefined) {
         payload.adminPrice = adminPrice;
@@ -246,7 +270,12 @@ class AdminProductService {
       const response = await axios.put(`/products/${id}/approve`, payload);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to approve product');
+      // Preserve the server's structured failure (notably CATEGORY_PENDING_REVIEW)
+      // so the caller can prompt for a decision instead of only showing a message.
+      const err: any = new Error(error?.message || 'Failed to approve product');
+      err.code = error?.data?.code;
+      err.details = error?.data?.data;
+      throw err;
     }
   }
 

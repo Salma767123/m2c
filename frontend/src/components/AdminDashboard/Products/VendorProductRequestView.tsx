@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
+import Dropdown from '@/components/UI/Dropdown'
 import {
   ArrowLeft,
   Check,
@@ -367,7 +368,16 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
       }
     } catch (error: any) {
       console.error('Error approving product:', error)
-      showErrorToast('Approval Failed', error.message || 'Unable to approve product.')
+      if (error?.code === 'CATEGORY_PENDING_REVIEW') {
+        // This page has no inline category-resolution control (the shared
+        // ApproveProductModal does) — point the admin at the review queue.
+        showErrorToast(
+          'Category Needs Review',
+          `${error.message} Resolve it in Catalog → Categories → "Pending Review", then approve again.`,
+        )
+      } else {
+        showErrorToast('Approval Failed', error.message || 'Unable to approve product.')
+      }
     } finally {
       setActionLoading(false)
     }
@@ -545,7 +555,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   <Button
                     variant="outline"
                     onClick={() => window.location.href = `/admin/dashboard/reinspection-review/product/${product.id}`}
-                    className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                    className="border-brand-300 text-brand-600 hover:bg-brand-50"
                   >
                     <FileText className="h-4 w-4 mr-2" />
                     Review &amp; Re-Inspect
@@ -754,14 +764,14 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               </div>
               <div className="divide-y divide-slate-100">
                 {/* Base variant */}
-                <div className="p-4 bg-blue-50/50">
+                <div className="p-4 bg-brand-50/40">
                   <div className="flex items-center gap-3 mb-3">
                     {product.singleUnitColorHex && (
-                      <div className="w-8 h-8 rounded-lg border-2 border-blue-200 shadow-sm shrink-0" style={{ backgroundColor: product.singleUnitColorHex }} />
+                      <div className="w-8 h-8 rounded-lg border-2 border-brand-200 shadow-sm shrink-0" style={{ backgroundColor: product.singleUnitColorHex }} />
                     )}
                     <div>
                       <p className="text-sm font-semibold text-slate-900">Base Unit</p>
-                      <p className="text-xs text-blue-600">Default variant</p>
+                      <p className="text-xs text-brand-600">Default variant</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -1081,180 +1091,190 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
       {/* Approval Modal */}
       {showApprovalModal && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Approve Product Request</h3>
-            <p className="text-slate-600 mb-4">
-              Set the final price for this product. This will be the price customers see.
-            </p>
-            <div className="mb-4 p-3 bg-slate-50 rounded-lg">
-              <p className="text-sm font-medium text-slate-700">Product: {product.name}</p>
-              <p className="text-sm text-slate-600">Vendor: {product.vendor.companyName}</p>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl">
+            {/* Header */}
+            <div className="mb-5">
+              <h3 className="text-xl font-bold text-slate-900">Approve Product Request</h3>
+              <p className="text-sm text-slate-500 mt-1">Set the final pricing customers will see, then approve the product.</p>
             </div>
 
-            {/* Category (fixed, chosen by vendor) + Subcategory (admin assigns
-                for the website listing at approval time). */}
-            <div className="mb-4 grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Category
-                </label>
-                <input
-                  type="text"
-                  value={product.category || '—'}
-                  readOnly
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md bg-slate-100 text-slate-600 cursor-not-allowed"
-                />
-                <p className="text-xs text-slate-500 mt-1">Selected by the vendor.</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Subcategory {subcategoryOptions.length > 0 && <span className="text-red-500">*</span>}
-                </label>
-                <select
-                  value={subCategory}
-                  onChange={(e) => setSubCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
-                  disabled={actionLoading || subcategoryOptions.length === 0}
-                >
-                  <option value="">
-                    {subcategoryOptions.length === 0 ? 'No subcategories for this category' : 'Select subcategory'}
-                  </option>
-                  {subcategoryOptions.map((name) => (
-                    <option key={name} value={name}>{name}</option>
-                  ))}
-                </select>
-                <p className="text-xs text-slate-500 mt-1">Assigned for the website listing.</p>
-              </div>
+            {/* Product summary */}
+            <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-brand-100 bg-brand-50/40 px-4 py-3 text-sm">
+              <span className="font-bold text-slate-900">{product.name}</span>
+              <span className="text-brand-300">·</span>
+              <span className="text-slate-600">{product.vendor.companyName}</span>
             </div>
 
-            {/* Base Pricing - always shown */}
-            <div className="mb-4 grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Admin Selling Price (₹) *
-                </label>
-                <div className="mb-2 text-sm text-slate-600">
-                  Vendor Base Price: ₹{product.basePrice}
-                </div>
-                <input
-                  type="number"
-                  value={adminPrice || ''}
-                  onChange={(e) => setAdminPrice(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                  placeholder="Enter selling price"
-                  step="0.01"
-                  min="0"
-                  disabled={actionLoading}
-                />
-                <p className="text-xs text-slate-500 mt-1">
-                  Final selling price customers see.
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Original Price (₹) *
-                </label>
-                <div className="mb-2 text-sm text-slate-600">
-                  For showing strikethrough discount
-                </div>
-                <input
-                  type="number"
-                  value={originalPrice || ''}
-                  onChange={(e) => setOriginalPrice(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                  placeholder="Enter original price"
-                  step="0.01"
-                  min="0"
-                  disabled={actionLoading}
-                />
-                {originalPrice && parseFloat(originalPrice) > parseFloat(adminPrice) && (
-                  <p className="text-xs text-green-600 mt-1">
-                    {Math.round(((parseFloat(originalPrice) - parseFloat(adminPrice)) / parseFloat(adminPrice)) * 100)}% off
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Currency Pricing */}
-            <div className="mb-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
-              <h4 className="text-sm font-semibold text-blue-900 mb-3">Currency Pricing</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-white rounded-md p-3 border border-blue-100">
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Selling Price (.in)</p>
-                  <p className="text-lg font-bold text-slate-900">₹{adminPrice || '—'}</p>
-                </div>
-                <div className="bg-white rounded-md p-3 border border-blue-100">
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Selling Price (.com)</p>
-                  <p className="text-lg font-bold text-slate-900">{adminPrice ? `$${convertINRtoUSD(parseFloat(adminPrice)).toFixed(2)}` : '—'}</p>
-                  <p className="text-[10px] text-green-600">Auto-calculated from exchange rate</p>
-                </div>
-              </div>
-
-              {/* Original Prices (MRP) */}
-              <p className="text-xs font-medium text-slate-600 mb-2 mt-4 border-b border-blue-200 pb-1">Original Prices (MRP)</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            {/* ── Category & Listing ─────────────────────────────────────────── */}
+            <section className="mb-6">
+              <h4 className="text-[11px] font-bold uppercase tracking-wider text-brand-500 mb-3">Category &amp; Listing</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="view-original-inr" className="block text-xs font-medium text-slate-700 mb-1">Original ₹ (MRP)</label>
+                  <label className="block text-sm font-semibold text-slate-800 mb-1.5">Category</label>
                   <input
-                    id="view-original-inr"
+                    type="text"
+                    value={product.category || '—'}
+                    readOnly
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-100 text-slate-600 cursor-not-allowed text-sm"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Selected by the vendor.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-800 mb-1.5">
+                    Subcategory {subcategoryOptions.length > 0 && <span className="text-brand-500">*</span>}
+                  </label>
+                  <select
+                    value={subCategory}
+                    onChange={(e) => setSubCategory(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                    disabled={actionLoading || subcategoryOptions.length === 0}
+                  >
+                    <option value="">
+                      {subcategoryOptions.length === 0 ? 'No subcategories for this category' : 'Select subcategory'}
+                    </option>
+                    {subcategoryOptions.map((name) => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-400 mt-1">Assigned for the website listing.</p>
+                </div>
+              </div>
+            </section>
+
+            {/* ── Base Pricing ───────────────────────────────────────────────── */}
+            <section className="mb-6">
+              <h4 className="text-[11px] font-bold uppercase tracking-wider text-brand-500 mb-3">Base Pricing (INR)</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-sm font-semibold text-slate-800">Admin Selling Price (₹) <span className="text-brand-500">*</span></label>
+                    <span className="text-xs text-slate-400">Base ₹{product.basePrice}</span>
+                  </div>
+                  <input
                     type="number"
-                    value={originalPriceINR || ''}
-                    onChange={(e) => setOriginalPriceINR(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors duration-200 text-sm"
-                    placeholder="MRP for .in domain"
+                    value={adminPrice || ''}
+                    onChange={(e) => setAdminPrice(e.target.value)}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
+                    placeholder="Enter selling price"
                     step="0.01"
                     min="0"
                     disabled={actionLoading}
                   />
+                  <p className="text-xs text-slate-400 mt-1">Final price customers see.</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Original $ (MRP)</label>
-                  <div className="w-full px-3 py-2.5 border border-slate-200 rounded-md bg-slate-50 text-sm text-slate-600">
-                    {originalPriceINR ? `$${convertINRtoUSD(parseFloat(originalPriceINR)).toFixed(2)}` : 'Auto-calculated'}
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-sm font-semibold text-slate-800">Original Price (₹) <span className="text-brand-500">*</span></label>
+                    {originalPrice && parseFloat(originalPrice) > parseFloat(adminPrice) && (
+                      <span className="text-xs font-semibold text-emerald-600">
+                        {Math.round(((parseFloat(originalPrice) - parseFloat(adminPrice)) / parseFloat(adminPrice)) * 100)}% off
+                      </span>
+                    )}
                   </div>
-                  <p className="text-[10px] text-green-600 mt-1">Auto-calculated from exchange rate</p>
-                </div>
-                <div>
-                  <label htmlFor="view-display-on" className="block text-xs font-medium text-slate-700 mb-1">Display On</label>
-                  <select
-                    id="view-display-on"
-                    value={priceVisibility}
-                    onChange={(e) => setPriceVisibility(e.target.value as 'IN_ONLY' | 'COM_ONLY' | 'BOTH')}
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors duration-200 text-sm"
+                  <input
+                    type="number"
+                    value={originalPrice || ''}
+                    onChange={(e) => setOriginalPrice(e.target.value)}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
+                    placeholder="Enter original price"
+                    step="0.01"
+                    min="0"
                     disabled={actionLoading}
-                  >
-                    <option value="BOTH">Both (.in & .com)</option>
-                    <option value="IN_ONLY">.in only (India)</option>
-                    <option value="COM_ONLY">.com only (Global)</option>
-                  </select>
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Struck-through to show the discount.</p>
                 </div>
               </div>
-              <p className="text-xs text-blue-700 mt-3">
-                INR/USD prices override admin selling price for their region. Original prices show as strikethrough.
-              </p>
-            </div>
+            </section>
+
+            {/* ── Currency Pricing (brand-tinted) ────────────────────────────── */}
+            <section className="mb-6 rounded-xl border border-brand-100 bg-brand-50/40 p-4">
+              <h4 className="text-[11px] font-bold uppercase tracking-wider text-brand-600">Currency Pricing</h4>
+              <p className="text-xs text-slate-500 mt-0.5 mb-3">.com prices auto-convert from INR at the live exchange rate.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-white rounded-lg p-3 border border-brand-100/70">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Selling Price (.in)</p>
+                  <p className="text-lg font-bold text-slate-900">₹{adminPrice || '—'}</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-brand-100/70">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Selling Price (.com)</p>
+                  <p className="text-lg font-bold text-slate-900">{adminPrice ? `$${convertINRtoUSD(parseFloat(adminPrice)).toFixed(2)}` : '—'}</p>
+                  <p className="text-[10px] text-emerald-600 mt-0.5">Auto-calculated</p>
+                </div>
+              </div>
+
+              {/* Original Prices (MRP) */}
+              <div className="mt-4 pt-4 border-t border-brand-100">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-3">Original Prices (MRP)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label htmlFor="view-original-inr" className="block text-xs font-semibold text-slate-700 mb-1">Original ₹ (MRP)</label>
+                    <input
+                      id="view-original-inr"
+                      type="number"
+                      value={originalPriceINR || ''}
+                      onChange={(e) => setOriginalPriceINR(e.target.value)}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors duration-200 text-sm"
+                      placeholder="MRP for .in"
+                      step="0.01"
+                      min="0"
+                      disabled={actionLoading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Original $ (MRP)</label>
+                    <div className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-50 text-sm text-slate-600">
+                      {originalPriceINR ? `$${convertINRtoUSD(parseFloat(originalPriceINR)).toFixed(2)}` : 'Auto'}
+                    </div>
+                    <p className="text-[10px] text-emerald-600 mt-1">Auto-calculated</p>
+                  </div>
+                  <div>
+                    <label htmlFor="view-display-on" className="block text-xs font-semibold text-slate-700 mb-1">Display On</label>
+                    <select
+                      id="view-display-on"
+                      value={priceVisibility}
+                      onChange={(e) => setPriceVisibility(e.target.value as 'IN_ONLY' | 'COM_ONLY' | 'BOTH')}
+                      className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors duration-200 text-sm"
+                      disabled={actionLoading}
+                    >
+                      <option value="BOTH">Both (.in & .com)</option>
+                      <option value="IN_ONLY">.in only (India)</option>
+                      <option value="COM_ONLY">.com only (Global)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs text-brand-600/80 mt-3">INR/USD prices override the admin selling price for their region. Original prices show as strikethrough.</p>
+            </section>
 
             {/* Variant Prices - shown only when product has variants */}
             {product.hasVariants && product.variants && product.variants.length > 0 && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-3">
-                  Set Prices for Each Variant
-                </label>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
+              <section className="mb-6">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-brand-500 mb-1">Variant Pricing</h4>
+                <p className="text-xs text-slate-500 mb-3">Set the selling &amp; original price for each variant — discount % auto-calculates.</p>
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                   {product.variants.map((variant) => (
                     <div key={variant.id} className="p-3 border border-slate-200 rounded-lg bg-white">
                       <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-3">
-                          <div
-                            className="w-6 h-6 rounded border border-slate-300"
-                            style={{ backgroundColor: variant.colorHex || '#ccc' }}
-                          />
-                          <div>
-                            <p className="text-sm font-medium text-slate-900">
-                              {variant.variantName?.trim() || [variant.size, variant.color].filter(Boolean).join(' - ') || 'Variant'}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              Vendor Price: ₹{variant.price} | Stock: {variant.stock}
+                        <div className="flex items-center gap-2.5">
+                          {variant.colorHex ? (
+                            <span className="w-7 h-7 rounded-md border border-slate-300 shadow-sm shrink-0" style={{ backgroundColor: variant.colorHex }} title={variant.colorHex} />
+                          ) : (
+                            <span className="w-7 h-7 rounded-md border border-dashed border-slate-300 shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-semibold text-slate-900 truncate">
+                                {variant.variantName?.trim() || variant.color || [variant.size, variant.color].filter(Boolean).join(' - ') || 'Variant'}
+                              </p>
+                              {variant.color && <span className="text-xs text-slate-500">{variant.color}</span>}
+                              {variant.colorHex && <span className="text-[10px] font-mono uppercase text-slate-400">{variant.colorHex}</span>}
+                            </div>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              Vendor ₹{variant.price} · Stock: {variant.stock}
                             </p>
                           </div>
                         </div>
@@ -1303,27 +1323,24 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                         </div>
                       </div>
                       {/* Variant Currency Preview */}
-                      <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-100">
-                        <p className="text-[10px] font-medium text-blue-600 mb-1.5">Currency Pricing</p>
+                      <div className="mt-3 p-2.5 rounded-lg border border-brand-100 bg-brand-50/40">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-brand-600 mb-1.5">Currency Pricing</p>
                         <div className="grid grid-cols-2 gap-2">
-                          <div className="bg-white rounded p-2 border border-blue-100">
-                            <p className="text-[10px] text-slate-500">Price (.in)</p>
-                            <p className="text-sm font-bold">₹{variantPrices[variant.id] || variant.price || '—'}</p>
+                          <div className="bg-white rounded-md p-2 border border-brand-100/70">
+                            <p className="text-[10px] text-slate-400">Price (.in)</p>
+                            <p className="text-sm font-bold text-slate-900">₹{variantPrices[variant.id] || variant.price || '—'}</p>
                           </div>
-                          <div className="bg-white rounded p-2 border border-blue-100">
-                            <p className="text-[10px] text-slate-500">Price (.com)</p>
-                            <p className="text-sm font-bold">{(variantPrices[variant.id] || variant.price) ? `$${convertINRtoUSD(parseFloat(variantPrices[variant.id] || String(variant.price))).toFixed(2)}` : '—'}</p>
-                            <p className="text-[8px] text-green-600">Auto from exchange rate</p>
+                          <div className="bg-white rounded-md p-2 border border-brand-100/70">
+                            <p className="text-[10px] text-slate-400">Price (.com)</p>
+                            <p className="text-sm font-bold text-slate-900">{(variantPrices[variant.id] || variant.price) ? `$${convertINRtoUSD(parseFloat(variantPrices[variant.id] || String(variant.price))).toFixed(2)}` : '—'}</p>
+                            <p className="text-[8px] text-emerald-600">Auto-calculated</p>
                           </div>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-slate-500 mt-2">
-                  Set admin selling price and original price for each variant. Discount % is auto-calculated.
-                </p>
-              </div>
+              </section>
             )}
 
             <div className="flex justify-end space-x-3 mt-6">
@@ -1379,16 +1396,12 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               )}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">QC Checker</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none text-sm"
+                <Dropdown
                   value={selectedQcChecker}
-                  onChange={(e) => setSelectedQcChecker(e.target.value)}
-                >
-                  <option value="">Select a QC Checker</option>
-                  {qcCheckers.map(qc => (
-                    <option key={qc.id} value={qc.id}>{formatCheckerName(qc)}</option>
-                  ))}
-                </select>
+                  onChange={(v) => setSelectedQcChecker(v as string)}
+                  placeholder="Select a QC Checker"
+                  options={qcCheckers.map(qc => ({ value: qc.id, label: formatCheckerName(qc) }))}
+                />
               </div>
               <div className="flex justify-end gap-3">
                 <button type="button" onClick={() => { setShowAssignModal(false); setSelectedQcChecker('') }}

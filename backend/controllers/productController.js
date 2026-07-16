@@ -4,6 +4,63 @@ const {
   resolveVariantImageUrls,
 } = require('../config/cloudinary');
 const { generateBaseSku, reconcileBaseSku, variantSkuFor } = require('../utils/skuGenerator');
+const { usdFromINR } = require('../utils/orderCurrency');
+const { stripAdminPricing } = require('../utils/vendorPricing');
+const { getCurrentExchangeRate } = require('./exchangeRateController');
+
+/** Parse a money input to a number, or null when it is absent/blank/non-numeric. */
+const numOrNull = (v) => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+/** First candidate that is actually set (0 counts as set; null/undefined do not). */
+const firstSet = (...values) => {
+  for (const v of values) {
+    if (v != null) return v;
+  }
+  return null;
+};
+
+/**
+ * Discount percentage off the original price.
+ *
+ * Discount is always a fraction OF THE ORIGINAL — "20% off ₹400" means the shopper pays
+ * ₹320 and saves ₹80/₹400. Dividing by the selling price instead answers a different
+ * question (the mark-up) and always overstates the saving: ₹400→₹350 is 12.5% off, but
+ * ÷350 reports 14%. That figure is advertised on the storefront badge, so it has to be
+ * the real one.
+ *
+ * Returns null when there is no genuine discount — the caller then leaves the field
+ * alone rather than writing a 0 or a negative.
+ */
+const discountPercent = (originalPrice, sellingPrice) => {
+  const orig = numOrNull(originalPrice);
+  const sell = numOrNull(sellingPrice);
+  if (orig == null || sell == null || orig <= 0 || sell >= orig) return null;
+  return Math.round(((orig - sell) / orig) * 100);
+};
+
+/**
+ * Build the regional price fields for a product or variant from admin input.
+ *
+ * INR is the source of truth and USD is derived from it, so an admin who fills in only
+ * the INR price still gets a correct .com price. An explicitly supplied USD price wins
+ * — that is the manual override — but a blank one is computed, never left null: a null
+ * priceUSD forces the storefront to convert on the fly, and used to make the order
+ * path bill the INR figure as USD.
+ */
+const deriveRegionalPrices = (src, rate) => {
+  const priceINR = firstSet(numOrNull(src.priceINR), numOrNull(src.adminFixedPrice));
+  const originalPriceINR = firstSet(numOrNull(src.originalPriceINR), numOrNull(src.originalPrice));
+  return {
+    priceINR,
+    priceUSD: numOrNull(src.priceUSD) ?? usdFromINR(priceINR, rate),
+    originalPriceINR,
+    originalPriceUSD: numOrNull(src.originalPriceUSD) ?? usdFromINR(originalPriceINR, rate),
+  };
+};
 
 const generateSlug = (name) => {
   return name
@@ -500,9 +557,11 @@ const getProduct = async (req, res) => {
       });
     }
 
+    // Admin and vendor share this endpoint. The admin needs the selling price; the
+    // vendor must not see it, so it is stripped rather than excluded by `select`.
     res.json({
       success: true,
-      data: product
+      data: req.user.role === 'VENDOR' ? stripAdminPricing(product) : product
     });
 
   } catch (error) {
@@ -693,7 +752,7 @@ const updateProduct = async (req, res) => {
 
             let discount = variant.discount ? parseFloat(variant.discount) : null;
             if (varOriginal && sellingINR && varOriginal > sellingINR) {
-              discount = Math.round(((varOriginal - sellingINR) / varOriginal) * 100);
+              discount = discountPercent(varOriginal, sellingINR);
             }
 
             return {
@@ -1019,7 +1078,7 @@ const getAvailableInventoryItems = async (req, res) => {
 const approveProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { adminPrice, variantPrices, originalPrice, variantOriginalPrices, priceINR, priceUSD, originalPriceINR, originalPriceUSD, priceVisibility, variantPricesINR, variantPricesUSD, variantOriginalPricesINR, variantOriginalPricesUSD, variantVisibilities, subCategory } = req.body;
+    const { adminPrice, variantPrices, originalPrice, variantOriginalPrices, priceINR, priceUSD, originalPriceINR, originalPriceUSD, priceVisibility, variantPricesINR, variantPricesUSD, variantOriginalPricesINR, variantOriginalPricesUSD, variantVisibilities, subCategory, categoryAction, categoryMergeTargetId } = req.body;
     const adminId = req.user.id;
 
     // Find the product with variants
@@ -1059,6 +1118,64 @@ const approveProduct = async (req, res) => {
         message: 'Product must be approved by QC (QC_APPROVED) before Admin approval'
       });
     }
+
+    // ── Vendor-proposed category gate ──────────────────────────────────────
+    // A product may sit on a category the vendor invented (status PENDING), which
+    // is invisible to the storefront. Approving it as-is would publish a product
+    // nobody can reach by browsing, so the admin must resolve the category in the
+    // same action: approve it into the taxonomy, or merge it into an existing one.
+    const pendingCategory = await prisma.category.findFirst({
+      where: { name: product.category, status: 'PENDING' },
+      select: { id: true, name: true, createdByVendorId: true },
+    });
+
+    if (pendingCategory) {
+      if (categoryAction === 'approve') {
+        await prisma.category.update({
+          where: { id: pendingCategory.id },
+          data: { status: 'ACTIVE', updatedBy: adminId },
+        });
+      } else if (categoryAction === 'merge') {
+        if (!categoryMergeTargetId) {
+          return res.status(400).json({
+            success: false,
+            code: 'CATEGORY_PENDING_REVIEW',
+            message: 'categoryMergeTargetId is required to merge the pending category',
+            data: { categoryId: pendingCategory.id, categoryName: pendingCategory.name },
+          });
+        }
+        const target = await prisma.category.findUnique({ where: { id: categoryMergeTargetId } });
+        if (!target || target.status !== 'ACTIVE') {
+          return res.status(400).json({
+            success: false,
+            message: 'Merge target must be an existing active category',
+          });
+        }
+        // Repoint every product on the pending name (this one included), then
+        // drop the now-unused proposal.
+        await prisma.product.updateMany({
+          where: { category: pendingCategory.name },
+          data: { category: target.name },
+        });
+        await prisma.category.delete({ where: { id: pendingCategory.id } });
+        // Keep the in-memory copy consistent with what we just wrote.
+        product.category = target.name;
+      } else {
+        // No decision supplied — tell the client what needs resolving so it can
+        // prompt, rather than silently publishing an unbrowsable product.
+        return res.status(400).json({
+          success: false,
+          code: 'CATEGORY_PENDING_REVIEW',
+          message: `"${pendingCategory.name}" is a vendor-proposed category awaiting review. Approve it or merge it into an existing category before publishing this product.`,
+          data: { categoryId: pendingCategory.id, categoryName: pendingCategory.name },
+        });
+      }
+    }
+
+    // Live exchange rate — fetched up-front because the variant pricing branch
+    // below auto-calculates USD prices and needs it before the base-price block.
+    const { getCurrentExchangeRate } = require('./exchangeRateController');
+    const exchangeRate = await getCurrentExchangeRate();
 
     // Prepare update data
     const updateData = {
@@ -1110,7 +1227,7 @@ const approveProduct = async (req, res) => {
             variantData.originalPriceINR = origPrice;
             variantData.originalPriceUSD = Math.round((origPrice / exchangeRate) * 100) / 100;
             if (origPrice > adminFixed) {
-              variantData.discount = Math.round(((origPrice - adminFixed) / origPrice) * 100);
+              variantData.discount = discountPercent(origPrice, adminFixed);
             }
           }
 
@@ -1134,9 +1251,8 @@ const approveProduct = async (req, res) => {
       if (originalPrice !== undefined && originalPrice !== null && parseFloat(originalPrice) > 0) {
         const origPrice = parseFloat(originalPrice);
         updateData.originalPrice = origPrice;
-        if (updateData.adminFixedPrice && origPrice > updateData.adminFixedPrice) {
-          updateData.discount = Math.round(((origPrice - updateData.adminFixedPrice) / updateData.adminFixedPrice) * 100);
-        }
+        const pct = discountPercent(origPrice, updateData.adminFixedPrice);
+        if (pct != null) updateData.discount = pct;
       }
 
     } else {
@@ -1156,18 +1272,14 @@ const approveProduct = async (req, res) => {
       if (originalPrice !== undefined && originalPrice !== null && parseFloat(originalPrice) > 0) {
         const origPrice = parseFloat(originalPrice);
         updateData.originalPrice = origPrice;
-        if (origPrice > parseFloat(finalAdminPrice)) {
-          updateData.discount = Math.round(((origPrice - parseFloat(finalAdminPrice)) / parseFloat(finalAdminPrice)) * 100);
-        }
+        const pct = discountPercent(origPrice, finalAdminPrice);
+        if (pct != null) updateData.discount = pct;
       }
     }
 
     // Centralized pricing: adminFixedPrice IS the selling price
     // priceINR = adminFixedPrice (synced automatically)
     // priceUSD = adminFixedPrice / exchangeRate (auto-calculated)
-    const { getCurrentExchangeRate } = require('./exchangeRateController');
-    const exchangeRate = await getCurrentExchangeRate();
-
     const sellingPrice = updateData.adminFixedPrice || (priceINR ? parseFloat(priceINR) : null);
     if (sellingPrice) {
       updateData.adminFixedPrice = sellingPrice;
@@ -1477,6 +1589,8 @@ const createProductByAdmin = async (req, res) => {
       adminFixedPrice, // Admin can set their own price
       priceINR,
       priceUSD,
+      originalPriceINR,
+      originalPriceUSD,
       priceVisibility,
 
       // Single Unit Pricing Configuration
@@ -1635,6 +1749,15 @@ const createProductByAdmin = async (req, res) => {
       // Generate unique slug
       const adminSlug = await generateUniqueSlug(name);
 
+      // Derive the USD prices the same way approveProduct and updateProductByAdmin do.
+      // Without this an admin-created product goes live with priceUSD = null, and the
+      // .com storefront has to convert it on the fly on every render.
+      const createRate = await getCurrentExchangeRate();
+      const productPrices = deriveRegionalPrices(
+        { priceINR, priceUSD, originalPriceINR, originalPriceUSD, adminFixedPrice, originalPrice },
+        createRate
+      );
+
       // Create product
       const product = await tx.product.create({
         data: {
@@ -1650,9 +1773,8 @@ const createProductByAdmin = async (req, res) => {
           originalPrice: originalPrice ? parseFloat(originalPrice) : null,
           discount: discount ? parseFloat(discount) : null,
           gstPercentage: gstPercentage !== null && gstPercentage !== undefined && gstPercentage !== '' ? parseFloat(gstPercentage) : null,
-          adminFixedPrice: adminFixedPrice ? parseFloat(adminFixedPrice) : null,
-          priceINR: priceINR ? parseFloat(priceINR) : null,
-          priceUSD: priceUSD ? parseFloat(priceUSD) : null,
+          adminFixedPrice: numOrNull(adminFixedPrice),
+          ...productPrices,
           priceVisibility: priceVisibility || 'BOTH',
 
           // Single Unit Pricing Configuration
@@ -1703,11 +1825,9 @@ const createProductByAdmin = async (req, res) => {
           price: parseFloat(variant.price),
           originalPrice: variant.originalPrice ? parseFloat(variant.originalPrice) : null,
           discount: variant.discount ? parseFloat(variant.discount) : null,
-          adminFixedPrice: variant.adminFixedPrice ? parseFloat(variant.adminFixedPrice) : null,
-          priceINR: variant.priceINR ? parseFloat(variant.priceINR) : null,
-          priceUSD: variant.priceUSD ? parseFloat(variant.priceUSD) : null,
-          originalPriceINR: variant.originalPriceINR ? parseFloat(variant.originalPriceINR) : null,
-          originalPriceUSD: variant.originalPriceUSD ? parseFloat(variant.originalPriceUSD) : null,
+          adminFixedPrice: numOrNull(variant.adminFixedPrice),
+          // INR is the source of truth; USD is derived. Same rule as the parent product.
+          ...deriveRegionalPrices(variant, createRate),
           priceVisibility: variant.priceVisibility || 'BOTH',
           stock: parseInt(variant.stock) || 0,
           lowStockThreshold: variant.lowStockThreshold != null && variant.lowStockThreshold !== '' ? parseInt(variant.lowStockThreshold) : null,
@@ -2015,7 +2135,7 @@ const updateProductByAdmin = async (req, res) => {
 
             let discount = variant.discount ? parseFloat(variant.discount) : null;
             if (varOriginal && sellingINR && varOriginal > sellingINR) {
-              discount = Math.round(((varOriginal - sellingINR) / varOriginal) * 100);
+              discount = discountPercent(varOriginal, sellingINR);
             }
 
             return {
@@ -2188,7 +2308,9 @@ const getAllProductsForAdmin = async (req, res) => {
       status,
       search,
       vendorId,
-      category
+      category,
+      dateFrom,
+      dateTo
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -2218,6 +2340,13 @@ const getAllProductsForAdmin = async (req, res) => {
         { description: { contains: search, mode: 'insensitive' } },
         { baseSku: { contains: search, mode: 'insensitive' } }
       ];
+    }
+
+    // Created-date range filter (YYYY-MM-DD)
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+      if (dateTo) where.createdAt.lte = new Date(`${dateTo}T23:59:59.999Z`);
     }
 
     // Get products with pagination
@@ -2265,12 +2394,30 @@ const getAllProductsForAdmin = async (req, res) => {
       prisma.product.count({ where })
     ]);
 
+    // Per-approval-status counts for the metric cards. Ignore the approvalStatus
+    // filter itself (so selecting one card doesn't shrink the others) while still
+    // respecting search / status / vendor / category / date filters.
+    const countsWhere = { ...where };
+    delete countsWhere.approvalStatus;
+    const grouped = await prisma.product.groupBy({
+      by: ['approvalStatus'],
+      where: countsWhere,
+      _count: { _all: true }
+    });
+    const counts = { total: 0, PENDING: 0, QC_APPROVED: 0, APPROVED: 0, REJECTED: 0, REINSPECTION: 0 };
+    for (const g of grouped) {
+      const n = g._count._all;
+      if (counts[g.approvalStatus] !== undefined) counts[g.approvalStatus] = n;
+      counts.total += n;
+    }
+
     const totalPages = Math.ceil(totalCount / parseInt(limit));
 
     res.json({
       success: true,
       data: {
         products,
+        counts,
         pagination: {
           currentPage: parseInt(page),
           totalPages,

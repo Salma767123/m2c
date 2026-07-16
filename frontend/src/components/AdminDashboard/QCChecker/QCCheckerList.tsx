@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Eye, Edit, Trash2, UserPlus, Mail, Phone, Calendar, RefreshCw, Send, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Eye, Edit, Trash2, UserPlus, Mail, Phone, Calendar, RefreshCw, Send, ChevronLeft, ChevronRight, Users, UserCheck, UserX, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
+import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalendar";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { qcCheckerService, QCCheckerData } from "@/services/qcCheckerService";
 import { formatCheckerName } from "@/lib/checkerUtils";
@@ -32,20 +33,20 @@ export default function QCCheckerList() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmModal, setConfirmModal] = useState<{ type: 'delete' | 'resend'; id: string; label: string } | null>(null);
 
-  // Fetch QC Checkers
+  // Fetch the FULL checker set so the metric cards reflect global totals.
+  // Search + status filtering is applied client-side below, so clicking a card
+  // never shrinks the other counts.
   const fetchCheckers = async () => {
     setLoading(true);
     try {
-      const params: { status?: string; search?: string } = {};
-      if (filterStatus !== "all") params.status = filterStatus;
-      if (searchTerm) params.search = searchTerm;
-
-      const result = await qcCheckerService.getAllQCCheckers(params);
+      const result = await qcCheckerService.getAllQCCheckers({});
       if (result.success) {
         setCheckers(result.data);
       }
@@ -58,18 +59,13 @@ export default function QCCheckerList() {
   };
 
   useEffect(() => {
-    setCurrentPage(1);
     fetchCheckers();
-  }, [filterStatus]);
+  }, []);
 
-  // Debounced search
+  // Reset to first page when the client-side search/filter changes.
   useEffect(() => {
     setCurrentPage(1);
-    const timer = setTimeout(() => {
-      fetchCheckers();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [searchTerm, filterStatus, dateFrom, dateTo]);
 
   // Delete handler
   const handleDeleteClick = (id: string, name: string) => {
@@ -124,12 +120,40 @@ export default function QCCheckerList() {
     );
   };
 
-  const totalPages = Math.max(1, Math.ceil(checkers.length / PAGE_SIZE));
-  const paginatedCheckers = checkers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  // Client-side search + status filter (stats below stay global from `checkers`).
+  const filteredCheckers = checkers.filter((c) => {
+    const matchesStatus = filterStatus === "all" || c.status === filterStatus;
+    const q = searchTerm.trim().toLowerCase();
+    const matchesSearch = !q ||
+      `${formatCheckerName(c)} ${c.email || ""} ${c.phone || ""} ${c.checkerId || ""}`.toLowerCase().includes(q);
+
+    // Joined-date range filter (YYYY-MM-DD strings compare lexicographically)
+    let matchesDate = true;
+    if (dateFrom || dateTo) {
+      const jd = c.joiningDate ? fmtDate(new Date(c.joiningDate)) : "";
+      if (!jd) matchesDate = false;
+      else if (dateFrom && jd < dateFrom) matchesDate = false;
+      else if (dateTo && jd > dateTo) matchesDate = false;
+    }
+
+    return matchesStatus && matchesSearch && matchesDate;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredCheckers.length / PAGE_SIZE));
+  const paginatedCheckers = filteredCheckers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const totalActive = checkers.filter((c) => c.status === "ACTIVE").length;
   const totalInactive = checkers.filter((c) => c.status === "INACTIVE").length;
   const totalInspections = checkers.reduce((sum, c) => sum + (c.completedInspections || 0), 0);
+
+  // Metric cards — styled like the Vendor Product Requests module. The first
+  // three filter the table; Total Inspections is a read-only derived metric.
+  const metricCards = [
+    { key: "all",      label: "Total Checkers",    subtitle: "All checkers",     value: checkers.length, Icon: Users,         iconBg: "bg-brand-50",   iconColor: "text-brand-500",   countColor: "text-slate-900",  activeClass: "border-brand-400 bg-brand-50/50" },
+    { key: "ACTIVE",   label: "Active",            subtitle: "Currently active", value: totalActive,     Icon: UserCheck,     iconBg: "bg-emerald-50", iconColor: "text-emerald-500", countColor: "text-emerald-700", activeClass: "border-emerald-400 bg-emerald-50/60" },
+    { key: "INACTIVE", label: "Inactive",          subtitle: "Disabled",         value: totalInactive,   Icon: UserX,         iconBg: "bg-slate-100",  iconColor: "text-slate-500",   countColor: "text-slate-700",  activeClass: "border-slate-400 bg-slate-100/60" },
+    { key: null,       label: "Total Inspections", subtitle: "Completed",        value: totalInspections, Icon: ClipboardList, iconBg: "bg-blue-50",    iconColor: "text-blue-500",    countColor: "text-blue-700",   activeClass: "" },
+  ];
 
   return (
     <div className="p-6">
@@ -159,32 +183,40 @@ export default function QCCheckerList() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-slate-600">Total Checkers</div>
-            <div className="text-2xl font-bold text-slate-900">{checkers.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-slate-600">Active</div>
-            <div className="text-2xl font-bold text-green-600">{totalActive}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-slate-600">Inactive</div>
-            <div className="text-2xl font-bold text-slate-600">{totalInactive}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-slate-600">Total Inspections</div>
-            <div className="text-2xl font-bold text-blue-600">{totalInspections}</div>
-          </CardContent>
-        </Card>
+      {/* Stats — click the first three cards to filter the table below */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {metricCards.map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
+          const clickable = key !== null;
+          const isActive = clickable && filterStatus === key;
+          const body = (
+            <>
+              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+                <span className="text-sm font-medium text-slate-500">{label}</span>
+                <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace("50", "100") : iconBg} transition-transform duration-150 ${clickable ? "group-hover:scale-110" : ""}`}>
+                  <Icon className={`h-4 w-4 ${iconColor}`} />
+                </div>
+              </div>
+              <div className="px-4 pb-4">
+                <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              </div>
+            </>
+          );
+          return clickable ? (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setFilterStatus((prev) => (prev === key ? "all" : key))}
+              className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : "border-slate-200/80 hover:border-slate-300"}`}
+            >
+              {body}
+            </button>
+          ) : (
+            <div key={label} className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+              {body}
+            </div>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -212,6 +244,14 @@ export default function QCCheckerList() {
                 ]}
                 onChange={(val) => setFilterStatus(val as string)}
                 placeholder="Filter by status"
+              />
+            </div>
+            <div className="shrink-0">
+              <DateRangeCalendar
+                from={dateFrom}
+                to={dateTo}
+                onChange={(from, to) => { setDateFrom(from); setDateTo(to); }}
+                placeholder="Joined Date"
               />
             </div>
           </div>

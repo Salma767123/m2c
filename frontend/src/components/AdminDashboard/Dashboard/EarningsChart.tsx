@@ -12,7 +12,7 @@ const CustomTooltip = ({ active, payload }: any) => {
         <p className="font-semibold text-slate-900 mb-2">{payload[0].payload.month}</p>
         {payload.map((entry: any, index: number) => (
           <p key={index} className="text-sm" style={{ color: entry.color }}>
-            {entry.name}: ${entry.value.toLocaleString()}
+            {entry.name}: ₹{entry.value.toLocaleString('en-IN')}
           </p>
         ))}
       </div>
@@ -46,10 +46,11 @@ export default function EarningsChart({ earningsData }: { earningsData: any[] })
               stroke="#94a3b8"
               style={{ fontSize: '12px' }}
             />
+            {/* earningsData is built from Order.totalAmountINR — rupees, not dollars. */}
             <YAxis
               stroke="#94a3b8"
               style={{ fontSize: '12px' }}
-              tickFormatter={(value) => `$${value / 1000}k`}
+              tickFormatter={(value) => `₹${value / 1000}k`}
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend

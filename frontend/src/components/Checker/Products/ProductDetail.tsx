@@ -65,6 +65,18 @@ const formatDate = (iso?: string | null) => {
     }
 }
 
+const formatDateTime = (iso?: string | null) => {
+    if (!iso) return "—"
+    try {
+        return new Date(iso).toLocaleString("en-IN", {
+            day: "2-digit", month: "short", year: "numeric",
+            hour: "2-digit", minute: "2-digit", hour12: true,
+        })
+    } catch {
+        return "—"
+    }
+}
+
 const formatCurrency = (value?: number | null) => {
     if (value === null || value === undefined) return "—"
     return `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -237,7 +249,6 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                                     {APPROVAL_LABELS[product.approvalStatus] || product.approvalStatus}
                                 </span>
                             </div>
-                            <p className="text-sm text-slate-500 mt-1">SKU: <span className="font-mono">{product.baseSku}</span></p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -277,11 +288,16 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                         <SummaryStat
                             icon={<CheckCircle className="w-5 h-5" />}
                             label="Last Inspected"
-                            value={formatDate(product.approvedAt)}
+                            value={formatDate(
+                                product.lastReviewedAt
+                                || product.approvedAt
+                                || ((product.qcInspectionData as Record<string, unknown> | null)?.inspectionStartedAt as string | undefined)
+                                || null
+                            )}
                         />
                         <SummaryStat
                             icon={<Clock className="w-5 h-5" />}
-                            label="Listed"
+                            label="Assigned"
                             value={formatDate(product.createdAt)}
                         />
                     </div>
@@ -824,8 +840,8 @@ function QcActivityTab({ product }: { product: ProductDetailData }) {
 
             {/* Timestamps */}
             <Section title="Timeline">
-                <Row icon={<Clock className="w-4 h-4" />} label="Listed on" value={formatDate(product.createdAt)} />
-                <Row icon={<Clock className="w-4 h-4" />} label="Last updated" value={formatDate(product.updatedAt)} />
+                <Row icon={<Clock className="w-4 h-4" />} label="Listed on" value={formatDateTime(product.createdAt)} />
+                <Row icon={<Clock className="w-4 h-4" />} label="Last updated" value={formatDateTime(product.updatedAt)} />
             </Section>
         </div>
     )

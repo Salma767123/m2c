@@ -8,6 +8,7 @@ import { Pagination } from 'swiper/modules';
 import type { Swiper as SwiperType } from 'swiper';
 import { categoryService } from '@/services/categoryService';
 import { Package } from 'lucide-react';
+import Reveal from '@/components/WebSite/Shared/Reveal';
 
 // Import Swiper styles
 import 'swiper/css';
@@ -130,11 +131,15 @@ export default function Category() {
     >
       <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         {/* Header Section */}
-        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 sm:gap-6 lg:gap-8 mb-8 sm:mb-10 md:mb-12 lg:mb-16">
+        <Reveal className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 sm:gap-6 lg:gap-8 mb-8 sm:mb-10 md:mb-12 lg:mb-16">
           <div className="text-center lg:text-left flex-1">
-            <h2 
+            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
+              <span className="h-px w-6 bg-[#e01a1b]" />
+              Categories
+            </span>
+            <h2
               id="category-heading"
-              className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold text-[#313131] mb-2 sm:mb-3 md:mb-4"
+              className="font-playfair text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-semibold text-[#1a1a1a] mb-2 sm:mb-3 md:mb-4 tracking-tight"
             >
               Shop by Category
             </h2>
@@ -145,16 +150,16 @@ export default function Category() {
 
           {/* View All Categories Button */}
           <div className="flex justify-center lg:justify-end lg:ml-8 shrink-0">
-            <Link 
+            <Link
               href="/categories"
-              className="inline-block bg-gray-800 text-white px-4 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-800 focus:ring-offset-2 transition-all font-semibold text-xs sm:text-sm md:text-base whitespace-nowrap transform hover:scale-105 active:scale-95 duration-200"
+              className="btn-shine inline-flex items-center justify-center bg-[#e01a1b] text-white px-6 md:px-8 py-2.5 md:py-3 rounded-full hover:bg-[#c41617] focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:ring-offset-2 shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 font-semibold text-xs sm:text-sm md:text-base whitespace-nowrap"
               aria-label="View all categories"
             >
               <span className="hidden sm:inline">View All Categories</span>
               <span className="sm:hidden">View All</span>
             </Link>
           </div>
-        </div>
+        </Reveal>
 
         {/* Categories Swiper */}
         <div className="relative" onKeyDown={handleKeyDown} tabIndex={0} role="region" aria-label="Categories navigation">
@@ -212,18 +217,18 @@ export default function Category() {
               <SwiperSlide key={`${category.id}-${index}`}>
                 <Link
                   href={`/categories/${category.slug}`}
-                  className="group text-center block w-full focus:outline-none focus:ring-2 focus:ring-gray-800 focus:ring-offset-2 rounded-xl"
+                  className="group text-center block w-full focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:ring-offset-2 rounded-2xl"
                   aria-label={`Browse ${category.name} category`}
                 >
                   {/* Category Image */}
-                  <div className="relative w-full aspect-square mb-3 sm:mb-4 overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-500 group-hover:shadow-2xl group-focus:shadow-2xl">
+                  <div className="relative w-full aspect-square mb-3 sm:mb-4 overflow-hidden rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] group-hover:-translate-y-1.5 group-hover:ring-[#e01a1b]/20 transition-all duration-500">
                     {category.image && !imageErrors.has(category.image) ? (
                       <Image
                         src={category.image}
                         alt={`${category.name} category image`}
                         fill
                         sizes="(max-width: 480px) 50vw, (max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, (max-width: 1280px) 16vw, (max-width: 1536px) 14vw, 12vw"
-                        className="object-cover group-hover:scale-110 transition-transform duration-700"
+                        className="object-cover group-hover:scale-110 transition-transform duration-[900ms] ease-out"
                         onError={() => handleImageError(category.image!)}
                         loading={index < 4 ? 'eager' : 'lazy'}
                         priority={index < 4}
@@ -238,11 +243,11 @@ export default function Category() {
                     <div className="absolute inset-0 bg-linear-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-300 rounded-xl" aria-hidden="true"></div>
                     
                     {/* Hover Effect Ring */}
-                    <div className="absolute inset-0 rounded-xl ring-2 ring-transparent group-hover:ring-gray-300 group-focus:ring-gray-300 transition-all duration-300" aria-hidden="true"></div>
+                    <div className="absolute inset-0 rounded-2xl ring-2 ring-transparent group-hover:ring-[#e01a1b]/30 group-focus:ring-[#e01a1b]/30 transition-all duration-300" aria-hidden="true"></div>
                   </div>
 
                   {/* Category Name */}
-                  <h3 className="text-xs sm:text-sm md:text-base font-semibold text-gray-700 group-hover:text-[#313131] group-focus:text-[#313131] transition-colors duration-200 px-1 leading-tight break-words">
+                  <h3 className="text-xs sm:text-sm md:text-base font-semibold text-gray-700 group-hover:text-[#e01a1b] group-focus:text-[#e01a1b] transition-colors duration-200 px-1 leading-tight break-words">
                     {category.name}
                   </h3>
                 </Link>
@@ -253,9 +258,9 @@ export default function Category() {
 
         {/* Mobile View All Button (Bottom) */}
         <div className="flex justify-center mt-8 sm:mt-10 md:mt-12 lg:hidden">
-          <Link 
+          <Link
             href="/categories"
-            className="inline-block bg-gray-800 text-white px-6 sm:px-8 py-3 sm:py-3.5 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-800 focus:ring-offset-2 transition-all font-semibold text-sm sm:text-base transform hover:scale-105 active:scale-95 duration-200"
+            className="btn-shine inline-flex items-center justify-center bg-[#e01a1b] text-white px-6 sm:px-8 py-3 sm:py-3.5 rounded-full hover:bg-[#c41617] focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:ring-offset-2 shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 font-semibold text-sm sm:text-base"
             aria-label="View all categories"
           >
             View All Categories
@@ -287,7 +292,7 @@ export default function Category() {
         
         .categories-swiper .swiper-pagination-bullet-active {
           transform: scale(1.2) !important;
-          background-color: rgb(31, 41, 55) !important;
+          background-color: #e01a1b !important;
           opacity: 1 !important;
         }
         

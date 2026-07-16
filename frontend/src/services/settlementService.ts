@@ -8,6 +8,13 @@ export interface Settlement {
     orderId: string;
     billingNumber: string;
     period: string;
+    /** Vendor's goods value before their GST. Null on rows created before the split existed. */
+    baseAmount?: number | null;
+    /** Vendor's GST on baseAmount. 0 for unregistered vendors (no GSTIN). */
+    taxAmount?: number | null;
+    /** Rate applied — null when the settlement spans mixed HSN rates. */
+    gstPercentage?: number | null;
+    /** GROSS payable to the vendor = baseAmount + taxAmount. */
     amount: number;
     dueDate: string | null;
     status: "Pending" | "Processing" | "Paid" | "Failed" | "Cancelled";

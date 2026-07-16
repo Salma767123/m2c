@@ -16,7 +16,8 @@ const {
   vendorLogin,
   testVendorEmail,
   assignQc,
-  verifyVendorBankDetails
+  verifyVendorBankDetails,
+  upsertVendorBankDetailsByAdmin
 } = require('../controllers/vendorController');
 const { authenticateToken, requireRole, requirePermission } = require('../middleware/auth');
 const { vendorUploadFields, handleUploadError } = require('../middleware/upload');
@@ -44,6 +45,8 @@ router.put('/:vendorId/reject', authenticateToken, requireRole('admin'), require
 router.put('/:vendorId/confirm-rejection', authenticateToken, requireRole('admin'), requirePermission('vendor_management:approve'), confirmRejection);
 router.put('/:vendorId/cancel-rejection', authenticateToken, requireRole('admin'), requirePermission('vendor_management:approve'), cancelRejection);
 router.put('/:vendorId/suspend', authenticateToken, requireRole('admin'), requirePermission('vendor_management:suspend'), suspendVendor);
+// Admin create/update of a vendor's bank details (vendor portal parity)
+router.put('/:vendorId/bank-details', authenticateToken, requireRole('admin'), requirePermission('vendor_management:edit'), upsertVendorBankDetailsByAdmin);
 router.put('/:vendorId/verify-bank', authenticateToken, requireRole('admin'), requirePermission('vendor_management:edit'), verifyVendorBankDetails);
 router.post('/assign-qc', authenticateToken, requireRole('admin'), requirePermission(['assign_qc_checker:create', 'assign_qc_checker:edit']), assignQc);
 

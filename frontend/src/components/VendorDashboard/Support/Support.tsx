@@ -232,21 +232,21 @@ export default function Support() {
         </div>
       </div>
 
-      {/* Results summary */}
-      <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
-        <span>
-          {filteredTickets.length === 0
-            ? '0 tickets'
-            : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filteredTickets.length)} of ${filteredTickets.length} ticket${filteredTickets.length === 1 ? '' : 's'}`}
-        </span>
-      </div>
+      {/* Results summary — only shown when there are tickets to page through */}
+      {filteredTickets.length > 0 && (
+        <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
+          <span>
+            {`Showing ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filteredTickets.length)} of ${filteredTickets.length} ticket${filteredTickets.length === 1 ? '' : 's'}`}
+          </span>
+        </div>
+      )}
 
       {/* Tickets Table */}
       <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b [&_tr]:border-slate-200/80 [&_th]:!text-slate-500 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
-              <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
+              <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
                 <TableHead>Ticket</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Priority</TableHead>

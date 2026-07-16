@@ -14,7 +14,12 @@ export interface Category {
     name: string;
     slug: string;
   };
-  status: 'ACTIVE' | 'INACTIVE';
+  /** PENDING = vendor-proposed, awaiting admin review (never shown on the website). */
+  status: 'PENDING' | 'ACTIVE' | 'INACTIVE';
+  /** True when a vendor proposed this category via the Step 4 "Other" path. */
+  isCustom?: boolean;
+  /** Vendor that proposed it (set alongside isCustom). */
+  createdByVendorId?: string | null;
   image?: string;
   metaTitle?: string;
   metaDescription?: string;
@@ -30,12 +35,15 @@ export interface Category {
   breadcrumb?: Category[]; // For breadcrumb navigation
 }
 
+// The form mirrors an existing Category, which may already be PENDING, so the
+// status must accept every Category status even though the editor's dropdown
+// only ever sets ACTIVE / INACTIVE.
 export interface CategoryFormData {
   name: string;
   description: string;
   slug?: string;
   parentId?: string;
-  status: 'ACTIVE' | 'INACTIVE';
+  status: 'PENDING' | 'ACTIVE' | 'INACTIVE';
   image?: string;
   metaTitle?: string;
   metaDescription?: string;
@@ -48,7 +56,7 @@ export interface SubcategoryFormData {
   name: string;
   description: string;
   slug?: string;
-  status: 'ACTIVE' | 'INACTIVE';
+  status: 'PENDING' | 'ACTIVE' | 'INACTIVE';
   image?: string;
   sortOrder: number;
 }
@@ -68,9 +76,20 @@ export interface CategoryStats {
   inactiveAllCategories: number;
 }
 
+/** Fields an admin may fill in while approving a vendor-proposed category. */
+export interface ApprovePendingData {
+  name?: string;
+  description?: string;
+  image?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  parentId?: string | null;
+  sortOrder?: number;
+}
+
 export interface CategoryFilters {
   search?: string;
-  status?: 'all' | 'ACTIVE' | 'INACTIVE';
+  status?: 'all' | 'PENDING' | 'ACTIVE' | 'INACTIVE';
   parentId?: string;
   includeSubcategories?: boolean;
   showRootOnly?: boolean; // New parameter to control root-only display
@@ -174,6 +193,26 @@ class CategoryService {
   // Bulk update category status (admin only)
   async bulkUpdateStatus(categoryIds: string[], status: 'ACTIVE' | 'INACTIVE'): Promise<{ message: string; data: { updatedCount: number } }> {
     const response = await axiosInstance.patch('/categories/bulk-status', { categoryIds, status });
+    return response.data;
+  }
+
+  // ── Vendor-proposed (PENDING) category review (admin only) ────────────────
+
+  /** Approve a vendor-proposed category — it joins the live taxonomy. */
+  async approvePendingCategory(id: string, data: ApprovePendingData = {}): Promise<{ message: string; data: { category: Category; productsRenamed: number } }> {
+    const response = await axiosInstance.patch(`/categories/${id}/approve`, data);
+    return response.data;
+  }
+
+  /** Merge a vendor-proposed category into an existing one (duplicate case). */
+  async mergePendingCategory(id: string, targetCategoryId: string): Promise<{ message: string; data: { mergedInto: string; productsMoved: number } }> {
+    const response = await axiosInstance.patch(`/categories/${id}/merge`, { targetCategoryId });
+    return response.data;
+  }
+
+  /** Reject a vendor-proposed category (blocked while products still use it). */
+  async rejectPendingCategory(id: string): Promise<{ message: string }> {
+    const response = await axiosInstance.delete(`/categories/${id}/reject`);
     return response.data;
   }
 

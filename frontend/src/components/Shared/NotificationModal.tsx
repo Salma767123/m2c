@@ -90,6 +90,32 @@ export const DEFAULT_CATEGORIES: CategoryDef[] = [
   { key: 'system', label: 'System', types: ['VENDOR_STATUS_CHANGED','NEW_VENDOR_REGISTRATION'] },
 ]
 
+/**
+ * Categories for the storefront customer (role USER).
+ *
+ * These are the ONLY notification types the backend ever sends to a customer:
+ *   - orderController        → ORDER_CONFIRMED
+ *   - adminOrderController   → ORDER_SHIPPED_TO_CUSTOMER, ORDER_DELIVERED,
+ *                              ORDER_CANCELLED, ORDER_RETURNED
+ *   - supportController      → SUPPORT_REPLY (when an admin replies to a
+ *                              ticket the customer raised)
+ * Intermediate hub statuses (VENDOR_PROCESSING, IN_TRANSIT_TO_ADMIN_HUB, …)
+ * are internal and deliberately never sent to customers.
+ *
+ * Customers previously got the vendor/admin DEFAULT_CATEGORIES, which meant
+ * four permanently-empty tabs (Products, Payments, Support, System) — Support
+ * and System there only match vendor types like NEW_SUPPORT_TICKET and
+ * VENDOR_STATUS_CHANGED, which a customer can never receive.
+ *
+ * Keep this in sync with the backend: a type that isn't listed here still
+ * shows under "All", it just won't be reachable via a chip.
+ */
+export const USER_CATEGORIES: CategoryDef[] = [
+  { key: 'orders', label: 'Orders', types: ['ORDER_CONFIRMED', 'ORDER_SHIPPED_TO_CUSTOMER', 'ORDER_DELIVERED'] },
+  { key: 'returns', label: 'Cancellations & Returns', types: ['ORDER_CANCELLED', 'ORDER_RETURNED'] },
+  { key: 'support', label: 'Support', types: ['SUPPORT_REPLY'] },
+]
+
 /** Categories relevant to the Quality Checker workflow */
 export const QC_CATEGORIES: CategoryDef[] = [
   { key: 'assignments', label: 'Assignments', types: ['VENDOR_ASSIGNED','PRODUCT_ASSIGNED','QC_ASSIGNED'] },
@@ -311,7 +337,7 @@ export default function NotificationModal({
               <h2 className="text-base font-bold text-gray-900">All Notifications</h2>
               {totalUnread > 0 && (
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                  isBrand ? 'bg-brand-100 text-brand-700' : 'bg-blue-100 text-blue-700'
+                  isBrand ? 'bg-brand-50 text-brand-500' : 'bg-blue-100 text-blue-700'
                 }`}>
                   {totalUnread} unread
                 </span>
@@ -325,7 +351,7 @@ export default function NotificationModal({
                 onClick={handleMarkAllRead}
                 className={`flex items-center gap-1.5 text-xs font-semibold transition-colors px-3 py-2 rounded-lg ${
                   isBrand
-                    ? 'text-brand-600 hover:text-brand-800 hover:bg-brand-50'
+                    ? 'text-brand-500 hover:text-brand-600 hover:bg-brand-50'
                     : 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'
                 }`}
               >
@@ -391,7 +417,7 @@ export default function NotificationModal({
                 className={`px-2.5 py-1 text-xs rounded-full font-medium transition-all ${
                   categoryFilter === 'all'
                     ? isBrand
-                      ? 'bg-brand-700 text-white shadow-sm'
+                      ? 'bg-brand-500 text-white shadow-sm'
                       : 'bg-slate-800 text-white shadow-sm'
                     : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                 }`}
@@ -405,7 +431,7 @@ export default function NotificationModal({
                   className={`px-2.5 py-1 text-xs rounded-full font-medium transition-all ${
                     categoryFilter === cat.key
                       ? isBrand
-                        ? 'bg-brand-700 text-white shadow-sm'
+                        ? 'bg-brand-500 text-white shadow-sm'
                         : 'bg-slate-800 text-white shadow-sm'
                       : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                   }`}
@@ -472,7 +498,7 @@ export default function NotificationModal({
                     onClick={() => handleMarkAsRead(selectedNotification.id)}
                     className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
                       isBrand
-                        ? 'text-brand-600 border border-brand-200 hover:bg-brand-50'
+                        ? 'text-brand-500 border border-brand-200 hover:bg-brand-50'
                         : 'text-blue-600 border border-blue-200 hover:bg-blue-50'
                     }`}
                   >

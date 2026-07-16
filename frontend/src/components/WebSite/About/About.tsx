@@ -4,6 +4,7 @@ import { aboutContent, missionStatement, values } from '@/components/mockData/ab
 import Image from 'next/image';
 import { CheckCircle, Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { useState, useRef } from 'react';
+import Reveal from '@/components/WebSite/Shared/Reveal';
 
 const About = () => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -100,15 +101,21 @@ const About = () => {
           )}
         </div>
         <div className="relative max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 text-center">
-          <h2 className={`text-2xl sm:text-3xl font-bold mb-3 sm:mb-6 ${missionStatement.image ? 'text-white' : 'text-gray-900'}`}>{missionStatement.title}</h2>
-          <p className={`text-sm sm:text-base lg:text-lg font-medium leading-relaxed ${missionStatement.image ? 'text-white/90' : 'text-gray-700'}`}>
-            {missionStatement.content}
-          </p>
+          <Reveal>
+            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#f24344] mb-3">
+              <span className="h-px w-6 bg-[#f24344]" />
+              Our Mission
+            </span>
+            <h2 className={`font-playfair text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight mb-3 sm:mb-6 ${missionStatement.image ? 'text-white' : 'text-[#1a1a1a]'}`}>{missionStatement.title}</h2>
+            <p className={`text-sm sm:text-base lg:text-lg font-medium leading-relaxed ${missionStatement.image ? 'text-white/90' : 'text-gray-600'}`}>
+              {missionStatement.content}
+            </p>
+          </Reveal>
         </div>
       </section>
 
       {/* Video Content Section */}
-      <section className="py-10 sm:py-12 lg:py-16 bg-slate-50 relative overflow-hidden">
+      <section className="py-10 sm:py-12 lg:py-16 bg-[#f7f7f5] relative overflow-hidden">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute inset-0" style={{
@@ -117,15 +124,19 @@ const About = () => {
         </div>
 
         <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 relative">
-          <div className="text-center mb-8 sm:mb-10 lg:mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">Our Story in Motion</h2>
+          <Reveal className="text-center mb-8 sm:mb-10 lg:mb-12">
+            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
+              <span className="h-px w-6 bg-[#e01a1b]" />
+              Watch The Craft
+            </span>
+            <h2 className="font-playfair text-2xl sm:text-3xl md:text-4xl font-semibold text-[#1a1a1a] tracking-tight mb-3 sm:mb-4">Our Story in Motion</h2>
             <p className="text-sm sm:text-base lg:text-lg text-gray-600 max-w-3xl mx-auto">
               Discover the passion, craftsmanship, and dedication that drives our mission to bring
               authentic handcrafted textiles from traditional artisans to your home.
             </p>
-          </div>
+          </Reveal>
           
-          <div className="relative rounded-2xl overflow-hidden shadow-2xl bg-black group transform hover:scale-[1.02] transition-transform duration-500">
+          <div className="relative rounded-2xl overflow-hidden shadow-2xl bg-linear-to-br from-[#2a0709] to-[#12060a] group transform hover:scale-[1.02] transition-transform duration-500">
             <video
               ref={videoRef}
               className="w-full h-auto max-h-120 object-cover grayscale group-hover:grayscale-0 transition-all duration-700 ease-in-out"
@@ -209,50 +220,54 @@ const About = () => {
       <section className="py-10 sm:py-12 lg:py-16">
         <div className="max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
           {aboutContent.map((section, index) => (
-            <div key={index} className={`mb-10 sm:mb-12 lg:mb-16 ${index % 2 === 1 ? 'lg:flex-row-reverse' : ''} lg:flex lg:items-center lg:gap-12`}>
+            <Reveal key={index} delay={index * 90} className={`group mb-10 sm:mb-12 lg:mb-16 ${index % 2 === 1 ? 'lg:flex-row-reverse' : ''} lg:flex lg:items-center lg:gap-12`}>
               <div className="lg:w-1/2 mb-6 lg:mb-0">
-                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">{section.title}</h3>
-                <p className="text-gray-700 font-medium leading-relaxed text-sm sm:text-base lg:text-lg">
+                <h3 className="font-playfair text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a1a1a] tracking-tight mb-3 sm:mb-4">{section.title}</h3>
+                <p className="text-gray-600 font-medium leading-relaxed text-sm sm:text-base lg:text-lg">
                   {section.content}
                 </p>
               </div>
               {section.image && (
                 <div className="lg:w-1/2">
-                  <div className="relative h-52 sm:h-64 lg:h-105 rounded-lg overflow-hidden shadow-lg">
+                  <div className="relative h-52 sm:h-64 lg:h-105 rounded-2xl overflow-hidden ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] group-hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] transition-all duration-500">
                     <Image
                       src={section.image}
                       alt={section.title}
                       fill
                       sizes="(max-width: 1024px) 100vw, 50vw"
-                      className="object-cover grayscale hover:grayscale-0 transition-all duration-700 ease-in-out"
+                      className="object-cover grayscale group-hover:grayscale-0 transition-all duration-[900ms] ease-out group-hover:scale-110"
                     />
                   </div>
                 </div>
               )}
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
 
       {/* Values Section */}
-      <section className="py-10 sm:py-12 lg:py-16 bg-gray-100">
+      <section className="py-10 sm:py-12 lg:py-16 bg-[#f7f7f5]">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="text-center mb-8 sm:mb-10 lg:mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">Our Values</h2>
+          <Reveal className="text-center mb-8 sm:mb-10 lg:mb-12">
+            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
+              <span className="h-px w-6 bg-[#e01a1b]" />
+              What We Stand For
+            </span>
+            <h2 className="font-playfair text-2xl sm:text-3xl md:text-4xl font-semibold text-[#1a1a1a] tracking-tight mb-3 sm:mb-4">Our Values</h2>
             <p className="text-sm sm:text-base lg:text-lg text-gray-600 max-w-2xl mx-auto">
               These core principles guide everything we do, from selecting artisan partners
               to delivering exceptional products to your doorstep.
             </p>
-          </div>
+          </Reveal>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
             {values.map((value, index) => (
-              <div key={index} className="text-center p-4 sm:p-5 lg:p-6 rounded-lg bg-gray-50 hover:bg-gray-50 transition-colors">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+              <Reveal key={index} delay={index * 90} className="group text-center p-6 sm:p-7 lg:p-8 rounded-2xl bg-white ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] hover:-translate-y-1.5 hover:ring-[#e01a1b]/20 transition-all duration-500">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#e01a1b] rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 shadow-[0_6px_20px_rgba(224,26,27,0.3)] group-hover:scale-110 transition-transform duration-300">
                   <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1 sm:mb-2">{value.title}</h3>
+                <h3 className="text-lg sm:text-xl font-semibold text-[#1a1a1a] mb-1 sm:mb-2">{value.title}</h3>
                 <p className="text-sm sm:text-base text-gray-600">{value.description}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>

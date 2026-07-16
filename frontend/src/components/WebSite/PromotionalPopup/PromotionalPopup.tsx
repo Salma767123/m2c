@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Copy, Check, ArrowRight, Tag } from "lucide-react";
 import { couponService, PopupCoupon } from "@/services/couponService";
+import { formatPrice } from "@/lib/currency";
 
 interface PromotionalPopupProps {
   category: string;
@@ -66,10 +67,12 @@ export default function PromotionalPopup({ category }: PromotionalPopupProps) {
 
   if (!visible || !coupon) return null;
 
+  // discountValue is stored in INR (the admin enters ₹ in CouponManagement), so a flat
+  // ₹500 coupon was advertising itself as "$500 OFF".
   const discountText =
     coupon.discountType === "PERCENTAGE"
       ? `${coupon.discountValue}% OFF`
-      : `$${coupon.discountValue} OFF`;
+      : `${formatPrice(coupon.discountValue, 'INR')} OFF`;
 
   return (
     <div
@@ -103,14 +106,14 @@ export default function PromotionalPopup({ category }: PromotionalPopupProps) {
         <div className="p-4 sm:p-5 lg:p-6">
           {/* Discount Badge */}
           <div className="flex items-center gap-2 mb-2 sm:mb-3">
-            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 bg-red-50 text-red-600 rounded-full text-xs sm:text-sm font-bold">
+            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 bg-[#fff1f1] text-[#e01a1b] rounded-full text-xs sm:text-sm font-bold">
               <Tag className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               {discountText}
             </span>
           </div>
 
           {/* Title */}
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 sm:mb-2 break-words">
+          <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a] mb-1 sm:mb-2 break-words tracking-tight">
             {coupon.popupTitle || `${discountText} on ${category}!`}
           </h2>
 
@@ -145,10 +148,10 @@ export default function PromotionalPopup({ category }: PromotionalPopupProps) {
           {/* Shop Now Button */}
           <button
             onClick={handleClose}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#222222] text-white rounded-xl font-semibold hover:bg-[#333333] transition-colors"
+            className="btn-shine group w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#e01a1b] text-white rounded-full font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300"
           >
             Shop Now
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
           </button>
         </div>
       </div>

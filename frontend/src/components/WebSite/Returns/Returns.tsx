@@ -1,20 +1,25 @@
 import { RotateCcw, Clock, Package, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import Reveal from '@/components/WebSite/Shared/Reveal';
 
 const Returns = () => {
   return (
-    <div className="min-h-screen bg-gray-50 py-8 sm:py-10 lg:py-12">
+    <div className="min-h-screen bg-[#f7f7f5] py-8 sm:py-10 lg:py-12">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 lg:p-8">
-          <div className="text-center mb-6 sm:mb-8">
-            <RotateCcw className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-blue-600 mb-3 sm:mb-4" />
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Returns & Exchanges</h1>
+        <div className="bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_10px_40px_rgba(0,0,0,0.06)] p-4 sm:p-6 lg:p-8">
+          <Reveal className="text-center mb-6 sm:mb-8">
+            <RotateCcw className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-[#e01a1b] mb-3 sm:mb-4" />
+            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
+              <span className="h-px w-6 bg-[#e01a1b]" />
+              Hassle-Free
+            </span>
+            <h1 className="font-playfair text-2xl sm:text-3xl md:text-4xl font-semibold text-[#1a1a1a] tracking-tight">Returns &amp; Exchanges</h1>
             <p className="text-sm sm:text-base text-gray-600 mt-2">Easy returns within 30 days</p>
-          </div>
+          </Reveal>
 
           <div className="space-y-8">
             <section>
               <div className="flex items-center mb-4">
-                <Clock className="h-6 w-6 text-blue-600 mr-3" />
+                <Clock className="h-6 w-6 text-[#e01a1b] mr-3" />
                 <h2 className="text-xl font-semibold text-gray-900">Return Policy</h2>
               </div>
               <p className="text-gray-700 mb-4">
@@ -23,7 +28,7 @@ const Returns = () => {
               </p>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-blue-800 font-medium">30-Day Return Window</p>
-                <p className="text-blue-700 text-sm mt-1">
+                <p className="text-[#c41617] text-sm mt-1">
                   Returns must be initiated within 30 days of delivery date
                 </p>
               </div>
@@ -59,12 +64,12 @@ const Returns = () => {
 
             <section>
               <div className="flex items-center mb-4">
-                <Package className="h-6 w-6 text-blue-600 mr-3" />
+                <Package className="h-6 w-6 text-[#e01a1b] mr-3" />
                 <h2 className="text-xl font-semibold text-gray-900">How to Return</h2>
               </div>
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">
-                  <div className="shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                  <div className="shrink-0 w-8 h-8 bg-[#e01a1b] text-white rounded-full flex items-center justify-center text-sm font-medium">
                     1
                   </div>
                   <div>
@@ -75,7 +80,7 @@ const Returns = () => {
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <div className="shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                  <div className="shrink-0 w-8 h-8 bg-[#e01a1b] text-white rounded-full flex items-center justify-center text-sm font-medium">
                     2
                   </div>
                   <div>
@@ -86,7 +91,7 @@ const Returns = () => {
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <div className="shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                  <div className="shrink-0 w-8 h-8 bg-[#e01a1b] text-white rounded-full flex items-center justify-center text-sm font-medium">
                     3
                   </div>
                   <div>
@@ -101,7 +106,7 @@ const Returns = () => {
 
             <section>
               <div className="flex items-center mb-4">
-                <AlertCircle className="h-6 w-6 text-blue-600 mr-3" />
+                <AlertCircle className="h-6 w-6 text-[#e01a1b] mr-3" />
                 <h2 className="text-xl font-semibold text-gray-900">Refund Information</h2>
               </div>
               <div className="space-y-4">

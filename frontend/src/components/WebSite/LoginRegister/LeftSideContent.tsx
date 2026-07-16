@@ -15,8 +15,11 @@ interface LeftSideContentProps {
 
 export default function LeftSideContent({ isLogin }: LeftSideContentProps) {
   return (
-    <div className="hidden lg:flex lg:flex-1 relative bg-[#000000]">
-      <div className="flex items-center justify-center w-full p-12">
+    <div className="hidden lg:flex lg:flex-1 relative overflow-hidden bg-gradient-to-br from-[#1a1a1a] via-[#a11315] to-[#e01a1b]">
+      {/* Soft brand glow accents */}
+      <div className="pointer-events-none absolute -top-24 -left-24 w-96 h-96 rounded-full bg-[#f24344]/25 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-[#e01a1b]/30 blur-3xl" />
+      <div className="relative flex items-center justify-center w-full p-12">
         <div className="max-w-lg text-center text-white">
           {/* Logo Section */}
           <div className="mb-8">
@@ -28,7 +31,7 @@ export default function LeftSideContent({ isLogin }: LeftSideContentProps) {
                 fallbackHeight={150}
               />
             </div>
-            <h1 className="text-4xl font-bold mb-3">
+            <h1 className="font-playfair text-4xl font-semibold tracking-tight mb-3">
               M 2 C MarkDowns Private Limited
             </h1>
             <p className="text-xl text-gray-100 font-medium">

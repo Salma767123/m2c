@@ -18,6 +18,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import Dropdown from '@/components/UI/Dropdown';
+import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar';
 import {
   Table,
   TableBody,
@@ -52,6 +53,8 @@ const CouponManagement = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'expired'>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
@@ -153,7 +156,16 @@ const CouponManagement = () => {
       matchesStatus = isExpired;
     }
 
-    return matchesSearch && matchesStatus;
+    // Created-date range filter (YYYY-MM-DD strings compare lexicographically)
+    let matchesDate = true;
+    if (dateFrom || dateTo) {
+      const cd = coupon.createdAt ? fmtDate(new Date(coupon.createdAt)) : '';
+      if (!cd) matchesDate = false;
+      else if (dateFrom && cd < dateFrom) matchesDate = false;
+      else if (dateTo && cd > dateTo) matchesDate = false;
+    }
+
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
   const totalPages = Math.ceil(filteredCoupons.length / PAGE_SIZE);
@@ -262,55 +274,36 @@ const CouponManagement = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600 font-medium">Total Coupons</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{stats.total}</p>
-            </div>
-            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
-              <Tag className="w-6 h-6 text-slate-700" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600 font-medium">Active</p>
-              <p className="text-2xl font-bold text-green-600 mt-1">{stats.active}</p>
-            </div>
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600 font-medium">Inactive</p>
-              <p className="text-2xl font-bold text-slate-600 mt-1">{stats.inactive}</p>
-            </div>
-            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
-              <XCircle className="w-6 h-6 text-slate-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600 font-medium">Expired</p>
-              <p className="text-2xl font-bold text-red-600 mt-1">{stats.expired}</p>
-            </div>
-            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-              <Clock className="w-6 h-6 text-red-600" />
-            </div>
-          </div>
-        </div>
+      {/* Stats Cards — click a card to filter the table below by that status */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {[
+          { key: 'all',      label: 'Total Coupons', subtitle: 'All coupons',      value: stats.total,    Icon: Tag,         iconBg: 'bg-brand-50',   iconColor: 'text-brand-500',   countColor: 'text-slate-900',   activeClass: 'border-brand-400 bg-brand-50/50' },
+          { key: 'active',   label: 'Active',        subtitle: 'Live & valid',     value: stats.active,   Icon: CheckCircle, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500', countColor: 'text-emerald-700', activeClass: 'border-emerald-400 bg-emerald-50/60' },
+          { key: 'inactive', label: 'Inactive',      subtitle: 'Disabled',         value: stats.inactive, Icon: XCircle,     iconBg: 'bg-slate-100',  iconColor: 'text-slate-500',   countColor: 'text-slate-700',   activeClass: 'border-slate-400 bg-slate-100/60' },
+          { key: 'expired',  label: 'Expired',       subtitle: 'Past validity',    value: stats.expired,  Icon: Clock,       iconBg: 'bg-red-50',     iconColor: 'text-red-500',     countColor: 'text-red-700',     activeClass: 'border-red-400 bg-red-50/60' },
+        ].map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
+          const isActive = statusFilter === key;
+          const toggle = () => { setStatusFilter((prev) => (prev === key ? 'all' : key) as typeof statusFilter); setCurrentPage(1); };
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={toggle}
+              className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : 'border-slate-200/80 hover:border-slate-300'}`}
+            >
+              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+                <span className="text-sm font-medium text-slate-500">{label}</span>
+                <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace('50', '100') : iconBg} transition-transform duration-150 group-hover:scale-110`}>
+                  <Icon className={`h-4 w-4 ${iconColor}`} />
+                </div>
+              </div>
+              <div className="px-4 pb-4">
+                <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters and Search */}
@@ -324,6 +317,15 @@ const CouponManagement = () => {
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
+            />
+          </div>
+
+          <div className="shrink-0">
+            <DateRangeCalendar
+              from={dateFrom}
+              to={dateTo}
+              placeholder="Created Date"
+              onChange={(f, t) => { setDateFrom(f); setDateTo(t); setCurrentPage(1); }}
             />
           </div>
 

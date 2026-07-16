@@ -141,12 +141,12 @@ export default function ExchangeRateTab() {
         </div>
 
         {/* Info Box */}
-        <div className="mt-6 flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-lg p-4">
-          <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
-          <div className="text-xs text-blue-800">
+        <div className="mt-6 flex items-start gap-3 bg-brand-50 border border-brand-100 rounded-lg p-4">
+          <AlertCircle className="h-4 w-4 text-brand-600 mt-0.5 shrink-0" />
+          <div className="text-xs text-brand-800">
             <p className="font-semibold mb-1">What happens when you update the rate:</p>
             <ul className="space-y-0.5 list-disc list-inside">
-              <li>All product USD prices are recalculated: <code className="bg-blue-100 px-1 rounded">USD = INR / rate</code></li>
+              <li>All product USD prices are recalculated: <code className="bg-brand-100 px-1 rounded">USD = INR / rate</code></li>
               <li>Product variant USD prices are also updated</li>
               <li>Bag type USD prices are updated</li>
               <li>INR prices are NOT changed — only USD values are recalculated</li>
@@ -160,7 +160,7 @@ export default function ExchangeRateTab() {
       <div className="bg-slate-50 rounded-xl border border-slate-200 p-6">
         <h3 className="font-semibold text-slate-900 mb-3">Conversion Formula</h3>
         <div className="bg-white rounded-lg p-4 border border-slate-100 font-mono text-sm text-center">
-          <span className="text-green-700">USD Price</span> = <span className="text-blue-700">INR Price</span> / <span className="text-orange-700">Exchange Rate</span>
+          <span className="text-green-700">USD Price</span> = <span className="text-brand-700">INR Price</span> / <span className="text-orange-700">Exchange Rate</span>
         </div>
         <p className="text-xs text-slate-500 mt-3 text-center">
           Example: ₹2,499 / {rate || '83.50'} = ${previewPrice(2499)}

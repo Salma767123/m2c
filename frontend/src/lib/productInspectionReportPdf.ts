@@ -149,7 +149,9 @@ export function generateProductInspectionPdf(
             body,
             margin: { left: margin, right: margin },
             theme: "grid",
-            headStyles: { fillColor: BRAND, textColor: [255, 255, 255], fontSize: 9, fontStyle: "bold" },
+            // Section table headers match the PDF's top header band — light brand
+            // tint + brand-red bold text + red border — instead of a solid red fill.
+            headStyles: { fillColor: [255, 245, 245], textColor: BRAND, fontSize: 9, fontStyle: "bold", lineColor: BRAND, lineWidth: 0.5 },
             bodyStyles: { fontSize: 9, textColor: SLATE },
             alternateRowStyles: { fillColor: [248, 250, 252] },
             styles: { cellPadding: 5, lineColor: [226, 232, 240], lineWidth: 0.5 },
@@ -184,19 +186,19 @@ export function generateProductInspectionPdf(
     // ── A. General Information ─────────────────────────────────────────────────
     const v = formData.vendorData || {}
     sectionTitle("A. General Information")
+    const generalRows: [string, string][] = [
+        ["Company Name", val(v.companyName || formData.vendor || meta.vendorName)],
+        ["Business Type", businessTypeLabel(v.businessType)],
+        ["Primary Phone", val(v.businessPhone)],
+        ["Secondary Phone", val(v.phoneNumber2)],
+        ["Primary Email", val(v.businessEmail)],
+        ["Inspection Date", val(formData.serviceStartDate)],
+        ["Service Type", val(formData.serviceType)],
+    ]
     runTable(
         [["Field", "Value"]],
-        [
-            ["Client", val(formData.client) === "—" ? "M2C" : val(formData.client)],
-            ["Vendor", val(formData.vendor || v.companyName || meta.vendorName)],
-            ["Company Name", val(v.companyName)],
-            ["Business Type", businessTypeLabel(v.businessType)],
-            ["Primary Phone", val(v.businessPhone)],
-            ["Secondary Phone", val(v.phoneNumber2)],
-            ["Primary Email", val(v.businessEmail)],
-            ["Inspection Date", val(formData.serviceStartDate)],
-            ["Service Type", val(formData.serviceType)],
-        ]
+        // Hide "Secondary Phone" when there's no value.
+        generalRows.filter(([label, value]) => !(label.startsWith("Secondary") && value === "—")),
     )
 
     // ── B. Main Contact Person ─────────────────────────────────────────────────
@@ -210,23 +212,28 @@ export function generateProductInspectionPdf(
         ["Primary Email", val(mc ? mc.email1 || mc.email : v.ownerEmail)],
         ["Secondary Email", val(mc ? mc.email2 : v.ownerEmail2)],
     ]
-    const hasContactData = contactRows.some(([, v]) => v !== "—")
+    // Hide "Secondary Phone"/"Secondary Email" rows when they have no value.
+    const visibleContactRows = contactRows.filter(([label, value]) => !(label.startsWith("Secondary") && value === "—"))
+    const hasContactData = visibleContactRows.some(([, v]) => v !== "—")
     if (hasContactData) {
         sectionTitle("B. Main Contact Person")
-        runTable([["Field", "Value"]], contactRows)
+        runTable([["Field", "Value"]], visibleContactRows)
     }
+
 
     // ── C. Product Being Inspected ─────────────────────────────────────────────
     const p = formData.productData || {}
     if (p.name || p.category) {
         sectionTitle("C. Product Being Inspected")
+        const productRows: [string, string][] = [
+            ["Product Name", val(p.name)],
+            ["Category", val(p.category)],
+            ["Sub-Category", val(p.subCategory)],
+        ]
         runTable(
             [["Field", "Value"]],
-            [
-                ["Product Name", val(p.name)],
-                ["Category", val(p.category)],
-                ["Sub-Category", val(p.subCategory)],
-            ]
+            // Hide "Sub-Category" when there's no value (vendors don't set it).
+            productRows.filter(([label, value]) => !(label === "Sub-Category" && value === "—")),
         )
     }
 
@@ -337,7 +344,10 @@ export function generateProductInspectionPdf(
             y += 14
 
             const testBody = tests.map((t: any) => [
-                val(t.label),
+                // Custom tests: show "Name (Subject)  [Custom]" so their data isn't lost.
+                t.isOther
+                    ? `${val(t.label || t.subject)}${t.subject && t.label ? ` (${t.subject})` : ""}  [Custom]`
+                    : val(t.label),
                 t.pass === true ? "Pass" : t.fail === true ? "Fail" : "—",
                 val(t.remarks),
                 String((t.rightPhotos || []).length),
@@ -486,7 +496,9 @@ export function generateProductInspectionPdf(
         doc.setFont("helvetica", "bold")
         doc.setFontSize(9)
         doc.setTextColor(...color)
-        doc.text(`Status: ${status}`, margin, blockY + 70)
+        // A full line below "Inspection Complete Time" (blockY + 66) so it no
+        // longer overlaps that row.
+        doc.text(`Status: ${status}`, margin, blockY + 92)
         doc.setTextColor(...SLATE)
     }
 

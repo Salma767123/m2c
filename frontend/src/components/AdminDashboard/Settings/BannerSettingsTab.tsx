@@ -258,13 +258,13 @@ export default function BannerSettingsTab() {
                             </label>
 
                             {/* Upload guidelines */}
-                            <div className="mb-3 flex items-start gap-2.5 rounded-lg bg-blue-50 border border-blue-200 p-3">
-                                <Info className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
-                                <div className="text-xs text-blue-800 leading-5">
+                            <div className="mb-3 flex items-start gap-2.5 rounded-lg bg-brand-50 border border-brand-200 p-3">
+                                <Info className="h-4 w-4 text-brand-600 shrink-0 mt-0.5" />
+                                <div className="text-xs text-brand-800 leading-5">
                                     <p className="font-semibold">
                                         Recommended size: 2872 × 1152 px (aspect ratio ≈ 2.49 : 1)
                                     </p>
-                                    <ul className="text-blue-700 mt-1 list-disc pl-4 space-y-0.5">
+                                    <ul className="text-brand-700 mt-1 list-disc pl-4 space-y-0.5">
                                         <li>Use a <strong>wide landscape</strong> image at the exact ratio above for a crisp, full fit.</li>
                                         <li>Keep text, logos &amp; key products in the <strong>centre</strong> — outer edges may be cropped on mobile and desktop.</li>
                                         <li>Make the background extend edge-to-edge so cropping never shows blank space.</li>

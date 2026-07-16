@@ -148,7 +148,7 @@ const navigation: NavigationItem[] = [
         permission: "support:view",
       },
       {
-        title: "General",
+        title: "General Enquiries",
         icon: Layers,
         subItems: [
           { title: "Vendor Enquiries", href: "/admin/dashboard/general/enquiry-form", permission: "vendor_enquiries:view" },
@@ -170,13 +170,24 @@ export default function AdminSidebar({ isCollapsed = false, onToggleCollapse }: 
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [adminEmail, setAdminEmail] = useState<string>("admin@example.com");
   const [adminName, setAdminName] = useState<string>("Super Admin");
+  const [adminImage, setAdminImage] = useState<string>("");
 
   useEffect(() => {
     const auth = getStoredAuth();
     if (auth && auth.user) {
       setAdminEmail(auth.user.email || "admin@example.com");
       setAdminName(auth.user.name || "Super Admin");
+      setAdminImage(auth.user.image || "");
     }
+    // Live-refresh when the admin saves their profile (avatar + name).
+    const onProfileUpdated = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail) return;
+      if (detail.name) setAdminName(detail.name);
+      setAdminImage(detail.image || "");
+    };
+    window.addEventListener("admin-profile-updated", onProfileUpdated);
+    return () => window.removeEventListener("admin-profile-updated", onProfileUpdated);
   }, []);
 
   const filterSubItems = (subItems: SubMenuItem[]) =>
@@ -553,10 +564,14 @@ export default function AdminSidebar({ isCollapsed = false, onToggleCollapse }: 
         {!isCollapsed ? (
           <>
             <div className="flex items-center">
-              <div className="h-10 w-10 rounded-full bg-linear-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-md">
-                <span className="text-sm font-semibold text-white">
-                  {adminName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                </span>
+              <div className="h-10 w-10 rounded-full bg-linear-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-md overflow-hidden">
+                {adminImage ? (
+                  <img src={adminImage} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-sm font-semibold text-white">
+                    {adminName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                  </span>
+                )}
               </div>
               <div className="ml-3 flex-1">
                 <p className="text-sm font-semibold text-slate-900">{adminName}</p>
@@ -573,10 +588,14 @@ export default function AdminSidebar({ isCollapsed = false, onToggleCollapse }: 
           </>
         ) : (
           <div className="flex flex-col items-center space-y-3">
-            <div className="h-10 w-10 rounded-full bg-linear-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-md" title={adminName}>
-              <span className="text-sm font-semibold text-white">
-                {adminName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-              </span>
+            <div className="h-10 w-10 rounded-full bg-linear-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-md overflow-hidden" title={adminName}>
+              {adminImage ? (
+                <img src={adminImage} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-sm font-semibold text-white">
+                  {adminName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                </span>
+              )}
             </div>
             <button
               onClick={() => logout()}

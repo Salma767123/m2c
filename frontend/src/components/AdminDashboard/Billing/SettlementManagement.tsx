@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Eye, CheckCircle, Clock, X, RefreshCw, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { Search, Eye, CheckCircle, Clock, X, RefreshCw, ChevronLeft, ChevronRight, CalendarDays, Receipt, Hourglass } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/UI/Table";
 import Dropdown from "@/components/UI/Dropdown";
+import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalendar";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { settlementService, Settlement } from "@/services/settlementService";
 import { hasPermission } from "@/lib/auth";
@@ -36,6 +37,8 @@ export default function SettlementManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null);
   const [transactionId, setTransactionId] = useState("");
@@ -71,7 +74,17 @@ export default function SettlementManagement() {
       settlement.vendorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       settlement.billingNumber.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "All" || settlement.status === statusFilter;
-    return matchesSearch && matchesStatus;
+
+    // Settlement-date range filter (YYYY-MM-DD strings compare lexicographically)
+    let matchesDate = true;
+    if (dateFrom || dateTo) {
+      const sd = settlement.createdAt ? fmtDate(new Date(settlement.createdAt)) : "";
+      if (!sd) matchesDate = false;
+      else if (dateFrom && sd < dateFrom) matchesDate = false;
+      else if (dateTo && sd > dateTo) matchesDate = false;
+    }
+
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
   const totalPages = Math.ceil(filteredSettlements.length / PAGE_SIZE);
@@ -173,26 +186,41 @@ export default function SettlementManagement() {
     .filter((s) => s.status === "Paid")
     .reduce((sum, s) => sum + s.amount, 0);
 
+  // Metric cards — styled like the Vendor Product Requests module; click to filter.
+  const metricCards = [
+    { key: "All",        label: "Total Settlements", subtitle: "All settlements",   value: settlements.length.toLocaleString(), Icon: Receipt,      iconBg: "bg-brand-50",   iconColor: "text-brand-500",   countColor: "text-slate-900",  activeClass: "border-brand-400 bg-brand-50/50" },
+    { key: "Pending",    label: "Pending",           subtitle: "Awaiting payment",  value: `₹${totalPending.toLocaleString()}`, Icon: Clock,        iconBg: "bg-amber-50",   iconColor: "text-amber-500",   countColor: "text-amber-700",  activeClass: "border-amber-400 bg-amber-50/60" },
+    { key: "Processing", label: "Processing",        subtitle: "In progress",       value: `₹${totalProcessing.toLocaleString()}`, Icon: Hourglass, iconBg: "bg-blue-50",    iconColor: "text-blue-500",    countColor: "text-blue-700",   activeClass: "border-blue-400 bg-blue-50/60" },
+    { key: "Paid",       label: "Paid",              subtitle: "Completed",         value: `₹${totalPaid.toLocaleString()}`,    Icon: CheckCircle,  iconBg: "bg-emerald-50", iconColor: "text-emerald-500", countColor: "text-emerald-700", activeClass: "border-emerald-400 bg-emerald-50/60" },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600">Total Settlements</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{settlements.length}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600">Pending</p>
-          <p className="text-2xl font-bold text-yellow-600 mt-1">₹{totalPending.toLocaleString()}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600">Processing</p>
-          <p className="text-2xl font-bold text-blue-600 mt-1">₹{totalProcessing.toLocaleString()}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600">Paid</p>
-          <p className="text-2xl font-bold text-green-600 mt-1">₹{totalPaid.toLocaleString()}</p>
-        </div>
+      {/* Stats Cards (click a card to filter the table below by that status) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {metricCards.map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
+          const isActive = statusFilter === key;
+          const toggle = () => { setStatusFilter((prev) => (prev === key ? "All" : key)); setCurrentPage(1); };
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={toggle}
+              className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : "border-slate-200/80 hover:border-slate-300"}`}
+            >
+              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+                <span className="text-sm font-medium text-slate-500">{label}</span>
+                <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace("50", "100") : iconBg} transition-transform duration-150 group-hover:scale-110`}>
+                  <Icon className={`h-4 w-4 ${iconColor}`} />
+                </div>
+              </div>
+              <div className="px-4 pb-4">
+                <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -214,6 +242,14 @@ export default function SettlementManagement() {
               options={statusOptions}
               onChange={(value) => { setStatusFilter(value as string); setCurrentPage(1); }}
               placeholder="Filter by Status"
+            />
+          </div>
+          <div className="shrink-0">
+            <DateRangeCalendar
+              from={dateFrom}
+              to={dateTo}
+              onChange={(from, to) => { setDateFrom(from); setDateTo(to); setCurrentPage(1); }}
+              placeholder="Settlement Date"
             />
           </div>
           <button
@@ -263,7 +299,19 @@ export default function SettlementManagement() {
                     <TableCell className="font-medium">{settlement.vendorName}</TableCell>
                     <TableCell>{settlement.billingNumber}</TableCell>
                     <TableCell>{settlement.period}</TableCell>
-                    <TableCell className="font-medium">₹{settlement.amount.toLocaleString()}</TableCell>
+                    <TableCell>
+                      {/* Gross payable, with the vendor-GST split underneath. Legacy
+                          rows have no split, so they just show the single figure. */}
+                      <div className="font-medium">₹{settlement.amount.toLocaleString()}</div>
+                      {settlement.taxAmount ? (
+                        <div className="text-xs text-slate-500 whitespace-nowrap">
+                          ₹{(settlement.baseAmount ?? 0).toLocaleString()}
+                          {' + '}
+                          {settlement.gstPercentage != null ? `${settlement.gstPercentage}% GST` : 'GST'}
+                          {' '}₹{settlement.taxAmount.toLocaleString()}
+                        </div>
+                      ) : null}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {settlement.dueDate ? (
@@ -393,10 +441,31 @@ export default function SettlementManagement() {
                     <span className="text-sm text-slate-600">Vendor:</span>
                     <span className="text-sm font-medium text-slate-900">{selectedSettlement.vendorName}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-slate-600">Amount:</span>
-                    <span className="text-sm font-medium text-slate-900">₹{selectedSettlement.amount.toLocaleString()}</span>
-                  </div>
+                  {/* Show the vendor-GST split so the admin can reconcile this
+                      payout against the vendor's tax invoice before releasing it. */}
+                  {selectedSettlement.taxAmount ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-slate-600">Goods Value:</span>
+                        <span className="text-sm font-medium text-slate-900">₹{(selectedSettlement.baseAmount ?? 0).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-slate-600">
+                          Vendor GST{selectedSettlement.gstPercentage != null ? ` (${selectedSettlement.gstPercentage}%)` : ''}:
+                        </span>
+                        <span className="text-sm font-medium text-slate-900">₹{selectedSettlement.taxAmount.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between border-t border-slate-200 pt-2 mt-2">
+                        <span className="text-sm font-semibold text-slate-900">Total Payable:</span>
+                        <span className="text-sm font-bold text-slate-900">₹{selectedSettlement.amount.toLocaleString()}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-slate-600">Amount:</span>
+                      <span className="text-sm font-medium text-slate-900">₹{selectedSettlement.amount.toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

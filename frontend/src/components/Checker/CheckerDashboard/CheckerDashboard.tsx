@@ -354,9 +354,6 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
                       <h4 className="font-semibold text-slate-900 text-sm leading-snug line-clamp-2 mb-1">
                         {product.name}
                       </h4>
-                      {product.baseSku && (
-                        <p className="text-xs text-slate-400 font-mono mb-0.5">SKU: {product.baseSku}</p>
-                      )}
                       {product.vendor?.companyName && (
                         <p className="text-xs text-slate-500 mb-3 truncate">{product.vendor.companyName}</p>
                       )}

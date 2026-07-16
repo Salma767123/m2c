@@ -57,10 +57,10 @@ export default function PaymentForm({ formData, updateFormData, paymentSettings 
             return (
               <label
                 key={method.id}
-                className="flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all"
+                className="flex items-center p-4 border-2 rounded-2xl cursor-pointer transition-all"
                 style={{
-                  borderColor: formData.paymentMethod === method.id ? "#374151" : "#cbd5e1",
-                  backgroundColor: formData.paymentMethod === method.id ? "#f3f4f6" : "#ffffff"
+                  borderColor: formData.paymentMethod === method.id ? "#e01a1b" : "#cbd5e1",
+                  backgroundColor: formData.paymentMethod === method.id ? "#fef2f2" : "#ffffff"
                 }}
               >
                 <input
@@ -69,11 +69,11 @@ export default function PaymentForm({ formData, updateFormData, paymentSettings 
                   value={method.id}
                   checked={formData.paymentMethod === method.id}
                   onChange={(e) => updateFormData("paymentMethod", e.target.value)}
-                  className="mr-3"
+                  className="mr-3 accent-[#e01a1b]"
                 />
                 <Icon className="w-5 h-5 mr-3 text-slate-600" />
                 <div className="flex-1">
-                  <span className="font-medium text-slate-900">{method.name}</span>
+                  <span className="font-semibold text-[#1a1a1a]">{method.name}</span>
                   <p className="text-xs text-slate-600">{method.description}</p>
                 </div>
               </label>

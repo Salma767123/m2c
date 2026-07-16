@@ -209,8 +209,8 @@ export default function HubSettingsTab() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <MapPin className="h-5 w-5 text-blue-600" />
+                  <div className="p-2 bg-brand-100 rounded-lg">
+                    <MapPin className="h-5 w-5 text-brand-600" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-slate-900">{hub.name}</h3>

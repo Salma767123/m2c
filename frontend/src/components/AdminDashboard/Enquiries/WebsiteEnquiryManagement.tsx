@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Badge } from '@/components/UI/Badge';
 import { Button } from '@/components/UI/Button';
 import Dropdown from '@/components/UI/Dropdown';
-import { Mail, Phone, Calendar, Eye, Trash2, MessageSquare, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar';
+import { Mail, Phone, Eye, Trash2, MessageSquare, Search, ChevronLeft, ChevronRight, Inbox, Reply, CheckCircle } from 'lucide-react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { hasPermission } from '@/lib/auth';
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
@@ -32,6 +33,8 @@ export default function WebsiteEnquiryManagement() {
   const [showModal, setShowModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [stats, setStats] = useState({ total: 0, new: 0, read: 0, replied: 0, closed: 0 });
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; subject: string } | null>(null);
@@ -123,8 +126,27 @@ export default function WebsiteEnquiryManagement() {
     return <Badge className={`${styles[status as keyof typeof styles]} text-xs`}>{status.toUpperCase()}</Badge>;
   };
 
-  const totalPages = Math.ceil(enquiries.length / PAGE_SIZE);
-  const paginatedItems = enquiries.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  // Client-side created-date filter (status + search are handled server-side).
+  const filteredEnquiries = enquiries.filter((e) => {
+    if (!dateFrom && !dateTo) return true;
+    const d = e.createdAt ? fmtDate(new Date(e.createdAt)) : '';
+    if (!d) return false;
+    if (dateFrom && d < dateFrom) return false;
+    if (dateTo && d > dateTo) return false;
+    return true;
+  });
+
+  const totalPages = Math.ceil(filteredEnquiries.length / PAGE_SIZE);
+  const paginatedItems = filteredEnquiries.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  // Metric cards — styled like the Vendor Product Requests module; click to filter.
+  const metricCards = [
+    { key: 'all',     label: 'Total',   subtitle: 'All enquiries',   value: stats.total,   Icon: MessageSquare, iconBg: 'bg-brand-50',   iconColor: 'text-brand-500',   countColor: 'text-slate-900',  activeClass: 'border-brand-400 bg-brand-50/50' },
+    { key: 'new',     label: 'New',     subtitle: 'Unopened',        value: stats.new,     Icon: Inbox,         iconBg: 'bg-blue-50',    iconColor: 'text-blue-500',    countColor: 'text-blue-700',   activeClass: 'border-blue-400 bg-blue-50/60' },
+    { key: 'read',    label: 'Read',    subtitle: 'Opened',          value: stats.read,    Icon: Eye,           iconBg: 'bg-amber-50',   iconColor: 'text-amber-500',   countColor: 'text-amber-700',  activeClass: 'border-amber-400 bg-amber-50/60' },
+    { key: 'replied', label: 'Replied', subtitle: 'Responded',       value: stats.replied, Icon: Reply,         iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500', countColor: 'text-emerald-700', activeClass: 'border-emerald-400 bg-emerald-50/60' },
+    { key: 'closed',  label: 'Closed',  subtitle: 'Resolved',        value: stats.closed,  Icon: CheckCircle,   iconBg: 'bg-slate-100',  iconColor: 'text-slate-500',   countColor: 'text-slate-700',  activeClass: 'border-slate-400 bg-slate-100/60' },
+  ];
 
   return (
     <div className="space-y-6">
@@ -134,22 +156,31 @@ export default function WebsiteEnquiryManagement() {
         <p className="text-slate-600">Manage contact form submissions from website visitors</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        {[
-          { label: 'Total', value: stats.total, color: 'bg-slate-100' },
-          { label: 'New', value: stats.new, color: 'bg-blue-100' },
-          { label: 'Read', value: stats.read, color: 'bg-yellow-100' },
-          { label: 'Replied', value: stats.replied, color: 'bg-green-100' },
-          { label: 'Closed', value: stats.closed, color: 'bg-slate-100' }
-        ].map((stat) => (
-          <Card key={stat.label}>
-            <CardContent className="p-4">
-              <div className="text-sm text-slate-600">{stat.label}</div>
-              <div className="text-2xl font-bold">{stat.value}</div>
-            </CardContent>
-          </Card>
-        ))}
+      {/* Stats Cards — click a card to filter the table below by that status */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {metricCards.map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
+          const isActive = statusFilter === key;
+          const toggle = () => { setStatusFilter((prev) => (prev === key ? 'all' : key)); setCurrentPage(1); };
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={toggle}
+              className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : 'border-slate-200/80 hover:border-slate-300'}`}
+            >
+              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+                <span className="text-sm font-medium text-slate-500">{label}</span>
+                <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace('50', '100') : iconBg} transition-transform duration-150 group-hover:scale-110`}>
+                  <Icon className={`h-4 w-4 ${iconColor}`} />
+                </div>
+              </div>
+              <div className="px-4 pb-4">
+                <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -167,6 +198,14 @@ export default function WebsiteEnquiryManagement() {
                   className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40"
                 />
               </div>
+            </div>
+            <div className="shrink-0">
+              <DateRangeCalendar
+                from={dateFrom}
+                to={dateTo}
+                placeholder="Enquiry Date"
+                onChange={(f, t) => { setDateFrom(f); setDateTo(t); setCurrentPage(1); }}
+              />
             </div>
             <div className="w-full md:w-64">
               <Dropdown
@@ -191,7 +230,7 @@ export default function WebsiteEnquiryManagement() {
         <CardContent className="p-0">
           {loading ? (
             <div className="p-8 text-center text-slate-500">Loading...</div>
-          ) : enquiries.length === 0 ? (
+          ) : filteredEnquiries.length === 0 ? (
             <div className="p-8 text-center text-slate-500">No enquiries found</div>
           ) : (
             <div className="overflow-x-auto">
@@ -234,27 +273,24 @@ export default function WebsiteEnquiryManagement() {
                       </td>
                       <td className="px-6 py-4">{getStatusBadge(enquiry.status)}</td>
                       <td className="px-6 py-4">
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-1">
                           {hasPermission('website_enquiries:view') && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
+                            <button
                               onClick={() => handleViewEnquiry(enquiry)}
                               title="View Details"
+                              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                             >
                               <Eye className="w-4 h-4" />
-                            </Button>
+                            </button>
                           )}
                           {hasPermission('website_enquiries:delete') && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
+                            <button
                               onClick={() => handleDeleteClick(enquiry)}
-                              className="text-red-600 hover:text-red-700"
                               title="Delete"
+                              className="p-2 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
                             >
                               <Trash2 className="w-4 h-4" />
-                            </Button>
+                            </button>
                           )}
                         </div>
                       </td>

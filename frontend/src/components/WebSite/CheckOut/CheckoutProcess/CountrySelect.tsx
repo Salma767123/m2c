@@ -101,10 +101,10 @@ export default function CountrySelect({
   };
 
   const baseStyle =
-    "w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-gray-500 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed outline-none transition-colors text-left bg-white";
+    "w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#e01a1b]/40 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed outline-none transition-colors text-left bg-white";
   const triggerStyle = invalid
     ? `${baseStyle} border-red-500 focus:border-red-500`
-    : `${baseStyle} border-slate-300 focus:border-gray-500`;
+    : `${baseStyle} border-slate-300 focus:border-[#e01a1b]`;
 
   return (
     <div ref={containerRef} className="relative">
@@ -142,7 +142,7 @@ export default function CountrySelect({
                 }}
                 onKeyDown={handleKey}
                 placeholder="Search country, ISO code, or +phone code..."
-                className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:border-gray-500 focus:ring-1 focus:ring-gray-500 outline-none"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:border-[#e01a1b] focus:ring-1 focus:ring-[#e01a1b]/40 outline-none"
               />
             </div>
           </div>
@@ -164,15 +164,15 @@ export default function CountrySelect({
                     onMouseEnter={() => setActiveIndex(idx)}
                     onClick={() => choose(c.isoCode)}
                     className={`w-full flex items-center justify-between gap-3 px-4 py-2 text-sm text-left transition-colors ${
-                      isActive ? "bg-slate-100" : "bg-white"
-                    } ${isSelected ? "font-semibold text-slate-900" : "text-slate-700"}`}
+                      isActive ? "bg-[#e01a1b]/5" : "bg-white"
+                    } ${isSelected ? "font-semibold text-[#1a1a1a]" : "text-slate-700"}`}
                   >
                     <span className="flex items-center gap-2 truncate">
                       <span className="shrink-0">{c.flag}</span>
                       <span className="truncate">{c.name}</span>
                       <span className="text-xs text-slate-400 shrink-0">{c.phoneCode}</span>
                     </span>
-                    {isSelected && <Check className="w-4 h-4 text-gray-700 shrink-0" />}
+                    {isSelected && <Check className="w-4 h-4 text-[#e01a1b] shrink-0" />}
                   </button>
                 );
               })

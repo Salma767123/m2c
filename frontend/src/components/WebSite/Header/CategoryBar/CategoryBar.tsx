@@ -68,10 +68,10 @@ const Category = () => {
             <Link
               key={category.id}
               href={`/categories/${category.slug}`}
-              className={`px-2.5 sm:px-3 py-1.5 sm:py-1 rounded-lg whitespace-nowrap transition-all duration-200 shrink-0 ${
+              className={`px-2.5 sm:px-3 py-1.5 sm:py-1 rounded-full whitespace-nowrap transition-all duration-300 shrink-0 ${
                 isActiveCategory(category.slug)
-                  ? 'text-white bg-[#222222] shadow-sm text-sm sm:text-base md:text-lg font-semibold transform scale-105'
-                  : 'text-[#444444] hover:text-white hover:bg-[#212121] text-[15px] sm:text-base'
+                  ? 'text-white bg-[#e01a1b] shadow-[0_4px_12px_rgba(224,26,27,0.3)] text-sm sm:text-base md:text-lg font-semibold'
+                  : 'text-[#444444] hover:text-[#e01a1b] hover:bg-[#fff1f1] text-[15px] sm:text-base'
               }`}
             >
               {category.name}
@@ -81,10 +81,10 @@ const Category = () => {
           {categories.length > 8 && (
             <Link
               href="/categories"
-              className="flex items-center gap-1 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-sm sm:text-base text-[#330b03] hover:text-[#3c2415] hover:bg-[#ddd9ce] whitespace-nowrap transition-all duration-200 shrink-0"
+              className="group flex items-center gap-1 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-full font-medium text-sm sm:text-base text-[#e01a1b] hover:bg-[#fff1f1] whitespace-nowrap transition-all duration-300 shrink-0"
             >
               More
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5" />
             </Link>
           )}
         </div>

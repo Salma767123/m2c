@@ -51,7 +51,9 @@ exports.getCustomers = async (req, res) => {
                 by: ['customerId'],
                 where: { customerId: { in: customerIds } },
                 _count: { id: true },
-                _sum: { totalAmount: true }
+                // INR twin — totalAmount is stored in each order's own currency, so
+                // summing it raw adds $ to ₹. See utils/orderCurrency.js.
+                _sum: { totalAmountINR: true }
             }),
             // Aggregate approved review stats per customer
             prisma.review.groupBy({
@@ -69,7 +71,7 @@ exports.getCustomers = async (req, res) => {
         for (const agg of orderAggregations) {
             orderMap[agg.customerId] = {
                 totalOrders: agg._count.id,
-                totalSpent: agg._sum.totalAmount || 0
+                totalSpent: agg._sum.totalAmountINR || 0
             };
         }
 
@@ -156,7 +158,9 @@ exports.getCustomerById = async (req, res) => {
             prisma.order.aggregate({
                 where: { customerId: id },
                 _count: { id: true },
-                _sum: { totalAmount: true }
+                // INR twin — totalAmount is stored in each order's own currency, so
+                // summing it raw adds $ to ₹. See utils/orderCurrency.js.
+                _sum: { totalAmountINR: true }
             }),
             prisma.review.aggregate({
                 where: { userId: id, status: 'APPROVED' },
@@ -172,6 +176,8 @@ exports.getCustomerById = async (req, res) => {
                     orderId: true,
                     status: true,
                     totalAmount: true,
+                    currency: true,
+                    exchangeRate: true,
                     createdAt: true,
                     paymentStatus: true,
                     paymentMethod: true,
@@ -210,7 +216,7 @@ exports.getCustomerById = async (req, res) => {
                 isPhoneVerified: !!customer.phoneNumber,
                 addresses: customer.addresses || [],
                 totalOrders: orderAgg._count.id,
-                totalSpent: orderAgg._sum.totalAmount || 0,
+                totalSpent: orderAgg._sum.totalAmountINR || 0,
                 averageRating: reviewAgg._avg.rating ? Math.round(reviewAgg._avg.rating * 10) / 10 : null,
                 reviewsCount: reviewAgg._count.id || 0,
                 recentOrders

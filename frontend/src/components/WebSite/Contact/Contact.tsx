@@ -2,6 +2,7 @@
 
 import { Mail, Phone, MapPin, Clock, Send, Store, X, Building2, FileText, Globe } from 'lucide-react';
 import { useState } from 'react';
+import Reveal from '@/components/WebSite/Shared/Reveal';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { enquiryService } from '@/services/enquiryService';
 import { contactEnquiryService } from '@/services/contactEnquiryService';
@@ -111,17 +112,21 @@ const Contact = () => {
   return (
     <div className="bg-white font-sans" >
       {/* Hero Section */}
-      <section className="relative bg-gray-50 py-10 sm:py-12 lg:py-16">
+      <section className="relative bg-[#f7f7f5] py-10 sm:py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3 sm:mb-6">
+          <Reveal className="text-center">
+            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
+              <span className="h-px w-6 bg-[#e01a1b]" />
+              Get in touch
+            </span>
+            <h1 className="font-playfair text-3xl sm:text-4xl lg:text-5xl font-semibold text-[#1a1a1a] tracking-tight mb-3 sm:mb-6">
               Get in Touch
             </h1>
             <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto">
               Have questions about our products or want to learn more about our artisans?
               We'd love to hear from you.
             </p>
-          </div>
+          </Reveal>
         </div>
       </section>
 
@@ -130,74 +135,86 @@ const Contact = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
             {/* Contact Information */}
             <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-5 sm:mb-6 lg:mb-8">Contact Information</h2>
+              <Reveal>
+                <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
+                  <span className="h-px w-6 bg-[#e01a1b]" />
+                  Reach Us
+                </span>
+                <h2 className="font-playfair text-2xl sm:text-3xl md:text-4xl font-semibold text-[#1a1a1a] tracking-tight mb-5 sm:mb-6 lg:mb-8">Contact Information</h2>
+              </Reveal>
 
-              <div className="space-y-6 font-medium">
-                <div className="flex items-start">
-                  <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center mr-4 shrink-0">
+              <div className="space-y-4 sm:space-y-5 font-medium">
+                <Reveal delay={0} className="group flex items-start bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] hover:-translate-y-1.5 hover:ring-[#e01a1b]/20 transition-all duration-500 p-5">
+                  <div className="w-12 h-12 bg-[#e01a1b] rounded-full flex items-center justify-center mr-4 shrink-0 shadow-[0_6px_20px_rgba(224,26,27,0.3)] group-hover:scale-110 transition-transform duration-300">
                     <Mail className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Email Us</h3>
+                    <h3 className="text-lg font-semibold text-[#1a1a1a] mb-1">Email Us</h3>
                     <p className="text-gray-600">info@heritagetextiles.com</p>
                     <p className="text-gray-600">support@heritagetextiles.com</p>
                   </div>
-                </div>
+                </Reveal>
 
-                <div className="flex items-start">
-                  <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center mr-4 shrink-0">
+                <Reveal delay={90} className="group flex items-start bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] hover:-translate-y-1.5 hover:ring-[#e01a1b]/20 transition-all duration-500 p-5">
+                  <div className="w-12 h-12 bg-[#e01a1b] rounded-full flex items-center justify-center mr-4 shrink-0 shadow-[0_6px_20px_rgba(224,26,27,0.3)] group-hover:scale-110 transition-transform duration-300">
                     <Phone className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Call Us</h3>
+                    <h3 className="text-lg font-semibold text-[#1a1a1a] mb-1">Call Us</h3>
                     <p className="text-gray-600">+1 (555) 123-4567</p>
                     <p className="text-gray-600">+1 (555) 987-6543</p>
                   </div>
-                </div>
+                </Reveal>
 
-                <div className="flex items-start">
-                  <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center mr-4 shrink-0">
+                <Reveal delay={180} className="group flex items-start bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] hover:-translate-y-1.5 hover:ring-[#e01a1b]/20 transition-all duration-500 p-5">
+                  <div className="w-12 h-12 bg-[#e01a1b] rounded-full flex items-center justify-center mr-4 shrink-0 shadow-[0_6px_20px_rgba(224,26,27,0.3)] group-hover:scale-110 transition-transform duration-300">
                     <MapPin className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Visit Us</h3>
+                    <h3 className="text-lg font-semibold text-[#1a1a1a] mb-1">Visit Us</h3>
                     <p className="text-gray-600">123 Heritage Lane</p>
                     <p className="text-gray-600">Artisan District, AD 12345</p>
                     <p className="text-gray-600">United States</p>
                   </div>
-                </div>
+                </Reveal>
 
-                <div className="flex items-start">
-                  <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center mr-4 shrink-0">
+                <Reveal delay={270} className="group flex items-start bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] hover:-translate-y-1.5 hover:ring-[#e01a1b]/20 transition-all duration-500 p-5">
+                  <div className="w-12 h-12 bg-[#e01a1b] rounded-full flex items-center justify-center mr-4 shrink-0 shadow-[0_6px_20px_rgba(224,26,27,0.3)] group-hover:scale-110 transition-transform duration-300">
                     <Clock className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Business Hours</h3>
+                    <h3 className="text-lg font-semibold text-[#1a1a1a] mb-1">Business Hours</h3>
                     <p className="text-gray-600">Monday - Friday: 9:00 AM - 6:00 PM</p>
                     <p className="text-gray-600">Saturday: 10:00 AM - 4:00 PM</p>
                     <p className="text-gray-600">Sunday: Closed</p>
                   </div>
-                </div>
+                </Reveal>
               </div>
 
               {/* Additional Info */}
-              <div className="mt-8 p-6 bg-gray-50 rounded-lg font-medium">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">For Artisan Partnerships</h3>
+              <div className="mt-8 p-6 bg-[#f7f7f5] rounded-2xl ring-1 ring-black/5 font-medium">
+                <h3 className="text-lg font-semibold text-[#1a1a1a] mb-2">For Artisan Partnerships</h3>
                 <p className="text-gray-600 mb-2">
                   Are you a skilled artisan interested in joining our marketplace?
                   We'd love to learn about your craft and explore partnership opportunities.
                 </p>
                 <p className="text-gray-600">
-                  Email us at: <span className="font-medium">partnerships@heritagetextiles.com</span>
+                  Email us at: <span className="font-medium text-[#e01a1b]">partnerships@heritagetextiles.com</span>
                 </p>
               </div>
             </div>
 
             {/* Contact Form */}
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-8">Send us a Message</h2>
+              <Reveal>
+                <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
+                  <span className="h-px w-6 bg-[#e01a1b]" />
+                  Say Hello
+                </span>
+                <h2 className="font-playfair text-3xl md:text-4xl font-semibold text-[#1a1a1a] tracking-tight mb-8">Send us a Message</h2>
+              </Reveal>
 
-              <form onSubmit={handleSubmit} className="bg-gray-50 p-6 border border-white rounded-xl space-y-6 font-medium">
+              <form onSubmit={handleSubmit} className="bg-[#f7f7f5] p-6 ring-1 ring-black/5 rounded-2xl space-y-6 font-medium">
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                     Full Name *
@@ -209,7 +226,7 @@ const Contact = () => {
                     required
                     value={formData.name}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-50 transition-colors"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-colors"
                     placeholder="Your full name"
                   />
                 </div>
@@ -225,7 +242,7 @@ const Contact = () => {
                     required
                     value={formData.email}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-50 focus:border-gray-50 transition-colors"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-colors"
                     placeholder="your.email@example.com"
                   />
                 </div>
@@ -241,7 +258,7 @@ const Contact = () => {
                     required
                     value={formData.subject}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-50 focus:border-gray-50 transition-colors"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-colors"
                     placeholder="What is this regarding?"
                   />
                 </div>
@@ -257,14 +274,14 @@ const Contact = () => {
                     rows={6}
                     value={formData.message}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-50 focus:border-gray-50 transition-colors resize-vertical"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-colors resize-vertical"
                     placeholder="Tell us more about your inquiry..."
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full bg-gray-700 text-white py-3 px-6 rounded-lg hover:bg-gray-700 transition-colors font-semibold flex items-center justify-center"
+                  className="btn-shine w-full bg-[#e01a1b] text-white py-3 px-6 rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 font-semibold flex items-center justify-center"
                 >
                   <Send className="w-5 h-5 mr-2" />
                   Send Message
@@ -278,11 +295,15 @@ const Contact = () => {
       {/* Vendor Invitation Section */}
       <section className="py-10 sm:py-12 lg:py-16 bg-gradient-to-br from-gray-900 to-gray-800">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-white rounded-full mb-4 sm:mb-6">
-              <Store className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+          <Reveal className="text-center">
+            <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-[#e01a1b] rounded-full mb-4 sm:mb-6 shadow-[0_6px_20px_rgba(224,26,27,0.4)]">
+              <Store className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
             </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-3 sm:mb-4">
+            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#f24344] mb-3">
+              <span className="h-px w-6 bg-[#f24344]" />
+              Partner With Us
+            </span>
+            <h2 className="font-playfair text-2xl sm:text-3xl lg:text-4xl font-semibold text-white tracking-tight mb-3 sm:mb-4">
               Become a Vendor Partner
             </h2>
             <p className="text-base sm:text-lg lg:text-xl text-gray-300 max-w-3xl mx-auto mb-6 sm:mb-8">
@@ -291,15 +312,15 @@ const Contact = () => {
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 lg:gap-6 max-w-4xl mx-auto mb-8 sm:mb-10">
-              <div className="bg-white/10 backdrop-blur-sm p-4 sm:p-5 lg:p-6 rounded-lg">
+              <div className="bg-white/10 backdrop-blur-sm p-4 sm:p-5 lg:p-6 rounded-2xl ring-1 ring-white/10 hover:ring-[#f24344]/40 transition-all duration-500">
                 <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">10K+</div>
                 <div className="text-sm sm:text-base text-gray-300">Active Customers</div>
               </div>
-              <div className="bg-white/10 backdrop-blur-sm p-4 sm:p-5 lg:p-6 rounded-lg">
+              <div className="bg-white/10 backdrop-blur-sm p-4 sm:p-5 lg:p-6 rounded-2xl ring-1 ring-white/10 hover:ring-[#f24344]/40 transition-all duration-500">
                 <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">500+</div>
                 <div className="text-sm sm:text-base text-gray-300">Vendor Partners</div>
               </div>
-              <div className="bg-white/10 backdrop-blur-sm p-4 sm:p-5 lg:p-6 rounded-lg">
+              <div className="bg-white/10 backdrop-blur-sm p-4 sm:p-5 lg:p-6 rounded-2xl ring-1 ring-white/10 hover:ring-[#f24344]/40 transition-all duration-500">
                 <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">24/7</div>
                 <div className="text-sm sm:text-base text-gray-300">Support Available</div>
               </div>
@@ -307,23 +328,23 @@ const Contact = () => {
 
             <button
               onClick={() => setShowVendorModal(true)}
-              className="bg-white text-gray-900 px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg hover:bg-gray-100 transition-all transform hover:scale-105 shadow-xl inline-flex items-center gap-2"
+              className="btn-shine bg-[#e01a1b] text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-semibold text-base sm:text-lg hover:bg-[#c41617] transition-all duration-300 transform hover:-translate-y-0.5 shadow-[0_6px_20px_rgba(224,26,27,0.35)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.5)] inline-flex items-center gap-2"
             >
               <Store className="w-5 h-5" />
               Join Us as a Vendor
             </button>
-          </div>
+          </Reveal>
         </div>
       </section>
 
       {/* Vendor Application Modal */}
       {showVendorModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
           <div className="bg-white rounded-lg shadow-2xl max-w-5xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 sm:p-5 lg:p-6 border-b border-gray-200 bg-gray-50 shrink-0">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gray-900 rounded-full flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-linear-to-br from-[#e01a1b] to-[#8d1618] rounded-full flex items-center justify-center shrink-0">
                   <Store className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
                 <div className="min-w-0">
@@ -356,7 +377,7 @@ const Contact = () => {
                       required
                       value={vendorFormData.name}
                       onChange={handleVendorChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all"
                       placeholder="Enter your full name"
                     />
                   </div>
@@ -374,7 +395,7 @@ const Contact = () => {
                         required
                         value={vendorFormData.companyName}
                         onChange={handleVendorChange}
-                        className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                        className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all"
                         placeholder="Your company name"
                       />
                     </div>
@@ -397,7 +418,7 @@ const Contact = () => {
                         maxLength={15}
                         value={vendorFormData.gstNumber}
                         onChange={handleVendorChange}
-                        className={`w-full pl-11 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all ${
+                        className={`w-full pl-11 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all ${
                           gstError ? 'border-red-500 bg-red-50' : 'border-gray-300'
                         }`}
                         placeholder="e.g., 29ABCDE1234F1Z5"
@@ -422,7 +443,7 @@ const Contact = () => {
                         required
                         value={vendorFormData.email}
                         onChange={handleVendorChange}
-                        className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                        className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all"
                         placeholder="your.email@company.com"
                       />
                     </div>
@@ -444,7 +465,7 @@ const Contact = () => {
                         required
                         value={vendorFormData.phone}
                         onChange={handleVendorChange}
-                        className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                        className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all"
                         placeholder="+1 (555) 123-4567"
                       />
                     </div>
@@ -462,7 +483,7 @@ const Contact = () => {
                         name="website"
                         value={vendorFormData.website}
                         onChange={handleVendorChange}
-                        className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                        className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all"
                         placeholder="https://www.yourcompany.com"
                       />
                     </div>
@@ -480,14 +501,14 @@ const Contact = () => {
                     type="button"
                     onClick={() => setShowVendorModal(false)}
                     disabled={isSubmittingVendor}
-                    className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold disabled:opacity-50 text-sm sm:text-base"
+                    className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 border border-gray-300 text-gray-700 rounded-full hover:bg-gray-50 transition-colors font-semibold disabled:opacity-50 text-sm sm:text-base"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmittingVendor}
-                    className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-semibold flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed text-sm sm:text-base"
+                    className="btn-shine flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-[#e01a1b] text-white rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] transition-all duration-300 font-semibold flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed text-sm sm:text-base"
                   >
                     {isSubmittingVendor ? (
                       <>

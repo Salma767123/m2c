@@ -327,7 +327,7 @@ export default function Products() {
                         <input
                             id="product-search"
                             type="text"
-                            placeholder="Search by product, SKU, category, or vendor..."
+                            placeholder="Search by product, category, or vendor..."
                             value={searchInput}
                             onChange={(e) => setSearchInput(e.target.value)}
                             className="w-full pl-12 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white shadow-xs"
@@ -475,7 +475,6 @@ export default function Products() {
                                             </div>
                                             <div>
                                                 <p className="font-bold text-slate-900 group-hover:text-brand-500 transition-colors text-sm leading-tight">{product.name}</p>
-                                                <p className="text-[10px] font-mono text-slate-400 mt-1 uppercase tracking-wider">SKU: {product.baseSku}</p>
                                             </div>
                                         </div>
                                     </TableCell>

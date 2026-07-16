@@ -122,7 +122,18 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
   }
 
 
-  const sym = currency === 'INR' ? '₹' : currency;
+  /*
+    Currency must come from the ORDER, not the caller's settings. The invoice
+    route doesn't pass `currency` at all, so the old `currency = '$'` default
+    stamped every invoice as USD — including ₹ orders. Order.currency is the
+    authoritative field ("INR" | "USD", defaulted at the DB level).
+  */
+  const invoiceCurrency = order.currency || (currency === 'INR' ? 'INR' : 'USD');
+  const sym = invoiceCurrency === 'INR' ? '₹' : '$';
+
+  // A GST-registered seller must head the document "TAX INVOICE" (standard
+  // practice); without a GSTIN it's a plain commercial invoice.
+  const invoiceTitle = gstNumber ? 'TAX INVOICE' : 'INVOICE';
 
   const fmt = (n) =>
     Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -160,18 +171,36 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
 
   const itemRows = items.map((item, i) => `
         <tr>
-            <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:center; color:#6b7280;">${i + 1}</td>
-            <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb;">
-                <div style="font-weight:600; color:#111827;">${escapeHtml(item.productName)}</div>
-                ${item.sku ? `<div style="font-size:11px; color:#9ca3af;">SKU: ${escapeHtml(item.sku)}</div>` : ''}
+            <td style="padding:12px 8px; border-bottom:1px solid #f0f0ee; text-align:center; color:#9ca3af; font-size:12px;">${i + 1}</td>
+            <td style="padding:12px 8px; border-bottom:1px solid #f0f0ee;">
+                <div style="font-weight:600; color:#1a1a1a;">${escapeHtml(item.productName)}</div>
+                ${item.sku ? `<div style="font-size:11px; color:#9ca3af; margin-top:2px;">SKU: ${escapeHtml(item.sku)}</div>` : ''}
                 ${item.size ? `<div style="font-size:11px; color:#9ca3af;">Size: ${escapeHtml(item.size)}</div>` : ''}
                 ${item.color ? `<div style="font-size:11px; color:#9ca3af;">Color: ${escapeHtml(item.color)}</div>` : ''}
             </td>
-            <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:center;">${item.quantity}</td>
-            <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:right;">${sym}${fmt(item.unitPrice)}</td>
-            <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:right; font-weight:600;">${sym}${fmt(item.totalPrice)}</td>
+            <td style="padding:12px 8px; border-bottom:1px solid #f0f0ee; text-align:center;">${item.quantity}</td>
+            <td style="padding:12px 8px; border-bottom:1px solid #f0f0ee; text-align:right;">${sym}${fmt(item.unitPrice)}</td>
+            <td style="padding:12px 8px; border-bottom:1px solid #f0f0ee; text-align:right; font-weight:700; color:#1a1a1a;">${sym}${fmt(item.totalPrice)}</td>
         </tr>
     `).join('');
+
+  // Summary rows in the order a standard invoice reads:
+  // subtotal → add-ons → discount → shipping → tax → grand total.
+  // (The previous layout listed Discount *after* Tax, which reads as though the
+  //  discount were applied post-tax.)
+  const summaryRow = (label, value, opts = {}) => `
+        <tr>
+          <td style="padding:7px 0; color:${opts.color || '#6b7280'}; font-size:13px;">${label}</td>
+          <td style="padding:7px 0; text-align:right; font-weight:600; font-size:13px; color:${opts.color || '#1a1a1a'};">${value}</td>
+        </tr>`;
+
+  const summaryRows = [
+    summaryRow('Subtotal', `${sym}${fmt(subtotal)}`),
+    bagTypePrice > 0 ? summaryRow(`Bag (${escapeHtml(bagTypeName || 'Add-on')})`, `${sym}${fmt(bagTypePrice)}`) : '',
+    discount > 0 ? summaryRow('Discount', `− ${sym}${fmt(discount)}`, { color: '#16a34a' }) : '',
+    summaryRow('Shipping', shippingCost > 0 ? `${sym}${fmt(shippingCost)}` : 'Free'),
+    tax > 0 ? summaryRow(gstNumber ? 'Tax (GST)' : 'Tax', `${sym}${fmt(tax)}`) : '',
+  ].join('');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -181,81 +210,97 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
   <title>Invoice ${escapeHtml(invoiceNo || orderId)}</title>
 </head>
 <body style="margin:0; padding:0; font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:#f3f4f6; color:#374151;">
-  <div style="max-width:800px; margin:24px auto; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+  <div style="max-width:800px; margin:24px auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08);">
 
-    <!-- ── Header ── -->
-    <div style="background:#111827; padding:32px 36px; display:flex; justify-content:space-between; align-items:flex-start;">
-      <div style="display:flex; align-items:center; gap:16px;">
-        ${companyLogo ? `
-        <img
-          src="${companyLogo}"
-          alt="${escapeHtml(companyName)} logo"
-          style="height:64px; width:auto; object-fit:contain; border-radius:8px;"
-        />` : ''}
-        <div>
-          ${(companyName !== 'M2C Store' && companyName !== 'M2C Marketplace Pvt Ltd') ? `<div style="font-size:26px; font-weight:800; color:#fff; letter-spacing:-0.5px; margin-bottom:4px;">${escapeHtml(companyName)}</div>` : ''}
-          ${gstNumber ? `<div style="font-size:12px; color:#9ca3af; margin-top:2px;">GSTIN: ${escapeHtml(gstNumber)}</div>` : ''}
-          ${address ? `<div style="font-size:12px; color:#9ca3af; margin-top:2px;">${escapeHtml(address)}</div>` : ''}
-        </div>
-      </div>
-      <div style="text-align:right;">
-        <div style="font-size:22px; font-weight:700; color:#fff;">INVOICE</div>
-        <div style="font-size:18px; font-weight:600; color:#6366f1; margin-top:4px; letter-spacing:1px;">${escapeHtml(invoiceNo || orderId)}</div>
-        <div style="font-size:12px; color:#9ca3af; margin-top:6px;">Date: ${fmtDate(orderDate)}</div>
-        <div style="display:inline-block; margin-top:8px; padding:4px 12px; background:${payStatusColor}; color:#fff; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:0.5px;">${escapeHtml(payStatusLabel)}</div>
-      </div>
-    </div>
+    <!-- ── Brand accent bar ── -->
+    <div style="height:5px; background:#e01a1b; font-size:0; line-height:0;">&nbsp;</div>
 
-    <!-- ── Bill To / Ship To / Order Info — standard 3-section invoice header ── -->
-    <div style="display:flex; gap:0; border-bottom:1px solid #e5e7eb;">
-      <div style="flex:1; padding:24px 36px; border-right:1px solid #e5e7eb;">
-        <div style="font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Bill To</div>
-        <div style="font-weight:700; font-size:15px; color:#111827;">${escapeHtml(customerName)}</div>
-        <div style="font-size:13px; color:#6b7280; margin-top:4px;">${escapeHtml(customerEmail)}</div>
-        <div style="font-size:13px; color:#6b7280;">${escapeHtml(formatPhoneForDisplay(customerPhone, addr.country))}</div>
-      </div>
-      <div style="flex:1; padding:24px 36px; border-right:1px solid #e5e7eb;">
-        <div style="font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Ship To</div>
-        ${recipientName
-          ? `<div style="font-weight:700; font-size:15px; color:#111827;">${escapeHtml(recipientName)}</div>`
-          : '<div style="font-size:13px; color:#9ca3af; font-style:italic;">Same as billing</div>'}
-        ${shippingAddrStr
-          ? `<div style="font-size:13px; color:#6b7280; margin-top:4px; white-space:pre-line;">${escapeHtml(shippingAddrStr)}</div>`
-          : ''}
-      </div>
-      <div style="flex:1; padding:24px 36px;">
-        <div style="font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Order Details</div>
-        <table style="width:100%; font-size:13px; border-collapse:collapse;">
-          <tr>
-            <td style="padding:3px 0; color:#6b7280;">Order ID</td>
-            <td style="padding:3px 0; text-align:right; font-weight:600; color:#111827;">${escapeHtml(orderId)}</td>
-          </tr>
-          <tr>
-            <td style="padding:3px 0; color:#6b7280;">Invoice No</td>
-            <td style="padding:3px 0; text-align:right; font-weight:700; color:#6366f1;">${escapeHtml(invoiceNo || '—')}</td>
-          </tr>
-          <tr>
-            <td style="padding:3px 0; color:#6b7280;">Order Date</td>
-            <td style="padding:3px 0; text-align:right; font-weight:600; color:#111827;">${fmtDate(orderDate)}</td>
-          </tr>
-          <tr>
-            <td style="padding:3px 0; color:#6b7280;">Payment</td>
-            <td style="padding:3px 0; text-align:right; font-weight:600; color:#111827;">${escapeHtml(paymentMethod || '—')}</td>
-          </tr>
-        </table>
-      </div>
-    </div>
+    <!-- ── Header: seller (left) vs invoice meta (right) ──
+         Table-based, not flexbox: Outlook and several webmail clients drop
+         display:flex entirely and would stack these on top of each other. -->
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse; border-bottom:1px solid #ececea;">
+      <tr>
+        <td style="padding:28px 36px; vertical-align:top;">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            ${companyLogo ? `
+            <td style="vertical-align:middle; padding-right:14px;">
+              <img src="${companyLogo}" alt="${escapeHtml(companyName)} logo" style="height:56px; width:auto; object-fit:contain; border-radius:8px; display:block;" />
+            </td>` : ''}
+            <td style="vertical-align:middle;">
+              <div style="font-size:19px; font-weight:800; color:#1a1a1a; letter-spacing:-0.3px;">${escapeHtml(companyName)}</div>
+              ${address ? `<div style="font-size:11px; color:#6b7280; margin-top:3px; max-width:260px;">${escapeHtml(address)}</div>` : ''}
+              ${(state || country) ? `<div style="font-size:11px; color:#6b7280;">${escapeHtml([state, country].filter(Boolean).join(', '))}</div>` : ''}
+              ${gstNumber ? `<div style="font-size:11px; color:#6b7280; margin-top:3px;">GSTIN: <strong style="color:#1a1a1a;">${escapeHtml(gstNumber)}</strong></div>` : ''}
+            </td>
+          </tr></table>
+        </td>
+        <td style="padding:28px 36px; vertical-align:top; text-align:right;">
+          <div style="font-size:24px; font-weight:800; color:#1a1a1a; letter-spacing:1px;">${invoiceTitle}</div>
+          <div style="font-size:16px; font-weight:700; color:#e01a1b; margin-top:4px; letter-spacing:0.5px;">${escapeHtml(invoiceNo || orderId)}</div>
+          <div style="font-size:12px; color:#6b7280; margin-top:6px;">Date: ${fmtDate(orderDate)}</div>
+          <div style="margin-top:8px;">
+            <span style="display:inline-block; padding:4px 12px; background:${payStatusColor}; color:#fff; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:0.5px;">${escapeHtml(payStatusLabel)}</span>
+          </div>
+        </td>
+      </tr>
+    </table>
 
-    <!-- ── Items Table ── -->
-    <div style="padding:24px 36px;">
-      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+    <!-- ── Bill To / Ship To / Order Details ── -->
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse; border-bottom:1px solid #ececea;">
+      <tr>
+        <td style="width:33.33%; padding:22px 28px; vertical-align:top; border-right:1px solid #ececea;">
+          <div style="font-size:10px; font-weight:700; color:#e01a1b; text-transform:uppercase; letter-spacing:1px; margin-bottom:9px;">Bill To</div>
+          <div style="font-weight:700; font-size:14px; color:#1a1a1a;">${escapeHtml(customerName)}</div>
+          <div style="font-size:12px; color:#6b7280; margin-top:4px;">${escapeHtml(customerEmail)}</div>
+          <div style="font-size:12px; color:#6b7280;">${escapeHtml(formatPhoneForDisplay(customerPhone, addr.country))}</div>
+        </td>
+        <td style="width:33.33%; padding:22px 28px; vertical-align:top; border-right:1px solid #ececea;">
+          <div style="font-size:10px; font-weight:700; color:#e01a1b; text-transform:uppercase; letter-spacing:1px; margin-bottom:9px;">Ship To</div>
+          ${recipientName
+            ? `<div style="font-weight:700; font-size:14px; color:#1a1a1a;">${escapeHtml(recipientName)}</div>`
+            : '<div style="font-size:12px; color:#9ca3af; font-style:italic;">Same as billing</div>'}
+          ${shippingAddrStr
+            ? `<div style="font-size:12px; color:#6b7280; margin-top:4px; white-space:pre-line; line-height:1.5;">${escapeHtml(shippingAddrStr)}</div>`
+            : ''}
+        </td>
+        <td style="width:33.33%; padding:22px 28px; vertical-align:top;">
+          <div style="font-size:10px; font-weight:700; color:#e01a1b; text-transform:uppercase; letter-spacing:1px; margin-bottom:9px;">Order Details</div>
+          <table role="presentation" style="width:100%; font-size:12px; border-collapse:collapse;">
+            <tr>
+              <td style="padding:3px 0; color:#6b7280;">Order ID</td>
+              <td style="padding:3px 0; text-align:right; font-weight:600; color:#1a1a1a;">${escapeHtml(orderId)}</td>
+            </tr>
+            <tr>
+              <td style="padding:3px 0; color:#6b7280;">Invoice No</td>
+              <td style="padding:3px 0; text-align:right; font-weight:700; color:#e01a1b;">${escapeHtml(invoiceNo || '—')}</td>
+            </tr>
+            <tr>
+              <td style="padding:3px 0; color:#6b7280;">Order Date</td>
+              <td style="padding:3px 0; text-align:right; font-weight:600; color:#1a1a1a;">${fmtDate(orderDate)}</td>
+            </tr>
+            <tr>
+              <td style="padding:3px 0; color:#6b7280;">Payment</td>
+              <td style="padding:3px 0; text-align:right; font-weight:600; color:#1a1a1a; text-transform:capitalize;">${escapeHtml(paymentMethod || '—')}</td>
+            </tr>
+            <tr>
+              <td style="padding:3px 0; color:#6b7280;">Currency</td>
+              <td style="padding:3px 0; text-align:right; font-weight:600; color:#1a1a1a;">${escapeHtml(invoiceCurrency)}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- ── Items ── -->
+    <div style="padding:24px 36px 8px;">
+      <table role="presentation" style="width:100%; border-collapse:collapse; font-size:13px;">
         <thead>
-          <tr style="background:#f9fafb;">
-            <th style="padding:10px 8px; text-align:center; font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">#</th>
-            <th style="padding:10px 8px; text-align:left; font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Item</th>
-            <th style="padding:10px 8px; text-align:center; font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Qty</th>
-            <th style="padding:10px 8px; text-align:right; font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Unit Price</th>
-            <th style="padding:10px 8px; text-align:right; font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Total</th>
+          <tr style="background:#faf9f7;">
+            <th style="padding:11px 8px; text-align:center; font-size:10px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.6px; border-bottom:2px solid #e01a1b;">#</th>
+            <th style="padding:11px 8px; text-align:left; font-size:10px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.6px; border-bottom:2px solid #e01a1b;">Item</th>
+            <th style="padding:11px 8px; text-align:center; font-size:10px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.6px; border-bottom:2px solid #e01a1b;">Qty</th>
+            <th style="padding:11px 8px; text-align:right; font-size:10px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.6px; border-bottom:2px solid #e01a1b;">Unit Price</th>
+            <th style="padding:11px 8px; text-align:right; font-size:10px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.6px; border-bottom:2px solid #e01a1b;">Total</th>
           </tr>
         </thead>
         <tbody>
@@ -264,45 +309,29 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
       </table>
     </div>
 
-    <!-- ── Summary ── -->
-    <div style="padding:0 36px 32px; display:flex; justify-content:flex-end;">
-      <table style="width:280px; font-size:13px; border-collapse:collapse;">
-        <tr>
-          <td style="padding:6px 0; color:#6b7280;">Subtotal</td>
-          <td style="padding:6px 0; text-align:right; font-weight:600;">${sym}${fmt(subtotal)}</td>
-        </tr>
-        ${shippingCost > 0 ? `
-        <tr>
-          <td style="padding:6px 0; color:#6b7280;">Shipping</td>
-          <td style="padding:6px 0; text-align:right; font-weight:600;">${sym}${fmt(shippingCost)}</td>
-        </tr>` : ''}
-        ${tax > 0 ? `
-        <tr>
-          <td style="padding:6px 0; color:#6b7280;">Tax (GST)</td>
-          <td style="padding:6px 0; text-align:right; font-weight:600;">${sym}${fmt(tax)}</td>
-        </tr>` : ''}
-        ${discount > 0 ? `
-        <tr>
-          <td style="padding:6px 0; color:#16a34a;">Discount</td>
-          <td style="padding:6px 0; text-align:right; font-weight:600; color:#16a34a;">− ${sym}${fmt(discount)}</td>
-        </tr>` : ''}
-        ${bagTypePrice > 0 ? `
-        <tr>
-          <td style="padding:6px 0; color:#6b7280;">Bag (${escapeHtml(bagTypeName || 'Add-on')})</td>
-          <td style="padding:6px 0; text-align:right; font-weight:600;">${sym}${fmt(bagTypePrice)}</td>
-        </tr>` : ''}
-        <tr style="border-top:2px solid #111827;">
-          <td style="padding:10px 0; font-size:16px; font-weight:800; color:#111827;">Grand Total</td>
-          <td style="padding:10px 0; text-align:right; font-size:16px; font-weight:800; color:#6366f1;">${sym}${fmt(totalAmount)}</td>
-        </tr>
-      </table>
-    </div>
+    <!-- ── Summary (right-aligned via table cell, not flex) ── -->
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse;">
+      <tr>
+        <td style="padding:8px 36px 32px;" align="right">
+          <table role="presentation" cellpadding="0" cellspacing="0" style="width:300px; border-collapse:collapse;">
+            ${summaryRows}
+            <tr>
+              <td colspan="2" style="padding:0;"><div style="height:2px; background:#1a1a1a; font-size:0; line-height:0;">&nbsp;</div></td>
+            </tr>
+            <tr>
+              <td style="padding:11px 0; font-size:15px; font-weight:800; color:#1a1a1a;">Grand Total</td>
+              <td style="padding:11px 0; text-align:right; font-size:17px; font-weight:800; color:#e01a1b;">${sym}${fmt(totalAmount)}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
 
     <!-- ── Footer ── -->
-    <div style="background:#f9fafb; border-top:1px solid #e5e7eb; padding:20px 36px; text-align:center;">
-      <div style="font-size:13px; font-weight:600; color:#111827; margin-bottom:4px;">Thank you for shopping with ${escapeHtml(companyName)}!</div>
+    <div style="background:#faf9f7; border-top:1px solid #ececea; padding:20px 36px; text-align:center;">
+      <div style="font-size:13px; font-weight:600; color:#1a1a1a; margin-bottom:4px;">Thank you for shopping with ${escapeHtml(companyName)}!</div>
       <div style="font-size:11px; color:#9ca3af;">This is a computer generated invoice and does not require a signature.</div>
-      ${gstNumber ? `<div style="font-size:11px; color:#9ca3af; margin-top:2px;">GSTIN: ${escapeHtml(gstNumber)} | ${escapeHtml(state)}, ${escapeHtml(country)}</div>` : ''}
+      ${gstNumber ? `<div style="font-size:11px; color:#9ca3af; margin-top:3px;">GSTIN: ${escapeHtml(gstNumber)}${(state || country) ? ` | ${escapeHtml([state, country].filter(Boolean).join(', '))}` : ''}</div>` : ''}
     </div>
   </div>
 </body>

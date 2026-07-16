@@ -47,6 +47,13 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
     if (auth) {
       setCurrentUser(auth.user)
     }
+    // Live-refresh the avatar/name when the admin saves their profile.
+    const onProfileUpdated = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail) setCurrentUser((prev: any) => ({ ...prev, ...detail }))
+    }
+    window.addEventListener('admin-profile-updated', onProfileUpdated)
+    return () => window.removeEventListener('admin-profile-updated', onProfileUpdated)
   }, [])
 
   useEffect(() => {
@@ -256,9 +263,13 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
               className="flex items-center space-x-2 text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5"
             >
               <div className="w-7 h-7 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center overflow-hidden">
-                <span className="text-brand-600 text-xs font-bold">
-                  {currentUser ? getUserInitials(currentUser.name) : 'SA'}
-                </span>
+                {currentUser?.image ? (
+                  <img src={currentUser.image} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-brand-600 text-xs font-bold">
+                    {currentUser ? getUserInitials(currentUser.name) : 'SA'}
+                  </span>
+                )}
               </div>
               <div className="hidden md:block text-left">
                 <p className="text-sm font-semibold text-slate-900 leading-tight">
@@ -276,10 +287,14 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
               <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-md border border-slate-200 z-50 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-brand-50 border border-brand-100 rounded-full flex items-center justify-center shrink-0">
-                      <span className="text-brand-600 font-bold text-sm">
-                        {currentUser ? getUserInitials(currentUser.name) : 'SA'}
-                      </span>
+                    <div className="w-10 h-10 bg-brand-50 border border-brand-100 rounded-full flex items-center justify-center shrink-0 overflow-hidden">
+                      {currentUser?.image ? (
+                        <img src={currentUser.image} alt="Profile" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-brand-600 font-bold text-sm">
+                          {currentUser ? getUserInitials(currentUser.name) : 'SA'}
+                        </span>
+                      )}
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-slate-900">

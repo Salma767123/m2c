@@ -88,7 +88,7 @@ export default function ReviewModal({ isOpen, onClose, orderId, items }: ReviewM
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 shrink-0">
                     <div className="min-w-0">
-                        <h2 className="text-base sm:text-lg font-bold text-gray-900">Write a Review</h2>
+                        <h2 className="font-playfair text-base sm:text-lg font-semibold text-[#1a1a1a]">Write a Review</h2>
                         <p className="text-xs text-gray-500 mt-0.5">Share your experience</p>
                     </div>
                     <button
@@ -107,11 +107,11 @@ export default function ReviewModal({ isOpen, onClose, orderId, items }: ReviewM
                             <div className="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                                 <CheckCircle className="w-8 h-8 text-green-500" />
                             </div>
-                            <h3 className="text-lg font-bold text-gray-900 mb-1">Thank You!</h3>
+                            <h3 className="font-playfair text-lg font-semibold text-[#1a1a1a] mb-1">Thank You!</h3>
                             <p className="text-sm text-gray-500 mb-4">Your review has been submitted and is pending approval.</p>
                             <button
                                 onClick={onClose}
-                                className="px-6 py-2.5 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-colors"
+                                className="btn-shine px-6 py-2.5 bg-[#e01a1b] text-white text-sm font-semibold rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300"
                             >
                                 Done
                             </button>
@@ -135,7 +135,7 @@ export default function ReviewModal({ isOpen, onClose, orderId, items }: ReviewM
                                                     items.length > 1 ? 'cursor-pointer' : ''
                                                 } ${
                                                     selected
-                                                        ? 'border-gray-900 bg-gray-50'
+                                                        ? 'border-[#e01a1b] bg-[#e01a1b]/5'
                                                         : 'border-gray-100 hover:border-gray-300'
                                                 }`}
                                             >
@@ -158,7 +158,7 @@ export default function ReviewModal({ isOpen, onClose, orderId, items }: ReviewM
                                                     {item.name || item.productName}
                                                 </p>
                                                 {selected && items.length > 1 && (
-                                                    <div className="w-2.5 h-2.5 bg-gray-900 rounded-full shrink-0" />
+                                                    <div className="w-2.5 h-2.5 bg-[#e01a1b] rounded-full shrink-0" />
                                                 )}
                                             </div>
                                         );
@@ -207,7 +207,7 @@ export default function ReviewModal({ isOpen, onClose, orderId, items }: ReviewM
                                     value={comment}
                                     onChange={(e) => setComment(e.target.value.slice(0, 500))}
                                     rows={3}
-                                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none resize-none text-sm bg-gray-50 placeholder:text-gray-400"
+                                    className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] resize-none text-sm bg-gray-50 placeholder:text-gray-400"
                                     placeholder="What did you like or dislike about this product?"
                                 />
                                 <p className="text-right text-[11px] text-gray-400 mt-1">{comment.length}/500</p>
@@ -225,7 +225,7 @@ export default function ReviewModal({ isOpen, onClose, orderId, items }: ReviewM
                             <button
                                 type="submit"
                                 disabled={loading || !selectedProduct || rating === 0}
-                                className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+                                className="btn-shine w-full flex items-center justify-center gap-2 py-3 px-4 bg-[#e01a1b] text-white rounded-full font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-[0_6px_20px_rgba(224,26,27,0.3)] text-sm"
                             >
                                 {loading ? (
                                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

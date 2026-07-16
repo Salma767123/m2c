@@ -2,6 +2,7 @@
 
 import { Heart, ShoppingCart, Trash2, Star, Eye } from 'lucide-react'
 import { products } from '@/components/mockData/products'
+import Reveal from '@/components/WebSite/Shared/Reveal'
 
 interface WishlistItem {
   id: string
@@ -54,11 +55,11 @@ export default function Wishlist() {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6">
+    <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 border border-slate-200 p-4 sm:p-5 lg:p-6">
       <div className="flex items-center flex-wrap gap-2 sm:gap-3 mb-5 sm:mb-6">
         <Heart className="w-5 h-5 sm:w-6 sm:h-6 text-red-500 fill-current shrink-0" />
-        <h2 className="text-lg sm:text-xl font-bold text-slate-900">My Wishlist</h2>
-        <span className="bg-gray-100 text-gray-800 text-xs sm:text-sm font-medium px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full">
+        <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a]">My Wishlist</h2>
+        <span className="bg-[#e01a1b]/10 text-[#e01a1b] text-xs sm:text-sm font-medium px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full">
           {wishlistItems.length} items
         </span>
       </div>
@@ -68,25 +69,25 @@ export default function Wishlist() {
           <Heart className="w-14 h-14 sm:w-16 sm:h-16 text-slate-300 mx-auto mb-3 sm:mb-4" />
           <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-2">Your wishlist is empty</h3>
           <p className="text-sm sm:text-base text-slate-600 mb-5 sm:mb-6">Save items you love to your wishlist</p>
-          <button className="bg-blue-600 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base">
+          <button className="btn-shine inline-flex items-center justify-center bg-[#e01a1b] text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-full font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 text-sm sm:text-base">
             Start Shopping
           </button>
         </div>
       ) : (
         /* Order-page style list — image left, content right */
         <div className="space-y-3 sm:space-y-4">
-          {wishlistItems.map((item) => (
-            <div key={item.id} className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 lg:p-5 hover:shadow-md transition-shadow">
+          {wishlistItems.map((item, index) => (
+            <Reveal key={item.id} delay={index * 90} className="group bg-white border border-slate-200 rounded-2xl ring-1 ring-black/5 p-3 sm:p-4 lg:p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] hover:-translate-y-1.5 hover:ring-[#e01a1b]/20 transition-all duration-500">
               <div className="flex items-start gap-3 sm:gap-4">
                 {/* Image */}
-                <div className="relative w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                <div className="relative w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
                   <img
                     src={item.image}
                     alt={item.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-transform duration-[900ms] ease-out group-hover:scale-110"
                   />
                   {item.originalPrice && (
-                    <div className="absolute top-1 left-1 bg-gray-700 text-white px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-semibold">
+                    <div className="absolute top-1 left-1 bg-[#e01a1b] text-white px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-semibold">
                       Sale
                     </div>
                   )}
@@ -135,8 +136,8 @@ export default function Wishlist() {
                     <button
                       onClick={() => addToCart(item.id)}
                       disabled={!item.inStock}
-                      className={`w-full sm:w-auto flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm rounded-lg transition-colors ${item.inStock
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      className={`w-full sm:w-auto flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm rounded-full transition-colors ${item.inStock
+                        ? 'bg-[#e01a1b] text-white hover:bg-[#c41617]'
                         : 'bg-slate-300 text-slate-500 cursor-not-allowed'}`}
                     >
                       <ShoppingCart className="w-4 h-4" />
@@ -145,7 +146,7 @@ export default function Wishlist() {
                     <div className="flex gap-2 sm:contents">
                       <button
                         aria-label="View product"
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition-colors"
                       >
                         <Eye className="w-4 h-4" />
                         <span>View</span>
@@ -153,7 +154,7 @@ export default function Wishlist() {
                       <button
                         onClick={() => removeFromWishlist(item.id)}
                         aria-label="Remove from wishlist"
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                         <span>Remove</span>
@@ -162,7 +163,7 @@ export default function Wishlist() {
                   </div>
                 </div>
               </div>
-            </div>
+            </Reveal>
           ))}
         </div>
       )}
@@ -175,10 +176,10 @@ export default function Wishlist() {
               {wishlistItems.filter(item => item.inStock).length} of {wishlistItems.length} items in stock
             </div>
             <div className="flex flex-wrap gap-2 sm:gap-3">
-              <button className="flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors">
+              <button className="flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition-colors">
                 Clear Wishlist
               </button>
-              <button className="flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+              <button className="btn-shine flex-1 sm:flex-none inline-flex items-center justify-center px-3 sm:px-4 py-2 text-sm bg-[#e01a1b] text-white rounded-full font-semibold hover:bg-[#c41617] transition-colors">
                 Add All to Cart
               </button>
             </div>

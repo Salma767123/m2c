@@ -76,19 +76,22 @@ interface Props {
 function PackagingRow({
   item,
   onChange,
+  invalid = false,
 }: {
   item: PackagingItem
   onChange: (patch: Partial<PackagingItem>) => void
+  invalid?: boolean
 }) {
   const needsRemarks = item.remarkCode !== null && item.remarkCode <= 7
 
   return (
     <div
-      className={`border rounded-2xl overflow-hidden transition-colors ${
-        item.verified === true
+      data-invalid={invalid ? 'true' : undefined}
+      className={`scroll-mt-24 border rounded-2xl overflow-hidden transition-colors ${
+        invalid
+          ? 'border-red-400 bg-red-50/40 ring-2 ring-red-300'
+          : item.verified === true
           ? 'border-emerald-200 bg-emerald-50/20'
-          : item.verified === false
-          ? 'border-slate-200 bg-white'
           : 'border-slate-200 bg-white'
       }`}
     >
@@ -176,6 +179,20 @@ function PackagingRow({
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function PI_Step3_PackagingInspection({ formData, setFormData, errors = {} }: Props) {
   const items: PackagingItem[] = formData.packagingItems || []
+
+  // Mirror the Next-gate validation so, when the step is blocked, we can point at
+  // and highlight the exact offending item (the form scrolls to data-invalid).
+  const firstInvalidItemId: string | null = (() => {
+    if (!errors.packagingItems) return null
+    const unanswered = items.find((it) => it.verified === null || it.verified === undefined)
+    if (unanswered) return unanswered.id
+    for (const it of items) {
+      if (it.verified !== true) continue
+      if (it.remarkCode === null) return it.id
+      if (it.remarkCode <= 7 && (!it.remarks || !String(it.remarks).trim())) return it.id
+    }
+    return null
+  })()
   const [cropQueue, setCropQueue] = useState<File[]>([])
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropFileName, setCropFileName] = useState('')
@@ -266,7 +283,12 @@ export default function PI_Step3_PackagingInspection({ formData, setFormData, er
       {/* Packaging items */}
       <div className="space-y-4">
         {items.map((item) => (
-          <PackagingRow key={item.id} item={item} onChange={(patch) => updateItem(item.id, patch)} />
+          <PackagingRow
+            key={item.id}
+            item={item}
+            invalid={item.id === firstInvalidItemId}
+            onChange={(patch) => updateItem(item.id, patch)}
+          />
         ))}
       </div>
 
@@ -282,7 +304,8 @@ export default function PI_Step3_PackagingInspection({ formData, setFormData, er
 
         {(formData.packagingPhotos || []).length === 0 && (
           <label
-            className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl px-6 py-8 cursor-pointer transition-colors group ${
+            data-invalid={errors.packagingPhotos ? 'true' : undefined}
+            className={`scroll-mt-24 flex flex-col items-center justify-center border-2 border-dashed rounded-xl px-6 py-8 cursor-pointer transition-colors group ${
               errors.packagingPhotos ? 'border-red-300 bg-red-50/30 hover:border-red-400' : 'border-slate-300 hover:border-brand-400 hover:bg-brand-50/30'
             }`}
           >

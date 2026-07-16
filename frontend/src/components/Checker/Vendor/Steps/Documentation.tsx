@@ -359,7 +359,8 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
 
       {/* Status hint */}
       <div
-        className={`rounded-xl px-4 py-3 text-sm border ${hasSignedDoc || hasSignedReport
+        data-invalid={!hasSignedDoc && !hasSignedReport && errors.signedDocuments ? 'true' : undefined}
+        className={`scroll-mt-24 rounded-xl px-4 py-3 text-sm border ${hasSignedDoc || hasSignedReport
           ? "bg-emerald-50 border-emerald-200 text-emerald-700"
           : errors.signedDocuments
             ? "bg-red-50 border-red-300 text-red-700"

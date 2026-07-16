@@ -371,7 +371,8 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
                 {/* Failed tests */}
                 {group.tests.filter((t) => t.fail).map((t) => (
                   <div key={t.id} className="text-xs text-red-700 flex items-center gap-1 mt-1">
-                    <XCircle className="w-3 h-3" /> {t.label}
+                    <XCircle className="w-3 h-3" /> {t.label || ((t as any).isOther ? (t as any).subject : "") || "Test"}
+                    {(t as any).isOther && <span className="text-[9px] font-bold uppercase text-brand-600">· Custom</span>}
                     {t.remarks && <span className="text-slate-500 italic"> — {t.remarks}</span>}
                   </div>
                 ))}
@@ -422,8 +423,9 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
               <button
                 ref={statusButtonRef}
                 type="button"
+                data-invalid={errors.inspectionStatus ? 'true' : undefined}
                 onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                className={`w-full px-4 py-3 border rounded-xl text-left flex items-center justify-between text-sm font-semibold transition-all duration-200 ${
+                className={`scroll-mt-24 w-full px-4 py-3 border rounded-xl text-left flex items-center justify-between text-sm font-semibold transition-all duration-200 ${
                   errors.inspectionStatus
                     ? 'border-red-500 bg-red-50/40 text-red-700'
                     : d.inspectionStatus && STATUS_STYLES[d.inspectionStatus]
@@ -473,12 +475,13 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
             </label>
             <textarea
               value={d.reviewerRemarks || ''}
+              data-invalid={errors.reviewerRemarks ? 'true' : undefined}
               onChange={(e) => setFormData((prev: any) => ({ ...prev, reviewerRemarks: e.target.value }))}
               rows={3}
               placeholder={d.inspectionStatus === 'Rejected'
                 ? 'Reason for rejection (required)…'
                 : 'Optional notes explaining this decision…'}
-              className={`w-full px-4 py-3 border rounded-xl text-sm resize-y transition-all duration-200 ${
+              className={`scroll-mt-24 w-full px-4 py-3 border rounded-xl text-sm resize-y transition-all duration-200 ${
                 errors.reviewerRemarks
                   ? 'border-red-500 bg-red-50/40 text-red-700'
                   : 'border-slate-300 bg-white text-slate-700 focus:border-slate-400 focus:outline-none'

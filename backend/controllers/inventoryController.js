@@ -1,6 +1,7 @@
 const { prisma } = require('../config/database');
 const { generateBaseSku } = require('../utils/skuGenerator');
 const { checkAndAlertLowStock } = require('../utils/lowStockAlert');
+const { stripAdminPricing } = require('../utils/vendorPricing');
 
 // Decide an inventory item's stock state, variant-aware. For products with
 // variants, low-stock is evaluated PER VARIANT (the variant is the sellable
@@ -155,7 +156,9 @@ const getVendorInventory = async (req, res) => {
               select: { id: true, variantName: true, size: true, color: true, sku: true, stock: true, lowStockThreshold: true },
             },
           },
-          take: 1
+          // Latest first so a re-created product wins; we still prefer the
+          // inventory's primary productId below when picking which one to show.
+          orderBy: { createdAt: 'desc' },
         }
       },
       orderBy: { createdAt: 'desc' },
@@ -167,7 +170,9 @@ const getVendorInventory = async (req, res) => {
     // UI can show per-variant stock and per-variant low-stock alerts.
     const enrichedItems = inventoryItems.map(item => {
       const { products, ...rest } = item;
-      const product = products?.[0] || null;
+      // Prefer the inventory's primary product (productId); else the newest one.
+      // Picking the wrong linked product previously dropped its variants.
+      const product = (products || []).find(p => p.id === item.productId) || products?.[0] || null;
       return {
         ...rest,
         productApprovalStatus: product?.approvalStatus || null,
@@ -242,6 +247,12 @@ const getInventoryItem = async (req, res) => {
         success: false,
         message: 'Inventory item not found'
       });
+    }
+
+    // Served on both /admin/:id and the vendor's /:id, so the admin's selling price is
+    // stripped per-caller rather than excluded by `select` (which would starve admin).
+    if (req.user?.role !== 'ADMIN') {
+      (inventoryItem.products || []).forEach(stripAdminPricing);
     }
 
     res.json({
@@ -890,18 +901,30 @@ const getVendorCategories = async (req, res) => {
       }
     }
 
-    // Append vendor-defined custom categories (Step 4 "Other" path). These
-    // live in additionalCategories JSON, not the master Category collection,
-    // so they have no DB row / subcategories — the vendor still needs to pick
-    // them when adding inventory. Admin assigns a real subcategory later when
-    // publishing the product to the website.
+    // Append vendor-proposed ("Other" path) categories so the vendor can still
+    // pick them while the admin reviews. These are now real Category rows with
+    // status PENDING (see utils/customCategories) — invisible to the storefront
+    // until approved. `status` is passed through so the UI can badge them.
+    const existingNames = new Set(categories.map(c => c.name.toLowerCase()));
+
+    const pendingOwn = await prisma.category.findMany({
+      where: { createdByVendorId: vendorId, status: 'PENDING' },
+      select: { id: true, name: true, slug: true, status: true },
+    });
+    for (const cat of pendingOwn) {
+      if (existingNames.has(cat.name.toLowerCase())) continue;
+      existingNames.add(cat.name.toLowerCase());
+      categories.push({ ...cat, isCustom: true });
+    }
+
+    // Legacy fallback: vendors registered before custom categories were promoted
+    // to Category rows still only have them in additionalCategories JSON.
     if (Array.isArray(vendor.additionalCategories)) {
-      const existingNames = new Set(categories.map(c => c.name.toLowerCase()));
       for (const cat of vendor.additionalCategories) {
         const name = typeof cat?.name === 'string' ? cat.name.trim() : '';
         if (!name || existingNames.has(name.toLowerCase())) continue;
         existingNames.add(name.toLowerCase());
-        categories.push({ id: cat.id || name, name, slug: cat.slug || name, isCustom: true });
+        categories.push({ id: cat.id || name, name, slug: cat.slug || name, isCustom: true, status: 'PENDING' });
       }
     }
 

@@ -6,8 +6,10 @@ import { CheckCircle, Package, Truck, Mail, Download, ArrowRight, Clock, AlertCi
 import { useState, useEffect } from "react"
 import orderService, { Order } from "@/services/orderService"
 import { popRecentOrder } from "@/lib/recentOrder"
+import { formatPrice } from "@/lib/currency"
 import { useSearchParams } from "next/navigation"
 import { getCountryName, getCountryFlag, getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants"
+import Reveal from "@/components/WebSite/Shared/Reveal"
 
 interface OrderConfirmationProps {
   // Optional initial data if passed from server
@@ -82,10 +84,10 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
         <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Not Found</h1>
+        <h1 className="font-playfair text-2xl font-semibold text-[#1a1a1a] mb-2">Order Not Found</h1>
         <p className="text-gray-600 mb-6">{error || "We couldn't find the order details."}</p>
         <Link href="/">
-          <button className="px-6 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors">
+          <button className="btn-shine inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#e01a1b] text-white rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 font-semibold">
             Return to Home
           </button>
         </Link>
@@ -101,6 +103,11 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
   // So we only render below if order exists. 
 
   if (!order) return null; // Should be handled by error view but typescript might complain
+
+  // Every figure on this page is money the customer was ALREADY charged, so it must be
+  // shown in the order's own currency — not the region's. This screen hardcoded '$',
+  // which billed a ₹4,999 order as "$4,999.00" on the receipt.
+  const money = (n: number) => formatPrice(n, order.currency === 'USD' ? 'USD' : 'INR');
 
   const orderStatus = order.status !== 'FAILED' && order.status !== 'CANCELLED'; // Simple check
   const isConfirmed = order.status === 'ORDER_CREATED' || order.status === 'CONFIRMED' || order.status === 'SHIPPED' || order.status === 'DELIVERED';
@@ -125,7 +132,7 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
       <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Status Header */}
-        <div className="text-center mb-8 sm:mb-12">
+        <Reveal className="text-center mb-8 sm:mb-12">
           <div className={`inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full mb-4 sm:mb-6 ${isConfirmed
               ? 'bg-green-100 border-2 border-green-200'
               : 'bg-red-200 border-2 border-red-400'
@@ -137,7 +144,7 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
             )}
           </div>
 
-          <h1 className={`text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 ${isConfirmed ? 'text-gray-900' : 'text-gray-700'
+          <h1 className={`font-playfair text-3xl sm:text-4xl lg:text-5xl font-semibold mb-3 sm:mb-4 ${isConfirmed ? 'text-[#1a1a1a]' : 'text-gray-700'
             }`}>
             {isConfirmed ? 'Order Confirmed!' : 'Order Processing'}
           </h1>
@@ -148,7 +155,7 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
               : 'Your order is being processed.'
             }
           </p>
-        </div>
+        </Reveal>
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-8 sm:mb-12">
@@ -158,7 +165,7 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
 
             {/* Order Information Card */}
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-              <div className="px-4 sm:px-6 py-3 sm:py-4 bg-black border-b border-gray-200">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 bg-linear-to-r from-[#e01a1b] to-[#c41617] border-b border-[#c41617]">
                 <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white flex items-center gap-2">
                   <Package className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                   Order Information
@@ -195,10 +202,10 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
 
                 {/* Status Timeline */}
                 <div className="border-t border-gray-200 pt-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">Order Status: <span className="text-blue-600">{order.status}</span></h3>
+                  <h3 className="font-semibold text-gray-900 mb-4">Order Status: <span className="text-[#e01a1b]">{order.status}</span></h3>
                   {/* Simplified timeline for now */}
                   <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-4">
-                    <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: '25%' }}></div>
+                    <div className="bg-[#e01a1b] h-2.5 rounded-full" style={{ width: '25%' }}></div>
                   </div>
                   <p className="text-xs text-gray-500 mt-2">Order placed</p>
                 </div>
@@ -207,7 +214,7 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
 
             {/* Shipping Address */}
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-              <div className="px-4 sm:px-6 py-3 sm:py-4 bg-black border-b border-gray-200">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 bg-linear-to-r from-[#e01a1b] to-[#c41617] border-b border-[#c41617]">
                 <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-white" />
                   Shipping Address
@@ -242,7 +249,7 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
           {/* Order Summary - Right Column */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 overflow-hidden lg:sticky lg:top-8">
-              <div className="px-4 sm:px-6 py-3 sm:py-4 bg-black border-b border-gray-200">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 bg-linear-to-r from-[#e01a1b] to-[#c41617] border-b border-[#c41617]">
                 <h2 className="text-lg sm:text-xl font-bold text-white">Order Summary</h2>
               </div>
 
@@ -266,9 +273,9 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
                         <p className="text-xs text-gray-600">Qty: {item.quantity}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-gray-900">${item.totalPrice.toFixed(2)}</p>
+                        <p className="font-semibold text-gray-900">{money(item.totalPrice)}</p>
                         {item.quantity > 1 && (
-                          <p className="text-xs text-gray-500">${item.unitPrice.toFixed(2)} each</p>
+                          <p className="text-xs text-gray-500">{money(item.unitPrice)} each</p>
                         )}
                       </div>
                     </div>
@@ -282,7 +289,7 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
                         <ShoppingBag className="w-4 h-4 text-amber-600" />
                         <span>Bag: {order.bagTypeName}</span>
                       </div>
-                      <span className="font-medium text-gray-900">${order.bagTypePrice.toFixed(2)}</span>
+                      <span className="font-medium text-gray-900">{money(order.bagTypePrice)}</span>
                     </div>
                   )}
                 </div>
@@ -290,31 +297,31 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
                 <div className="border-t border-gray-200 pt-4 space-y-3">
                   <div className="flex justify-between text-gray-600">
                     <span>Subtotal</span>
-                    <span className="font-medium">${order.subtotal.toFixed(2)}</span>
+                    <span className="font-medium">{money(order.subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Shipping</span>
-                    <span className="font-medium text-gray-800">${order.shippingCost.toFixed(2)}</span>
+                    <span className="font-medium text-gray-800">{money(order.shippingCost)}</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Tax</span>
-                    <span className="font-medium">${order.tax.toFixed(2)}</span>
+                    <span className="font-medium">{money(order.tax)}</span>
                   </div>
                   {order.discount > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Discount</span>
-                      <span className="font-medium">-${order.discount.toFixed(2)}</span>
+                      <span className="font-medium">-{money(order.discount)}</span>
                     </div>
                   )}
                   {order.bagTypePrice && order.bagTypePrice > 0 && (
                     <div className="flex justify-between text-gray-600">
                       <span>Bag ({order.bagTypeName})</span>
-                      <span className="font-medium">${order.bagTypePrice.toFixed(2)}</span>
+                      <span className="font-medium">{money(order.bagTypePrice)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-lg font-bold text-gray-900 pt-3 border-t border-gray-200">
                     <span>Total</span>
-                    <span>${order.totalAmount.toFixed(2)}</span>
+                    <span>{money(order.totalAmount)}</span>
                   </div>
                 </div>
 
@@ -336,16 +343,16 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
         </div>
 
         {/* Action Buttons */}
-        <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-6 lg:p-8">
+        <Reveal className="bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-4 sm:p-6 lg:p-8">
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
             <Link href="/" className="w-full sm:w-auto">
-              <button className="w-full flex items-center justify-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 bg-black hover:bg-gray-800 text-white font-semibold rounded-lg sm:rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base">
+              <button className="btn-shine group w-full flex items-center justify-center gap-2 px-6 py-2.5 sm:py-3 bg-[#e01a1b] hover:bg-[#c41617] text-white font-semibold rounded-full transition-all duration-300 hover:-translate-y-0.5 shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] text-sm sm:text-base">
                 Continue Shopping
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
               </button>
             </Link>
           </div>
-        </div>
+        </Reveal>
       </div>
     </div>
   )

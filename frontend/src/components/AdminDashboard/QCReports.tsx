@@ -17,6 +17,7 @@ import {
     ChevronLeft, ChevronRight, RotateCw,
 } from "lucide-react"
 import Dropdown from '@/components/UI/Dropdown'
+import DateRangeCalendar from '@/components/Shared/DateRangeCalendar'
 import { formatDate } from "@/lib/utils"
 import { showErrorToast } from '@/lib/toast-utils'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -31,17 +32,17 @@ const TABLE_MIN_HEIGHT_PX = PAGE_SIZE * 65
 
 const FACTORY_RESULT_OPTIONS = [
     { value: '', label: 'All results' },
-    { value: 'PASSED', label: 'Passed' },
-    { value: 'FAILED', label: 'Failed' },
+    { value: 'PASSED', label: 'Approved' },
+    { value: 'FAILED', label: 'Rejected' },
 ]
 
 const PRODUCT_STATUS_OPTIONS = [
     { value: '', label: 'All statuses' },
-    { value: 'QC_APPROVED', label: 'QC Approved' },
-    { value: 'APPROVED', label: 'Approved' },
+    { value: 'QC_APPROVED', label: 'Pending Approval' },
+    { value: 'APPROVED', label: 'Approved by Admin' },
     { value: 'REJECTED', label: 'Rejected' },
-    { value: 'REINSPECTION', label: 'Reinspection' },
-    { value: 'PENDING', label: 'Pending' },
+    { value: 'REINSPECTION', label: 'Re-Inspection' },
+    { value: 'PENDING', label: 'Pending QC' },
 ]
 
 const SORT_OPTIONS = [
@@ -71,6 +72,19 @@ export default function QCReports() {
 
     const initialTab = searchParams.get('tab') === 'product' ? 'product' : 'factory'
     const [activeTab, setActiveTab] = useState<'factory' | 'product'>(initialTab)
+
+    // ── Date-range filter (shared across both tabs) ─────────────────────────
+    const [dateFrom, setDateFrom] = useState('')
+    const [dateTo, setDateTo] = useState('')
+    // Keep a row when its report date falls within the selected range (inclusive).
+    const inDateRange = (d?: string | null) => {
+        if (!dateFrom && !dateTo) return true
+        if (!d) return false
+        const day = new Date(d).toLocaleDateString('en-CA') // local YYYY-MM-DD
+        if (dateFrom && day < dateFrom) return false
+        if (dateTo && day > dateTo) return false
+        return true
+    }
 
     // ── Factory tab state ───────────────────────────────────────────────────
     const [factorySearchInput, setFactorySearchInput] = useState(searchParams.get('search') ?? '')
@@ -210,7 +224,7 @@ export default function QCReports() {
         switch (status) {
             case 'PASSED':
             case 'APPROVED':
-                return <Badge className="bg-green-50 text-green-700 border border-green-200">Passed / Approved</Badge>
+                return <Badge className="bg-green-50 text-green-700 border border-green-200">Approved</Badge>
             case 'QC_APPROVED':
                 return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200">QC Approved</Badge>
             case 'REINSPECTION':
@@ -218,7 +232,7 @@ export default function QCReports() {
                 return <Badge className="bg-amber-50 text-amber-700 border border-amber-200">Re-Inspection</Badge>
             case 'FAILED':
             case 'REJECTED':
-                return <Badge className="bg-red-50 text-red-700 border border-red-200">Failed / Rejected</Badge>
+                return <Badge className="bg-red-50 text-red-700 border border-red-200">Rejected</Badge>
             case 'PENDING':
             case 'IN_PROGRESS':
                 return <Badge className="bg-brand-50 text-brand-700 border border-brand-200">In Progress</Badge>
@@ -233,11 +247,34 @@ export default function QCReports() {
         }
     }
 
+    // Product "Admin Status" — the ADMIN's approval state, distinct from the QC
+    // checker's decision. QC_APPROVED means QC is done but the admin has NOT yet
+    // finalised, so it reads "Pending Approval" (not "Approved").
+    const getAdminStatusBadge = (approvalStatus: string) => {
+        switch (approvalStatus) {
+            case 'APPROVED':
+                return <Badge className="bg-green-50 text-green-700 border border-green-200">Approved by Admin</Badge>
+            case 'QC_APPROVED':
+                return <Badge className="bg-amber-50 text-amber-700 border border-amber-200">Pending Approval</Badge>
+            case 'REJECTED':
+                return <Badge className="bg-red-50 text-red-700 border border-red-200">Rejected</Badge>
+            case 'REINSPECTION':
+                return <Badge className="bg-purple-50 text-purple-700 border border-purple-200">Re-Inspection</Badge>
+            case 'PENDING':
+                return <Badge className="bg-slate-50 text-slate-700 border border-slate-200">Pending QC</Badge>
+            default:
+                return <Badge className="bg-slate-50 text-slate-700 border border-slate-200">{approvalStatus}</Badge>
+        }
+    }
+
+    const clearDateFilter = () => { setDateFrom(''); setDateTo('') }
+
     const clearFactoryFilters = () => {
         setFactorySearchInput('')
         setFactoryResult('')
         setFactorySort(DEFAULT_SORT)
         setFactoryPage(1)
+        clearDateFilter()
     }
 
     const clearProductFilters = () => {
@@ -245,10 +282,16 @@ export default function QCReports() {
         setProductStatus('')
         setProductSort(DEFAULT_SORT)
         setProductPage(1)
+        clearDateFilter()
     }
 
-    const factoryHasFilters = Boolean(debouncedFactorySearch || factoryResult || factorySort !== DEFAULT_SORT || factoryPage !== 1)
-    const productHasFilters = Boolean(debouncedProductSearch || productStatus || productSort !== DEFAULT_SORT || productPage !== 1)
+    const hasDateFilter = Boolean(dateFrom || dateTo)
+    const factoryHasFilters = Boolean(debouncedFactorySearch || factoryResult || factorySort !== DEFAULT_SORT || factoryPage !== 1 || hasDateFilter)
+    const productHasFilters = Boolean(debouncedProductSearch || productStatus || productSort !== DEFAULT_SORT || productPage !== 1 || hasDateFilter)
+
+    // Client-side date-range narrowing of the loaded page (the API has no date param).
+    const visibleFactory = factoryReports.filter(r => inDateRange(r.completedAt || r.createdAt))
+    const visibleProduct = productReports.filter(p => inDateRange(p.updatedAt || p.createdAt))
 
 
     return (
@@ -264,7 +307,7 @@ export default function QCReports() {
             <div className="flex gap-4 border-b border-slate-200">
                 <button
                     onClick={() => setActiveTab('factory')}
-                    className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'factory' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'factory' ? 'text-brand-600' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     <div className="flex items-center gap-2">
                         <Factory className="h-4 w-4" />
@@ -274,7 +317,7 @@ export default function QCReports() {
                 </button>
                 <button
                     onClick={() => setActiveTab('product')}
-                    className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'product' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'product' ? 'text-brand-600' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     <div className="flex items-center gap-2">
                         <PackageCheck className="h-4 w-4" />
@@ -288,7 +331,7 @@ export default function QCReports() {
             {activeTab === 'factory' && (
                 <div className="space-y-4">
                     {/* Filter bar */}
-                    <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] items-start">
+                    <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] items-start">
                         <div className="relative">
                             <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
                             <input
@@ -308,6 +351,12 @@ export default function QCReports() {
                                 </button>
                             )}
                         </div>
+                        <DateRangeCalendar
+                            from={dateFrom}
+                            to={dateTo}
+                            placeholder="Inspection Date"
+                            onChange={(f, t) => { setDateFrom(f); setDateTo(t); setFactoryPage(1) }}
+                        />
                         <div className="min-w-37.5">
                             <Dropdown
                                 value={factoryResult}
@@ -377,14 +426,14 @@ export default function QCReports() {
                                                 </div>
                                             </TableCell>
                                         </TableRow>
-                                    ) : factoryReports.length === 0 ? (
+                                    ) : visibleFactory.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={6} className="text-center py-8 text-slate-500">
                                                 {factoryHasFilters ? 'No reports match the current filters.' : 'No factory inspection reports found.'}
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        factoryReports.map((report) => (
+                                        visibleFactory.map((report) => (
                                             <TableRow key={report.id}>
                                                 <TableCell>
                                                     <div className="font-medium text-slate-900">{report.vendor?.companyName || 'Unknown Vendor'}</div>
@@ -479,7 +528,7 @@ export default function QCReports() {
             {activeTab === 'product' && (
                 <div className="space-y-4">
                     {/* Filter bar */}
-                    <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] items-start">
+                    <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] items-start">
                         <div className="relative">
                             <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
                             <input
@@ -499,6 +548,12 @@ export default function QCReports() {
                                 </button>
                             )}
                         </div>
+                        <DateRangeCalendar
+                            from={dateFrom}
+                            to={dateTo}
+                            placeholder="Inspection Date"
+                            onChange={(f, t) => { setDateFrom(f); setDateTo(t); setProductPage(1) }}
+                        />
                         <div className="min-w-42.5">
                             <Dropdown
                                 value={productStatus}
@@ -536,8 +591,8 @@ export default function QCReports() {
                                         <TableHead>Product</TableHead>
                                         <TableHead>Vendor</TableHead>
                                         <TableHead>Category</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Decision</TableHead>
+                                        <TableHead>Admin Status</TableHead>
+                                        <TableHead>QC Decision</TableHead>
                                         <TableHead>Date</TableHead>
                                         <TableHead>Actions</TableHead>
                                     </TableRow>
@@ -570,15 +625,17 @@ export default function QCReports() {
                                                 </div>
                                             </TableCell>
                                         </TableRow>
-                                    ) : productReports.length === 0 ? (
+                                    ) : visibleProduct.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                                                 {productHasFilters ? 'No reports match the current filters.' : 'No product inspection reports found.'}
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        productReports.map((product) => {
-                                            const decision = product.finalDecision || product.approvalStatus
+                                        visibleProduct.map((product) => {
+                                            // The QC checker's Review-step decision — a data point, NOT the
+                                            // admin's final approval (that is the Status column / product approval).
+                                            const decision = product.qcDecision || product.finalDecision || '—'
                                             return (
                                                 <TableRow key={product.id}>
                                                     <TableCell>
@@ -591,7 +648,7 @@ export default function QCReports() {
                                                     <TableCell>
                                                         <span className="text-sm text-slate-900">{product.category}</span>
                                                     </TableCell>
-                                                    <TableCell>{getStatusBadge(product.approvalStatus)}</TableCell>
+                                                    <TableCell>{getAdminStatusBadge(product.approvalStatus)}</TableCell>
                                                     <TableCell>
                                                         <span className={`text-sm font-medium ${decision === 'Approved' ? 'text-green-600' : decision === 'Rejected' ? 'text-red-600' : 'text-yellow-600'}`}>
                                                             {decision}

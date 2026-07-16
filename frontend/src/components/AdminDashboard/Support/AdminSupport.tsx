@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
+import DateRangeCalendar from "@/components/Shared/DateRangeCalendar";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import supportService, { SupportTicket } from "@/services/supportService";
 import { hasPermission } from "@/lib/auth";
@@ -29,6 +30,8 @@ export default function AdminSupport() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
@@ -97,6 +100,16 @@ export default function AdminSupport() {
     }
   };
 
+  // Keep a ticket when its created date falls within the selected range.
+  const inDateRange = (d?: string | null) => {
+    if (!dateFrom && !dateTo) return true;
+    if (!d) return false;
+    const day = new Date(d).toLocaleDateString("en-CA"); // local YYYY-MM-DD
+    if (dateFrom && day < dateFrom) return false;
+    if (dateTo && day > dateTo) return false;
+    return true;
+  };
+
   const filteredTickets = tickets.filter((ticket) => {
     const matchesSearch =
       ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -106,7 +119,7 @@ export default function AdminSupport() {
     const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
 
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesSearch && matchesStatus && matchesPriority && inDateRange(ticket.createdAt);
   });
 
   const totalPages = Math.ceil(filteredTickets.length / PAGE_SIZE);
@@ -119,6 +132,14 @@ export default function AdminSupport() {
     resolved: tickets.filter((t) => t.status === "resolved").length,
   };
 
+  // Interactive metric cards — clicking one filters the table by that status.
+  const metricCards = [
+    { key: "all", label: "Total Tickets", subtitle: "All requests", count: stats.total, Icon: MessageCircle, iconBg: "bg-brand-50", iconColor: "text-brand-500", countColor: "text-slate-900", activeClass: "border-brand-400 bg-brand-50/50" },
+    { key: "open", label: "Open", subtitle: "Awaiting response", count: stats.open, Icon: AlertCircle, iconBg: "bg-red-50", iconColor: "text-red-500", countColor: "text-red-700", activeClass: "border-red-400 bg-red-50/60" },
+    { key: "in-progress", label: "In Progress", subtitle: "Being handled", count: stats.inProgress, Icon: Clock, iconBg: "bg-blue-50", iconColor: "text-blue-500", countColor: "text-blue-700", activeClass: "border-blue-400 bg-blue-50/60" },
+    { key: "resolved", label: "Resolved", subtitle: "Completed", count: stats.resolved, Icon: CheckCircle, iconBg: "bg-emerald-50", iconColor: "text-emerald-500", countColor: "text-emerald-700", activeClass: "border-emerald-400 bg-emerald-50/60" },
+  ];
+
   return (
     <div className="p-6 space-y-6">
       <Breadcrumb />
@@ -129,55 +150,32 @@ export default function AdminSupport() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <MessageCircle className="w-8 h-8 text-blue-600" />
-              <div className="ml-4">
-                <h3 className="text-sm font-medium text-slate-500">Total Tickets</h3>
-                <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
+      {/* Interactive metric cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {metricCards.map(({ key, label, subtitle, count, Icon, iconBg, iconColor, countColor, activeClass }) => {
+          const isActive = statusFilter === key;
+          const pct = stats.total > 0 && key !== "all" ? Math.round((count / stats.total) * 100) : null;
+          return (
+            <button
+              key={key}
+              onClick={() => { setStatusFilter(statusFilter === key ? "all" : key); setCurrentPage(1); }}
+              className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${
+                isActive ? activeClass : "border-slate-200/80 hover:border-slate-300"
+              }`}
+            >
+              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+                <span className="text-sm font-medium text-slate-500">{label}</span>
+                <div className={`p-1.5 rounded-lg ${iconBg} transition-transform duration-150 group-hover:scale-110`}>
+                  <Icon className={`h-4 w-4 ${iconColor}`} />
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <AlertCircle className="w-8 h-8 text-red-600" />
-              <div className="ml-4">
-                <h3 className="text-sm font-medium text-slate-500">Open</h3>
-                <p className="text-2xl font-bold text-slate-900">{stats.open}</p>
+              <div className="px-4 pb-4">
+                <div className={`text-2xl font-bold ${countColor}`}>{count}</div>
+                <p className="text-xs text-slate-400 mt-0.5">{pct !== null ? `${pct}% of total` : subtitle}</p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <Clock className="w-8 h-8 text-blue-600" />
-              <div className="ml-4">
-                <h3 className="text-sm font-medium text-slate-500">In Progress</h3>
-                <p className="text-2xl font-bold text-slate-900">{stats.inProgress}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-              <div className="ml-4">
-                <h3 className="text-sm font-medium text-slate-500">Resolved</h3>
-                <p className="text-2xl font-bold text-slate-900">{stats.resolved}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -198,6 +196,12 @@ export default function AdminSupport() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
+              <DateRangeCalendar
+                from={dateFrom}
+                to={dateTo}
+                placeholder="Created Date"
+                onChange={(f, t) => { setDateFrom(f); setDateTo(t); setCurrentPage(1); }}
+              />
               <div className="w-full sm:w-48">
                 <Dropdown
                   value={statusFilter}
@@ -251,7 +255,7 @@ export default function AdminSupport() {
           <TableBody>
             {paginatedItems.length > 0 ? (
               paginatedItems.map((ticket) => (
-                <TableRow key={ticket.id}>
+                <TableRow key={ticket.id} className="hover:bg-slate-50/60 transition-colors">
                   <TableCell>
                     <div className="font-mono font-medium text-slate-900">{ticket.ticketId}</div>
                   </TableCell>
@@ -299,10 +303,10 @@ export default function AdminSupport() {
                     {hasPermission('support:view') && (
                       <Link
                         href={`/admin/dashboard/support/${ticket.id}`}
-                        className="inline-flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium"
+                        title="View & Reply"
+                        className="inline-flex p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                       >
-                        <Eye className="w-4 h-4 mr-1" />
-                        View & Reply
+                        <Eye className="w-4 h-4" />
                       </Link>
                     )}
                   </TableCell>

@@ -14,12 +14,13 @@ import {
   ShoppingBag
 } from "lucide-react"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
-import { formatPrice, getCurrency, getRegionalPrice } from '@/lib/currency'
+import { formatPrice, getCurrency, getRegionalPrice, convertUSDtoINR } from '@/lib/currency'
 import bagTypeService from "@/services/bagTypeService"
 import ShippingForm from "./CheckoutProcess/ShippingForm"
 import PaymentForm from "./CheckoutProcess/PaymentForm"
 import ReviewOrder from "./CheckoutProcess/ReviewOrder"
 import AddressSelector from "./CheckoutProcess/AddressSelector"
+import Reveal from "@/components/WebSite/Shared/Reveal"
 import cartService, { CartItem } from "@/services/cartService"
 import orderService, { CreateOrderParams } from "@/services/orderService"
 import { stashRecentOrder } from "@/lib/recentOrder"
@@ -37,14 +38,38 @@ declare global {
   }
 }
 
+/**
+ * Split a stored full name into first / middle / last. The first token is the
+ * first name, the last token is the last name, and anything between is treated
+ * as the middle name (so "A B C D" → first "A", middle "B C", last "D").
+ */
+function splitFullName(full?: string | null): { firstName: string; middleName: string; lastName: string } {
+  const parts = String(full || "").trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return { firstName: "", middleName: "", lastName: "" }
+  if (parts.length === 1) return { firstName: parts[0], middleName: "", lastName: "" }
+  return {
+    firstName: parts[0],
+    middleName: parts.slice(1, -1).join(" "),
+    lastName: parts[parts.length - 1],
+  }
+}
+
+/** Compose first / middle / last back into a single stored name. */
+function joinFullName(firstName: string, middleName: string, lastName: string): string {
+  return [firstName, middleName, lastName].map((s) => (s || "").trim()).filter(Boolean).join(" ")
+}
+
 export interface CheckoutFormData {
   // Shipping Information
   firstName: string
+  middleName: string
   lastName: string
   email: string
   phone: string
   address: string
   addressLine2: string
+  addressLine3: string
+  landmark: string
   city: string
   state: string
   zipCode: string
@@ -83,11 +108,14 @@ export default function Checkout() {
 
   const [formData, setFormData] = useState<CheckoutFormData>({
     firstName: "",
+    middleName: "",
     lastName: "",
     email: "",
     phone: "",
     address: "",
     addressLine2: "",
+    addressLine3: "",
+    landmark: "",
     city: "",
     state: "",
     zipCode: "",
@@ -219,10 +247,8 @@ export default function Checkout() {
       if (response.success && response.data) {
         const userData = response.data
 
-        // Split name into first and last name
-        const nameParts = userData.name?.split(' ') || ['', '']
-        const firstName = nameParts[0] || ''
-        const lastName = nameParts.slice(1).join(' ') || ''
+        // Split the stored full name into first / middle / last.
+        const { firstName, middleName, lastName } = splitFullName(userData.name)
 
         // Pre-fill personal info only. Shipping address is sourced from saved addresses
         // (see fetchSavedAddresses) so it isn't overridden by legacy flat User.address fields.
@@ -240,6 +266,7 @@ export default function Checkout() {
           return {
             ...prev,
             firstName: prev.firstName || firstName,
+            middleName: prev.middleName || middleName,
             lastName: prev.lastName || lastName,
             email: userData.email,
             phone: usePhone,
@@ -274,18 +301,19 @@ export default function Checkout() {
   }
 
   const applySavedAddressToForm = (addr: SavedAddress) => {
-    const nameParts = (addr.name || "").trim().split(/\s+/)
-    const firstName = nameParts[0] || ""
-    const lastName = nameParts.slice(1).join(" ") || ""
+    const { firstName, middleName, lastName } = splitFullName(addr.name)
     const countryIso = normalizeCountryToIso(addr.country)
     const displayPhone = addr.phone ? formatPhoneAsYouType(addr.phone, countryIso) : ""
     setFormData((prev) => ({
       ...prev,
       firstName,
+      middleName,
       lastName,
       phone: displayPhone || prev.phone,
       address: addr.address || "",
       addressLine2: addr.addressLine2 || "",
+      addressLine3: addr.addressLine3 || "",
+      landmark: addr.landmark || "",
       city: addr.city || "",
       state: addr.state || "",
       zipCode: addr.zipCode || "",
@@ -320,10 +348,13 @@ export default function Checkout() {
     setFormData((prev) => ({
       ...prev,
       firstName: "",
+      middleName: "",
       lastName: "",
       phone: "",
       address: "",
       addressLine2: "",
+      addressLine3: "",
+      landmark: "",
       city: "",
       state: "",
       zipCode: "",
@@ -345,10 +376,12 @@ export default function Checkout() {
         const existing = savedAddresses.find(a => a.id === editingAddressId)
         const payload: AddressPayload = {
           type: existing?.type || "home",
-          name: `${formData.firstName} ${formData.lastName}`.trim(),
+          name: joinFullName(formData.firstName, formData.middleName, formData.lastName),
           phone: toE164(formData.phone, formData.country),
           address: formData.address,
           addressLine2: formData.addressLine2 || undefined,
+          addressLine3: formData.addressLine3 || undefined,
+          landmark: formData.landmark || undefined,
           city: formData.city,
           state: formData.state,
           zipCode: formData.zipCode,
@@ -376,10 +409,12 @@ export default function Checkout() {
       try {
         const payload: AddressPayload = {
           type: "home",
-          name: `${formData.firstName} ${formData.lastName}`.trim(),
+          name: joinFullName(formData.firstName, formData.middleName, formData.lastName),
           phone: toE164(formData.phone, formData.country),
           address: formData.address,
           addressLine2: formData.addressLine2 || undefined,
+          addressLine3: formData.addressLine3 || undefined,
+          landmark: formData.landmark || undefined,
           city: formData.city,
           state: formData.state,
           zipCode: formData.zipCode,
@@ -469,15 +504,31 @@ export default function Checkout() {
       const gstRate = item.product?.gstPercentage ? item.product.gstPercentage / 100 : 0
       return sum + (itemSubtotal * gstRate)
     }, 0)
+
+    // Round every component to 2dp BEFORE summing, mirroring the server
+    // (orderController `round2`). Each line is displayed to 2dp, so summing the
+    // raw floats produced a total that didn't match the lines shown above it
+    // (e.g. 16.76 + 2.01 − 1.68 displayed as 17.10 instead of 17.09) and the
+    // same drift then carried onto the invoice and the payment amount.
+    const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
+    const roundedSubtotal = r2(subtotal)
+    const roundedShipping = r2(shipping)
+    const roundedTax = r2(tax)
+    const roundedDiscount = r2(discountAmount)
+    const roundedBag = r2(bagTypePrice)
+
     // Calculate total with discount + bag cost, ensure >= 0
-    const total = Math.max(0, subtotal + shipping + tax - discountAmount + bagTypePrice)
+    const total = Math.max(
+      0,
+      r2(roundedSubtotal + roundedShipping + roundedTax - roundedDiscount + roundedBag)
+    )
 
     setOrderSummary({
-      subtotal,
-      shipping,
-      tax,
-      discount: discountAmount,
-      bagCost: bagTypePrice,
+      subtotal: roundedSubtotal,
+      shipping: roundedShipping,
+      tax: roundedTax,
+      discount: roundedDiscount,
+      bagCost: roundedBag,
       total
     })
   }
@@ -511,11 +562,14 @@ export default function Checkout() {
 
       const shippingAddress = {
         firstName: formData.firstName,
+        middleName: formData.middleName || "",
         lastName: formData.lastName,
         email: formData.email,
         phone: toE164(formData.phone, formData.country),
         street: formData.address,
         addressLine2: formData.addressLine2 || "",
+        addressLine3: formData.addressLine3 || "",
+        landmark: formData.landmark || "",
         city: formData.city,
         state: formData.state,
         zipCode: formData.zipCode,
@@ -549,10 +603,12 @@ export default function Checkout() {
         }
       }
 
-      // Create Razorpay order
+      // Create Razorpay order. Send the currency the total is actually quoted
+      // in — the server converts USD → INR before charging. Hardcoding 'INR'
+      // here charged a USD figure as rupees (a $9.39 order collected ₹9.39).
       const orderResponse = await paymentService.createRazorpayOrder(
         orderSummary.total,
-        'INR'
+        getCurrency()
       )
 
       if (!orderResponse.success) {
@@ -665,8 +721,8 @@ export default function Checkout() {
     <div className="max-w-2xl mx-auto flex items-center justify-between sm:justify-center mb-5 sm:mb-6 lg:mb-8 bg-[#fdfdfd] px-3 sm:px-4 py-3 sm:py-4 rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       {steps.map((step, index) => (
         <div key={step.id} className="flex items-center min-w-0">
-          <div className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 shrink-0 ${currentStep >= step.id
-            ? "bg-gray-800 border-gray-800 text-white"
+          <div className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 shrink-0 transition-colors ${currentStep >= step.id
+            ? "bg-[#e01a1b] border-[#e01a1b] text-white"
             : "border-slate-300 text-slate-400"
             }`}>
             {currentStep > step.id ? (
@@ -676,11 +732,11 @@ export default function Checkout() {
             )}
           </div>
           {/* Label: hidden on mobile, shown sm+; on mobile only show label for the active step */}
-          <span className={`ml-2 text-xs sm:text-sm font-medium truncate ${currentStep >= step.id ? "text-gray-800" : "text-slate-400"} ${currentStep === step.id ? "inline" : "hidden sm:inline"}`}>
+          <span className={`ml-2 text-xs sm:text-sm font-medium truncate ${currentStep >= step.id ? "text-[#e01a1b]" : "text-slate-400"} ${currentStep === step.id ? "inline" : "hidden sm:inline"}`}>
             {step.name}
           </span>
           {index < steps.length - 1 && (
-            <div className={`flex-1 sm:flex-none sm:w-16 h-0.5 mx-2 sm:mx-4 min-w-4 ${currentStep > step.id ? "bg-gray-800" : "bg-slate-300"
+            <div className={`flex-1 sm:flex-none sm:w-16 h-0.5 mx-2 sm:mx-4 min-w-4 ${currentStep > step.id ? "bg-[#e01a1b]" : "bg-slate-300"
               }`} />
           )}
         </div>
@@ -710,7 +766,7 @@ export default function Checkout() {
             {savedAddresses.length > 0 && (
               <div className="border-t border-slate-200 pt-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-slate-900">
+                  <h3 className="font-playfair text-base font-semibold text-[#1a1a1a]">
                     {editingAddressId ? "Edit shipping address" : "Enter new shipping address"}
                   </h3>
                   {editingAddressId && (
@@ -745,7 +801,7 @@ export default function Checkout() {
                   checked={saveNewAddressToBook}
                   onChange={(e) => setSaveNewAddressToBook(e.target.checked)}
                   disabled={placingOrder}
-                  className="w-4 h-4 accent-gray-800"
+                  className="w-4 h-4 accent-[#e01a1b]"
                 />
                 <span className="text-sm text-slate-700">
                   Save this address to my address book
@@ -825,10 +881,10 @@ export default function Checkout() {
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center max-w-md mx-auto p-8">
           <ShoppingBag className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Your cart is empty</h2>
+          <h2 className="font-playfair text-2xl font-semibold text-[#1a1a1a] mb-2">Your cart is empty</h2>
           <p className="text-slate-500 mb-6">Add some items to your cart before proceeding to checkout.</p>
           <Link href="/products">
-            <button className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium">
+            <button className="btn-shine inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#e01a1b] text-white rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 font-semibold">
               Browse Products
             </button>
           </Link>
@@ -841,21 +897,21 @@ export default function Checkout() {
     <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8 font-sans">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         {/* Header — Order-page style with icon */}
-        <div className="mb-5 sm:mb-6 lg:mb-8">
+        <Reveal className="mb-5 sm:mb-6 lg:mb-8">
           <Link href="/cart">
-            <button className="flex items-center gap-2 text-sm sm:text-base text-slate-600 hover:text-slate-900 mb-3 sm:mb-4">
+            <button className="flex items-center gap-2 text-sm sm:text-base text-slate-600 hover:text-[#e01a1b] transition-colors mb-3 sm:mb-4">
               <ArrowLeft className="w-4 h-4" />
               Back to Cart
             </button>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <Lock className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-blue-600 shrink-0" />
+            <Lock className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-[#e01a1b] shrink-0" />
             <div className="min-w-0">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">Checkout</h1>
+              <h1 className="font-playfair text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#1a1a1a] mb-1 sm:mb-2">Checkout</h1>
               <p className="text-sm sm:text-base text-slate-600">Complete your purchase securely</p>
             </div>
           </div>
-        </div>
+        </Reveal>
 
         {renderStepIndicator()}
 
@@ -863,8 +919,8 @@ export default function Checkout() {
           {/* Checkout Form */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-linear-to-r from-gray-700 to-gray-800">
-                <h2 className="text-lg sm:text-xl font-bold text-[#fffff4]">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[#c41617] bg-linear-to-r from-[#e01a1b] to-[#c41617]">
+                <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#fffff4]">
                   {currentStep === 1 && "Shipping Information"}
                   {currentStep === 2 && "Payment Information"}
                   {currentStep === 3 && "Review Your Order"}
@@ -914,7 +970,7 @@ export default function Checkout() {
                       ) ||
                       (currentStep === 1 && !canAdvanceShipping)
                     }
-                    className="px-5 sm:px-6 lg:px-8 py-2.5 sm:py-3 bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white font-semibold rounded-lg sm:rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2 text-sm sm:text-base"
+                    className="btn-shine px-5 sm:px-6 lg:px-8 py-2.5 sm:py-3 bg-[#e01a1b] hover:bg-[#c41617] text-white font-semibold rounded-full transition-all duration-300 hover:-translate-y-0.5 shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center gap-2 text-sm sm:text-base"
                   >
                     {placingOrder && <Loader2 className="w-4 h-4 animate-spin" />}
                     {currentStep === 3 ? (placingOrder ? "Placing Order..." : "Place Order") : "Continue"}
@@ -928,7 +984,7 @@ export default function Checkout() {
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden lg:sticky lg:top-8">
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-linear-to-r from-slate-50 to-white">
-                <h2 className="text-lg sm:text-xl font-bold text-slate-900">Order Summary</h2>
+                <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a]">Order Summary</h2>
               </div>
 
               <div className="p-4 sm:p-5 lg:p-6">
@@ -1049,6 +1105,18 @@ export default function Checkout() {
                       <span>Total</span>
                       <span>{formatPrice(orderSummary.total)}</span>
                     </div>
+                    {/*
+                      Our Razorpay account settles in INR, so a USD order is
+                      converted server-side before the payment is created.
+                      Say so here — otherwise the gateway suddenly quoting
+                      rupees reads as a wrong amount. Same rate the server
+                      uses, so the figure matches the actual charge.
+                    */}
+                    {getCurrency() === 'USD' && orderSummary.total > 0 && (
+                      <p className="mt-1.5 text-xs text-slate-500">
+                        Charged as {formatPrice(convertUSDtoINR(orderSummary.total), 'INR')} — billed in INR at today&apos;s exchange rate.
+                      </p>
+                    )}
                   </div>
                 </div>
 

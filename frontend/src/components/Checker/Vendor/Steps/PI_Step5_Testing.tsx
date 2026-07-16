@@ -144,9 +144,11 @@ function PhotoStrip({
 function TestRow({
   test,
   onChange,
+  invalid = false,
 }: {
   test: TestItem
   onChange: (patch: Partial<TestItem>) => void
+  invalid?: boolean
 }) {
   const addRightPhotos = (photo: { name: string; data: string }) => {
     onChange({ rightPhotos: [...test.rightPhotos, photo] })
@@ -180,8 +182,10 @@ function TestRow({
 
   return (
     <div
-      className={`border rounded-xl overflow-hidden transition-colors ${
-        test.pass ? 'border-emerald-200 bg-emerald-50/20'
+      data-invalid={invalid ? 'true' : undefined}
+      className={`scroll-mt-24 border rounded-xl overflow-hidden transition-colors ${
+        invalid ? 'border-red-500 bg-red-50/50 ring-2 ring-red-400'
+          : test.pass ? 'border-emerald-200 bg-emerald-50/20'
           : test.fail ? 'border-red-200 bg-red-50/20'
           : 'border-slate-200 bg-white'
       }`}
@@ -273,18 +277,22 @@ function OtherTestRow({
   test,
   onChange,
   onRemove,
+  invalid = false,
 }: {
   test: TestItem
   onChange: (patch: Partial<TestItem>) => void
   onRemove: () => void
+  invalid?: boolean
 }) {
   const togglePass = () => onChange({ pass: test.pass ? null : true, fail: null })
   const toggleFail = () => onChange({ fail: test.fail ? null : true, pass: null })
 
   return (
     <div
-      className={`border rounded-xl overflow-hidden transition-colors ${
-        test.pass ? 'border-emerald-200 bg-emerald-50/20'
+      data-invalid={invalid ? 'true' : undefined}
+      className={`scroll-mt-24 border rounded-xl overflow-hidden transition-colors ${
+        invalid ? 'border-red-500 bg-red-50/50 ring-2 ring-red-400'
+          : test.pass ? 'border-emerald-200 bg-emerald-50/20'
           : test.fail ? 'border-red-200 bg-red-50/20'
           : 'border-brand-200 bg-brand-50/10'
       }`}
@@ -395,12 +403,14 @@ function OtherTestRow({
 // ── Collapsible group ────────────────────────────────────────────────────────
 function TestGroupCard({
   group,
+  invalidTestId = null,
   onToggleCollapse,
   onTestChange,
   onAddOther,
   onRemoveOther,
 }: {
   group: TestGroup
+  invalidTestId?: string | null
   onToggleCollapse: () => void
   onTestChange: (testId: string, patch: Partial<TestItem>) => void
   onAddOther: () => void
@@ -412,6 +422,10 @@ function TestGroupCard({
   const failed = group.tests.filter((t) => t.fail).length
   const total = group.tests.length
   const done = passed + failed
+  // Force this group open when it holds the failing test, so the highlighted
+  // row is actually in the DOM for the scroll-to-error to land on.
+  const holdsInvalid = !!invalidTestId && group.tests.some((t) => t.id === invalidTestId)
+  const showTests = !group.collapsed || holdsInvalid
 
   return (
     <div className="border border-slate-200 rounded-2xl overflow-hidden">
@@ -447,12 +461,13 @@ function TestGroupCard({
       </button>
 
       {/* Tests */}
-      {!group.collapsed && (
+      {showTests && (
         <div className="p-4 space-y-3">
           {regularTests.map((test) => (
             <TestRow
               key={test.id}
               test={test}
+              invalid={test.id === invalidTestId}
               onChange={(patch) => onTestChange(test.id, patch)}
             />
           ))}
@@ -460,6 +475,7 @@ function TestGroupCard({
             <OtherTestRow
               key={test.id}
               test={test}
+              invalid={test.id === invalidTestId}
               onChange={(patch) => onTestChange(test.id, patch)}
               onRemove={() => onRemoveOther(test.id)}
             />
@@ -671,6 +687,22 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
   const totalFail = allTests.filter((t) => t.fail).length
   const totalDone = totalPass + totalFail
 
+  // Mirror the Next-gate validation so, when blocked, we can point at (and
+  // highlight) the exact failing test — the form scrolls to data-invalid.
+  const firstInvalidTestId: string | null = (() => {
+    if (!errors.testGroups) return null
+    const blank = (s: any) => !s || !String(s).trim()
+    for (const g of groups) {
+      for (const t of (g.tests || [])) {
+        if (t.isOther && (blank(t.subject) || blank(t.label))) return t.id
+        if (t.pass !== true && t.fail !== true) return t.id
+        if (t.pass === true && (!Array.isArray(t.rightPhotos) || t.rightPhotos.length === 0)) return t.id
+        if (t.fail === true && (!Array.isArray(t.wrongPhotos) || t.wrongPhotos.length === 0)) return t.id
+      }
+    }
+    return null
+  })()
+
   return (
     <div className="space-y-8">
       <div className="border-b border-slate-200 pb-6">
@@ -681,7 +713,7 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
       </div>
 
       {errors.testGroups && (
-        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+        <div className="scroll-mt-24 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
           <p className="text-sm font-semibold text-red-700">{errors.testGroups}</p>
         </div>
       )}
@@ -705,6 +737,7 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
           <TestGroupCard
             key={group.id}
             group={group}
+            invalidTestId={firstInvalidTestId}
             onToggleCollapse={() => toggleCollapse(group.id)}
             onTestChange={(testId, patch) => updateTest(group.id, testId, patch)}
             onAddOther={() => addOtherTest(group.id)}

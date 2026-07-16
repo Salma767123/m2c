@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Search, Eye, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, Eye, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Package, Clock, PackageCheck, Truck, CheckCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -12,9 +12,24 @@ import {
   TableRow,
 } from "@/components/UI/Table";
 import Dropdown from "@/components/UI/Dropdown";
+import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalendar";
 import { orderService, VendorShipment } from "@/services/orderService";
+import { formatOrderAmount } from "@/lib/currency";
 import { showErrorToast } from "@/lib/toast-utils";
 import { hasPermission } from "@/lib/auth";
+
+// Show what the customer was actually charged, plus an INR equivalent for USD orders
+// so admins can compare a .com order against a .in one. The equivalent comes from the
+// rate snapshotted on the order, so it never drifts when the live rate is edited.
+function Money({ amount, order }: { amount: number; order?: { currency?: "INR" | "USD"; exchangeRate?: number | null } }) {
+  const { charged, inrEquivalent } = formatOrderAmount(amount, order?.currency, order?.exchangeRate);
+  return (
+    <div className="whitespace-nowrap">
+      <span className="font-medium text-slate-900">{charged}</span>
+      {inrEquivalent && <span className="block text-xs text-slate-500">≈ {inrEquivalent}</span>}
+    </div>
+  );
+}
 
 // Polls every 30s while the tab is visible so admin sees vendor status updates without F5.
 const REFRESH_INTERVAL_MS = 30000;
@@ -54,6 +69,8 @@ export default function VendorToHub() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("Active");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [shipments, setShipments] = useState<VendorShipment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -175,19 +192,38 @@ export default function VendorToHub() {
     const matchesStatus =
       statusFilter === "All" ||
       (statusFilter === "Active" && group.shipments.some(s => ACTIVE_STATUSES.includes(s.status))) ||
+      (statusFilter === "PROCESSING" && group.shipments.some(s => ["VENDOR_PROCESSING", "ORDER_CREATED"].includes(s.status))) ||
       group.shipments.some(s => s.status === statusFilter);
 
-    return matchesSearch && matchesStatus;
+    // Order-date range filter (YYYY-MM-DD strings compare lexicographically)
+    let matchesDate = true;
+    if (dateFrom || dateTo) {
+      const od = group.orderDate ? fmtDate(new Date(group.orderDate)) : "";
+      if (!od) matchesDate = false;
+      else if (dateFrom && od < dateFrom) matchesDate = false;
+      else if (dateTo && od > dateTo) matchesDate = false;
+    }
+
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, dateFrom, dateTo]);
 
   // Pagination (by order group, not by shipment)
   const totalPages = Math.ceil(filteredGroups.length / PAGE_SIZE);
   const paginatedGroups = filteredGroups.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  // Metric cards — styled like the Vendor Product Requests module; click to filter.
+  const metricCards = [
+    { key: 'All',                     label: 'Total Shipments', subtitle: 'All shipments',  count: shipments.length,                                                                                     Icon: Package,      iconBg: 'bg-brand-50',   iconColor: 'text-brand-500',   countColor: 'text-slate-900',  activeClass: 'border-brand-400 bg-brand-50/50' },
+    { key: 'PROCESSING',              label: 'Processing',      subtitle: 'Being prepared', count: shipments.filter((s) => s.status === 'VENDOR_PROCESSING' || s.status === 'ORDER_CREATED').length,       Icon: Clock,        iconBg: 'bg-amber-50',   iconColor: 'text-amber-500',   countColor: 'text-amber-700',  activeClass: 'border-amber-400 bg-amber-50/60' },
+    { key: 'PACKED_BY_VENDOR',        label: 'Packed',          subtitle: 'Ready to ship',  count: shipments.filter((s) => s.status === 'PACKED_BY_VENDOR').length,                                       Icon: PackageCheck, iconBg: 'bg-purple-50',  iconColor: 'text-purple-500',  countColor: 'text-purple-700', activeClass: 'border-purple-400 bg-purple-50/60' },
+    { key: 'IN_TRANSIT_TO_ADMIN_HUB', label: 'In Transit',      subtitle: 'On the way',     count: shipments.filter((s) => s.status === 'IN_TRANSIT_TO_ADMIN_HUB').length,                                Icon: Truck,        iconBg: 'bg-blue-50',    iconColor: 'text-blue-500',    countColor: 'text-blue-700',   activeClass: 'border-blue-400 bg-blue-50/60' },
+    { key: 'RECEIVED_AT_ADMIN_HUB',   label: 'Received at Hub', subtitle: 'At the hub',     count: shipments.filter((s) => s.status === 'RECEIVED_AT_ADMIN_HUB').length,                                  Icon: CheckCircle,  iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500', countColor: 'text-emerald-700', activeClass: 'border-emerald-400 bg-emerald-50/60' },
+  ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -221,36 +257,31 @@ export default function VendorToHub() {
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600">Total Shipments</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{shipments.length}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600">Processing</p>
-          <p className="text-2xl font-bold text-yellow-600 mt-1">
-            {shipments.filter((s) => s.status === "VENDOR_PROCESSING" || s.status === "ORDER_CREATED").length}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600">Packed</p>
-          <p className="text-2xl font-bold text-purple-600 mt-1">
-            {shipments.filter((s) => s.status === "PACKED_BY_VENDOR").length}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600">In Transit</p>
-          <p className="text-2xl font-bold text-blue-600 mt-1">
-            {shipments.filter((s) => s.status === "IN_TRANSIT_TO_ADMIN_HUB").length}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600">Received at Hub</p>
-          <p className="text-2xl font-bold text-green-600 mt-1">
-            {shipments.filter((s) => s.status === "RECEIVED_AT_ADMIN_HUB").length}
-          </p>
-        </div>
+      {/* Stats Cards (click a card to filter the table below by that status) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {metricCards.map(({ key, label, subtitle, count, Icon, iconBg, iconColor, countColor, activeClass }) => {
+          const isActive = statusFilter === key;
+          const toggle = () => setStatusFilter((prev) => (prev === key ? "All" : key));
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={toggle}
+              className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : 'border-slate-200/80 hover:border-slate-300'}`}
+            >
+              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+                <span className="text-sm font-medium text-slate-500">{label}</span>
+                <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace('50', '100') : iconBg} transition-transform duration-150 group-hover:scale-110`}>
+                  <Icon className={`h-4 w-4 ${iconColor}`} />
+                </div>
+              </div>
+              <div className="px-4 pb-4">
+                <div className={`text-2xl font-bold ${countColor}`}>{count}</div>
+                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -268,10 +299,18 @@ export default function VendorToHub() {
           </div>
           <div className="w-full md:w-64">
             <Dropdown
-              value={statusFilter}
+              value={STATUS_LABELS[statusFilter] ? statusFilter : "All"}
               options={statusDisplayOptions}
               onChange={(value) => setStatusFilter(value as string)}
               placeholder="Filter by Status"
+            />
+          </div>
+          <div className="shrink-0">
+            <DateRangeCalendar
+              from={dateFrom}
+              to={dateTo}
+              onChange={(from, to) => { setDateFrom(from); setDateTo(to); }}
+              placeholder="Order Date"
             />
           </div>
           <button
@@ -285,11 +324,6 @@ export default function VendorToHub() {
             <span className="text-sm font-medium">Refresh</span>
           </button>
         </div>
-        {lastUpdated && (
-          <p className="text-xs text-slate-500 mt-3">
-            Auto-updates every 30s &middot; Last updated {lastUpdated.toLocaleTimeString("en-IN")}
-          </p>
-        )}
       </div>
 
       {/* Orders Table */}
@@ -303,7 +337,7 @@ export default function VendorToHub() {
               <TableHead>SKU</TableHead>
               <TableHead>Vendor</TableHead>
               <TableHead>Order Date</TableHead>
-              <TableHead>Amount</TableHead>
+              <TableHead>Items Total</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
@@ -338,7 +372,7 @@ export default function VendorToHub() {
                       <TableCell>{sku}</TableCell>
                       <TableCell>{s.vendorName}</TableCell>
                       <TableCell>{new Date(group.orderDate).toLocaleDateString("en-IN")}</TableCell>
-                      <TableCell>₹{shipmentAmount.toLocaleString("en-IN")}</TableCell>
+                      <TableCell><Money amount={shipmentAmount} order={s.order} /></TableCell>
                       <TableCell>
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(s.status)}`}>
                           {s.status.replace(/_/g, " ")}
@@ -391,7 +425,7 @@ export default function VendorToHub() {
                         </span>
                       </TableCell>
                       <TableCell>{new Date(group.orderDate).toLocaleDateString("en-IN")}</TableCell>
-                      <TableCell>₹{totalAmount.toLocaleString("en-IN")}</TableCell>
+                      <TableCell><Money amount={totalAmount} order={activeShipments[0]?.order} /></TableCell>
                       <TableCell>
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(groupStatus)}`}>
                           {groupStatus === "MIXED" ? "MIXED STATUS" : groupStatus.replace(/_/g, " ")}
@@ -422,7 +456,7 @@ export default function VendorToHub() {
                           <TableCell>{sku}</TableCell>
                           <TableCell>{s.vendorName}</TableCell>
                           <TableCell className="text-xs text-slate-500">—</TableCell>
-                          <TableCell>₹{shipmentAmount.toLocaleString("en-IN")}</TableCell>
+                          <TableCell><Money amount={shipmentAmount} order={s.order} /></TableCell>
                           <TableCell>
                             <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(s.status)}`}>
                               {s.status.replace(/_/g, " ")}

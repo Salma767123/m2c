@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Badge } from '@/components/UI/Badge'
-import { Store, ArrowRight, Package } from 'lucide-react'
+import { Store, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
 const getStatusBadge = (status: string) => {
@@ -23,13 +23,17 @@ export default function RecentVendors({ vendors }: { vendors: any[] }) {
       <CardContent>
         <div className="space-y-4 max-h-100 overflow-y-auto">
           {vendors && vendors.map((vendor) => (
-            <div key={vendor.id} className="flex items-center justify-between p-4 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors gap-3">
+            <Link
+              key={vendor.id}
+              href={`/admin/dashboard/vendors/view/${vendor.id}`}
+              className="flex items-center justify-between p-4 border border-slate-100 rounded-lg hover:bg-slate-50 hover:border-slate-200 transition-colors gap-3 group"
+            >
               <div className="flex items-center space-x-4 min-w-0 flex-1">
                 <div className="h-10 w-10 bg-brand-50 text-brand-500 rounded-full flex items-center justify-center shrink-0">
                   <Store className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <h4 className="text-sm font-semibold text-slate-900 truncate">{vendor.companyName}</h4>
+                  <h4 className="text-sm font-semibold text-slate-900 truncate group-hover:text-brand-600 transition-colors">{vendor.companyName}</h4>
                   <div className="flex items-center mt-1 space-x-2 text-xs text-slate-500">
                     <span className="truncate">{vendor.vendorType}</span>
                     <span>•</span>
@@ -37,10 +41,11 @@ export default function RecentVendors({ vendors }: { vendors: any[] }) {
                   </div>
                 </div>
               </div>
-              <div className="shrink-0">
+              <div className="shrink-0 flex items-center gap-2">
                 {getStatusBadge(vendor.status)}
+                <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-brand-500 transition-colors" />
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </CardContent>

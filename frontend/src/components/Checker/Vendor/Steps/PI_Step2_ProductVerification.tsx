@@ -348,7 +348,16 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
                     {Array.isArray(variant.images) && variant.images[0] && (
                       <VerifyField fieldKey={`pv_var${vi}_image`} label="Variant Image"
                         value={variant.images[0]} type="image"
-                        verifications={verifications} onChange={onVerify} />
+                        verifications={verifications} onChange={onVerify}
+                        headerAction={
+                          <button
+                            type="button"
+                            onClick={() => setViewingImage({ url: variant.images[0], label: `Variant ${vi + 1} Image` })}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-2 py-0.5 rounded-lg border border-brand-100 transition-colors"
+                          >
+                            <Eye className="w-3 h-3" /> View
+                          </button>
+                        } />
                     )}
                   </div>
                 </div>
@@ -442,7 +451,10 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
 
         {(formData.productEvidencePhotos || []).length === 0 && (
           <label
-            className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl px-6 py-8 cursor-pointer hover:border-brand-400 hover:bg-brand-50/30 transition-colors group"
+            data-invalid={errors.productEvidencePhotos ? 'true' : undefined}
+            className={`scroll-mt-24 flex flex-col items-center justify-center border-2 border-dashed rounded-xl px-6 py-8 cursor-pointer transition-colors group ${
+              errors.productEvidencePhotos ? 'border-red-300 bg-red-50/30 hover:border-red-400' : 'border-slate-300 hover:border-brand-400 hover:bg-brand-50/30'
+            }`}
           >
             <Upload className="w-8 h-8 text-slate-400 group-hover:text-brand-500 mb-2 transition-colors" />
             <p className="text-sm font-medium text-slate-700">Upload product evidence photo</p>

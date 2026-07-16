@@ -11,10 +11,11 @@ import {
 } from "@/services/addressService";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { getCountryName, getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants";
+import Reveal from "@/components/WebSite/Shared/Reveal";
 
 const TYPE_META: Record<string, { label: string; icon: typeof Home; badgeCls: string }> = {
   home: { label: "Home", icon: Home, badgeCls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  work: { label: "Work", icon: Briefcase, badgeCls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  work: { label: "Work", icon: Briefcase, badgeCls: "bg-[#e01a1b]/10 text-[#e01a1b] border-[#e01a1b]/20" },
   other: { label: "Other", icon: MapPin, badgeCls: "bg-slate-50 text-slate-700 border-slate-200" },
 };
 
@@ -131,12 +132,12 @@ export default function AddressBook() {
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 border border-slate-200 p-4 sm:p-5 lg:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-5 sm:mb-6">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600 shrink-0" />
+            <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-[#e01a1b] shrink-0" />
             <div className="min-w-0">
-              <h2 className="text-lg sm:text-xl font-bold text-slate-900">Saved Addresses</h2>
+              <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a]">Saved Addresses</h2>
               <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                 {addresses.length} of {MAX_SAVED_ADDRESSES} addresses used
               </p>
@@ -146,7 +147,7 @@ export default function AddressBook() {
             type="button"
             onClick={openAdd}
             disabled={atLimit}
-            className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="btn-shine flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base bg-[#e01a1b] hover:bg-[#c41617] text-white font-semibold rounded-full shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             title={atLimit ? `Limit of ${MAX_SAVED_ADDRESSES} addresses reached` : "Add new address"}
           >
             <Plus className="w-4 h-4" />
@@ -158,15 +159,16 @@ export default function AddressBook() {
           <EmptyState onAdd={openAdd} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {addresses.map((addr) => (
-              <AddressCard
-                key={addr.id}
-                addr={addr}
-                busy={busyId === addr.id}
-                onEdit={() => openEdit(addr)}
-                onDelete={() => setConfirmDeleteId(addr.id)}
-                onSetDefault={() => handleSetDefault(addr)}
-              />
+            {addresses.map((addr, index) => (
+              <Reveal key={addr.id} delay={index * 90}>
+                <AddressCard
+                  addr={addr}
+                  busy={busyId === addr.id}
+                  onEdit={() => openEdit(addr)}
+                  onDelete={() => setConfirmDeleteId(addr.id)}
+                  onSetDefault={() => handleSetDefault(addr)}
+                />
+              </Reveal>
             ))}
           </div>
         )}
@@ -223,10 +225,10 @@ function AddressCard({
 
   return (
     <div
-      className={`relative border-2 rounded-xl p-5 transition-all ${
+      className={`relative h-full border-2 rounded-2xl p-5 transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] ${
         addr.isDefault
-          ? "border-gray-800 bg-gradient-to-br from-gray-50 to-white shadow-sm"
-          : "border-slate-200 bg-white hover:border-slate-300"
+          ? "border-[#e01a1b] bg-gradient-to-br from-[#e01a1b]/5 to-white shadow-sm"
+          : "border-slate-200 bg-white hover:border-[#e01a1b]/30"
       }`}
     >
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -235,7 +237,7 @@ function AddressCard({
           {meta.label}
         </span>
         {addr.isDefault && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-gray-800 text-white rounded-full">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-[#e01a1b] text-white rounded-full">
             <Star className="w-3 h-3 fill-white" />
             Default
           </span>
@@ -281,7 +283,7 @@ function AddressCard({
             type="button"
             onClick={onSetDefault}
             disabled={busy}
-            className="text-xs font-semibold text-gray-700 hover:text-gray-900 hover:underline disabled:opacity-50 flex items-center gap-1"
+            className="text-xs font-semibold text-[#e01a1b] hover:text-[#c41617] hover:underline disabled:opacity-50 flex items-center gap-1"
           >
             {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Star className="w-3 h-3" />}
             Set as default
@@ -303,7 +305,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       <button
         type="button"
         onClick={onAdd}
-        className="inline-flex items-center gap-2 px-5 py-2.5 bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white font-medium rounded-lg shadow-sm"
+        className="btn-shine inline-flex items-center gap-2 px-5 py-2.5 bg-[#e01a1b] hover:bg-[#c41617] text-white font-semibold rounded-full shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] transition-all"
       >
         <Plus className="w-4 h-4" />
         Add your first address
@@ -333,7 +335,7 @@ function DeleteConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="px-5 py-2.5 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 disabled:opacity-50"
+            className="px-5 py-2.5 border border-slate-300 text-slate-700 font-medium rounded-full hover:bg-slate-50 disabled:opacity-50"
           >
             Cancel
           </button>
@@ -341,7 +343,7 @@ function DeleteConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg disabled:opacity-50 flex items-center gap-2"
+            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full disabled:opacity-50 flex items-center gap-2"
           >
             {busy && <Loader2 className="w-4 h-4 animate-spin" />}
             Delete

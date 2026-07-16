@@ -120,7 +120,7 @@ export default function Home() {
         <button
           onClick={handleAdminQuickLogin}
           disabled={loggingIn !== null}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors text-center disabled:opacity-60 disabled:cursor-not-allowed"
+          className="px-6 py-3 bg-[#1a1a1a] text-white rounded-full font-semibold hover:bg-[#e01a1b] hover:shadow-[0_10px_30px_rgba(224,26,27,0.28)] transition-all duration-300 text-center disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loggingIn === 'admin' ? 'Logging in...' : isAdminLoggedIn ? 'Admin Dashboard' : 'Admin Login'}
         </button>
@@ -129,7 +129,7 @@ export default function Home() {
         <button
           onClick={handleVendorQuickLogin}
           disabled={loggingIn !== null}
-          className="px-6 py-3 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition-colors text-center disabled:opacity-60 disabled:cursor-not-allowed"
+          className="px-6 py-3 bg-[#1a1a1a] text-white rounded-full font-semibold hover:bg-[#e01a1b] hover:shadow-[0_10px_30px_rgba(224,26,27,0.28)] transition-all duration-300 text-center disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loggingIn === 'vendor' ? 'Logging in...' : isVendorLoggedIn ? 'Vendor Dashboard' : 'Vendor Login'}
         </button>
@@ -138,7 +138,7 @@ export default function Home() {
         <button
           onClick={handleCheckerQuickLogin}
           disabled={loggingIn !== null}
-          className="px-6 py-3 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 transition-colors text-center disabled:opacity-60 disabled:cursor-not-allowed"
+          className="px-6 py-3 bg-[#1a1a1a] text-white rounded-full font-semibold hover:bg-[#e01a1b] hover:shadow-[0_10px_30px_rgba(224,26,27,0.28)] transition-all duration-300 text-center disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loggingIn === 'checker' ? 'Logging in...' : 'Checker Login'}
         </button>
