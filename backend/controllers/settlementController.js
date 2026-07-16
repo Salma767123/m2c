@@ -142,12 +142,25 @@ const getVendorSettlements = async (req, res) => {
     try {
         const vendorId = req.user.id;
 
+        // `order` is whitelisted, not included wholesale: the Order row holds the
+        // customer's totals at M2C's marked-up selling price plus customer PII, and the
+        // vendor is entitled to neither. Settlement money (amount/baseAmount/taxAmount)
+        // is already the vendor's own, in INR.
         const settlements = await prisma.settlement.findMany({
             where: { vendorId },
             orderBy: { createdAt: 'desc' },
             include: {
-                order: true
-            }
+                order: {
+                    select: {
+                        id: true,
+                        orderId: true,
+                        status: true,
+                        orderDate: true,
+                        createdAt: true,
+                        invoiceNo: true,
+                    },
+                },
+            },
         });
 
         res.status(200).json({

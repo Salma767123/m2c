@@ -188,7 +188,7 @@ export default function PrintPreviewModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="absolute inset-0 bg-black/50 transition-opacity"
         onClick={onClose}
       />
       
@@ -221,7 +221,7 @@ export default function PrintPreviewModal({
         <div className="flex-1 p-4 overflow-hidden">
           <div className="w-full h-full border border-gray-300 rounded-lg overflow-hidden bg-white relative">
             {isLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
+              <div className="absolute inset-0 flex items-center justify-center bg-white/75 z-10">
                 <div className="flex items-center gap-2 text-gray-600">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
                   <span>Loading preview...</span>

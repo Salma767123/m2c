@@ -14,7 +14,7 @@ import {
   ShoppingBag
 } from "lucide-react"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
-import { formatPrice, getCurrency, getRegionalPrice } from '@/lib/currency'
+import { formatPrice, getCurrency, getRegionalPrice, convertUSDtoINR } from '@/lib/currency'
 import bagTypeService from "@/services/bagTypeService"
 import ShippingForm from "./CheckoutProcess/ShippingForm"
 import PaymentForm from "./CheckoutProcess/PaymentForm"
@@ -1105,6 +1105,18 @@ export default function Checkout() {
                       <span>Total</span>
                       <span>{formatPrice(orderSummary.total)}</span>
                     </div>
+                    {/*
+                      Our Razorpay account settles in INR, so a USD order is
+                      converted server-side before the payment is created.
+                      Say so here — otherwise the gateway suddenly quoting
+                      rupees reads as a wrong amount. Same rate the server
+                      uses, so the figure matches the actual charge.
+                    */}
+                    {getCurrency() === 'USD' && orderSummary.total > 0 && (
+                      <p className="mt-1.5 text-xs text-slate-500">
+                        Charged as {formatPrice(convertUSDtoINR(orderSummary.total), 'INR')} — billed in INR at today&apos;s exchange rate.
+                      </p>
+                    )}
                   </div>
                 </div>
 

@@ -12,6 +12,12 @@ const VENDOR_STATUS_NOTIFY = {
 };
 
 // Shared include for shipment queries — keeps response shape consistent.
+//
+// The order `select` is a WHITELIST, deliberately. Every money field on Order
+// (totalAmount, subtotal, tax, discount, shippingCost, bagTypePrice) is what the
+// CUSTOMER paid at M2C's marked-up price — the vendor is paid from Product.basePrice
+// instead, so those figures would expose M2C's margin. They are omitted, and nothing
+// in the vendor portal reads them. Vendor-facing money comes from attachVendorPrices.
 const SHIPMENT_INCLUDE = {
     items: true,
     order: {
@@ -19,7 +25,6 @@ const SHIPMENT_INCLUDE = {
             id: true,
             orderId: true,
             customerName: true,
-            totalAmount: true,
             paymentStatus: true,
             paymentMethod: true,
             createdAt: true,
@@ -27,12 +32,9 @@ const SHIPMENT_INCLUDE = {
             shippingAddress: true,
             customerEmail: true,
             customerPhone: true,
-            subtotal: true,
-            shippingCost: true,
-            tax: true,
-            discount: true,
+            // bagTypeName is packaging the vendor may need to pack against; its price
+            // is M2C's, so it stays out.
             bagTypeName: true,
-            bagTypePrice: true,
             paymentId: true,
             invoiceNo: true,
         },
@@ -63,6 +65,23 @@ function normalizeShipment(shipment) {
     return { ...rest, adminReview: adminReviews?.[0] || null };
 }
 
+/**
+ * The ONLY way a shipment should leave this controller.
+ *
+ * Every vendor response needs both steps — attachVendorPrices (swap M2C's selling
+ * price for the vendor's own) and normalizeShipment. Calling them by hand at each
+ * `res.json` meant three paths forgot the first and leaked the selling price, so the
+ * two are fused here and the raw pieces are never called directly.
+ *
+ * @param {object|object[]} shipments One shipment or a list.
+ */
+async function toVendorResponse(shipments) {
+    const list = Array.isArray(shipments) ? shipments : [shipments];
+    await attachVendorPrices(list.flatMap(s => s?.items || []));
+    const normalized = list.map(normalizeShipment);
+    return Array.isArray(shipments) ? normalized : normalized[0];
+}
+
 // Vendor: Get all shipments for this vendor
 const getVendorOrders = async (req, res) => {
     try {
@@ -74,13 +93,9 @@ const getVendorOrders = async (req, res) => {
             orderBy: { createdAt: 'desc' },
         });
 
-        // Attach the vendor's own price to every line item; the stored unitPrice/
-        // totalPrice are the admin/customer price and must not surface to the vendor.
-        await attachVendorPrices(shipments.flatMap(s => s.items || []));
-
         res.json({
             success: true,
-            data: shipments.map(normalizeShipment),
+            data: await toVendorResponse(shipments),
         });
     } catch (error) {
         console.error('Get vendor orders error:', error);
@@ -139,11 +154,9 @@ const getVendorOrderById = async (req, res) => {
             });
         }
 
-        await attachVendorPrices(shipment.items || []);
-
         res.json({
             success: true,
-            data: normalizeShipment(shipment),
+            data: await toVendorResponse(shipment),
         });
     } catch (error) {
         console.error('Get vendor order error:', error);
@@ -242,7 +255,7 @@ const updateVendorOrderStatus = async (req, res) => {
             });
             return res.json({
                 success: true,
-                data: current,
+                data: await toVendorResponse(current),
                 message: `Order is already marked as ${status.replace(/_/g, ' ')}`,
             });
         }
@@ -305,7 +318,7 @@ const updateVendorOrderStatus = async (req, res) => {
 
         res.json({
             success: true,
-            data: normalizeShipment(updatedShipment),
+            data: await toVendorResponse(updatedShipment),
         });
     } catch (error) {
         console.error('Update vendor order status error:', error);
@@ -512,6 +525,11 @@ const reshipVendorOrder = async (req, res) => {
                             quantity: item.quantity,
                             unitPrice: item.unitPrice,
                             totalPrice: item.totalPrice,
+                            // Carry the frozen INR twin across. Recomputing it would need
+                            // the order's rate snapshot; copying is exact and cheaper.
+                            // Dropping it (as this did) left the reshipped line out of
+                            // every INR revenue aggregate — see utils/orderCurrency.js.
+                            totalPriceINR: item.totalPriceINR,
                         })),
                     },
                     statusHistory: {
@@ -534,7 +552,7 @@ const reshipVendorOrder = async (req, res) => {
 
         res.json({
             success: true,
-            data: normalizeShipment(newShipment),
+            data: await toVendorResponse(newShipment),
             message: 'Reship created successfully. Pack and ship the replacement.',
         });
     } catch (error) {

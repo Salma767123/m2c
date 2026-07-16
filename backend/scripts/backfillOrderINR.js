@@ -2,8 +2,14 @@
  * Backfill the INR twins (Order.totalAmountINR & friends, OrderItem.totalPriceINR)
  * for orders written before those columns existed.
  *
- * Run:  node scripts/backfillOrderINR.js          (dry run — reports, writes nothing)
- *       node scripts/backfillOrderINR.js --apply  (writes)
+ * Run:  node scripts/backfillOrderINR.js               (dry run — reports, writes nothing)
+ *       node scripts/backfillOrderINR.js --apply       (writes)
+ *       node scripts/backfillOrderINR.js --rate=83.5   (override the rate used)
+ *
+ * Use --rate when the CURRENT ExchangeRate is not the rate those orders were priced
+ * under. That is the normal case for orders placed before an admin first configured a
+ * rate: the storefront priced them off the 83.5 fallback, so backfilling them at a
+ * later, higher rate would silently inflate historical revenue.
  *
  * INR orders are exact: the twin equals the original, no rate needed.
  *
@@ -20,11 +26,19 @@ const { prisma } = require('../config/database');
 const { FALLBACK_USD_RATE, toINR } = require('../utils/orderCurrency');
 
 const APPLY = process.argv.includes('--apply');
+const rateArg = process.argv.find(a => a.startsWith('--rate='));
+const RATE_OVERRIDE = rateArg ? parseFloat(rateArg.split('=')[1]) : null;
 
 (async () => {
     const rateRow = await prisma.exchangeRate.findUnique({ where: { currency: 'USD' } });
-    const liveRate = rateRow?.rate > 0 ? rateRow.rate : FALLBACK_USD_RATE;
-    if (!rateRow?.rate) {
+    let liveRate;
+    if (RATE_OVERRIDE > 0) {
+        liveRate = RATE_OVERRIDE;
+        console.log(`Using rate override ${liveRate} for orders with no snapshot.\n`);
+    } else if (rateRow?.rate > 0) {
+        liveRate = rateRow.rate;
+    } else {
+        liveRate = FALLBACK_USD_RATE;
         console.warn(`! No ExchangeRate row for USD — approximating with fallback ${FALLBACK_USD_RATE}\n`);
     }
 

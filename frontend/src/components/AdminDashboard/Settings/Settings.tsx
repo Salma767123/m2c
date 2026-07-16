@@ -92,8 +92,6 @@ export default function Settings() {
     gstNumber: "29ABCDE1234F1Z5",
     panNumber: "ABCDE1234F",
     cinNumber: "U74999KA2020PTC123456",
-    businessRegistrationNumber: "BRN123456789",
-    taxId: "TAX123456",
     companyEmail: "info@m2c.com",
     companyPhone: "+91 80-1234-5678",
     companyWebsite: "https://www.m2c.com",
@@ -197,8 +195,6 @@ export default function Settings() {
               gstNumber: companyResponse.data.gstNumber || "",
               panNumber: companyResponse.data.panNumber || "",
               cinNumber: companyResponse.data.cinNumber || "",
-              businessRegistrationNumber: companyResponse.data.businessRegistrationNumber || "",
-              taxId: companyResponse.data.taxId || "",
               companyEmail: companyResponse.data.companyEmail || "",
               companyPhone: companyResponse.data.companyPhone || "",
               companyWebsite: companyResponse.data.companyWebsite || "",
@@ -340,9 +336,7 @@ export default function Settings() {
         response = await companyInfoService.updateLegalInfo({
           gstNumber: companyInfo.gstNumber,
           panNumber: companyInfo.panNumber,
-          cinNumber: companyInfo.cinNumber,
-          businessRegistrationNumber: companyInfo.businessRegistrationNumber,
-          taxId: companyInfo.taxId
+          cinNumber: companyInfo.cinNumber
         });
       } else if (formId === 'address-form') {
         response = await companyInfoService.updateAddress({
@@ -1127,7 +1121,7 @@ export default function Settings() {
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      PAN Number <span className="text-red-500">*</span>
+                      Company PAN Number <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -1151,29 +1145,6 @@ export default function Settings() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Business Registration Number</label>
-                    <input
-                      type="text"
-                      value={companyInfo.businessRegistrationNumber}
-                      onChange={(e) => setCompanyInfo({ ...companyInfo, businessRegistrationNumber: e.target.value })}
-                      disabled={currentUser.role !== "super_admin"}
-                      placeholder="BRN123456789"
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Tax ID</label>
-                    <input
-                      type="text"
-                      value={companyInfo.taxId}
-                      onChange={(e) => setCompanyInfo({ ...companyInfo, taxId: e.target.value })}
-                      disabled={currentUser.role !== "super_admin"}
-                      placeholder="TAX123456"
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
-                    />
-                  </div>
                 </div>
 
                 {currentUser.role === "super_admin" && canManageSettings && (

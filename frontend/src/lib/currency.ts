@@ -78,6 +78,21 @@ export function convertINRtoUSD(inrPrice: number): number {
 }
 
 /**
+ * Convert USD to INR using the cached exchange rate.
+ * Fallback: 83.50 — the same default the server applies.
+ *
+ * Used to tell a USD shopper what they'll actually be billed: the Razorpay
+ * account settles in INR, so paymentController converts the order total
+ * before creating the payment. Both sides read the same ExchangeRate row
+ * (and the same 83.50 fallback), so this figure matches the real charge —
+ * but the server's value is the authoritative one.
+ */
+export function convertUSDtoINR(usdPrice: number): number {
+  const rate = cachedExchangeRate || 83.50
+  return Math.round(usdPrice * rate * 100) / 100
+}
+
+/**
  * Pick the correct price based on region.
  * Priority: priceINR/priceUSD → adminFixedPrice → basePrice
  * For US: if priceUSD missing, auto-convert from INR using exchange rate

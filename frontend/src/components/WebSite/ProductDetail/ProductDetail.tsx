@@ -515,7 +515,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       {/* Lens overlay — desktop only */}
                       {isImageHovered && currentImageUrl && (
                         <div
-                          className="hidden lg:block absolute w-24 h-24 border-2 border-[#e01a1b] bg-transparent bg-opacity-30 pointer-events-none rounded-lg"
+                          className="hidden lg:block absolute w-24 h-24 border-2 border-[#e01a1b] bg-transparent pointer-events-none rounded-lg"
                           style={{
                             left: `${mousePosition.x}%`,
                             top: `${mousePosition.y}%`,

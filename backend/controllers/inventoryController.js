@@ -1,6 +1,7 @@
 const { prisma } = require('../config/database');
 const { generateBaseSku } = require('../utils/skuGenerator');
 const { checkAndAlertLowStock } = require('../utils/lowStockAlert');
+const { stripAdminPricing } = require('../utils/vendorPricing');
 
 // Decide an inventory item's stock state, variant-aware. For products with
 // variants, low-stock is evaluated PER VARIANT (the variant is the sellable
@@ -246,6 +247,12 @@ const getInventoryItem = async (req, res) => {
         success: false,
         message: 'Inventory item not found'
       });
+    }
+
+    // Served on both /admin/:id and the vendor's /:id, so the admin's selling price is
+    // stripped per-caller rather than excluded by `select` (which would starve admin).
+    if (req.user?.role !== 'ADMIN') {
+      (inventoryItem.products || []).forEach(stripAdminPricing);
     }
 
     res.json({

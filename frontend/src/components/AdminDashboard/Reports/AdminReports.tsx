@@ -567,7 +567,7 @@ export default function AdminReports() {
                       <TableCell className="font-medium text-slate-900">{o.id}</TableCell>
                       <TableCell className="text-slate-600">{o.customer}</TableCell>
                       <TableCell className="text-slate-600">{o.vendor}</TableCell>
-                      <TableCell className="font-semibold">{fmt(o.amount)}</TableCell>
+                      <TableCell className="font-semibold">{fmtOrder(o)}</TableCell>
                       <TableCell><StatusBadge status={o.status} /></TableCell>
                       <TableCell><StatusBadge status={o.paymentStatus} /></TableCell>
                       <TableCell className="text-slate-500 text-sm">{new Date(o.date).toLocaleDateString('en-IN')}</TableCell>
