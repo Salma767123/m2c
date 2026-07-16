@@ -13,8 +13,8 @@ export interface QCCheckerData {
   alternateEmail?: string | null;
   alternatePhone?: string | null;
   idProof?: string | null;
-  // Lightweight profile fetch (?light=1) returns these instead of the heavy
-  // base64 idProof blob; the blob is fetched on demand via getCheckerIdProof().
+  // Lightweight profile fetch (?light=1) omits the heavy base64 idProof blob and
+  // returns these instead; the blob is fetched on demand via getCheckerIdProof().
   hasIdProof?: boolean;
   idProofType?: 'pdf' | 'image' | null;
   phone: string;
@@ -166,9 +166,10 @@ class QCCheckerService {
   // Get current checker profile
   async getCheckerProfile(): Promise<{ success: boolean; data: QCCheckerData }> {
     try {
-      // ?light=1 strips the heavy base64 idProof/profilePhoto blobs so the
+      // ?light=1 strips the heavy base64 idProof blob (a multi-MB PDF) so the
       // profile screen loads fast on slow mobile connections. The ID proof is
       // fetched on demand (getCheckerIdProof) only when the user taps "View".
+      // profilePhoto is kept (it's the avatar shown on the profile screen).
       const response = await axios.get('/qc-checkers/me', { params: { light: 1 } });
       return response.data;
     } catch (error: any) {

@@ -633,11 +633,12 @@ const getCheckerProfile = async (req, res) => {
             });
         }
 
-        // Lightweight mode (?light=1): strip the heavy base64 blobs (idProof PDF,
-        // profilePhoto) from the payload so the profile screen loads fast on slow
+        // Lightweight mode (?light=1): strip the heavy base64 idProof blob (a
+        // multi-MB PDF) from the payload so the profile screen loads fast on slow
         // mobile connections. We still surface whether an ID proof exists and its
         // type so the UI can render the "View ID Proof" button; the actual blob is
-        // fetched on demand via GET /qc-checkers/me/id-proof.
+        // fetched on demand via GET /qc-checkers/me/id-proof. profilePhoto is kept
+        // — it's the avatar shown on the profile screen and is comparatively small.
         const light = req.query.light === '1' || req.query.light === 'true';
         if (light) {
             const ip = checker.idProof;
@@ -646,7 +647,6 @@ const getCheckerProfile = async (req, res) => {
                 ? ((ip.startsWith('data:application/pdf') || ip.toLowerCase().endsWith('.pdf')) ? 'pdf' : 'image')
                 : null;
             delete checker.idProof;
-            delete checker.profilePhoto;
         }
 
         res.json({
