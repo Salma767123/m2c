@@ -71,8 +71,8 @@ export default function VI_Step8_FinalReview({ verifications, meta, onMetaChange
                 <View key={key} className="bg-white border border-red-100 rounded-lg px-4 py-2.5 flex-row items-start justify-between" style={{ columnGap: 12 }}>
                   <View className="flex-1">
                     <View className="flex-row items-center mb-0.5" style={{ columnGap: 8 }}>
-                      <View className="px-1.5 py-0.5 bg-blue-50 border border-blue-200 rounded">
-                        <Text className="text-xs font-bold text-blue-600">Step {step}</Text>
+                      <View className="px-1.5 py-0.5 bg-brand-50 border border-brand-200 rounded">
+                        <Text className="text-xs font-bold text-brand-600">Step {step}</Text>
                       </View>
                       <Text className="text-xs font-semibold text-slate-600">{label}</Text>
                     </View>
@@ -81,11 +81,11 @@ export default function VI_Step8_FinalReview({ verifications, meta, onMetaChange
                   {onGoToStep && (
                     <TouchableOpacity
                       onPress={() => onGoToStep(step, key)}
-                      className="flex-row items-center px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg"
+                      className="flex-row items-center px-2.5 py-1.5 bg-white border border-brand-200 rounded-lg"
                       style={{ columnGap: 4 }}
                     >
-                      <Pencil size={12} color="#2563eb" />
-                      <Text className="text-xs font-semibold text-blue-600">Edit</Text>
+                      <Pencil size={12} color="#e01a1b" />
+                      <Text className="text-xs font-semibold text-brand-600">Edit</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -98,7 +98,7 @@ export default function VI_Step8_FinalReview({ verifications, meta, onMetaChange
       {/* Inspector Details */}
       <View className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <View className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex-row items-center" style={{ columnGap: 8 }}>
-          <User size={16} color="#2563eb" />
+          <User size={16} color="#e01a1b" />
           <Text className="text-sm font-bold text-slate-800">Inspector Details</Text>
         </View>
         <View className="p-4" style={{ rowGap: 20 }}>

@@ -21,6 +21,7 @@ import {
 import StatCard from './StatCard';
 import qcCheckerService from '../../services/qcCheckerService';
 import { router } from 'expo-router';
+import { brand } from '@/constants/design';
 
 // ── Product status labels + badge colours (mirrors web CheckerDashboard) ──────
 const PRODUCT_STATUS_LABELS: Record<string, string> = {
@@ -130,7 +131,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
       const [productsRes, vendorsRes, inspectionsRes] = await Promise.all([
         qcCheckerService.getAssignedProducts(),
         qcCheckerService.getAssignedVendors(),
-        qcCheckerService.getInspections({ limit: 50 }).catch(() => ({ success: false, inspections: [] })),
+        qcCheckerService.getInspections({ limit: 50, status: 'COMPLETED' }).catch(() => ({ success: false, inspections: [] })),
       ]);
       if (productsRes.success) {
         const raw: any = productsRes.data;
@@ -192,7 +193,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
           value: assignedVendors.length.toString(),
           icon: TrendingUp,
           trend: pl(assignedVendors.length, 'Vendor'),
-          color: 'blue' as const,
+          color: 'brand' as const,
           onPress: () => goVendors({}),
         },
         {
@@ -208,7 +209,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
           value: passedVendors.toString(),
           icon: CheckCircle2,
           trend: pl(passedVendors, 'Vendor'),
-          color: 'emerald' as const,
+          color: 'success' as const,
           onPress: () => goVendors({ inspectionStatus: 'Completed' }),
         },
         {
@@ -216,7 +217,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
           value: failedVendors.toString(),
           icon: AlertCircle,
           trend: pl(failedVendors, 'Vendor'),
-          color: 'red' as const,
+          color: 'danger' as const,
           onPress: () => goVendors({ status: 'Rejected' }),
         },
       ]
@@ -226,7 +227,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
           value: assignedProducts.length.toString(),
           icon: TrendingUp,
           trend: pl(assignedProducts.length, 'Product'),
-          color: 'blue' as const,
+          color: 'brand' as const,
           onPress: () => goProducts({}),
         },
         {
@@ -242,7 +243,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
           value: passedProducts.toString(),
           icon: CheckCircle2,
           trend: pl(passedProducts, 'Product'),
-          color: 'emerald' as const,
+          color: 'success' as const,
           onPress: () => goProducts({ status: 'QC_APPROVED' }),
         },
         {
@@ -250,7 +251,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
           value: failedProducts.toString(),
           icon: AlertCircle,
           trend: pl(failedProducts, 'Product'),
-          color: 'red' as const,
+          color: 'danger' as const,
           onPress: () => goProducts({ status: 'REJECTED' }),
         },
       ];
@@ -279,7 +280,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
             {
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: pressed ? '#1d4ed8' : '#2563eb',
+              backgroundColor: pressed ? brand[600] : brand[500],
               borderRadius: 12,
               paddingHorizontal: 24,
               paddingVertical: 12,
@@ -294,24 +295,12 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-gray-50"
-      contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor="#2563eb"
-          colors={['#2563eb']}
-        />
-      }
-    >
-      {/* Header */}
-      <View className="mb-6">
+    <View className="flex-1 bg-gray-50">
+      {/* Sticky greeting — stays pinned below the AppBar; content scrolls under it */}
+      <View className="px-4 pt-4 pb-3 bg-gray-50 border-b border-slate-200">
         <Text className="text-3xl font-extrabold text-slate-900 mb-1">Dashboard</Text>
-        <Text className="text-slate-600 text-sm mb-3">
-          Welcome back, <Text className="font-bold text-blue-600">{checkerId}</Text>
+        <Text className="text-slate-600 text-sm mb-2">
+          Welcome back, <Text className="font-bold text-brand-600">{checkerId}</Text>
         </Text>
         <View className="flex-row items-center flex-wrap" style={{ columnGap: 8, rowGap: 4 }}>
           <View className="flex-row items-center">
@@ -328,27 +317,40 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
         </View>
       </View>
 
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ padding: 16, paddingBottom: 16 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={brand[500]}
+            colors={[brand[500]]}
+          />
+        }
+      >
       {/* Domain toggle */}
       <View className="flex-row mb-6" style={{ columnGap: 12 }}>
         <Pressable
           onPress={() => setActiveTab('vendor')}
           className={`flex-1 flex-row items-center justify-center rounded-xl border py-3 ${
-            isVendor ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'
+            isVendor ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white'
           }`}
         >
-          <Factory size={18} color={isVendor ? '#1d4ed8' : '#64748b'} />
-          <Text className={`ml-2 text-sm font-bold ${isVendor ? 'text-blue-700' : 'text-slate-500'}`}>
+          <Factory size={18} color={isVendor ? brand[500] : '#64748b'} />
+          <Text className={`ml-2 text-sm font-bold ${isVendor ? 'text-brand-700' : 'text-slate-500'}`}>
             Vendor Inspection
           </Text>
         </Pressable>
         <Pressable
           onPress={() => setActiveTab('product')}
           className={`flex-1 flex-row items-center justify-center rounded-xl border py-3 ${
-            !isVendor ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'
+            !isVendor ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white'
           }`}
         >
-          <Package size={18} color={!isVendor ? '#1d4ed8' : '#64748b'} />
-          <Text className={`ml-2 text-sm font-bold ${!isVendor ? 'text-blue-700' : 'text-slate-500'}`}>
+          <Package size={18} color={!isVendor ? brand[500] : '#64748b'} />
+          <Text className={`ml-2 text-sm font-bold ${!isVendor ? 'text-brand-700' : 'text-slate-500'}`}>
             Product Inspection
           </Text>
         </Pressable>
@@ -363,21 +365,22 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
 
       {/* Recent Assignments */}
       <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-6">
-        <View className="px-5 py-4 border-b border-slate-100">
+        {/* Primary-red header strip — white icon circle + white text */}
+        <View className="bg-brand-500 px-5 py-4">
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center" style={{ gap: 12 }}>
-              <View className="w-10 h-10 bg-blue-100 rounded-xl items-center justify-center">
-                <CalendarDays size={20} color="#2563eb" strokeWidth={2} />
+              <View className="w-10 h-10 bg-white rounded-full items-center justify-center">
+                <CalendarDays size={20} color={brand[500]} strokeWidth={2.25} />
               </View>
               <View style={{ gap: 2 }}>
-                <Text className="text-base font-semibold text-slate-900">Recent Assignments</Text>
-                <Text className="text-xs text-slate-600">
+                <Text className="text-base font-bold text-white">Recent Assignments</Text>
+                <Text className="text-xs text-white/85">
                   {isVendor ? 'Vendors awaiting action' : 'Products awaiting action'}
                 </Text>
               </View>
             </View>
-            <View className="bg-blue-100 px-3 py-1.5 rounded-full">
-              <Text className="text-xs font-bold text-blue-800">{recentCount} total</Text>
+            <View className="bg-white px-3 py-1.5 rounded-full">
+              <Text className="text-xs font-bold text-brand-600">{recentCount} total</Text>
             </View>
           </View>
         </View>
@@ -426,8 +429,8 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
                       ]}
                     >
                       <View className="flex-row items-center" style={{ gap: 12 }}>
-                        <View className="w-11 h-11 bg-blue-50 rounded-xl items-center justify-center">
-                          <Factory size={18} color="#2563eb" strokeWidth={2} />
+                        <View className="w-11 h-11 bg-brand-50 rounded-xl items-center justify-center">
+                          <Factory size={18} color={brand[500]} strokeWidth={2} />
                         </View>
                         <View className="flex-1" style={{ gap: 4 }}>
                           <Text className="font-semibold text-slate-900" numberOfLines={1}>
@@ -480,8 +483,8 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
                       ]}
                     >
                       <View className="flex-row items-center" style={{ gap: 12 }}>
-                        <View className="w-11 h-11 bg-blue-50 rounded-xl items-center justify-center">
-                          <Package size={18} color="#2563eb" strokeWidth={2} />
+                        <View className="w-11 h-11 bg-brand-50 rounded-xl items-center justify-center">
+                          <Package size={18} color={brand[500]} strokeWidth={2} />
                         </View>
                         <View className="flex-1" style={{ gap: 4 }}>
                           <Text className="font-semibold text-slate-900" numberOfLines={1}>
@@ -516,7 +519,8 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
           )}
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -578,14 +582,14 @@ function DashboardSkeleton({ checkerId }: { checkerId: string | null }) {
   return (
     <ScrollView
       className="flex-1 bg-gray-50"
-      contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+      contentContainerStyle={{ padding: 16, paddingBottom: 16 }}
       showsVerticalScrollIndicator={false}
     >
       {/* Header: real greeting + placeholder date */}
       <View className="mb-6">
         <Text className="text-3xl font-extrabold text-slate-900 mb-1">Dashboard</Text>
         <Text className="text-slate-600 text-sm mb-3">
-          Welcome back, <Text className="font-bold text-blue-600">{checkerId || '...'}</Text>
+          Welcome back, <Text className="font-bold text-brand-600">{checkerId || '...'}</Text>
         </Text>
         <SkeletonBlock width={220} height={14} rounded="md" />
       </View>
@@ -600,7 +604,7 @@ function DashboardSkeleton({ checkerId }: { checkerId: string | null }) {
 
       {/* Recent Assignments card */}
       <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-6">
-        <View className="px-5 py-4 border-b border-slate-200 flex-row items-center justify-between bg-blue-50/50">
+        <View className="px-5 py-4 border-b border-slate-200 flex-row items-center justify-between bg-brand-50/50">
           <View className="flex-row items-center flex-1">
             <SkeletonBlock width={36} height={36} rounded="lg" className="mr-3" />
             <View className="flex-1">

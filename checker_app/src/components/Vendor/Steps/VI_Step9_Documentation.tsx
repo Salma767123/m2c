@@ -213,7 +213,7 @@ export default function VI_Step9_Documentation({
       <View className="border-b border-slate-200 pb-4 mb-4">
         <Text className="text-2xl font-bold text-slate-900 mb-1">Documentation & Sign-off</Text>
         <Text className="text-slate-500 text-sm">
-          Generate the factory inspection report, capture the client&apos;s signature, and finalise.
+          Generate the factory inspection report, capture the inspector&apos;s signature, and finalise.
         </Text>
       </View>
 
@@ -223,8 +223,8 @@ export default function VI_Step9_Documentation({
         pointerEvents={hasSignedReport ? 'none' : 'auto'}
       >
         <View className="flex-row items-start mb-3">
-          <View className="w-10 h-10 rounded-xl bg-blue-50 items-center justify-center mr-3">
-            <FileText size={18} color="#2563eb" />
+          <View className="w-10 h-10 rounded-xl bg-brand-50 items-center justify-center mr-3">
+            <FileText size={18} color="#e01a1b" />
           </View>
           <View className="flex-1">
             <Text className="font-bold text-slate-900">Manual Document</Text>
@@ -252,7 +252,7 @@ export default function VI_Step9_Documentation({
               </View>
             ) : (
               <View className="flex-row" style={{ columnGap: 8 }}>
-                <TouchableOpacity onPress={viewManualDoc} className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl bg-blue-600">
+                <TouchableOpacity onPress={viewManualDoc} className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl bg-brand-500">
                   <Eye size={16} color="#fff" />
                   <Text className="text-white font-semibold text-sm ml-1.5">View</Text>
                 </TouchableOpacity>
@@ -263,7 +263,7 @@ export default function VI_Step9_Documentation({
             )}
           </View>
         ) : (
-          <TouchableOpacity onPress={() => setShowDocModal(true)} className="flex-row items-center justify-center py-2.5 rounded-xl bg-blue-600">
+          <TouchableOpacity onPress={() => setShowDocModal(true)} className="flex-row items-center justify-center py-2.5 rounded-xl bg-brand-500">
             <FileText size={16} color="#fff" />
             <Text className="text-white font-semibold text-sm ml-1.5">Open Document Center</Text>
           </TouchableOpacity>
@@ -276,12 +276,12 @@ export default function VI_Step9_Documentation({
         pointerEvents={hasSignedDoc ? 'none' : 'auto'}
       >
         <View className="flex-row items-start mb-3">
-          <View className="w-10 h-10 rounded-xl bg-blue-50 items-center justify-center mr-3">
-            <PenLine size={18} color="#2563eb" />
+          <View className="w-10 h-10 rounded-xl bg-brand-50 items-center justify-center mr-3">
+            <PenLine size={18} color="#e01a1b" />
           </View>
           <View className="flex-1">
             <Text className="font-bold text-slate-900">Digital Signed Report</Text>
-            <Text className="text-sm text-slate-600">Draw the client&apos;s signature on-screen to auto-generate a digitally-signed report.</Text>
+            <Text className="text-sm text-slate-600">Draw your signature on-screen to auto-generate a digitally-signed report.</Text>
           </View>
         </View>
 
@@ -305,7 +305,7 @@ export default function VI_Step9_Documentation({
               </View>
             ) : (
               <View className="flex-row" style={{ columnGap: 8 }}>
-                <TouchableOpacity onPress={viewSignedReport} className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl bg-blue-600">
+                <TouchableOpacity onPress={viewSignedReport} className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl bg-brand-500">
                   <Eye size={16} color="#fff" />
                   <Text className="text-white font-semibold text-sm ml-1.5">View Signed Report</Text>
                 </TouchableOpacity>
@@ -316,9 +316,9 @@ export default function VI_Step9_Documentation({
             )}
           </View>
         ) : (
-          <TouchableOpacity onPress={() => setShowSignModal(true)} className="flex-row items-center justify-center py-2.5 rounded-xl border border-blue-200 bg-blue-50">
-            <PenLine size={16} color="#1d4ed8" />
-            <Text className="text-blue-700 font-semibold text-sm ml-1.5">Open Signature Center</Text>
+          <TouchableOpacity onPress={() => setShowSignModal(true)} className="flex-row items-center justify-center py-2.5 rounded-xl border border-brand-200 bg-brand-50">
+            <PenLine size={16} color="#c41617" />
+            <Text className="text-brand-700 font-semibold text-sm ml-1.5">Open Signature Center</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -358,7 +358,7 @@ export default function VI_Step9_Documentation({
             <View className="p-5">
               {/* Step 1 — Download Report */}
               <View className="flex-row items-center mb-2">
-                <View className="w-6 h-6 rounded-full bg-blue-600 items-center justify-center mr-2">
+                <View className="w-6 h-6 rounded-full bg-brand-500 items-center justify-center mr-2">
                   <Text className="text-white text-xs font-bold">1</Text>
                 </View>
                 <Text className="text-sm font-bold text-slate-800">Download Inspection Report</Text>
@@ -370,7 +370,7 @@ export default function VI_Step9_Documentation({
                 <TouchableOpacity
                   onPress={handleDownloadReport}
                   disabled={downloading}
-                  className="flex-row items-center self-start px-4 py-2.5 rounded-xl bg-blue-600"
+                  className="flex-row items-center self-start px-4 py-2.5 rounded-xl bg-brand-500"
                   style={{ opacity: downloading ? 0.6 : 1 }}
                 >
                   {downloading ? (
@@ -394,21 +394,21 @@ export default function VI_Step9_Documentation({
               {hasDownloaded && (
                 <View className="border-t border-slate-100 pt-4">
                   <View className="flex-row items-center mb-2">
-                    <View className="w-6 h-6 rounded-full bg-blue-600 items-center justify-center mr-2">
+                    <View className="w-6 h-6 rounded-full bg-brand-500 items-center justify-center mr-2">
                       <Text className="text-white text-xs font-bold">2</Text>
                     </View>
                     <Text className="text-sm font-bold text-slate-800">Upload Signed Copy</Text>
                   </View>
                   <Text className="text-xs text-slate-500 mb-2 ml-8">
-                    Upload the scanned, signed copy. Accepted formats: PNG, JPG.
+                    Upload the scanned, signed copy. Accepted formats: PDF, PNG, JPG.
                   </Text>
                   <TouchableOpacity
                     onPress={handleUploadSignedCopy}
-                    className="ml-8 border-2 border-dashed border-blue-300 rounded-xl p-5 items-center"
+                    className="ml-8 border-2 border-dashed border-brand-200 rounded-xl p-5 items-center"
                   >
-                    <Upload size={22} color="#60a5fa" />
+                    <Upload size={22} color="#f24344" />
                     <Text className="text-slate-700 font-medium text-sm mt-1.5">Tap to upload signed copy</Text>
-                    <Text className="text-slate-400 text-xs mt-0.5">PNG, JPG</Text>
+                    <Text className="text-slate-400 text-xs mt-0.5">PDF, PNG, JPG</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -443,7 +443,7 @@ export default function VI_Step9_Documentation({
               <TouchableOpacity
                 onPress={handleConfirmSignature}
                 disabled={generating || !drawnSignature}
-                className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl bg-blue-600"
+                className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl bg-brand-500"
                 style={{ opacity: generating || !drawnSignature ? 0.6 : 1 }}
               >
                 {generating ? (

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -10,7 +10,6 @@ import {
   StatusBar,
   Image,
   Modal,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,7 +25,6 @@ import {
   Mail,
   CheckCircle,
   Play,
-  TrendingUp,
   BarChart3,
   Globe,
   Briefcase,
@@ -36,23 +34,29 @@ import {
   FileText,
   AlertCircle,
   RefreshCw,
-  ShieldCheck,
   Eye,
-  Download,
   X as XIcon,
   ExternalLink,
+  Landmark,
+  UserCircle,
 } from 'lucide-react-native';
-import qcCheckerService, { AuditLogEntry } from '../../services/qcCheckerService';
-import AuditTimeline from '../../components/General/AuditTimeline';
-import { downloadFactoryReportPdf } from '../../lib/reportPdf';
+import qcCheckerService from '../../services/qcCheckerService';
+import {
+  buildFullName,
+  formatLocalLandline,
+  formatIntlLandline,
+  getOwnershipTypeLabel,
+  FACILITY_META,
+  withUnit,
+} from '../../components/Vendor/Steps/fieldHelpers';
+import { AppText, SectionCard, Button } from '@/components/UI';
+import { brand, colors, elevation } from '@/constants/design';
 
-type TabId = 'overview' | 'documents' | 'history' | 'upcoming' | 'performance';
+type TabId = 'overview' | 'history' | 'upcoming';
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
-  { id: 'documents', label: 'Documents' },
-  { id: 'history', label: 'History' },
-  { id: 'upcoming', label: 'Upcoming' },
-  { id: 'performance', label: 'Stats' },
+  { id: 'history', label: 'Inspection History' },
+  { id: 'upcoming', label: 'Upcoming Inspections' },
 ];
 
 // ── Document helpers (mirror web docDownload) ────────────────────────────────
@@ -88,34 +92,25 @@ const proxiedDocUrl = (url: string): string => {
   return url;
 };
 
-// Registration document types shown in the Documents tab (mirror web).
-const COMPANY_DOC_TYPES = ['GST_CERTIFICATE', 'PAN_CARD', 'COMPANY_REGISTRATION', 'AADHAAR_CARD'];
+// Registration document types shown in the Documents tab (mirror web —
+// includes TRADE_LICENSE and EXPORT_LICENSE so those uploads aren't dropped).
+const COMPANY_DOC_TYPES = [
+  'GST_CERTIFICATE',
+  'PAN_CARD',
+  'COMPANY_REGISTRATION',
+  'AADHAAR_CARD',
+  'TRADE_LICENSE',
+  'EXPORT_LICENSE',
+];
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   GST_CERTIFICATE: 'GST Certificate',
   PAN_CARD: 'PAN Card',
   COMPANY_REGISTRATION: 'Company Registration',
   AADHAAR_CARD: 'Aadhaar Card',
+  TRADE_LICENSE: 'Trade License',
+  EXPORT_LICENSE: 'Export License (IEC)',
   OTHER: 'Factory Image',
-};
-
-const statusStyle = (status: string) => {
-  const key = (status || '').toLowerCase();
-  const map: Record<string, { bg: string; text: string; dot: string }> = {
-    active: { bg: '#d1fae5', text: '#065f46', dot: '#10b981' },
-    approved: { bg: '#d1fae5', text: '#065f46', dot: '#10b981' },
-    pending: { bg: '#fef3c7', text: '#92400e', dot: '#f59e0b' },
-    under_review: { bg: '#dbeafe', text: '#1e40af', dot: '#3b82f6' },
-    review: { bg: '#dbeafe', text: '#1e40af', dot: '#3b82f6' },
-    completed: { bg: '#e2e8f0', text: '#334155', dot: '#64748b' },
-    passed: { bg: '#d1fae5', text: '#065f46', dot: '#10b981' },
-    failed: { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444' },
-    rejected: { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444' },
-    reinspection: { bg: '#ffedd5', text: '#9a3412', dot: '#f59e0b' },
-    submitted: { bg: '#dbeafe', text: '#1e40af', dot: '#3b82f6' },
-    suspended: { bg: '#e2e8f0', text: '#334155', dot: '#64748b' },
-  };
-  return map[key] || map.active;
 };
 
 const priorityStyle = (p: string) => {
@@ -144,6 +139,273 @@ const formatDate = (input?: string | Date | null) => {
 const formatAddress = (...parts: Array<string | null | undefined>) =>
   parts.map((p) => (p ?? '').toString().trim()).filter((p) => p.length > 0).join(', ');
 
+// Date + 12-hour time — used for inspection start / completed timestamps (mirror web formatDateTime).
+const formatDateTime = (input?: string | Date | null): string => {
+  if (!input) return '';
+  const d = typeof input === 'string' ? new Date(input) : input;
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-IN', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  });
+};
+
+// Convert a "HH:MM" clock string (or Date/ISO) into 12-hour format (mirror web formatTime12).
+const formatTime12 = (time?: string | Date | null): string => {
+  if (!time) return '';
+  let hours: number;
+  let minutes: number;
+  if (time instanceof Date) {
+    hours = time.getHours();
+    minutes = time.getMinutes();
+  } else {
+    const clock = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(time.trim());
+    if (clock) {
+      hours = Number(clock[1]);
+      minutes = Number(clock[2]);
+    } else {
+      const parsed = new Date(time);
+      if (Number.isNaN(parsed.getTime())) return time;
+      hours = parsed.getHours();
+      minutes = parsed.getMinutes();
+    }
+  }
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return typeof time === 'string' ? time : '';
+  }
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const h12 = hours % 12 === 0 ? 12 : hours % 12;
+  return `${h12}:${String(minutes).padStart(2, '0')} ${period}`;
+};
+
+// ── Derived vendor status (mirror web getNewMainStatus / getNewInspectionStatus) ──
+// The raw DB status alone doesn't tell the checker where the assignment stands;
+// these fold the latest inspection's lifecycle into a human "main status" and a
+// separate "inspection status", exactly like the web QC-checker detail screen.
+const getNewMainStatus = (
+  dbStatus: string,
+  latestInspection?: { status?: string | null; result?: string | null; cycleNumber?: number | null } | null,
+): string => {
+  const status = dbStatus?.toUpperCase() || 'PENDING';
+  if (status === 'APPROVED') return 'Approved';
+  if (status === 'REJECTED') return 'Rejected';
+  if (status === 'REINSPECTION') return 'Re-Inspection';
+  if (status === 'UNDER_REVIEW') {
+    if (latestInspection) {
+      const inspStatus = latestInspection.status?.toUpperCase();
+      const cycle = latestInspection.cycleNumber ?? 1;
+      if (inspStatus === 'SCHEDULED' || inspStatus === 'IN_PROGRESS') {
+        return cycle > 1 ? 'Re-Inspection' : 'New Assignment';
+      }
+      if (inspStatus === 'SUBMITTED' || inspStatus === 'UNDER_ADMIN_REVIEW') {
+        return cycle > 1 ? 'Re-Inspection Under Review by Admin' : 'Under Review by Admin';
+      }
+    }
+    return 'Under Review by Admin';
+  }
+  if (status === 'PENDING') return 'New Assignment';
+  return status.replace(/_/g, ' ').toLowerCase();
+};
+
+const getNewInspectionStatus = (
+  dbStatus: string,
+  latestInspection?: { status?: string | null; result?: string | null } | null,
+): string => {
+  const status = dbStatus?.toUpperCase() || 'PENDING';
+  if (status === 'APPROVED') return 'Completed';
+  if (status === 'REJECTED') {
+    if (latestInspection && latestInspection.result?.toUpperCase() === 'FAILED') return 'Rejected';
+    return 'Completed';
+  }
+  if (status === 'REINSPECTION') return 'Pending';
+  if (status === 'UNDER_REVIEW') {
+    if (latestInspection) {
+      const inspStatus = latestInspection.status?.toUpperCase();
+      if (inspStatus === 'SCHEDULED' || inspStatus === 'IN_PROGRESS') return 'Pending';
+      if (inspStatus === 'SUBMITTED' || inspStatus === 'UNDER_ADMIN_REVIEW') {
+        if (latestInspection.result?.toUpperCase() === 'FAILED') return 'Rejected';
+        return 'Submitted';
+      }
+    }
+    return 'Pending';
+  }
+  return 'Pending';
+};
+
+// Badge colours for the derived main status (mirror web MAIN_STATUS_COLORS).
+const MAIN_STATUS_STYLE: Record<string, { bg: string; text: string }> = {
+  'New Assignment': { bg: '#eff6ff', text: '#1d4ed8' },
+  'Under Review by Admin': { bg: '#fff7ed', text: '#c2410c' },
+  'Re-Inspection': { bg: '#fff7ed', text: '#c2410c' },
+  'Re-Inspection Under Review by Admin': { bg: '#fffbeb', text: '#b45309' },
+  'Re-Inspection Under Review': { bg: '#fffbeb', text: '#b45309' },
+  Approved: { bg: '#ecfdf5', text: '#047857' },
+  Rejected: { bg: '#fef2f2', text: '#b91c1c' },
+};
+const mainStatusStyle = (s: string) => MAIN_STATUS_STYLE[s] || { bg: '#fffbeb', text: '#b45309' };
+
+// Badge colours for the derived inspection status (mirror web INSPECTION_STATUS_COLORS).
+const INSPECTION_STATUS_STYLE: Record<string, { bg: string; text: string }> = {
+  Pending: { bg: '#f8fafc', text: '#334155' },
+  Submitted: { bg: '#eff6ff', text: '#1d4ed8' },
+  Rejected: { bg: '#fef2f2', text: '#b91c1c' },
+  Completed: { bg: '#ecfdf5', text: '#047857' },
+};
+const inspectionStatusStyle = (s?: string | null) =>
+  INSPECTION_STATUS_STYLE[s || 'Pending'] || INSPECTION_STATUS_STYLE.Pending;
+
+// Lifecycle-aware badge for an inspection-history row (mirror web getInspectionRowBadge).
+// The Pass/Fail verdict is only final once COMPLETED; while SUBMITTED / under admin
+// review the row must reflect that lifecycle state, not the proposed result.
+const getInspectionRowBadge = (insp: any): { label: string; bg: string; text: string } => {
+  const status = (insp.status || '').toUpperCase();
+  const result = (insp.result || '').toUpperCase();
+  switch (status) {
+    case 'COMPLETED':
+      if (result === 'PASSED') return { label: 'Passed', bg: '#ecfdf5', text: '#047857' };
+      if (result === 'FAILED') return { label: 'Failed', bg: '#fef2f2', text: '#b91c1c' };
+      return { label: 'Completed', bg: '#ecfdf5', text: '#047857' };
+    case 'SUBMITTED':
+    case 'UNDER_ADMIN_REVIEW':
+      return { label: 'Under Review by Admin', bg: '#eff6ff', text: '#1d4ed8' };
+    case 'SCHEDULED':
+      return { label: 'Scheduled', bg: '#f8fafc', text: '#475569' };
+    case 'IN_PROGRESS':
+      return { label: 'In Progress', bg: '#fffbeb', text: '#b45309' };
+    case 'REJECTED':
+      return { label: 'Rejected', bg: '#fef2f2', text: '#b91c1c' };
+    case 'REINSPECTION':
+      return { label: 'Re-Inspection', bg: '#fffbeb', text: '#b45309' };
+    case 'CANCELLED':
+      return { label: 'Cancelled', bg: '#f8fafc', text: '#64748b' };
+    default:
+      return { label: status ? status.replace(/_/g, ' ') : 'Pending', bg: '#f8fafc', text: '#475569' };
+  }
+};
+
+// ── Vendor DETAIL label maps (distinct from the Step-1/Step-3 form maps) ─────
+// The web DETAIL screen uses its own Business Type / Company ID label maps that
+// differ from the inspection-form step maps, so we replicate them locally here
+// instead of reusing getBusinessTypeLabel / getCompanyIdLabel from fieldHelpers.
+const getDetailBusinessTypeLabel = (type: string): string => {
+  const map: Record<string, string> = {
+    proprietorship: 'Proprietorship',
+    'pvt-ltd': 'Pvt Ltd',
+    'partnership-firm': 'Partnership Firm',
+    llp: 'LLP',
+    sole: 'Sole Proprietorship',
+    partnership: 'Partnership',
+    corporation: 'Corporation',
+    llc: 'Limited Liability Company (LLC)',
+  };
+  return map[type] || type;
+};
+
+const getDetailCompanyIdLabel = (businessType: string): string => {
+  const map: Record<string, string> = {
+    proprietorship: 'IEC Code',
+    'pvt-ltd': 'CIN Number',
+    'partnership-firm': 'Partnership Deed',
+    llp: 'LLPIN Number',
+  };
+  return map[businessType] || 'Business Registration ID';
+};
+
+// Employee-count label — the web DETAIL map uses plain hyphens and "100+
+// employees", which differs from fieldHelpers.getEmployeeCountLabel (en-dashes
+// + "More than 100 employees"), so replicate the DETAIL variant locally.
+const getDetailEmployeeCountLabel = (count: string): string => {
+  const map: Record<string, string> = {
+    '10-20': '10-20 employees',
+    '20-50': '20-50 employees',
+    '50-100': '50-100 employees',
+    '100+': '100+ employees',
+  };
+  return map[count] || count;
+};
+
+// Owner designation code → label. Main owner shows the RAW designation; the
+// additional owners are resolved through this map (mirrors web VendorDetail).
+const resolveOwnerDesignation = (val?: string | null): string => {
+  if (!val) return '';
+  const map: Record<string, string> = {
+    proprietor: 'Proprietor',
+    ceo: 'CEO',
+    director: 'Director',
+    'managing-director': 'Managing Director',
+    founder: 'Founder',
+    other: 'Other',
+  };
+  return map[val] || val;
+};
+
+// Facility sub-card titles — mirror the WEB FACILITY_META labels (finishing →
+// "Final Packing and Dispatch"), which differ from the mobile fieldHelpers
+// FACILITY_META (left untouched because the inspection form depends on it).
+const FACILITY_TITLE: Record<string, string> = {
+  spinning: 'Spinning',
+  weaving: 'Weaving',
+  dyeing: 'Dyeing',
+  printing: 'Printing',
+  stitching: 'Stitching',
+  finishing: 'Final Packing and Dispatch',
+};
+
+// "Active Facilities" chip labels (finishing → "Finishing", per web).
+const FACILITY_CHIP: Record<string, string> = {
+  spinning: 'Spinning',
+  weaving: 'Weaving',
+  dyeing: 'Dyeing',
+  printing: 'Printing',
+  stitching: 'Stitching',
+  finishing: 'Finishing',
+};
+
+// Country name → ISO2 for common countries so we can render a flag image via
+// flagcdn. Unmappable names fall back to a plain (flag-less) chip.
+const COUNTRY_ISO: Record<string, string> = {
+  India: 'IN', 'United States': 'US', 'United States of America': 'US',
+  'United Kingdom': 'GB', China: 'CN', Germany: 'DE', France: 'FR', Italy: 'IT',
+  Spain: 'ES', Canada: 'CA', Australia: 'AU', Japan: 'JP', Bangladesh: 'BD',
+  Pakistan: 'PK', 'Sri Lanka': 'LK', Nepal: 'NP', 'United Arab Emirates': 'AE',
+  'Saudi Arabia': 'SA', Singapore: 'SG', Malaysia: 'MY', Thailand: 'TH',
+  Vietnam: 'VN', Indonesia: 'ID', Netherlands: 'NL', Belgium: 'BE',
+  Switzerland: 'CH', Sweden: 'SE', Norway: 'NO', Denmark: 'DK', Poland: 'PL',
+  Turkey: 'TR', Russia: 'RU', Brazil: 'BR', Mexico: 'MX', 'South Africa': 'ZA',
+  Egypt: 'EG', Nigeria: 'NG', Kenya: 'KE', 'South Korea': 'KR',
+  'New Zealand': 'NZ', Ireland: 'IE', Portugal: 'PT', Austria: 'AT',
+  Greece: 'GR', Israel: 'IL', Qatar: 'QA', Kuwait: 'KW', Bahrain: 'BH',
+  Oman: 'OM', 'Hong Kong': 'HK', Taiwan: 'TW', Philippines: 'PH',
+};
+
+// Non-empty check for scalars/arrays (mirrors web hasData).
+const hasVal = (v: any): boolean => {
+  if (v === null || v === undefined || v === '') return false;
+  if (Array.isArray(v)) return v.length > 0;
+  return true;
+};
+
+// Capitalize the first letter of each word (mirrors CSS `capitalize`).
+const capitalizeWords = (s: string): string => s.replace(/\b\w/g, (c) => c.toUpperCase());
+// Capitalize only the first character (mirrors web vendorTypes transform).
+const capitalizeFirst = (s: string): string =>
+  typeof s === 'string' && s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+
+// Certification expiry badge (mirrors web getCertificateStatus — 4 tiers).
+// Returns null only for a missing/invalid date; otherwise always a badge.
+const certExpiryStatus = (
+  expiryDate?: string | null,
+): { label: string; bg: string; text: string } | null => {
+  if (!expiryDate) return null;
+  const expiry = new Date(expiryDate);
+  if (isNaN(expiry.getTime())) return null;
+  const days = Math.ceil((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  if (days < 0) return { label: 'Expired', bg: '#fee2e2', text: '#991b1b' };
+  if (days <= 30) return { label: `Expires in ${days} days`, bg: '#fef3c7', text: '#92400e' };
+  if (days <= 90) return { label: `Expires in ${days} days`, bg: '#fef9c3', text: '#854d0e' };
+  return { label: `Valid until ${formatDate(expiryDate)}`, bg: '#d1fae5', text: '#047857' };
+};
+
 export default function VendorDetailScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const insets = useSafeAreaInsets();
@@ -157,10 +419,8 @@ export default function VendorDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   // Fullscreen image lightbox (registered document images).
   const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
-  const [downloadingReport, setDownloadingReport] = useState(false);
 
   const loadAll = useCallback(async (limitOverride?: number) => {
     if (!id) return;
@@ -172,42 +432,9 @@ export default function VendorDetailScreen() {
       if (res.success) {
         setFullVendor(res.data.vendor);
         setStats(res.data.stats);
-        const inspections = res.data.recentInspections || [];
-        setRecentInspections(inspections);
+        setRecentInspections(res.data.recentInspections || []);
         setUpcomingList(res.data.upcomingInspections || []);
         if (res.data.recentInspectionsMeta) setHistoryMeta(res.data.recentInspectionsMeta);
-
-        // Fetch audit trails for all of this vendor's inspections
-        // (the API expects inspection IDs, not vendor IDs)
-        if (inspections.length > 0) {
-          const allLogs: AuditLogEntry[] = [];
-          const seenIds = new Set<string>();
-          await Promise.all(
-            inspections.map(async (insp: any) => {
-              try {
-                const auditRes = await qcCheckerService.getAuditTrail(
-                  'FACTORY_INSPECTION',
-                  insp.id,
-                );
-                for (const log of auditRes.logs || []) {
-                  if (!seenIds.has(log.id)) {
-                    seenIds.add(log.id);
-                    allLogs.push(log);
-                  }
-                }
-              } catch {
-                // Silently skip failed audit fetches
-              }
-            }),
-          );
-          // Sort chronologically (newest first for vendor-level view)
-          allLogs.sort(
-            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-          );
-          setAuditLogs(allLogs);
-        } else {
-          setAuditLogs([]);
-        }
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to load vendor details');
@@ -236,6 +463,19 @@ export default function VendorDetailScreen() {
   );
   const firstUpcoming = actualUpcoming[0];
   const isContinuing = firstUpcoming?.status === 'IN_PROGRESS';
+
+  // Derived main / inspection status (mirror web) — folds the latest inspection's
+  // lifecycle into the badges shown in the header, instead of the raw DB status.
+  const latestInspection =
+    upcomingList.length > 0 ? upcomingList[0] : recentInspections.length > 0 ? recentInspections[0] : null;
+  const currentMainStatus = fullVendor
+    ? getNewMainStatus(fullVendor.status, latestInspection)
+    : '';
+  const currentInspectionStatus = fullVendor
+    ? getNewInspectionStatus(fullVendor.status, latestInspection)
+    : '';
+  // Once the assignment is completed, the QC checker only needs a compact summary.
+  const isCompleted = currentInspectionStatus === 'Completed';
 
   const handleLoadMoreHistory = () => {
     const nextLimit = Math.min(historyLimit + 20, 50);
@@ -274,30 +514,6 @@ export default function VendorDetailScreen() {
     }
   }, []);
 
-  // Download Report is available once at least one inspection has been
-  // completed / submitted for this vendor (mirrors web's report availability).
-  const reportInspection = useMemo(() => {
-    const done = recentInspections.filter((i) =>
-      ['COMPLETED', 'SUBMITTED', 'UNDER_ADMIN_REVIEW'].includes(
-        (i.status || '').toUpperCase(),
-      ) || i.result,
-    );
-    return done[0] || null;
-  }, [recentInspections]);
-
-  const handleDownloadReport = useCallback(async () => {
-    if (!reportInspection) return;
-    setDownloadingReport(true);
-    try {
-      const checkerName = fullVendor?.assignedQc?.name || undefined;
-      await downloadFactoryReportPdf(reportInspection, { variant: 'canonical', checkerName });
-    } catch (err: any) {
-      Alert.alert('Download failed', err?.message || 'Could not generate the report.');
-    } finally {
-      setDownloadingReport(false);
-    }
-  }, [reportInspection, fullVendor]);
-
   // Skeleton only on initial load
   if (loading && !fullVendor) {
     return <VendorDetailSkeleton onBack={() => router.back()} insetsTop={insets.top} />;
@@ -311,18 +527,11 @@ export default function VendorDetailScreen() {
           <View className="w-20 h-20 rounded-full bg-red-50 items-center justify-center mb-5">
             <AlertCircle size={36} color="#dc2626" strokeWidth={1.75} />
           </View>
-          <Text className="text-xl font-bold text-slate-900 mb-2 text-center">
+          <AppText variant="headlineSm" color={colors.text} style={{ marginBottom: 8, textAlign: 'center' }}>
             Something went wrong
-          </Text>
-          <Text className="text-base text-slate-600 text-center mb-6">{error}</Text>
-          <TouchableOpacity
-            onPress={() => loadAll()}
-            activeOpacity={0.85}
-            className="flex-row items-center bg-blue-600 rounded-xl px-6 py-3"
-          >
-            <RefreshCw size={18} color="#ffffff" />
-            <Text className="text-white font-bold text-base ml-2">Try Again</Text>
-          </TouchableOpacity>
+          </AppText>
+          <AppText variant="bodyMd" color={colors.textSecondary} style={{ textAlign: 'center', marginBottom: 24 }}>{error}</AppText>
+          <Button label="Try Again" icon={RefreshCw} onPress={() => loadAll()} />
         </View>
       </View>
     );
@@ -331,12 +540,671 @@ export default function VendorDetailScreen() {
   const companyName = fullVendor?.companyName || name || 'Vendor';
   const location =
     formatAddress(fullVendor?.factoryCity, fullVendor?.factoryState) || 'Location not provided';
-  const specializations: string[] = fullVendor?.specializations || [];
   const productCategories: string[] = fullVendor?.productCategories || [];
   const certifications: any[] = fullVendor?.certifications || [];
-  const paymentTerms: string[] = fullVendor?.paymentTerms || [];
-  const pill = statusStyle(fullVendor?.status || 'active');
+  const additionalOwners: any[] = Array.isArray(fullVendor?.additionalOwners)
+    ? fullVendor.additionalOwners
+    : [];
+  const bank = fullVendor?.bankDetails || null;
   const websiteSafe = safeExternalUrl(fullVendor?.website);
+
+  // ── Overview derived data (mirror web renderOverviewTab) ───────────────────
+  // Factory Site photos belong to the Legal Address & Factory Site; the rest
+  // are Warehouse photos (web splits on the "Factory Site" name prefix).
+  const legalSiteImages = factoryImages.filter((m) => (m.label || '').startsWith('Factory Site'));
+  const warehousePhotoImages = factoryImages.filter((m) => !(m.label || '').startsWith('Factory Site'));
+
+  // Product photos across registered category products + custom categories.
+  const productPhotos: { label: string; url: string }[] = [];
+  const collectProductPhotos = (catLabel: string, products: any) => {
+    (Array.isArray(products) ? products : []).forEach((p: any, i: number) => {
+      (Array.isArray(p?.photos) ? p.photos : []).forEach((ph: any) => {
+        const url = ph?.url || ph?.preview;
+        if (url) {
+          productPhotos.push({
+            label: [catLabel, p?.name || `Product ${i + 1}`].filter(Boolean).join(' · '),
+            url,
+          });
+        }
+      });
+    });
+  };
+  if (fullVendor?.categoryProducts && typeof fullVendor.categoryProducts === 'object') {
+    Object.values(fullVendor.categoryProducts).forEach((products: any) => collectProductPhotos('', products));
+  }
+  if (Array.isArray(fullVendor?.additionalCategories)) {
+    fullVendor.additionalCategories.forEach((cat: any) =>
+      collectProductPhotos(cat?.name || 'Custom Category', cat?.products),
+    );
+  }
+
+  // Contact persons (main + alternates) for the Contact & Trade section.
+  const mainContactPerson =
+    fullVendor?.mainContact && typeof fullVendor.mainContact === 'object' ? fullVendor.mainContact : null;
+  const alternateContactsList: any[] = Array.isArray(fullVendor?.alternateContacts)
+    ? fullVendor.alternateContacts
+    : [];
+  const contactPersons = [
+    ...(mainContactPerson ? [{ ...mainContactPerson, _label: 'Contact Person 1 (Main)' }] : []),
+    ...alternateContactsList.map((c: any, i: number) => ({ ...c, _label: `Contact Person ${i + 2}` })),
+  ];
+
+  // Warehouse "same as factory" detection (mirrors web).
+  const _wEq = (a: any, b: any) => (a || '').toString().trim() === (b || '').toString().trim();
+  const warehouseSameAsFactory =
+    (!fullVendor?.warehouseAddress && !fullVendor?.warehouseCity) ||
+    (_wEq(fullVendor?.warehouseAddress, fullVendor?.factoryAddress) &&
+      _wEq(fullVendor?.warehouseCity, fullVendor?.factoryCity) &&
+      _wEq(fullVendor?.warehouseState, fullVendor?.factoryState) &&
+      _wEq(fullVendor?.warehouseZipCode, fullVendor?.factoryZipCode) &&
+      _wEq(fullVendor?.warehouseCountry, fullVendor?.factoryCountry));
+
+  // Shared inline renderers for the overview sections.
+  const imageStrip = (items: { label: string; url: string }[]) => (
+    <View className="flex-row flex-wrap" style={{ columnGap: 10, rowGap: 12 }}>
+      {items.map((m, i) => (
+        <DocTile key={`${m.label}-${i}`} url={m.url} name={m.label} onOpen={() => openDoc(m.url, m.label)} />
+      ))}
+    </View>
+  );
+  const countryChips = (list: string[]) => (
+    <View className="flex-row flex-wrap" style={{ rowGap: 6, columnGap: 6 }}>
+      {list.map((nm, i) => {
+        const iso = COUNTRY_ISO[nm];
+        return (
+          <View
+            key={i}
+            className="flex-row items-center rounded-lg px-2.5 py-1"
+            style={{ backgroundColor: '#f1f5f9' }}
+          >
+            {iso ? (
+              <Image
+                source={{ uri: `https://flagcdn.com/24x18/${iso.toLowerCase()}.png` }}
+                style={{ width: 16, height: 12, marginRight: 6, borderRadius: 2 }}
+                resizeMode="cover"
+              />
+            ) : null}
+            <Text className="text-xs font-semibold" style={{ color: '#334155' }}>
+              {nm}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+
+  const renderOverview = () => {
+    if (!fullVendor) return null;
+    const fv = fullVendor;
+    const bt: string = fv.businessType;
+
+    // ── Facilities ──
+    const enabledFacilities = fv.enabledFacilities || {};
+    const detailsMap = fv.facilityDetails || {};
+    const enabledList: string[] = Object.entries(enabledFacilities)
+      .filter(([, en]) => !!en)
+      .map(([k]) => FACILITY_CHIP[k] || k);
+    const facilityCards = Object.entries(detailsMap)
+      .filter(([fid]) => enabledFacilities[fid])
+      .map(([fid, details]: [string, any]) => {
+        const rows = (FACILITY_META[fid]?.detailFields ?? []).filter(
+          ({ key }) => (details || {})[key] !== null && (details || {})[key] !== undefined && (details || {})[key] !== '',
+        );
+        return { fid, rows, details };
+      })
+      .filter((c) => c.rows.length > 0);
+    const hasFacilitiesData = (fv.enabledFacilities || fv.facilityDetails) && (enabledList.length > 0 || facilityCards.length > 0);
+
+    // ── Section presence flags ──
+    const s2Fields =
+      hasVal(fv.businessPhone) || hasVal(fv.phoneNumber2) || hasVal(fv.businessEmail) || hasVal(fv.businessEmail2) ||
+      !!formatLocalLandline({ countryCode: '+91', std: fv.localLandlineStd, number: fv.landlineNumber }) ||
+      !!formatIntlLandline(fv.intlLandline) || hasVal(fv.businessAddress) || hasVal(fv.addressLine2) ||
+      hasVal(fv.addressLine3) || hasVal(fv.landmark) || hasVal(fv.businessCity) || hasVal(fv.businessState) ||
+      hasVal(fv.businessZipCode) || hasVal(fv.businessCountry);
+
+    const ownerFullName = buildFullName(fv.ownerTitle, fv.ownerFirstName, fv.ownerMiddleName, fv.ownerLastName, fv.ownerName);
+    const ownerLocalLL = formatLocalLandline({ countryCode: '+91', std: fv.ownerLocalLandlineStd, number: fv.ownerLandline });
+    const ownerIntlLL = formatIntlLandline(fv.ownerIntlLandline);
+    const s3Fields =
+      hasVal(ownerFullName) || hasVal(fv.designation) || hasVal(fv.ownerPhone) || hasVal(fv.ownerPhone2) ||
+      hasVal(fv.ownerEmail) || hasVal(fv.ownerEmail2) || !!ownerLocalLL || !!ownerIntlLL ||
+      hasVal(fv.businessStartDate) || hasVal(fv.employeeCount);
+    const s3Custom = !!fv.ownerPhoto || (Array.isArray(fv.additionalOwners) && fv.additionalOwners.length > 0);
+
+    const s4Fields =
+      hasVal(fv.factoryOwnershipType) || hasVal(fv.factorySize) || hasVal(fv.factoryAddress) || hasVal(fv.addressLine2) ||
+      hasVal(fv.addressLine3) || hasVal(fv.landmark) || hasVal(fv.factoryCity) || hasVal(fv.factoryState) ||
+      hasVal(fv.factoryZipCode) || hasVal(fv.factoryCountry);
+    const hasWarehouseSection = !!(fv.warehouseAddress || fv.warehouseCity || fv.factoryAddress || fv.factoryCity);
+    const s4Custom = hasWarehouseSection || legalSiteImages.length > 0 || warehousePhotoImages.length > 0;
+
+    const vendorTypeChips: string[] = Array.isArray(fv.vendorTypes) ? fv.vendorTypes.map(capitalizeFirst) : [];
+    const s5 = vendorTypeChips.length > 0 || (Array.isArray(fv.productCategories) && fv.productCategories.length > 0) ||
+      hasVal(fv.categoryRemarks) || productPhotos.length > 0;
+
+    const s7Fields = hasVal(fv.complianceStandards) || hasVal(fv.packagingCapabilities) || hasVal(fv.logisticsPartners) ||
+      (Array.isArray(fv.shippingMethods) && fv.shippingMethods.length > 0);
+    const certs: any[] = Array.isArray(fv.certifications) ? fv.certifications : [];
+
+    const s8Fields =
+      (fv.importExperience !== undefined && fv.importExperience !== null) ||
+      (fv.exportExperience !== undefined && fv.exportExperience !== null) ||
+      (Array.isArray(fv.importCountries) && fv.importCountries.length > 0) ||
+      (Array.isArray(fv.exportCountries) && fv.exportCountries.length > 0);
+
+    const bank = fv.bankDetails || null;
+
+    return (
+      <View className="mx-4" style={{ rowGap: 14 }}>
+        {/* ── SECTION 1 · Company Details ─────────────────────────── */}
+        <SectionCard icon={Briefcase} title="Company Details">
+          <InfoRow label="Company Name" value={fv.companyName} />
+          {hasVal(fv.companyType) ? (
+            <View className="py-3 border-b border-slate-100">
+              <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 4 }}>Company Type</AppText>
+              <View className="self-start rounded-full px-2.5 py-1" style={{ backgroundColor: brand[50] }}>
+                <AppText variant="labelSm" color={brand[600]}>
+                  {capitalizeWords(String(fv.companyType).replace(/_/g, ' ').toLowerCase())}
+                </AppText>
+              </View>
+            </View>
+          ) : null}
+          {hasVal(bt) ? <InfoRow label="Business Type" value={getDetailBusinessTypeLabel(bt)} /> : null}
+          {hasVal(fv.factoryOwnershipType) ? (
+            <InfoRow label="Factory Ownership Type" value={getOwnershipTypeLabel(fv.factoryOwnershipType)} />
+          ) : null}
+          <InfoRow label="Year Established" value={fv.establishedYear} />
+          {fv.gstNumber ? <InfoRow label="GST Number" value={fv.gstNumber} /> : null}
+          {!fv.gstNumber ? <InfoRow label="Vendor Type" value="Unregistered — identified by email" /> : null}
+          {fv.companyIdNumber ? <InfoRow label={getDetailCompanyIdLabel(bt)} value={fv.companyIdNumber} /> : null}
+          {fv.iecCode ? <InfoRow label="IEC Code" value={fv.iecCode} /> : null}
+          <InfoRow label={bt === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number'} value={fv.panNumber} />
+          {fv.aadhaarNumber ? <InfoRow label="Aadhaar Number" value={fv.aadhaarNumber} /> : null}
+          {hasVal(fv.website) ? (
+            <View className="py-3 border-b border-slate-100">
+              <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 4 }}>Website</AppText>
+              {websiteSafe ? (
+                <TouchableOpacity onPress={() => Linking.openURL(websiteSafe)} className="flex-row items-center">
+                  <Globe size={14} color={brand[500]} />
+                  <AppText variant="bodySm" color={brand[600]} style={{ marginLeft: 6, flexShrink: 1, textDecorationLine: 'underline' }}>{fv.website}</AppText>
+                </TouchableOpacity>
+              ) : (
+                <View className="flex-row items-center">
+                  <Globe size={14} color="#94a3b8" />
+                  <AppText variant="bodySm" color={colors.text} style={{ marginLeft: 6, flexShrink: 1 }}>{fv.website}</AppText>
+                </View>
+              )}
+            </View>
+          ) : null}
+          {companyLogo ? (
+            <View className="pt-3">
+              <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 8 }}>Company Logo</AppText>
+              <TouchableOpacity onPress={() => openDoc(companyLogo, 'Company Logo')} activeOpacity={0.85}>
+                <Image
+                  source={{ uri: companyLogo }}
+                  style={{ width: 96, height: 96, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' }}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          {companyDocs.length > 0 ? (
+            <View className="pt-3">
+              <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 8 }}>
+                Registration Documents ({companyDocs.length})
+              </AppText>
+              <View className="flex-row flex-wrap" style={{ columnGap: 10, rowGap: 12 }}>
+                {companyDocs.map((doc: any, idx: number) => (
+                  <DocTile
+                    key={doc.id || idx}
+                    url={doc.documentUrl}
+                    name={doc.name || DOC_TYPE_LABELS[doc.type] || 'Document'}
+                    typeLabel={DOC_TYPE_LABELS[doc.type] || doc.type}
+                    onOpen={() => openDoc(doc.documentUrl, doc.name)}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null}
+        </SectionCard>
+
+        {/* ── SECTION 2 · Contact & Communication Details ─────────── */}
+        {s2Fields ? (
+          <SectionCard icon={Phone} title="Contact & Communication Details">
+            <InfoRow label="Primary Phone" value={fv.businessPhone} />
+            <InfoRow label="Secondary Phone" value={fv.phoneNumber2} />
+            <InfoRow label="Primary Email" value={fv.businessEmail} />
+            <InfoRow label="Secondary Email" value={fv.businessEmail2} />
+            <InfoRow
+              label="Local Landline Number"
+              value={formatLocalLandline({ countryCode: '+91', std: fv.localLandlineStd, number: fv.landlineNumber })}
+            />
+            <InfoRow label="International Landline Number" value={formatIntlLandline(fv.intlLandline)} />
+            <InfoRow label="Address Line 1" value={fv.businessAddress} />
+            <InfoRow label="Address Line 2" value={fv.addressLine2} />
+            <InfoRow label="Address Line 3" value={fv.addressLine3} />
+            <InfoRow label="Landmark" value={fv.landmark} />
+            <InfoRow label="City" value={fv.businessCity} />
+            <InfoRow label="State" value={fv.businessState} />
+            <InfoRow label="ZIP / Postal Code" value={fv.businessZipCode} />
+            <InfoRow label="Country" value={fv.businessCountry} />
+          </SectionCard>
+        ) : null}
+
+        {/* ── SECTION 3 · Owner Profile ───────────────────────────── */}
+        {s3Fields || s3Custom ? (
+          <SectionCard icon={UserCircle} title="Owner Profile">
+            <View className="flex-row items-start mb-1">
+              {fv.ownerPhoto ? (
+                <TouchableOpacity onPress={() => openDoc(fv.ownerPhoto, 'Owner Photo')} activeOpacity={0.85}>
+                  <Image
+                    source={{ uri: fv.ownerPhoto }}
+                    style={{ width: 80, height: 80, borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0' }}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ) : (
+                <View className="w-20 h-20 rounded-2xl bg-slate-100 border border-slate-200 items-center justify-center">
+                  <UserCircle size={40} color="#cbd5e1" />
+                </View>
+              )}
+              <View className="flex-1 ml-3">
+                <InfoRow label="Owner Full Name" value={ownerFullName} />
+                <InfoRow label="Designation" value={fv.designation} />
+                <InfoRow label="Primary Phone" value={fv.ownerPhone} />
+                <InfoRow label="Secondary Phone" value={fv.ownerPhone2} />
+              </View>
+            </View>
+            <InfoRow label="Primary Email" value={fv.ownerEmail} />
+            <InfoRow label="Secondary Email" value={fv.ownerEmail2} />
+            <InfoRow label="Local Landline" value={ownerLocalLL} />
+            <InfoRow label="International Landline" value={ownerIntlLL} />
+            <InfoRow label="Business Start Date" value={fv.businessStartDate ? formatDate(fv.businessStartDate) : null} />
+            <InfoRow
+              label="Number of Employees"
+              value={fv.employeeCount ? getDetailEmployeeCountLabel(fv.employeeCount) : null}
+            />
+            {Array.isArray(fv.additionalOwners) && fv.additionalOwners.length > 0 ? (
+              <View className="pt-3">
+                <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 8 }}>Additional Owners</AppText>
+                <View style={{ rowGap: 10 }}>
+                  {fv.additionalOwners.map((owner: any, idx: number) => (
+                    <View
+                      key={idx}
+                      className="border border-slate-200 rounded-xl p-3"
+                      style={{ backgroundColor: '#f8fafc' }}
+                    >
+                      <View className="flex-row items-center mb-1.5">
+                        {owner.photo ? (
+                          <TouchableOpacity
+                            onPress={() => openDoc(owner.photo, `Owner ${idx + 2} Photo`)}
+                            activeOpacity={0.85}
+                          >
+                            <Image
+                              source={{ uri: owner.photo }}
+                              style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#e2e8f0' }}
+                              resizeMode="cover"
+                            />
+                          </TouchableOpacity>
+                        ) : (
+                          <View className="w-11 h-11 rounded-full bg-slate-100 border border-slate-200 items-center justify-center">
+                            <UserCircle size={24} color="#cbd5e1" />
+                          </View>
+                        )}
+                        <AppText variant="titleMd" color={colors.text} style={{ marginLeft: 10 }}>Owner {idx + 2}</AppText>
+                      </View>
+                      <InfoRow
+                        label="Name"
+                        value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)}
+                      />
+                      <InfoRow label="Designation" value={resolveOwnerDesignation(owner.designation)} />
+                      <InfoRow label="Primary Email" value={owner.email} />
+                      <InfoRow label="Secondary Email" value={owner.email2} />
+                      <InfoRow label="Primary Phone" value={owner.phone} />
+                      <InfoRow label="Secondary Phone" value={owner.phone2} />
+                      <InfoRow
+                        label="Local Landline"
+                        value={formatLocalLandline({
+                          countryCode: '+91',
+                          std: owner.localLandlineStd,
+                          number: owner.localLandline || owner.landline,
+                        })}
+                      />
+                      <InfoRow label="International Landline" value={formatIntlLandline(owner.intlLandline)} />
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+          </SectionCard>
+        ) : null}
+
+        {/* ── SECTION 4 · Legal Address & Factory Site ────────────── */}
+        {s4Fields || s4Custom ? (
+          <SectionCard icon={Warehouse} title="Legal Address & Factory Site">
+            {hasVal(fv.factoryOwnershipType) ? (
+              <InfoRow label="Ownership Type" value={getOwnershipTypeLabel(fv.factoryOwnershipType)} />
+            ) : null}
+            <InfoRow label="Warehousing Capacity" value={fv.factorySize} />
+            <InfoRow label="Address Line 1" value={fv.factoryAddress} />
+            <InfoRow label="Address Line 2" value={fv.addressLine2} />
+            <InfoRow label="Address Line 3" value={fv.addressLine3} />
+            <InfoRow label="Landmark" value={fv.landmark} />
+            <InfoRow label="City" value={fv.factoryCity} />
+            <InfoRow label="State" value={fv.factoryState} />
+            <InfoRow label="ZIP / Postal Code" value={fv.factoryZipCode} />
+            <InfoRow label="Country" value={fv.factoryCountry} />
+
+            {legalSiteImages.length > 0 ? (
+              <View className="pt-3">
+                <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 8 }}>
+                  Factory Site Images ({legalSiteImages.length})
+                </AppText>
+                {imageStrip(legalSiteImages)}
+              </View>
+            ) : null}
+
+            {hasWarehouseSection ? (
+              <View className="pt-4 mt-2 border-t border-slate-100">
+                <AppText variant="titleMd" color={colors.text} style={{ marginBottom: 8 }}>Warehouse Address</AppText>
+                {warehouseSameAsFactory ? (
+                  <>
+                    <View
+                      className="flex-row items-start p-3 rounded-xl border border-brand-100"
+                      style={{ backgroundColor: brand[50] }}
+                    >
+                      <MapPin size={16} color={brand[500]} style={{ marginTop: 1 }} />
+                      <AppText variant="bodySm" color={brand[700]} style={{ marginLeft: 8, flex: 1 }}>
+                        Warehouse Address is the same as the Legal Address & Factory Site above.
+                      </AppText>
+                    </View>
+                    {fv.mapLink ? (
+                      <View className="pt-3">
+                        <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 4 }}>Map / Location Link</AppText>
+                        <TouchableOpacity
+                          onPress={() => {
+                            const u = safeExternalUrl(fv.mapLink);
+                            if (u) Linking.openURL(u);
+                          }}
+                          className="flex-row items-center"
+                        >
+                          <Globe size={14} color={brand[500]} />
+                          <AppText variant="bodySm" color={brand[600]} style={{ marginLeft: 6, textDecorationLine: 'underline' }}>View Map</AppText>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <InfoRow label="Ownership Type" value={getOwnershipTypeLabel(fv.ownershipType) || '—'} />
+                    <InfoRow label="Warehousing Capacity" value={fv.warehouseSize || '—'} />
+                    <InfoRow label="Address Line 1" value={fv.warehouseAddress} />
+                    <InfoRow label="Address Line 2" value={fv.warehouseAddressLine2} />
+                    <InfoRow label="Address Line 3" value={fv.warehouseAddressLine3} />
+                    <InfoRow label="Landmark" value={fv.warehouseLandmark} />
+                    <InfoRow label="City" value={fv.warehouseCity} />
+                    <InfoRow label="State" value={fv.warehouseState} />
+                    <InfoRow label="ZIP / Postal Code" value={fv.warehouseZipCode} />
+                    <InfoRow label="Country" value={fv.warehouseCountry} />
+                    {fv.mapLink ? (
+                      <View className="py-3 border-b border-slate-100">
+                        <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 4 }}>Map / Location Link</AppText>
+                        <TouchableOpacity
+                          onPress={() => {
+                            const u = safeExternalUrl(fv.mapLink);
+                            if (u) Linking.openURL(u);
+                          }}
+                          className="flex-row items-center"
+                        >
+                          <Globe size={14} color={brand[500]} />
+                          <AppText variant="bodySm" color={brand[600]} style={{ marginLeft: 6, textDecorationLine: 'underline' }}>View Map</AppText>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+                  </>
+                )}
+              </View>
+            ) : null}
+
+            {warehousePhotoImages.length > 0 ? (
+              <View className="pt-3">
+                <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 8 }}>
+                  Warehouse Images ({warehousePhotoImages.length})
+                </AppText>
+                {imageStrip(warehousePhotoImages)}
+              </View>
+            ) : null}
+          </SectionCard>
+        ) : null}
+
+        {/* ── SECTION 5 · Vendor Type & Products ──────────────────── */}
+        {s5 ? (
+          <SectionCard icon={Package} title="Vendor Type & Products">
+            {vendorTypeChips.length > 0 ? (
+              <ChipGroup label="Vendor Type" items={vendorTypeChips} bg="#f1f5f9" text="#334155" />
+            ) : null}
+            {Array.isArray(fv.productCategories) && fv.productCategories.length > 0 ? (
+              <ChipGroup label="Product Categories" items={fv.productCategories} bg={brand[50]} text={brand[600]} />
+            ) : null}
+            {hasVal(fv.categoryRemarks) ? <InfoRow label="General Remarks" value={fv.categoryRemarks} /> : null}
+            {productPhotos.length > 0 ? (
+              <View className="pt-3">
+                <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 8 }}>Product Photos ({productPhotos.length})</AppText>
+                {imageStrip(productPhotos)}
+              </View>
+            ) : null}
+          </SectionCard>
+        ) : null}
+
+        {/* ── SECTION 6 · Manufacturing Facilities ────────────────── */}
+        {hasFacilitiesData ? (
+          <SectionCard icon={Factory} title="Manufacturing Facilities">
+            {enabledList.length > 0 ? (
+              <View className="pb-1">
+                <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 8 }}>Active Facilities</AppText>
+                <View className="flex-row flex-wrap" style={{ rowGap: 6, columnGap: 6 }}>
+                  {enabledList.map((f, i) => (
+                    <View key={i} className="rounded-lg px-2.5 py-1" style={{ backgroundColor: brand[50] }}>
+                      <AppText variant="labelSm" color={brand[600]}>{f}</AppText>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+            {facilityCards.map(({ fid, rows, details }) => (
+              <View key={fid} className="pt-3 mt-2 border-t border-slate-100">
+                <AppText variant="titleMd" color={colors.text} style={{ marginBottom: 4, textTransform: 'uppercase' }}>
+                  {(FACILITY_TITLE[fid] || FACILITY_META[fid]?.label || capitalizeFirst(fid))} Facility Details
+                </AppText>
+                {rows.map(({ key, label, unit }) => (
+                  <InfoRow key={key} label={label} value={withUnit((details || {})[key], unit)} />
+                ))}
+              </View>
+            ))}
+          </SectionCard>
+        ) : null}
+
+        {/* ── SECTION 7 · Certifications & Quality Control ────────── */}
+        {s7Fields || certs.length > 0 ? (
+          <SectionCard icon={Award} title="Certifications & Quality Control">
+            <InfoRow label="Compliance Standards" value={fv.complianceStandards} />
+            <InfoRow label="Packaging Capabilities" value={fv.packagingCapabilities} />
+            <InfoRow label="Logistics Partners" value={fv.logisticsPartners} />
+            {Array.isArray(fv.shippingMethods) && fv.shippingMethods.length > 0 ? (
+              <ChipGroup label="Shipping Methods" items={fv.shippingMethods} bg="#f1f5f9" text="#334155" />
+            ) : null}
+            {certs.length > 0 ? (
+              <View className="pt-3">
+                <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 8 }}>Catalog Certifications ({certs.length})</AppText>
+                <View style={{ rowGap: 10 }}>
+                  {certs.map((cert: any, idx: number) => {
+                    const status = cert.expiryDate ? certExpiryStatus(cert.expiryDate) : null;
+                    return (
+                      <View
+                        key={cert.id || idx}
+                        className="border border-slate-200 rounded-xl p-3"
+                        style={{ backgroundColor: '#f8fafc' }}
+                      >
+                        <View className="flex-row items-center justify-between mb-1">
+                          <View className="rounded px-2.5 py-0.5" style={{ backgroundColor: brand[50], flexShrink: 1 }}>
+                            <AppText variant="labelSm" color={brand[600]} numberOfLines={1}>{cert.name}</AppText>
+                          </View>
+                          {cert.documentUrl ? (
+                            <TouchableOpacity
+                              onPress={() => openDoc(cert.documentUrl, cert.name)}
+                              className="flex-row items-center rounded-lg px-2.5 py-1"
+                              style={{ backgroundColor: brand[50], flexShrink: 0, marginLeft: 8 }}
+                            >
+                              <Eye size={13} color={brand[600]} />
+                              <AppText variant="labelSm" color={brand[600]} style={{ marginLeft: 4 }} numberOfLines={1}>View</AppText>
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
+                        <InfoRow label="Issued By" value={cert.issuedBy} />
+                        <InfoRow label="Certificate #" value={cert.certificateNumber} />
+                        {cert.expiryDate ? (
+                          <View className="pt-2">
+                            <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 4 }}>Expiry Date</AppText>
+                            <View className="flex-row items-center flex-wrap" style={{ columnGap: 6, rowGap: 4 }}>
+                              <Calendar size={13} color="#64748b" />
+                              <AppText variant="bodySm" color={colors.text}>{formatDate(cert.expiryDate)}</AppText>
+                              {status ? (
+                                <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: status.bg }}>
+                                  <AppText variant="labelSm" color={status.text} style={{ fontSize: 10, lineHeight: 13 }}>{status.label}</AppText>
+                                </View>
+                              ) : null}
+                            </View>
+                          </View>
+                        ) : (
+                          <AppText variant="bodySm" color={colors.textFaint} style={{ paddingTop: 8 }}>No expiry date set</AppText>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+          </SectionCard>
+        ) : null}
+
+        {/* ── SECTION 8 · Contact & Trade Information ──────────────── */}
+        {s8Fields || contactPersons.length > 0 ? (
+          <SectionCard icon={FileText} title="Contact & Trade Information">
+            {fv.importExperience !== undefined && fv.importExperience !== null ? (
+              <InfoRow label="Import Experience" value={fv.importExperience ? 'Yes' : 'No'} />
+            ) : null}
+            {fv.exportExperience !== undefined && fv.exportExperience !== null ? (
+              <InfoRow label="Export Experience" value={fv.exportExperience ? 'Yes' : 'No'} />
+            ) : null}
+            {Array.isArray(fv.importCountries) && fv.importCountries.length > 0 ? (
+              <View className="pt-3 border-t border-slate-100 mt-1">
+                <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 8 }}>Import Countries</AppText>
+                {countryChips(fv.importCountries)}
+              </View>
+            ) : null}
+            {Array.isArray(fv.exportCountries) && fv.exportCountries.length > 0 ? (
+              <View className="pt-3 border-t border-slate-100 mt-1">
+                <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 8 }}>Export Countries</AppText>
+                {countryChips(fv.exportCountries)}
+              </View>
+            ) : null}
+            {contactPersons.length > 0 ? (
+              <View className="pt-3">
+                <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 8 }}>Contact Persons ({contactPersons.length})</AppText>
+                <View style={{ rowGap: 10 }}>
+                  {contactPersons.map((contact: any, idx: number) => {
+                    const nameParts = [contact.firstName, contact.middleName, contact.lastName].filter(Boolean);
+                    const fullName = nameParts.length > 0 ? nameParts.join(' ') : contact.name || '';
+                    const designation = contact.designation === 'Others' ? contact.customDesignation : contact.designation;
+                    const department = contact.department === 'Others' ? contact.customDepartment : contact.department;
+                    const localLL = formatLocalLandline({
+                      countryCode: '+91',
+                      std: contact.localLandlineStd,
+                      number: contact.localLandline || contact.landline,
+                    });
+                    const intlLL = formatIntlLandline(
+                      contact.intlLandlineNumber
+                        ? `+${contact.intlLandlineCountryCode || ''} ${contact.intlLandlineStd || ''} ${contact.intlLandlineNumber}`.trim()
+                        : contact.intlLandline,
+                    );
+                    return (
+                      <View
+                        key={idx}
+                        className="border border-slate-200 rounded-xl p-3"
+                        style={{ backgroundColor: '#f8fafc' }}
+                      >
+                        {contact.photo ? (
+                          <View className="items-center mb-2">
+                            <TouchableOpacity
+                              onPress={() => openDoc(contact.photo, fullName || 'Contact')}
+                              activeOpacity={0.85}
+                            >
+                              <Image
+                                source={{ uri: contact.photo }}
+                                style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: '#e2e8f0' }}
+                                resizeMode="cover"
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        ) : null}
+                        <AppText variant="titleMd" color={colors.text} style={{ marginBottom: 4 }}>{contact._label}</AppText>
+                        <InfoRow label="Name" value={fullName} />
+                        <InfoRow label="Designation" value={designation} />
+                        <InfoRow label="Department" value={department} />
+                        <InfoRow label="Primary Email" value={contact.email1 || contact.email} />
+                        <InfoRow label="Secondary Email" value={contact.email2} />
+                        <InfoRow label="Primary Phone" value={contact.phone1 || contact.phone} />
+                        <InfoRow label="Secondary Phone" value={contact.phone2} />
+                        <InfoRow label="Local Landline Number" value={localLL} />
+                        <InfoRow label="International Landline Number" value={intlLL} />
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+          </SectionCard>
+        ) : null}
+
+        {/* ── SECTION 9 · Banking Details ─────────────────────────── */}
+        {bank && bank.bankName ? (
+          <SectionCard icon={Landmark} title="Banking Details">
+            <InfoRow label="Bank Name" value={bank.bankName} />
+            <InfoRow
+              label="Account Number"
+              value={
+                bank.accountNumber
+                  ? bank.accountNumber.length > 4
+                    ? `**** **** ${bank.accountNumber.slice(-4)}`
+                    : bank.accountNumber
+                  : null
+              }
+            />
+            <InfoRow label="IFSC Code" value={bank.ifscCode} />
+            <InfoRow label="SWIFT / BIC Code" value={bank.swiftCode} />
+            <InfoRow label="IBAN Number" value={bank.iban} />
+            <InfoRow label="Account Type" value={bank.accountType} />
+            <InfoRow label="Account Holder Name" value={bank.accountHolderName} />
+            <InfoRow label="Branch Name" value={bank.branchName} />
+            <InfoRow label="Branch Address" value={bank.branchAddress} />
+            {bank.isVerified ? (
+              <View className="pt-3">
+                <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 6 }}>Verification Status</AppText>
+                <View
+                  className="flex-row items-center self-start rounded-full px-2.5 py-1"
+                  style={{ backgroundColor: '#d1fae5' }}
+                >
+                  <CheckCircle size={13} color="#065f46" />
+                  <AppText variant="labelSm" color="#065f46" style={{ marginLeft: 4 }}>Verified</AppText>
+                </View>
+              </View>
+            ) : null}
+          </SectionCard>
+        ) : null}
+      </View>
+    );
+  };
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -351,34 +1219,72 @@ export default function VendorDetailScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2563eb" colors={['#2563eb']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={brand[500]} colors={[brand[500]]} />
         }
       >
-        {/* Top meta row: status + QC assignee */}
-        <View className="px-4 pt-4 flex-row flex-wrap" style={{ rowGap: 6, columnGap: 6 }}>
-          <View
-            className="rounded-full px-3 py-1 flex-row items-center"
-            style={{ backgroundColor: pill.bg }}
-          >
-            <View
-              className="w-1.5 h-1.5 rounded-full mr-1.5"
-              style={{ backgroundColor: pill.dot }}
-            />
-            <Text className="text-xs font-bold capitalize" style={{ color: pill.text }}>
-              {(fullVendor?.status || '').replace(/_/g, ' ').toLowerCase()}
-            </Text>
-          </View>
+        {/* Top meta row: derived main + inspection status + QC assignee */}
+        <View className="px-4 pt-4 flex-row flex-wrap items-center" style={{ rowGap: 6, columnGap: 6 }}>
+          {currentMainStatus ? (
+            <View className="rounded-full px-3 py-1" style={{ backgroundColor: mainStatusStyle(currentMainStatus).bg }}>
+              <AppText variant="labelSm" color={mainStatusStyle(currentMainStatus).text}>
+                {currentMainStatus}
+              </AppText>
+            </View>
+          ) : null}
+          {currentInspectionStatus ? (
+            <View className="rounded-full px-3 py-1" style={{ backgroundColor: inspectionStatusStyle(currentInspectionStatus).bg }}>
+              <AppText variant="labelSm" color={inspectionStatusStyle(currentInspectionStatus).text}>
+                Inspection: {currentInspectionStatus}
+              </AppText>
+            </View>
+          ) : null}
           {fullVendor?.assignedQc?.name ? (
             <View className="bg-slate-100 rounded-full px-3 py-1">
-              <Text className="text-xs font-medium text-slate-700">
+              <AppText variant="labelSm" color={colors.textSecondary}>
                 QC: {fullVendor.assignedQc.name}
-              </Text>
+              </AppText>
             </View>
           ) : null}
         </View>
 
-        {/* Blue summary card */}
-        <View className="mx-4 mt-4 rounded-2xl p-5" style={{ backgroundColor: '#2563eb' }}>
+        {isCompleted ? (
+          /* Compact completed view — assignment done, full vendor profile hidden */
+          <View className="mx-4 mt-4 bg-white rounded-2xl border border-slate-200 p-4">
+            <CompletedRow icon={<Factory size={18} color={brand[600]} />} label="Vendor Name" value={companyName} />
+            <CompletedRow icon={<MapPin size={18} color={brand[600]} />} label="Location" value={location} />
+            <View className="flex-row items-center py-2.5">
+              <View className="w-9 h-9 rounded-xl bg-brand-50 items-center justify-center mr-3">
+                <BarChart3 size={18} color={brand[600]} />
+              </View>
+              <View className="flex-1">
+                <AppText variant="labelSm" color={colors.textMuted} style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Inspection Status
+                </AppText>
+                <View
+                  className="self-start rounded-full px-2.5 py-0.5 mt-1"
+                  style={{ backgroundColor: inspectionStatusStyle(currentInspectionStatus).bg }}
+                >
+                  <AppText variant="labelSm" color={inspectionStatusStyle(currentInspectionStatus).text}>
+                    {currentInspectionStatus}
+                  </AppText>
+                </View>
+              </View>
+            </View>
+            <CompletedRow
+              icon={<Calendar size={18} color={brand[600]} />}
+              label="Submitted Date"
+              value={fullVendor?.submittedAt ? formatDate(fullVendor.submittedAt) : '—'}
+            />
+            <CompletedRow
+              icon={<CheckCircle size={18} color={brand[600]} />}
+              label="Approved Date"
+              value={fullVendor?.approvedAt ? formatDate(fullVendor.approvedAt) : '—'}
+            />
+          </View>
+        ) : (
+        <>
+        {/* Brand summary card */}
+        <View className="mx-4 mt-4 rounded-2xl p-5" style={{ backgroundColor: brand[500] }}>
           <SummaryRow
             icon={<Factory size={18} color="#ffffff" />}
             label="Vendor"
@@ -405,17 +1311,13 @@ export default function VendorDetailScreen() {
         {/* Start / Continue CTA */}
         {firstUpcoming ? (
           <View className="mx-4 mt-3">
-            <TouchableOpacity
+            <Button
               onPress={handleStartInspectionFlow}
-              activeOpacity={0.85}
-              className="flex-row items-center justify-center bg-blue-600 rounded-xl py-3"
-            >
-              <Play size={16} color="#ffffff" strokeWidth={2.25} />
-              <Text className="text-white font-bold text-sm ml-2">
-                {isContinuing ? 'Continue' : 'Start Now'}
-                {firstUpcoming.poNumber ? ` (${firstUpcoming.poNumber})` : ''}
-              </Text>
-            </TouchableOpacity>
+              variant="primary"
+              icon={Play}
+              fullWidth
+              label={`${isContinuing ? 'Continue' : 'Start Now'}${firstUpcoming.poNumber ? ` (${firstUpcoming.poNumber})` : ''}`}
+            />
           </View>
         ) : null}
 
@@ -434,7 +1336,7 @@ export default function VendorDetailScreen() {
                 onPress={() => setActiveTab(tab.id)}
                 activeOpacity={0.7}
                 className={`mx-1 px-4 py-2 rounded-full ${
-                  isActive ? 'bg-slate-900' : 'bg-white border border-slate-200'
+                  isActive ? 'bg-brand-500' : 'bg-white border border-slate-200'
                 }`}
               >
                 <Text
@@ -449,352 +1351,38 @@ export default function VendorDetailScreen() {
           })}
         </ScrollView>
 
-        {activeTab === 'overview' ? (
-          <View className="mx-4" style={{ rowGap: 14 }}>
-            <Card icon={<Briefcase size={18} color="#2563eb" />} title="Company Information">
-              <InfoRow label="Company Name" value={companyName} />
-              <InfoRow label="Company Type" value={fullVendor?.companyType} />
-              <InfoRow label="Vendor Type" value={fullVendor?.vendorType} />
-              <InfoRow label="Established" value={fullVendor?.establishedYear?.toString()} />
-              <InfoRow label="GST Number" value={fullVendor?.gstNumber} />
-              <InfoRow label="Annual Turnover" value={fullVendor?.annualTurnover} />
-              {fullVendor?.website ? (
-                <View className="pb-3 border-b border-slate-100">
-                  <Text className="text-xs font-medium text-slate-500 mb-1">Website</Text>
-                  {websiteSafe ? (
-                    <TouchableOpacity
-                      onPress={() => Linking.openURL(websiteSafe)}
-                      className="flex-row items-center"
-                    >
-                      <Globe size={14} color="#2563eb" />
-                      <Text className="text-sm text-blue-600 ml-1.5 underline" style={{ flexShrink: 1 }}>
-                        {fullVendor.website}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <View className="flex-row items-center">
-                      <Globe size={14} color="#94a3b8" />
-                      <Text className="text-sm text-slate-700 ml-1.5" style={{ flexShrink: 1 }}>
-                        {fullVendor.website}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              ) : null}
-              {fullVendor?.companyDescription ? (
-                <View className="pb-3">
-                  <Text className="text-xs font-medium text-slate-500 mb-1">Description</Text>
-                  <Text className="text-sm text-slate-900" style={{ lineHeight: 20 }} selectable>
-                    {fullVendor.companyDescription}
-                  </Text>
-                </View>
-              ) : null}
-            </Card>
-
-            <Card icon={<Phone size={18} color="#2563eb" />} title="Contact Information">
-              {/* Primary contact */}
-              <View className="pb-3 border-b border-slate-100">
-                <Text className="text-xs font-medium text-slate-500 mb-1">Primary Contact</Text>
-                <Text className="text-sm font-semibold text-slate-900">
-                  {fullVendor?.ownerName || '—'}
-                </Text>
-                <Text className="text-xs text-slate-500 mb-1">Owner</Text>
-                <View className="flex-row flex-wrap mt-1" style={{ columnGap: 12, rowGap: 6 }}>
-                  {fullVendor?.businessPhone ? (
-                    <TouchableOpacity
-                      onPress={() => Linking.openURL(`tel:${fullVendor.businessPhone}`)}
-                      className="flex-row items-center"
-                    >
-                      <Phone size={13} color="#475569" />
-                      <Text className="text-sm text-slate-700 ml-1">{fullVendor.businessPhone}</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  {fullVendor?.businessEmail ? (
-                    <TouchableOpacity
-                      onPress={() => Linking.openURL(`mailto:${fullVendor.businessEmail}`)}
-                      className="flex-row items-center"
-                    >
-                      <Mail size={13} color="#475569" />
-                      <Text className="text-sm text-slate-700 ml-1">{fullVendor.businessEmail}</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-              </View>
-
-              {/* Assigned QC Checker — NEW section */}
-              {fullVendor?.assignedQc ? (
-                <View className="py-3 border-b border-slate-100">
-                  <Text className="text-xs font-medium text-slate-500 mb-1">
-                    Assigned QC Checker
-                  </Text>
-                  <Text className="text-sm font-semibold text-slate-900">
-                    {fullVendor.assignedQc.name}
-                  </Text>
-                  {fullVendor.assignedQc.checkerId ? (
-                    <Text className="text-[11px] text-slate-500">
-                      ID: {fullVendor.assignedQc.checkerId}
-                    </Text>
-                  ) : null}
-                  <View className="flex-row flex-wrap mt-1.5" style={{ columnGap: 12, rowGap: 6 }}>
-                    {fullVendor.assignedQc.phone ? (
-                      <TouchableOpacity
-                        onPress={() => Linking.openURL(`tel:${fullVendor.assignedQc.phone}`)}
-                        className="flex-row items-center"
-                      >
-                        <Phone size={13} color="#475569" />
-                        <Text className="text-sm text-slate-700 ml-1">
-                          {fullVendor.assignedQc.phone}
-                        </Text>
-                      </TouchableOpacity>
-                    ) : null}
-                    {fullVendor.assignedQc.email ? (
-                      <TouchableOpacity
-                        onPress={() => Linking.openURL(`mailto:${fullVendor.assignedQc.email}`)}
-                        className="flex-row items-center"
-                      >
-                        <Mail size={13} color="#475569" />
-                        <Text className="text-sm text-slate-700 ml-1">
-                          {fullVendor.assignedQc.email}
-                        </Text>
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-                </View>
-              ) : null}
-
-              {fullVendor?.businessAddress ? (
-                <View className="py-3 border-b border-slate-100">
-                  <Text className="text-xs font-medium text-slate-500 mb-1">Business Address</Text>
-                  <Text className="text-sm text-slate-700" style={{ lineHeight: 20 }}>
-                    {formatAddress(
-                      fullVendor.businessAddress,
-                      fullVendor.businessCity,
-                      fullVendor.businessState,
-                      fullVendor.businessZipCode,
-                    )}
-                  </Text>
-                </View>
-              ) : null}
-
-              {fullVendor?.factoryAddress ? (
-                <View className="py-3 border-b border-slate-100">
-                  <View className="flex-row items-center mb-1">
-                    <Factory size={13} color="#64748b" />
-                    <Text className="text-xs font-medium text-slate-500 ml-1">Factory</Text>
-                  </View>
-                  <Text className="text-sm text-slate-700" style={{ lineHeight: 20 }}>
-                    {formatAddress(
-                      fullVendor.factoryAddress,
-                      fullVendor.factoryCity,
-                      fullVendor.factoryState,
-                      fullVendor.factoryZipCode,
-                    )}
-                  </Text>
-                  {fullVendor.factorySize ? (
-                    <Text className="text-[11px] text-slate-500 mt-0.5">
-                      Size: {fullVendor.factorySize}
-                    </Text>
-                  ) : null}
-                </View>
-              ) : null}
-
-              {fullVendor?.warehouseAddress ? (
-                <View className="pt-3">
-                  <View className="flex-row items-center mb-1">
-                    <Warehouse size={13} color="#64748b" />
-                    <Text className="text-xs font-medium text-slate-500 ml-1">Warehouse</Text>
-                  </View>
-                  <Text className="text-sm text-slate-700" style={{ lineHeight: 20 }}>
-                    {formatAddress(
-                      fullVendor.warehouseAddress,
-                      fullVendor.warehouseCity,
-                      fullVendor.warehouseState,
-                    )}
-                  </Text>
-                </View>
-              ) : null}
-            </Card>
-
-            <Card icon={<Package size={18} color="#2563eb" />} title="Capabilities & Products">
-              <InfoRow label="Production Capacity" value={fullVendor?.productionCapacity} />
-              <InfoRow label="Minimum Order Quantity" value={fullVendor?.minimumOrderQuantity} />
-              <InfoRow label="Delivery Time" value={fullVendor?.deliveryTime} />
-              <InfoRow label="Quality Control" value={fullVendor?.qualityControl} />
-              {productCategories.length > 0 ? (
-                <ChipGroup label="Product Categories" items={productCategories} bg="#dbeafe" text="#1d4ed8" />
-              ) : null}
-              {specializations.length > 0 ? (
-                <ChipGroup label="Specializations" items={specializations} bg="#f3e8ff" text="#6b21a8" />
-              ) : null}
-              {paymentTerms.length > 0 ? (
-                <ChipGroup label="Payment Terms" items={paymentTerms} bg="#f1f5f9" text="#334155" />
-              ) : null}
-              {certifications.length > 0 ? (
-                <View className="pt-3">
-                  <View className="flex-row items-center mb-2">
-                    <Award size={13} color="#059669" />
-                    <Text className="text-xs font-medium text-slate-500 ml-1">Certifications</Text>
-                  </View>
-                  <View className="flex-row flex-wrap" style={{ rowGap: 6, columnGap: 6 }}>
-                    {certifications.map((c: any, i: number) => (
-                      <View
-                        key={i}
-                        className="rounded-lg px-2.5 py-1"
-                        style={{ backgroundColor: '#dcfce7' }}
-                      >
-                        <Text className="text-xs font-semibold" style={{ color: '#166534' }}>
-                          {c.name}
-                          {c.issuedBy ? ` — ${c.issuedBy}` : ''}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-            </Card>
-          </View>
-        ) : null}
-
-        {activeTab === 'documents' ? (
-          <View className="mx-4" style={{ rowGap: 14 }}>
-            {/* Download Report */}
-            <Card icon={<Download size={18} color="#2563eb" />} title="Inspection Report">
-              {reportInspection ? (
-                <>
-                  <Text className="text-sm text-slate-600 mb-3" style={{ lineHeight: 20 }}>
-                    Download the factory inspection report for this vendor.
-                  </Text>
-                  <TouchableOpacity
-                    onPress={handleDownloadReport}
-                    disabled={downloadingReport}
-                    activeOpacity={0.85}
-                    className="flex-row items-center justify-center bg-blue-600 rounded-xl py-3"
-                    style={{ opacity: downloadingReport ? 0.6 : 1 }}
-                  >
-                    {downloadingReport ? (
-                      <ActivityIndicator size="small" color="#ffffff" />
-                    ) : (
-                      <Download size={16} color="#ffffff" strokeWidth={2.25} />
-                    )}
-                    <Text className="text-white font-bold text-sm ml-2">
-                      {downloadingReport ? 'Preparing…' : 'Download Report'}
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <Text className="text-sm text-slate-400">
-                  Report unavailable — no completed inspection yet.
-                </Text>
-              )}
-            </Card>
-
-            {/* Company logo */}
-            {companyLogo ? (
-              <Card icon={<FileText size={18} color="#2563eb" />} title="Company Logo">
-                <TouchableOpacity
-                  onPress={() => openDoc(companyLogo, 'Company Logo')}
-                  activeOpacity={0.85}
-                >
-                  <Image
-                    source={{ uri: companyLogo }}
-                    style={{ width: 112, height: 112, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' }}
-                    resizeMode="cover"
-                  />
-                </TouchableOpacity>
-              </Card>
-            ) : null}
-
-            {/* Registration documents */}
-            {companyDocs.length > 0 ? (
-              <Card
-                icon={<FileText size={18} color="#2563eb" />}
-                title={`Registration Documents (${companyDocs.length})`}
-              >
-                <View className="flex-row flex-wrap" style={{ columnGap: 10, rowGap: 12 }}>
-                  {companyDocs.map((doc: any, idx: number) => (
-                    <DocTile
-                      key={doc.id || idx}
-                      url={doc.documentUrl}
-                      name={doc.name || DOC_TYPE_LABELS[doc.type] || 'Document'}
-                      typeLabel={DOC_TYPE_LABELS[doc.type] || doc.type}
-                      onOpen={() => openDoc(doc.documentUrl, doc.name)}
-                    />
-                  ))}
-                </View>
-              </Card>
-            ) : null}
-
-            {/* Factory images */}
-            {factoryImages.length > 0 ? (
-              <Card
-                icon={<Factory size={18} color="#2563eb" />}
-                title={`Factory Images (${factoryImages.length})`}
-              >
-                <View className="flex-row flex-wrap" style={{ columnGap: 10, rowGap: 12 }}>
-                  {factoryImages.map((m: any, i: number) => (
-                    <DocTile
-                      key={`${m.label}-${i}`}
-                      url={m.url}
-                      name={m.label}
-                      onOpen={() => openDoc(m.url, m.label)}
-                    />
-                  ))}
-                </View>
-              </Card>
-            ) : null}
-
-            {/* Empty */}
-            {!companyLogo && companyDocs.length === 0 && factoryImages.length === 0 ? (
-              <EmptyCard
-                icon={<FileText size={26} color="#94a3b8" />}
-                title="No documents uploaded"
-                sub="Registered documents will appear here."
-              />
-            ) : null}
-          </View>
-        ) : null}
+        {activeTab === 'overview' ? renderOverview() : null}
 
         {activeTab === 'history' ? (
           <View className="mx-4" style={{ rowGap: 16 }}>
             {/* ── Inspection History ────────────────────────────────────── */}
-            <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-              {/* Section header */}
-              <View
-                className="flex-row items-center justify-between px-4 py-3 border-b border-slate-100"
-                style={{ backgroundColor: '#F8FAFC' }}
-              >
-                <View className="flex-row items-center" style={{ gap: 10 }}>
-                  <View
-                    className="w-8 h-8 rounded-lg items-center justify-center"
-                    style={{ backgroundColor: '#EEF2FF' }}
-                  >
-                    <FileText size={16} color="#4F46E5" />
-                  </View>
-                  <View>
-                    <Text className="text-sm font-bold text-slate-900">Inspection History</Text>
-                    <Text className="text-[10px] text-slate-500">
-                      {recentInspections.length === 0
-                        ? 'Completed reports will appear here'
-                        : historyMeta && historyMeta.total > 0
-                          ? `Showing ${historyMeta.returned} of ${historyMeta.total}`
-                          : `${recentInspections.length} completed`}
-                    </Text>
-                  </View>
-                </View>
-                {recentInspections.length > 0 && (
-                  <View className="rounded-full px-2.5 py-0.5" style={{ backgroundColor: '#E2E8F0' }}>
-                    <Text className="text-[10px] font-bold text-slate-600">
+            <SectionCard
+              icon={FileText}
+              title="Inspection History"
+              subtitle={
+                recentInspections.length === 0
+                  ? 'Completed reports will appear here'
+                  : historyMeta && historyMeta.total > 0
+                    ? `Showing ${historyMeta.returned} of ${historyMeta.total}`
+                    : `${recentInspections.length} completed`
+              }
+              right={
+                recentInspections.length > 0 ? (
+                  <View className="rounded-full bg-white px-2.5 py-0.5">
+                    <AppText variant="labelSm" color={brand[600]}>
                       {historyMeta?.total ?? recentInspections.length}
-                    </Text>
+                    </AppText>
                   </View>
-                )}
-              </View>
+                ) : undefined
+              }
+              bodyPadded={false}
+            >
 
               {/* Inspection cards */}
               {recentInspections.length > 0 ? (
                 <View className="p-3" style={{ gap: 10 }}>
                   {recentInspections.map((insp: any) => {
-                    const r = statusStyle(insp.result || '');
+                    const badge = getInspectionRowBadge(insp);
                     const scoreNum = typeof insp.score === 'number' ? insp.score : null;
                     const scoreColor =
                       scoreNum === null
@@ -812,15 +1400,8 @@ export default function VendorDetailScreen() {
                           : scoreNum >= 6
                             ? '#FFFBEB'
                             : '#FEF2F2';
-                    const resultText = insp.result
-                      ? insp.result.replace(/_/g, ' ')
-                      : 'Pending';
-                    const isPassed = ['passed', 'approved', 'completed'].includes(
-                      (insp.result || '').toLowerCase(),
-                    );
-                    const isFailed = ['failed', 'rejected'].includes(
-                      (insp.result || '').toLowerCase(),
-                    );
+                    const isPassed = badge.label === 'Passed' || badge.label === 'Completed';
+                    const isFailed = badge.label === 'Failed' || badge.label === 'Rejected';
                     const dateLabel =
                       formatDate(insp.scheduledDate) || insp.scheduledDate || '';
 
@@ -829,7 +1410,7 @@ export default function VendorDetailScreen() {
                         key={insp.id}
                         activeOpacity={0.7}
                         accessibilityRole="button"
-                        accessibilityLabel={`Inspection ${insp.poNumber}, ${insp.clientName}, ${resultText}`}
+                        accessibilityLabel={`Inspection ${insp.poNumber}, ${insp.clientName}, ${badge.label}`}
                         className="rounded-xl overflow-hidden"
                         style={{
                           backgroundColor: '#FFFFFF',
@@ -843,7 +1424,7 @@ export default function VendorDetailScreen() {
                           <View
                             style={{
                               width: 4,
-                              backgroundColor: r.dot,
+                              backgroundColor: badge.text,
                               borderTopLeftRadius: 12,
                               borderBottomLeftRadius: 12,
                             }}
@@ -880,23 +1461,23 @@ export default function VendorDetailScreen() {
 
                             {/* Bottom row: Status badge + Score */}
                             <View className="flex-row items-center justify-between">
-                              {/* Status badge */}
+                              {/* Lifecycle-aware status badge */}
                               <View
                                 className="flex-row items-center rounded-full px-2.5 py-1"
-                                style={{ backgroundColor: r.bg, gap: 4 }}
+                                style={{ backgroundColor: badge.bg, gap: 4 }}
                               >
                                 {isPassed ? (
-                                  <CheckCircle size={12} color={r.text} />
+                                  <CheckCircle size={12} color={badge.text} />
                                 ) : isFailed ? (
-                                  <AlertCircle size={12} color={r.text} />
+                                  <AlertCircle size={12} color={badge.text} />
                                 ) : (
-                                  <Clock size={12} color={r.text} />
+                                  <Clock size={12} color={badge.text} />
                                 )}
                                 <Text
                                   className="text-[10px] font-bold uppercase"
-                                  style={{ color: r.text }}
+                                  style={{ color: badge.text }}
                                 >
-                                  {resultText}
+                                  {badge.label}
                                 </Text>
                               </View>
 
@@ -935,12 +1516,19 @@ export default function VendorDetailScreen() {
                               ) : null}
                             </View>
 
-                            {/* Completion date — if applicable */}
-                            {insp.completedAt && (
-                              <Text className="text-[10px] text-slate-400">
-                                Completed {formatDate(insp.completedAt)}
+                            {/* Lifecycle timestamps: Scheduled / Started / Completed */}
+                            <View className="pt-1 border-t border-slate-100" style={{ rowGap: 3 }}>
+                              <Text className="text-[10px] text-slate-500">
+                                Scheduled: {insp.scheduledDate || '—'}
+                                {insp.scheduledTime ? ` at ${formatTime12(insp.scheduledTime)}` : ''}
                               </Text>
-                            )}
+                              <Text className="text-[10px] text-slate-500">
+                                Started: {insp.startedAt ? formatDateTime(insp.startedAt) : '—'}
+                              </Text>
+                              <Text className="text-[10px] text-slate-500">
+                                Completed: {(insp.completedAt || insp.submittedAt) ? formatDateTime(insp.completedAt || insp.submittedAt) : '—'}
+                              </Text>
+                            </View>
                           </View>
                         </View>
                       </TouchableOpacity>
@@ -956,10 +1544,7 @@ export default function VendorDetailScreen() {
                   >
                     <FileText size={24} color="#94A3B8" />
                   </View>
-                  <Text className="text-sm font-bold text-slate-900">No inspections yet</Text>
-                  <Text className="text-xs text-slate-500 text-center px-8">
-                    Completed inspections will appear here once they are submitted.
-                  </Text>
+                  <Text className="text-sm font-bold text-slate-900">No completed inspections yet.</Text>
                 </View>
               )}
 
@@ -977,52 +1562,19 @@ export default function VendorDetailScreen() {
                     opacity: loading || historyLimit >= 50 ? 0.5 : 1,
                   }}
                 >
-                  <RefreshCw size={14} color="#2563EB" />
-                  <Text className="text-sm font-semibold text-blue-600 ml-2">
+                  <RefreshCw size={14} color={brand[500]} />
+                  <AppText variant="titleMd" color={brand[600]} style={{ marginLeft: 8 }}>
                     {historyLimit >= 50 ? 'Showing max 50' : 'Load older inspections'}
-                  </Text>
+                  </AppText>
                 </TouchableOpacity>
               )}
-            </View>
-
-            {/* Audit Trail */}
-            {auditLogs.length > 0 && (
-              <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                {/* Section header */}
-                <View
-                  className="flex-row items-center justify-between px-4 py-3 border-b border-slate-100"
-                  style={{ backgroundColor: '#F8FAFC' }}
-                >
-                  <View className="flex-row items-center" style={{ gap: 10 }}>
-                    <View
-                      className="w-8 h-8 rounded-lg items-center justify-center"
-                      style={{ backgroundColor: '#EFF6FF' }}
-                    >
-                      <ShieldCheck size={16} color="#2563EB" />
-                    </View>
-                    <View>
-                      <Text className="text-sm font-bold text-slate-900">Audit Trail</Text>
-                      <Text className="text-[10px] text-slate-500">All actions and status changes</Text>
-                    </View>
-                  </View>
-                  <View className="rounded-full px-2.5 py-0.5" style={{ backgroundColor: '#E2E8F0' }}>
-                    <Text className="text-[10px] font-bold text-slate-600">
-                      {auditLogs.length} {auditLogs.length === 1 ? 'entry' : 'entries'}
-                    </Text>
-                  </View>
-                </View>
-                {/* Timeline content */}
-                <View className="p-4">
-                  <AuditTimeline logs={auditLogs} />
-                </View>
-              </View>
-            )}
+            </SectionCard>
           </View>
         ) : null}
 
         {activeTab === 'upcoming' ? (
           <View className="mx-4">
-            <Card icon={<Calendar size={18} color="#2563eb" />} title="Upcoming Inspections">
+            <SectionCard icon={Calendar} title="Upcoming Inspections">
               {actualUpcoming.length > 0 ? (
                 <View style={{ rowGap: 10 }}>
                   {actualUpcoming.map((insp: any) => {
@@ -1030,8 +1582,8 @@ export default function VendorDetailScreen() {
                     return (
                       <View key={insp.id} className="border border-slate-200 rounded-xl p-3.5">
                         <View className="flex-row items-center justify-between mb-2">
-                          <View className="rounded px-2 py-0.5" style={{ backgroundColor: '#dbeafe' }}>
-                            <Text className="text-xs font-mono font-bold text-blue-700">
+                          <View className="rounded px-2 py-0.5" style={{ backgroundColor: brand[50] }}>
+                            <Text className="text-xs font-mono font-bold" style={{ color: brand[600] }}>
                               {insp.poNumber}
                             </Text>
                           </View>
@@ -1049,11 +1601,13 @@ export default function VendorDetailScreen() {
                         <View className="flex-row" style={{ columnGap: 16 }}>
                           <View className="flex-row items-center">
                             <Calendar size={12} color="#64748b" />
-                            <Text className="text-xs text-slate-600 ml-1">{insp.scheduledDate}</Text>
+                            <Text className="text-xs text-slate-600 ml-1">
+                              {formatDate(insp.scheduledDate) || insp.scheduledDate}
+                            </Text>
                           </View>
                           <View className="flex-row items-center">
                             <Clock size={12} color="#64748b" />
-                            <Text className="text-xs text-slate-600 ml-1">{insp.scheduledTime}</Text>
+                            <Text className="text-xs text-slate-600 ml-1">{formatTime12(insp.scheduledTime)}</Text>
                           </View>
                         </View>
                       </View>
@@ -1063,38 +1617,12 @@ export default function VendorDetailScreen() {
               ) : (
                 <EmptyCard icon={<Calendar size={26} color="#94a3b8" />} title="No pending inspections" sub="" />
               )}
-            </Card>
+            </SectionCard>
           </View>
         ) : null}
+        </>
+        )}
 
-        {activeTab === 'performance' ? (
-          <View className="mx-4 flex-row flex-wrap" style={{ columnGap: 10, rowGap: 10 }}>
-            <StatTile
-              icon={<Calendar size={22} color="#2563eb" />}
-              bg="#dbeafe"
-              value={stats?.scheduledCount ?? 0}
-              label="Scheduled"
-            />
-            <StatTile
-              icon={<Clock size={22} color="#d97706" />}
-              bg="#fef3c7"
-              value={stats?.inProgressCount ?? 0}
-              label="In Progress"
-            />
-            <StatTile
-              icon={<CheckCircle size={22} color="#059669" />}
-              bg="#d1fae5"
-              value={stats?.completedCount ?? 0}
-              label="Completed"
-            />
-            <StatTile
-              icon={<TrendingUp size={22} color="#7c3aed" />}
-              bg="#ede9fe"
-              value={`${stats?.passRate ?? 0}%`}
-              label="Pass Rate"
-            />
-          </View>
-        ) : null}
       </ScrollView>
 
       {/* Fullscreen image lightbox for registered document images */}
@@ -1167,15 +1695,15 @@ function DocTile({
         )}
       </View>
       {typeLabel ? (
-        <Text className="text-[9px] font-bold uppercase text-slate-400 mt-1.5" numberOfLines={1}>
+        <AppText variant="labelSm" color={colors.textFaint} style={{ fontSize: 9, lineHeight: 12, marginTop: 6, textTransform: 'uppercase' }} numberOfLines={1}>
           {typeLabel}
-        </Text>
+        </AppText>
       ) : null}
       <View className="flex-row items-center mt-0.5">
-        {isImg ? <Eye size={11} color="#2563eb" /> : <ExternalLink size={11} color="#2563eb" />}
-        <Text className="text-[11px] font-semibold text-slate-700 ml-1 flex-1" numberOfLines={1}>
+        {isImg ? <Eye size={11} color={brand[500]} /> : <ExternalLink size={11} color={brand[500]} />}
+        <AppText variant="labelSm" color={colors.textSecondary} style={{ marginLeft: 4, flex: 1 }} numberOfLines={1}>
           {name}
-        </Text>
+        </AppText>
       </View>
     </TouchableOpacity>
   );
@@ -1201,7 +1729,7 @@ function Header({
       >
         <ArrowLeft size={20} color="#0f172a" />
       </TouchableOpacity>
-      <Text className="text-base font-bold text-slate-900">Vendor Details</Text>
+      <AppText variant="titleLg" color={colors.text}>Vendor Details</AppText>
       <View className="w-10" />
     </View>
   );
@@ -1219,10 +1747,10 @@ function Card({
   return (
     <View className="bg-white rounded-2xl border border-slate-200 p-4">
       <View className="flex-row items-center mb-3">
-        <View className="w-9 h-9 rounded-xl bg-blue-50 items-center justify-center mr-3">
+        <View className="w-9 h-9 rounded-xl bg-brand-50 items-center justify-center mr-3">
           {icon}
         </View>
-        <Text className="text-base font-extrabold text-slate-900">{title}</Text>
+        <AppText variant="titleLg" color={colors.text}>{title}</AppText>
       </View>
       {children}
     </View>
@@ -1233,10 +1761,37 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
   if (value === null || value === undefined || value === '') return null;
   return (
     <View className="py-3 border-b border-slate-100">
-      <Text className="text-xs font-medium text-slate-500 mb-1">{label}</Text>
-      <Text className="text-sm text-slate-900" style={{ lineHeight: 20 }} selectable>
+      <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 4 }}>{label}</AppText>
+      <AppText variant="bodySm" color={colors.text} style={{ lineHeight: 20 }} selectable>
         {String(value)}
-      </Text>
+      </AppText>
+    </View>
+  );
+}
+
+// Icon + label + value row used by the compact completed-summary view.
+function CompletedRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value?: string | number | null;
+}) {
+  return (
+    <View className="flex-row items-center py-2.5">
+      <View className="w-9 h-9 rounded-xl bg-brand-50 items-center justify-center mr-3">
+        {icon}
+      </View>
+      <View className="flex-1">
+        <AppText variant="labelSm" color={colors.textMuted} style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          {label}
+        </AppText>
+        <AppText variant="titleMd" color={colors.text} numberOfLines={2}>
+          {value === null || value === undefined || value === '' ? '—' : String(value)}
+        </AppText>
+      </View>
     </View>
   );
 }
@@ -1254,44 +1809,16 @@ function ChipGroup({
 }) {
   return (
     <View className="pt-3 border-t border-slate-100 mt-1">
-      <Text className="text-xs font-medium text-slate-500 mb-2">{label}</Text>
+      <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 8 }}>{label}</AppText>
       <View className="flex-row flex-wrap" style={{ rowGap: 6, columnGap: 6 }}>
         {items.map((item, i) => (
           <View key={i} className="rounded-lg px-2.5 py-1" style={{ backgroundColor: bg }}>
-            <Text className="text-xs font-semibold" style={{ color: text }}>
+            <AppText variant="labelSm" color={text}>
               {item}
-            </Text>
+            </AppText>
           </View>
         ))}
       </View>
-    </View>
-  );
-}
-
-function StatTile({
-  icon,
-  bg,
-  value,
-  label,
-}: {
-  icon: React.ReactNode;
-  bg: string;
-  value: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <View
-      className="bg-white rounded-2xl border border-slate-200 p-4"
-      style={{ width: '48%' }}
-    >
-      <View
-        className="w-12 h-12 rounded-xl items-center justify-center mb-3"
-        style={{ backgroundColor: bg }}
-      >
-        {icon}
-      </View>
-      <Text className="text-2xl font-extrabold text-slate-900">{value}</Text>
-      <Text className="text-xs font-medium text-slate-500 mt-0.5">{label}</Text>
     </View>
   );
 }
@@ -1316,12 +1843,12 @@ function SummaryRow({
         {icon}
       </View>
       <View className="flex-1">
-        <Text className="text-xs" style={{ color: '#bfdbfe' }}>
+        <AppText variant="bodySm" color={brand[100]}>
           {label}
-        </Text>
-        <Text className="text-sm font-semibold text-white" numberOfLines={2}>
+        </AppText>
+        <AppText variant="titleMd" color={colors.white} numberOfLines={2}>
           {value}
-        </Text>
+        </AppText>
       </View>
     </View>
   );
@@ -1341,8 +1868,8 @@ function EmptyCard({
       <View className="w-16 h-16 rounded-full bg-slate-100 items-center justify-center mb-3">
         {icon}
       </View>
-      <Text className="text-sm font-semibold text-slate-700 mb-1">{title}</Text>
-      {sub ? <Text className="text-xs text-slate-500">{sub}</Text> : null}
+      <AppText variant="titleMd" color={colors.textSecondary} style={{ marginBottom: 4 }}>{title}</AppText>
+      {sub ? <AppText variant="bodySm" color={colors.textMuted}>{sub}</AppText> : null}
     </View>
   );
 }

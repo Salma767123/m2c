@@ -1,5 +1,6 @@
 // RN port of VI_Step2_WarehouseFactory.tsx — Warehouse & Factory verification
-// plus the 3 mandatory-ish inspector evidence photo slots.
+// plus the mandatory inspector evidence photo slots (3 for the Legal Address &
+// Factory Site, +3 for the Warehouse when its address differs).
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
@@ -16,9 +17,16 @@ export interface FactoryEvidencePhoto {
 }
 
 export interface FactoryEvidenceState {
+  // Legal Address & Factory Site — inspector evidence photos
   frontView: FactoryEvidencePhoto | null;
   nameBoard: FactoryEvidencePhoto | null;
   routeMap: FactoryEvidencePhoto | null;
+  // Warehouse — inspector evidence photos (only collected when the warehouse
+  // address differs from the Legal Address & Factory Site). Optional so the
+  // host screen's initial 3-slot state remains valid.
+  warehouseFrontView?: FactoryEvidencePhoto | null;
+  warehouseNameBoard?: FactoryEvidencePhoto | null;
+  warehouseRouteMap?: FactoryEvidencePhoto | null;
 }
 
 interface Props {
@@ -37,7 +45,7 @@ function EvidenceUpload({
   onChange,
 }: {
   label: string;
-  value: FactoryEvidencePhoto | null;
+  value: FactoryEvidencePhoto | null | undefined;
   onChange: (photo: FactoryEvidencePhoto | null) => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -93,7 +101,9 @@ function EvidenceUpload({
 
   return (
     <View style={{ rowGap: 8 }}>
-      <Text className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">{label} — Inspector Evidence Photo</Text>
+      <Text className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+        {label} — Inspector Evidence Photo <Text className="text-red-500">*</Text>
+      </Text>
       {value ? (
         <View className="self-start relative">
           <Image source={{ uri: value.url }} style={{ width: 128, height: 128, borderRadius: 12 }} className="border border-emerald-200" resizeMode="cover" />
@@ -112,7 +122,7 @@ function EvidenceUpload({
           className="flex-row items-center px-4 py-2.5 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 self-start"
           style={{ columnGap: 8, opacity: busy ? 0.6 : 1 }}
         >
-          {busy ? <ActivityIndicator size="small" color="#2563eb" /> : <Camera size={16} color="#475569" />}
+          {busy ? <ActivityIndicator size="small" color="#e01a1b" /> : <Camera size={16} color="#475569" />}
           <Text className="text-slate-600 text-sm font-medium">{busy ? 'Processing…' : 'Upload Evidence Photo'}</Text>
         </TouchableOpacity>
       )}
@@ -122,16 +132,44 @@ function EvidenceUpload({
 
 const eq = (a: any, b: any) => (a || '').trim() === (b || '').trim();
 
-function detectSameAsLegal(v: any): boolean {
-  if (!v.factoryAddress && !v.factoryCity) return true;
+// The Warehouse Address counts as "same as" the Legal Address & Factory Site
+// when the vendor didn't enter a separate warehouse address, or entered one
+// that matches the legal/factory address field-for-field.
+export function detectSameAsWarehouse(v: any): boolean {
+  if (!v.warehouseAddress && !v.warehouseCity) return true;
   return (
-    eq(v.factoryAddress, v.warehouseAddress) &&
-    eq(v.factoryCity, v.warehouseCity) &&
-    eq(v.factoryState, v.warehouseState) &&
-    eq(v.factoryZipCode, v.warehouseZipCode) &&
-    eq(v.factoryCountry, v.warehouseCountry)
+    eq(v.warehouseAddress, v.factoryAddress) &&
+    eq(v.warehouseCity, v.factoryCity) &&
+    eq(v.warehouseState, v.factoryState) &&
+    eq(v.warehouseZipCode, v.factoryZipCode) &&
+    eq(v.warehouseCountry, v.factoryCountry)
   );
 }
+
+// Vendor-uploaded photos are all stored as type='OTHER' documents. The Legal
+// Address & Factory Site photos are prefixed "Factory Site …", while the
+// Warehouse photos are named "Factory …".
+const FACTORY_SITE_PHOTO_ORDER: Record<string, number> = {
+  'Factory Site Name Board': 0,
+  'Factory Site Front View': 1,
+  'Factory Site Back View': 2,
+  'Factory Site Left View': 3,
+  'Factory Site Right View': 4,
+  'Factory Site Road View': 5,
+  'Factory Site Interior': 6,
+  'Factory Site Image (Other)': 7,
+};
+const WAREHOUSE_PHOTO_ORDER: Record<string, number> = {
+  'Factory Name Board': 0,
+  'Factory Front View': 1,
+  'Factory Back View': 2,
+  'Factory Left View': 3,
+  'Factory Right View': 4,
+  'Factory Road View': 5,
+  'Factory Interior': 6,
+  'Factory Image (Other)': 7,
+};
+const isFactorySiteDoc = (name: string) => (name || '').startsWith('Factory Site');
 
 export default function VI_Step2_WarehouseFactory({
   vendor: v,
@@ -146,35 +184,51 @@ export default function VI_Step2_WarehouseFactory({
     <VerifyField key={key} fieldKey={key} label={label} value={value} type={type} verifications={verifications} onChange={onChange} />
   );
 
-  const factoryImages = Array.isArray(v.documents)
-    ? v.documents.filter((d: any) => d.type === 'OTHER').map((d: any) => ({ label: d.name || 'Factory Image', url: d.documentUrl }))
-    : [];
+  const otherDocs = Array.isArray(v.documents) ? v.documents.filter((d: any) => d.type === 'OTHER') : [];
+  // Legal Address & Factory Site images — "Factory Site …" documents.
+  const legalImages = otherDocs
+    .filter((d: any) => isFactorySiteDoc(d.name))
+    .map((d: any) => ({ label: d.name || 'Factory Site Image', url: d.documentUrl }))
+    .sort((a: any, b: any) => (FACTORY_SITE_PHOTO_ORDER[a.label] ?? 99) - (FACTORY_SITE_PHOTO_ORDER[b.label] ?? 99));
+  // Warehouse images — every other "Factory …" document.
+  const warehouseImages = otherDocs
+    .filter((d: any) => !isFactorySiteDoc(d.name))
+    .map((d: any) => ({ label: d.name || 'Warehouse Image', url: d.documentUrl }))
+    .sort((a: any, b: any) => (WAREHOUSE_PHOTO_ORDER[a.label] ?? 99) - (WAREHOUSE_PHOTO_ORDER[b.label] ?? 99));
 
-  const isSameAsLegal = detectSameAsLegal(v);
+  const isSameAsWarehouse = detectSameAsWarehouse(v);
 
   useEffect(() => {
     const keys: string[] = [
-      'w_ownershipType',
-      'w_warehouseSize',
-      ...(v.warehouseAddress ? ['w_warehouseAddress'] : []),
-      ...(v.warehouseAddressLine2 ? ['w_warehouseAddressLine2'] : []),
-      ...(v.warehouseAddressLine3 ? ['w_warehouseAddressLine3'] : []),
-      ...(v.warehouseLandmark ? ['w_warehouseLandmark'] : []),
-      ...(v.warehouseCity ? ['w_warehouseCity'] : []),
-      ...(v.warehouseState ? ['w_warehouseState'] : []),
-      ...(v.warehouseZipCode ? ['w_warehouseZipCode'] : []),
-      ...(v.warehouseCountry ? ['w_warehouseCountry'] : []),
-      ...(isSameAsLegal
+      // ── Legal Address & Factory Site ──
+      'w_legalOwnershipType',
+      'w_legalCapacity',
+      ...(v.factoryAddress ? ['w_legalAddress'] : []),
+      ...(v.addressLine2 ? ['w_legalAddressLine2'] : []),
+      ...(v.addressLine3 ? ['w_legalAddressLine3'] : []),
+      ...(v.landmark ? ['w_legalLandmark'] : []),
+      ...(v.factoryCity ? ['w_legalCity'] : []),
+      ...(v.factoryState ? ['w_legalState'] : []),
+      ...(v.factoryZipCode ? ['w_legalZipCode'] : []),
+      ...(v.factoryCountry ? ['w_legalCountry'] : []),
+      ...(v.mapLink ? ['w_mapLink'] : []),
+      ...legalImages.map((_: any, idx: number) => `w_legalImg_${idx}`),
+      // ── Warehouse Address ──
+      ...(isSameAsWarehouse
         ? ['w_sameWarehouse']
         : [
-            ...(v.factoryAddress ? ['w_factoryAddress'] : []),
-            ...(v.factoryCity ? ['w_factoryCity'] : []),
-            ...(v.factoryState ? ['w_factoryState'] : []),
-            ...(v.factoryZipCode ? ['w_factoryZipCode'] : []),
-            ...(v.factoryCountry ? ['w_factoryCountry'] : []),
+            'w_whOwnershipType',
+            'w_whCapacity',
+            ...(v.warehouseAddress ? ['w_whAddress'] : []),
+            ...(v.warehouseAddressLine2 ? ['w_whAddressLine2'] : []),
+            ...(v.warehouseAddressLine3 ? ['w_whAddressLine3'] : []),
+            ...(v.warehouseLandmark ? ['w_whLandmark'] : []),
+            ...(v.warehouseCity ? ['w_whCity'] : []),
+            ...(v.warehouseState ? ['w_whState'] : []),
+            ...(v.warehouseZipCode ? ['w_whZipCode'] : []),
+            ...(v.warehouseCountry ? ['w_whCountry'] : []),
           ]),
-      ...(v.mapLink ? ['w_mapLink'] : []),
-      ...factoryImages.map((_: any, idx: number) => `w_factoryImg_${idx}`),
+      ...warehouseImages.map((_: any, idx: number) => `w_whImg_${idx}`),
     ];
     onRegisterFields(keys);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -187,27 +241,51 @@ export default function VI_Step2_WarehouseFactory({
         <Text className="text-slate-500 text-sm">Verify the warehouse and factory address and physical infrastructure.</Text>
       </View>
 
-      <SectionBlock title="Legal Address & Factory Site" icon={<Warehouse size={16} color="#2563eb" />}>
+      {/* Section 1: Legal Address & Factory Site */}
+      <SectionBlock title="Legal Address & Factory Site" icon={<Warehouse size={16} color="#e01a1b" />}>
         <View style={{ rowGap: 16 }}>
-          {vf('w_ownershipType', 'Ownership Type', getOwnershipTypeLabel(v.ownershipType))}
-          {vf('w_warehouseSize', 'Warehousing Capacity', v.warehouseSize)}
-          {v.warehouseAddress && vf('w_warehouseAddress', 'Address Line 1', v.warehouseAddress)}
-          {v.warehouseAddressLine2 && vf('w_warehouseAddressLine2', 'Address Line 2', v.warehouseAddressLine2)}
-          {v.warehouseAddressLine3 && vf('w_warehouseAddressLine3', 'Address Line 3', v.warehouseAddressLine3)}
-          {v.warehouseLandmark && vf('w_warehouseLandmark', 'Landmark', v.warehouseLandmark)}
-          {v.warehouseCity && vf('w_warehouseCity', 'City', v.warehouseCity)}
-          {v.warehouseState && vf('w_warehouseState', 'State', v.warehouseState)}
-          {v.warehouseZipCode && vf('w_warehouseZipCode', 'ZIP / Postal Code', v.warehouseZipCode)}
-          {v.warehouseCountry && vf('w_warehouseCountry', 'Country', v.warehouseCountry)}
+          {vf('w_legalOwnershipType', 'Ownership Type', getOwnershipTypeLabel(v.factoryOwnershipType))}
+          {vf('w_legalCapacity', 'Warehousing Capacity', v.factorySize)}
+          {v.factoryAddress && vf('w_legalAddress', 'Address Line 1', v.factoryAddress)}
+          {v.addressLine2 && vf('w_legalAddressLine2', 'Address Line 2', v.addressLine2)}
+          {v.addressLine3 && vf('w_legalAddressLine3', 'Address Line 3', v.addressLine3)}
+          {v.landmark && vf('w_legalLandmark', 'Landmark', v.landmark)}
+          {v.factoryCity && vf('w_legalCity', 'City', v.factoryCity)}
+          {v.factoryState && vf('w_legalState', 'State', v.factoryState)}
+          {v.factoryZipCode && vf('w_legalZipCode', 'ZIP / Postal Code', v.factoryZipCode)}
+          {v.factoryCountry && vf('w_legalCountry', 'Country', v.factoryCountry)}
+          {v.mapLink && vf('w_mapLink', 'Map / Location Link', v.mapLink, 'url')}
         </View>
+        {/* Factory Images — only the Legal Address & Factory Site photos */}
+        {legalImages.length > 0 && (
+          <View style={{ rowGap: 12 }} className="mt-2">
+            <View className="flex-row items-center" style={{ columnGap: 6 }}>
+              <ImageIcon size={14} color="#475569" />
+              <Text className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Factory Images</Text>
+            </View>
+            {legalImages.map((img: any, idx: number) => (
+              <VerifyField
+                key={idx}
+                fieldKey={`w_legalImg_${idx}`}
+                label={img.label}
+                value={img.url}
+                type="image"
+                verifications={verifications}
+                onChange={onChange}
+                headerAction={img.url ? <ViewButton url={img.url} name={img.label} isImage /> : undefined}
+              />
+            ))}
+          </View>
+        )}
       </SectionBlock>
 
-      <SectionBlock title="Warehouse Address" icon={<MapPin size={16} color="#2563eb" />}>
-        {isSameAsLegal ? (
+      {/* Section 2: Warehouse Address */}
+      <SectionBlock title="Warehouse Address" icon={<MapPin size={16} color="#e01a1b" />}>
+        {isSameAsWarehouse ? (
           <View style={{ rowGap: 16 }}>
-            <View className="flex-row items-start p-4 bg-blue-50 border border-blue-200 rounded-xl" style={{ columnGap: 12 }}>
-              <MapPin size={16} color="#3b82f6" />
-              <Text className="text-sm text-blue-800 font-medium flex-1">
+            <View className="flex-row items-start p-4 bg-brand-50 border border-brand-200 rounded-xl" style={{ columnGap: 12 }}>
+              <MapPin size={16} color="#e01a1b" />
+              <Text className="text-sm text-brand-700 font-medium flex-1">
                 Warehouse Address is the same as the Legal Address & Factory Site provided above. Please verify.
               </Text>
             </View>
@@ -218,27 +296,32 @@ export default function VI_Step2_WarehouseFactory({
               verifications={verifications}
               onChange={onChange}
             />
-            {v.mapLink && vf('w_mapLink', 'Map / Location Link', v.mapLink, 'url')}
           </View>
         ) : (
           <View style={{ rowGap: 16 }}>
-            {v.factoryAddress && vf('w_factoryAddress', 'Address Line 1', v.factoryAddress)}
-            {v.factoryCity && vf('w_factoryCity', 'City', v.factoryCity)}
-            {v.factoryState && vf('w_factoryState', 'State', v.factoryState)}
-            {v.factoryZipCode && vf('w_factoryZipCode', 'ZIP / Postal Code', v.factoryZipCode)}
-            {v.factoryCountry && vf('w_factoryCountry', 'Country', v.factoryCountry)}
-            {v.mapLink && vf('w_mapLink', 'Map / Location Link', v.mapLink, 'url')}
+            {vf('w_whOwnershipType', 'Ownership Type', getOwnershipTypeLabel(v.ownershipType))}
+            {vf('w_whCapacity', 'Warehousing Capacity', v.warehouseSize)}
+            {v.warehouseAddress && vf('w_whAddress', 'Address Line 1', v.warehouseAddress)}
+            {v.warehouseAddressLine2 && vf('w_whAddressLine2', 'Address Line 2', v.warehouseAddressLine2)}
+            {v.warehouseAddressLine3 && vf('w_whAddressLine3', 'Address Line 3', v.warehouseAddressLine3)}
+            {v.warehouseLandmark && vf('w_whLandmark', 'Landmark', v.warehouseLandmark)}
+            {v.warehouseCity && vf('w_whCity', 'City', v.warehouseCity)}
+            {v.warehouseState && vf('w_whState', 'State', v.warehouseState)}
+            {v.warehouseZipCode && vf('w_whZipCode', 'ZIP / Postal Code', v.warehouseZipCode)}
+            {v.warehouseCountry && vf('w_whCountry', 'Country', v.warehouseCountry)}
           </View>
         )}
-      </SectionBlock>
-
-      {factoryImages.length > 0 && (
-        <SectionBlock title="Factory Photos (Vendor-Uploaded)" icon={<ImageIcon size={16} color="#2563eb" />}>
-          <View style={{ rowGap: 16 }}>
-            {factoryImages.map((img: any, idx: number) => (
+        {/* Warehouse Images — only the Warehouse Address photos */}
+        {warehouseImages.length > 0 && (
+          <View style={{ rowGap: 12 }} className="mt-2">
+            <View className="flex-row items-center" style={{ columnGap: 6 }}>
+              <ImageIcon size={14} color="#475569" />
+              <Text className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Warehouse Images</Text>
+            </View>
+            {warehouseImages.map((img: any, idx: number) => (
               <VerifyField
                 key={idx}
-                fieldKey={`w_factoryImg_${idx}`}
+                fieldKey={`w_whImg_${idx}`}
                 label={img.label}
                 value={img.url}
                 type="image"
@@ -248,20 +331,50 @@ export default function VI_Step2_WarehouseFactory({
               />
             ))}
           </View>
-        </SectionBlock>
-      )}
+        )}
+      </SectionBlock>
 
-      <SectionBlock title="Inspector Evidence Photos" icon={<Camera size={16} color="#2563eb" />}>
-        <Text className="text-xs text-slate-500 -mt-2">Upload photos taken during the factory visit to serve as inspection evidence.</Text>
+      {/* Inspector Evidence Photos */}
+      <SectionBlock title="Inspector Evidence Photos" icon={<Camera size={16} color="#e01a1b" />}>
+        <Text className="text-xs text-slate-500 -mt-2">
+          Upload photos taken during the visit to serve as inspection evidence.{' '}
+          {isSameAsWarehouse
+            ? 'All three Legal Address & Factory Site photos are required.'
+            : 'All three Legal Address & Factory Site photos and all three Warehouse photos are required.'}
+        </Text>
         {evidenceError && (
           <View className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            <Text className="text-sm font-semibold text-red-600">At least one evidence photo is required before continuing.</Text>
+            <Text className="text-sm font-semibold text-red-600">
+              {isSameAsWarehouse
+                ? 'All three evidence photos are required before continuing.'
+                : 'All six evidence photos (Legal Address & Factory Site and Warehouse) are required before continuing.'}
+            </Text>
           </View>
         )}
-        <View style={{ rowGap: 20 }} className={evidenceError ? 'border-2 border-red-300 rounded-xl p-2' : ''}>
-          <EvidenceUpload label="Factory Front View" value={factoryEvidence.frontView} onChange={(p) => onEvidenceChange('frontView', p)} />
-          <EvidenceUpload label="Factory Name Board" value={factoryEvidence.nameBoard} onChange={(p) => onEvidenceChange('nameBoard', p)} />
-          <EvidenceUpload label="Route Map Photo" value={factoryEvidence.routeMap} onChange={(p) => onEvidenceChange('routeMap', p)} />
+        <View style={{ rowGap: 24 }} className={evidenceError ? 'border-2 border-red-300 rounded-xl p-2' : ''}>
+          {/* Group 1: Legal Address & Factory Site */}
+          <View style={{ rowGap: 16 }}>
+            <View className="flex-row items-center" style={{ columnGap: 6 }}>
+              <Warehouse size={16} color="#e01a1b" />
+              <Text className="text-sm font-bold text-slate-700">Legal Address & Factory Site — Photo Evidence</Text>
+            </View>
+            <EvidenceUpload label="Factory Site Name Board" value={factoryEvidence.nameBoard} onChange={(p) => onEvidenceChange('nameBoard', p)} />
+            <EvidenceUpload label="Factory Site Front View" value={factoryEvidence.frontView} onChange={(p) => onEvidenceChange('frontView', p)} />
+            <EvidenceUpload label="Factory Site Route Map" value={factoryEvidence.routeMap} onChange={(p) => onEvidenceChange('routeMap', p)} />
+          </View>
+
+          {/* Group 2: Warehouse — only when the warehouse address differs */}
+          {!isSameAsWarehouse && (
+            <View style={{ rowGap: 16 }}>
+              <View className="flex-row items-center" style={{ columnGap: 6 }}>
+                <MapPin size={16} color="#e01a1b" />
+                <Text className="text-sm font-bold text-slate-700">Warehouse — Photo Evidence</Text>
+              </View>
+              <EvidenceUpload label="Warehouse Name Board" value={factoryEvidence.warehouseNameBoard} onChange={(p) => onEvidenceChange('warehouseNameBoard', p)} />
+              <EvidenceUpload label="Warehouse Front View" value={factoryEvidence.warehouseFrontView} onChange={(p) => onEvidenceChange('warehouseFrontView', p)} />
+              <EvidenceUpload label="Warehouse Route Map" value={factoryEvidence.warehouseRouteMap} onChange={(p) => onEvidenceChange('warehouseRouteMap', p)} />
+            </View>
+          )}
         </View>
       </SectionBlock>
     </View>

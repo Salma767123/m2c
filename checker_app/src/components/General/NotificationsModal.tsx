@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   Modal,
   FlatList,
+  ScrollView,
+  TextInput,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
@@ -14,13 +16,9 @@ import {
   Bell,
   X,
   CheckCheck,
-  Package,
-  Building2,
-  CalendarClock,
-  RefreshCw,
-  CheckCircle2,
   Check,
   Undo2,
+  Search,
 } from 'lucide-react-native';
 import {
   AppNotification,
@@ -29,6 +27,9 @@ import {
   markNotificationUnread,
   markAllNotificationsRead,
 } from '@/services/notificationService';
+import { iconFor } from './notificationIcons';
+import { AppText } from '@/components/UI/AppText';
+import { brand, colors } from '@/constants/design';
 
 interface NotificationsModalProps {
   visible: boolean;
@@ -37,20 +38,50 @@ interface NotificationsModalProps {
   onUnreadChange?: (count: number) => void;
 }
 
-const TYPE_ICON: Record<
-  string,
-  { Icon: typeof Bell; color: string; bg: string }
-> = {
-  PRODUCT_ASSIGNED: { Icon: Package, color: '#2563eb', bg: '#dbeafe' },
-  VENDOR_ASSIGNED: { Icon: Building2, color: '#7c3aed', bg: '#ede9fe' },
-  INSPECTION_SCHEDULED: { Icon: CalendarClock, color: '#0891b2', bg: '#cffafe' },
-  REINSPECTION_RAISED: { Icon: RefreshCw, color: '#ea580c', bg: '#ffedd5' },
-  INSPECTION_COMPLETED: { Icon: CheckCircle2, color: '#16a34a', bg: '#dcfce7' },
-  REINSPECTION_COMPLETED: { Icon: CheckCircle2, color: '#16a34a', bg: '#dcfce7' },
-};
+// Read-status filter — mirrors the web NotificationModal read filter.
+type ReadFilter = 'all' | 'unread' | 'read';
+const READ_FILTERS: { key: ReadFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'unread', label: 'Unread' },
+  { key: 'read', label: 'Read' },
+];
 
-function iconFor(type: string) {
-  return TYPE_ICON[type] || { Icon: Bell, color: '#475569', bg: '#e2e8f0' };
+// Category filter tabs — type mapping mirrors the web QC_CATEGORIES.
+const CATEGORY_TABS: { key: string; label: string; types?: string[] }[] = [
+  { key: 'all', label: 'All' },
+  {
+    key: 'assignments',
+    label: 'Assignments',
+    types: ['VENDOR_ASSIGNED', 'PRODUCT_ASSIGNED', 'QC_ASSIGNED'],
+  },
+  {
+    key: 'inspections',
+    label: 'Inspections',
+    types: [
+      'INSPECTION_SCHEDULED',
+      'REINSPECTION_RAISED',
+      'INSPECTION_COMPLETED',
+      'INSPECTION_SUBMITTED',
+      'REINSPECTION_COMPLETED',
+      'INSPECTION_FINAL_REJECTED',
+      'REINSPECTION_REQUIRED',
+      'REINSPECTION_RESULT',
+    ],
+  },
+  { key: 'vendor-status', label: 'Vendor Status', types: ['VENDOR_STATUS_CHANGED'] },
+  { key: 'approvals', label: 'Approvals', types: ['PRODUCT_APPROVED', 'PRODUCT_PENDING_APPROVAL'] },
+  { key: 'rejections', label: 'Rejections', types: ['PRODUCT_REJECTED', 'INSPECTION_FINAL_REJECTED'] },
+  {
+    key: 'support',
+    label: 'Support',
+    types: ['SUPPORT_REPLY', 'NEW_SUPPORT_TICKET', 'NEW_ENQUIRY'],
+  },
+];
+
+function matchesCategory(n: AppNotification, categoryKey: string): boolean {
+  if (categoryKey === 'all') return true;
+  const tab = CATEGORY_TABS.find((t) => t.key === categoryKey);
+  return tab?.types?.includes(n.type) ?? true;
 }
 
 function timeAgo(dateStr: string): string {
@@ -78,6 +109,26 @@ export default function NotificationsModal({
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [category, setCategory] = useState('all');
+  const [readFilter, setReadFilter] = useState<ReadFilter>('all');
+  const [search, setSearch] = useState('');
+
+  // Client-side filters (category + read-status + search) over the fetched list.
+  const visibleItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return items.filter((n) => {
+      if (!matchesCategory(n, category)) return false;
+      if (readFilter === 'unread' && n.isRead) return false;
+      if (readFilter === 'read' && !n.isRead) return false;
+      if (q) {
+        return (
+          n.title?.toLowerCase().includes(q) ||
+          n.message?.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [items, category, readFilter, search]);
 
   const load = useCallback(async () => {
     const res = await fetchNotifications(1, 50);
@@ -88,6 +139,9 @@ export default function NotificationsModal({
 
   useEffect(() => {
     if (!visible) return;
+    setCategory('all');
+    setReadFilter('all');
+    setSearch('');
     setLoading(true);
     load().finally(() => setLoading(false));
   }, [visible, load]);
@@ -148,75 +202,173 @@ export default function NotificationsModal({
     >
       {/* Match the status-bar icon colour to the white header so the
           gesture-area text stays readable on both Android and iOS. */}
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar barStyle="light-content" backgroundColor={brand[500]} />
       <View className="flex-1 bg-gray-50">
-        {/* Header — light surface (matches the body); padding-top driven by
-            the actual safe-area inset instead of a hardcoded pt-14 so the
-            status-bar / notch / Dynamic Island area no longer shows a
+        {/* Brand-red header strip — white icon circle + white title; padding-top
+            driven by the actual safe-area inset instead of a hardcoded pt-14 so
+            the status-bar / notch / Dynamic Island area no longer shows a
             black bar. */}
         <View
-          className="bg-white border-b border-gray-200 px-4 pb-4"
-          style={{ paddingTop: insets.top + 12 }}
+          className="px-4 pb-4"
+          style={{ backgroundColor: brand[500], paddingTop: insets.top + 12 }}
         >
           <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center">
-              <View className="bg-blue-50 rounded-full p-2 mr-3">
-                <Bell size={18} color="#2563eb" />
+            <View className="flex-row items-center flex-1">
+              <View className="bg-white rounded-full w-10 h-10 items-center justify-center mr-3">
+                <Bell size={18} color={brand[500]} />
               </View>
-              <View>
-                <Text className="text-lg font-bold text-gray-900">
+              <View className="flex-1">
+                <AppText variant="titleLg" color={colors.white}>
                   Notifications
-                </Text>
-                <Text className="text-xs text-gray-500">
+                </AppText>
+                <AppText variant="bodySm" color="rgba(255,255,255,0.85)">
                   {unread > 0 ? `${unread} unread` : 'All caught up'}
-                </Text>
+                </AppText>
               </View>
             </View>
             <TouchableOpacity
               onPress={onClose}
               hitSlop={10}
-              className="bg-gray-100 rounded-full w-9 h-9 items-center justify-center"
+              className="rounded-full w-9 h-9 items-center justify-center"
+              style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}
             >
-              <X size={18} color="#374151" />
+              <X size={18} color={colors.white} />
             </TouchableOpacity>
           </View>
 
           {unread > 0 && (
             <TouchableOpacity
               onPress={handleMarkAll}
-              className="flex-row items-center self-start mt-3 bg-blue-50 border border-blue-100 rounded-full px-3 py-1.5"
+              className="flex-row items-center self-start mt-3 rounded-full px-3 py-1.5"
+              style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}
             >
-              <CheckCheck size={14} color="#2563eb" />
-              <Text className="text-xs font-semibold text-blue-700 ml-1.5">
+              <CheckCheck size={14} color={colors.white} />
+              <AppText variant="labelMd" color={colors.white} style={{ marginLeft: 6 }}>
                 Mark all as read
-              </Text>
+              </AppText>
             </TouchableOpacity>
           )}
+        </View>
+
+        {/* White filter block — search + read pills + category tabs */}
+        <View className="bg-white border-b border-slate-200 px-4 pt-3 pb-4">
+          {/* Search box — filters title + message client-side (mirrors web) */}
+          <View className="flex-row items-center bg-slate-100 border border-slate-200 rounded-xl px-3">
+            <Search size={16} color="#94a3b8" />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search notifications..."
+              placeholderTextColor="#94a3b8"
+              className="flex-1 text-sm text-slate-900 py-2.5 px-2"
+              returnKeyType="search"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
+                <X size={16} color="#94a3b8" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Read-status filter pills — All / Unread / Read (client-side) */}
+          <View className="flex-row items-center mt-3">
+            {READ_FILTERS.map((f) => {
+              const isActive = readFilter === f.key;
+              return (
+                <TouchableOpacity
+                  key={f.key}
+                  onPress={() => setReadFilter(f.key)}
+                  activeOpacity={0.7}
+                  className={`mr-2 px-4 py-1.5 rounded-full ${
+                    isActive ? 'bg-brand-500' : 'bg-white border border-slate-200'
+                  }`}
+                >
+                  <Text
+                    className={`text-xs font-bold ${
+                      isActive ? 'text-white' : 'text-slate-600'
+                    }`}
+                  >
+                    {f.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Category tabs — mirrors the web notification modal categories */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="mt-3 -mx-4"
+            contentContainerStyle={{ paddingHorizontal: 12 }}
+          >
+            {CATEGORY_TABS.map((tab) => {
+              const isActive = category === tab.key;
+              return (
+                <TouchableOpacity
+                  key={tab.key}
+                  onPress={() => setCategory(tab.key)}
+                  activeOpacity={0.7}
+                  className={`mx-1 px-4 py-2 rounded-full ${
+                    isActive ? 'bg-brand-500' : 'bg-white border border-slate-200'
+                  }`}
+                >
+                  <Text
+                    className={`text-xs font-bold ${
+                      isActive ? 'text-white' : 'text-slate-600'
+                    }`}
+                  >
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
 
         {/* List */}
         {loading && items.length === 0 ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="#111827" />
+            <ActivityIndicator size="large" color={brand[500]} />
           </View>
         ) : (
           <FlatList
-            data={items}
+            data={visibleItems}
             keyExtractor={(n) => n.id}
             contentContainerStyle={{ padding: 12, flexGrow: 1 }}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={brand[500]}
+                colors={[brand[500]]}
+              />
             }
             ListEmptyComponent={
               <View className="flex-1 items-center justify-center py-24">
-                <Bell size={48} color="#d1d5db" />
-                <Text className="text-base font-semibold text-gray-400 mt-3">
-                  No notifications yet
-                </Text>
-                <Text className="text-xs text-gray-400 mt-1 text-center px-8">
-                  You&apos;ll be notified about product and vendor assignments,
-                  inspections, and re-inspections.
-                </Text>
+                <View className="bg-slate-100 rounded-full w-20 h-20 items-center justify-center">
+                  <Bell size={36} color="#94a3b8" />
+                </View>
+                <AppText variant="titleMd" color={colors.text} style={{ marginTop: 12 }}>
+                  {search.trim()
+                    ? 'No notifications match your search'
+                    : readFilter !== 'all'
+                    ? `No ${readFilter} notifications`
+                    : category === 'all'
+                    ? 'No notifications yet'
+                    : 'No notifications in this category'}
+                </AppText>
+                <AppText
+                  variant="bodySm"
+                  color={colors.textMuted}
+                  style={{ marginTop: 4, textAlign: 'center', paddingHorizontal: 32 }}
+                >
+                  {search.trim() || readFilter !== 'all'
+                    ? 'Try adjusting your filters or pull to refresh.'
+                    : category === 'all'
+                    ? "You'll be notified about product and vendor assignments, inspections, and re-inspections."
+                    : 'Try another category or pull to refresh.'}
+                </AppText>
               </View>
             }
             renderItem={({ item }) => {

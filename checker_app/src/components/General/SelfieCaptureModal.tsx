@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   TouchableOpacity,
   Modal,
   Image,
@@ -12,6 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { Camera, CheckCircle, RotateCcw, UserCheck, MapPin } from 'lucide-react-native';
+import { AppText } from '@/components/UI/AppText';
+import { colors } from '@/constants/design';
 
 export type SelfieResult = {
   /** base64-encoded string (without data URI prefix) */
@@ -144,15 +145,15 @@ export default function SelfieCaptureModal({
       <View className="flex-1 bg-slate-950">
         {/* Header */}
         <View className="pt-14 px-6 pb-6 items-center">
-          <View className="w-16 h-16 rounded-full bg-blue-600 items-center justify-center mb-4">
-            <UserCheck size={30} color="#ffffff" />
+          <View className="w-16 h-16 rounded-full bg-brand-500 items-center justify-center mb-4">
+            <UserCheck size={30} color={colors.white} />
           </View>
-          <Text className="text-xl font-extrabold text-white text-center mb-2">
+          <AppText variant="headlineMd" color={colors.white} style={{ textAlign: 'center', marginBottom: 8 }}>
             {title}
-          </Text>
-          <Text className="text-sm text-slate-400 text-center leading-5">
+          </AppText>
+          <AppText variant="bodyMd" color="#94a3b8" style={{ textAlign: 'center' }}>
             {description}
-          </Text>
+          </AppText>
         </View>
 
         {/* Preview or Placeholder */}
@@ -166,9 +167,9 @@ export default function SelfieCaptureModal({
           ) : (
             <View className="items-center">
               <Camera size={52} color="#475569" strokeWidth={1.5} />
-              <Text className="text-slate-500 text-sm mt-4 text-center px-8">
+              <AppText variant="bodyMd" color="#64748b" style={{ marginTop: 16, textAlign: 'center', paddingHorizontal: 32 }}>
                 Tap the button below to open{'\n'}your front camera
-              </Text>
+              </AppText>
             </View>
           )}
         </View>
@@ -177,11 +178,11 @@ export default function SelfieCaptureModal({
         {preview && (
           <View className="mx-6 mt-3 flex-row items-center justify-center" style={{ columnGap: 6 }}>
             <MapPin size={14} color={coords ? '#10b981' : '#ef4444'} />
-            <Text className={`text-xs font-semibold ${coords ? 'text-emerald-400' : 'text-red-400'}`}>
+            <AppText variant="labelMd" color={coords ? '#34d399' : '#f87171'}>
               {coords
                 ? `GPS Captured (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})`
                 : 'GPS not available — location verification may fail'}
-            </Text>
+            </AppText>
           </View>
         )}
 
@@ -199,17 +200,17 @@ export default function SelfieCaptureModal({
               onPress={requestAndCapture}
               disabled={capturing}
               activeOpacity={0.85}
-              className="bg-blue-600 rounded-2xl py-4 items-center justify-center flex-row"
+              className="bg-brand-500 rounded-2xl py-4 items-center justify-center flex-row"
               style={{ opacity: capturing ? 0.7 : 1 }}
             >
               {capturing ? (
-                <ActivityIndicator size="small" color="#ffffff" />
+                <ActivityIndicator size="small" color={colors.white} />
               ) : (
                 <>
-                  <Camera size={20} color="#ffffff" />
-                  <Text className="text-white font-bold text-base ml-2">
+                  <Camera size={20} color={colors.white} />
+                  <AppText variant="titleMd" color={colors.white} style={{ marginLeft: 8 }}>
                     Take Selfie
-                  </Text>
+                  </AppText>
                 </>
               )}
             </TouchableOpacity>
@@ -222,19 +223,19 @@ export default function SelfieCaptureModal({
                 className="flex-1 bg-slate-700 rounded-2xl py-4 items-center justify-center flex-row"
               >
                 <RotateCcw size={18} color="#cbd5e1" />
-                <Text className="text-slate-200 font-semibold text-sm ml-2">
+                <AppText variant="titleMd" color="#e2e8f0" style={{ marginLeft: 8 }}>
                   Retake
-                </Text>
+                </AppText>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleConfirm}
                 activeOpacity={0.85}
                 className="flex-1 bg-emerald-600 rounded-2xl py-4 items-center justify-center flex-row"
               >
-                <CheckCircle size={18} color="#ffffff" />
-                <Text className="text-white font-bold text-sm ml-2">
+                <CheckCircle size={18} color={colors.white} />
+                <AppText variant="titleMd" color={colors.white} style={{ marginLeft: 8 }}>
                   Use Photo
-                </Text>
+                </AppText>
               </TouchableOpacity>
             </View>
           )}
@@ -246,7 +247,7 @@ export default function SelfieCaptureModal({
               activeOpacity={0.7}
               className="items-center py-2"
             >
-              <Text className="text-slate-500 text-sm">Cancel inspection</Text>
+              <AppText variant="bodyMd" color="#64748b">Cancel inspection</AppText>
             </TouchableOpacity>
           ) : null}
         </View>

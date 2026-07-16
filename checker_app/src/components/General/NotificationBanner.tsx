@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated } from 'react-native';
+import { View, TouchableOpacity, Animated } from 'react-native';
 import { Bell, X } from 'lucide-react-native';
+import { AppText } from '@/components/UI/AppText';
+import { brand, colors, slate, radius, space } from '@/constants/design';
 
 interface NotificationBannerProps {
   visible: boolean;
@@ -66,11 +68,11 @@ export default function NotificationBanner({
           dismiss();
         }}
         style={{
-          marginHorizontal: 12,
+          marginHorizontal: space.md,
           marginTop: 50,
-          backgroundColor: '#0f172a',
-          borderRadius: 16,
-          padding: 16,
+          backgroundColor: slate[900],
+          borderRadius: radius.lg,
+          padding: space.lg,
           flexDirection: 'row',
           alignItems: 'flex-start',
           shadowColor: '#000',
@@ -80,41 +82,27 @@ export default function NotificationBanner({
           elevation: 10,
         }}
       >
+        {/* Brand-red icon chip */}
         <View
           style={{
             width: 40,
             height: 40,
-            borderRadius: 12,
-            backgroundColor: '#2563eb',
+            borderRadius: radius.md,
+            backgroundColor: brand[500],
             alignItems: 'center',
             justifyContent: 'center',
-            marginRight: 12,
+            marginRight: space.md,
           }}
         >
-          <Bell size={20} color="#ffffff" />
+          <Bell size={20} color={colors.white} />
         </View>
-        <View style={{ flex: 1, marginRight: 8 }}>
-          <Text
-            style={{
-              color: '#ffffff',
-              fontSize: 14,
-              fontWeight: '800',
-              marginBottom: 2,
-            }}
-            numberOfLines={1}
-          >
+        <View style={{ flex: 1, marginRight: space.sm }}>
+          <AppText variant="titleMd" color={colors.white} numberOfLines={1}>
             {title}
-          </Text>
-          <Text
-            style={{
-              color: '#94a3b8',
-              fontSize: 13,
-              lineHeight: 18,
-            }}
-            numberOfLines={2}
-          >
+          </AppText>
+          <AppText variant="bodySm" color={slate[400]} numberOfLines={2} style={{ marginTop: 2 }}>
             {body}
-          </Text>
+          </AppText>
         </View>
         <TouchableOpacity
           onPress={dismiss}
@@ -128,7 +116,7 @@ export default function NotificationBanner({
             justifyContent: 'center',
           }}
         >
-          <X size={14} color="#94a3b8" />
+          <X size={14} color={slate[400]} />
         </TouchableOpacity>
       </TouchableOpacity>
     </Animated.View>

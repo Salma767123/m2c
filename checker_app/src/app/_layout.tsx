@@ -4,6 +4,14 @@ import { StatusBar } from 'expo-status-bar';
 import { LogBox } from 'react-native';
 import { useCallback, useEffect, useState } from 'react';
 import 'react-native-reanimated';
+import * as SplashScreen from 'expo-splash-screen';
+import {
+  useFonts,
+  Outfit_400Regular,
+  Outfit_500Medium,
+  Outfit_600SemiBold,
+  Outfit_700Bold,
+} from '@expo-google-fonts/outfit';
 import '../../global.css';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -21,12 +29,26 @@ import {
 // Must be called at top-level, outside components
 setupBackgroundHandler();
 
+// Keep the native splash up until the Outfit fonts are ready so the UI
+// never flashes in the system fallback font first.
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [fontsLoaded] = useFonts({
+    Outfit_400Regular,
+    Outfit_500Medium,
+    Outfit_600SemiBold,
+    Outfit_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
+  }, [fontsLoaded]);
   const [notification, setNotification] = useState<{
     visible: boolean;
     title: string;
@@ -77,6 +99,8 @@ export default function RootLayout() {
       unsubOpened();
     };
   }, [handleNotificationNav]);
+
+  if (!fontsLoaded) return null;
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

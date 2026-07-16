@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, Modal, Image } from 'react-native';
+import { View, TouchableOpacity, ScrollView, TextInput, Alert, Modal, Image } from 'react-native';
 import {
   ArrowLeft,
   User,
@@ -11,10 +11,10 @@ import {
   Edit3,
   MapPin,
   Shield,
+  ShieldCheck,
   Award,
   CheckCircle2,
   FileText,
-  ExternalLink,
   Clock,
   X as XIcon,
 } from 'lucide-react-native';
@@ -23,6 +23,8 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import * as WebBrowser from 'expo-web-browser';
 
 import qcCheckerService from '../../services/qcCheckerService';
+import { AppText, SectionCard, Button } from '@/components/UI';
+import { brand, colors, danger, elevation } from '@/constants/design';
 
 // Decide whether an ID-proof reference is a PDF (mirrors web CheckerSettings).
 const isPdfIdProof = (v?: string | null) =>
@@ -129,15 +131,25 @@ function InfoRow({ icon, label, value, multiline, subValue }: InfoRowProps) {
   const displayValue = value?.trim() ? value : '—';
   return (
     <View className={`flex-row ${multiline ? 'items-start' : 'items-center'} py-4`}>
-      <View className="w-10 h-10 rounded-xl bg-slate-100 items-center justify-center mr-4">
+      <View className="w-10 h-10 rounded-xl bg-brand-50 items-center justify-center mr-4">
         {icon}
       </View>
       <View className="flex-1">
-        <Text className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+        <AppText
+          variant="labelMd"
+          color={colors.textMuted}
+          style={{ textTransform: 'uppercase', marginBottom: 3 }}
+        >
           {label}
-        </Text>
-        <Text className="text-base font-medium text-slate-900 leading-6">{displayValue}</Text>
-        {subValue ? <Text className="text-sm text-slate-500 mt-0.5">{subValue}</Text> : null}
+        </AppText>
+        <AppText variant="bodyMd" color={colors.text}>
+          {displayValue}
+        </AppText>
+        {subValue ? (
+          <AppText variant="bodySm" color={colors.textMuted} style={{ marginTop: 2 }}>
+            {subValue}
+          </AppText>
+        ) : null}
       </View>
     </View>
   );
@@ -168,11 +180,13 @@ function FormField({
 }: FormFieldProps) {
   return (
     <View className="mb-4">
-      <Text className="text-sm font-semibold text-slate-700 mb-2">
+      <AppText variant="labelLg" color={colors.text} style={{ marginBottom: 8 }}>
         {label}
-        {required ? <Text className="text-red-500"> *</Text> : null}
-        {readOnly ? <Text className="text-slate-400 font-normal"> (read-only)</Text> : null}
-      </Text>
+        {required ? <AppText variant="labelLg" color={danger[500]}> *</AppText> : null}
+        {readOnly ? (
+          <AppText variant="bodySm" color={colors.textFaint}> (read-only)</AppText>
+        ) : null}
+      </AppText>
       <TextInput
         value={value}
         onChangeText={onChange}
@@ -332,47 +346,49 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
   ].filter(Boolean);
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0f172a', paddingTop: insets.top, paddingBottom: insets.bottom }}>
+    <View style={{ flex: 1, backgroundColor: brand[500], paddingTop: insets.top, paddingBottom: insets.bottom }}>
       <View className="flex-1 bg-slate-50">
-        {/* Header */}
-        <View className="bg-slate-900 px-4 pt-2 pb-4">
+        {/* Header — red AppBar */}
+        <View className="bg-brand-500 px-4 pt-2 pb-4">
           <View className="flex-row items-center">
             <TouchableOpacity
               onPress={onClose}
               accessibilityRole="button"
               accessibilityLabel="Go back"
               activeOpacity={0.7}
-              className="rounded-full bg-white/10 items-center justify-center mr-3"
+              className="rounded-full bg-white/15 items-center justify-center mr-3"
               style={{ minHeight: 44, minWidth: 44 }}
             >
               <ArrowLeft size={20} color="#ffffff" />
             </TouchableOpacity>
             <View className="flex-1">
-              <Text className="text-lg font-bold text-white">My Profile</Text>
-              <Text className="text-sm text-slate-400">Account details</Text>
+              <AppText variant="headlineSm" color={colors.white}>My Profile</AppText>
+              <AppText variant="bodySm" color="rgba(255,255,255,0.85)">Account details</AppText>
             </View>
           </View>
         </View>
 
         <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 32 }}>
-          {/* Identity card with dark top bleed */}
-          <View className="bg-slate-900 pb-16 px-4" />
+          {/* Identity card with red top bleed */}
+          <View className="bg-brand-500 pb-16 px-4" />
           <View className="px-4 -mt-20">
-            <View className="bg-white rounded-3xl border border-slate-200 p-6" style={{ elevation: 2 }}>
+            <View className="bg-white rounded-3xl border border-slate-200 p-6" style={elevation.card}>
               <View className="flex-row items-center">
                 <View
-                  className="rounded-2xl bg-blue-600 items-center justify-center"
+                  className="rounded-2xl bg-brand-600 items-center justify-center"
                   style={{ width: 72, height: 72 }}
                 >
-                  <Text className="text-white font-bold text-2xl">
+                  <AppText variant="headlineLg" color={colors.white}>
                     {getInitials(checkerInfo.name)}
-                  </Text>
+                  </AppText>
                 </View>
                 <View className="flex-1 ml-4">
-                  <Text className="text-xl font-bold text-slate-900" numberOfLines={1}>
+                  <AppText variant="headlineSm" color={colors.text} numberOfLines={1}>
                     {checkerInfo.name || 'Unnamed inspector'}
-                  </Text>
-                  <Text className="text-sm text-slate-600 mt-0.5">{checkerInfo.role}</Text>
+                  </AppText>
+                  <AppText variant="bodySm" color={colors.textSecondary} style={{ marginTop: 2 }}>
+                    {checkerInfo.role}
+                  </AppText>
                   <View className="flex-row items-center mt-2">
                     <View
                       className={`flex-row items-center px-2 py-1 rounded-full ${
@@ -385,19 +401,18 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
                         }`}
                         style={{ width: 6, height: 6 }}
                       />
-                      <Text
-                        className={`text-xs font-semibold ${
-                          isActive ? 'text-emerald-700' : 'text-slate-600'
-                        }`}
+                      <AppText
+                        variant="labelSm"
+                        color={isActive ? '#15803d' : colors.textSecondary}
                       >
                         {isActive ? 'Active' : 'Inactive'}
-                      </Text>
+                      </AppText>
                     </View>
                     {checkerInfo.id ? (
                       <View className="ml-2 px-2 py-1 rounded-full bg-slate-100">
-                        <Text className="text-xs font-semibold text-slate-700">
+                        <AppText variant="labelSm" color={colors.textSecondary}>
                           ID · {checkerInfo.id}
-                        </Text>
+                        </AppText>
                       </View>
                     ) : null}
                   </View>
@@ -407,30 +422,32 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
               {/* Stats row */}
               <View className="flex-row mt-6 pt-5 border-t border-slate-100">
                 <View className="flex-1 items-center">
-                  <Text className="text-2xl font-bold text-slate-900">
+                  <AppText variant="headlineLg" color={colors.text}>
                     {checkerInfo.totalInspections}
-                  </Text>
-                  <Text className="text-xs font-medium text-slate-500 mt-1">Inspections</Text>
+                  </AppText>
+                  <AppText variant="labelMd" color={colors.textMuted} style={{ marginTop: 4 }}>
+                    Inspections
+                  </AppText>
                 </View>
                 <View className="w-px bg-slate-200" />
                 <View className="flex-1 items-center">
-                  <Text className="text-2xl font-bold text-slate-900">
+                  <AppText variant="headlineLg" color={colors.text}>
                     {checkerInfo.experience || '—'}
-                  </Text>
-                  <Text className="text-xs font-medium text-slate-500 mt-1">
+                  </AppText>
+                  <AppText variant="labelMd" color={colors.textMuted} style={{ marginTop: 4 }}>
                     {checkerInfo.experience ? 'Years exp.' : 'Experience'}
-                  </Text>
+                  </AppText>
                 </View>
                 <View className="w-px bg-slate-200" />
                 <View className="flex-1 items-center">
-                  <Text className="text-2xl font-bold text-slate-900">
+                  <AppText variant="headlineLg" color={colors.text}>
                     {checkerInfo.joinDate
                       ? new Date().getFullYear() - new Date(checkerInfo.joinDate).getFullYear()
                       : '—'}
-                  </Text>
-                  <Text className="text-xs font-medium text-slate-500 mt-1">
+                  </AppText>
+                  <AppText variant="labelMd" color={colors.textMuted} style={{ marginTop: 4 }}>
                     {checkerInfo.joinDate ? 'Years here' : 'Tenure'}
-                  </Text>
+                  </AppText>
                 </View>
               </View>
             </View>
@@ -438,154 +455,143 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
 
           {/* Contact section */}
           <View className="px-4 mt-6">
-            <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">
-              Contact
-            </Text>
-            <View className="bg-white rounded-2xl border border-slate-200 px-4 divide-y divide-slate-100">
-              <InfoRow
-                icon={<Mail size={18} color="#2563eb" strokeWidth={2} />}
-                label="Email"
-                value={checkerInfo.email}
-              />
-              <InfoRow
-                icon={<Phone size={18} color="#2563eb" strokeWidth={2} />}
-                label="Phone"
-                value={checkerInfo.phone}
-              />
-              <InfoRow
-                icon={<MapPin size={18} color="#2563eb" strokeWidth={2} />}
-                label="Address"
-                multiline
-                value={addressLines[0] || ''}
-                subValue={addressLines.slice(1).join(' · ')}
-              />
-            </View>
+            <SectionCard icon={Mail} title="Contact" bodyPadded={false}>
+              <View className="px-4 divide-y divide-slate-100">
+                <InfoRow
+                  icon={<Mail size={18} color={brand[500]} strokeWidth={2} />}
+                  label="Email"
+                  value={checkerInfo.email}
+                />
+                <InfoRow
+                  icon={<Phone size={18} color={brand[500]} strokeWidth={2} />}
+                  label="Phone"
+                  value={checkerInfo.phone}
+                />
+                <InfoRow
+                  icon={<MapPin size={18} color={brand[500]} strokeWidth={2} />}
+                  label="Address"
+                  multiline
+                  value={addressLines[0] || ''}
+                  subValue={addressLines.slice(1).join(' · ')}
+                />
+              </View>
+            </SectionCard>
           </View>
 
           {/* Professional section */}
           <View className="px-4 mt-6">
-            <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">
-              Professional
-            </Text>
-            <View className="bg-white rounded-2xl border border-slate-200 px-4 divide-y divide-slate-100">
-              <InfoRow
-                icon={<Briefcase size={18} color="#2563eb" strokeWidth={2} />}
-                label="Department"
-                value={checkerInfo.department}
-              />
-              <InfoRow
-                icon={<Shield size={18} color="#2563eb" strokeWidth={2} />}
-                label="Specialization"
-                value={checkerInfo.specialization}
-              />
-              <InfoRow
-                icon={<BarChart3 size={18} color="#2563eb" strokeWidth={2} />}
-                label="Experience"
-                value={checkerInfo.experience ? `${checkerInfo.experience} years` : ''}
-              />
-              <InfoRow
-                icon={<Calendar size={18} color="#2563eb" strokeWidth={2} />}
-                label="Join date"
-                value={formatDate(checkerInfo.joinDate)}
-                subValue={tenure(checkerInfo.joinDate)}
-              />
-            </View>
+            <SectionCard icon={Briefcase} title="Professional" bodyPadded={false}>
+              <View className="px-4 divide-y divide-slate-100">
+                <InfoRow
+                  icon={<Briefcase size={18} color={brand[500]} strokeWidth={2} />}
+                  label="Department"
+                  value={checkerInfo.department}
+                />
+                <InfoRow
+                  icon={<Shield size={18} color={brand[500]} strokeWidth={2} />}
+                  label="Specialization"
+                  value={checkerInfo.specialization}
+                />
+                <InfoRow
+                  icon={<BarChart3 size={18} color={brand[500]} strokeWidth={2} />}
+                  label="Experience"
+                  value={checkerInfo.experience ? `${checkerInfo.experience} years` : ''}
+                />
+                <InfoRow
+                  icon={<Calendar size={18} color={brand[500]} strokeWidth={2} />}
+                  label="Join date"
+                  value={formatDate(checkerInfo.joinDate)}
+                  subValue={tenure(checkerInfo.joinDate)}
+                />
+              </View>
+            </SectionCard>
           </View>
 
           {/* Security & ID section */}
           <View className="px-4 mt-6">
-            <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">
-              Security &amp; ID
-            </Text>
-            <View className="bg-white rounded-2xl border border-slate-200 px-4 divide-y divide-slate-100">
-              {/* Last login */}
-              <InfoRow
-                icon={<Clock size={18} color="#2563eb" strokeWidth={2} />}
-                label="Last Login"
-                value={checkerInfo.lastLogin ? formatDateTime(checkerInfo.lastLogin) : '—'}
-              />
-              {/* ID proof */}
-              <View className="flex-row items-center py-4">
-                <View className="w-10 h-10 rounded-xl bg-slate-100 items-center justify-center mr-4">
-                  <Shield size={18} color="#2563eb" strokeWidth={2} />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                    ID Proof
-                  </Text>
-                  {checkerInfo.idProof ? (
-                    <TouchableOpacity
-                      onPress={openIdProof}
-                      activeOpacity={0.8}
-                      className="flex-row items-center self-start bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 mt-1"
+            <SectionCard icon={ShieldCheck} title="Security & ID" bodyPadded={false}>
+              <View className="px-4 divide-y divide-slate-100">
+                {/* Last login */}
+                <InfoRow
+                  icon={<Clock size={18} color={brand[500]} strokeWidth={2} />}
+                  label="Last Login"
+                  value={checkerInfo.lastLogin ? formatDateTime(checkerInfo.lastLogin) : '—'}
+                />
+                {/* ID proof */}
+                <View className="flex-row items-center py-4">
+                  <View className="w-10 h-10 rounded-xl bg-brand-50 items-center justify-center mr-4">
+                    <FileText size={18} color={brand[500]} strokeWidth={2} />
+                  </View>
+                  <View className="flex-1">
+                    <AppText
+                      variant="labelMd"
+                      color={colors.textMuted}
+                      style={{ textTransform: 'uppercase', marginBottom: 8 }}
                     >
-                      <FileText size={14} color="#1d4ed8" />
-                      <Text className="text-sm font-semibold text-blue-700 mx-1.5">
-                        View ID Proof{isPdfIdProof(checkerInfo.idProof) ? ' (PDF)' : ''}
-                      </Text>
-                      <ExternalLink size={13} color="#1d4ed8" />
-                    </TouchableOpacity>
-                  ) : (
-                    <Text className="text-base font-medium text-slate-400 leading-6">
-                      No ID proof uploaded
-                    </Text>
-                  )}
+                      ID Proof
+                    </AppText>
+                    {checkerInfo.idProof ? (
+                      <Button
+                        label={`View ID Proof${isPdfIdProof(checkerInfo.idProof) ? ' (PDF)' : ''}`}
+                        onPress={openIdProof}
+                        variant="primary"
+                        icon={FileText}
+                      />
+                    ) : (
+                      <AppText variant="bodyMd" color={colors.textFaint}>
+                        No ID proof uploaded
+                      </AppText>
+                    )}
+                  </View>
                 </View>
               </View>
-            </View>
+            </SectionCard>
           </View>
 
           {/* Personal section */}
           <View className="px-4 mt-6">
-            <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">
-              Personal
-            </Text>
-            <View className="bg-white rounded-2xl border border-slate-200 px-4 divide-y divide-slate-100">
-              <InfoRow
-                icon={<User size={18} color="#2563eb" strokeWidth={2} />}
-                label="Full name"
-                value={checkerInfo.name}
-              />
-              <InfoRow
-                icon={<Calendar size={18} color="#2563eb" strokeWidth={2} />}
-                label="Date of birth"
-                value={formatDate(checkerInfo.dateOfBirth)}
-              />
-            </View>
+            <SectionCard icon={User} title="Personal" bodyPadded={false}>
+              <View className="px-4 divide-y divide-slate-100">
+                <InfoRow
+                  icon={<User size={18} color={brand[500]} strokeWidth={2} />}
+                  label="Full name"
+                  value={checkerInfo.name}
+                />
+                <InfoRow
+                  icon={<Calendar size={18} color={brand[500]} strokeWidth={2} />}
+                  label="Date of birth"
+                  value={formatDate(checkerInfo.dateOfBirth)}
+                />
+              </View>
+            </SectionCard>
           </View>
 
           {/* Certifications */}
           {checkerInfo.certifications ? (
             <View className="px-4 mt-6">
-              <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">
-                Certifications
-              </Text>
-              <View className="bg-white rounded-2xl border border-slate-200 p-4">
+              <SectionCard icon={Award} title="Certifications">
                 <View className="flex-row items-start">
-                  <View className="w-10 h-10 rounded-xl bg-blue-50 items-center justify-center mr-3">
-                    <Award size={18} color="#2563eb" strokeWidth={2} />
+                  <View className="w-10 h-10 rounded-xl bg-brand-50 items-center justify-center mr-3">
+                    <Award size={18} color={brand[500]} strokeWidth={2} />
                   </View>
-                  <Text className="flex-1 text-base text-slate-800 leading-6">
+                  <AppText variant="bodyMd" color={colors.text} style={{ flex: 1 }}>
                     {checkerInfo.certifications}
-                  </Text>
+                  </AppText>
                 </View>
-              </View>
+              </SectionCard>
             </View>
           ) : null}
 
           {/* Edit action */}
           <View className="px-4 mt-8">
-            <TouchableOpacity
+            <Button
+              label="Edit profile"
               onPress={() => setShowEditModal(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Edit profile"
-              activeOpacity={0.85}
-              className="bg-slate-900 rounded-2xl flex-row items-center justify-center"
-              style={{ minHeight: 52 }}
-            >
-              <Edit3 size={18} color="#ffffff" strokeWidth={2} />
-              <Text className="text-white font-semibold text-base ml-2">Edit profile</Text>
-            </TouchableOpacity>
+              variant="primary"
+              size="lg"
+              icon={Edit3}
+              fullWidth
+            />
           </View>
         </ScrollView>
 
@@ -601,9 +607,9 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
               className="flex-row items-center justify-between px-4"
               style={{ paddingTop: insets.top + 8, paddingBottom: 8 }}
             >
-              <Text className="text-white text-sm font-semibold flex-1 mr-3" numberOfLines={1}>
+              <AppText variant="titleMd" color={colors.white} style={{ flex: 1, marginRight: 12 }} numberOfLines={1}>
                 ID Proof
-              </Text>
+              </AppText>
               <TouchableOpacity
                 onPress={() => setIdProofLightbox(false)}
                 hitSlop={10}
@@ -631,9 +637,9 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
           presentationStyle="pageSheet"
           onRequestClose={() => setShowEditModal(false)}
         >
-          <View style={{ flex: 1, backgroundColor: '#0f172a', paddingTop: insets.top, paddingBottom: insets.bottom }}>
+          <View style={{ flex: 1, backgroundColor: brand[500], paddingTop: insets.top, paddingBottom: insets.bottom }}>
             <View className="flex-1 bg-slate-50">
-              <View className="bg-slate-900 px-4 py-3">
+              <View className="bg-brand-500 px-4 py-3">
                 <View className="flex-row items-center justify-between">
                   <TouchableOpacity
                     onPress={() => setShowEditModal(false)}
@@ -642,9 +648,9 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
                     activeOpacity={0.7}
                     style={{ minHeight: 44, minWidth: 44, justifyContent: 'center' }}
                   >
-                    <Text className="text-white text-base font-medium">Cancel</Text>
+                    <AppText variant="bodyLg" color={colors.white}>Cancel</AppText>
                   </TouchableOpacity>
-                  <Text className="text-lg font-bold text-white">Edit profile</Text>
+                  <AppText variant="headlineSm" color={colors.white}>Edit profile</AppText>
                   <TouchableOpacity
                     onPress={handleSaveProfile}
                     disabled={saving}
@@ -661,9 +667,9 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
                   >
                     <View className="flex-row items-center">
                       {saving ? null : <CheckCircle2 size={16} color="#ffffff" />}
-                      <Text className="text-white text-base font-semibold ml-1">
+                      <AppText variant="titleMd" color={colors.white} style={{ marginLeft: 4 }}>
                         {saving ? 'Saving…' : 'Save'}
-                      </Text>
+                      </AppText>
                     </View>
                   </TouchableOpacity>
                 </View>
@@ -675,87 +681,81 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
               >
-                <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-                  Personal
-                </Text>
-                <View className="bg-white rounded-2xl border border-slate-200 p-4 mb-6">
-                  <FormField
-                    label="Full name"
-                    required
-                    value={editForm.name}
-                    onChange={(t) => setEditForm((p) => ({ ...p, name: t }))}
-                    placeholder="Enter your full name"
-                  />
-                  <FormField
-                    label="Date of birth"
-                    readOnly
-                    value={editForm.dateOfBirth}
-                    placeholder="YYYY-MM-DD"
-                  />
+                <View className="mb-6">
+                  <SectionCard icon={User} title="Personal">
+                    <FormField
+                      label="Full name"
+                      required
+                      value={editForm.name}
+                      onChange={(t) => setEditForm((p) => ({ ...p, name: t }))}
+                      placeholder="Enter your full name"
+                    />
+                    <FormField
+                      label="Date of birth"
+                      readOnly
+                      value={editForm.dateOfBirth}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </SectionCard>
                 </View>
 
-                <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-                  Contact
-                </Text>
-                <View className="bg-white rounded-2xl border border-slate-200 p-4 mb-6">
-                  <FormField
-                    label="Email"
-                    readOnly
-                    value={editForm.email}
-                    placeholder="Enter your email"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                  <FormField
-                    label="Phone number"
-                    required
-                    value={editForm.phone}
-                    onChange={(t) => setEditForm((p) => ({ ...p, phone: t }))}
-                    placeholder="Enter your phone number"
-                    keyboardType="phone-pad"
-                  />
+                <View className="mb-6">
+                  <SectionCard icon={Mail} title="Contact">
+                    <FormField
+                      label="Email"
+                      readOnly
+                      value={editForm.email}
+                      placeholder="Enter your email"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                    <FormField
+                      label="Phone number"
+                      required
+                      value={editForm.phone}
+                      onChange={(t) => setEditForm((p) => ({ ...p, phone: t }))}
+                      placeholder="Enter your phone number"
+                      keyboardType="phone-pad"
+                    />
+                  </SectionCard>
                 </View>
 
-                <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-                  Address
-                </Text>
-                <View className="bg-white rounded-2xl border border-slate-200 p-4 mb-6">
-                  <FormField
-                    label="Street address"
-                    value={editForm.address}
-                    onChange={(t) => setEditForm((p) => ({ ...p, address: t }))}
-                    placeholder="Enter street address"
-                  />
-                  <FormField
-                    label="City"
-                    value={editForm.city}
-                    onChange={(t) => setEditForm((p) => ({ ...p, city: t }))}
-                    placeholder="Enter city"
-                  />
-                  <FormField
-                    label="State / Province"
-                    value={editForm.state}
-                    onChange={(t) => setEditForm((p) => ({ ...p, state: t }))}
-                    placeholder="Enter state"
-                  />
-                  <FormField
-                    label="ZIP / Postal code"
-                    value={editForm.zipCode}
-                    onChange={(t) => setEditForm((p) => ({ ...p, zipCode: t }))}
-                    placeholder="Enter ZIP code"
-                  />
-                  <FormField
-                    label="Country"
-                    value={editForm.country}
-                    onChange={(t) => setEditForm((p) => ({ ...p, country: t }))}
-                    placeholder="Enter country"
-                  />
+                <View className="mb-6">
+                  <SectionCard icon={MapPin} title="Address">
+                    <FormField
+                      label="Street address"
+                      value={editForm.address}
+                      onChange={(t) => setEditForm((p) => ({ ...p, address: t }))}
+                      placeholder="Enter street address"
+                    />
+                    <FormField
+                      label="City"
+                      value={editForm.city}
+                      onChange={(t) => setEditForm((p) => ({ ...p, city: t }))}
+                      placeholder="Enter city"
+                    />
+                    <FormField
+                      label="State / Province"
+                      value={editForm.state}
+                      onChange={(t) => setEditForm((p) => ({ ...p, state: t }))}
+                      placeholder="Enter state"
+                    />
+                    <FormField
+                      label="ZIP / Postal code"
+                      value={editForm.zipCode}
+                      onChange={(t) => setEditForm((p) => ({ ...p, zipCode: t }))}
+                      placeholder="Enter ZIP code"
+                    />
+                    <FormField
+                      label="Country"
+                      value={editForm.country}
+                      onChange={(t) => setEditForm((p) => ({ ...p, country: t }))}
+                      placeholder="Enter country"
+                    />
+                  </SectionCard>
                 </View>
 
-                <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-                  Professional
-                </Text>
-                <View className="bg-white rounded-2xl border border-slate-200 p-4">
+                <SectionCard icon={Briefcase} title="Professional">
                   <FormField
                     label="Specialization"
                     readOnly
@@ -776,7 +776,7 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
                     value={editForm.certifications}
                     placeholder="List any relevant certifications..."
                   />
-                </View>
+                </SectionCard>
               </KeyboardAwareScrollView>
             </View>
           </View>

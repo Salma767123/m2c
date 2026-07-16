@@ -30,9 +30,13 @@ import {
   AlertCircle,
   ShieldCheck,
   X,
+  ClipboardList,
+  Image as ImageIcon,
 } from 'lucide-react-native';
 import qcCheckerService, { AuditLogEntry } from '../../services/qcCheckerService';
 import AuditTimeline from '../../components/General/AuditTimeline';
+import { SectionCard, Button } from '@/components/UI';
+import { brand, elevation } from '@/constants/design';
 
 type Tab = 'overview' | 'images' | 'activity';
 const TABS: { id: Tab; label: string }[] = [
@@ -126,7 +130,7 @@ export default function ProductDetailScreen() {
   if (loading && !product) {
     return (
       <View className="flex-1 bg-white items-center justify-center">
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color={brand[500]} />
         <Text className="mt-4 text-slate-600 text-sm">Loading product…</Text>
       </View>
     );
@@ -142,10 +146,7 @@ export default function ProductDetailScreen() {
           </View>
           <Text className="text-xl font-bold text-slate-900 mb-2 text-center">Something went wrong</Text>
           <Text className="text-base text-slate-600 text-center mb-6">{error || 'Product not found'}</Text>
-          <TouchableOpacity onPress={load} className="flex-row items-center bg-blue-600 rounded-xl px-6 py-3">
-            <RefreshCw size={18} color="#ffffff" />
-            <Text className="text-white font-bold ml-2">Try Again</Text>
-          </TouchableOpacity>
+          <Button label="Try Again" onPress={load} icon={RefreshCw} variant="primary" />
         </View>
       </View>
     );
@@ -166,7 +167,7 @@ export default function ProductDetailScreen() {
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 100 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2563eb" colors={['#2563eb']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={brand[500]} colors={[brand[500]]} />
         }
         showsVerticalScrollIndicator={false}
       >
@@ -186,7 +187,7 @@ export default function ProductDetailScreen() {
         </View>
 
         {/* Summary card */}
-        <View className="mx-4 mt-4 rounded-2xl p-5" style={{ backgroundColor: '#2563eb' }}>
+        <View className="mx-4 mt-4 rounded-2xl p-5" style={[{ backgroundColor: brand[500] }, elevation.card]}>
           <View className="flex-row flex-wrap" style={{ rowGap: 14, columnGap: 0 }}>
             <SummaryStat label="Base Price" value={fmtPrice(product.basePrice)} />
             <SummaryStat label="Total Stock" value={String(product.totalStock ?? 0)} />
@@ -198,17 +199,16 @@ export default function ProductDetailScreen() {
         {/* Start Inspection CTA */}
         {canInspect ? (
           <View className="mx-4 mt-3">
-            <TouchableOpacity
+            <Button
+              label="Start Inspection"
+              icon={FileText}
+              variant="primary"
+              fullWidth
               onPress={() => router.push({
                 pathname: '/product-inspection' as any,
                 params: { productId: id, productName: product.name, vendorName: v.companyName || '' },
               })}
-              activeOpacity={0.85}
-              className="flex-row items-center justify-center bg-blue-600 rounded-xl py-3"
-            >
-              <FileText size={16} color="#ffffff" />
-              <Text className="text-white font-bold text-sm ml-2">Start Inspection</Text>
-            </TouchableOpacity>
+            />
           </View>
         ) : null}
 
@@ -238,25 +238,25 @@ export default function ProductDetailScreen() {
               </TouchableOpacity>
             ) : null}
 
-            <Card title="Product">
+            <SectionCard icon={Package} title="Product">
               <InfoRow label="Category" value={product.category} />
               <InfoRow label="Sub-category" value={product.subCategory} />
               <InfoRow label="Base Price" value={fmtPrice(product.basePrice)} />
               <InfoRow label="Total Stock" value={String(product.totalStock ?? 0)} />
-            </Card>
+            </SectionCard>
 
-            <Card title="Vendor">
+            <SectionCard icon={Factory} title="Vendor">
               <InfoRow label="Company" value={v.companyName} />
               <InfoRow label="Owner" value={v.ownerName} />
               <InfoRow label="Email" value={v.businessEmail || v.email} onPress={() => {}} />
               <InfoRow label="Phone" value={v.businessPhone} />
               <InfoRow label="Factory" value={[v.factoryCity, v.factoryState].filter(Boolean).join(', ')} />
-            </Card>
+            </SectionCard>
 
             {product.description ? (
-              <Card title="Description">
+              <SectionCard icon={FileText} title="Description">
                 <Text className="text-sm text-slate-700" style={{ lineHeight: 20 }} selectable>{product.description}</Text>
-              </Card>
+              </SectionCard>
             ) : null}
 
             {product.rejectionReason ? (
@@ -271,7 +271,7 @@ export default function ProductDetailScreen() {
         {/* Images & Variants */}
         {activeTab === 'images' ? (
           <View className="mx-4" style={{ rowGap: 14 }}>
-            <Card title={`Images (${images.length})`}>
+            <SectionCard icon={ImageIcon} title={`Images (${images.length})`}>
               {images.length === 0 ? (
                 <Text className="text-sm text-slate-500 py-4 text-center">No images uploaded.</Text>
               ) : (
@@ -284,7 +284,7 @@ export default function ProductDetailScreen() {
                     >
                       <Image source={{ uri: img.url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                       {img.isPrimary ? (
-                        <View className="absolute top-1 left-1 bg-blue-600 rounded-full px-1.5 py-0.5">
+                        <View className="absolute top-1 left-1 bg-brand-500 rounded-full px-1.5 py-0.5">
                           <Text className="text-white text-[8px] font-bold">Primary</Text>
                         </View>
                       ) : null}
@@ -292,9 +292,9 @@ export default function ProductDetailScreen() {
                   ))}
                 </View>
               )}
-            </Card>
+            </SectionCard>
 
-            <Card title={`Variants (${variants.length})`}>
+            <SectionCard icon={Layers} title={`Variants (${variants.length})`}>
               {variants.length === 0 ? (
                 <Text className="text-sm text-slate-500 py-4 text-center">No variants defined.</Text>
               ) : (
@@ -359,8 +359,8 @@ export default function ProductDetailScreen() {
                               <Text className="text-sm font-extrabold text-slate-900">
                                 {fmtPrice(vr.price)}
                               </Text>
-                              <View className="bg-blue-50 rounded-md px-1.5 py-0.5">
-                                <Text className="text-[10px] font-bold text-blue-700">
+                              <View className="bg-brand-50 rounded-md px-1.5 py-0.5">
+                                <Text className="text-[10px] font-bold text-brand-700">
                                   Stock: {vr.stock}
                                 </Text>
                               </View>
@@ -372,7 +372,7 @@ export default function ProductDetailScreen() {
                   })}
                 </View>
               )}
-            </Card>
+            </SectionCard>
           </View>
         ) : null}
 
@@ -421,56 +421,43 @@ export default function ProductDetailScreen() {
                   </View>
 
                   {qc ? (
-                    <Card title="Assigned QC Checker">
+                    <SectionCard icon={UserCheck} title="Assigned QC Checker">
                       <InfoRow label="Name" value={qc.name} />
                       <InfoRow label="Email" value={qc.email} />
-                    </Card>
+                    </SectionCard>
                   ) : null}
 
                   {qcSummary.length > 0 ? (
-                    <Card title="Inspection Form Summary">
+                    <SectionCard icon={ClipboardList} title="Inspection Form Summary">
                       {qcSummary.map(({ key, value }) => (
                         <InfoRow key={key} label={humanize(key)} value={value} />
                       ))}
-                    </Card>
+                    </SectionCard>
                   ) : null}
 
-                  <Card title="Timeline">
+                  <SectionCard icon={Clock} title="Timeline">
                     <InfoRow label="Listed on" value={fmt(product.createdAt)} />
                     <InfoRow label="Last updated" value={fmt(product.updatedAt)} />
                     {product.inspectionCycleNumber > 1 && (
                       <InfoRow label="Inspection Cycle" value={`#${product.inspectionCycleNumber}`} />
                     )}
-                  </Card>
+                  </SectionCard>
 
                   {/* Audit Trail */}
                   {auditLogs.length > 0 && (
-                    <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                      {/* Section header */}
-                      <View
-                        className="flex-row items-center justify-between px-4 py-3 border-b border-slate-100"
-                        style={{ backgroundColor: '#F8FAFC' }}
-                      >
-                        <View className="flex-row items-center" style={{ gap: 10 }}>
-                          <View
-                            className="w-8 h-8 rounded-lg items-center justify-center"
-                            style={{ backgroundColor: '#EFF6FF' }}
-                          >
-                            <ShieldCheck size={16} color="#2563EB" />
-                          </View>
-                          <Text className="text-sm font-bold text-slate-900">Audit Trail</Text>
-                        </View>
-                        <View className="rounded-full px-2.5 py-0.5" style={{ backgroundColor: '#E2E8F0' }}>
-                          <Text className="text-[10px] font-bold text-slate-600">
+                    <SectionCard
+                      icon={ShieldCheck}
+                      title="Audit Trail"
+                      right={
+                        <View className="rounded-full px-2.5 py-1 bg-white">
+                          <Text className="text-[10px] font-bold text-brand-600">
                             {auditLogs.length} {auditLogs.length === 1 ? 'entry' : 'entries'}
                           </Text>
                         </View>
-                      </View>
-                      {/* Timeline content */}
-                      <View className="p-4">
-                        <AuditTimeline logs={auditLogs} />
-                      </View>
-                    </View>
+                      }
+                    >
+                      <AuditTimeline logs={auditLogs} />
+                    </SectionCard>
                   )}
                 </>
               );
@@ -522,15 +509,6 @@ function Header({ onBack, insetsTop }: {
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View className="bg-white rounded-2xl border border-slate-200 p-4">
-      <Text className="text-sm font-bold text-slate-900 mb-3 pb-2 border-b border-slate-100">{title}</Text>
-      {children}
-    </View>
-  );
-}
-
 function InfoRow({ label, value, onPress }: { label: string; value?: string | null; onPress?: () => void }) {
   if (!value) return null;
   const Content = (
@@ -549,7 +527,7 @@ function InfoRow({ label, value, onPress }: { label: string; value?: string | nu
 function SummaryStat({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ width: '50%', marginBottom: 4 }}>
-      <Text className="text-[10px] text-blue-200 uppercase tracking-wider font-bold mb-0.5">{label}</Text>
+      <Text className="text-[10px] uppercase tracking-wider font-bold mb-0.5" style={{ color: 'rgba(255,255,255,0.75)' }}>{label}</Text>
       <Text className="text-base font-extrabold text-white">{value}</Text>
     </View>
   );

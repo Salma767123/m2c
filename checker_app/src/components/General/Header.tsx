@@ -1,4 +1,4 @@
-import { View, Text, Image, TouchableOpacity, Modal } from "react-native";
+import { View, Image, TouchableOpacity, Modal, StyleSheet } from "react-native";
 import { useState, useEffect } from "react";
 import { Bell, User, LogOut, UserCircle, ChevronDown } from "lucide-react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,8 +10,10 @@ import {
   onNotificationReceived,
 } from '@/services/notificationService';
 import NotificationsModal from './NotificationsModal';
+import { AppText } from '@/components/UI/AppText';
+import { brand, colors, radius, space, elevation, danger, info } from '@/constants/design';
 
-const UNREAD_POLL_MS = 15000;
+const UNREAD_POLL_MS = 30000;
 
 export default function Header() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -27,7 +29,6 @@ export default function Header() {
     };
     refresh();
     const timer = setInterval(refresh, UNREAD_POLL_MS);
-    // Refresh instantly when a push arrives in the foreground
     const unsub = onNotificationReceived(refresh);
     return () => {
       active = false;
@@ -38,7 +39,6 @@ export default function Header() {
 
   const handleSignOut = async () => {
     try {
-      // Stop this device from receiving the checker's pushes before clearing auth
       await unregisterPushNotifications();
       await AsyncStorage.removeItem('checkerID');
       setShowProfileMenu(false);
@@ -55,117 +55,132 @@ export default function Header() {
 
   return (
     <>
-      <View className="bg-black border-b border-gray-800 shadow-sm" style={{ zIndex: 100 }}>
-        <View className="flex-row items-center justify-between px-4 py-3">
-          {/* Logo Section */}
-          <View className="flex-row items-center flex-1">
-            <View className="bg-white rounded-xl p-2 mr-3 border border-gray-700">
-              <Image 
+      <View style={{ backgroundColor: brand[500], zIndex: 100 }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: space.lg,
+            paddingVertical: space.md,
+          }}
+        >
+          {/* Logo + title */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <View
+              style={{
+                backgroundColor: colors.white,
+                borderRadius: radius.md,
+                padding: 6,
+                marginRight: space.md,
+              }}
+            >
+              <Image
                 source={require('../../../assets/images/logo2.png')}
-                className="w-16 h-12"
+                style={{ width: 56, height: 40 }}
                 resizeMode="contain"
               />
             </View>
             <View>
-              <Text className="text-xl font-bold text-white">QC Checker</Text>
-              <Text className="text-xs text-gray-400">Quality Control Portal</Text>
+              <AppText variant="headlineSm" color={colors.white}>QC Checker</AppText>
+              <AppText variant="labelSm" color={brand[100]} style={{ textTransform: 'uppercase' }}>
+                Quality Control Portal
+              </AppText>
             </View>
           </View>
 
-          {/* Right Actions */}
-          <View className="flex-row items-center gap-2">
-            {/* Notification Bell */}
+          {/* Right actions */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+            {/* Notification bell */}
             <TouchableOpacity
               onPress={() => setShowNotifications(true)}
+              activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel={
-                unreadCount > 0
-                  ? `Notifications, ${unreadCount} unread`
-                  : 'Notifications'
-              }
-              className="bg-white rounded-full w-10 h-10 items-center justify-center border border-gray-300"
+              accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+              style={styles.iconBtn}
             >
-              <Bell size={18} color="#111827" strokeWidth={2.2} />
+              <Bell size={20} color={colors.white} strokeWidth={2.2} />
               {unreadCount > 0 && (
-                <View
-                  className="absolute -top-1 -right-1 bg-red-500 rounded-full min-w-[18px] h-[18px] items-center justify-center px-1 border-2 border-black"
-                >
-                  <Text className="text-white text-[10px] font-bold">
+                <View style={styles.badge}>
+                  <AppText variant="labelSm" color={colors.white} style={{ fontSize: 10, lineHeight: 12 }}>
                     {unreadCount > 99 ? '99+' : unreadCount}
-                  </Text>
+                  </AppText>
                 </View>
               )}
             </TouchableOpacity>
 
-            {/* Profile Menu */}
+            {/* Profile */}
             <TouchableOpacity
               onPress={() => setShowProfileMenu(!showProfileMenu)}
-              className="flex-row items-center bg-white rounded-full pl-2 pr-3 py-2 border border-gray-300"
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Account menu"
+              style={styles.profileBtn}
             >
-              <View className="bg-black rounded-full p-1 mr-2">
-                <User size={16} color="#ffffff" strokeWidth={2.5} />
-              </View>
-              <ChevronDown size={14} color="#111827" strokeWidth={2} />
+              <User size={16} color={colors.white} strokeWidth={2.5} />
+              <ChevronDown size={14} color={colors.white} strokeWidth={2} />
             </TouchableOpacity>
           </View>
         </View>
       </View>
 
-      {/* Profile Dropdown Menu - Rendered outside header */}
+      {/* Profile dropdown */}
       {showProfileMenu && (
-        <View 
-          className="absolute right-4 bg-white rounded-2xl shadow-2xl border border-gray-200 w-56"
-          style={{ 
-            top: 70,
-            zIndex: 1000,
-            elevation: 10
-          }}
-        >
+        <>
           <TouchableOpacity
-            onPress={handleViewProfile}
-            className="flex-row items-center px-4 py-3 border-b border-gray-100"
+            activeOpacity={1}
+            onPress={() => setShowProfileMenu(false)}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
+          />
+          <View
+            style={[
+              {
+                position: 'absolute',
+                right: space.lg,
+                top: 66,
+                width: 224,
+                backgroundColor: colors.surface,
+                borderRadius: radius.lg,
+                borderWidth: 1,
+                borderColor: colors.border,
+                zIndex: 1000,
+                overflow: 'hidden',
+              },
+              elevation.dropdown,
+            ]}
           >
-            <View className="bg-blue-100 rounded-full p-2 mr-3">
-              <UserCircle size={20} color="#2563eb" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-sm font-bold text-gray-900">View Profile</Text>
-              <Text className="text-xs text-gray-500">Account settings</Text>
-            </View>
-          </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleViewProfile}
+              activeOpacity={0.7}
+              style={styles.menuRow}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: info[100] }]}>
+                <UserCircle size={20} color={info[500]} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText variant="titleMd">View Profile</AppText>
+                <AppText variant="bodySm" color={colors.textMuted}>Account settings</AppText>
+              </View>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleSignOut}
-            className="flex-row items-center px-4 py-3"
-          >
-            <View className="bg-red-100 rounded-full p-2 mr-3">
-              <LogOut size={20} color="#dc2626" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-sm font-bold text-red-600">Sign Out</Text>
-              <Text className="text-xs text-gray-500">Logout from account</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              onPress={handleSignOut}
+              activeOpacity={0.7}
+              style={[styles.menuRow, { borderBottomWidth: 0 }]}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: danger[50] }]}>
+                <LogOut size={20} color={danger[500]} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText variant="titleMd" color={danger[500]}>Sign Out</AppText>
+                <AppText variant="bodySm" color={colors.textMuted}>Logout from account</AppText>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </>
       )}
 
-      {/* Overlay to close dropdown */}
-      {showProfileMenu && (
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setShowProfileMenu(false)}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 999
-          }}
-        />
-      )}
-
-      {/* Profile Modal */}
+      {/* Profile modal */}
       <Modal
         visible={showProfileModal}
         animationType="slide"
@@ -175,7 +190,7 @@ export default function Header() {
         <ViewProfile onClose={() => setShowProfileModal(false)} />
       </Modal>
 
-      {/* Notifications Modal */}
+      {/* Notifications modal */}
       <NotificationsModal
         visible={showNotifications}
         onClose={() => setShowNotifications(false)}
@@ -184,3 +199,53 @@ export default function Header() {
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  iconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: radius.full,
+    backgroundColor: danger[500],
+    borderWidth: 2,
+    borderColor: brand[500],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 42,
+    paddingHorizontal: 12,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  menuIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

@@ -9,8 +9,10 @@
 // "Done" simply closes the picker and "Clear" resets both endpoints.
 
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Pressable, Modal } from 'react-native';
+import { View, TouchableOpacity, Pressable, Modal } from 'react-native';
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react-native';
+import { AppText } from '@/components/UI/AppText';
+import { brand, colors } from '@/constants/design';
 
 export const fmtDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -72,6 +74,8 @@ export default function DateRangeCalendar({
   const inRange = (d: Date) => !!(fromD && toD && d >= fromD && d <= toD);
   const isEndpoint = (d: Date) =>
     !!((fromD && fmtDate(d) === from) || (toD && fmtDate(d) === to));
+  const todayStr = fmtDate(new Date());
+  const isToday = (d: Date) => fmtDate(d) === todayStr;
 
   const label = from
     ? to
@@ -93,16 +97,18 @@ export default function DateRangeCalendar({
       <Pressable
         onPress={openPicker}
         className={`w-full flex-row items-center rounded-xl border bg-white px-3 py-3 ${
-          from ? 'border-blue-300' : 'border-slate-200'
+          from ? 'border-brand-400' : 'border-slate-200'
         }`}
       >
-        <Calendar size={16} color="#94a3b8" />
-        <Text
-          className={`ml-2 flex-1 text-sm font-medium ${from ? 'text-slate-700' : 'text-slate-500'}`}
+        <Calendar size={16} color={from ? brand[500] : '#94a3b8'} />
+        <AppText
+          variant="bodyMd"
+          color={from ? colors.textSecondary : colors.textMuted}
+          style={{ marginLeft: 8, flex: 1 }}
           numberOfLines={1}
         >
           {label}
-        </Text>
+        </AppText>
         {!!from && (
           <TouchableOpacity
             onPress={() => onChange('', '')}
@@ -140,9 +146,9 @@ export default function DateRangeCalendar({
               >
                 <ChevronLeft size={18} color="#64748b" />
               </TouchableOpacity>
-              <Text className="text-sm font-semibold text-slate-800">
+              <AppText variant="titleMd" color={colors.text}>
                 {MONTHS[month]} {year}
-              </Text>
+              </AppText>
               <TouchableOpacity
                 onPress={() => setView(new Date(year, month + 1, 1))}
                 accessibilityRole="button"
@@ -157,7 +163,7 @@ export default function DateRangeCalendar({
             <View className="mb-1 flex-row">
               {WEEKDAYS.map((w) => (
                 <View key={w} className="flex-1 items-center py-1">
-                  <Text className="text-[10px] font-bold uppercase text-slate-400">{w}</Text>
+                  <AppText variant="labelSm" color={colors.textFaint} style={{ textTransform: 'uppercase' }}>{w}</AppText>
                 </View>
               ))}
             </View>
@@ -174,23 +180,28 @@ export default function DateRangeCalendar({
                         onPress={() => handleDayPress(d)}
                         className={`h-9 w-9 items-center justify-center rounded-lg ${
                           isEndpoint(d)
-                            ? 'bg-blue-600'
+                            ? 'bg-brand-500'
                             : inRange(d)
-                            ? 'bg-blue-50'
+                            ? 'bg-brand-50'
+                            : isToday(d)
+                            ? 'bg-brand-50'
                             : ''
                         }`}
                       >
-                        <Text
-                          className={`text-sm ${
+                        <AppText
+                          variant="bodySm"
+                          color={
                             isEndpoint(d)
-                              ? 'font-semibold text-white'
+                              ? colors.white
                               : inRange(d)
-                              ? 'text-blue-700'
-                              : 'text-slate-700'
-                          }`}
+                              ? brand[700]
+                              : isToday(d)
+                              ? brand[600]
+                              : colors.textSecondary
+                          }
                         >
                           {d.getDate()}
-                        </Text>
+                        </AppText>
                       </TouchableOpacity>
                     </View>
                   )
@@ -204,13 +215,13 @@ export default function DateRangeCalendar({
                 onPress={() => onChange('', '')}
                 className="px-2 py-1.5"
               >
-                <Text className="text-xs font-medium text-slate-500">Clear</Text>
+                <AppText variant="labelMd" color={colors.textMuted}>Clear</AppText>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setOpen(false)}
-                className="rounded-lg bg-blue-600 px-3 py-1.5"
+                className="rounded-lg bg-brand-500 px-3 py-1.5"
               >
-                <Text className="text-xs font-semibold text-white">Done</Text>
+                <AppText variant="labelMd" color={colors.white}>Done</AppText>
               </TouchableOpacity>
             </View>
           </Pressable>

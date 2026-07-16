@@ -36,10 +36,10 @@ function EmailValue({ value }: { value: string }) {
       ? 'border-emerald-200 bg-emerald-50'
       : status === 'failed'
         ? 'border-red-200 bg-red-50'
-        : 'border-blue-200 bg-blue-50';
+        : 'border-brand-200 bg-brand-50';
   const btnTextCls =
-    status === 'sent' ? 'text-emerald-700' : status === 'failed' ? 'text-red-700' : 'text-blue-700';
-  const iconColor = status === 'sent' ? '#047857' : status === 'failed' ? '#b91c1c' : '#1d4ed8';
+    status === 'sent' ? 'text-emerald-700' : status === 'failed' ? 'text-red-700' : 'text-brand-700';
+  const iconColor = status === 'sent' ? '#047857' : status === 'failed' ? '#b91c1c' : '#c41617';
 
   return (
     <View className="flex-row items-center flex-wrap" style={{ columnGap: 8, rowGap: 6 }}>
@@ -48,8 +48,8 @@ function EmailValue({ value }: { value: string }) {
         className="flex-row items-center"
         style={{ columnGap: 6 }}
       >
-        <Mail size={14} color="#2563eb" />
-        <Text className="text-sm font-medium text-blue-600">{value}</Text>
+        <Mail size={14} color="#e01a1b" />
+        <Text className="text-sm font-medium text-brand-600">{value}</Text>
       </TouchableOpacity>
       <TouchableOpacity
         onPress={sendTest}
@@ -58,7 +58,7 @@ function EmailValue({ value }: { value: string }) {
         style={{ columnGap: 4, opacity: status === 'sending' ? 0.6 : 1 }}
       >
         {status === 'sending' ? (
-          <ActivityIndicator size="small" color="#1d4ed8" />
+          <ActivityIndicator size="small" color="#c41617" />
         ) : status === 'sent' ? (
           <Check size={12} color={iconColor} strokeWidth={3} />
         ) : (
@@ -175,7 +175,7 @@ export function RenderValue({
   if (type === 'url' && typeof value === 'string') {
     return (
       <TouchableOpacity onPress={() => Linking.openURL(value).catch(() => {})}>
-        <Text className="text-blue-600 text-sm underline">{value}</Text>
+        <Text className="text-brand-600 text-sm underline">{value}</Text>
       </TouchableOpacity>
     );
   }
@@ -193,19 +193,35 @@ export function RenderValue({
     if (items.length === 0) return <Text className="text-slate-400 italic text-sm">None</Text>;
     return (
       <View className="flex-row flex-wrap" style={{ gap: 6 }}>
-        {items.map((item, i) => (
-          <View key={i} className="px-2.5 py-0.5 bg-slate-100 rounded-full border border-slate-200">
-            <Text className="text-slate-700 text-xs font-medium">{String(item)}</Text>
-          </View>
-        ))}
+        {items.map((item, i) => {
+          // Items may be a plain string, or a { flagIso, label } object for
+          // countries — the latter renders a real flag image (flagcdn).
+          const iso = item && typeof item === 'object' ? item.flagIso : undefined;
+          const text = item && typeof item === 'object' ? item.label : String(item);
+          return (
+            <View
+              key={i}
+              className="flex-row items-center px-2.5 py-0.5 bg-slate-100 rounded-full border border-slate-200"
+              style={{ columnGap: 5 }}
+            >
+              {iso ? (
+                <Image
+                  source={{ uri: `https://flagcdn.com/w20/${String(iso).toLowerCase()}.png` }}
+                  style={{ width: 16, height: 11, borderRadius: 2 }}
+                />
+              ) : null}
+              <Text className="text-slate-700 text-xs font-medium">{text}</Text>
+            </View>
+          );
+        })}
       </View>
     );
   }
 
   if (type === 'badge' && typeof value === 'string') {
     return (
-      <View className="px-2.5 py-0.5 bg-blue-50 rounded-full border border-blue-100 self-start">
-        <Text className="text-blue-700 text-xs font-bold">{value}</Text>
+      <View className="px-2.5 py-0.5 bg-brand-50 rounded-full border border-brand-100 self-start">
+        <Text className="text-brand-700 text-xs font-bold">{value}</Text>
       </View>
     );
   }
@@ -292,15 +308,20 @@ export default function VerifyField({
           <Text className="text-xs text-red-600 font-medium">Please complete this verification before continuing.</Text>
         )}
         {v.ok === false && (
-          <TextInput
-            value={v.remarks}
-            onChangeText={setRemarks}
-            placeholder="Remarks for this field…"
-            placeholderTextColor="#94a3b8"
-            multiline
-            className="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-slate-900"
-            style={{ minHeight: 56, textAlignVertical: 'top' }}
-          />
+          <>
+            <Text className="text-xs font-semibold text-slate-600">
+              Reason <Text className="text-red-500">*</Text>
+            </Text>
+            <TextInput
+              value={v.remarks}
+              onChangeText={setRemarks}
+              placeholder="Reason for marking No (required)…"
+              placeholderTextColor="#94a3b8"
+              multiline
+              className="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-slate-900"
+              style={{ minHeight: 56, textAlignVertical: 'top' }}
+            />
+          </>
         )}
       </View>
 
@@ -354,11 +375,11 @@ export function DocCard({
   const viewButton = url ? (
     <TouchableOpacity
       onPress={() => (isImg ? setLightbox(true) : openDocument(url))}
-      className="flex-row items-center px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg"
+      className="flex-row items-center px-2.5 py-1 bg-brand-50 border border-brand-200 rounded-lg"
       style={{ columnGap: 4 }}
     >
-      <Eye size={12} color="#1d4ed8" />
-      <Text className="text-xs font-semibold text-blue-700">View</Text>
+      <Eye size={12} color="#c41617" />
+      <Text className="text-xs font-semibold text-brand-700">View</Text>
     </TouchableOpacity>
   ) : undefined;
 
@@ -388,11 +409,11 @@ export function ViewButton({ url, name, isImage }: { url: string; name: string; 
     <>
       <TouchableOpacity
         onPress={() => (isImage ? setLightbox(true) : openDocument(url))}
-        className="flex-row items-center px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg"
+        className="flex-row items-center px-2.5 py-1 bg-brand-50 border border-brand-200 rounded-lg"
         style={{ columnGap: 4 }}
       >
-        <Eye size={12} color="#1d4ed8" />
-        <Text className="text-xs font-semibold text-blue-700">View</Text>
+        <Eye size={12} color="#c41617" />
+        <Text className="text-xs font-semibold text-brand-700">View</Text>
       </TouchableOpacity>
       {lightbox && <ImageLightbox url={url} name={name} onClose={() => setLightbox(false)} />}
     </>

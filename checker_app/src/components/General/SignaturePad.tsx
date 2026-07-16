@@ -8,10 +8,12 @@
 // exact same `data:image/png;base64,...` format the backend/PDF already expect.
 
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Image, PanResponder } from 'react-native';
+import { View, TouchableOpacity, Image, PanResponder } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import ViewShot from 'react-native-view-shot';
 import { Eraser, PenLine } from 'lucide-react-native';
+import { AppText } from '@/components/UI/AppText';
+import { brand, colors } from '@/constants/design';
 
 export interface SignaturePadProps {
   /** Existing signature as a PNG data URI — shown as an image until redrawn */
@@ -109,7 +111,9 @@ export default function SignaturePad({
   return (
     <View>
       {!!label && (
-        <Text className="mb-2 text-sm font-semibold text-slate-700">{label}</Text>
+        <AppText variant="titleMd" color={colors.textSecondary} style={{ marginBottom: 8 }}>
+          {label}
+        </AppText>
       )}
 
       {showExisting ? (
@@ -128,10 +132,10 @@ export default function SignaturePad({
           <TouchableOpacity
             onPress={handleRedo}
             activeOpacity={0.8}
-            className="mt-2 flex-row items-center justify-center self-start rounded-lg bg-blue-50 px-3 py-2"
+            className="mt-2 flex-row items-center justify-center self-start rounded-lg bg-brand-50 px-3 py-2"
           >
-            <PenLine size={14} color="#2563eb" />
-            <Text className="ml-1.5 text-xs font-semibold text-blue-600">Redo signature</Text>
+            <PenLine size={14} color={brand[500]} />
+            <AppText variant="labelMd" color={brand[600]} style={{ marginLeft: 6 }}>Redo signature</AppText>
           </TouchableOpacity>
         </View>
       ) : (
@@ -176,9 +180,9 @@ export default function SignaturePad({
                     pointerEvents="none"
                     className="absolute inset-0 items-center justify-center"
                   >
-                    <Text className="text-sm text-slate-400">
+                    <AppText variant="bodyMd" color={colors.textFaint}>
                       Sign here using your finger or stylus
-                    </Text>
+                    </AppText>
                   </View>
                 )}
               </View>
@@ -191,7 +195,7 @@ export default function SignaturePad({
             className="mt-2 flex-row items-center justify-center self-start rounded-lg bg-slate-100 px-3 py-2"
           >
             <Eraser size={14} color="#475569" />
-            <Text className="ml-1.5 text-xs font-semibold text-slate-600">Clear</Text>
+            <AppText variant="labelMd" color={colors.textSecondary} style={{ marginLeft: 6 }}>Clear</AppText>
           </TouchableOpacity>
         </View>
       )}

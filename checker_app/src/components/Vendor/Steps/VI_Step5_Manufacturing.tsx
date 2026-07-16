@@ -43,7 +43,7 @@ export default function VI_Step5_Manufacturing({ vendor: v, verifications, onCha
         <Text className="text-slate-500 text-sm">Verify the production facilities, machinery, and capacity information submitted by the vendor.</Text>
       </View>
 
-      <SectionBlock title="Active Facilities" icon={<Settings size={16} color="#2563eb" />}>
+      <SectionBlock title="Active Facilities" icon={<Settings size={16} color="#e01a1b" />}>
         {activeFacilities.length === 0 ? (
           <Text className="text-sm text-slate-400 italic">No facilities declared.</Text>
         ) : (
@@ -55,7 +55,7 @@ export default function VI_Step5_Manufacturing({ vendor: v, verifications, onCha
               return (
                 <View key={facilityKey} className="bg-slate-50 border border-slate-200 rounded-xl p-4" style={{ rowGap: 16 }}>
                   <View className="flex-row items-center pb-2 border-b border-slate-200" style={{ columnGap: 8 }}>
-                    <View className="w-2 h-2 rounded-full bg-blue-600" />
+                    <View className="w-2 h-2 rounded-full bg-brand-500" />
                     <Text className="text-sm font-bold text-slate-800">{meta.label}</Text>
                     <View className="ml-auto px-2 py-0.5 bg-emerald-50 border border-emerald-200 rounded-full">
                       <Text className="text-xs font-bold text-emerald-700">Active</Text>

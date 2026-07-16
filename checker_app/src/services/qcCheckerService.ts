@@ -488,6 +488,7 @@ class QCCheckerService {
     limit?: number;
     search?: string;
     result?: string;
+    status?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
   }): Promise<{

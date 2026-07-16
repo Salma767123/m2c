@@ -2,17 +2,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
-  Text,
   ScrollView,
   TextInput,
   TouchableOpacity,
+  Pressable,
   RefreshControl,
   Modal,
-  Alert,
 } from 'react-native';
 import {
   Search,
-  Eye,
   CheckCircle,
   XCircle,
   RefreshCw,
@@ -22,13 +20,16 @@ import {
   ChevronRight,
   Factory,
   Package,
-  Download,
+  FileText,
+  CalendarDays,
+  User,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import qcCheckerService from '../../../services/qcCheckerService';
 import { useDebounce } from '../../../hooks/useDebounce';
 import DateRangeCalendar, { fmtDate } from '@/components/General/DateRangeCalendar';
-import { downloadFactoryReportPdf, downloadProductReportPdf } from '@/lib/reportPdf';
+import { AppText, StatusBadge } from '@/components/UI';
+import { brand, colors, elevation } from '@/constants/design';
 
 type Tab = 'factory' | 'product';
 const PAGE_SIZE = 12;
@@ -66,43 +67,51 @@ export default function ReportsScreen() {
 
   return (
     <View className="flex-1 bg-gray-50">
-      {/* Header */}
-      <View className="px-4 pt-5 pb-3">
-        <Text className="text-2xl font-extrabold text-slate-900 mb-1">Inspection Reports</Text>
-        <Text className="text-slate-600 text-sm">Your completed quality control reports</Text>
-      </View>
+      {/* Fixed page header + tab strip — stays put outside the scroll list */}
+      <View className="bg-gray-50 border-b border-slate-200 pb-3">
+        <View className="px-4 pt-5 pb-3">
+          <AppText variant="headlineLg">Inspection Reports</AppText>
+          <AppText variant="bodySm" color={colors.textSecondary} style={{ marginTop: 2 }}>
+            Your completed quality control reports
+          </AppText>
+        </View>
 
-      {/* Tab Bar */}
-      <View className="flex-row mx-4 mb-3 bg-slate-200 rounded-xl p-1">
-        {([
-          { key: 'factory' as Tab, label: 'Factory', icon: Factory },
-          { key: 'product' as Tab, label: 'Product', icon: Package },
-        ]).map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.key;
-          return (
-            <TouchableOpacity
-              key={tab.key}
-              onPress={() => setActiveTab(tab.key)}
-              activeOpacity={0.8}
-              className={`flex-1 flex-row items-center justify-center py-2.5 rounded-lg ${
-                isActive ? 'bg-white' : ''
-              }`}
-              style={isActive ? {
-                shadowColor: '#0f172a',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.08,
-                shadowRadius: 4,
-                elevation: 2,
-              } : undefined}
-            >
-              <Icon size={15} color={isActive ? '#0f172a' : '#64748b'} strokeWidth={2.25} />
-              <Text className={`ml-1.5 text-sm font-bold ${isActive ? 'text-slate-900' : 'text-slate-500'}`}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+        {/* Tab Bar — active = brand red */}
+        <View className="flex-row mx-4 bg-slate-100 rounded-xl p-1">
+          {([
+            { key: 'factory' as Tab, label: 'Factory', icon: Factory },
+            { key: 'product' as Tab, label: 'Product', icon: Package },
+          ]).map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                onPress={() => setActiveTab(tab.key)}
+                activeOpacity={0.8}
+                className={`flex-1 flex-row items-center justify-center py-2.5 rounded-lg ${
+                  isActive ? 'bg-brand-500' : ''
+                }`}
+                style={isActive ? {
+                  shadowColor: '#0f172a',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.12,
+                  shadowRadius: 4,
+                  elevation: 2,
+                } : undefined}
+              >
+                <Icon size={15} color={isActive ? '#ffffff' : '#64748b'} strokeWidth={2.25} />
+                <AppText
+                  variant="titleMd"
+                  color={isActive ? '#ffffff' : colors.textMuted}
+                  style={{ marginLeft: 6 }}
+                >
+                  {tab.label}
+                </AppText>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
       {activeTab === 'factory' ? <FactoryReportsTab /> : <ProductReportsTab />}
@@ -128,12 +137,6 @@ function FactoryReportsTab() {
   const [error, setError] = useState<string | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
   const [showSortModal, setShowSortModal] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [checkerName, setCheckerName] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    qcCheckerService.getCheckerData().then((d) => { if (d?.name) setCheckerName(d.name); }).catch(() => {});
-  }, []);
 
   const didMountRef = useRef(false);
   useEffect(() => {
@@ -200,17 +203,6 @@ function FactoryReportsTab() {
   const totalShown = dateFrom ? filteredInspections.length : pagination.total;
   const clearFilters = () => { setSearchInput(''); setResultFilter(''); setSort(DEFAULT_SORT); setDateFrom(''); setDateTo(''); setPage(1); };
 
-  const handleDownload = async (insp: any) => {
-    setDownloadingId(insp.id);
-    try {
-      await downloadFactoryReportPdf(insp, { variant: 'canonical', checkerName });
-    } catch (e: any) {
-      Alert.alert('PDF Error', e?.message || 'Failed to generate PDF');
-    } finally {
-      setDownloadingId(null);
-    }
-  };
-
   const buildRow = (insp: any) => {
     const fd = insp.itemsToInspect && !Array.isArray(insp.itemsToInspect) ? insp.itemsToInspect : {};
     return {
@@ -231,9 +223,9 @@ function FactoryReportsTab() {
   return (
     <ScrollView
       className="flex-1"
-      contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+      contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadReports(); }} tintColor="#2563eb" colors={['#2563eb']} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadReports(); }} tintColor={brand[500]} colors={[brand[500]]} />}
     >
       {/* Search */}
       <View className="mb-3 flex-row items-center bg-white border border-slate-300 rounded-xl px-4 py-2.5">
@@ -267,37 +259,40 @@ function FactoryReportsTab() {
         <TouchableOpacity onPress={() => setShowResultModal(true)}
           className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
         >
-          <Text className="text-sm text-slate-900" numberOfLines={1}>{resultLabel}</Text>
+          <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{resultLabel}</AppText>
           <ChevronDown size={16} color="#64748b" />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setShowSortModal(true)}
           className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
         >
-          <Text className="text-sm text-slate-900" numberOfLines={1}>{sortLabel}</Text>
+          <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{sortLabel}</AppText>
           <ChevronDown size={16} color="#64748b" />
         </TouchableOpacity>
       </View>
 
       {/* Summary */}
       <View className="flex-row items-center justify-between mb-3">
-        <Text className="text-xs text-slate-600">
+        <AppText variant="labelSm" color={colors.textSecondary}>
           {loading && inspections.length === 0 ? '' : totalShown === 0 ? '0 reports' : `Showing ${rangeStart}–${rangeEnd} of ${totalShown}`}
-        </Text>
+        </AppText>
         {hasActiveFilters ? (
           <TouchableOpacity onPress={clearFilters}>
-            <Text className="text-xs font-semibold text-blue-600 underline">Clear filters</Text>
+            <AppText variant="labelSm" color={brand[600]} style={{ textDecorationLine: 'underline' }}>Clear filters</AppText>
           </TouchableOpacity>
         ) : null}
       </View>
 
       {/* Error */}
       {error && !loading ? (
-        <View className="bg-red-50 border border-red-200 rounded-xl p-4 mb-3">
-          <Text className="text-sm text-red-700 mb-2">{error}</Text>
-          <TouchableOpacity onPress={loadReports} className="bg-red-600 rounded-lg px-4 py-2 self-start flex-row items-center">
+        <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-3">
+          <AppText variant="bodySm" color={colors.dangerFg} style={{ marginBottom: 8 }}>{error}</AppText>
+          <Pressable onPress={loadReports}
+            className="rounded-lg px-4 py-2.5 self-start flex-row items-center"
+            style={({ pressed }) => ({ backgroundColor: pressed ? brand[600] : brand[500], minHeight: 44 })}
+          >
             <RefreshCw size={14} color="#ffffff" />
-            <Text className="text-white font-semibold text-sm ml-2">Retry</Text>
-          </TouchableOpacity>
+            <AppText variant="titleMd" color="#ffffff" style={{ marginLeft: 8 }}>Retry</AppText>
+          </Pressable>
         </View>
       ) : null}
 
@@ -305,16 +300,16 @@ function FactoryReportsTab() {
       {loading && inspections.length === 0 && !error ? (
         <View style={{ rowGap: 10 }}>
           {Array.from({ length: 4 }).map((_, i) => (
-            <View key={i} className="bg-white rounded-2xl border border-slate-200 p-4">
-              <View className="flex-row items-center justify-between mb-3">
-                <View className="flex-1"><View className="h-3.5 bg-slate-200 rounded w-3/4 mb-2" /><View className="h-2.5 bg-slate-200 rounded w-1/2" /></View>
+            <View key={i} className="bg-white rounded-2xl border border-slate-200 p-4" style={elevation.card}>
+              <View className="flex-row items-center" style={{ columnGap: 12 }}>
+                <View className="w-11 h-11 bg-slate-200 rounded-xl" />
+                <View className="flex-1">
+                  <View className="h-3.5 bg-slate-200 rounded w-3/4 mb-2" />
+                  <View className="h-2.5 bg-slate-200 rounded w-1/2 mb-2" />
+                  <View className="h-2.5 bg-slate-200 rounded w-2/5" />
+                </View>
                 <View className="h-5 w-16 bg-slate-200 rounded-full" />
               </View>
-              <View className="flex-row mb-3" style={{ columnGap: 8 }}>
-                <View className="flex-1 h-2.5 bg-slate-200 rounded" />
-                <View className="flex-1 h-2.5 bg-slate-200 rounded" />
-              </View>
-              <View className="h-9 bg-slate-200 rounded-lg" />
             </View>
           ))}
         </View>
@@ -325,47 +320,34 @@ function FactoryReportsTab() {
         <View style={{ rowGap: 10 }}>
           {filteredInspections.map((insp) => {
             const row = buildRow(insp);
-            const isDownloading = downloadingId === insp.id;
             return (
-              <View key={insp.id} className="bg-white rounded-2xl border border-slate-200 p-4">
-                <View className="flex-row items-start justify-between mb-3">
-                  <View className="flex-1 mr-3">
-                    <Text className="text-base font-bold text-slate-900 mb-0.5" numberOfLines={1}>{row.vendor}</Text>
-                    <Text className="text-xs text-slate-500">{row.factoryName}</Text>
+              <Pressable
+                key={insp.id}
+                onPress={() => router.push({ pathname: '/factory-report/[id]' as any, params: { id: insp.id } })}
+                className="bg-white rounded-2xl border border-slate-200 overflow-hidden"
+                style={({ pressed }) => [{ padding: 14, minHeight: 44, backgroundColor: pressed ? '#f8fafc' : '#ffffff' }, elevation.card]}
+              >
+                <View className="flex-row items-center" style={{ gap: 12 }}>
+                  <View className="w-11 h-11 bg-brand-50 rounded-xl items-center justify-center">
+                    <FileText size={18} color={brand[500]} strokeWidth={2} />
+                  </View>
+                  <View className="flex-1" style={{ gap: 3 }}>
+                    <AppText variant="titleMd" numberOfLines={1}>{row.vendor}</AppText>
+                    <AppText variant="bodySm" color={colors.textMuted} numberOfLines={1}>{row.factoryName}</AppText>
+                    <View className="flex-row items-center flex-wrap" style={{ columnGap: 12, rowGap: 2 }}>
+                      <View className="flex-row items-center" style={{ gap: 4 }}>
+                        <User size={11} color={colors.textFaint} />
+                        <AppText variant="labelSm" color={colors.textFaint} numberOfLines={1}>{row.clientName}</AppText>
+                      </View>
+                      <View className="flex-row items-center" style={{ gap: 4 }}>
+                        <CalendarDays size={11} color={colors.textFaint} />
+                        <AppText variant="labelSm" color={colors.textFaint}>{row.inspectionDate}</AppText>
+                      </View>
+                    </View>
                   </View>
                   <ResultBadge result={row.result} />
                 </View>
-                <View className="flex-row flex-wrap mb-3 pb-3 border-b border-slate-100" style={{ columnGap: 16, rowGap: 4 }}>
-                  <View>
-                    <Text className="text-[10px] text-slate-400 font-bold uppercase">Client</Text>
-                    <Text className="text-xs text-slate-700 font-medium">{row.clientName}</Text>
-                  </View>
-                  <View>
-                    <Text className="text-[10px] text-slate-400 font-bold uppercase">Completed</Text>
-                    <Text className="text-xs text-slate-700 font-medium">{row.inspectionDate}</Text>
-                  </View>
-                </View>
-                <View className="flex-row" style={{ columnGap: 8 }}>
-                  <TouchableOpacity
-                    onPress={() => router.push({ pathname: '/factory-report/[id]' as any, params: { id: insp.id } })}
-                    activeOpacity={0.8}
-                    className="flex-1 flex-row items-center justify-center bg-slate-100 rounded-lg py-2.5"
-                  >
-                    <Eye size={14} color="#475569" />
-                    <Text className="text-slate-700 font-semibold text-sm ml-2">View Report</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleDownload(insp)}
-                    disabled={isDownloading}
-                    activeOpacity={0.8}
-                    className="flex-row items-center justify-center rounded-lg py-2.5 px-3"
-                    style={{ backgroundColor: '#222', opacity: isDownloading ? 0.6 : 1 }}
-                    accessibilityLabel="Download PDF"
-                  >
-                    <Download size={14} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              </View>
+              </Pressable>
             );
           })}
         </View>
@@ -377,14 +359,17 @@ function FactoryReportsTab() {
           <View className="w-20 h-20 rounded-2xl bg-slate-100 items-center justify-center mb-4">
             <Factory size={36} color="#94a3b8" />
           </View>
-          <Text className="text-base font-bold text-slate-900 mb-1">{hasActiveFilters ? 'No reports match filters' : 'No reports yet'}</Text>
-          <Text className="text-sm text-slate-500 text-center mb-4">
+          <AppText variant="titleLg" style={{ marginBottom: 4 }}>{hasActiveFilters ? 'No reports match filters' : 'No reports yet'}</AppText>
+          <AppText variant="bodySm" color={colors.textSecondary} style={{ textAlign: 'center', marginBottom: 16 }}>
             {hasActiveFilters ? 'Try adjusting your search or filters.' : 'Completed factory inspections will appear here.'}
-          </Text>
+          </AppText>
           {hasActiveFilters ? (
-            <TouchableOpacity onPress={clearFilters} className="bg-blue-600 rounded-lg px-4 py-2.5">
-              <Text className="text-white font-semibold text-sm">Clear filters</Text>
-            </TouchableOpacity>
+            <Pressable onPress={clearFilters}
+              className="rounded-lg px-4 py-2.5"
+              style={({ pressed }) => ({ backgroundColor: pressed ? brand[600] : brand[500], minHeight: 44, justifyContent: 'center' })}
+            >
+              <AppText variant="titleMd" color="#ffffff">Clear filters</AppText>
+            </Pressable>
           ) : null}
         </View>
       ) : null}
@@ -419,12 +404,6 @@ function ProductReportsTab() {
   const [error, setError] = useState<string | null>(null);
   const [showSortModal, setShowSortModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [checkerName, setCheckerName] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    qcCheckerService.getCheckerData().then((d) => { if (d?.name) setCheckerName(d.name); }).catch(() => {});
-  }, []);
 
   const didMountRef = useRef(false);
   useEffect(() => {
@@ -494,27 +473,10 @@ function ProductReportsTab() {
   const sortLabel = PRODUCT_SORT_OPTIONS.find((o) => o.value === sort)?.label || 'Latest first';
   const statusLabel = PRODUCT_STATUS_OPTIONS.find((o) => o.value === statusFilter)?.label || 'All results';
 
-  const handleDownload = async (product: any) => {
-    setDownloadingId(product.id);
-    try {
-      await downloadProductReportPdf(product, { variant: 'canonical', checkerName });
-    } catch (e: any) {
-      Alert.alert('PDF Error', e?.message || 'Failed to generate PDF');
-    } finally {
-      setDownloadingId(null);
-    }
-  };
-
-  const APPROVAL_STYLE: Record<string, { bg: string; text: string }> = {
-    QC_APPROVED: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
-    APPROVED: { bg: 'bg-green-100', text: 'text-green-800' },
-    REJECTED: { bg: 'bg-red-100', text: 'text-red-800' },
-  };
-
   return (
     <ScrollView
       className="flex-1"
-      contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+      contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
       showsVerticalScrollIndicator={false}
     >
       {/* Search */}
@@ -549,25 +511,25 @@ function ProductReportsTab() {
         <TouchableOpacity onPress={() => setShowStatusModal(true)}
           className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
         >
-          <Text className="text-sm text-slate-900" numberOfLines={1}>{statusLabel}</Text>
+          <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{statusLabel}</AppText>
           <ChevronDown size={16} color="#64748b" />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setShowSortModal(true)}
           className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
         >
-          <Text className="text-sm text-slate-900" numberOfLines={1}>{sortLabel}</Text>
+          <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{sortLabel}</AppText>
           <ChevronDown size={16} color="#64748b" />
         </TouchableOpacity>
       </View>
 
       {/* Summary */}
       <View className="flex-row items-center justify-between mb-3">
-        <Text className="text-xs text-slate-600">
+        <AppText variant="labelSm" color={colors.textSecondary}>
           {loading && products.length === 0 ? '' : filteredProducts.length === 0 ? '0 reports' : `${filteredProducts.length} report${filteredProducts.length === 1 ? '' : 's'}`}
-        </Text>
+        </AppText>
         {hasActiveFilters ? (
           <TouchableOpacity onPress={clearFilters}>
-            <Text className="text-xs font-semibold text-blue-600 underline">Clear filters</Text>
+            <AppText variant="labelSm" color={brand[600]} style={{ textDecorationLine: 'underline' }}>Clear filters</AppText>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -576,69 +538,55 @@ function ProductReportsTab() {
       {loading && products.length === 0 ? (
         <View style={{ rowGap: 10 }}>
           {Array.from({ length: 3 }).map((_, i) => (
-            <View key={i} className="bg-white rounded-2xl border border-slate-200 p-4">
-              <View className="h-3.5 bg-slate-200 rounded w-3/4 mb-2" />
-              <View className="h-2.5 bg-slate-200 rounded w-1/2 mb-3" />
-              <View className="h-9 bg-slate-200 rounded-lg" />
+            <View key={i} className="bg-white rounded-2xl border border-slate-200 p-4" style={elevation.card}>
+              <View className="flex-row items-center" style={{ columnGap: 12 }}>
+                <View className="w-11 h-11 bg-slate-200 rounded-xl" />
+                <View className="flex-1">
+                  <View className="h-3.5 bg-slate-200 rounded w-3/4 mb-2" />
+                  <View className="h-2.5 bg-slate-200 rounded w-1/2" />
+                </View>
+              </View>
             </View>
           ))}
         </View>
       ) : error ? (
-        <View className="bg-red-50 border border-red-200 rounded-xl p-4">
-          <Text className="text-sm text-red-700">{error}</Text>
+        <View className="bg-red-50 border border-red-200 rounded-2xl p-4">
+          <AppText variant="bodySm" color={colors.dangerFg}>{error}</AppText>
         </View>
       ) : filteredProducts.length === 0 ? (
         <View className="py-12 items-center">
           <View className="w-20 h-20 rounded-2xl bg-slate-100 items-center justify-center mb-4">
             <Package size={36} color="#94a3b8" />
           </View>
-          <Text className="text-base font-bold text-slate-900 mb-1">{hasActiveFilters ? 'No matches' : 'No product reports'}</Text>
-          <Text className="text-sm text-slate-500 text-center">
+          <AppText variant="titleLg" style={{ marginBottom: 4 }}>{hasActiveFilters ? 'No matches' : 'No product reports'}</AppText>
+          <AppText variant="bodySm" color={colors.textSecondary} style={{ textAlign: 'center' }}>
             {hasActiveFilters ? 'Try adjusting your search or filters.' : 'QC approved products will appear here.'}
-          </Text>
+          </AppText>
         </View>
       ) : (
         <View style={{ rowGap: 10 }}>
-          {filteredProducts.map((p: any) => {
-            const badge = APPROVAL_STYLE[p.approvalStatus] || { bg: 'bg-slate-100', text: 'text-slate-700' };
-            const isDownloading = downloadingId === p.id;
-            return (
-              <View key={p.id} className="bg-white rounded-2xl border border-slate-200 p-4">
-                <View className="flex-row items-start justify-between mb-2">
-                  <View className="flex-1 mr-3">
-                    <Text className="text-base font-bold text-slate-900 mb-0.5" numberOfLines={1}>{p.name}</Text>
-                    <Text className="text-xs text-slate-500">SKU: {p.baseSku}</Text>
-                  </View>
-                  <View className={`px-2.5 py-1 rounded-full ${badge.bg}`}>
-                    <Text className={`text-[10px] font-bold ${badge.text}`}>{p.approvalStatus?.replace(/_/g, ' ')}</Text>
-                  </View>
+          {filteredProducts.map((p: any) => (
+            <Pressable
+              key={p.id}
+              onPress={() => router.push({ pathname: '/product-report/[id]' as any, params: { id: p.id } })}
+              className="bg-white rounded-2xl border border-slate-200 overflow-hidden"
+              style={({ pressed }) => [{ padding: 14, minHeight: 44, backgroundColor: pressed ? '#f8fafc' : '#ffffff' }, elevation.card]}
+            >
+              <View className="flex-row items-center" style={{ gap: 12 }}>
+                <View className="w-11 h-11 bg-brand-50 rounded-xl items-center justify-center">
+                  <Package size={18} color={brand[500]} strokeWidth={2} />
                 </View>
-                <Text className="text-xs text-slate-600 mb-3">
-                  {p.vendor?.companyName || '—'} · {p.category}
-                </Text>
-                <View className="flex-row" style={{ columnGap: 8 }}>
-                  <TouchableOpacity
-                    onPress={() => router.push({ pathname: '/product-report/[id]' as any, params: { id: p.id } })}
-                    activeOpacity={0.8}
-                    className="flex-1 flex-row items-center justify-center bg-slate-100 rounded-lg py-2.5"
-                  >
-                    <Eye size={14} color="#475569" />
-                    <Text className="text-slate-700 font-semibold text-sm ml-2">View Report</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleDownload(p)}
-                    disabled={isDownloading}
-                    activeOpacity={0.8}
-                    className="flex-row items-center justify-center rounded-lg py-2.5 px-3"
-                    style={{ backgroundColor: '#222', opacity: isDownloading ? 0.6 : 1 }}
-                    accessibilityLabel="Download PDF"
-                  >
-                    <Download size={14} color="#fff" />
-                  </TouchableOpacity>
+                <View className="flex-1" style={{ gap: 3 }}>
+                  <AppText variant="titleMd" numberOfLines={1}>{p.name}</AppText>
+                  <AppText variant="bodySm" color={colors.textMuted} numberOfLines={1}>SKU: {p.baseSku}</AppText>
+                  <AppText variant="labelSm" color={colors.textFaint} numberOfLines={1}>
+                    {p.vendor?.companyName || '—'} · {p.category}
+                  </AppText>
                 </View>
+                <StatusBadge status={p.approvalStatus} label={p.approvalStatus?.replace(/_/g, ' ')} />
               </View>
-            );
-          })}
+            </Pressable>
+          ))}
         </View>
       )}
 
@@ -661,7 +609,7 @@ function ResultBadge({ result }: { result: string }) {
     return (
       <View className="flex-row items-center bg-emerald-100 px-2.5 py-1 rounded-full border border-emerald-200" style={{ columnGap: 4 }}>
         <CheckCircle size={10} color="#059669" />
-        <Text className="text-[10px] font-bold text-emerald-700">Passed</Text>
+        <AppText variant="labelSm" color="#047857">Passed</AppText>
       </View>
     );
   }
@@ -669,13 +617,13 @@ function ResultBadge({ result }: { result: string }) {
     return (
       <View className="flex-row items-center bg-red-100 px-2.5 py-1 rounded-full border border-red-200" style={{ columnGap: 4 }}>
         <XCircle size={10} color="#dc2626" />
-        <Text className="text-[10px] font-bold text-red-700">Failed</Text>
+        <AppText variant="labelSm" color="#b91c1c">Failed</AppText>
       </View>
     );
   }
   return (
     <View className="bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
-      <Text className="text-[10px] font-bold text-slate-700">{result || '—'}</Text>
+      <AppText variant="labelSm" color="#334155">{result || '—'}</AppText>
     </View>
   );
 }
@@ -691,16 +639,16 @@ function OptionModal({ visible, title, options, value, onSelect, onClose }: {
       >
         <View className="bg-white rounded-2xl w-11/12 max-w-sm overflow-hidden">
           <View className="px-5 py-4 border-b border-slate-100">
-            <Text className="text-base font-bold text-slate-900">{title}</Text>
+            <AppText variant="titleLg">{title}</AppText>
           </View>
           {options.map((opt) => {
             const active = opt.value === value;
             return (
               <TouchableOpacity key={opt.value} onPress={() => onSelect(opt.value)}
-                className={`px-5 py-3.5 flex-row items-center justify-between border-b border-slate-100 ${active ? 'bg-blue-50' : ''}`}
+                className={`px-5 py-3.5 flex-row items-center justify-between border-b border-slate-100 ${active ? 'bg-brand-50' : ''}`}
               >
-                <Text className={`text-sm ${active ? 'text-blue-700 font-bold' : 'text-slate-700'}`}>{opt.label}</Text>
-                {active ? <View className="w-2 h-2 rounded-full bg-blue-600" /> : null}
+                <AppText variant="bodyMd" color={active ? brand[700] : colors.textSecondary} style={active ? { fontWeight: '700' } : undefined}>{opt.label}</AppText>
+                {active ? <View className="w-2 h-2 rounded-full bg-brand-500" /> : null}
               </TouchableOpacity>
             );
           })}
@@ -721,18 +669,18 @@ function Pagination({ page, totalPages, onChange, disabled }: {
         style={{ opacity: disabled || page <= 1 ? 0.4 : 1 }}
       >
         <ChevronLeft size={14} color="#475569" />
-        <Text className="text-xs font-semibold text-slate-700 ml-1">Prev</Text>
+        <AppText variant="labelSm" color={colors.textSecondary} style={{ marginLeft: 4 }}>Prev</AppText>
       </TouchableOpacity>
       {pages.map((p, i) =>
         p === '…' ? (
-          <Text key={`el-${i}`} className="px-2 text-slate-400">…</Text>
+          <AppText key={`el-${i}`} variant="bodySm" color={colors.textFaint} style={{ paddingHorizontal: 8 }}>…</AppText>
         ) : (
           <TouchableOpacity key={p} onPress={() => onChange(p)} disabled={disabled}
             className={`min-w-9 px-3 py-2 rounded-lg border ${
-              p === page ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-200'
+              p === page ? 'bg-brand-500 border-brand-500' : 'bg-white border-slate-200'
             }`} style={{ opacity: disabled ? 0.4 : 1 }}
           >
-            <Text className={`text-xs font-bold text-center ${p === page ? 'text-white' : 'text-slate-700'}`}>{p}</Text>
+            <AppText variant="labelSm" color={p === page ? '#ffffff' : colors.textSecondary} style={{ textAlign: 'center' }}>{p}</AppText>
           </TouchableOpacity>
         ),
       )}
@@ -740,7 +688,7 @@ function Pagination({ page, totalPages, onChange, disabled }: {
         className="flex-row items-center px-3 py-2 rounded-lg border border-slate-200 bg-white"
         style={{ opacity: disabled || page >= totalPages ? 0.4 : 1 }}
       >
-        <Text className="text-xs font-semibold text-slate-700 mr-1">Next</Text>
+        <AppText variant="labelSm" color={colors.textSecondary} style={{ marginRight: 4 }}>Next</AppText>
         <ChevronRight size={14} color="#475569" />
       </TouchableOpacity>
     </View>

@@ -8,6 +8,7 @@
 
 import type { Verifications } from './Steps/VI_VerifyField';
 import type { FactoryEvidenceState } from './Steps/VI_Step2_WarehouseFactory';
+import { detectSameAsWarehouse } from './Steps/VI_Step2_WarehouseFactory';
 import type { InspectorMeta } from './Steps/VI_Step8_FinalReview';
 
 // Returns the registered keys that are not yet verified (ok === null).
@@ -15,9 +16,18 @@ export function unverifiedKeys(registeredKeys: string[], verifications: Verifica
   return registeredKeys.filter((k) => (verifications[k]?.ok ?? null) === null);
 }
 
-// Step 2 — at least one inspector evidence photo (mirrors goNext step===2).
-export function hasEvidence(evidence: FactoryEvidenceState): boolean {
-  return !!(evidence.frontView || evidence.nameBoard || evidence.routeMap);
+// Step 2 — all three Legal Address & Factory Site evidence photos are always
+// required (Name Board, Front View, Route Map). When the warehouse address
+// differs from the Legal Address & Factory Site, all three Warehouse photos are
+// also required (mirrors web VendorInspectionForm goNext step===2). `vendor` is
+// optional — when omitted, only the Legal Address & Factory Site trio is
+// enforced.
+export function hasEvidence(evidence: FactoryEvidenceState, vendor?: any): boolean {
+  const hasFactory = !!(evidence.frontView && evidence.nameBoard && evidence.routeMap);
+  if (!hasFactory) return false;
+  const isSame = vendor ? detectSameAsWarehouse(vendor) : true;
+  if (isSame) return true;
+  return !!(evidence.warehouseFrontView && evidence.warehouseNameBoard && evidence.warehouseRouteMap);
 }
 
 export interface StepValidationResult {
@@ -36,13 +46,17 @@ export function validateStep(
   registeredKeys: string[],
   verifications: Verifications,
   evidence: FactoryEvidenceState,
+  vendor?: any,
 ): StepValidationResult {
-  if (step === 2 && !hasEvidence(evidence)) {
+  if (step === 2 && !hasEvidence(evidence, vendor)) {
+    const isSame = vendor ? detectSameAsWarehouse(vendor) : true;
     return {
       ok: false,
       unverified: [],
       missingEvidence: true,
-      message: 'Please upload at least one inspector evidence photo before continuing.',
+      message: isSame
+        ? 'Please upload all three Legal Address & Factory Site evidence photos (Name Board, Front View, Route Map) before continuing.'
+        : 'Please upload all six inspector evidence photos — Legal Address & Factory Site and Warehouse (Name Board, Front View, Route Map each) — before continuing.',
     };
   }
 

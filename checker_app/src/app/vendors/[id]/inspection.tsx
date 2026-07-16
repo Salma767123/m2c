@@ -24,7 +24,6 @@ import {
   Clock,
 } from 'lucide-react-native';
 import qcCheckerService from '../../../services/qcCheckerService';
-import SelfieCaptureModal, { SelfieResult } from '../../../components/General/SelfieCaptureModal';
 
 import { HighlightFieldsProvider, Verifications } from '../../../components/Vendor/Steps/VI_VerifyField';
 import VI_Step1_CompanyInfo from '../../../components/Vendor/Steps/VI_Step1_CompanyInfo';
@@ -40,13 +39,13 @@ import { validateStep, validateForSubmit } from '../../../components/Vendor/vali
 import { formatCheckerName } from '../../../components/Vendor/Steps/fieldHelpers';
 
 const STEPS = [
-  { id: 1, label: 'Company' },
+  { id: 1, label: 'Company Info' },
   { id: 2, label: 'Warehouse' },
   { id: 3, label: 'Owner' },
-  { id: 4, label: 'Products' },
+  { id: 4, label: 'Vendor & Products' },
   { id: 5, label: 'Manufacturing' },
   { id: 6, label: 'Certifications' },
-  { id: 7, label: 'Contact' },
+  { id: 7, label: 'Contact & Trade' },
   { id: 8, label: 'Final Review' },
   { id: 9, label: 'Documentation' },
 ];
@@ -92,18 +91,18 @@ export default function VendorInspectionScreen() {
   const registeredFieldsRef = useRef<string[]>([]);
   const [highlightedKeys, setHighlightedKeys] = useState<Set<string>>(new Set());
 
-  // ── Selfie / GPS gates ──────────────────────────────────────────────
-  const [showBeforeSelfie, setShowBeforeSelfie] = useState(true);
-  const [beforeSelfie, setBeforeSelfie] = useState<SelfieResult | null>(null);
-  const [showAfterSelfie, setShowAfterSelfie] = useState(false);
-  const [afterSelfie, setAfterSelfie] = useState<SelfieResult | null>(null);
-  const [locationStarting, setLocationStarting] = useState(false);
+  // No selfie / GPS gate — matches the web QC checker (selfie removed,
+  // geofence disabled by default). The inspection auto-starts on mount and
+  // submit goes straight through.
+  const startedRef = useRef(false);
 
   // ── Exit guard state ────────────────────────────────────────────────
   const allowLeaveRef = useRef(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const pendingNavActionRef = useRef<null | (() => void)>(null);
   const dirtyRef = useRef(false);
+  const contentScrollRef = useRef<ScrollView>(null);
+  const scrollToTop = () => contentScrollRef.current?.scrollTo({ y: 0, animated: true });
 
   const handleRegisterFields = useCallback((keys: string[]) => {
     registeredFieldsRef.current = keys;
@@ -209,6 +208,14 @@ export default function VendorInspectionScreen() {
     };
   }, [id]);
 
+  // Auto-start the inspection once loaded — no selfie/location gate (geofence
+  // disabled, matching web). Idempotent: ignore errors if already started.
+  useEffect(() => {
+    if (!inspectionId || startedRef.current) return;
+    startedRef.current = true;
+    qcCheckerService.startInspection(inspectionId, null).catch(() => {});
+  }, [inspectionId]);
+
   // ── Draft persistence — debounced write on every change ─────────────
   useEffect(() => {
     if (!inspectionId || loading || allowLeaveRef.current) return;
@@ -262,10 +269,12 @@ export default function VendorInspectionScreen() {
     if (!result.ok) {
       if (result.missingEvidence) {
         setEvidenceError(true);
+        scrollToTop();
         Alert.alert('Evidence photo required', result.message || 'Upload at least one evidence photo.');
         return;
       }
       setHighlightedKeys(new Set(result.unverified));
+      scrollToTop();
       Alert.alert('Verification incomplete', result.message || 'Please verify all fields before continuing.');
       return;
     }
@@ -290,13 +299,19 @@ export default function VendorInspectionScreen() {
     if (step > 1) setStep((s) => s - 1);
   };
 
+  // When the step changes, reset the form scroll to the top so each step
+  // starts from its heading (not wherever the previous step was scrolled).
+  useEffect(() => {
+    contentScrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, [step]);
+
   const handleGoToStep = (target: number, fieldKey?: string) => {
     setStep(target);
     if (fieldKey) setHighlightedKeys(new Set([fieldKey]));
   };
 
   // ── Submit ──────────────────────────────────────────────────────────
-  const handleSubmit = async (afterSelfieOverride?: SelfieResult) => {
+  const handleSubmit = async () => {
     if (!inspectionId) {
       Alert.alert('Cannot Submit', 'No active inspection found.');
       return;
@@ -320,18 +335,10 @@ export default function VendorInspectionScreen() {
       return;
     }
 
-    // Require after-selfie + GPS before finalising.
-    const resolvedAfterSelfie = afterSelfieOverride ?? afterSelfie;
-    if (!resolvedAfterSelfie) {
-      setShowAfterSelfie(true);
-      return;
-    }
-
     setSubmitting(true);
     try {
-      // Payload keys EXACTLY match the web VendorInspectionForm submit, with the
-      // app's selfie keys added additively. GPS goes through the service's
-      // `location` param (adds checkerLatitude/checkerLongitude), same as web.
+      // Payload keys EXACTLY match the web VendorInspectionForm submit
+      // (no selfie / GPS — geofence disabled by default, same as web).
       const payload: any = {
         verifications,
         inspectorName: meta.inspectorName,
@@ -343,18 +350,11 @@ export default function VendorInspectionScreen() {
         signedDocuments: docData.signedDocuments,
         signedReport: docData.signedReport,
         clientSignature: docData.clientSignature || null,
-        // App-only additive keys (selfie evidence + factory evidence photos)
+        // App-only additive key (factory evidence photos)
         factoryEvidence,
-        beforeSelfieTakenAt: beforeSelfie?.takenAt,
-        beforeSelfiePhoto: beforeSelfie ? { name: 'before-selfie.jpg', data: beforeSelfie.dataUri } : undefined,
-        afterSelfieTakenAt: resolvedAfterSelfie.takenAt,
-        afterSelfiePhoto: { name: 'after-selfie.jpg', data: resolvedAfterSelfie.dataUri },
       };
 
-      const submitLoc =
-        resolvedAfterSelfie.latitude != null && resolvedAfterSelfie.longitude != null
-          ? { latitude: resolvedAfterSelfie.latitude, longitude: resolvedAfterSelfie.longitude }
-          : null;
+      const submitLoc = null;
 
       const res = await qcCheckerService.completeInspection(inspectionId, payload, submitLoc);
       if (res.success) {
@@ -462,7 +462,7 @@ export default function VendorInspectionScreen() {
   if (loading) {
     return (
       <View className="flex-1 bg-slate-50 items-center justify-center">
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color="#e01a1b" />
         <Text className="mt-4 text-slate-600">Loading vendor inspection…</Text>
       </View>
     );
@@ -481,7 +481,7 @@ export default function VendorInspectionScreen() {
             {isSubmitted ? 'Inspection Submitted' : loadError.type === 'not_assigned' ? 'Access Denied' : 'Unable to Start Inspection'}
           </Text>
           <Text className="text-slate-600 text-sm text-center leading-relaxed">{loadError.message}</Text>
-          <TouchableOpacity onPress={() => router.back()} className="mt-6 bg-blue-600 rounded-xl px-6 py-3">
+          <TouchableOpacity onPress={() => router.back()} className="mt-6 bg-brand-500 rounded-xl px-6 py-3">
             <Text className="text-white font-bold">Back to Vendor List</Text>
           </TouchableOpacity>
         </View>
@@ -492,81 +492,6 @@ export default function VendorInspectionScreen() {
   return (
     <View className="flex-1 bg-slate-50">
       <Header onBack={() => router.back()} title={typeof name === 'string' ? name : 'Vendor Inspection'} />
-
-      {/* Before-inspection selfie gate */}
-      <SelfieCaptureModal
-        visible={showBeforeSelfie}
-        title="Before Inspection Selfie"
-        description="Take a selfie to verify your presence before starting the inspection. Your GPS location will be verified against the vendor's factory."
-        onConfirm={async (result) => {
-          setBeforeSelfie(result);
-          setShowBeforeSelfie(false);
-          if (inspectionId) {
-            setLocationStarting(true);
-            try {
-              const loc =
-                result.latitude != null && result.longitude != null
-                  ? { latitude: result.latitude, longitude: result.longitude }
-                  : null;
-              await qcCheckerService.startInspection(inspectionId, loc);
-            } catch (startErr: any) {
-              const errData = startErr?.data;
-              if (
-                errData?.error === 'Location mismatch' ||
-                errData?.error === 'Location required' ||
-                errData?.error === 'Vendor location not set'
-              ) {
-                Alert.alert(
-                  errData.error === 'Location mismatch' ? '📍 Location Mismatch' : '📍 Location Error',
-                  errData.message || 'Location verification failed.',
-                  [{ text: 'Go Back', onPress: () => { allowLeaveRef.current = true; router.back(); } }],
-                );
-                return;
-              }
-              if (startErr?.status !== 400) console.error('Auto-start failed:', startErr);
-            } finally {
-              setLocationStarting(false);
-            }
-          }
-        }}
-        onCancel={() => { allowLeaveRef.current = true; router.back(); }}
-      />
-
-      {/* After-inspection selfie gate */}
-      <SelfieCaptureModal
-        visible={showAfterSelfie}
-        title="After Inspection Selfie"
-        description="Great work! Take a final selfie to confirm you completed the inspection on-site."
-        onConfirm={(result) => {
-          setAfterSelfie(result);
-          setShowAfterSelfie(false);
-          handleSubmit(result);
-        }}
-      />
-
-      {/* Location verification overlay */}
-      {locationStarting && (
-        <View className="absolute inset-0 bg-black/60 items-center justify-center" style={{ zIndex: 100 }}>
-          <View className="bg-white rounded-2xl p-8 mx-8 items-center">
-            <ActivityIndicator size="large" color="#2563eb" />
-            <Text className="text-base font-bold text-slate-900 mt-4">Verifying Location…</Text>
-            <Text className="text-sm text-slate-500 mt-1 text-center">Checking your proximity to the vendor's factory</Text>
-          </View>
-        </View>
-      )}
-
-      {/* Location verified banner */}
-      {beforeSelfie && !locationStarting && !showBeforeSelfie && (
-        <View className="mx-4 mt-2 mb-1 bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex-row items-center" style={{ columnGap: 8 }}>
-          <View className="w-6 h-6 rounded-full bg-emerald-500 items-center justify-center">
-            <Check size={14} color="#ffffff" strokeWidth={3} />
-          </View>
-          <View className="flex-1">
-            <Text className="text-xs font-bold text-emerald-800">Location Verified ✓</Text>
-            <Text className="text-[11px] text-emerald-600 mt-0.5">Your location has been confirmed near the vendor's factory</Text>
-          </View>
-        </View>
-      )}
 
       {/* Re-inspection banner */}
       {cycleNumber > 1 && (
@@ -591,7 +516,7 @@ export default function VendorInspectionScreen() {
             const isDone = s.id < step;
             return (
               <TouchableOpacity key={s.id} onPress={() => setStep(s.id)} activeOpacity={0.7} className="items-center mx-1" style={{ width: 78 }}>
-                <View className={`w-10 h-10 rounded-full items-center justify-center ${isActive || isDone ? 'bg-blue-600' : 'bg-slate-200'}`}>
+                <View className={`w-10 h-10 rounded-full items-center justify-center ${isActive || isDone ? 'bg-brand-500' : 'bg-slate-200'}`}>
                   {isDone ? (
                     <Check size={18} color="#ffffff" strokeWidth={3} />
                   ) : (
@@ -608,7 +533,7 @@ export default function VendorInspectionScreen() {
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={10}>
-        <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={contentScrollRef} className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
           <View className="bg-white rounded-2xl border border-slate-200 p-4">
             <HighlightFieldsProvider keys={highlightedKeys}>{renderStep()}</HighlightFieldsProvider>
           </View>
@@ -640,7 +565,7 @@ export default function VendorInspectionScreen() {
             <Text className="ml-2 font-bold text-sm text-white">{submitting ? 'Submitting…' : 'Submit Inspection Report'}</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity onPress={goNext} activeOpacity={0.85} className="flex-1 flex-row items-center justify-center py-3 rounded-xl bg-blue-600">
+          <TouchableOpacity onPress={goNext} activeOpacity={0.85} className="flex-1 flex-row items-center justify-center py-3 rounded-xl bg-brand-500">
             <Save size={16} color="#ffffff" strokeWidth={2.5} />
             <Text className="mx-2 font-bold text-sm text-white">Save & Continue</Text>
             <ArrowRight size={16} color="#ffffff" strokeWidth={2.5} />
@@ -653,8 +578,8 @@ export default function VendorInspectionScreen() {
         <View className="flex-1 bg-black/50 items-center justify-center px-6">
           <View className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
             <View className="p-6 flex-row items-start" style={{ columnGap: 16 }}>
-              <View className="w-12 h-12 rounded-full bg-blue-50 items-center justify-center">
-                <AlertTriangle size={24} color="#2563eb" />
+              <View className="w-12 h-12 rounded-full bg-brand-50 items-center justify-center">
+                <AlertTriangle size={24} color="#e01a1b" />
               </View>
               <View className="flex-1">
                 <Text className="text-lg font-bold text-slate-900">Exit inspection?</Text>
@@ -667,7 +592,7 @@ export default function VendorInspectionScreen() {
               <TouchableOpacity onPress={cancelExit} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-white items-center">
                 <Text className="font-semibold text-slate-700">Keep editing</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={confirmExit} className="flex-1 px-4 py-2.5 rounded-xl bg-blue-600 items-center">
+              <TouchableOpacity onPress={confirmExit} className="flex-1 px-4 py-2.5 rounded-xl bg-brand-500 items-center">
                 <Text className="font-semibold text-white">Yes, exit</Text>
               </TouchableOpacity>
             </View>
@@ -681,7 +606,7 @@ export default function VendorInspectionScreen() {
 function Header({ onBack, title = 'Vendor Inspection' }: { onBack: () => void; title?: string }) {
   const insets = useSafeAreaInsets();
   return (
-    <View className="flex-row items-center justify-between px-4 pb-3" style={{ backgroundColor: '#0f172a', paddingTop: insets.top + 8 }}>
+    <View className="flex-row items-center justify-between px-4 pb-3" style={{ backgroundColor: '#e01a1b', paddingTop: insets.top + 8 }}>
       <TouchableOpacity onPress={onBack} hitSlop={10} activeOpacity={0.7} className="w-10 h-10 items-center justify-center rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}>
         <ArrowLeft size={20} color="#ffffff" />
       </TouchableOpacity>

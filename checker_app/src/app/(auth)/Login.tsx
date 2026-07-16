@@ -1,19 +1,19 @@
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
-  Text,
   TextInput,
   Pressable,
   View,
   Image,
   StatusBar,
-  ActivityIndicator,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { User, Lock, LogIn, Shield, Eye, EyeOff } from 'lucide-react-native';
 import { qcCheckerService } from '../../services/qcCheckerService';
+import { AppText, Card, Button } from '@/components/UI';
+import { brand, colors, fonts, space, elevation, danger, slate } from '@/constants/design';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -23,6 +23,7 @@ export default function LoginScreen() {
   const [checkerIdError, setCheckerIdError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [focusedField, setFocusedField] = useState<'id' | 'password' | null>(null);
   const currentYear = new Date().getFullYear();
 
   const validateCheckerId = useCallback((value: string) => {
@@ -46,7 +47,7 @@ export default function LoginScreen() {
   const handleSubmit = useCallback(async () => {
     const normalizedId = checkerId.trim().toUpperCase();
     const trimmedPassword = password.trim();
-    
+
     const isIdValid = validateCheckerId(normalizedId);
     const isPasswordValid = validatePassword(trimmedPassword);
 
@@ -63,7 +64,7 @@ export default function LoginScreen() {
 
       if (result.success && result.data) {
         await qcCheckerService.storeCheckerAuth(result.data.token, result.data.checker);
-        
+
         // Register for push notifications (optional, don't block login)
         try {
           const notificationService = await import('@/services/notificationService');
@@ -71,7 +72,7 @@ export default function LoginScreen() {
         } catch {
           console.log('Push notification registration skipped');
         }
-        
+
         router.replace('/(tabs)');
       }
     } catch (error: any) {
@@ -82,8 +83,13 @@ export default function LoginScreen() {
     }
   }, [checkerId, password, validateCheckerId, validatePassword]);
 
+  // Input border colour: error → danger, focused → brand red, else slate.
+  const fieldBorder = (isError: boolean, isFocused: boolean) =>
+    isError ? 'border-red-400' : isFocused ? 'border-brand-500' : 'border-slate-200';
+
   return (
     <View className="flex-1 bg-slate-900" style={{ paddingTop: insets.top }}>
+      <StatusBar barStyle="light-content" />
       <KeyboardAwareScrollView
         contentContainerStyle={{ paddingBottom: 20, flexGrow: 1, justifyContent: 'center' }}
         keyboardShouldPersistTaps="handled"
@@ -95,54 +101,56 @@ export default function LoginScreen() {
         <View className="px-6 py-8">
           {/* Logo Section */}
           <View className="items-center mb-8 mt-4" style={{ gap: 16 }}>
-            <View 
-              className="bg-white rounded-2xl p-4 shadow-2xl"
-              style={{ borderCurve: 'continuous' }}
+            <View
+              className="bg-white rounded-2xl p-4"
+              style={[{ borderCurve: 'continuous' }, elevation.raised]}
             >
-              <Image 
+              <Image
                 source={require('../../../assets/images/logo4.png')}
                 className="w-48 h-36"
                 resizeMode="contain"
               />
             </View>
-            <View style={{ gap: 4 }}>
-              <Text className="text-2xl font-bold text-white text-center">QC Checker</Text>
-              <Text className="text-sm text-slate-400 text-center">
+            <View className="items-center" style={{ gap: 4 }}>
+              <AppText variant="headlineLg" color={colors.white}>QC Checker</AppText>
+              <AppText variant="bodySm" color={slate[400]}>
                 Quality Control Portal
-              </Text>
+              </AppText>
             </View>
           </View>
 
           {/* Login Card */}
-          <View 
-            className="bg-white rounded-2xl p-6 shadow-2xl"
-            style={{ borderCurve: 'continuous', gap: 20 }}
-          >
+          <Card style={{ padding: 24, gap: 20 }}>
             <View className="flex-row items-center" style={{ gap: 12 }}>
-              <View 
-                className="bg-slate-900 rounded-full p-2"
-                style={{ borderCurve: 'continuous' }}
+              <View
+                className="w-10 h-10 rounded-full items-center justify-center"
+                style={{ backgroundColor: brand[500] }}
               >
-                <Shield size={20} color="#FFFFFF" strokeWidth={2} />
+                <Shield size={20} color={colors.white} strokeWidth={2} />
               </View>
               <View style={{ gap: 2 }}>
-                <Text className="text-lg font-bold text-slate-900">Sign In</Text>
-                <Text className="text-xs text-slate-600">Access your dashboard</Text>
+                <AppText variant="titleLg">Sign In</AppText>
+                <AppText variant="bodySm" color={colors.textMuted}>Access your dashboard</AppText>
               </View>
             </View>
 
             {/* Checker ID Input */}
             <View style={{ gap: 8 }}>
-              <Text className="text-xs font-semibold text-slate-700">
+              <AppText variant="labelLg" color={colors.textSecondary}>
                 Checker ID
-              </Text>
-              <View 
-                className={`flex-row items-center bg-slate-50 rounded-xl px-3 py-3 border ${
-                  checkerIdError ? 'border-red-400' : 'border-slate-300'
-                }`}
+              </AppText>
+              <View
+                className={`flex-row items-center bg-slate-50 rounded-xl px-3 py-3 border ${fieldBorder(
+                  !!checkerIdError,
+                  focusedField === 'id'
+                )}`}
                 style={{ borderCurve: 'continuous', gap: 12 }}
               >
-                <User size={18} color="#64748b" strokeWidth={2} />
+                <User
+                  size={18}
+                  color={focusedField === 'id' ? brand[500] : colors.textMuted}
+                  strokeWidth={2}
+                />
                 <TextInput
                   value={checkerId}
                   autoCapitalize="characters"
@@ -151,30 +159,40 @@ export default function LoginScreen() {
                     setCheckerId(value.toUpperCase());
                     if (checkerIdError) setCheckerIdError('');
                   }}
-                  onBlur={() => validateCheckerId(checkerId)}
+                  onFocus={() => setFocusedField('id')}
+                  onBlur={() => {
+                    setFocusedField(null);
+                    validateCheckerId(checkerId);
+                  }}
                   placeholder="e.g. QC-001"
-                  placeholderTextColor="#94a3b8"
-                  className="flex-1 text-sm text-slate-900"
+                  placeholderTextColor={colors.textFaint}
+                  className="flex-1"
+                  style={{ fontFamily: fonts.regular, fontSize: 15, color: colors.text }}
                   editable={!submitting}
                 />
               </View>
               {!!checkerIdError && (
-                <Text className="text-xs text-red-600">{checkerIdError}</Text>
+                <AppText variant="bodySm" color={danger[500]}>{checkerIdError}</AppText>
               )}
             </View>
 
             {/* Password Input */}
             <View style={{ gap: 8 }}>
-              <Text className="text-xs font-semibold text-slate-700">
+              <AppText variant="labelLg" color={colors.textSecondary}>
                 Password
-              </Text>
-              <View 
-                className={`flex-row items-center bg-slate-50 rounded-xl px-3 py-3 border ${
-                  passwordError ? 'border-red-400' : 'border-slate-300'
-                }`}
+              </AppText>
+              <View
+                className={`flex-row items-center bg-slate-50 rounded-xl px-3 py-3 border ${fieldBorder(
+                  !!passwordError,
+                  focusedField === 'password'
+                )}`}
                 style={{ borderCurve: 'continuous', gap: 12 }}
               >
-                <Lock size={18} color="#64748b" strokeWidth={2} />
+                <Lock
+                  size={18}
+                  color={focusedField === 'password' ? brand[500] : colors.textMuted}
+                  strokeWidth={2}
+                />
                 <TextInput
                   value={password}
                   secureTextEntry={!showPassword}
@@ -182,66 +200,53 @@ export default function LoginScreen() {
                     setPassword(value);
                     if (passwordError) setPasswordError('');
                   }}
-                  onBlur={() => validatePassword(password)}
+                  onFocus={() => setFocusedField('password')}
+                  onBlur={() => {
+                    setFocusedField(null);
+                    validatePassword(password);
+                  }}
                   placeholder="Enter your password"
-                  placeholderTextColor="#94a3b8"
-                  className="flex-1 text-sm text-slate-900"
+                  placeholderTextColor={colors.textFaint}
+                  className="flex-1"
+                  style={{ fontFamily: fonts.regular, fontSize: 15, color: colors.text }}
                   editable={!submitting}
                 />
-                <Pressable 
-                  onPress={() => setShowPassword(!showPassword)} 
+                <Pressable
+                  onPress={() => setShowPassword(!showPassword)}
                   disabled={submitting}
                   hitSlop={8}
                 >
                   {showPassword ? (
-                    <EyeOff size={18} color="#64748b" />
+                    <EyeOff size={18} color={colors.textMuted} />
                   ) : (
-                    <Eye size={18} color="#64748b" />
+                    <Eye size={18} color={colors.textMuted} />
                   )}
                 </Pressable>
               </View>
               {!!passwordError && (
-                <Text className="text-xs text-red-600">{passwordError}</Text>
+                <AppText variant="bodySm" color={danger[500]}>{passwordError}</AppText>
               )}
             </View>
 
             {/* Sign In Button */}
-            <Pressable
+            <Button
+              label={submitting ? 'Signing in...' : 'Sign In'}
+              variant="primary"
+              size="lg"
+              icon={submitting ? undefined : LogIn}
+              loading={submitting}
               disabled={submitting}
               onPress={handleSubmit}
-              style={{
-                marginTop: 8,
-                height: 56,
-                backgroundColor: submitting ? '#94a3b8' : '#2563eb',
-                borderRadius: 16,
-                borderCurve: 'continuous',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'row',
-                gap: 8,
-                elevation: 4,
-                shadowColor: '#2563eb',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 12,
-              }}
-            >
-              {submitting ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <LogIn size={20} color="#FFFFFF" strokeWidth={2.5} />
-              )}
-              <Text className="font-bold text-base text-white">
-                {submitting ? 'Signing in...' : 'Sign In'}
-              </Text>
-            </Pressable>
-          </View>
+              fullWidth
+              style={{ marginTop: space.sm }}
+            />
+          </Card>
 
           {/* Footer */}
           <View className="mt-6 items-center">
-            <Text className="text-xs text-slate-400">
+            <AppText variant="bodySm" color={slate[400]}>
               © {currentYear} QC Checker. All rights reserved.
-            </Text>
+            </AppText>
           </View>
         </View>
       </KeyboardAwareScrollView>

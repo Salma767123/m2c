@@ -8,6 +8,9 @@ import {
   TouchableOpacity,
   RefreshControl,
   Modal,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import {
   Search,
@@ -21,13 +24,24 @@ import {
   RefreshCw,
   X,
   ChevronDown,
+  ChevronUp,
   ChevronLeft,
   ChevronRight,
+  User,
+  Mail,
+  Phone,
 } from 'lucide-react-native';
 import qcCheckerService from '../../services/qcCheckerService';
 import { useDebounce } from '../../hooks/useDebounce';
 import { router, useLocalSearchParams } from 'expo-router';
 import DateRangeCalendar, { fmtDate } from '../../components/General/DateRangeCalendar';
+import { AppText, Button } from '@/components/UI';
+import { brand, colors, elevation } from '@/constants/design';
+
+// Enable LayoutAnimation on Android so the filter section collapses smoothly.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const PAGE_SIZE = 12;
 const DEFAULT_SORT = 'assignedQcAt:desc';
@@ -46,7 +60,7 @@ const STATUS_OPTIONS = [
 ];
 
 const INSPECTION_STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
+  { value: '', label: 'All Inspection Statuses' },
   { value: 'Pending', label: 'Pending' },
   { value: 'Submitted', label: 'Submitted' },
   { value: 'Rejected', label: 'Rejected' },
@@ -56,8 +70,6 @@ const INSPECTION_STATUS_OPTIONS = [
 const SORT_OPTIONS = [
   { value: 'assignedQcAt:desc', label: 'Newest assignment' },
   { value: 'assignedQcAt:asc', label: 'Oldest assignment' },
-  { value: 'submittedAt:desc', label: 'Newest submission' },
-  { value: 'submittedAt:asc', label: 'Oldest submission' },
 ];
 
 // Map the human-facing tab value back to the backend status filter the server
@@ -145,17 +157,30 @@ const MAIN_STATUS_STYLE: Record<string, { bg: string; text: string; border: stri
 const mainStatusStyle = (s: string) =>
   MAIN_STATUS_STYLE[s] || { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' };
 
-const INSPECTION_PRIORITY = ['IN_PROGRESS', 'SCHEDULED', 'COMPLETED', 'CANCELLED'] as const;
+// Badge colours keyed by the derived inspection-status bucket (mirror web).
+const INSPECTION_STATUS_STYLE: Record<string, { bg: string; text: string; border: string }> = {
+  Pending: { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' },
+  Submitted: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+  Rejected: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
+  Completed: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+};
+const inspectionStatusStyle = (s?: string | null) =>
+  INSPECTION_STATUS_STYLE[s || 'Pending'] || INSPECTION_STATUS_STYLE.Pending;
 
 interface Vendor {
   id: string;
   name: string;
   location: string;
-  submittedDate?: string;
+  state?: string | null;
+  assignedDate?: string;
   mainStatus: string;
   inspectionStatusBucket: string;
   createdAtRaw?: string;
-  inspectionStatus: string | null;
+  contactPerson: {
+    name: string;
+    phone: string;
+    email: string;
+  };
 }
 
 const formatLocation = (city?: string | null, state?: string | null) => {
@@ -163,37 +188,34 @@ const formatLocation = (city?: string | null, state?: string | null) => {
   return parts.length > 0 ? parts.join(', ') : 'Location not provided';
 };
 
-const pickInspectionStatus = (insps?: Array<{ status?: string | null }>) => {
-  if (!insps || insps.length === 0) return null;
-  for (const target of INSPECTION_PRIORITY) {
-    const hit = insps.find((i) => i.status === target);
-    if (hit?.status) return hit.status;
-  }
-  return insps[0].status ?? null;
-};
-
 const transformVendor = (v: any): Vendor => {
   const latestInspection = v.inspections?.[0] ?? null;
-  // Date used for the date-range filter: assignedQcAt, falling back to createdAt.
+  // Date used for the "Assigned Date" and date-range filter: assignedQcAt,
+  // falling back to createdAt for older records (mirrors web).
   const dateObj = v.assignedQcAt
     ? new Date(v.assignedQcAt)
     : v.createdAt
       ? new Date(v.createdAt)
       : null;
-  const createdAtRaw = dateObj && !isNaN(dateObj.getTime()) ? fmtDate(dateObj) : undefined;
+  const validDate = dateObj && !isNaN(dateObj.getTime()) ? dateObj : null;
+  const createdAtRaw = validDate ? fmtDate(validDate) : undefined;
+  const assignedDate = validDate
+    ? validDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    : undefined;
   return {
     id: v.id,
     name: v.companyName,
     location: formatLocation(v.factoryCity, v.factoryState),
-    submittedDate: v.submittedAt
-      ? new Date(v.submittedAt).toLocaleDateString('en-IN', {
-          day: '2-digit', month: 'short', year: 'numeric',
-        })
-      : undefined,
+    state: v.factoryState || null,
+    assignedDate,
     mainStatus: getNewMainStatus(v.status, latestInspection),
     inspectionStatusBucket: getNewInspectionStatus(v.status, latestInspection),
     createdAtRaw,
-    inspectionStatus: pickInspectionStatus(v.inspections),
+    contactPerson: {
+      name: v.ownerName || 'Not Provided',
+      phone: v.businessPhone || 'Not Provided',
+      email: v.businessEmail || 'Not Provided',
+    },
   };
 };
 
@@ -202,6 +224,7 @@ export default function VendorsTab() {
   const incoming = useLocalSearchParams<{
     status?: string;
     inspectionStatus?: string;
+    state?: string;
     sort?: string;
     search?: string;
     dateFrom?: string;
@@ -211,6 +234,7 @@ export default function VendorsTab() {
   const [searchInput, setSearchInput] = useState(incoming.search ?? '');
   const [status, setStatus] = useState(incoming.status ?? '');
   const [inspectionStatus, setInspectionStatus] = useState(incoming.inspectionStatus ?? '');
+  const [selectedState, setSelectedState] = useState(incoming.state ?? '');
   const [sort, setSort] = useState(incoming.sort ?? DEFAULT_SORT);
   const [dateFrom, setDateFrom] = useState(incoming.dateFrom ?? '');
   const [dateTo, setDateTo] = useState(incoming.dateTo ?? '');
@@ -224,24 +248,26 @@ export default function VendorsTab() {
   const [error, setError] = useState<string | null>(null);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showInspectionModal, setShowInspectionModal] = useState(false);
+  const [showStateModal, setShowStateModal] = useState(false);
   const [showSortModal, setShowSortModal] = useState(false);
 
   // Apply incoming params once when they change (deep-link from dashboard).
   useEffect(() => {
     if (incoming.status !== undefined) setStatus(incoming.status ?? '');
     if (incoming.inspectionStatus !== undefined) setInspectionStatus(incoming.inspectionStatus ?? '');
+    if (incoming.state !== undefined) setSelectedState(incoming.state ?? '');
     if (incoming.sort !== undefined) setSort(incoming.sort ?? DEFAULT_SORT);
     if (incoming.search !== undefined) setSearchInput(incoming.search ?? '');
     if (incoming.dateFrom !== undefined) setDateFrom(incoming.dateFrom ?? '');
     if (incoming.dateTo !== undefined) setDateTo(incoming.dateTo ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incoming.status, incoming.inspectionStatus, incoming.sort, incoming.search, incoming.dateFrom, incoming.dateTo]);
+  }, [incoming.status, incoming.inspectionStatus, incoming.state, incoming.sort, incoming.search, incoming.dateFrom, incoming.dateTo]);
 
   const didMountRef = useRef(false);
   useEffect(() => {
     if (!didMountRef.current) { didMountRef.current = true; return; }
     setPage(1);
-  }, [debouncedSearch, status, inspectionStatus, sort, dateFrom, dateTo]);
+  }, [debouncedSearch, status, inspectionStatus, selectedState, sort, dateFrom, dateTo]);
 
   const [sortBy, sortOrder] = useMemo(() => {
     const [by, ord] = sort.split(':');
@@ -292,6 +318,19 @@ export default function VendorsTab() {
     loadVendors();
   }, [loadVendors]);
 
+  // State filter options derived from the loaded vendors (mirror web; a
+  // vendor-derived list stands in for country-state-city's IN states).
+  const stateOptions = useMemo(() => {
+    const uniqueVendorStates = Array.from(
+      new Set(vendors.map((v) => v.state).filter(Boolean)),
+    ) as string[];
+    uniqueVendorStates.sort((a, b) => a.localeCompare(b));
+    return [
+      { value: '', label: 'All States' },
+      ...uniqueVendorStates.map((s) => ({ value: s, label: s })),
+    ];
+  }, [vendors]);
+
   // ── Client-side filtering (mirror web VendorList) ──────────────────────────
   const filtered = useMemo(() => {
     let result = vendors;
@@ -303,6 +342,9 @@ export default function VendorsTab() {
         (v) => v.inspectionStatusBucket.toLowerCase() === inspectionStatus.toLowerCase(),
       );
     }
+    if (selectedState) {
+      result = result.filter((v) => v.state?.toLowerCase() === selectedState.toLowerCase());
+    }
     if (dateFrom) {
       result = result.filter((v) => {
         if (!v.createdAtRaw) return false;
@@ -311,23 +353,22 @@ export default function VendorsTab() {
       });
     }
     return result;
-  }, [vendors, status, inspectionStatus, dateFrom, dateTo]);
+  }, [vendors, status, inspectionStatus, selectedState, dateFrom, dateTo]);
 
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const rangeStart = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const rangeEnd = Math.min(currentPage * PAGE_SIZE, total);
 
   const hasActiveFilters = Boolean(
-    debouncedSearch || status || inspectionStatus || dateFrom || dateTo || sort !== DEFAULT_SORT || page !== 1,
+    debouncedSearch || status || inspectionStatus || selectedState || dateFrom || dateTo || sort !== DEFAULT_SORT || page !== 1,
   );
 
   const clearFilters = () => {
     setSearchInput('');
     setStatus('');
     setInspectionStatus('');
+    setSelectedState('');
     setSort(DEFAULT_SORT);
     setDateFrom('');
     setDateTo('');
@@ -344,256 +385,308 @@ export default function VendorsTab() {
 
   const statusLabel = STATUS_OPTIONS.find((o) => o.value === status)?.label || 'All Statuses';
   const inspectionLabel =
-    INSPECTION_STATUS_OPTIONS.find((o) => o.value === inspectionStatus)?.label || 'All Statuses';
+    INSPECTION_STATUS_OPTIONS.find((o) => o.value === inspectionStatus)?.label || 'All Inspection Statuses';
+  const stateLabel = stateOptions.find((o) => o.value === selectedState)?.label || 'All States';
   const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label || 'Newest assignment';
 
+  // Collapsible filter section — toggled by the arrow button next to the title.
+  const [showFilters, setShowFilters] = useState(true);
+  const toggleFilters = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowFilters((v) => !v);
+  };
+
   return (
-    <ScrollView
-      className="flex-1 bg-gray-50"
-      contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2563eb" colors={['#2563eb']} />
-      }
-    >
-      {/* Header */}
-      <View className="mb-5">
-        <Text className="text-2xl font-extrabold text-slate-900 mb-1">Vendor Management</Text>
-        <Text className="text-slate-600 text-sm">Select a vendor to start quality inspection</Text>
-      </View>
-
-      {/* Search */}
-      <View className="mb-3 flex-row items-center bg-white border border-slate-300 rounded-xl px-4 py-2.5">
-        <Search size={18} color="#94a3b8" />
-        <TextInput
-          placeholder="Search by name, city, or state..."
-          value={searchInput}
-          onChangeText={setSearchInput}
-          className="flex-1 ml-3 text-sm text-slate-900"
-          placeholderTextColor="#94a3b8"
-        />
-        {searchInput ? (
-          <TouchableOpacity onPress={() => setSearchInput('')} hitSlop={8}>
-            <X size={16} color="#94a3b8" />
-          </TouchableOpacity>
-        ) : null}
-      </View>
-
-      {/* Status + Inspection Status */}
-      <View className="flex-row mb-3" style={{ columnGap: 8 }}>
-        <TouchableOpacity
-          onPress={() => setShowStatusModal(true)}
-          className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
-        >
-          <Text className="text-sm text-slate-900" numberOfLines={1}>{statusLabel}</Text>
-          <ChevronDown size={16} color="#64748b" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setShowInspectionModal(true)}
-          className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
-        >
-          <Text className="text-sm text-slate-900" numberOfLines={1}>{inspectionLabel}</Text>
-          <ChevronDown size={16} color="#64748b" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Date range + Sort */}
-      <View className="flex-row mb-4" style={{ columnGap: 8 }}>
+    <View className="flex-1 bg-gray-50">
+      {/* Sticky title + filter toggle arrow */}
+      <View className="px-4 pt-4 pb-2 bg-gray-50 flex-row items-start justify-between">
         <View className="flex-1">
-          <DateRangeCalendar
-            from={dateFrom}
-            to={dateTo}
-            onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
-            placeholder="Filter by date"
-          />
+          <AppText variant="headlineLg" color={colors.text}>Vendor Management</AppText>
+          <AppText variant="bodySm" color={colors.textSecondary} style={{ marginTop: 2 }}>
+            Select a vendor to start quality inspection
+          </AppText>
         </View>
         <TouchableOpacity
-          onPress={() => setShowSortModal(true)}
-          className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-3"
+          onPress={toggleFilters}
+          accessibilityRole="button"
+          accessibilityLabel={showFilters ? 'Hide filters' : 'Show filters'}
+          className="w-9 h-9 rounded-full bg-white border border-slate-200 items-center justify-center mt-1"
+          style={elevation.card}
         >
-          <Text className="text-sm text-slate-900" numberOfLines={1}>{sortLabel}</Text>
-          <ChevronDown size={16} color="#64748b" />
+          {showFilters ? (
+            <ChevronUp size={18} color={colors.textSecondary} />
+          ) : (
+            <ChevronDown size={18} color={colors.textSecondary} />
+          )}
         </TouchableOpacity>
       </View>
 
-      {/* Summary + Clear */}
-      <View className="flex-row items-center justify-between mb-4">
-        <Text className="text-xs text-slate-600">
-          {loading && vendors.length === 0
-            ? ''
-            : total === 0
-              ? '0 vendors'
-              : `Showing ${rangeStart}–${rangeEnd} of ${total}`}
-        </Text>
-        {hasActiveFilters ? (
-          <TouchableOpacity onPress={clearFilters}>
-            <Text className="text-xs font-semibold text-blue-600 underline">Clear filters</Text>
-          </TouchableOpacity>
-        ) : null}
-      </View>
-
-      {/* Error */}
-      {error && !loading ? (
-        <View className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-          <View className="flex-row items-start mb-3">
-            <AlertCircle size={18} color="#dc2626" />
-            <Text className="text-sm text-red-700 ml-2 flex-1">{error}</Text>
+      {/* Search + filters — collapsible via the arrow */}
+      {showFilters ? (
+        <View className="px-4 pt-1 pb-3 bg-gray-50 border-b border-slate-200">
+          {/* Search */}
+          <View className="mb-3 flex-row items-center bg-white border border-slate-300 rounded-xl px-4 py-2.5">
+            <Search size={18} color="#94a3b8" />
+            <TextInput
+              placeholder="Search by name, city, or state..."
+              value={searchInput}
+              onChangeText={setSearchInput}
+              className="flex-1 ml-3 text-sm text-slate-900"
+              placeholderTextColor="#94a3b8"
+            />
+            {searchInput ? (
+              <TouchableOpacity onPress={() => setSearchInput('')} hitSlop={8}>
+                <X size={16} color="#94a3b8" />
+              </TouchableOpacity>
+            ) : null}
           </View>
-          <TouchableOpacity
-            onPress={loadVendors}
-            className="bg-red-600 rounded-lg px-4 py-2 flex-row items-center justify-center self-start"
-          >
-            <RefreshCw size={14} color="#ffffff" />
-            <Text className="text-white font-semibold text-sm ml-2">Retry</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
 
-      {/* Skeleton initial load */}
-      {loading && vendors.length === 0 && !error ? (
-        <View style={{ rowGap: 12 }}>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <View key={i} className="bg-white rounded-2xl border border-slate-200 p-5">
-              <View className="flex-row items-center mb-4">
-                <View className="w-12 h-12 rounded-xl bg-slate-200" />
-                <View className="flex-1 ml-3">
-                  <View className="h-3 bg-slate-200 rounded w-3/4 mb-2" />
-                  <View className="h-2 bg-slate-200 rounded w-1/2" />
-                </View>
-                <View className="h-5 w-16 bg-slate-200 rounded-full" />
-              </View>
-              <View className="h-2.5 bg-slate-200 rounded w-2/3 mb-2" />
-              <View className="h-2.5 bg-slate-200 rounded w-1/2 mb-4" />
-              <View className="flex-row" style={{ columnGap: 8 }}>
-                <View className="flex-1 h-9 bg-slate-200 rounded-lg" />
-                <View className="flex-1 h-9 bg-slate-200 rounded-lg" />
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : null}
-
-      {/* Vendor cards */}
-      {!error && pageItems.length > 0 ? (
-        <View style={{ rowGap: 12 }}>
-          {pageItems.map((v) => {
-            const pill = mainStatusStyle(v.mainStatus);
-            const isCompleted = v.inspectionStatus === 'COMPLETED';
-            const isCancelled = v.inspectionStatus === 'CANCELLED';
-            const isInProgress = v.inspectionStatus === 'IN_PROGRESS';
-            return (
-              <View
-                key={v.id}
-                className="bg-white rounded-2xl border border-slate-200 p-5"
-              >
-                <View className="flex-row items-start justify-between mb-3" style={{ columnGap: 8 }}>
-                  <View className="flex-row items-center flex-1">
-                    <View className="w-11 h-11 rounded-xl bg-blue-100 items-center justify-center mr-3">
-                      <Factory size={20} color="#2563eb" />
-                    </View>
-                    <Text className="font-bold text-slate-900 text-base flex-1" numberOfLines={2}>
-                      {v.name}
-                    </Text>
-                  </View>
-                  <View className={`px-2.5 py-1 rounded-full border ${pill.bg} ${pill.border}`}>
-                    <Text className={`text-[10px] font-bold ${pill.text}`} numberOfLines={1}>
-                      {v.mainStatus}
-                    </Text>
-                  </View>
-                </View>
-
-                <View className="mb-4" style={{ rowGap: 8 }}>
-                  <View className="flex-row items-center">
-                    <MapPin size={13} color="#64748b" />
-                    <Text className="text-sm text-slate-600 ml-2 flex-1" numberOfLines={1}>
-                      {v.location}
-                    </Text>
-                  </View>
-                  {v.submittedDate ? (
-                    <View className="flex-row items-center">
-                      <CalendarDays size={13} color="#64748b" />
-                      <View className="ml-2 bg-slate-100 border border-slate-200 rounded px-2 py-0.5">
-                        <Text className="text-xs font-mono text-slate-600">
-                          Submitted: {v.submittedDate}
-                        </Text>
-                      </View>
-                    </View>
-                  ) : null}
-                </View>
-
-                <View className="flex-row" style={{ columnGap: 8 }}>
-                  <TouchableOpacity
-                    onPress={() => handleViewDetails(v)}
-                    activeOpacity={0.8}
-                    className="flex-1 flex-row items-center justify-center bg-slate-100 rounded-lg py-2.5"
-                  >
-                    <Eye size={14} color="#475569" />
-                    <Text className="text-slate-700 font-semibold text-sm ml-2">Details</Text>
-                  </TouchableOpacity>
-
-                  {isCompleted ? (
-                    <View className="flex-1 flex-row items-center justify-center bg-emerald-100 border border-emerald-200 rounded-lg py-2.5">
-                      <CheckCircle size={14} color="#065f46" />
-                      <Text className="text-emerald-800 font-bold text-sm ml-2">Completed</Text>
-                    </View>
-                  ) : isCancelled ? (
-                    <View className="flex-1 flex-row items-center justify-center bg-slate-100 border border-slate-200 rounded-lg py-2.5">
-                      <X size={14} color="#64748b" />
-                      <Text className="text-slate-700 font-bold text-sm ml-2">Cancelled</Text>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      onPress={() => handleStartInspection(v)}
-                      activeOpacity={0.85}
-                      className="flex-1 flex-row items-center justify-center bg-blue-600 rounded-lg py-2.5"
-                    >
-                      <Text className="text-white font-semibold text-sm mr-1.5">
-                        {isInProgress ? 'Continue' : 'Start'}
-                      </Text>
-                      <ArrowRight size={14} color="#ffffff" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      ) : null}
-
-      {/* Empty state */}
-      {!loading && !error && total === 0 ? (
-        <View className="py-12 items-center">
-          <View className="w-20 h-20 rounded-2xl bg-slate-100 items-center justify-center mb-4">
-            <Factory size={36} color="#94a3b8" strokeWidth={1.75} />
-          </View>
-          <Text className="text-base font-bold text-slate-900 mb-1 text-center">
-            {hasActiveFilters ? 'No vendors match your filters' : 'No vendors assigned yet'}
-          </Text>
-          <Text className="text-sm text-slate-500 text-center mb-4">
-            {hasActiveFilters
-              ? 'Try adjusting or clearing your filters.'
-              : 'Vendors assigned to you by the admin will appear here.'}
-          </Text>
-          {hasActiveFilters ? (
+          {/* Status + Inspection Status */}
+          <View className="flex-row mb-3" style={{ columnGap: 8 }}>
             <TouchableOpacity
-              onPress={clearFilters}
-              className="bg-blue-600 rounded-lg px-4 py-2.5"
+              onPress={() => setShowStatusModal(true)}
+              className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
             >
-              <Text className="text-white font-semibold text-sm">Clear filters</Text>
+              <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{statusLabel}</AppText>
+              <ChevronDown size={16} color="#64748b" />
             </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowInspectionModal(true)}
+              className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
+            >
+              <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{inspectionLabel}</AppText>
+              <ChevronDown size={16} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+
+          {/* State + Sort */}
+          <View className="flex-row mb-3" style={{ columnGap: 8 }}>
+            <TouchableOpacity
+              onPress={() => setShowStateModal(true)}
+              className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
+            >
+              <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{stateLabel}</AppText>
+              <ChevronDown size={16} color="#64748b" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowSortModal(true)}
+              className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
+            >
+              <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{sortLabel}</AppText>
+              <ChevronDown size={16} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Date range */}
+          <View className="mb-3">
+            <DateRangeCalendar
+              from={dateFrom}
+              to={dateTo}
+              onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
+              placeholder="Filter by date"
+            />
+          </View>
+
+          {/* Clear */}
+          {hasActiveFilters ? (
+            <View className="flex-row items-center justify-end">
+              <TouchableOpacity onPress={clearFilters}>
+                <AppText variant="labelLg" color={brand[600]} style={{ textDecorationLine: 'underline' }}>
+                  Clear filters
+                </AppText>
+              </TouchableOpacity>
+            </View>
           ) : null}
         </View>
       ) : null}
 
-      {/* Pagination */}
-      {totalPages > 1 ? (
-        <Pagination
-          page={currentPage}
-          totalPages={totalPages}
-          onChange={setPage}
-          disabled={loading}
-        />
-      ) : null}
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={brand[500]} colors={[brand[500]]} />
+        }
+      >
+        {/* Error */}
+        {error && !loading ? (
+          <View className="bg-danger-50 border border-red-200 rounded-2xl p-4 mb-4" style={elevation.card}>
+            <View className="flex-row items-center mb-3">
+              <View className="w-9 h-9 rounded-full bg-red-100 items-center justify-center mr-2.5">
+                <AlertCircle size={18} color="#dc2626" />
+              </View>
+              <AppText variant="bodySm" color="#b91c1c" className="flex-1">{error}</AppText>
+            </View>
+            <Button label="Retry" icon={RefreshCw} variant="primary" onPress={loadVendors} />
+          </View>
+        ) : null}
+
+        {/* Skeleton initial load */}
+        {loading && vendors.length === 0 && !error ? (
+          <View style={{ rowGap: 12 }}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <View key={i} className="bg-white rounded-2xl border border-slate-200 p-5">
+                <View className="flex-row items-center mb-4">
+                  <View className="w-12 h-12 rounded-xl bg-slate-200" />
+                  <View className="flex-1 ml-3">
+                    <View className="h-3 bg-slate-200 rounded w-3/4 mb-2" />
+                    <View className="h-2 bg-slate-200 rounded w-1/2" />
+                  </View>
+                  <View className="h-5 w-16 bg-slate-200 rounded-full" />
+                </View>
+                <View className="h-2.5 bg-slate-200 rounded w-2/3 mb-2" />
+                <View className="h-2.5 bg-slate-200 rounded w-1/2 mb-4" />
+                <View className="flex-row" style={{ columnGap: 8 }}>
+                  <View className="flex-1 h-9 bg-slate-200 rounded-lg" />
+                  <View className="flex-1 h-9 bg-slate-200 rounded-lg" />
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Vendor cards */}
+        {!error && pageItems.length > 0 ? (
+          <View style={{ rowGap: 12 }}>
+            {pageItems.map((v) => {
+              const pill = mainStatusStyle(v.mainStatus);
+              const inspPill = inspectionStatusStyle(v.inspectionStatusBucket);
+              // A checker-rejected/submitted inspection is submitted work — the
+              // checker can't start again unless the admin orders a re-inspection
+              // (mirrors web's derived-bucket gating).
+              const isInspectionDone =
+                v.inspectionStatusBucket === 'Completed' ||
+                v.inspectionStatusBucket === 'Submitted' ||
+                v.inspectionStatusBucket === 'Rejected' ||
+                v.mainStatus === 'Approved' ||
+                v.mainStatus === 'Rejected';
+              return (
+                <View
+                  key={v.id}
+                  className="bg-white rounded-2xl border border-slate-200 p-5"
+                  style={elevation.card}
+                >
+                  <View className="flex-row items-start justify-between mb-3" style={{ columnGap: 8 }}>
+                    <View className="flex-row items-center flex-1">
+                      <View className="w-11 h-11 rounded-xl bg-brand-50 items-center justify-center mr-3">
+                        <Factory size={20} color={brand[500]} strokeWidth={2} />
+                      </View>
+                      <View className="flex-1">
+                        <AppText variant="titleLg" color={colors.text} numberOfLines={2}>
+                          {v.name}
+                        </AppText>
+                        <Text className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mt-0.5">
+                          VND-{v.id.substring(0, 8).toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                    <View className="items-end" style={{ rowGap: 4 }}>
+                      <View className={`px-2.5 py-1 rounded-full border ${pill.bg} ${pill.border}`}>
+                        <Text className={`text-[10px] font-bold ${pill.text}`} numberOfLines={1}>
+                          {v.mainStatus}
+                        </Text>
+                      </View>
+                      <View className={`px-2.5 py-1 rounded-full border ${inspPill.bg} ${inspPill.border}`}>
+                        <Text className={`text-[10px] font-bold ${inspPill.text}`} numberOfLines={1}>
+                          {v.inspectionStatusBucket || 'Pending'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View className="mb-4" style={{ rowGap: 8 }}>
+                    <View className="flex-row items-center">
+                      <User size={13} color="#64748b" />
+                      <AppText variant="bodySm" color={colors.text} className="ml-2 flex-1" numberOfLines={1}>
+                        {v.contactPerson.name}
+                      </AppText>
+                    </View>
+                    <View className="flex-row items-center">
+                      <Mail size={13} color="#64748b" />
+                      <AppText variant="bodySm" color={colors.textSecondary} className="ml-2 flex-1" numberOfLines={1}>
+                        {v.contactPerson.email}
+                      </AppText>
+                    </View>
+                    <View className="flex-row items-center">
+                      <Phone size={13} color="#64748b" />
+                      <AppText variant="bodySm" color={colors.textSecondary} className="ml-2 flex-1" numberOfLines={1}>
+                        {v.contactPerson.phone}
+                      </AppText>
+                    </View>
+                    <View className="flex-row items-center">
+                      <MapPin size={13} color="#64748b" />
+                      <AppText variant="bodySm" color={colors.textSecondary} className="ml-2 flex-1" numberOfLines={1}>
+                        {v.location}
+                      </AppText>
+                    </View>
+                    <View className="flex-row items-center">
+                      <CalendarDays size={13} color="#64748b" />
+                      <AppText variant="bodySm" color={colors.textSecondary} className="ml-2 flex-1" numberOfLines={1}>
+                        {v.assignedDate || 'N/A'}
+                      </AppText>
+                    </View>
+                  </View>
+
+                  <View className="flex-row" style={{ columnGap: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => handleViewDetails(v)}
+                      activeOpacity={0.8}
+                      accessibilityLabel="View Details"
+                      className="w-12 items-center justify-center bg-slate-100 rounded-lg py-2.5"
+                    >
+                      <Eye size={16} color="#475569" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => handleStartInspection(v)}
+                      disabled={isInspectionDone}
+                      activeOpacity={0.85}
+                      className="flex-1 flex-row items-center justify-center bg-brand-500 rounded-lg py-2.5"
+                      style={{ opacity: isInspectionDone ? 0.5 : 1 }}
+                    >
+                      <ArrowRight size={14} color="#ffffff" />
+                      <AppText variant="titleMd" color={colors.white} className="ml-1.5">
+                        Start Inspect
+                      </AppText>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+
+        {/* Empty state */}
+        {!loading && !error && total === 0 ? (
+          <View className="py-12 items-center">
+            <View className="w-20 h-20 rounded-2xl bg-slate-100 items-center justify-center mb-4">
+              <Factory size={36} color="#94a3b8" strokeWidth={1.75} />
+            </View>
+            <AppText variant="titleLg" color={colors.text} style={{ marginBottom: 4, textAlign: 'center' }}>
+              {hasActiveFilters ? 'No vendors match your filters' : 'No vendors assigned yet'}
+            </AppText>
+            <AppText variant="bodySm" color={colors.textMuted} style={{ textAlign: 'center', marginBottom: 16 }}>
+              {hasActiveFilters
+                ? 'Try adjusting or clearing your filters.'
+                : 'Vendors assigned to you by the admin will appear here.'}
+            </AppText>
+            {hasActiveFilters ? (
+              <Button label="Clear filters" variant="primary" onPress={clearFilters} style={{ alignSelf: 'center' }} />
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Pagination */}
+        {totalPages > 1 ? (
+          <Pagination
+            page={currentPage}
+            totalPages={totalPages}
+            onChange={setPage}
+            disabled={loading}
+          />
+        ) : null}
+      </ScrollView>
 
       {/* Status modal */}
       <OptionModal
@@ -615,6 +708,16 @@ export default function VendorsTab() {
         onClose={() => setShowInspectionModal(false)}
       />
 
+      {/* State modal */}
+      <OptionModal
+        visible={showStateModal}
+        title="Filter by state"
+        options={stateOptions}
+        value={selectedState}
+        onSelect={(v) => { setSelectedState(v); setShowStateModal(false); }}
+        onClose={() => setShowStateModal(false)}
+      />
+
       {/* Sort modal */}
       <OptionModal
         visible={showSortModal}
@@ -624,7 +727,7 @@ export default function VendorsTab() {
         onSelect={(v) => { setSort(v); setShowSortModal(false); }}
         onClose={() => setShowSortModal(false)}
       />
-    </ScrollView>
+    </View>
   );
 }
 
@@ -648,7 +751,7 @@ function OptionModal({
       >
         <View className="bg-white rounded-2xl w-11/12 max-w-sm overflow-hidden">
           <View className="px-5 py-4 border-b border-slate-100">
-            <Text className="text-base font-bold text-slate-900">{title}</Text>
+            <AppText variant="titleLg" color={colors.text}>{title}</AppText>
           </View>
           {options.map((opt) => {
             const active = opt.value === value;
@@ -657,13 +760,13 @@ function OptionModal({
                 key={opt.value}
                 onPress={() => onSelect(opt.value)}
                 className={`px-5 py-3.5 flex-row items-center justify-between border-b border-slate-100 ${
-                  active ? 'bg-blue-50' : ''
+                  active ? 'bg-brand-50' : ''
                 }`}
               >
-                <Text className={`text-sm ${active ? 'text-blue-700 font-bold' : 'text-slate-700'}`}>
+                <AppText variant="bodyMd" color={active ? brand[700] : colors.textSecondary}>
                   {opt.label}
-                </Text>
-                {active ? <CheckCircle size={16} color="#2563eb" /> : null}
+                </AppText>
+                {active ? <CheckCircle size={16} color={brand[500]} /> : null}
               </TouchableOpacity>
             );
           })}
@@ -688,24 +791,28 @@ function Pagination({
         style={{ opacity: disabled || page <= 1 ? 0.4 : 1 }}
       >
         <ChevronLeft size={14} color="#475569" />
-        <Text className="text-xs font-semibold text-slate-700 ml-1">Prev</Text>
+        <AppText variant="labelLg" color={colors.textSecondary} className="ml-1">Prev</AppText>
       </TouchableOpacity>
       {pages.map((p, i) =>
         p === '…' ? (
-          <Text key={`el-${i}`} className="px-2 text-slate-400">…</Text>
+          <AppText key={`el-${i}`} variant="bodyMd" color={colors.textFaint} className="px-2">…</AppText>
         ) : (
           <TouchableOpacity
             key={p}
             onPress={() => onChange(p)}
             disabled={disabled}
             className={`min-w-9 px-3 py-2 rounded-lg border ${
-              p === page ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-200'
+              p === page ? 'bg-brand-600 border-brand-600' : 'bg-white border-slate-200'
             }`}
             style={{ opacity: disabled ? 0.4 : 1 }}
           >
-            <Text className={`text-xs font-bold text-center ${p === page ? 'text-white' : 'text-slate-700'}`}>
+            <AppText
+              variant="labelLg"
+              color={p === page ? colors.white : colors.textSecondary}
+              style={{ textAlign: 'center' }}
+            >
               {p}
-            </Text>
+            </AppText>
           </TouchableOpacity>
         ),
       )}
@@ -715,7 +822,7 @@ function Pagination({
         className="flex-row items-center px-3 py-2 rounded-lg border border-slate-200 bg-white"
         style={{ opacity: disabled || page >= totalPages ? 0.4 : 1 }}
       >
-        <Text className="text-xs font-semibold text-slate-700 mr-1">Next</Text>
+        <AppText variant="labelLg" color={colors.textSecondary} className="mr-1">Next</AppText>
         <ChevronRight size={14} color="#475569" />
       </TouchableOpacity>
     </View>

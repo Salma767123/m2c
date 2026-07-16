@@ -76,7 +76,7 @@ export const takePhoto = async (
   try {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
-      allowsEditing: false,
+      allowsEditing: true, // enables the crop/edit step after capture
       quality: 0.6,
       base64: true,
     });
@@ -107,6 +107,9 @@ export const pickFromGallery = async (
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsMultipleSelection: allowMultiple,
+      // Crop/edit is only supported for single selection — expo-image-picker
+      // ignores allowsEditing when multiple selection is on.
+      allowsEditing: !allowMultiple,
       quality: 0.6,
       base64: true,
     });

@@ -96,6 +96,53 @@ export function getEmployeeCountLabel(val: string): string {
   return map[val] || val;
 }
 
+// Owner designation code → label (mirrors frontend/src/lib/utils.ts
+// resolveOwnerDesignation). Falls through to the raw value for custom/unknown
+// strings so old data or free-typed entries still render as-is.
+const OWNER_DESIGNATION_LABEL: Record<string, string> = {
+  proprietor: 'Proprietor',
+  ceo: 'CEO',
+  director: 'Director',
+  'managing-director': 'Managing Director',
+  founder: 'Founder',
+  other: 'Other',
+};
+export function resolveOwnerDesignation(value?: string | null): string {
+  if (!value) return '';
+  return OWNER_DESIGNATION_LABEL[value] ?? value;
+}
+
+// ── Country flags (mirrors web VI_Step7 withFlags) ──────────────────────────
+// Country name → ISO2 for common countries so we can render a flag image via
+// flagcdn. Unmappable names fall back to a plain (flag-less) chip.
+export const COUNTRY_ISO: Record<string, string> = {
+  India: 'IN', 'United States': 'US', 'United States of America': 'US',
+  'United Kingdom': 'GB', China: 'CN', Germany: 'DE', France: 'FR', Italy: 'IT',
+  Spain: 'ES', Canada: 'CA', Australia: 'AU', Japan: 'JP', Bangladesh: 'BD',
+  Pakistan: 'PK', 'Sri Lanka': 'LK', Nepal: 'NP', 'United Arab Emirates': 'AE',
+  'Saudi Arabia': 'SA', Singapore: 'SG', Malaysia: 'MY', Thailand: 'TH',
+  Vietnam: 'VN', Indonesia: 'ID', Netherlands: 'NL', Belgium: 'BE',
+  Switzerland: 'CH', Sweden: 'SE', Norway: 'NO', Denmark: 'DK', Poland: 'PL',
+  Turkey: 'TR', Russia: 'RU', Brazil: 'BR', Mexico: 'MX', 'South Africa': 'ZA',
+  Egypt: 'EG', Nigeria: 'NG', Kenya: 'KE', 'South Korea': 'KR',
+  'New Zealand': 'NZ', Ireland: 'IE', Portugal: 'PT', Austria: 'AT',
+  Greece: 'GR', Israel: 'IL', Qatar: 'QA', Kuwait: 'KW', Bahrain: 'BH',
+  Oman: 'OM', 'Hong Kong': 'HK', Taiwan: 'TW', Philippines: 'PH',
+};
+
+export interface FlagItem {
+  flagIso: string;
+  label: string;
+}
+
+// Map country names → { flagIso, label } objects the list renderer understands.
+export function withFlags(countries: string[]): FlagItem[] {
+  return (Array.isArray(countries) ? countries : []).map((name) => ({
+    flagIso: COUNTRY_ISO[name] || '',
+    label: name,
+  }));
+}
+
 // Append a unit if the value is a plain number (no letters already present).
 export function withUnit(val: any, unit?: string): any {
   if (!val || !unit) return val;
@@ -120,7 +167,9 @@ export const FACILITY_META: Record<
   weaving: {
     label: 'Weaving',
     detailFields: [
-      { key: 'loomCount', label: 'Number of Looms', unit: 'Looms' },
+      // `loomCount` is a legacy field key — the form labels it "Number of
+      // Machines" like every other facility; don't surface "looms" wording.
+      { key: 'loomCount', label: 'Number of Machines', unit: 'Machines' },
       { key: 'weavingCapacity', label: 'Daily Capacity', unit: 'Kg / Day' },
       { key: 'remarks', label: 'Remarks' },
     ],
@@ -150,7 +199,9 @@ export const FACILITY_META: Record<
     ],
   },
   finishing: {
-    label: 'Finishing',
+    // Form name for this stage — "Finishing" alone doesn't match what the
+    // vendor selected on the Manufacturing Facilities step.
+    label: 'Final Packing and Dispatch',
     detailFields: [
       { key: 'finishingCapacity', label: 'Daily Capacity', unit: 'Pieces / Day' },
       { key: 'remarks', label: 'Remarks' },
