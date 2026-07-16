@@ -7,6 +7,12 @@ export interface QCCheckerData {
   checkerId: string;
   email: string;
   name: string;
+  // Optional web-parity fields (present on the /qc-checkers/me payload).
+  title?: string | null;
+  profilePhoto?: string | null;
+  alternateEmail?: string | null;
+  alternatePhone?: string | null;
+  idProof?: string | null;
   phone: string;
   address?: string;
   city?: string;
