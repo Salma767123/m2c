@@ -390,7 +390,7 @@ export default function VendorsTab() {
   const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label || 'Newest assignment';
 
   // Collapsible filter section — toggled by the arrow button next to the title.
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
   const toggleFilters = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setShowFilters((v) => !v);

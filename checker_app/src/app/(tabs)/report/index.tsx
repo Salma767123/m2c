@@ -89,7 +89,7 @@ export default function ReportsScreen() {
 
   // Collapsible search/filter section — toggled by the arrow next to the title
   // (ported from the vendor list). Shared across both tabs.
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
   const toggleFilters = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setShowFilters((v) => !v);
