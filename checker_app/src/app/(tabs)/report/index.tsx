@@ -544,7 +544,7 @@ function ProductReportsTab({ showFilters }: { showFilters: boolean }) {
           <View className="mb-3 flex-row items-center bg-white border border-slate-300 rounded-xl px-4 py-2.5">
             <Search size={18} color="#94a3b8" />
             <TextInput
-              placeholder="Search by product, SKU, or vendor..."
+              placeholder="Search by product, or vendor..."
               value={searchInput}
               onChangeText={setSearchInput}
               className="flex-1 ml-3 text-sm text-slate-900"
@@ -637,6 +637,10 @@ function ProductReportsTab({ showFilters }: { showFilters: boolean }) {
               const inspectedOn = p.updatedAt
                 ? new Date(p.updatedAt).toLocaleDateString('en-IN')
                 : '—';
+              const submittedOn = p.createdAt
+                ? new Date(p.createdAt).toLocaleDateString('en-IN')
+                : '—';
+              const vendorCode = p.vendor?.vendorCode;
               return (
                 <Pressable
                   key={p.id}
@@ -658,13 +662,15 @@ function ProductReportsTab({ showFilters }: { showFilters: boolean }) {
                     )}
                     <View className="flex-1" style={{ gap: 4, minWidth: 0 }}>
                       <AppText variant="titleMd" numberOfLines={1}>{p.name}</AppText>
-                      <AppText variant="bodySm" color={colors.textMuted} numberOfLines={1}>SKU: {p.baseSku}</AppText>
                       <AppText variant="labelSm" color={colors.textFaint} numberOfLines={1}>
-                        {p.vendor?.companyName || '—'} · {p.category}
+                        {p.vendor?.companyName || '—'} · {p.category || '—'}
                       </AppText>
-                      <View className="flex-row items-center" style={{ gap: 4 }}>
+                      {vendorCode ? (
+                        <AppText variant="bodySm" color={colors.textMuted} numberOfLines={1}>ID: {vendorCode}</AppText>
+                      ) : null}
+                      <View className="flex-row items-center flex-wrap" style={{ gap: 4 }}>
                         <CalendarDays size={11} color={colors.textFaint} />
-                        <AppText variant="labelSm" color={colors.textFaint}>Inspected {inspectedOn}</AppText>
+                        <AppText variant="labelSm" color={colors.textFaint}>Submitted {submittedOn} · Inspected {inspectedOn}</AppText>
                       </View>
                     </View>
                     <View style={{ flexShrink: 0 }}>

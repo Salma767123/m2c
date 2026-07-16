@@ -215,7 +215,7 @@ export default function ProductDetailScreen() {
           <View className="flex-row flex-wrap" style={{ rowGap: 14, columnGap: 0 }}>
             <SummaryStat label="Inspection Status" value={APPROVAL_LABELS[product.approvalStatus] || product.approvalStatus} />
             <SummaryStat label="Inspection Cycle" value={`#${product.inspectionCycleNumber ?? 1}`} />
-            <SummaryStat label="Last Inspected" value={fmt(product.approvedAt)} />
+            <SummaryStat label="Last Inspected" value={fmt(product.lastReviewedAt || product.approvedAt || product.qcInspectionData?.inspectionStartedAt || null)} />
             <SummaryStat label="Listed" value={fmt(product.createdAt)} />
           </View>
         </View>

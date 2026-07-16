@@ -40,6 +40,15 @@ function humanizeVerKey(key: string): string {
     .trim();
 }
 
+// Humanize an additional-evidence key (camelCase / snake_case → Title Case),
+// mirroring web's humanizeEvidenceKey (e.g. "factoryFrontView" → "Factory Front View").
+function humanizeEvidenceKey(key: string): string {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <View className="py-2">
@@ -214,10 +223,10 @@ export default function ProductReportDetailScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-        {/* Title + SKU subtitle */}
+        {/* Title + product name subtitle */}
         <AppText variant="headlineLg" color={colors.text}>Product Inspection Report</AppText>
         <AppText variant="bodySm" color={colors.textMuted} style={{ marginBottom: 16, marginTop: 2 }}>
-          {product.name} • SKU: {product.baseSku || 'N/A'}
+          {product.name}
         </AppText>
 
         {/* Preview + Download PDF */}
@@ -437,7 +446,19 @@ export default function ProductReportDetailScreen() {
                             <View key={test.id || i} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
                               <View className="flex-row items-center justify-between">
                                 <View className="flex-1 mr-2">
-                                  <AppText variant="titleMd" color={colors.text}>{test.label || `Test ${i + 1}`}</AppText>
+                                  <View className="flex-row items-center flex-wrap" style={{ columnGap: 6, rowGap: 2 }}>
+                                    <AppText variant="titleMd" color={colors.text}>
+                                      {test.label || (test.isOther ? test.subject : '') || `Test ${i + 1}`}
+                                    </AppText>
+                                    {test.isOther ? (
+                                      <View className="rounded border border-brand-100 bg-brand-50 px-1.5 py-0.5">
+                                        <AppText variant="labelSm" color={brand[600]} style={{ fontSize: 10, letterSpacing: 0.5 }}>CUSTOM</AppText>
+                                      </View>
+                                    ) : null}
+                                  </View>
+                                  {test.isOther && test.subject ? (
+                                    <AppText variant="bodySm" color={colors.textMuted} style={{ marginTop: 2 }}>Subject: {test.subject}</AppText>
+                                  ) : null}
                                   {test.remarks ? (
                                     <AppText variant="bodySm" color={colors.textMuted} style={{ marginTop: 2 }}>{test.remarks}</AppText>
                                   ) : null}
@@ -466,21 +487,15 @@ export default function ProductReportDetailScreen() {
                   );
                 })}
 
-                {/* Additional evidence summary */}
+                {/* Additional evidence photos */}
                 {Object.entries(additionalEvidence).some(([, ph]) => Array.isArray(ph) && ph.length > 0) ? (
                   <View>
                     <AppText variant="labelSm" color={colors.textMuted} style={{ textTransform: 'uppercase', marginBottom: 8 }}>Additional Evidence</AppText>
-                    <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-                      {Object.entries(additionalEvidence)
-                        .filter(([, ph]) => Array.isArray(ph) && ph.length > 0)
-                        .map(([key, ph]) => (
-                          <View key={key} className="bg-slate-100 rounded-lg px-2.5 py-1">
-                            <AppText variant="labelSm" color={colors.textSecondary}>
-                              {key.replace(/_/g, ' ')}: {ph.length} photo(s)
-                            </AppText>
-                          </View>
-                        ))}
-                    </View>
+                    {Object.entries(additionalEvidence)
+                      .filter(([, ph]) => Array.isArray(ph) && ph.length > 0)
+                      .map(([key, ph]) => (
+                        <PhotoGrid key={key} photos={ph as any[]} label={humanizeEvidenceKey(key)} onTap={setLightboxUri} />
+                      ))}
                   </View>
                 ) : null}
               </View>
