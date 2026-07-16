@@ -21,6 +21,8 @@ import {
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 import qcCheckerService, { QCCheckerData } from '../../services/qcCheckerService';
 import { AppText, SectionCard } from '@/components/UI';
@@ -29,6 +31,22 @@ import { brand, colors, space } from '@/constants/design';
 // Decide whether an ID-proof reference is a PDF (mirrors web CheckerSettings).
 const isPdfIdProof = (v?: string | null) =>
   !!v && (v.startsWith('data:application/pdf') || v.toLowerCase().endsWith('.pdf'));
+
+// Build the backend document-proxy URL for Cloudinary-hosted files so they open
+// through our API rather than hitting Cloudinary directly (which 401s). Non-
+// Cloudinary URLs are returned untouched. (Same logic as the vendor detail page.)
+const proxiedDocUrl = (url: string): string => {
+  try {
+    const host = new URL(url).hostname;
+    if (/^res\.cloudinary\.com$/i.test(host)) {
+      const base = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/+$/, '');
+      return `${base}/document-proxy?url=${encodeURIComponent(url)}`;
+    }
+  } catch {
+    /* non-URL string (e.g. data: URI): return as-is */
+  }
+  return url;
+};
 
 type ViewProfileProps = {
   onClose: () => void;
@@ -123,14 +141,31 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
   const openIdProof = async () => {
     const idProof = profile?.idProof;
     if (!idProof) return;
-    if (isPdfIdProof(idProof)) {
-      try {
-        await WebBrowser.openBrowserAsync(idProof);
-      } catch {
-        Alert.alert('Unable to open', 'Could not open the ID proof.');
-      }
-    } else {
+    // Images (remote URL or base64 data URI) → in-app lightbox (Image handles both).
+    if (!isPdfIdProof(idProof)) {
       setIdProofLightbox(true);
+      return;
+    }
+    try {
+      if (idProof.startsWith('data:')) {
+        // base64 data-URI PDF — WebBrowser can't open data: URIs, so write it
+        // to a cache file and hand it to the OS share/open sheet.
+        const base64 = idProof.substring(idProof.indexOf(',') + 1);
+        const fileUri = `${FileSystem.cacheDirectory}id-proof-${Date.now()}.pdf`;
+        await FileSystem.writeAsStringAsync(fileUri, base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'ID Proof' });
+        } else {
+          await WebBrowser.openBrowserAsync(fileUri);
+        }
+      } else {
+        // remote PDF (e.g. Cloudinary) — open through the backend document-proxy.
+        await WebBrowser.openBrowserAsync(proxiedDocUrl(idProof));
+      }
+    } catch (err: any) {
+      Alert.alert('Unable to open', err?.message || 'Could not open the ID proof.');
     }
   };
 
@@ -307,7 +342,7 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
             <View className="flex-1 items-center justify-center px-4 pb-8">
               {profile?.idProof ? (
                 <Image
-                  source={{ uri: profile.idProof }}
+                  source={{ uri: proxiedDocUrl(profile.idProof) }}
                   style={{ width: '100%', height: '100%' }}
                   resizeMode="contain"
                 />
