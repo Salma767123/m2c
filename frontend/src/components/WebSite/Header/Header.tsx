@@ -8,8 +8,6 @@ import {
   ShoppingCart,
   Heart,
   Menu,
-  Globe,
-  ChevronDown,
   X,
   User,
   Settings,
@@ -30,13 +28,8 @@ const Header = () => {
   const pathname = usePathname();
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isLanguageCurrencyOpen, setIsLanguageCurrencyOpen] = useState(false);
-  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-  const [showCurrencyDropdown, setShowCurrencyDropdown] = useState(false);
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState("English");
-  const [selectedCurrency, setSelectedCurrency] = useState("USD");
   const [searchQuery, setSearchQuery] = useState("");
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
@@ -52,30 +45,8 @@ const Header = () => {
     "Jute",
   ]);
 
-  const modalRef = useRef<HTMLDivElement>(null);
-  const languageDropdownRef = useRef<HTMLDivElement>(null);
-  const currencyDropdownRef = useRef<HTMLDivElement>(null);
   const accountDropdownRef = useRef<HTMLDivElement>(null);
   const searchModalRef = useRef<HTMLDivElement>(null);
-
-  const languages = [
-    { value: "en", label: "English", flag: "🇺🇸" },
-    { value: "es", label: "Español", flag: "🇪🇸" },
-    { value: "fr", label: "Français", flag: "🇫🇷" },
-    { value: "de", label: "Deutsch", flag: "🇩🇪" },
-    { value: "it", label: "Italiano", flag: "🇮🇹" },
-    { value: "pt", label: "Português", flag: "🇵🇹" },
-  ];
-
-  const currencies = [
-    { value: "USD", label: "USD - US Dollar", symbol: "$" },
-    { value: "EUR", label: "EUR - Euro", symbol: "€" },
-    { value: "GBP", label: "GBP - British Pound", symbol: "£" },
-    { value: "CAD", label: "CAD - Canadian Dollar", symbol: "C$" },
-    { value: "AUD", label: "AUD - Australian Dollar", symbol: "A$" },
-    { value: "JPY", label: "JPY - Japanese Yen", symbol: "¥" },
-    { value: "INR", label: "INR - Indian Rupee", symbol: "₹" },
-  ];
 
   // Listen for global open-search-modal event (e.g. from SubCategories page)
   useEffect(() => {
@@ -84,27 +55,26 @@ const Header = () => {
     return () => window.removeEventListener('open-search-modal', openModal);
   }, []);
 
-  // Close dropdowns when clicking outside
+  // Close the search panel on Escape
+  useEffect(() => {
+    if (!showSearchModal) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowSearchModal(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showSearchModal]);
+
+  // Close dropdowns when clicking outside. Each panel is checked independently —
+  // an unmounted panel must not keep its open sibling from closing.
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        modalRef.current &&
-        !modalRef.current.contains(event.target as Node) &&
-        languageDropdownRef.current &&
-        !languageDropdownRef.current.contains(event.target as Node) &&
-        currencyDropdownRef.current &&
-        !currencyDropdownRef.current.contains(event.target as Node) &&
-        accountDropdownRef.current &&
-        !accountDropdownRef.current.contains(event.target as Node) &&
-        searchModalRef.current &&
-        !searchModalRef.current.contains(event.target as Node)
-      ) {
-        setIsLanguageCurrencyOpen(false);
-        setShowLanguageDropdown(false);
-        setShowCurrencyDropdown(false);
-        setShowAccountDropdown(false);
-        setShowSearchModal(false);
-      }
+      const target = event.target as Node;
+      const isOutside = (ref: React.RefObject<HTMLDivElement | null>) =>
+        !ref.current || !ref.current.contains(target);
+
+      if (isOutside(accountDropdownRef)) setShowAccountDropdown(false);
+      if (isOutside(searchModalRef)) setShowSearchModal(false);
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -294,11 +264,11 @@ const Header = () => {
   }
 
   return (
-    <div className="sticky top-0 z-50 font-sans">
+    <div className="sticky top-0 z-50 font-sans isolate">
       {/* Brand accent bar — a live sliver of primary colour across the top */}
       <div className="h-1 w-full animate-brand-bar" />
       {/* Main Header */}
-      <header className="bg-white shadow-lg border-b border-gray-100 transition-all duration-300">
+      <header className="relative z-30 bg-white shadow-lg border-b border-gray-100 transition-all duration-300">
         <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
           <div className="flex items-center h-[68px] sm:h-18 md:h-20 xl:h-28 gap-2 sm:gap-3 md:gap-4">
 
@@ -366,147 +336,6 @@ const Header = () => {
               >
                 <Search className="w-5 h-5 md:w-6 md:h-6" />
               </button>
-
-              {/* Globe Icon - Language & Currency Selector */}
-              <div className="relative">
-                <button
-                  onClick={() =>
-                    setIsLanguageCurrencyOpen(!isLanguageCurrencyOpen)
-                  }
-                  className="p-2 text-[#222222] hover:text-white hover:bg-[#e01a1b] rounded-xl transition-all duration-200 transform hover:scale-110"
-                  aria-label="Language and Currency"
-                >
-                  <Globe className="w-5 h-5 md:w-6 md:h-6" />
-                </button>
-
-                {/* Language & Currency Modal */}
-                {isLanguageCurrencyOpen && (
-                  <div
-                    ref={modalRef}
-                    className="absolute top-full right-0 sm:-right-4 mt-2 w-[calc(100vw-1.5rem)] max-w-xs sm:w-80 bg-white rounded-xl shadow-xl z-50 overflow-visible animate-in fade-in slide-in-from-top-2 duration-200"
-                  >
-                    {/* Triangle indicator pointing to Globe icon */}
-                    <div className="absolute -top-2 right-4 sm:right-6 w-4 h-4 bg-gray-50 transform rotate-45 z-10"></div>
-
-                    <div className="bg-gray-50 p-3 sm:p-4 md:p-6">
-                      <h3 className="font-bold text-gray-900 text-base sm:text-lg">
-                        Preferences
-                      </h3>
-                      <p className="text-xs sm:text-sm text-slate-900 mt-1">
-                        Customize your language and currency
-                      </p>
-                    </div>
-
-                    <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-5">
-                      {/* Language Selection */}
-                      <div ref={languageDropdownRef} className="relative">
-                        <label className="block text-xs sm:text-sm font-semibold text-slate-800 mb-2 sm:mb-3">
-                          Language
-                        </label>
-                        <button
-                          onClick={() =>
-                            setShowLanguageDropdown(!showLanguageDropdown)
-                          }
-                          className="w-full flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium bg-white border-2 border-slate-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                        >
-                          <span className="flex items-center gap-2 sm:gap-3">
-                            <span className="text-sm sm:text-lg">
-                              {
-                                languages.find(
-                                  (l) => l.label === selectedLanguage,
-                                )?.flag
-                              }
-                            </span>
-                            <span className="text-slate-800">
-                              {selectedLanguage}
-                            </span>
-                          </span>
-                          <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4 text-slate-600" />
-                        </button>
-                        {showLanguageDropdown && (
-                          <div className="absolute z-20 w-full mt-2 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                            {languages.map((lang) => (
-                              <button
-                                key={lang.value}
-                                onClick={() => {
-                                  setSelectedLanguage(lang.label);
-                                  setShowLanguageDropdown(false);
-                                }}
-                                className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-slate-700 text-left hover:bg-gray-50 hover:text-gray-600 transition-colors duration-150"
-                              >
-                                <span className="text-sm sm:text-lg">{lang.flag}</span>
-                                <span className="font-medium">
-                                  {lang.label}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Currency Selection */}
-                      <div ref={currencyDropdownRef} className="relative">
-                        <label className="block text-xs sm:text-sm font-semibold text-slate-800 mb-2 sm:mb-3">
-                          Currency
-                        </label>
-                        <button
-                          onClick={() =>
-                            setShowCurrencyDropdown(!showCurrencyDropdown)
-                          }
-                          className="w-full flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium bg-white border-2 border-slate-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                        >
-                          <span className="flex items-center gap-2 sm:gap-3">
-                            <span className="text-sm sm:text-lg font-bold text-slate-800">
-                              {
-                                currencies.find(
-                                  (c) => c.value === selectedCurrency,
-                                )?.symbol
-                              }
-                            </span>
-                            <span className="text-slate-800">
-                              {selectedCurrency}
-                            </span>
-                          </span>
-                          <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4 text-slate-600" />
-                        </button>
-                        {showCurrencyDropdown && (
-                          <div className="absolute z-20 w-full mt-2 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                            {currencies.map((currency) => (
-                              <button
-                                key={currency.value}
-                                onClick={() => {
-                                  setSelectedCurrency(currency.value);
-                                  setShowCurrencyDropdown(false);
-                                }}
-                                className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-slate-700 text-left hover:bg-gray-50 hover:text-gray-600 transition-colors duration-150"
-                              >
-                                <span className="w-5 sm:w-6 text-center font-bold">
-                                  {currency.symbol}
-                                </span>
-                                <span className="font-medium">
-                                  {currency.label}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Save Button */}
-                      <button
-                        onClick={() => {
-                          setIsLanguageCurrencyOpen(false);
-                          setShowLanguageDropdown(false);
-                          setShowCurrencyDropdown(false);
-                        }}
-                        className="btn-shine w-full bg-[#e01a1b] hover:bg-[#c41617] text-white font-semibold py-2.5 sm:py-3 px-3 sm:px-4 rounded-full transition-all duration-300 shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#e01a1b] focus:ring-offset-2 text-xs sm:text-sm"
-                      >
-                        Save Preferences
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
 
               {/* User Account Dropdown */}
               <div
@@ -726,71 +555,78 @@ const Header = () => {
       </header>
 
       {/* Category Bar */}
-      <Category />
+      <div className="relative z-20">
+        <Category />
+      </div>
 
-      {/* Search Modal */}
+      {/* Search panel — drops down from the header, page stays visible behind */}
       {showSearchModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-center pt-8 sm:pt-12 md:pt-16 lg:pt-20 px-3 sm:px-4 animate-in fade-in duration-200"
-          onClick={() => setShowSearchModal(false)}
-        >
+        <>
+          {/* Soft scrim: dims the page below the header without hiding it */}
           <div
-            ref={searchModalRef}
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl lg:max-w-3xl mx-auto overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-4 sm:p-6 md:p-8">
-              {/* Search Input Section */}
-              <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 md:mb-8 bg-linear-to-r from-gray-600 to-gray-700 px-3 sm:px-4 md:px-5 py-3 sm:py-4 md:py-5 rounded-xl shadow-lg">
-                <Search className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white shrink-0" />
-                <input
-                  type="text"
-                  placeholder="Search for products, categories, brands..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 text-sm sm:text-base md:text-lg font-medium outline-none bg-transparent text-white placeholder-blue-100"
-                  autoFocus
-                />
-                {searchQuery && (
-                  <button
-                    type="submit"
-                    className="bg-amber-500 hover:bg-amber-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-colors shrink-0"
-                  >
-                    Search
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowSearchModal(false)}
-                  className="p-1.5 sm:p-2 md:p-2.5 hover:bg-gray-600 rounded-lg transition-all duration-200 shrink-0"
-                  aria-label="Close search"
+            className="fixed inset-0 z-0 bg-slate-900/25 backdrop-blur-[2px] animate-in fade-in duration-200"
+            onClick={() => setShowSearchModal(false)}
+            aria-hidden="true"
+          />
+          <div className="absolute left-0 right-0 top-full z-10 px-3 sm:px-4 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div
+              ref={searchModalRef}
+              className="bg-white rounded-b-2xl shadow-[0_18px_40px_-12px_rgba(15,23,42,0.35)] w-full max-w-3xl mx-auto overflow-hidden border border-t-0 border-slate-200"
+            >
+              <div className="p-4 sm:p-5">
+                {/* Search Input Section */}
+                <form
+                  onSubmit={handleSearchSubmit}
+                  className="flex items-center gap-2 sm:gap-3 bg-slate-50 border border-slate-200 focus-within:border-[#e01a1b] focus-within:ring-2 focus-within:ring-[#e01a1b]/15 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all duration-200"
                 >
-                  <X className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
-                </button>
-              </form>
-              {!searchQuery && (
-                <div className="space-y-4 sm:space-y-6 md:space-y-8">
-                  <div>
-                    <p className="text-xs sm:text-sm font-bold text-slate-800 mb-3 sm:mb-4 uppercase tracking-widest">
+                  <Search className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Search for products, categories, brands..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1 text-sm sm:text-base font-medium outline-none bg-transparent text-slate-800 placeholder-slate-400"
+                    autoFocus
+                  />
+                  {searchQuery && (
+                    <button
+                      type="submit"
+                      className="bg-[#e01a1b] hover:bg-[#c01617] text-white px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-colors shrink-0"
+                    >
+                      Search
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowSearchModal(false)}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors shrink-0"
+                    aria-label="Close search"
+                  >
+                    <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                </form>
+                {!searchQuery && popularSearches.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-[11px] font-bold text-slate-500 mb-2.5 uppercase tracking-widest">
                       Popular Searches
                     </p>
-                    <div className="flex flex-wrap gap-2 sm:gap-3">
+                    <div className="flex flex-wrap gap-2">
                       {popularSearches.map((term) => (
                         <button
                           key={term}
                           onClick={() => handleSearchShortcut(term)}
-                          className="px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 md:py-3 bg-linear-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 border-2 border-gray-200 hover:border-gray-400 rounded-xl text-xs sm:text-sm font-semibold text-gray-700 transition-all duration-200 transform hover:scale-105 hover:shadow-md"
+                          className="px-3 py-1.5 bg-slate-50 hover:bg-[#e01a1b] hover:border-[#e01a1b] hover:text-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 transition-colors duration-200"
                         >
                           {term}
                         </button>
                       ))}
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

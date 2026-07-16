@@ -5,7 +5,7 @@ const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
 const { notifications } = require('../utils/notificationService');
 const { checkAndAlertLowStock } = require('../utils/lowStockAlert');
 const { withRetry } = require('../utils/dbRetry');
-const { resolveUsdRate, toINR } = require('../utils/orderCurrency');
+const { resolveUsdRate, toINR, resolveUnitPrice } = require('../utils/orderCurrency');
 
 /** Round a money value to 2 decimals, avoiding float artefacts (e.g. 115.19999). */
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -179,17 +179,10 @@ const createOrder = async (req, res) => {
                 });
             }
 
-            // Pick regional price based on currency: priceINR/priceUSD → adminFixedPrice → basePrice
-            let unitPrice;
-            if (currency === 'USD') {
-                unitPrice = variant
-                    ? (variant.priceUSD || variant.adminFixedPrice || variant.price)
-                    : (product.priceUSD || product.adminFixedPrice || product.basePrice);
-            } else {
-                unitPrice = variant
-                    ? (variant.priceINR || variant.adminFixedPrice || variant.price)
-                    : (product.priceINR || product.adminFixedPrice || product.basePrice);
-            }
+            // Price the line in the order's currency. Shared with the storefront's
+            // getRegionalPrice() chain — see resolveUnitPrice() for why a USD order
+            // must convert from INR rather than fall through to an INR field.
+            const unitPrice = resolveUnitPrice(variant || product, currency, orderExchangeRate);
             // Round per line as well: the invoice prints each item's totalPrice,
             // so the printed item lines must sum to the printed subtotal.
             const itemTotal = round2(unitPrice * item.quantity);
@@ -258,10 +251,10 @@ const createOrder = async (req, res) => {
         // 4. Resolve bag type pricing (bag was already fetched + validated in
         // the parallel pre-flight above).
         const bagTypeName = bagType ? bagType.name : null;
+        // Same chain as the line items — a bag priced only in INR must be converted
+        // for a USD order, never charged as-is.
         const bagTypePrice = bagType
-            ? (currency === 'USD'
-                ? (bagType.priceUSD || bagType.price)
-                : (bagType.priceINR || bagType.price))
+            ? resolveUnitPrice(bagType, currency, orderExchangeRate)
             : 0;
 
         // 5. Create Order

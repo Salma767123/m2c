@@ -6,6 +6,7 @@ import { CheckCircle, Package, Truck, Mail, Download, ArrowRight, Clock, AlertCi
 import { useState, useEffect } from "react"
 import orderService, { Order } from "@/services/orderService"
 import { popRecentOrder } from "@/lib/recentOrder"
+import { formatPrice } from "@/lib/currency"
 import { useSearchParams } from "next/navigation"
 import { getCountryName, getCountryFlag, getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants"
 import Reveal from "@/components/WebSite/Shared/Reveal"
@@ -102,6 +103,11 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
   // So we only render below if order exists. 
 
   if (!order) return null; // Should be handled by error view but typescript might complain
+
+  // Every figure on this page is money the customer was ALREADY charged, so it must be
+  // shown in the order's own currency — not the region's. This screen hardcoded '$',
+  // which billed a ₹4,999 order as "$4,999.00" on the receipt.
+  const money = (n: number) => formatPrice(n, order.currency === 'USD' ? 'USD' : 'INR');
 
   const orderStatus = order.status !== 'FAILED' && order.status !== 'CANCELLED'; // Simple check
   const isConfirmed = order.status === 'ORDER_CREATED' || order.status === 'CONFIRMED' || order.status === 'SHIPPED' || order.status === 'DELIVERED';
@@ -267,9 +273,9 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
                         <p className="text-xs text-gray-600">Qty: {item.quantity}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-gray-900">${item.totalPrice.toFixed(2)}</p>
+                        <p className="font-semibold text-gray-900">{money(item.totalPrice)}</p>
                         {item.quantity > 1 && (
-                          <p className="text-xs text-gray-500">${item.unitPrice.toFixed(2)} each</p>
+                          <p className="text-xs text-gray-500">{money(item.unitPrice)} each</p>
                         )}
                       </div>
                     </div>
@@ -283,7 +289,7 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
                         <ShoppingBag className="w-4 h-4 text-amber-600" />
                         <span>Bag: {order.bagTypeName}</span>
                       </div>
-                      <span className="font-medium text-gray-900">${order.bagTypePrice.toFixed(2)}</span>
+                      <span className="font-medium text-gray-900">{money(order.bagTypePrice)}</span>
                     </div>
                   )}
                 </div>
@@ -291,31 +297,31 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
                 <div className="border-t border-gray-200 pt-4 space-y-3">
                   <div className="flex justify-between text-gray-600">
                     <span>Subtotal</span>
-                    <span className="font-medium">${order.subtotal.toFixed(2)}</span>
+                    <span className="font-medium">{money(order.subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Shipping</span>
-                    <span className="font-medium text-gray-800">${order.shippingCost.toFixed(2)}</span>
+                    <span className="font-medium text-gray-800">{money(order.shippingCost)}</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Tax</span>
-                    <span className="font-medium">${order.tax.toFixed(2)}</span>
+                    <span className="font-medium">{money(order.tax)}</span>
                   </div>
                   {order.discount > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Discount</span>
-                      <span className="font-medium">-${order.discount.toFixed(2)}</span>
+                      <span className="font-medium">-{money(order.discount)}</span>
                     </div>
                   )}
                   {order.bagTypePrice && order.bagTypePrice > 0 && (
                     <div className="flex justify-between text-gray-600">
                       <span>Bag ({order.bagTypeName})</span>
-                      <span className="font-medium">${order.bagTypePrice.toFixed(2)}</span>
+                      <span className="font-medium">{money(order.bagTypePrice)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-lg font-bold text-gray-900 pt-3 border-t border-gray-200">
                     <span>Total</span>
-                    <span>${order.totalAmount.toFixed(2)}</span>
+                    <span>{money(order.totalAmount)}</span>
                   </div>
                 </div>
 

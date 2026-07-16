@@ -233,6 +233,11 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
     )
   }
 
+  // formatPrice() with no currency arg falls back to the REGION, not this order's
+  // currency — so a USD order viewed on the .in site rendered as ₹. Bind the order's
+  // own currency once and use it for every amount below.
+  const money = (n: number) => formatPrice(n, orderDetails.currency === 'USD' ? 'USD' : 'INR')
+
   const normalizedStatus = getNormalizedStatus(orderDetails.status)
   const shippingAddr = orderDetails.shippingAddress || {}
 
@@ -355,10 +360,10 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                         </div>
                         <div className="flex items-baseline justify-between gap-2 flex-wrap">
                           <span className="text-base sm:text-lg font-bold text-slate-900">
-                            {formatPrice(item.totalPrice)}
+                            {money(item.totalPrice)}
                           </span>
                           <span className="text-xs sm:text-sm text-slate-500">
-                            {formatPrice(item.unitPrice)} each
+                            {money(item.unitPrice)} each
                           </span>
                         </div>
                       </div>
@@ -372,7 +377,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                         <ShoppingBag className="w-4 h-4 text-amber-600" />
                         <span>Bag: {orderDetails.bagTypeName}</span>
                       </div>
-                      <span className="font-semibold text-slate-900">{formatPrice(orderDetails.bagTypePrice)}</span>
+                      <span className="font-semibold text-slate-900">{money(orderDetails.bagTypePrice)}</span>
                     </div>
                   )}
                 </div>
@@ -420,34 +425,34 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 <CardContent className="p-4 sm:p-5 lg:p-6 space-y-3 sm:space-y-4">
                   <div className="flex justify-between">
                     <span className="text-slate-600">Subtotal</span>
-                    <span className="font-medium">{formatPrice(orderDetails.subtotal)}</span>
+                    <span className="font-medium">{money(orderDetails.subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Shipping</span>
                     <span className="font-medium text-green-600">
-                      {orderDetails.shippingCost > 0 ? `${formatPrice(orderDetails.shippingCost)}` : 'Free'}
+                      {orderDetails.shippingCost > 0 ? money(orderDetails.shippingCost) : 'Free'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Tax</span>
-                    <span className="font-medium">{formatPrice(orderDetails.tax)}</span>
+                    <span className="font-medium">{money(orderDetails.tax)}</span>
                   </div>
                   {orderDetails.discount > 0 && (
                     <div className="flex justify-between">
                       <span className="text-slate-600">Discount</span>
-                      <span className="font-medium text-green-600">-{formatPrice(orderDetails.discount)}</span>
+                      <span className="font-medium text-green-600">-{money(orderDetails.discount)}</span>
                     </div>
                   )}
                   {orderDetails.bagTypePrice && orderDetails.bagTypePrice > 0 && (
                     <div className="flex justify-between">
                       <span className="text-slate-600">Bag ({orderDetails.bagTypeName})</span>
-                      <span className="font-medium">{formatPrice(orderDetails.bagTypePrice)}</span>
+                      <span className="font-medium">{money(orderDetails.bagTypePrice)}</span>
                     </div>
                   )}
                   <div className="border-t border-slate-200 pt-4">
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total</span>
-                      <span>{formatPrice(orderDetails.totalAmount)}</span>
+                      <span>{money(orderDetails.totalAmount)}</span>
                     </div>
                   </div>
                 </CardContent>

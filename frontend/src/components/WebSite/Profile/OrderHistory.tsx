@@ -5,8 +5,14 @@ import Link from 'next/link'
 import { Package, Eye, Download, Star, Truck, CheckCircle, Clock, AlertCircle, ChevronLeft, ChevronRight, ShoppingBag } from 'lucide-react'
 import orderService, { Order as APIOrder } from '@/services/orderService'
 import Reveal from '@/components/WebSite/Shared/Reveal'
+import { formatPrice } from '@/lib/currency'
 
 const ORDERS_PER_PAGE = 5
+
+/** Show each amount in the currency the order was charged in, not a hardcoded '$'. */
+function money(amount: number, order: Pick<APIOrder, 'currency'>): string {
+  return formatPrice(amount, order.currency === 'USD' ? 'USD' : 'INR')
+}
 
 /** Smart pagination range builder — collapses long page lists to "1 … 4 5 6 … 20". */
 function getPageRange(current: number, total: number): Array<number | '…'> {
@@ -200,7 +206,7 @@ export default function OrderHistory() {
                     </span>
                   </div>
                   <div className="text-left sm:text-right shrink-0">
-                    <p className="text-base sm:text-lg font-bold text-slate-900">${order.totalAmount.toFixed(2)}</p>
+                    <p className="text-base sm:text-lg font-bold text-slate-900">{money(order.totalAmount, order)}</p>
                     <p className="text-xs text-slate-500">{order.paymentStatus}</p>
                   </div>
                 </div>
@@ -229,8 +235,8 @@ export default function OrderHistory() {
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-semibold text-slate-900 text-sm sm:text-base">${(item.totalPrice).toFixed(2)}</p>
-                        <p className="text-xs sm:text-sm text-slate-600">${item.unitPrice.toFixed(2)} each</p>
+                        <p className="font-semibold text-slate-900 text-sm sm:text-base">{money(item.totalPrice, order)}</p>
+                        <p className="text-xs sm:text-sm text-slate-600">{money(item.unitPrice, order)} each</p>
                       </div>
                     </div>
                   ))}
@@ -242,7 +248,7 @@ export default function OrderHistory() {
                         <ShoppingBag className="w-4 h-4 text-amber-600" />
                         <span>Bag: {order.bagTypeName}</span>
                       </div>
-                      <span className="font-medium text-slate-900">${order.bagTypePrice.toFixed(2)}</span>
+                      <span className="font-medium text-slate-900">{money(order.bagTypePrice, order)}</span>
                     </div>
                   )}
                 </div>

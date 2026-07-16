@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Copy, Check, ArrowRight, Tag } from "lucide-react";
 import { couponService, PopupCoupon } from "@/services/couponService";
+import { formatPrice } from "@/lib/currency";
 
 interface PromotionalPopupProps {
   category: string;
@@ -66,10 +67,12 @@ export default function PromotionalPopup({ category }: PromotionalPopupProps) {
 
   if (!visible || !coupon) return null;
 
+  // discountValue is stored in INR (the admin enters ₹ in CouponManagement), so a flat
+  // ₹500 coupon was advertising itself as "$500 OFF".
   const discountText =
     coupon.discountType === "PERCENTAGE"
       ? `${coupon.discountValue}% OFF`
-      : `$${coupon.discountValue} OFF`;
+      : `${formatPrice(coupon.discountValue, 'INR')} OFF`;
 
   return (
     <div

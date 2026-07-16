@@ -1,12 +1,16 @@
-import { Users, Store, ShoppingCart, DollarSign, TrendingUp } from 'lucide-react'
+import { Users, Store, ShoppingCart, IndianRupee, TrendingUp } from 'lucide-react'
+import { formatPrice } from '@/lib/currency'
 
 export default function DashboardStats({ summaryData }: { summaryData: any }) {
+  // Both figures are SUM(Order.totalAmountINR) — see adminDashboardController's
+  // totalIncome. They are rupees, and were rendered with a '$', overstating the
+  // headline revenue ~83x to anyone reading it as dollars.
   const stats = [
     {
       title: 'Total Earnings',
-      value: `$${summaryData.totalEarnings.toLocaleString()}`,
+      value: formatPrice(summaryData.totalEarnings, 'INR'),
       change: 'Lifetime earnings',
-      icon: DollarSign,
+      icon: IndianRupee,
       color: 'text-emerald-600',
       iconBg: 'bg-emerald-50',
     },
@@ -36,7 +40,7 @@ export default function DashboardStats({ summaryData }: { summaryData: any }) {
     },
     {
       title: 'Total Income',
-      value: `$${summaryData.totalIncome.toLocaleString()}`,
+      value: formatPrice(summaryData.totalIncome, 'INR'),
       change: 'Lifetime income',
       icon: TrendingUp,
       color: 'text-emerald-600',

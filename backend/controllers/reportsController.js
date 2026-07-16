@@ -338,6 +338,10 @@ const getOrdersReport = async (req, res) => {
                     orderId: true,
                     customerName: true,
                     totalAmount: true,
+                    // totalAmount is meaningless without the currency it is quoted in,
+                    // and the INR equivalent needs the order's own rate snapshot.
+                    currency: true,
+                    exchangeRate: true,
                     status: true,
                     paymentStatus: true,
                     createdAt: true,
@@ -372,6 +376,12 @@ const getOrdersReport = async (req, res) => {
                         customer: o.customerName,
                         vendor: o.items[0]?.vendorName || '-',
                         amount: o.totalAmount,
+                        // amount is in the order's OWN currency, so it cannot be rendered
+                        // without these two — getOverviewReport sends them for the same
+                        // reason. Omitting them made the UI fall back to a hardcoded ₹,
+                        // printing a $9.39 order as ₹9.39.
+                        currency: o.currency,
+                        exchangeRate: o.exchangeRate,
                         status: o.status,
                         paymentStatus: o.paymentStatus,
                         date: o.createdAt,

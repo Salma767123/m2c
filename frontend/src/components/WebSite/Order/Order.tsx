@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { formatPrice } from "@/lib/currency"
 import {
   Package,
   Truck,
@@ -53,12 +54,24 @@ interface OrderItem {
   color?: string
 }
 
+/**
+ * Format an amount in the currency the order was charged in.
+ *
+ * This screen hardcoded '$' on all eight money lines, so a .in shopper's ₹4,999 order
+ * read back as "$4,999.00" in their own order history.
+ */
+function money(amount: number, order: Pick<Order, 'currency'>): string {
+  return formatPrice(amount, order.currency === 'USD' ? 'USD' : 'INR')
+}
+
 interface Order {
   id: string
   orderNumber: string
   date: string
   status: string
   total: number
+  /** The currency the customer was actually charged. Every amount below is in it. */
+  currency?: 'INR' | 'USD'
   items: OrderItem[]
   trackingNumber?: string
   estimatedDelivery?: string
@@ -112,6 +125,7 @@ export default function OrderList() {
             return 'processing';
           })(apiOrder.status),
           total: apiOrder.totalAmount,
+          currency: apiOrder.currency,
           paymentStatus: apiOrder.paymentStatus,
           items: apiOrder.items.map((item: any) => ({
             id: item.id,
@@ -386,7 +400,7 @@ export default function OrderList() {
                             </span>
                           </div>
                           <div className="text-left sm:text-right shrink-0">
-                            <p className="text-base sm:text-lg font-bold text-slate-900">${order.total.toFixed(2)}</p>
+                            <p className="text-base sm:text-lg font-bold text-slate-900">{money(order.total, order)}</p>
                             {order.trackingNumber && (
                               <p className="text-xs sm:text-sm text-slate-600 break-all">Tracking: {order.trackingNumber}</p>
                             )}
@@ -419,8 +433,8 @@ export default function OrderList() {
                                 </div>
                               </div>
                               <div className="text-right shrink-0">
-                                <p className="font-semibold text-slate-900 text-sm sm:text-base">${(item.price * item.quantity).toFixed(2)}</p>
-                                <p className="text-xs sm:text-sm text-slate-600">${item.price.toFixed(2)} each</p>
+                                <p className="font-semibold text-slate-900 text-sm sm:text-base">{money(item.price * item.quantity, order)}</p>
+                                <p className="text-xs sm:text-sm text-slate-600">{money(item.price, order)} each</p>
                               </div>
                             </div>
                           ))}
@@ -432,7 +446,7 @@ export default function OrderList() {
                                 <ShoppingBag className="w-4 h-4 text-amber-600" />
                                 <span>Bag: {order.bagTypeName}</span>
                               </div>
-                              <span className="font-medium text-slate-900">${order.bagTypePrice.toFixed(2)}</span>
+                              <span className="font-medium text-slate-900">{money(order.bagTypePrice, order)}</span>
                             </div>
                           )}
 
@@ -563,7 +577,7 @@ export default function OrderList() {
                             </span>
                           </div>
                           <div className="text-left sm:text-right shrink-0">
-                            <p className="text-base sm:text-lg font-bold text-slate-900">${order.total.toFixed(2)}</p>
+                            <p className="text-base sm:text-lg font-bold text-slate-900">{money(order.total, order)}</p>
                             {order.trackingNumber && (
                               <p className="text-xs sm:text-sm text-slate-600 break-all">Tracking: {order.trackingNumber}</p>
                             )}
@@ -596,8 +610,8 @@ export default function OrderList() {
                                 </div>
                               </div>
                               <div className="text-right shrink-0">
-                                <p className="font-semibold text-slate-900 text-sm sm:text-base">${(item.price * item.quantity).toFixed(2)}</p>
-                                <p className="text-xs sm:text-sm text-slate-600">${item.price.toFixed(2)} each</p>
+                                <p className="font-semibold text-slate-900 text-sm sm:text-base">{money(item.price * item.quantity, order)}</p>
+                                <p className="text-xs sm:text-sm text-slate-600">{money(item.price, order)} each</p>
                               </div>
                             </div>
                           ))}
@@ -609,7 +623,7 @@ export default function OrderList() {
                                 <ShoppingBag className="w-4 h-4 text-amber-600" />
                                 <span>Bag: {order.bagTypeName}</span>
                               </div>
-                              <span className="font-medium text-slate-900">${order.bagTypePrice.toFixed(2)}</span>
+                              <span className="font-medium text-slate-900">{money(order.bagTypePrice, order)}</span>
                             </div>
                           )}
 

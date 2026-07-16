@@ -52,4 +52,68 @@ function toINR(amount, currency, rate) {
     return amount * rate;
 }
 
-module.exports = { FALLBACK_USD_RATE, resolveUsdRate, toINR };
+const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+
+/**
+ * Resolve the price to charge for one unit, in the order's currency.
+ *
+ * This MUST mirror getRegionalPrice() in frontend/src/lib/currency.ts. The shopper is
+ * quoted the frontend's number on the product page, in the cart and at checkout; if
+ * this chain disagrees, the order is written at a price the customer never saw.
+ *
+ * The INR chain is the source of truth. USD is derived from it:
+ *   - priceUSD when the admin has set/recalculated one (exchangeRateController
+ *     backfills it on every rate edit), else
+ *   - the INR price converted with the order's rate SNAPSHOT.
+ *
+ * Never fall through to an INR field for a USD order: that bills a ₹350 product as
+ * $350. Falling back to the live-converted figure keeps the number in the right
+ * order of magnitude even when priceUSD is missing.
+ *
+ * `== null` not `||` throughout: a legitimately-zero price must not be treated as
+ * "unset" and silently replaced by the next candidate.
+ *
+ * @param {object} p       Product or ProductVariant. Products carry `basePrice`,
+ *                         variants carry `price` — both are the vendor's own price.
+ * @param {string} currency Order currency ('USD' | 'INR').
+ * @param {number|null} rate The order's INR-per-USD snapshot (from resolveUsdRate).
+ * @returns {number} Unit price in `currency`, rounded to 2dp.
+ */
+function resolveUnitPrice(p, currency, rate) {
+    const inrPrice = firstSet(p.priceINR, p.adminFixedPrice, p.basePrice, p.price) ?? 0;
+
+    if (currency !== 'USD') return round2(inrPrice);
+
+    if (p.priceUSD != null) return round2(p.priceUSD);
+    if (inrPrice <= 0) return 0;
+    if (!rate || rate <= 0) {
+        // resolveUsdRate never returns a bad rate, so this is unreachable in the order
+        // path. Guard anyway: charging the INR number as USD is the bug this exists
+        // to prevent, and silently returning 0 would give the goods away free.
+        throw new Error(
+            `[orderCurrency] Cannot price in USD: no exchange rate and no priceUSD set.`
+        );
+    }
+    return round2(inrPrice / rate);
+}
+
+/**
+ * Derive a USD price from an INR one. The INR price is the source of truth; USD is
+ * always a function of it and the rate, so it is never entered by hand.
+ * Returns null for an unset INR price — null means "no USD price", and
+ * resolveUnitPrice() converts live rather than treating null as zero.
+ */
+function usdFromINR(inrPrice, rate) {
+    if (inrPrice == null || !rate || rate <= 0) return null;
+    return round2(inrPrice / rate);
+}
+
+/** First candidate that is actually set (0 counts as set; null/undefined do not). */
+function firstSet(...values) {
+    for (const v of values) {
+        if (v != null) return v;
+    }
+    return null;
+}
+
+module.exports = { FALLBACK_USD_RATE, resolveUsdRate, toINR, resolveUnitPrice, usdFromINR };

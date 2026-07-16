@@ -276,6 +276,12 @@ html, body {
   --color-brand-500: #e01a1b;
   --color-brand-600: #c41617;
   --color-brand-700: #a31314;
+  /* 800 — darkest step, for body copy on brand-50/100 tints. The scale
+     previously stopped at 700 while `text-brand-800` was already used in 9
+     places (Settings, ExchangeRateTab, BannerSettingsTab, SEOSettingsTab,
+     WarehouseDetails); with no token behind it Tailwind emitted no class at
+     all, so that text silently fell back to the inherited colour. */
+  --color-brand-800: #7d0f10;
 
   /* ── Success green ── completion states, valid badges.
      Matches Stitch overrideSecondaryColor (= Tailwind green-600). */

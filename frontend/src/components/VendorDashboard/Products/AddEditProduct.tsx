@@ -2967,7 +2967,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                           alt={image.alt}
                           className="w-full h-32 object-cover rounded border-2 border-slate-800"
                         />
-                        <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center">
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center">
                           <button
                             type="button"
                             onClick={() => removeImage(image.id)}
@@ -3038,7 +3038,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               alt={image.alt}
                               className="w-full h-20 object-cover rounded border"
                             />
-                            <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center gap-1">
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center gap-1">
                               {formData.images.filter(img => img.imageType === 'cover').length === 0 && (
                                 <button
                                   type="button"
