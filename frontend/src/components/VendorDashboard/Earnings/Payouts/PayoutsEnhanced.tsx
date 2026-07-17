@@ -166,6 +166,48 @@ export default function PayoutsEnhanced() {
       y += 10;
     });
 
+    // ── Products in this settlement (only if the frozen snapshot exists) ──
+    if (settlement.lineItemsAvailable && settlement.lineItems?.length) {
+      y += 5;
+      doc.setFillColor(243, 244, 246);
+      doc.rect(15, y - 6, pageW - 30, 10, 'F');
+      doc.setTextColor(55, 65, 81);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Products in this Settlement', 18, y);
+
+      y += 12;
+      doc.setFontSize(8);
+      doc.setTextColor(107, 114, 128);
+      doc.setFont('helvetica', 'bold');
+      // Column anchors: Product | Qty | Unit | Taxable | GST | Total
+      const colQty = pageW - 92, colUnit = pageW - 74, colTax = pageW - 52, colGst = pageW - 32, colTotal = pageW - 18;
+      doc.text('Product', 18, y);
+      doc.text('Qty', colQty, y, { align: 'right' });
+      doc.text('Unit', colUnit, y, { align: 'right' });
+      doc.text('Taxable', colTax, y, { align: 'right' });
+      doc.text('GST', colGst, y, { align: 'right' });
+      doc.text('Total', colTotal, y, { align: 'right' });
+      y += 3;
+      doc.setDrawColor(229, 231, 235);
+      doc.line(15, y, pageW - 15, y);
+      y += 6;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(17, 24, 39);
+      settlement.lineItems.forEach((li) => {
+        const name = li.productName.length > 34 ? li.productName.slice(0, 33) + '…' : li.productName;
+        doc.text(name, 18, y);
+        doc.text(String(li.quantity), colQty, y, { align: 'right' });
+        doc.text(`Rs.${(li.unitPrice ?? 0).toLocaleString('en-IN')}`, colUnit, y, { align: 'right' });
+        doc.text(`Rs.${(li.taxableValue ?? 0).toLocaleString('en-IN')}`, colTax, y, { align: 'right' });
+        doc.text(li.gstAmount ? `Rs.${li.gstAmount.toLocaleString('en-IN')}` : '-', colGst, y, { align: 'right' });
+        doc.text(`Rs.${(li.lineTotal ?? 0).toLocaleString('en-IN')}`, colTotal, y, { align: 'right' });
+        y += 8;
+      });
+      y += 2;
+    }
+
     // ── Financial Overview section ──
     y += 5;
     doc.setFillColor(243, 244, 246);
@@ -174,6 +216,19 @@ export default function PayoutsEnhanced() {
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text('Financial Overview', 18, y);
+
+    // Goods + GST split, when present, before the gross total.
+    if (settlement.taxAmount) {
+      y += 12;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(75, 85, 99);
+      doc.text('Taxable Value (goods)', 18, y);
+      doc.text(`Rs. ${(settlement.baseAmount ?? 0).toLocaleString('en-IN')}`, pageW - 18, y, { align: 'right' });
+      y += 8;
+      doc.text(`GST${settlement.gstPercentage != null ? ` (${settlement.gstPercentage}%)` : ''}`, 18, y);
+      doc.text(`Rs. ${settlement.taxAmount.toLocaleString('en-IN')}`, pageW - 18, y, { align: 'right' });
+    }
 
     y += 14;
     doc.setFontSize(10);
@@ -738,10 +793,75 @@ export default function PayoutsEnhanced() {
                 </div>
               </div>
 
+              {/* Product breakdown — the goods this payout covers, at the vendor's own
+                  price. Shown only when the frozen snapshot exists; older settlements
+                  fall back to a note rather than inventing per-line figures. */}
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Products in this Settlement</h3>
+                {selectedSettlement.lineItemsAvailable && selectedSettlement.lineItems?.length ? (
+                  <div className="border border-slate-200 rounded-lg overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 border-b border-slate-200">
+                        <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500">
+                          <th className="px-3 py-2 font-semibold">Product</th>
+                          <th className="px-3 py-2 font-semibold text-center">Qty</th>
+                          <th className="px-3 py-2 font-semibold text-right">Unit Price</th>
+                          <th className="px-3 py-2 font-semibold text-right">Taxable</th>
+                          <th className="px-3 py-2 font-semibold text-right">GST</th>
+                          <th className="px-3 py-2 font-semibold text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {selectedSettlement.lineItems.map((li) => (
+                          <tr key={li.id}>
+                            <td className="px-3 py-2">
+                              <div className="font-medium text-slate-900">{li.productName}</div>
+                              <div className="text-xs text-slate-500">
+                                SKU: {li.sku}
+                                {(li.size || li.color) && ` · ${[li.size, li.color].filter(Boolean).join(' / ')}`}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-center text-slate-700">{li.quantity}</td>
+                            <td className="px-3 py-2 text-right text-slate-700">₹{(li.unitPrice ?? 0).toLocaleString('en-IN')}</td>
+                            <td className="px-3 py-2 text-right text-slate-700">₹{(li.taxableValue ?? 0).toLocaleString('en-IN')}</td>
+                            <td className="px-3 py-2 text-right text-slate-700">
+                              {li.gstAmount
+                                ? <>₹{li.gstAmount.toLocaleString('en-IN')}{li.gstRate != null && <span className="text-xs text-slate-400"> ({li.gstRate}%)</span>}</>
+                                : <span className="text-slate-400">—</span>}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold text-slate-900">₹{(li.lineTotal ?? 0).toLocaleString('en-IN')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-500">
+                    Line-item detail isn&apos;t available for settlements created before this
+                    update. The totals below remain accurate.
+                  </div>
+                )}
+              </div>
+
               {/* Financial Breakdown */}
               <div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Financial Overview</h3>
                 <div className="bg-slate-50 p-4 rounded-lg space-y-3">
+                  {/* Goods + GST split so it reconciles against the vendor's tax invoice. */}
+                  {selectedSettlement.taxAmount ? (
+                    <>
+                      <div className="flex justify-between items-center text-slate-600">
+                        <span>Taxable Value (goods)</span>
+                        <span>₹{(selectedSettlement.baseAmount ?? 0).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-slate-600">
+                        <span>
+                          GST{selectedSettlement.gstPercentage != null ? ` (${selectedSettlement.gstPercentage}%)` : ''}
+                        </span>
+                        <span>₹{selectedSettlement.taxAmount.toLocaleString('en-IN')}</span>
+                      </div>
+                    </>
+                  ) : null}
                   <div className="flex justify-between items-center border-t border-slate-300 pt-3">
                     <span className="font-bold text-slate-900 text-lg">Settlement Amount</span>
                     <span className="font-bold text-slate-900 text-lg">

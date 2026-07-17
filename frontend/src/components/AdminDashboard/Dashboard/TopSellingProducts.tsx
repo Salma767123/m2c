@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { TrendingUp, Package } from 'lucide-react'
+import { formatPrice } from "@/lib/currency";
 
 export default function TopSellingProducts({ products }: { products: any[] }) {
   return (
@@ -26,7 +27,7 @@ export default function TopSellingProducts({ products }: { products: any[] }) {
 
               {/* Revenue & Trend */}
               <div className="text-right shrink-0">
-                <p className="font-bold text-sm text-slate-900">${product.revenue?.toLocaleString() || 0}</p>
+                <p className="font-bold text-sm text-slate-900">{formatPrice(product.revenue ?? 0, 'INR')}</p>
                 <div className="flex items-center justify-end gap-1 text-xs text-green-600 mt-1">
                   <TrendingUp className="w-3 h-3" />
                   <span>N/A</span>

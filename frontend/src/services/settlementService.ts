@@ -28,6 +28,34 @@ export interface Settlement {
     vendor?: {
         bankDetails?: { id: string; bankName: string } | null;
     };
+    /**
+     * Per-product payout breakdown for this settlement, all in INR at the vendor's own
+     * price. Empty when the frozen snapshot predates this feature — see
+     * `lineItemsAvailable`.
+     */
+    lineItems?: SettlementLineItem[];
+    /** True when every line has a frozen payout snapshot; false for legacy settlements. */
+    lineItemsAvailable?: boolean;
+}
+
+export interface SettlementLineItem {
+    id: string;
+    productName: string;
+    productImage?: string | null;
+    sku: string;
+    size?: string | null;
+    color?: string | null;
+    quantity: number;
+    /** Vendor's own unit price (INR). */
+    unitPrice: number | null;
+    /** unitPrice x quantity, before GST (INR). */
+    taxableValue: number | null;
+    /** GST rate applied to this line. */
+    gstRate: number | null;
+    /** GST on taxableValue (INR). */
+    gstAmount: number | null;
+    /** taxableValue + gstAmount (INR). */
+    lineTotal: number | null;
 }
 
 export const settlementService = {

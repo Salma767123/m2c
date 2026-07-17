@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Star } from 'lucide-react';
+import { formatPrice } from "@/lib/currency";
 
 export interface TopProduct {
   name: string;
@@ -36,7 +37,7 @@ export default function TopProducts({ products }: TopProductsProps) {
                 </div>
               </div>
               <div className="text-right ml-3">
-                <p className="font-bold text-slate-700 text-sm sm:text-base">${product.revenue.toFixed(2)}</p>
+                <p className="font-bold text-slate-700 text-sm sm:text-base">{formatPrice(product.revenue ?? 0, 'INR')}</p>
               </div>
             </div>
           ))}

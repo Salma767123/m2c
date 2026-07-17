@@ -225,6 +225,13 @@ const createOrder = async (req, res) => {
                 unitPrice: unitPrice,
                 totalPrice: itemTotal,
                 totalPriceINR: toINR(itemTotal, currency, orderExchangeRate),
+                // Freeze the vendor payout for this line so the settlement statement can
+                // itemise it later. Vendor money is always INR — vendorPrice is basePrice,
+                // never converted. Mirrors the vendorTotals accumulation above.
+                vendorUnitPrice: round2(vendorPrice),
+                vendorLineBase: round2(vendorItemTotal),
+                vendorLineTax: round2(vendorItemTax),
+                vendorGstRate: vendorGstRate,
                 vendorId: product.vendorId,
                 vendorName: product.vendor.companyName || product.vendor.ownerName,
                 sku: variant ? variant.sku : product.baseSku,

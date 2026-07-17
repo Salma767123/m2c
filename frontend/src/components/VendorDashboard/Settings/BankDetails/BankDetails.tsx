@@ -34,11 +34,25 @@ const composeBranchAddress = (f: BankDetailsForm): string =>
 
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/
 
+// Indian bank account numbers are numeric and 9–18 digits (varies by bank).
+const ACCOUNT_NUMBER_REGEX = /^\d{9,18}$/
+
 const validateBankDetails = (f: BankDetailsForm): Record<string, string> => {
   const errors: Record<string, string> = {}
   if (!f.accountHolderName?.trim()) errors.accountHolderName = 'Account holder name is required'
   if (!f.bankName?.trim()) errors.bankName = 'Bank name is required'
-  if (!f.accountNumber?.trim()) errors.accountNumber = 'Account number is required'
+
+  const account = f.accountNumber?.trim() || ''
+  if (!account) {
+    errors.accountNumber = 'Account number is required'
+  } else if (/[*•]/.test(account)) {
+    // Still the masked value the field was seeded with — the vendor must
+    // re-type the full number to change it.
+    errors.accountNumber = 'Please re-enter your full account number'
+  } else if (!ACCOUNT_NUMBER_REGEX.test(account)) {
+    errors.accountNumber = 'Enter a valid account number (9–18 digits, numbers only)'
+  }
+
   if (!f.ifscCode?.trim()) {
     errors.ifscCode = 'IFSC code is required'
   } else if (!IFSC_REGEX.test(f.ifscCode.toUpperCase())) {
@@ -144,7 +158,14 @@ export default function BankDetails() {
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
+    const { name } = e.target
+    let value = e.target.value
+    // Constrain sensitive/coded fields as the vendor types.
+    if (name === 'accountNumber') {
+      value = value.replace(/\D/g, '').slice(0, 18) // digits only, max 18
+    } else if (name === 'ifscCode') {
+      value = value.toUpperCase().slice(0, 11) // IFSC is 11 uppercase chars
+    }
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -160,6 +181,9 @@ export default function BankDetails() {
   const openFormModal = () => {
     setErrors({})
     setMessage(null)
+    // The field is seeded with a MASKED number ("******1111"); blank it so the
+    // vendor re-enters the real one and the digit-only filter has clean input.
+    setFormData(prev => ({ ...prev, accountNumber: '' }))
     setShowFormModal(true)
   }
 
@@ -486,7 +510,10 @@ export default function BankDetails() {
                 name="accountNumber"
                 value={formData.accountNumber}
                 onChange={handleChange}
-                placeholder="Enter account number"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={18}
+                placeholder="Enter account number (9–18 digits)"
                 className={`w-full px-3.5 py-2.5 pr-10 border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-colors disabled:bg-slate-100 disabled:cursor-not-allowed ${
                   errors.accountNumber
                     ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
@@ -510,6 +537,11 @@ export default function BankDetails() {
               </Button>
             </div>
             <FieldError message={errors.accountNumber} />
+            {!errors.accountNumber && bankDetails?.accountNumber && (
+              <p className="mt-1.5 text-xs text-slate-500">
+                Re-enter your full account number to update it.
+              </p>
+            )}
           </div>
 
           {/* IFSC Code */}

@@ -20,6 +20,7 @@ import { useRouter } from 'next/navigation';
 import Dropdown from '@/components/UI/Dropdown';
 import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar';
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
+import { formatPrice } from "@/lib/currency";
 import {
   Users as UsersIcon,
   UserPlus,
@@ -448,7 +449,7 @@ export default function UserManagement() {
                       <div className="text-sm">
                         <div className="font-medium">{user.totalOrders} orders</div>
                         {user.totalSpent > 0 && (
-                          <div className="text-slate-500">${user.totalSpent.toFixed(2)}</div>
+                          <div className="text-slate-500">{formatPrice(user.totalSpent ?? 0, 'INR')}</div>
                         )}
                       </div>
                     </TableCell>
