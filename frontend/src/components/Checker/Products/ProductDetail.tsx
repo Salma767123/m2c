@@ -10,6 +10,7 @@ import {
     Phone,
     MapPin,
     Layers,
+    Tag,
     FileText,
     RotateCw,
     CheckCircle,
@@ -229,6 +230,15 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
         product.images?.[0]?.url ||
         null
 
+    // Once the admin has finalised the inspection (approved or rejected), the checker's
+    // job on this product is done — they should see only what they recorded, not the
+    // full product/vendor/fabric catalogue. Collapse the view to QC Activity alone.
+    const inspectionFinalised = ["APPROVED", "REJECTED"].includes(product.approvalStatus)
+    const visibleTabs: Tab[] = inspectionFinalised ? ["activity"] : (Object.keys(TAB_LABELS) as Tab[])
+    // Guard against a stale activeTab pointing at a now-hidden tab (e.g. status flips to
+    // APPROVED while "overview" is selected). Fall back to the first visible tab.
+    const effectiveTab: Tab = visibleTabs.includes(activeTab) ? activeTab : visibleTabs[0]
+
     return (
         <div className="min-h-screen font-sans bg-[#f7f7f5]">
             <div className="p-8 max-w-6xl mx-auto">
@@ -306,12 +316,12 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                 {/* Tabs */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
                     <div className="flex border-b border-slate-200 overflow-x-auto">
-                        {(Object.keys(TAB_LABELS) as Tab[]).map((tab) => (
+                        {visibleTabs.map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
-                                aria-current={activeTab === tab ? "page" : undefined}
-                                className={`px-5 py-3 text-sm font-semibold whitespace-nowrap transition-colors ${activeTab === tab
+                                aria-current={effectiveTab === tab ? "page" : undefined}
+                                className={`px-5 py-3 text-sm font-semibold whitespace-nowrap transition-colors ${effectiveTab === tab
                                     ? "text-brand-600 border-b-2 border-brand-500 bg-brand-50/40"
                                     : "text-slate-600 hover:text-slate-900"
                                     }`}
@@ -322,13 +332,13 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                     </div>
 
                     <div className="p-6">
-                        {activeTab === "overview" && (
+                        {effectiveTab === "overview" && (
                             <OverviewTab product={product} primaryImage={primaryImage} />
                         )}
-                        {activeTab === "images" && (
+                        {effectiveTab === "images" && (
                             <ImagesTab product={product} onOpenLightbox={setLightbox} />
                         )}
-                        {activeTab === "activity" && (
+                        {effectiveTab === "activity" && (
                             <QcActivityTab product={product} />
                         )}
                     </div>
@@ -733,13 +743,6 @@ function summariseQcData(data: unknown): Array<{ key: string; value: string }> {
     return out
 }
 
-function humanizeKey(key: string): string {
-    return key
-        .replace(/([A-Z])/g, " $1")
-        .replace(/^./, (c) => c.toUpperCase())
-        .trim()
-}
-
 function QcActivityTab({ product }: { product: ProductDetailData }) {
     const status: string = product.approvalStatus
     const isReinspection = status === "REINSPECTION"
@@ -748,6 +751,29 @@ function QcActivityTab({ product }: { product: ProductDetailData }) {
     const isApproved = status === "QC_APPROVED" || status === "APPROVED"
     const qcSummary = summariseQcData(product.qcInspectionData)
     const qc = product.assignedQc
+
+    // Curated inspection summary. The raw qcInspectionData carries AQL / sample /
+    // defect-count internals; the checker view instead surfaces the identifying
+    // context (who/what/when) plus the factory address, product and variant count.
+    const qcData = (product.qcInspectionData || {}) as Record<string, unknown>
+    const qcVal = (key: string): string => {
+        const val = qcData[key]
+        return val === null || val === undefined || val === "" ? "" : String(val)
+    }
+    const ven = product.vendor || {}
+    const factoryAddressLines = [
+        ven.factoryAddress,
+        ven.warehouseAddressLine2,
+        ven.warehouseAddressLine3,
+        ven.warehouseLandmark,
+        [ven.factoryCity, ven.factoryState, ven.factoryZipCode].filter(Boolean).join(", "),
+        ven.factoryCountry,
+    ]
+        .map((l) => (l ?? "").toString().trim())
+        .filter(Boolean)
+    const summaryImage =
+        (product.images || []).find((i) => i.isPrimary)?.url || (product.images || [])[0]?.url || null
+    const variantCount = (product.variants || []).length
 
     if (!hasAction) {
         return (
@@ -825,15 +851,73 @@ function QcActivityTab({ product }: { product: ProductDetailData }) {
             {/* Inspection form summary */}
             {qcSummary.length > 0 && (
                 <Section title="Inspection Form Summary">
+                    {/* Field order groups by meaning and keeps the two-column grid gap-free:
+                        Product is the headline (full width, top); Category sits right next
+                        to it; the remaining single-column fields are laid out in even pairs
+                        so no cell is left blank; and the full-width rows (Factory Address,
+                        Signature) sit at the bottom where nothing renders beside them. */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
-                        {qcSummary.map(({ key, value }) => (
+                        {/* Product — headline, full width */}
+                        <div className="sm:col-span-2">
                             <Row
-                                key={key}
-                                icon={<FileText className="w-4 h-4" />}
-                                label={humanizeKey(key)}
-                                value={value}
+                                icon={<Package className="w-4 h-4" />}
+                                label="Product"
+                                value={
+                                    <span className="flex items-center gap-3 mt-0.5">
+                                        {summaryImage ? (
+                                            <img
+                                                src={summaryImage}
+                                                alt={product.name}
+                                                className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0"
+                                            />
+                                        ) : (
+                                            <span className="w-10 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0">
+                                                <ImageIcon className="w-4 h-4 text-slate-300" />
+                                            </span>
+                                        )}
+                                        <span className="font-medium text-slate-900">{product.name}</span>
+                                    </span>
+                                }
                             />
-                        ))}
+                        </div>
+
+                        {/* Category, then vendor, then the vendor's factory address —
+                            kept together as one block since they describe who/where. */}
+                        <Row icon={<Tag className="w-4 h-4" />} label="Category" value={[product.category, product.subCategory].filter(Boolean).join(" › ")} />
+                        <Row icon={<Factory className="w-4 h-4" />} label="Vendor" value={qcVal("vendor") || ven.companyName} />
+
+                        {/* Factory address — full width, right under the vendor it belongs to */}
+                        <div className="sm:col-span-2">
+                            <Row
+                                icon={<MapPin className="w-4 h-4" />}
+                                label="Factory Address"
+                                value={
+                                    factoryAddressLines.length > 0 ? (
+                                        <span className="block leading-relaxed">
+                                            {factoryAddressLines.map((line, i) => (
+                                                <span key={i} className="block">{line}</span>
+                                            ))}
+                                        </span>
+                                    ) : (
+                                        "—"
+                                    )
+                                }
+                            />
+                        </div>
+
+                        {/* Inspection meta — even pairs, no gaps */}
+                        <Row icon={<ClipboardCheck className="w-4 h-4" />} label="Inspection Type" value={qcVal("serviceType")} />
+                        <Row icon={<Layers className="w-4 h-4" />} label="Variants" value={`${variantCount} variant${variantCount === 1 ? "" : "s"}`} />
+                        <Row icon={<Clock className="w-4 h-4" />} label="Inspection Start Date" value={qcVal("serviceStartDate")} />
+                        <Row icon={<Clock className="w-4 h-4" />} label="Inspection Started At" value={formatDateTime(qcVal("inspectionStartedAt")) } />
+                        <Row icon={<CheckCircle className="w-4 h-4" />} label="Final Decision" value={qcVal("finalDecision")} />
+                        <Row icon={<ClipboardCheck className="w-4 h-4" />} label="Inspection Status" value={qcVal("inspectionStatus")} />
+
+                        {qcVal("inspectorSignature") && (
+                            <div className="sm:col-span-2">
+                                <Row icon={<UserCheck className="w-4 h-4" />} label="Inspector Signature" value={qcVal("inspectorSignature")} />
+                            </div>
+                        )}
                     </div>
                 </Section>
             )}

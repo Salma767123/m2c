@@ -255,14 +255,10 @@ export default function ProductInspectionDetail({ productId }: Props) {
 
             {/* General Info Banner */}
             <div className="bg-gradient-to-r from-brand-500 to-brand-600 rounded-2xl p-6 text-white">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
                     <div>
                         <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Vendor</p>
                         <p className="font-semibold text-sm">{formData.vendor || product.vendor?.companyName || '—'}</p>
-                    </div>
-                    <div>
-                        <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Client</p>
-                        <p className="font-semibold text-sm">{formData.client || '—'}</p>
                     </div>
                     <div>
                         <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Service Type</p>
