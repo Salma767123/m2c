@@ -11,6 +11,7 @@ import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import supportService, { SupportTicket, TicketMessage } from "@/services/supportService";
 import { useEffect } from "react";
 import { hasPermission } from "@/lib/auth";
+import TicketAttachments from "./TicketAttachments";
 
 export default function TicketDetail({ ticketId }: { ticketId: string }) {
   const canManage = hasPermission("support:edit");
@@ -120,12 +121,29 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
     }
   };
 
+  // The same page serves customer, vendor and admin tickets — label the raiser by
+  // whoever actually opened it instead of hardcoding "Vendor".
+  const creatorLabel =
+    ticket.creatorType === "user" ? "Customer" :
+    ticket.creatorType === "vendor" ? "Vendor" :
+    ticket.creatorType === "admin" ? "Admin" : "Requester";
+
+  // Support is now split into scoped Vendor/Customer lists. Go back to the list the
+  // ticket actually belongs to, not the old combined view — otherwise "back" lands
+  // on a page the sidebar no longer links to.
+  const listHref = ticket.creatorType === "user"
+    ? "/admin/dashboard/support/customer"
+    : "/admin/dashboard/support/vendor";
+
   return (
     <div className="p-6 max-w-420 mx-auto space-y-6">
-      <Breadcrumb />
+      <Breadcrumb
+        customLabels={{ support: creatorLabel === "Customer" ? "Customer Support" : "Vendor Support" }}
+        hrefOverrides={{ support: listHref }}
+      />
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/admin/dashboard/support" className="text-blue-600 hover:text-blue-700">
+        <Link href={listHref} className="text-blue-600 hover:text-blue-700">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1">
@@ -167,6 +185,22 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
                   <span className="text-sm text-slate-900">{new Date(ticket.updatedAt).toLocaleString()}</span>
                 </div>
               </div>
+
+              {/* The full issue the user typed — the whole point of the ticket, so it
+                  must be shown, not just the metadata above it. */}
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <span className="text-sm text-slate-600">Description:</span>
+                <p className="mt-1.5 text-sm text-slate-900 whitespace-pre-wrap bg-slate-50 rounded-lg p-3 border border-slate-100">
+                  {ticket.description}
+                </p>
+              </div>
+
+              {ticket.attachments && ticket.attachments.length > 0 && (
+                <div className="mt-4">
+                  <span className="text-sm text-slate-600">Attachments:</span>
+                  <TicketAttachments urls={ticket.attachments} />
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -175,6 +209,11 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
             <CardContent className="p-6">
               <h2 className="text-lg font-semibold text-slate-900 mb-4">Conversation</h2>
               <div className="space-y-4">
+                {messages.length === 0 && (
+                  <p className="text-sm text-slate-400 text-center py-6">
+                    No replies yet. Send a response below to start the conversation.
+                  </p>
+                )}
                 {messages.map((message) => (
                   <div
                     key={message.id}
@@ -192,6 +231,7 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
                         <span className="text-sm font-semibold">{message.senderName}</span>
                       </div>
                       <p className="text-sm">{message.message}</p>
+                      <TicketAttachments urls={message.attachments} dark={message.senderType === "admin" || message.senderType === "super_admin"} />
                       <p
                         className={`text-xs mt-2 ${message.senderType === "admin" || message.senderType === "super_admin" ? "text-blue-100" : "text-slate-500"
                           }`}
@@ -214,7 +254,7 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
                   <textarea
                     value={replyMessage}
                     onChange={(e) => setReplyMessage(e.target.value)}
-                    placeholder="Type your response to the vendor..."
+                    placeholder={`Type your response to the ${creatorLabel.toLowerCase()}...`}
                     rows={5}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                     required
@@ -240,7 +280,7 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
           {/* Vendor Info */}
           <Card>
             <CardContent className="p-6">
-              <h2 className="text-lg font-semibold text-slate-900 mb-4">Vendor Information</h2>
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">{creatorLabel} Information</h2>
               <div className="space-y-3">
                 <div>
                   <span className="text-sm text-slate-600">Name:</span>

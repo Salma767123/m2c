@@ -230,6 +230,23 @@ const getVendorSettlements = async (req, res) => {
                         invoiceNo: true,
                     },
                 },
+                // Vendor's own registration details for the settlement advice
+                // "Paid To" block — GSTIN + registered business address. This is
+                // the vendor's own data (they own this record), so no PII concern.
+                vendor: {
+                    select: {
+                        companyName: true,
+                        gstNumber: true,
+                        businessAddress: true,
+                        addressLine2: true,
+                        addressLine3: true,
+                        landmark: true,
+                        businessCity: true,
+                        businessState: true,
+                        businessZipCode: true,
+                        businessCountry: true,
+                    },
+                },
             },
         });
 

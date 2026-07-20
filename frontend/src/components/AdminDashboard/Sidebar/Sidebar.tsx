@@ -144,8 +144,10 @@ const navigation: NavigationItem[] = [
       {
         title: "Support",
         icon: Headphones,
-        href: "/admin/dashboard/support",
-        permission: "support:view",
+        subItems: [
+          { title: "Vendor Support", href: "/admin/dashboard/support/vendor", permission: "support:view" },
+          { title: "Customer Support", href: "/admin/dashboard/support/customer", permission: "support:view" },
+        ],
       },
       {
         title: "General Enquiries",

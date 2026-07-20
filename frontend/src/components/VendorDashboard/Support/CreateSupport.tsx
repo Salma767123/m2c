@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Dropdown from '@/components/UI/Dropdown'
 import supportService from '@/services/supportService'
+import { uploadFileToCloudinary } from '@/lib/cloudinaryUpload'
 import { useRouter } from 'next/navigation'
 import ResultModal from '@/components/UI/ResultModal'
 
@@ -110,10 +111,21 @@ export default function CreateSupport() {
     setIsSubmitting(true)
 
     try {
+      // Upload the picked files straight to Cloudinary and send only the URLs.
+      // Previously the File[] was collected but never sent, so attachments never
+      // reached the ticket and never showed up for the admin.
+      let attachmentUrls: string[] = []
+      if (formData.attachments.length > 0) {
+        attachmentUrls = await Promise.all(
+          formData.attachments.map((file) => uploadFileToCloudinary(file, 'support-tickets').then((r) => r.url)),
+        )
+      }
+
       const payload = {
         subject: formData.subject,
         category: formData.category === 'other' ? formData.otherCategory.trim() : formData.category,
         description: formData.description,
+        attachments: attachmentUrls,
       }
 
       const res = await supportService.createTicket(payload)

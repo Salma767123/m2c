@@ -494,8 +494,12 @@ class QCCheckerService {
             });
             return response.data;
         } catch (error: any) {
-            const err = new Error(error?.response?.data?.error || error?.message || 'Failed to start inspection') as Error & { status?: number };
+            const data = error?.response?.data || {};
+            // Prefer the human-readable `message` (e.g. the expired-window text)
+            // and carry `code` so callers can special-case INSPECTION_EXPIRED.
+            const err = new Error(data.message || data.error || error?.message || 'Failed to start inspection') as Error & { status?: number; code?: string };
             err.status = error?.response?.status;
+            err.code = data.code;
             throw err;
         }
     }

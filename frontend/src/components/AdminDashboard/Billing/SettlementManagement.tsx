@@ -437,6 +437,14 @@ export default function SettlementManagement() {
                     <span className="text-sm text-slate-600">Settlement Number:</span>
                     <span className="text-sm font-medium text-slate-900">{selectedSettlement.settlementNumber}</span>
                   </div>
+                  {/* Which invoice this payout settles — lets the admin tie the transfer
+                      back to the source invoice before releasing funds. */}
+                  {selectedSettlement.billingNumber ? (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-slate-600">Invoice:</span>
+                      <span className="text-sm font-medium text-slate-900">{selectedSettlement.billingNumber}</span>
+                    </div>
+                  ) : null}
                   <div className="flex justify-between">
                     <span className="text-sm text-slate-600">Vendor:</span>
                     <span className="text-sm font-medium text-slate-900">{selectedSettlement.vendorName}</span>

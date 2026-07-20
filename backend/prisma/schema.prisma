@@ -1814,6 +1814,13 @@ model Inspection {
   reviewedAt  DateTime?
   reviewedBy  String?   @db.ObjectId
 
+  // Scheduling lifecycle. reminderSentAt guards the 1-hour-before reminder so
+  // the cron sweep never double-notifies. expiredAt stamps when a SCHEDULED
+  // assignment blew past its booked window (scheduledDate+time+duration)
+  // without the checker starting — see utils/inspectionSchedule.js.
+  reminderSentAt DateTime?
+  expiredAt      DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1834,6 +1841,9 @@ enum InspectionStatus {
   REINSPECTION
   COMPLETED
   CANCELLED
+  // Booked window (scheduledDate + scheduledTime + estimatedDuration) elapsed
+  // before the checker started. Terminal — frees the vendor for reassignment.
+  EXPIRED
 }
 
 enum InspectionResult {

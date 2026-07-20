@@ -1,20 +1,31 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import {
     ArrowLeft, ShieldCheck,
     CheckCircle, XCircle, AlertTriangle,
-    Truck, Camera, Download, FlaskConical, Star
+    Truck, Camera, Download, FlaskConical, Star, Check, X, FileText
 } from 'lucide-react'
 import { Badge } from '@/components/UI/Badge'
 import productService from '@/services/productService'
 import { generateProductInspectionPdf } from '@/lib/productInspectionReportPdf'
 import reinspectionService, { AuditLogEntry } from '@/services/reinspectionService'
 import InspectionAuditTimeline from './ReInspection/InspectionAuditTimeline'
+import ApproveProductModal, { type ApprovableProduct } from './Products/ApproveProductModal'
+import { adminProductService } from '@/services/adminProductService'
+import { hasPermission } from '@/lib/auth'
+import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 
 interface Props {
     productId: string
+    /**
+     * Where this report is opened from. In the Vendor Requests module a product
+     * may not be inspected yet, so we show a "not inspected" state (with a link
+     * to the full product detail) instead of a generic "report missing" error.
+     */
+    context?: 'qc-reports' | 'vendor-requests'
 }
 
 // ── Helper Components ──────────────────────────────────────────────────────────
@@ -110,7 +121,7 @@ function humanizeEvidenceKey(key: string): string {
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export default function ProductInspectionDetail({ productId }: Props) {
+export default function ProductInspectionDetail({ productId, context }: Props) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const autoDownload = searchParams.get('download') === 'true'
@@ -121,28 +132,54 @@ export default function ProductInspectionDetail({ productId }: Props) {
     const [selectedImage, setSelectedImage] = useState<{src: string, alt: string} | null>(null)
     const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([])
     const autoDownloadTriggered = useRef(false)
+    // Admin decision state — only used in the Vendor Requests context.
+    const [showApproveModal, setShowApproveModal] = useState(false)
+    const [showRejectModal, setShowRejectModal] = useState(false)
+    const [rejectReason, setRejectReason] = useState('')
+    const [actionLoading, setActionLoading] = useState(false)
 
-    useEffect(() => {
-        const load = async () => {
-            try {
-                const res = await productService.getProduct(productId)
-                if (res.success && res.data) {
-                    setProduct(res.data)
-                    // Fetch audit trail (non-critical)
-                    reinspectionService.getAuditTrail('PRODUCT_INSPECTION', productId)
-                        .then(r => setAuditLogs(r.logs || []))
-                        .catch(() => {})
-                } else {
-                    setError('Product report not found')
-                }
-            } catch (e: any) {
-                setError(e.message || 'Failed to load product report')
-            } finally {
-                setLoading(false)
+    const loadProduct = useCallback(async (opts?: { silent?: boolean }) => {
+        if (!opts?.silent) setLoading(true)
+        try {
+            const res = await productService.getProduct(productId)
+            if (res.success && res.data) {
+                setProduct(res.data)
+                setError(null)
+                // Fetch audit trail (non-critical)
+                reinspectionService.getAuditTrail('PRODUCT_INSPECTION', productId)
+                    .then(r => setAuditLogs(r.logs || []))
+                    .catch(() => {})
+            } else {
+                setError('Product report not found')
             }
+        } catch (e: any) {
+            setError(e.message || 'Failed to load product report')
+        } finally {
+            setLoading(false)
         }
-        load()
     }, [productId])
+
+    useEffect(() => { loadProduct() }, [loadProduct])
+
+    const handleReject = async () => {
+        if (!rejectReason.trim()) { showErrorToast('Reason required', 'Please enter a rejection reason.'); return }
+        setActionLoading(true)
+        try {
+            const res = await adminProductService.rejectProduct(productId, rejectReason.trim())
+            if (res.success) {
+                showSuccessToast('Product Rejected', 'The vendor has been notified of the rejection.')
+                setShowRejectModal(false)
+                setRejectReason('')
+                await loadProduct({ silent: true })
+            } else {
+                showErrorToast('Rejection Failed', res.message || 'Unable to reject product.')
+            }
+        } catch (e: any) {
+            showErrorToast('Rejection Failed', e.message || 'Unable to reject product.')
+        } finally {
+            setActionLoading(false)
+        }
+    }
 
     const handleDownloadPdf = async () => {
         if (!product) return
@@ -188,16 +225,54 @@ export default function ProductInspectionDetail({ productId }: Props) {
         </div>
     )
 
-    if (error || !product || !(product as any).qcInspectionData) return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-            <AlertTriangle className="w-12 h-12 text-amber-500" />
-            <p className="text-slate-600 text-lg">{error || 'QC Report data missing'}</p>
-            <button onClick={() => router.back()} className="text-blue-600 underline text-sm">Go back</button>
-        </div>
-    )
+    if (error || !product || !(product as any).qcInspectionData) {
+        // Product loaded fine but simply hasn't been inspected yet — common when
+        // an admin opens a still-PENDING vendor request. Guide them to the full
+        // product detail rather than showing a bare "report missing" error.
+        const notInspectedYet = !error && product && !(product as any).qcInspectionData
+        const productName = (product as any)?.name
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-6">
+                <AlertTriangle className="w-12 h-12 text-amber-500" />
+                <p className="text-slate-800 text-lg font-semibold">
+                    {notInspectedYet ? 'No inspection report yet' : (error || 'QC Report data missing')}
+                </p>
+                {notInspectedYet && (
+                    <p className="text-slate-500 text-sm max-w-md">
+                        {productName ? `"${productName}" ` : 'This product '}
+                        hasn&apos;t been inspected yet, so there is no QC report to display. Once a QC checker submits the inspection, the report will appear here.
+                    </p>
+                )}
+                <div className="flex items-center gap-3 mt-1">
+                    {notInspectedYet && context === 'vendor-requests' && (
+                        <button
+                            onClick={() => router.push(`/admin/dashboard/products/view/${productId}`)}
+                            className="px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors"
+                        >
+                            View Product Details
+                        </button>
+                    )}
+                    <button onClick={() => router.back()} className="text-slate-600 hover:text-slate-900 underline text-sm">Go back</button>
+                </div>
+            </div>
+        )
+    }
 
     const formData = (product as any).qcInspectionData
     const approvalStatus = (product as any).approvalStatus
+
+    // Admin decision actions belong here (the QC report) — but only when this
+    // page is opened from the Vendor Requests approval queue, never from the
+    // read-only QC Reports module.
+    const canDecide = context === 'vendor-requests'
+    const approvableProduct: ApprovableProduct = {
+        id: (product as any).id,
+        name: (product as any).name,
+        vendor: (product as any).vendor ? { companyName: (product as any).vendor.companyName } : null,
+        basePrice: (product as any).basePrice ?? 0,
+        originalPrice: (product as any).originalPrice ?? null,
+        variants: (product as any).variants ?? null,
+    }
 
     const statusColors: Record<string, string> = {
         QC_APPROVED: 'bg-green-50 text-green-700 border border-green-200',
@@ -235,6 +310,42 @@ export default function ProductInspectionDetail({ productId }: Props) {
                         {product.name} &bull; SKU: {product.baseSku}
                     </p>
                 </div>
+
+                {/* Admin decision — the approve / reject / re-inspection call, made
+                    after reviewing this report. Only in the Vendor Requests queue. */}
+                {canDecide && approvalStatus === 'QC_APPROVED' && hasPermission('vendor_product_requests:approve') && (
+                    <>
+                        <button
+                            onClick={() => setShowRejectModal(true)}
+                            disabled={actionLoading}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                            <X className="w-4 h-4" />
+                            Reject
+                        </button>
+                        <button
+                            onClick={() => setShowApproveModal(true)}
+                            disabled={actionLoading}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                        >
+                            <Check className="w-4 h-4" />
+                            Approve
+                        </button>
+                    </>
+                )}
+                {canDecide && approvalStatus === 'REJECTED' && hasPermission('reinspection_review:view') && (
+                    <Link
+                        href={`/admin/dashboard/reinspection-review/product/${productId}`}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-brand-600 border border-brand-300 rounded-lg hover:bg-brand-50 transition-colors"
+                    >
+                        <FileText className="w-4 h-4" />
+                        Review &amp; Re-Inspect
+                    </Link>
+                )}
+                {canDecide && approvalStatus === 'REINSPECTION' && (
+                    <Badge className="bg-orange-50 text-orange-700 border border-orange-200">Awaiting QC Re-Inspection</Badge>
+                )}
+
                 <button
                     onClick={handleDownloadPdf}
                     disabled={downloading}
@@ -636,6 +747,51 @@ export default function ProductInspectionDetail({ productId }: Props) {
                             onClick={(e) => e.stopPropagation()}
                         />
                         <p className="text-center text-white mt-4 text-sm font-medium">{selectedImage.alt}</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Admin decision modals — Approve (with pricing) reuses the shared
+                modal used by the product tables; Reject captures a reason. */}
+            {canDecide && (
+                <ApproveProductModal
+                    product={showApproveModal ? approvableProduct : null}
+                    open={showApproveModal}
+                    onClose={() => setShowApproveModal(false)}
+                    onApproved={() => { setShowApproveModal(false); loadProduct({ silent: true }) }}
+                />
+            )}
+
+            {canDecide && showRejectModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !actionLoading && setShowRejectModal(false)}>
+                    <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+                        <div>
+                            <h3 className="text-lg font-bold text-slate-900">Reject Product</h3>
+                            <p className="text-sm text-slate-500 mt-1">The vendor will be notified with the reason below.</p>
+                        </div>
+                        <textarea
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            rows={4}
+                            placeholder="Reason for rejection (e.g. failed on-site tests, packaging defects)…"
+                            className="w-full rounded-lg border border-slate-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                        />
+                        <div className="flex items-center justify-end gap-3">
+                            <button
+                                onClick={() => { setShowRejectModal(false); setRejectReason('') }}
+                                disabled={actionLoading}
+                                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleReject}
+                                disabled={actionLoading || !rejectReason.trim()}
+                                className="px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                            >
+                                {actionLoading ? 'Rejecting…' : 'Reject Product'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

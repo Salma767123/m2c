@@ -8,11 +8,13 @@ import {
   X,
   MapPin,
   Package,
+  LifeBuoy,
   LogOut
 } from 'lucide-react';
 import ProfileTab from '@/components/WebSite/Profile/ProfileTab';
 import AddressBook from '@/components/WebSite/Profile/AddressBook';
 import OrderHistory from '@/components/WebSite/Profile/OrderHistory';
+import SupportTickets from '@/components/WebSite/Profile/SupportTickets';
 import Reveal from '@/components/WebSite/Shared/Reveal';
 // import Notifications from '@/components/WebSite/Profile/Notifications';
 import type { UserProfile } from '@/components/WebSite/Profile/types';
@@ -150,6 +152,7 @@ const Profile = () => {
     { id: 'profile', label: 'Profile Information', icon: User },
     { id: 'addresses', label: 'Saved Addresses', icon: MapPin },
     { id: 'orders', label: 'Order History', icon: Package },
+    { id: 'support', label: 'Support', icon: LifeBuoy },
   ];
 
   const renderProfileTab = () => (
@@ -292,6 +295,7 @@ const Profile = () => {
             {activeTab === 'profile' && renderProfileTab()}
             {activeTab === 'addresses' && <AddressBook />}
             {activeTab === 'orders' && <OrderHistory />}
+            {activeTab === 'support' && <SupportTickets />}
           </Reveal>
         </div>
       </div>

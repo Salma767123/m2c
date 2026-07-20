@@ -82,10 +82,19 @@ function ColorField({ label = 'Color', color, hex }: { label?: string; color?: s
 
 interface VendorProductRequestViewProps {
   requestId: string
+  /**
+   * Which module this detail page is opened from. Drives the breadcrumb, the
+   * back button, and post-action redirects so the same product-detail view can
+   * serve both "All Products" (catalog) and "Vendor Requests" (approval queue).
+   */
+  context?: 'vendor-requests' | 'all-products'
 }
 
-export default function VendorProductRequestView({ requestId }: VendorProductRequestViewProps) {
+export default function VendorProductRequestView({ requestId, context = 'vendor-requests' }: VendorProductRequestViewProps) {
   const router = useRouter()
+  const isAllProducts = context === 'all-products'
+  const backHref = isAllProducts ? '/admin/dashboard/products' : '/admin/dashboard/products/vendor-requests'
+  const backLabel = isAllProducts ? 'Back to Products' : 'Back to Requests'
   const [product, setProduct] = useState<AdminProduct | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState(0)
@@ -363,7 +372,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
         } : null)
         // Optionally redirect back to requests list
         setTimeout(() => {
-          router.push('/admin/dashboard/products/vendor-requests')
+          router.push(backHref)
         }, 1500)
       }
     } catch (error: any) {
@@ -402,7 +411,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
         } : null)
         // Optionally redirect back to requests list
         setTimeout(() => {
-          router.push('/admin/dashboard/products/vendor-requests')
+          router.push(backHref)
         }, 1500)
       }
     } catch (error: any) {
@@ -469,10 +478,10 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
           <p className="text-slate-500 font-medium">Product not found</p>
           <p className="text-sm text-slate-400">The requested vendor product could not be found.</p>
           <Button
-            onClick={() => router.push('/admin/dashboard/products/vendor-requests')}
+            onClick={() => router.push(backHref)}
             className="mt-4"
           >
-            Back to Requests
+            {backLabel}
           </Button>
         </div>
       </div>
@@ -491,7 +500,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
         <span className="text-slate-400">/</span>
         <Link href="/admin/dashboard/products" className="hover:text-slate-900 transition-colors hover:underline">Products</Link>
         <span className="text-slate-400">/</span>
-        <Link href="/admin/dashboard/products/vendor-requests" className="hover:text-slate-900 transition-colors hover:underline">Vendor Requests</Link>
+        <Link href={backHref} className="hover:text-slate-900 transition-colors hover:underline">{isAllProducts ? 'All Products' : 'Vendor Requests'}</Link>
         <span className="text-slate-400">/</span>
         <span className="text-slate-900 font-medium" aria-current="page">{product?.name || 'View Request'}</span>
       </nav>
@@ -501,9 +510,9 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => router.push('/admin/dashboard/products/vendor-requests')}
+              onClick={() => router.push(backHref)}
               className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors shrink-0"
-              aria-label="Back to requests"
+              aria-label={backLabel}
             >
               <ArrowLeft className="h-4 w-4 text-slate-600" />
             </button>
@@ -518,7 +527,9 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
             </div>
           </div>
           <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
-          {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED' || product.approvalStatus === 'REINSPECTION' || product.approvalStatus === 'REJECTED') && (
+          {/* All Products is the read-only catalog view — the approve / reject /
+              re-inspection decision lives on the QC report (Vendor Requests) view. */}
+          {!isAllProducts && (product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED' || product.approvalStatus === 'REINSPECTION' || product.approvalStatus === 'REJECTED') && (
             <>
               {product.approvalStatus === 'QC_APPROVED' ? (
                 hasPermission('vendor_product_requests:approve') && (

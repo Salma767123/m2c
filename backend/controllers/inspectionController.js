@@ -209,6 +209,51 @@ const startInspection = async (req, res) => {
             return res.status(400).json({ error: `Cannot start an inspection that is currently ${inspection.status}` });
         }
 
+        // ── Deadline guard ─────────────────────────────────────────────
+        // The inspection form can only be OPENED inside its booked window
+        // [scheduledStart, scheduledStart + estimatedDuration]. Once the whole
+        // window has elapsed, block opening it — whether the assignment was never
+        // started (SCHEDULED) or opened once but not submitted (IN_PROGRESS; the
+        // form auto-flips SCHEDULED → IN_PROGRESS on first load, so this state
+        // does NOT mean active work). Mark it EXPIRED (frees the vendor for
+        // reassignment) and alert admin + the checker.
+        const { getInspectionDeadline, isInspectionWindowElapsed } = require('../utils/inspectionSchedule');
+        if ((inspection.status === 'SCHEDULED' || inspection.status === 'IN_PROGRESS') && isInspectionWindowElapsed(inspection)) {
+            const deadline = getInspectionDeadline(inspection);
+            await prisma.inspection.update({
+                where: { id },
+                data: { status: 'EXPIRED', expiredAt: new Date() },
+            }).catch((e) => console.error('Failed to mark inspection expired on start:', e));
+
+            // Notify the checker (in-app) and admins (in-app) that it lapsed.
+            try {
+                const vendorRecord = await prisma.vendor.findUnique({ where: { id: inspection.vendorId }, select: { companyName: true } });
+                const vendorName = vendorRecord?.companyName || 'Vendor';
+                const { createNotification, createNotificationForRole } = require('./notificationController');
+                createNotification({
+                    userId: inspection.checkerId, role: 'QC_CHECKER', type: 'INSPECTION_EXPIRED',
+                    title: 'Inspection Window Expired',
+                    message: `The inspection for "${vendorName}" scheduled on ${inspection.scheduledDate} at ${inspection.scheduledTime} can no longer be started — its time window has passed.`,
+                    data: { screen: 'vendors', vendorId: inspection.vendorId },
+                }).catch(() => {});
+                createNotificationForRole({
+                    role: 'ADMIN', type: 'INSPECTION_EXPIRED',
+                    title: 'Inspection Missed',
+                    message: `"${vendorName}" inspection (scheduled ${inspection.scheduledDate} ${inspection.scheduledTime}) expired — the checker did not start it in time. Reassign a new QC checker.`,
+                    data: { screen: 'assign-qc-checker', vendorId: inspection.vendorId },
+                }).catch(() => {});
+            } catch (e) {
+                console.error('Failed to send inspection-expired notifications:', e);
+            }
+
+            return res.status(409).json({
+                success: false,
+                code: 'INSPECTION_EXPIRED',
+                error: 'Inspection window has passed',
+                message: `This inspection can no longer be started. Its scheduled window (${inspection.scheduledDate} ${inspection.scheduledTime}${deadline ? `, valid until ${deadline.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}` : ''}) has already ended. Please ask the admin to schedule a new assignment.`,
+            });
+        }
+
         // Dev/non-production: skip the geofence and start the inspection without GPS.
         const { isGeofenceDisabled } = require('../utils/locationUtils');
         if (isGeofenceDisabled()) {

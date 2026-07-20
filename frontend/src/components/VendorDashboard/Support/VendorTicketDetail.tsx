@@ -5,6 +5,7 @@ import { ArrowLeft, Send, User, CheckCircle, Clock, AlertCircle, MessageSquare, 
 import Link from "next/link";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import supportService, { SupportTicket, TicketMessage } from "@/services/supportService";
+import TicketAttachments from "@/components/AdminDashboard/Support/TicketAttachments";
 
 export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
     const [ticket, setTicket] = useState<SupportTicket | null>(null);
@@ -198,6 +199,7 @@ export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
                                                         </span>
                                                     </div>
                                                     <p className="text-sm leading-relaxed">{message.message}</p>
+                                                    <TicketAttachments urls={message.attachments} dark={isVendor} />
                                                     <p className={`text-xs mt-2 ${isVendor ? "text-slate-400" : "text-slate-500"}`}>
                                                         {new Date(message.createdAt).toLocaleString('en-IN', {
                                                             day: 'numeric', month: 'short', year: 'numeric',
@@ -279,6 +281,12 @@ export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
                                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Category</p>
                                 <p className="text-sm text-slate-900 mt-1 capitalize">{ticket.category}</p>
                             </div>
+                            {ticket.attachments && ticket.attachments.length > 0 && (
+                                <div>
+                                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Attachments</p>
+                                    <TicketAttachments urls={ticket.attachments} />
+                                </div>
+                            )}
                             <div className="pt-3 border-t border-slate-100">
                                 <div className="flex items-center gap-2 text-xs text-slate-500">
                                     <Calendar className="h-3.5 w-3.5" />

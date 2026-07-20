@@ -1180,7 +1180,12 @@ const getAllVendors = async (req, res) => {
         inspections: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: { id: true, status: true, result: true, completedAt: true },
+          // scheduledDate/Time/estimatedDuration let the admin UI flag an
+          // IN_PROGRESS inspection as "Overtime" once its booked window elapses.
+          select: {
+            id: true, status: true, result: true, completedAt: true,
+            scheduledDate: true, scheduledTime: true, estimatedDuration: true,
+          },
         },
         _count: {
           select: {

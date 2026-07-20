@@ -440,13 +440,25 @@ export default function ViewProduct({ productId }: ViewProductProps) {
             </div>
           )}
 
-          {/* Pricing Configuration — mirrors the "Pricing" tab */}
+          {/* Pricing Configuration — the vendor's own payout economics. The admin's
+              MRP and discount are deliberately not shown (and not sent by the backend):
+              together they reveal M2C's selling price. Tax + Total are what the vendor
+              is actually paid per unit — base price plus their GST. */}
           <SpecSection icon={<DollarSign className="h-4 w-4" />} title="Pricing Configuration">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <InfoField label="Base Price" value={`₹${product.basePrice}`} />
-              {product.gstPercentage ? <InfoField label="GST Rate" value={`${product.gstPercentage}%`} /> : null}
-              {product.originalPrice && product.originalPrice > product.basePrice ? <InfoField label="Original (MRP)" value={`₹${product.originalPrice}`} /> : null}
-              {product.discount ? <InfoField label="Discount" value={`${product.discount}% OFF`} /> : null}
+              <InfoField
+                label="GST Rate"
+                value={`${product.vendorGstRate ?? product.gstPercentage ?? 0}%`}
+              />
+              <InfoField
+                label="Tax Amount"
+                value={`₹${(product.vendorTaxAmount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              />
+              <InfoField
+                label="Total Amount"
+                value={`₹${(product.vendorTotalAmount ?? product.basePrice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              />
             </div>
           </SpecSection>
 

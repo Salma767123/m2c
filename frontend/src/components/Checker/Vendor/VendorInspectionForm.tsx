@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Check, ArrowLeft, ArrowRight, AlertTriangle, ShieldAlert, Clock, Save } from 'lucide-react'
+import { Check, ArrowLeft, ArrowRight, AlertTriangle, ShieldAlert, Clock, Save, AlarmClockOff } from 'lucide-react'
 import { HighlightFieldsProvider } from './Steps/VI_VerifyField'
 import type { Verifications } from './Steps/VI_VerifyField'
 import type { InspectorMeta } from './Steps/VI_Step8_FinalReview'
@@ -70,7 +70,7 @@ function getCurrentCoords(): Promise<{ checkerLatitude: number; checkerLongitude
 export default function VendorInspectionForm({ vendorId, vendorName, onComplete }: Props) {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<{ type: 'not_assigned' | 'submitted' | 'unknown'; message: string } | null>(null)
+  const [loadError, setLoadError] = useState<{ type: 'not_assigned' | 'submitted' | 'unknown' | 'expired'; message: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [checkerCoords, setCheckerCoords] = useState<{ checkerLatitude: number; checkerLongitude: number } | null>(null)
   const [vendor, setVendor] = useState<any>(null)
@@ -207,6 +207,12 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
       } catch (err: any) {
         if (cancelled) return
         const msg: string = err?.message || ''
+        // Booked window elapsed before the checker started — block the form with
+        // a full-page warning; the assignment is now EXPIRED and needs a reassign.
+        if (err?.code === 'INSPECTION_EXPIRED' || (err?.status === 409 && /window has passed|expired/i.test(msg))) {
+          setLoadError({ type: 'expired', message: msg || 'This inspection can no longer be started — its scheduled time window has passed. Please ask the admin to schedule a new assignment.' })
+          return
+        }
         if (err?.status === 400 && /already/i.test(msg)) return
         // Vendor has no map location configured — geofence can't run, but the
         // inspection form should still be usable. Don't surface this as an error.
@@ -248,8 +254,11 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
           } catch (beginErr: any) {
             if (cancelled) return
             const status = beginErr?.status
-            const msg: string = beginErr?.message || 'Could not begin inspection.'
-            if (status === 403) {
+            const code = beginErr?.data?.code
+            const msg: string = beginErr?.data?.message || beginErr?.message || 'Could not begin inspection.'
+            if (code === 'INSPECTION_EXPIRED' || (status === 409 && /window has passed|expired/i.test(msg))) {
+              setLoadError({ type: 'expired', message: msg })
+            } else if (status === 403) {
               setLoadError({ type: 'not_assigned', message: msg })
             } else if (status === 409) {
               setLoadError({ type: 'submitted', message: msg })
@@ -561,22 +570,30 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
   if (loadError) {
     const isSubmitted = loadError.type === 'submitted'
     const isNotAssigned = loadError.type === 'not_assigned'
+    const isExpired = loadError.type === 'expired'
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-[#f7f7f5]">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 max-w-md w-full text-center space-y-5">
           <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto ${
-            isSubmitted ? 'bg-amber-50' : isNotAssigned ? 'bg-red-50' : 'bg-red-50'
+            isSubmitted || isExpired ? 'bg-amber-50' : 'bg-red-50'
           }`}>
             {isSubmitted
               ? <Clock className="w-7 h-7 text-amber-500" />
-              : <ShieldAlert className="w-7 h-7 text-red-500" />
+              : isExpired
+                ? <AlarmClockOff className="w-7 h-7 text-amber-500" />
+                : <ShieldAlert className="w-7 h-7 text-red-500" />
             }
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900 mb-1">
-              {isSubmitted ? 'Inspection Submitted' : isNotAssigned ? 'Access Denied' : 'Unable to Start Inspection'}
+              {isSubmitted ? 'Inspection Submitted' : isNotAssigned ? 'Access Denied' : isExpired ? 'Inspection Window Expired' : 'Unable to Start Inspection'}
             </h2>
             <p className="text-slate-600 text-sm leading-relaxed">{loadError.message}</p>
+            {isExpired && (
+              <p className="text-slate-500 text-xs leading-relaxed mt-2">
+                The admin has been notified and can assign a new inspection for this vendor.
+              </p>
+            )}
           </div>
           <button
             onClick={onComplete}

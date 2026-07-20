@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Search, UserCheck, Building2, Mail, Phone, CheckCircle,
   Plus, FileText, ChevronLeft, ChevronRight,
-  AlertTriangle, Clock, Users, X,
+  AlertTriangle, Clock, Users, X, RotateCw,
 } from "lucide-react";
 import { Badge } from "@/components/UI/Badge";
 import { LoadingSpinner } from "@/components/UI/LoadingSpinner";
@@ -32,6 +32,9 @@ interface Vendor {
   assignedCheckerName: string | null;
   inspectionStatus: string | null;
   inspectionResult: string | null;
+  inspectionScheduledDate: string | null;
+  inspectionScheduledTime: string | null;
+  inspectionDuration: string | null;
   createdAt: string;
 }
 
@@ -42,6 +45,33 @@ interface QCChecker {
 }
 
 const ITEMS_PER_PAGE = 10;
+
+// Whether an assignment's booked window (scheduledDate + scheduledTime +
+// estimatedDuration) has fully elapsed. Mirrors backend utils/inspectionSchedule
+// so an IN_PROGRESS inspection running past its slot reads as "Overtime".
+function isPastInspectionWindow(
+  scheduledDate: string | null,
+  scheduledTime: string | null,
+  estimatedDuration: string | null,
+): boolean {
+  if (!scheduledDate) return false;
+  const [y, m, d] = scheduledDate.split("-").map((n) => parseInt(n, 10));
+  if (!y || !m || !d) return false;
+  let hours = 0, minutes = 0;
+  const match = (scheduledTime || "").trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (match) {
+    hours = parseInt(match[1], 10);
+    minutes = parseInt(match[2], 10);
+    const mer = match[3]?.toUpperCase();
+    if (mer === "PM" && hours < 12) hours += 12;
+    if (mer === "AM" && hours === 12) hours = 0;
+  }
+  const start = new Date(y, m - 1, d, hours, minutes, 0, 0);
+  const durStr = (estimatedDuration || "1 hour").toLowerCase();
+  const durNum = parseFloat(durStr) || 1;
+  const durMs = durStr.includes("min") ? durNum * 60000 : durStr.includes("day") ? durNum * 86400000 : durNum * 3600000;
+  return Date.now() > start.getTime() + durMs;
+}
 
 function getPageRange(current: number, total: number): Array<number | "…"> {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -78,8 +108,21 @@ const getStatusBadge = (status: string) => {
   }
 };
 
-const getInspectionBadge = (vendorStatus: string, status: string | null, result: string | null) => {
+const getInspectionBadge = (
+  vendorStatus: string,
+  status: string | null,
+  result: string | null,
+  schedule?: { date: string | null; time: string | null; duration: string | null },
+) => {
   if (!status) return <span className="text-sm text-slate-400 italic">No Inspection</span>;
+  // An assignment whose window lapsed before the checker started.
+  if (status === "EXPIRED") {
+    return <Badge className="bg-red-50 text-red-700 border border-red-200 font-bold">Expired · Missed</Badge>;
+  }
+  // Started but running past its booked window and not yet submitted.
+  if (status === "IN_PROGRESS" && schedule && isPastInspectionWindow(schedule.date, schedule.time, schedule.duration)) {
+    return <Badge className="bg-orange-50 text-orange-700 border border-orange-200 font-bold">In Progress · Overtime</Badge>;
+  }
   // Once the vendor decision is finalized, the QC cycle that led to it is
   // concluded — reflect the outcome rather than a lingering inspection state
   // (an Approved vendor must never read "In Progress"). The vendor status is
@@ -137,6 +180,9 @@ export default function AssignQCChecker() {
       assignedCheckerName: v.assignedQc ? formatCheckerName(v.assignedQc) : null,
       inspectionStatus: v.latestInspection?.status || null,
       inspectionResult: v.latestInspection?.result || null,
+      inspectionScheduledDate: v.latestInspection?.scheduledDate || null,
+      inspectionScheduledTime: v.latestInspection?.scheduledTime || null,
+      inspectionDuration: v.latestInspection?.estimatedDuration || null,
       createdAt: v.createdAt || "",
     }));
 
@@ -363,6 +409,7 @@ export default function AssignQCChecker() {
                     { value: "COMPLETED", label: "Completed" },
                     { value: "REINSPECTION", label: "Re-Inspection" },
                     { value: "REJECTED", label: "Rejected" },
+                    { value: "EXPIRED", label: "Expired · Missed" },
                     { value: "CANCELLED", label: "Cancelled" },
                   ]}
                   onChange={(val) => handleInspectionStatusChange(val as string)}
@@ -470,7 +517,7 @@ export default function AssignQCChecker() {
 
                       {/* Inspection Status */}
                       <TableCell className="py-3 px-3 align-middle">
-                        {getInspectionBadge(vendor.status, vendor.inspectionStatus, vendor.inspectionResult)}
+                        {getInspectionBadge(vendor.status, vendor.inspectionStatus, vendor.inspectionResult, { date: vendor.inspectionScheduledDate, time: vendor.inspectionScheduledTime, duration: vendor.inspectionDuration })}
                       </TableCell>
 
                       {/* Assigned QC Checker */}
@@ -515,6 +562,19 @@ export default function AssignQCChecker() {
                                 >
                                   <FileText className="h-3.5 w-3.5" />
                                   Review
+                                </Link>
+                              );
+                            }
+                            // A missed/expired assignment is freed for a fresh one —
+                            // surface it as an explicit "Reassign" rather than "Update".
+                            if (s === "EXPIRED") {
+                              return (
+                                <Link
+                                  href={`/admin/dashboard/vendors/assign-qc-checker/add?vendorId=${vendor.id}`}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                                >
+                                  <RotateCw className="h-3.5 w-3.5" />
+                                  Reassign
                                 </Link>
                               );
                             }

@@ -26,6 +26,17 @@ export interface Settlement {
         orderId: string;
     };
     vendor?: {
+        companyName?: string | null;
+        /** Vendor's GST registration number. Null for unregistered vendors. */
+        gstNumber?: string | null;
+        businessAddress?: string | null;
+        addressLine2?: string | null;
+        addressLine3?: string | null;
+        landmark?: string | null;
+        businessCity?: string | null;
+        businessState?: string | null;
+        businessZipCode?: string | null;
+        businessCountry?: string | null;
         bankDetails?: { id: string; bankName: string } | null;
     };
     /**
