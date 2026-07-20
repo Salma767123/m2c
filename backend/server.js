@@ -149,6 +149,26 @@ app.get("/api/jobs/overdue-settlements", async (req, res) => {
   }
 });
 
+// Vercel Cron entry point for inspection reminders + auto-expiry. Same auth
+// contract as the settlement job above.
+app.get("/api/jobs/inspection-schedule-sweep", async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return res.status(503).json({ success: false, error: "CRON_SECRET is not configured" });
+  }
+  if (req.headers.authorization !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+  try {
+    const { runInspectionScheduleSweep } = require("./jobs/inspectionReminders");
+    const result = await runInspectionScheduleSweep();
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    console.error("Inspection schedule sweep failed:", error);
+    res.status(500).json({ success: false, error: "Inspection schedule sweep failed" });
+  }
+});
+
 // Import routes
 const authRoutes = require("./routes/auth/authRoutes");
 const vendorRoutes = require("./routes/vendorRoutes");
@@ -411,6 +431,8 @@ if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
     try {
       const { startOverdueSettlementCheck } = require('./jobs/overdueSettlements');
       startOverdueSettlementCheck();
+      const { startInspectionScheduleSweep } = require('./jobs/inspectionReminders');
+      startInspectionScheduleSweep();
     } catch (error) {
       console.error('Failed to start cron jobs:', error.message);
     }

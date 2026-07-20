@@ -5,7 +5,7 @@ const {
 } = require('../config/cloudinary');
 const { generateBaseSku, reconcileBaseSku, variantSkuFor } = require('../utils/skuGenerator');
 const { usdFromINR } = require('../utils/orderCurrency');
-const { stripAdminPricing } = require('../utils/vendorPricing');
+const { stripAdminPricing, attachVendorPayout } = require('../utils/vendorPricing');
 const { getCurrentExchangeRate } = require('./exchangeRateController');
 
 /** Parse a money input to a number, or null when it is absent/blank/non-numeric. */
@@ -486,6 +486,21 @@ const getVendorProducts = async (req, res) => {
       take: parseInt(limit)
     });
 
+    // This is a vendor-only endpoint, but the query uses `include` (no product-level
+    // `select`), so every product ships its admin selling price + MRP + discount. Strip
+    // them and attach the vendor's own payout economics instead — same rule as the
+    // single-product view. One GSTIN lookup covers the batch: all products are this
+    // vendor's.
+    const vendorRow = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { gstNumber: true },
+    });
+    const vendorHasGstin = !!vendorRow?.gstNumber;
+    for (const product of products) {
+      stripAdminPricing(product);
+      attachVendorPayout(product, vendorHasGstin);
+    }
+
     // Calculate pagination info
     const totalPages = Math.ceil(totalItems / parseInt(limit));
     const hasNextPage = parseInt(page) < totalPages;
@@ -528,6 +543,8 @@ const getProduct = async (req, res) => {
       whereCondition.vendorId = vendorId;
     }
 
+    const isVendor = req.user.role === 'VENDOR';
+
     const product = await prisma.product.findFirst({
       where: whereCondition,
       include: {
@@ -546,7 +563,9 @@ const getProduct = async (req, res) => {
             baseStock: true,
             category: true
           }
-        }
+        },
+        // Vendors need their GSTIN status to know whether GST is added to their payout.
+        ...(isVendor ? { vendor: { select: { gstNumber: true } } } : {}),
       }
     });
 
@@ -557,11 +576,19 @@ const getProduct = async (req, res) => {
       });
     }
 
-    // Admin and vendor share this endpoint. The admin needs the selling price; the
-    // vendor must not see it, so it is stripped rather than excluded by `select`.
+    // Admin and vendor share this endpoint. The admin needs the selling price and MRP;
+    // the vendor must not see either (MRP + discount reconstruct the selling price), so
+    // those are stripped and replaced with the vendor's own payout economics.
+    if (isVendor) {
+      const vendorHasGstin = !!product.vendor?.gstNumber;
+      delete product.vendor; // was fetched only to read gstNumber
+      stripAdminPricing(product);
+      attachVendorPayout(product, vendorHasGstin);
+    }
+
     res.json({
       success: true,
-      data: req.user.role === 'VENDOR' ? stripAdminPricing(product) : product
+      data: product
     });
 
   } catch (error) {

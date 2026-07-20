@@ -11,9 +11,12 @@ interface BreadcrumbItem {
 
 interface BreadcrumbProps {
   customLabels?: Record<string, string>
+  // Override the link a given path segment points to (e.g. send "support" to the
+  // scoped Vendor/Customer list instead of the retired combined page).
+  hrefOverrides?: Record<string, string>
 }
 
-export function Breadcrumb({ customLabels = {} }: BreadcrumbProps = {}) {
+export function Breadcrumb({ customLabels = {}, hrefOverrides = {} }: BreadcrumbProps = {}) {
   const pathname = usePathname()
   
   // Map technical paths to user-friendly labels
@@ -83,7 +86,7 @@ export function Breadcrumb({ customLabels = {} }: BreadcrumbProps = {}) {
           if (i === paths.length - 1) {
             breadcrumbs.push({ label })
           } else {
-            breadcrumbs.push({ label, href: currentPath })
+            breadcrumbs.push({ label, href: hrefOverrides[segment] || currentPath })
           }
         } else {
           // Use mapped label or capitalize the segment
@@ -93,7 +96,7 @@ export function Breadcrumb({ customLabels = {} }: BreadcrumbProps = {}) {
           if (i === paths.length - 1 || nonNavigableSegments.has(segment)) {
             breadcrumbs.push({ label })
           } else {
-            breadcrumbs.push({ label, href: currentPath })
+            breadcrumbs.push({ label, href: hrefOverrides[segment] || currentPath })
           }
         }
       }
@@ -115,7 +118,7 @@ export function Breadcrumb({ customLabels = {} }: BreadcrumbProps = {}) {
           if (i === paths.length - 1) {
             breadcrumbs.push({ label })
           } else {
-            breadcrumbs.push({ label, href: currentPath })
+            breadcrumbs.push({ label, href: hrefOverrides[segment] || currentPath })
           }
         } else {
           const label = customLabels[segment] || pathLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1)
@@ -124,7 +127,7 @@ export function Breadcrumb({ customLabels = {} }: BreadcrumbProps = {}) {
           if (i === paths.length - 1 || nonNavigableSegments.has(segment)) {
             breadcrumbs.push({ label })
           } else {
-            breadcrumbs.push({ label, href: currentPath })
+            breadcrumbs.push({ label, href: hrefOverrides[segment] || currentPath })
           }
         }
       }
@@ -143,7 +146,7 @@ export function Breadcrumb({ customLabels = {} }: BreadcrumbProps = {}) {
         if (i === paths.length - 1) {
           breadcrumbs.push({ label })
         } else {
-          breadcrumbs.push({ label, href: currentPath })
+          breadcrumbs.push({ label, href: hrefOverrides[segment] || currentPath })
         }
       }
     }

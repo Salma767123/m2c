@@ -42,6 +42,15 @@ interface AssignedProduct {
 const PAGE_SIZE = 12
 const DEFAULT_SORT = 'createdAt:desc'
 
+// The product carries no dedicated inspection-schedule field; createdAt is the moment
+// it was assigned into the checker's queue, which is what the detail page already
+// surfaces as the assignment date.
+const formatScheduledDate = (iso?: string) => {
+    if (!iso) return '—'
+    const d = new Date(iso)
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
 // Mirrors the ProductApprovalStatus enum in backend/prisma/schema.prisma.
 // Rendered as tabs at the top of the page (same pattern as Vendor Management).
 const STATUS_TABS = [
@@ -402,6 +411,7 @@ export default function Products() {
                                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Product</TableHead>
                                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
                                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Category</TableHead>
+                                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Scheduled Date</TableHead>
                                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Approval</TableHead>
                                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-5 text-[10px] uppercase tracking-wider text-right">Actions</TableHead>
                             </TableRow>
@@ -428,6 +438,9 @@ export default function Products() {
                                         <div className="h-3.5 w-20 bg-slate-200 rounded animate-pulse" />
                                     </TableCell>
                                     <TableCell className="py-4 px-4 align-middle">
+                                        <div className="h-3.5 w-24 bg-slate-200 rounded animate-pulse" />
+                                    </TableCell>
+                                    <TableCell className="py-4 px-4 align-middle">
                                         <div className="h-6 w-24 bg-slate-200 rounded-full animate-pulse" />
                                     </TableCell>
                                     <TableCell className="py-4 px-5 align-middle">
@@ -452,6 +465,7 @@ export default function Products() {
                                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Product</TableHead>
                                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
                                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Category</TableHead>
+                                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Scheduled Date</TableHead>
                                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Approval</TableHead>
                                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-5 text-[10px] uppercase tracking-wider text-right">Actions</TableHead>
                             </TableRow>
@@ -488,6 +502,11 @@ export default function Products() {
                                     {/* Category Column */}
                                     <TableCell className="py-4 px-4 align-middle text-sm font-semibold text-slate-600">
                                         {product.category}
+                                    </TableCell>
+
+                                    {/* Scheduled Date Column */}
+                                    <TableCell className="py-4 px-4 align-middle text-sm font-medium text-slate-600 whitespace-nowrap">
+                                        {formatScheduledDate(product.createdAt)}
                                     </TableCell>
 
                                     {/* Approval Column */}

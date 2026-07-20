@@ -19,7 +19,8 @@ import {
   Clock,
   Package,
   Eye,
-  Star
+  Star,
+  LifeBuoy
 } from 'lucide-react'
 
 interface CustomerViewProps {
@@ -88,6 +89,24 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
     if (['shipped', 'shipped_to_customer', 'in_transit'].includes(s)) return 'bg-blue-50 text-blue-700 border border-blue-200'
     if (['cancelled', 'failed'].includes(s)) return 'bg-red-50 text-red-700 border border-red-200'
     return 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+  }
+
+  const getTicketStatusColor = (status: string) => {
+    const s = (status || '').toLowerCase().replace(/_/g, '-')
+    if (s === 'open') return 'bg-red-50 text-red-700 border border-red-200'
+    if (s === 'in-progress') return 'bg-blue-50 text-blue-700 border border-blue-200'
+    if (s === 'resolved') return 'bg-green-50 text-green-700 border border-green-200'
+    return 'bg-slate-100 text-slate-600 border border-slate-200'
+  }
+
+  const getTicketPriorityColor = (priority: string) => {
+    switch ((priority || '').toLowerCase()) {
+      case 'urgent': return 'bg-red-50 text-red-700 border border-red-200'
+      case 'high': return 'bg-orange-50 text-orange-700 border border-orange-200'
+      case 'medium': return 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+      case 'low': return 'bg-green-50 text-green-700 border border-green-200'
+      default: return 'bg-slate-50 text-slate-600 border border-slate-200'
+    }
   }
 
   return (
@@ -310,6 +329,54 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
                 <div className="p-8 text-center text-slate-500">
                   <ShoppingBag className="h-8 w-8 mx-auto mb-2 text-slate-300" />
                   <p>No orders yet</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Support Tickets — raised by this customer; click through to the ticket */}
+          <Card className="border border-slate-200">
+            <CardHeader className="border-b border-slate-200 bg-slate-50">
+              <CardTitle className="text-base flex items-center gap-2">
+                <LifeBuoy className="h-4 w-4 text-slate-600" />
+                Support Tickets
+                {customer.supportTickets?.length ? (
+                  <span className="ml-1 text-xs font-semibold text-slate-500">({customer.supportTickets.length})</span>
+                ) : null}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {customer.supportTickets && customer.supportTickets.length > 0 ? (
+                <div className="divide-y divide-slate-200">
+                  {customer.supportTickets.map((t: any) => (
+                    <div key={t.id} className="p-4 hover:bg-slate-50 transition-colors">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-xs text-slate-400">{t.ticketId}</span>
+                            <Badge className={getTicketStatusColor(t.status)}>{String(t.status).replace(/[-_]/g, ' ')}</Badge>
+                            <Badge className={getTicketPriorityColor(t.priority)}>{t.priority}</Badge>
+                          </div>
+                          <p className="font-medium text-slate-900 mt-1 truncate">{t.subject}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {t.category} · {new Date(t.createdAt).toLocaleDateString('en-IN')}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => router.push(`/admin/dashboard/support/${t.id}`)}
+                          className="p-1.5 hover:bg-slate-200 rounded-md transition-colors shrink-0"
+                          title="Open ticket"
+                        >
+                          <Eye className="h-4 w-4 text-slate-500" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-slate-500">
+                  <LifeBuoy className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                  <p>No support tickets</p>
                 </div>
               )}
             </CardContent>

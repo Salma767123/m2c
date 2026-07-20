@@ -11,8 +11,28 @@ import DateRangeCalendar from '@/components/Shared/DateRangeCalendar';
 import { settlementService, Settlement } from '@/services/settlementService';
 import VendorService, { VendorBankDetails } from '@/services/vendorService';
 import { showErrorToast } from '@/lib/toast-utils';
+import axios from '@/lib/axios';
+
+// M2C's own registration details for the settlement advice "Paid By" block.
+interface SellerInfo {
+  companyName: string;
+  gstNumber?: string | null;
+  registeredAddress?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  country?: string | null;
+}
 
 const PAGE_SIZE = 10;
+
+// Settlement money is always the vendor's own figure in INR (backend guarantee).
+// Two decimals to read like a real invoice (GST lines carry paise, e.g. 115.20).
+const fmtINR = (n?: number | null) =>
+  `₹${(n ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const fmtDocDate = (d?: string | null) =>
+  d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 function getPageRange(current: number, total: number): Array<number | '…'> {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -40,6 +60,7 @@ export default function PayoutsEnhanced() {
   const [showBankModal, setShowBankModal] = useState(false);
   const [bankDetails, setBankDetails] = useState<VendorBankDetails | null>(null);
   const [bankLoading, setBankLoading] = useState(true);
+  const [seller, setSeller] = useState<SellerInfo>({ companyName: 'M2C MarkDowns' });
 
   const fetchSettlements = async () => {
     try {
@@ -67,9 +88,30 @@ export default function PayoutsEnhanced() {
     }
   };
 
+  const fetchSellerInfo = async () => {
+    try {
+      const res = await axios.get('/company-info/public');
+      if (res?.data?.success && res.data.data) {
+        const d = res.data.data;
+        setSeller({
+          companyName: d.companyName || 'M2C MarkDowns',
+          gstNumber: d.gstNumber,
+          registeredAddress: d.registeredAddress,
+          city: d.city,
+          state: d.state,
+          zipCode: d.zipCode,
+          country: d.country,
+        });
+      }
+    } catch {
+      // Non-fatal — fall back to the company name only.
+    }
+  };
+
   useEffect(() => {
     fetchSettlements();
     fetchBankDetails();
+    fetchSellerInfo();
   }, []);
 
   const handleDownloadReport = () => {
@@ -166,6 +208,48 @@ export default function PayoutsEnhanced() {
       y += 10;
     });
 
+    // ── Products in this settlement (only if the frozen snapshot exists) ──
+    if (settlement.lineItemsAvailable && settlement.lineItems?.length) {
+      y += 5;
+      doc.setFillColor(243, 244, 246);
+      doc.rect(15, y - 6, pageW - 30, 10, 'F');
+      doc.setTextColor(55, 65, 81);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Products in this Settlement', 18, y);
+
+      y += 12;
+      doc.setFontSize(8);
+      doc.setTextColor(107, 114, 128);
+      doc.setFont('helvetica', 'bold');
+      // Column anchors: Product | Qty | Unit | Taxable | GST | Total
+      const colQty = pageW - 92, colUnit = pageW - 74, colTax = pageW - 52, colGst = pageW - 32, colTotal = pageW - 18;
+      doc.text('Product', 18, y);
+      doc.text('Qty', colQty, y, { align: 'right' });
+      doc.text('Unit', colUnit, y, { align: 'right' });
+      doc.text('Taxable', colTax, y, { align: 'right' });
+      doc.text('GST', colGst, y, { align: 'right' });
+      doc.text('Total', colTotal, y, { align: 'right' });
+      y += 3;
+      doc.setDrawColor(229, 231, 235);
+      doc.line(15, y, pageW - 15, y);
+      y += 6;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(17, 24, 39);
+      settlement.lineItems.forEach((li) => {
+        const name = li.productName.length > 34 ? li.productName.slice(0, 33) + '…' : li.productName;
+        doc.text(name, 18, y);
+        doc.text(String(li.quantity), colQty, y, { align: 'right' });
+        doc.text(`Rs.${(li.unitPrice ?? 0).toLocaleString('en-IN')}`, colUnit, y, { align: 'right' });
+        doc.text(`Rs.${(li.taxableValue ?? 0).toLocaleString('en-IN')}`, colTax, y, { align: 'right' });
+        doc.text(li.gstAmount ? `Rs.${li.gstAmount.toLocaleString('en-IN')}` : '-', colGst, y, { align: 'right' });
+        doc.text(`Rs.${(li.lineTotal ?? 0).toLocaleString('en-IN')}`, colTotal, y, { align: 'right' });
+        y += 8;
+      });
+      y += 2;
+    }
+
     // ── Financial Overview section ──
     y += 5;
     doc.setFillColor(243, 244, 246);
@@ -174,6 +258,19 @@ export default function PayoutsEnhanced() {
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text('Financial Overview', 18, y);
+
+    // Goods + GST split, when present, before the gross total.
+    if (settlement.taxAmount) {
+      y += 12;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(75, 85, 99);
+      doc.text('Taxable Value (goods)', 18, y);
+      doc.text(`Rs. ${(settlement.baseAmount ?? 0).toLocaleString('en-IN')}`, pageW - 18, y, { align: 'right' });
+      y += 8;
+      doc.text(`GST${settlement.gstPercentage != null ? ` (${settlement.gstPercentage}%)` : ''}`, 18, y);
+      doc.text(`Rs. ${settlement.taxAmount.toLocaleString('en-IN')}`, pageW - 18, y, { align: 'right' });
+    }
 
     y += 14;
     doc.setFontSize(10);
@@ -670,93 +767,220 @@ export default function PayoutsEnhanced() {
         </div>
       )}
 
-      {/* Payout Details Modal */}
+      {/* Settlement Advice — rendered as a standard invoice document so the
+          vendor gets the same From/To → line-items → totals layout used across
+          the platform's invoices (mirrors AdminDashboard/Billing/InvoiceDetail). */}
       {showDetailsModal && selectedSettlement && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-slate-900">Settlement Details</h2>
-              <button
-                onClick={() => setShowDetailsModal(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <X className="w-6 h-6 text-slate-600" />
-              </button>
+          <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Action bar (not part of the document) */}
+            <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-slate-900">Settlement Advice</h2>
+              <div className="flex items-center gap-2">
+                {selectedSettlement.status === 'Paid' && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleDownloadReceipt(selectedSettlement); }}
+                    className="hidden sm:flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download Receipt
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  <X className="w-6 h-6 text-slate-600" />
+                </button>
+              </div>
             </div>
 
-            <div className="p-6 space-y-6">
-              {/* Settlement Information */}
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Payout Information</h3>
-                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg">
+            {/* ── Invoice Document ── */}
+            <div className="p-6">
+              <div className="rounded-xl border border-slate-200 overflow-hidden">
+                {/* Header */}
+                <div className="bg-brand-500 px-8 py-6 flex justify-between items-start">
                   <div>
-                    <p className="text-sm text-slate-600 mb-1">Settlement Number</p>
-                    <p className="font-semibold text-slate-900">{selectedSettlement.settlementNumber}</p>
+                    <p className="text-2xl font-bold text-white mb-1">M2C MarkDowns</p>
+                    <p className="text-white/80 text-xs uppercase tracking-wider">Vendor Settlement Advice</p>
+                    <p className="text-white font-mono font-semibold text-sm mt-2">{selectedSettlement.settlementNumber}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Billing Number</p>
-                    <p className="font-semibold text-slate-900">{selectedSettlement.billingNumber}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Period</p>
-                    <p className="font-semibold text-slate-900">{selectedSettlement.period}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Status</p>
-                    <span
-                      className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(selectedSettlement.status)}`}
-                    >
+                  <div className="text-right">
+                    <p className="text-[11px] text-white/70 uppercase tracking-wider mb-1">Date</p>
+                    <p className="text-white font-semibold">{fmtDocDate(selectedSettlement.createdAt)}</p>
+                    <span className={`inline-flex mt-2 px-3 py-1 rounded-full text-xs font-bold capitalize ${getStatusBadge(selectedSettlement.status)}`}>
                       {selectedSettlement.status}
                     </span>
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Created At</p>
-                    <p className="font-semibold text-slate-900">
-                      {selectedSettlement.createdAt ? new Date(selectedSettlement.createdAt).toLocaleDateString('en-IN') : '-'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Due Date</p>
-                    <p className="font-semibold text-slate-900">
-                      {selectedSettlement.dueDate ? new Date(selectedSettlement.dueDate).toLocaleDateString('en-IN') : selectedSettlement.status === 'Pending' ? 'Awaiting Approval' : '—'}
-                    </p>
-                  </div>
-                  {selectedSettlement.paymentDate && (
+                </div>
+
+                <div className="p-8">
+                  {/* Paid By + Paid To — each with GSTIN + registered address */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6 pb-6 border-b border-slate-100">
                     <div>
-                      <p className="text-sm text-slate-600 mb-1">Payment Date</p>
-                      <p className="font-semibold text-slate-900">
-                        {new Date(selectedSettlement.paymentDate).toLocaleDateString('en-IN')}
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Paid By</p>
+                      <p className="font-bold text-slate-900 text-base">{seller.companyName}</p>
+                      {seller.gstNumber && (
+                        <p className="text-sm text-slate-600 mt-1">GSTIN: <span className="font-mono">{seller.gstNumber}</span></p>
+                      )}
+                      {(() => {
+                        const line = [
+                          seller.registeredAddress,
+                          [seller.city, seller.state, seller.zipCode].filter(Boolean).join(', '),
+                          seller.country,
+                        ].filter(Boolean).join(', ');
+                        return line ? <p className="text-sm text-slate-600 mt-1 leading-relaxed">{line}</p> : null;
+                      })()}
+                    </div>
+                    <div className="md:text-right">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Paid To</p>
+                      <p className="font-bold text-slate-900 text-base">{selectedSettlement.vendor?.companyName || selectedSettlement.vendorName || '—'}</p>
+                      {selectedSettlement.vendor?.gstNumber ? (
+                        <p className="text-sm text-slate-600 mt-1">GSTIN: <span className="font-mono">{selectedSettlement.vendor.gstNumber}</span></p>
+                      ) : (
+                        <p className="text-sm text-slate-400 italic mt-1">Unregistered (no GSTIN)</p>
+                      )}
+                      {(() => {
+                        const v = selectedSettlement.vendor;
+                        if (!v) return null;
+                        const line = [
+                          v.businessAddress, v.addressLine2, v.addressLine3, v.landmark,
+                          [v.businessCity, v.businessState, v.businessZipCode].filter(Boolean).join(', '),
+                          v.businessCountry,
+                        ].filter(Boolean).join(', ');
+                        return line ? <p className="text-sm text-slate-600 mt-1 leading-relaxed">{line}</p> : null;
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Settlement meta — stacked label/value cells so long mono values
+                      (billing / order / txn IDs) align cleanly instead of wrapping. */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4 mb-8 pb-8 border-b border-slate-100">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Invoice No</p>
+                      <p className="text-sm font-mono font-semibold text-slate-900 break-all">{selectedSettlement.billingNumber || '—'}</p>
+                    </div>
+                    {selectedSettlement.order?.orderId && (
+                      <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Order ID</p>
+                        <p className="text-sm font-mono font-semibold text-slate-900 break-all">{selectedSettlement.order.orderId}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Billing Period</p>
+                      <p className="text-sm font-semibold text-slate-900">{selectedSettlement.period || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Due Date</p>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {selectedSettlement.dueDate ? fmtDocDate(selectedSettlement.dueDate) : selectedSettlement.status === 'Pending' ? 'Awaiting Approval' : '—'}
                       </p>
                     </div>
-                  )}
-                  {selectedSettlement.transactionId && (
-                    <div>
-                      <p className="text-sm text-slate-600 mb-1">Transaction ID</p>
-                      <p className="font-semibold font-mono text-slate-900">{selectedSettlement.transactionId}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+                    {selectedSettlement.paymentDate && (
+                      <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Paid On</p>
+                        <p className="text-sm font-semibold text-slate-900">{fmtDocDate(selectedSettlement.paymentDate)}</p>
+                      </div>
+                    )}
+                    {selectedSettlement.transactionId && (
+                      <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Txn ID</p>
+                        <p className="text-sm font-mono font-semibold text-slate-900 break-all">{selectedSettlement.transactionId}</p>
+                      </div>
+                    )}
+                  </div>
 
-              {/* Financial Breakdown */}
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Financial Overview</h3>
-                <div className="bg-slate-50 p-4 rounded-lg space-y-3">
-                  <div className="flex justify-between items-center border-t border-slate-300 pt-3">
-                    <span className="font-bold text-slate-900 text-lg">Settlement Amount</span>
-                    <span className="font-bold text-slate-900 text-lg">
-                      ₹{selectedSettlement.amount.toLocaleString('en-IN')}
-                    </span>
+                  {/* Line items — goods this payout covers, at the vendor's own price.
+                      Shown only when the frozen snapshot exists; older settlements
+                      fall back to a note rather than inventing per-line figures. */}
+                  <div className="mb-8">
+                    {selectedSettlement.lineItemsAvailable && selectedSettlement.lineItems?.length ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50">
+                              <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">#</th>
+                              <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Item</th>
+                              <th className="text-center px-4 py-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Qty</th>
+                              <th className="text-right px-4 py-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Unit Price</th>
+                              <th className="text-right px-4 py-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Taxable</th>
+                              <th className="text-right px-4 py-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">GST</th>
+                              <th className="text-right px-4 py-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedSettlement.lineItems.map((li, i) => (
+                              <tr key={li.id} className="border-b border-slate-100">
+                                <td className="px-4 py-3 text-slate-400">{i + 1}</td>
+                                <td className="px-4 py-3">
+                                  <div className="font-semibold text-slate-900">{li.productName}</div>
+                                  <div className="text-xs text-slate-500">
+                                    SKU: {li.sku}
+                                    {(li.size || li.color) && ` · ${[li.size, li.color].filter(Boolean).join(' / ')}`}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-center">{li.quantity}</td>
+                                <td className="px-4 py-3 text-right">{fmtINR(li.unitPrice)}</td>
+                                <td className="px-4 py-3 text-right">{fmtINR(li.taxableValue)}</td>
+                                <td className="px-4 py-3 text-right">
+                                  {li.gstAmount
+                                    ? <>{fmtINR(li.gstAmount)}{li.gstRate != null && <span className="text-xs text-slate-400"> ({li.gstRate}%)</span>}</>
+                                    : <span className="text-slate-400">—</span>}
+                                </td>
+                                <td className="px-4 py-3 text-right font-semibold">{fmtINR(li.lineTotal)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-500">
+                        Line-item detail isn&apos;t available for settlements created before this
+                        update. The totals below remain accurate.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Totals */}
+                  <div className="flex justify-end">
+                    <div className="w-72 space-y-2 text-sm">
+                      {/* Goods + GST split so it reconciles against the vendor's tax invoice. */}
+                      {selectedSettlement.taxAmount ? (
+                        <>
+                          <div className="flex justify-between py-1 border-b border-slate-100">
+                            <span className="text-slate-500">Taxable Value (goods)</span>
+                            <span className="font-medium">{fmtINR(selectedSettlement.baseAmount)}</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-slate-100">
+                            <span className="text-slate-500">
+                              GST{selectedSettlement.gstPercentage != null ? ` (${selectedSettlement.gstPercentage}%)` : ''}
+                            </span>
+                            <span className="font-medium">{fmtINR(selectedSettlement.taxAmount)}</span>
+                          </div>
+                        </>
+                      ) : null}
+                      <div className="flex justify-between py-3 px-4 bg-brand-500 text-white rounded-lg mt-2">
+                        <span className="font-bold text-base">Settlement Amount</span>
+                        <span className="font-bold text-base">{fmtINR(selectedSettlement.amount)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="mt-10 pt-6 border-t border-slate-100 text-center">
+                    <p className="text-sm text-slate-500">Payout to your registered bank account.</p>
+                    <p className="text-xs text-slate-400 mt-1">This is a computer-generated settlement advice and does not require a signature.</p>
                   </div>
                 </div>
               </div>
 
-              {/* Download Receipt Button */}
+              {/* Download Receipt — full-width fallback for narrow screens / paid rows */}
               {selectedSettlement.status === 'Paid' && (
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); handleDownloadReceipt(selectedSettlement); }}
-                  className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors"
+                  className="sm:hidden mt-6 w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors"
                 >
                   <Download className="w-4 h-4" />
                   Download Receipt

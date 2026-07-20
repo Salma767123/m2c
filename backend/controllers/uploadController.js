@@ -18,6 +18,7 @@ const ALLOWED_FOLDERS = new Set([
   'vendor-certifications',
   'vendor-contact-photos',
   'products',
+  'support-tickets',
 ]);
 
 // GET /api/uploads/signature?folder=<folder>

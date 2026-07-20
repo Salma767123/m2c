@@ -110,6 +110,12 @@ export interface ProductDetailVendor {
   factoryState?: string | null
   factoryZipCode?: string | null
   factoryCountry?: string | null
+  // Factory + warehouse are the same physical location at registration, so the
+  // richer address-detail lines (line 2/3, landmark) are only stored on the
+  // warehouse columns. Used to compose the full factory address for QC display.
+  warehouseAddressLine2?: string | null
+  warehouseAddressLine3?: string | null
+  warehouseLandmark?: string | null
 }
 
 export interface AssignedQcSummary {

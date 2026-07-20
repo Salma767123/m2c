@@ -80,12 +80,11 @@ async function attachVendorPrices(items) {
  * `basePrice` (products) / `price` (variants); everything below is what M2C resells at,
  * so it reveals M2C's margin on the vendor's own goods.
  *
- * NOT stripped, deliberately: `originalPrice` and `discount`. The vendor's own edit form
- * reads them back, and `originalPrice` is whatever the vendor submitted — until an admin
- * approves the product and overwrites it with M2C's MRP. That overwrite means the pair
- * still implies the selling price (selling = originalPrice x (1 - discount/100)), so this
- * closes the direct leak, not the derivable one. The real fix is to stop approveProduct
- * overwriting the vendor's field and give M2C's MRP a column of its own.
+ * `originalPrice` (MRP) and `discount` are stripped too. approveProduct overwrites
+ * `originalPrice` with M2C's MRP, and MRP x (1 - discount/100) reconstructs the selling
+ * price — the "derivable leak". The vendor never enters or edits these (their form has no
+ * such fields), so removing them is safe. Vendors instead see their own payout economics
+ * via attachVendorPayout: base price, the GST they're paid, and the total.
  */
 const ADMIN_PRICE_FIELDS = [
     'adminFixedPrice',
@@ -93,6 +92,8 @@ const ADMIN_PRICE_FIELDS = [
     'priceUSD',
     'originalPriceINR',
     'originalPriceUSD',
+    'originalPrice',
+    'discount',
 ];
 
 /**
@@ -115,9 +116,52 @@ function stripAdminPricing(product) {
     return product;
 }
 
+const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+
+/**
+ * Attach the vendor's payout economics to a product they own — the GST they will be paid
+ * on their own price and the resulting per-unit total. Replaces the MRP/discount fields
+ * stripped above with numbers that are actually the vendor's to see.
+ *
+ * Mirrors the settlement math exactly (orderController + Settlement): GST is charged only
+ * by GST-REGISTERED vendors, at the product's HSN rate. An unregistered vendor is paid
+ * base only, so their tax is 0 even though the product still carries an HSN rate — the
+ * `vendorGstRate` reflects what they're actually paid, not the bare HSN rate.
+ *
+ * Mutates in place (product + every variant) and returns the product.
+ *
+ * @param {object} product        Product with `basePrice`, `gstPercentage`, `variants[]`.
+ * @param {boolean} vendorHasGstin Whether the owning vendor has a GSTIN.
+ */
+function attachVendorPayout(product, vendorHasGstin) {
+    if (!product || typeof product !== 'object') return product;
+    const hsnRate = product.gstPercentage || 0;
+    const rate = vendorHasGstin ? hsnRate : 0;
+
+    const payout = (unitPrice) => {
+        const base = typeof unitPrice === 'number' && unitPrice > 0 ? unitPrice : 0;
+        const tax = round2(base * rate / 100);
+        return { gstRate: rate, taxAmount: tax, totalAmount: round2(base + tax) };
+    };
+
+    const p = payout(product.basePrice);
+    product.vendorGstRate = p.gstRate;
+    product.vendorTaxAmount = p.taxAmount;
+    product.vendorTotalAmount = p.totalAmount;
+
+    for (const variant of product.variants || []) {
+        const v = payout(variant.price);
+        variant.vendorGstRate = v.gstRate;
+        variant.vendorTaxAmount = v.taxAmount;
+        variant.vendorTotalAmount = v.totalAmount;
+    }
+    return product;
+}
+
 module.exports = {
     attachVendorPrices,
     stripAdminPricing,
+    attachVendorPayout,
     SELLING_PRICE_FIELDS,
     ADMIN_PRICE_FIELDS,
 };

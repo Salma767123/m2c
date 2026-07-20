@@ -464,7 +464,7 @@ export default function ProductsTable() {
                 <TableCell>
                   <div className="flex items-center space-x-2">
                     {hasPermission('all_products:view') && (
-                      <Link href={`/admin/dashboard/products/vendor-requests/view/${product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}--${product.id}`}>
+                      <Link href={`/admin/dashboard/products/view/${product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}--${product.id}`}>
                         <Button variant="ghost" size="sm" title="View Details" className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors">
                           <Eye className="h-4 w-4" />
                         </Button>

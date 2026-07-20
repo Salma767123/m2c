@@ -1,10 +1,8 @@
-import AdminSupport from "@/components/AdminDashboard/Support/AdminSupport";
-import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
+import { redirect } from "next/navigation";
 
+// Support is now split into scoped Vendor/Customer lists (see the sidebar). The old
+// combined page is retired — anything landing here (a stale link, a bookmark) is
+// sent to the Vendor list rather than showing the deprecated all-tickets view.
 export default function AdminSupportPage() {
-  return (
-    <PermissionGuard permission="support:view">
-      <AdminSupport />
-    </PermissionGuard>
-  );
+  redirect("/admin/dashboard/support/vendor");
 }

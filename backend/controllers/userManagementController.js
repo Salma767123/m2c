@@ -153,8 +153,8 @@ exports.getCustomerById = async (req, res) => {
             return res.status(404).json({ success: false, error: 'Customer not found' });
         }
 
-        // Get order stats, review stats, and recent orders in parallel
-        const [orderAgg, reviewAgg, recentOrders] = await Promise.all([
+        // Get order stats, review stats, recent orders and support tickets in parallel
+        const [orderAgg, reviewAgg, recentOrders, supportTickets] = await Promise.all([
             prisma.order.aggregate({
                 where: { customerId: id },
                 _count: { id: true },
@@ -194,6 +194,17 @@ exports.getCustomerById = async (req, res) => {
                         }
                     }
                 }
+            }),
+            // Support tickets this customer raised (creatorType 'user'). Lets the admin
+            // see and jump to a customer's tickets from within the Customers module.
+            prisma.supportTicket.findMany({
+                where: { creatorId: id, creatorType: 'user' },
+                orderBy: { createdAt: 'desc' },
+                take: 10,
+                select: {
+                    id: true, ticketId: true, subject: true, category: true,
+                    priority: true, status: true, createdAt: true, updatedAt: true,
+                }
             })
         ]);
 
@@ -219,7 +230,8 @@ exports.getCustomerById = async (req, res) => {
                 totalSpent: orderAgg._sum.totalAmountINR || 0,
                 averageRating: reviewAgg._avg.rating ? Math.round(reviewAgg._avg.rating * 10) / 10 : null,
                 reviewsCount: reviewAgg._count.id || 0,
-                recentOrders
+                recentOrders,
+                supportTickets
             }
         });
     } catch (error) {

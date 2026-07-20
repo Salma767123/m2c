@@ -286,8 +286,34 @@ const upsertVendorBankDetails = async (req, res) => {
     });
 
     if (existingBankDetails && existingBankDetails.isVerified) {
-      return res.status(400).json({ 
-        error: 'Bank details are already verified and cannot be changed. Please contact admin for modifications.' 
+      return res.status(400).json({
+        error: 'Bank details are already verified and cannot be changed. Please contact admin for modifications.'
+      });
+    }
+
+    // The read endpoints return the account number MASKED (e.g. "******7474").
+    // The edit form preloads that value, so if the vendor changes another field
+    // and saves without re-typing, the masked string comes back here. Writing it
+    // verbatim would corrupt the real number with asterisks. So: if the incoming
+    // value is masked, keep the stored number (unchanged); reject only if there
+    // is nothing stored to fall back to.
+    let accountNumberToSave = accountNumber;
+    if (/\*/.test(accountNumber)) {
+      if (existingBankDetails?.accountNumber && !/\*/.test(existingBankDetails.accountNumber)) {
+        accountNumberToSave = existingBankDetails.accountNumber;
+      } else {
+        return res.status(400).json({
+          error: 'Please enter the full account number.'
+        });
+      }
+    }
+
+    // Format guard (defence-in-depth — never trust the client). Indian bank
+    // account numbers are numeric, 9–18 digits. Only applies to a freshly typed
+    // value; a fallback from the stored number above is already known-good.
+    if (!/^\d{9,18}$/.test(accountNumberToSave)) {
+      return res.status(400).json({
+        error: 'Enter a valid account number (9–18 digits, numbers only).'
       });
     }
 
@@ -296,7 +322,7 @@ const upsertVendorBankDetails = async (req, res) => {
       where: { vendorId },
       update: {
         bankName,
-        accountNumber,
+        accountNumber: accountNumberToSave,
         ifscCode: ifscCode.toUpperCase(),
         accountType,
         accountHolderName,
@@ -307,7 +333,7 @@ const upsertVendorBankDetails = async (req, res) => {
       create: {
         vendorId,
         bankName,
-        accountNumber,
+        accountNumber: accountNumberToSave,
         ifscCode: ifscCode.toUpperCase(),
         accountType,
         accountHolderName,

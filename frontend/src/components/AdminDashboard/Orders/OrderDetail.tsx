@@ -5,6 +5,7 @@ import { ArrowLeft, Package, CreditCard, User, MapPin, Truck, Star, Briefcase, F
 import { useRouter } from "next/navigation";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order } from "@/services/orderService";
+import { formatPrice } from "@/lib/currency";
 import { hubService, Hub } from "@/services/hubService";
 import { MapPin as HubIcon } from "lucide-react";
 import axiosInstance from "@/lib/axios";
@@ -116,6 +117,10 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
         return <div className="p-6 text-center text-red-500">Order not found</div>;
     }
 
+    // Every amount here is what the customer was charged, so it must show in the order's
+    // own currency. These lines hardcoded '$', printing a ₹ order as dollars.
+    const money = (n: number) => formatPrice(n, order.currency === 'USD' ? 'USD' : 'INR');
+
     const { status } = order;
 
     return (
@@ -206,7 +211,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                                                 )}
                                                 <p className="text-sm text-slate-600 mt-1">Vendor: {item.vendorName}</p>
                                             </div>
-                                            <p className="text-base font-bold text-slate-900">${item.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                            <p className="text-base font-bold text-slate-900">{money(item.unitPrice)}</p>
                                         </div>
                                         <div className="flex gap-6 mt-4">
                                             <div>
@@ -215,7 +220,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                                             </div>
                                             <div>
                                                 <p className="text-xs text-slate-500 uppercase">Subtotal</p>
-                                                <p className="text-sm font-medium text-slate-900">${item.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                                <p className="text-sm font-medium text-slate-900">{money(item.totalPrice)}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -226,12 +231,12 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                             <div className="w-full max-w-xs space-y-2">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-slate-500">Subtotal</span>
-                                    <span className="text-slate-900 font-medium">${order.subtotal?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}</span>
+                                    <span className="text-slate-900 font-medium">{money(order.subtotal ?? 0)}</span>
                                 </div>
                                 {order.shippingCost > 0 ? (
                                     <div className="flex justify-between text-sm">
                                         <span className="text-slate-500">Shipping</span>
-                                        <span className="text-slate-900 font-medium">${order.shippingCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="text-slate-900 font-medium">{money(order.shippingCost)}</span>
                                     </div>
                                 ) : (
                                     <div className="flex justify-between text-sm">
@@ -242,24 +247,24 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                                 {order.tax > 0 ? (
                                     <div className="flex justify-between text-sm">
                                         <span className="text-slate-500">Tax</span>
-                                        <span className="text-slate-900 font-medium">${order.tax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="text-slate-900 font-medium">{money(order.tax)}</span>
                                     </div>
                                 ) : null}
                                 {order.discount > 0 ? (
                                     <div className="flex justify-between text-sm">
                                         <span className="text-slate-500">Discount</span>
-                                        <span className="text-red-600 font-medium">-${order.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="text-red-600 font-medium">-{money(order.discount)}</span>
                                     </div>
                                 ) : null}
                                 {order.bagTypeName ? (
                                     <div className="flex justify-between text-sm">
                                         <span className="text-slate-500">Bag ({order.bagTypeName})</span>
-                                        <span className="text-slate-900 font-medium">${(order.bagTypePrice ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="text-slate-900 font-medium">{money(order.bagTypePrice ?? 0)}</span>
                                     </div>
                                 ) : null}
                                 <div className="flex justify-between pt-2 border-t border-slate-200">
                                     <span className="text-base font-semibold text-slate-900">Total</span>
-                                    <span className="text-xl font-bold text-teal-600">${order.totalAmount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span className="text-xl font-bold text-teal-600">{money(order.totalAmount ?? 0)}</span>
                                 </div>
                             </div>
                         </div>

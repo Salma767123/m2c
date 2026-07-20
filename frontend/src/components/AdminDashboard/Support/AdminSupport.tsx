@@ -26,10 +26,23 @@ function getPageRange(current: number, total: number): Array<number | '…'> {
   return pages;
 }
 
-export default function AdminSupport() {
+// `scope` locks the page to one creator type so it can be mounted as a dedicated
+// "Vendor" or "Customer" sub-menu. 'all' keeps the combined view with a type filter.
+type SupportScope = "all" | "vendor" | "customer";
+const SCOPE_CREATOR_TYPE: Record<SupportScope, string> = { all: "all", vendor: "vendor", customer: "user" };
+const SCOPE_TITLE: Record<SupportScope, { title: string; subtitle: string }> = {
+  all: { title: "Support Tickets", subtitle: "Manage and respond to customer and vendor support requests" },
+  vendor: { title: "Vendor Support Tickets", subtitle: "Manage and respond to vendor support requests" },
+  customer: { title: "Customer Support Tickets", subtitle: "Manage and respond to customer support requests" },
+};
+
+export default function AdminSupport({ scope = "all" }: { scope?: SupportScope }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
+  // Tickets from every portal land here (creatorType: user | vendor | admin). In a
+  // scoped view this is fixed; in the combined view the admin picks it.
+  const [typeFilter, setTypeFilter] = useState(SCOPE_CREATOR_TYPE[scope]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -67,6 +80,16 @@ export default function AdminSupport() {
         return "bg-slate-50 text-slate-700 border border-slate-200";
       default:
         return "bg-slate-50 text-slate-700 border border-slate-200";
+    }
+  };
+
+  // Who raised the ticket — the same table serves customer, vendor and admin tickets.
+  const creatorTypeMeta = (type?: string): { label: string; cls: string } => {
+    switch ((type || "").toLowerCase()) {
+      case "user": return { label: "Customer", cls: "bg-indigo-50 text-indigo-700 border border-indigo-200" };
+      case "vendor": return { label: "Vendor", cls: "bg-amber-50 text-amber-700 border border-amber-200" };
+      case "admin": return { label: "Admin", cls: "bg-slate-100 text-slate-600 border border-slate-200" };
+      default: return { label: "—", cls: "bg-slate-50 text-slate-500 border border-slate-200" };
     }
   };
 
@@ -118,8 +141,9 @@ export default function AdminSupport() {
       ticket.ticketId.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
+    const matchesType = typeFilter === "all" || (ticket.creatorType || "").toLowerCase() === typeFilter;
 
-    return matchesSearch && matchesStatus && matchesPriority && inDateRange(ticket.createdAt);
+    return matchesSearch && matchesStatus && matchesPriority && matchesType && inDateRange(ticket.createdAt);
   });
 
   const totalPages = Math.ceil(filteredTickets.length / PAGE_SIZE);
@@ -145,8 +169,8 @@ export default function AdminSupport() {
       <Breadcrumb />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Vendor Support Tickets</h1>
-          <p className="text-slate-600 mt-1">Manage and respond to vendor support requests</p>
+          <h1 className="text-2xl font-bold text-slate-900">{SCOPE_TITLE[scope].title}</h1>
+          <p className="text-slate-600 mt-1">{SCOPE_TITLE[scope].subtitle}</p>
         </div>
       </div>
 
@@ -187,7 +211,7 @@ export default function AdminSupport() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 z-10" />
                 <input
                   type="text"
-                  placeholder="Search tickets by ID, vendor, or subject..."
+                  placeholder="Search tickets by ID, name, or subject..."
                   value={searchTerm}
                   onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40"
@@ -202,6 +226,21 @@ export default function AdminSupport() {
                 placeholder="Created Date"
                 onChange={(f, t) => { setDateFrom(f); setDateTo(t); setCurrentPage(1); }}
               />
+              {scope === "all" && (
+                <div className="w-full sm:w-44">
+                  <Dropdown
+                    value={typeFilter}
+                    options={[
+                      { value: "all", label: "All Types" },
+                      { value: "user", label: "Customer" },
+                      { value: "vendor", label: "Vendor" },
+                      { value: "admin", label: "Admin" },
+                    ]}
+                    onChange={(val) => { setTypeFilter(val as string); setCurrentPage(1); }}
+                    placeholder="Raised by"
+                  />
+                </div>
+              )}
               <div className="w-full sm:w-48">
                 <Dropdown
                   value={statusFilter}
@@ -242,11 +281,10 @@ export default function AdminSupport() {
           <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
             <TableRow>
               <TableHead>Ticket ID</TableHead>
-              <TableHead>Vendor</TableHead>
-              <TableHead>Subject</TableHead>
+              <TableHead>Raised By</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Priority</TableHead>
-              <TableHead>Category</TableHead>
+              {scope !== "vendor" && <TableHead>Category</TableHead>}
               <TableHead>Created</TableHead>
               <TableHead>Responses</TableHead>
               <TableHead>Actions</TableHead>
@@ -261,14 +299,13 @@ export default function AdminSupport() {
                   </TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium text-slate-900">{ticket.creatorName}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-slate-900">{ticket.creatorName}</span>
+                        {(() => { const m = creatorTypeMeta(ticket.creatorType); return (
+                          <span className={`inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${m.cls}`}>{m.label}</span>
+                        ); })()}
+                      </div>
                       <div className="text-sm text-slate-500">{ticket.creatorEmail}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium text-slate-900">{ticket.subject}</div>
-                      <div className="text-sm text-slate-500 line-clamp-1">{ticket.description}</div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -290,9 +327,11 @@ export default function AdminSupport() {
                       {ticket.priority.toUpperCase()}
                     </span>
                   </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-slate-900">{ticket.category}</span>
-                  </TableCell>
+                  {scope !== "vendor" && (
+                    <TableCell>
+                      <span className="text-sm text-slate-900">{ticket.category}</span>
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="text-sm text-slate-900">{new Date(ticket.createdAt).toLocaleDateString()}</div>
                   </TableCell>
@@ -314,7 +353,7 @@ export default function AdminSupport() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={9}>
+                <TableCell colSpan={scope === "vendor" ? 7 : 8}>
                   <div className="p-6 text-center text-slate-500">No tickets found matching your criteria.</div>
                 </TableCell>
               </TableRow>

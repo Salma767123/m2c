@@ -1038,6 +1038,8 @@ const getActiveInspectionForVendor = async (req, res) => {
             status: true,
             itemsToInspect: true,
             scheduledDate: true,
+            scheduledTime: true,
+            estimatedDuration: true,
             cycleNumber: true,
             parentInspectionId: true,
             rejectionReason: true,
@@ -1108,11 +1110,36 @@ const getActiveInspectionForVendor = async (req, res) => {
         // Only return inspections the checker can act on. Falling back to
         // COMPLETED/CANCELLED rows would leak a stale id into InspectionForm and
         // corrupt the submit path (server would reject, but UX path is wrong).
-        const inspection = await prisma.inspection.findFirst({
+        let inspection = await prisma.inspection.findFirst({
             where: { vendorId, checkerId, status: { in: ['SCHEDULED', 'IN_PROGRESS'] } },
             orderBy: { scheduledDate: 'asc' },
             select: inspectionSelect,
         });
+
+        // Deadline enforcement: the form opens straight into an IN_PROGRESS
+        // inspection without calling startInspection, so the booked-window check
+        // must also run here. A lapsed window is expired (frees the vendor for
+        // reassignment) and reported as no active inspection — the client then
+        // hits beginVendorInspection, which returns the EXPIRED 409.
+        if (inspection) {
+            const { isInspectionWindowElapsed } = require('../utils/inspectionSchedule');
+            if (isInspectionWindowElapsed(inspection)) {
+                await prisma.inspection.update({
+                    where: { id: inspection.id },
+                    data: { status: 'EXPIRED', expiredAt: new Date() },
+                }).catch((e) => console.error('Failed to expire inspection in getActiveInspectionForVendor:', e));
+                try {
+                    const { createNotificationForRole } = require('./notificationController');
+                    createNotificationForRole({
+                        role: 'ADMIN', type: 'INSPECTION_EXPIRED',
+                        title: 'Inspection Missed',
+                        message: `"${inspection.vendor?.companyName || 'Vendor'}" inspection (scheduled ${inspection.scheduledDate} ${inspection.scheduledTime}) expired — the window passed before it was completed. Reassign a new QC checker.`,
+                        data: { screen: 'assign-qc-checker', vendorId },
+                    }).catch(() => {});
+                } catch (e) { console.error('expired notify failed:', e); }
+                inspection = null;
+            }
+        }
 
         // Flatten the vendor's registered products into a clean, read-only list
         // for Step 3 (Production Info): [{ category, name, photos: [url] }].
@@ -1204,12 +1231,37 @@ const beginVendorInspection = async (req, res) => {
             });
         }
 
-        // 2. Return existing active inspection if one exists
+        // 2. Return existing active inspection if one exists — but a booked
+        //    window that has fully elapsed can no longer be opened. Expire it and
+        //    tell the checker to have the admin reschedule.
+        const { getInspectionDeadline, isInspectionWindowElapsed } = require('../utils/inspectionSchedule');
         const active = await prisma.inspection.findFirst({
             where: { vendorId, checkerId, status: { in: ['SCHEDULED', 'IN_PROGRESS'] } },
             orderBy: { scheduledDate: 'asc' },
         });
         if (active) {
+            if (isInspectionWindowElapsed(active)) {
+                await prisma.inspection.update({
+                    where: { id: active.id },
+                    data: { status: 'EXPIRED', expiredAt: new Date() },
+                }).catch((e) => console.error('Failed to expire inspection in beginVendorInspection:', e));
+                try {
+                    const { createNotificationForRole } = require('./notificationController');
+                    createNotificationForRole({
+                        role: 'ADMIN', type: 'INSPECTION_EXPIRED',
+                        title: 'Inspection Missed',
+                        message: `"${vendor.companyName}" inspection (scheduled ${active.scheduledDate} ${active.scheduledTime}) expired — the window passed before it was completed. Reassign a new QC checker.`,
+                        data: { screen: 'assign-qc-checker', vendorId },
+                    }).catch(() => {});
+                } catch (e) { console.error('expired notify failed:', e); }
+                const deadline = getInspectionDeadline(active);
+                return res.status(409).json({
+                    success: false,
+                    code: 'INSPECTION_EXPIRED',
+                    error: 'Inspection window has passed',
+                    message: `This inspection can no longer be opened. Its scheduled window (${active.scheduledDate} ${active.scheduledTime}${deadline ? `, valid until ${deadline.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}` : ''}) has already ended. Please ask the admin to schedule a new assignment.`,
+                });
+            }
             return res.json({ success: true, inspection: active, created: false });
         }
 
@@ -1224,6 +1276,24 @@ const beginVendorInspection = async (req, res) => {
                 error: 'inspection_submitted',
                 message: 'The vendor inspection has already been submitted and is currently under admin review. No changes can be made until admin completes the review.',
                 inspection: { id: submitted.id, status: submitted.status },
+            });
+        }
+
+        // 3b. Do not resurrect an expired assignment. If the checker's most recent
+        //     inspection for this vendor was EXPIRED (missed window), auto-creating
+        //     a fresh today-dated one would silently bypass the admin's schedule.
+        //     The admin must reassign instead.
+        const latest = await prisma.inspection.findFirst({
+            where: { vendorId, checkerId },
+            orderBy: { createdAt: 'desc' },
+            select: { status: true, scheduledDate: true, scheduledTime: true },
+        });
+        if (latest?.status === 'EXPIRED') {
+            return res.status(409).json({
+                success: false,
+                code: 'INSPECTION_EXPIRED',
+                error: 'Inspection window has passed',
+                message: `The scheduled inspection for "${vendor.companyName}" (${latest.scheduledDate} ${latest.scheduledTime}) has expired. Please ask the admin to schedule a new assignment.`,
             });
         }
 

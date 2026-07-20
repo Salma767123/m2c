@@ -501,4 +501,86 @@ const sendTestEmail = async ({ to, checkerName, vendorName }) => {
   });
 };
 
-module.exports = { sendVendorApprovalEmail, sendVendorRejectionEmail, sendQCCheckerCredentialsEmail, sendStaffCredentialsEmail, sendTestEmail };
+/**
+ * Remind a QC checker that an assigned inspection starts soon. Fires ~1 hour
+ * before the scheduled start (see jobs/inspectionReminders.js).
+ */
+const sendInspectionReminderEmail = async ({ to, checkerName, vendorName, scheduledDate, scheduledTime, estimatedDuration, factoryLocation }) => {
+  const transporter = createTransporter();
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Upcoming Inspection Reminder</title>
+    </head>
+    <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 0;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+              <!-- Header -->
+              <tr>
+                <td style="background-color:#e01a1b;padding:32px 40px;text-align:center;">
+                  <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">⏰ Inspection Starting Soon</h1>
+                  <p style="margin:8px 0 0;color:#ffe3e3;font-size:14px;">M2C MarkDowns — Quality Control</p>
+                </td>
+              </tr>
+
+              <!-- Body -->
+              <tr>
+                <td style="padding:32px 40px;">
+                  <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+                    Hi ${checkerName || 'there'},
+                  </p>
+                  <p style="margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;">
+                    This is a reminder that your assigned inspection for <strong>${vendorName || 'a vendor'}</strong> is scheduled to begin shortly. Please make sure you reach the location on time — the inspection can only be started within its scheduled window.
+                  </p>
+
+                  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#fff5f5;border:1px solid #ffd5d5;border-radius:8px;margin:0 0 20px;">
+                    <tr><td style="padding:16px 20px;">
+                      <p style="margin:0 0 6px;color:#6b7280;font-size:13px;">Vendor</p>
+                      <p style="margin:0 0 14px;color:#111827;font-size:15px;font-weight:600;">${vendorName || '—'}</p>
+                      <p style="margin:0 0 6px;color:#6b7280;font-size:13px;">Date &amp; Time</p>
+                      <p style="margin:0 0 14px;color:#111827;font-size:15px;font-weight:600;">${scheduledDate || '—'} at ${scheduledTime || '—'}</p>
+                      <p style="margin:0 0 6px;color:#6b7280;font-size:13px;">Estimated Duration</p>
+                      <p style="margin:0 0 ${factoryLocation ? '14px' : '0'};color:#111827;font-size:15px;font-weight:600;">${estimatedDuration || '—'}</p>
+                      ${factoryLocation ? `<p style="margin:0 0 6px;color:#6b7280;font-size:13px;">Location</p><p style="margin:0;color:#111827;font-size:15px;font-weight:600;">${factoryLocation}</p>` : ''}
+                    </td></tr>
+                  </table>
+
+                  <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.6;">
+                    If the scheduled window passes before you start, the assignment will expire and the admin will need to reschedule it.
+                  </p>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="background-color:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+                  <p style="margin:0;color:#9ca3af;font-size:13px;">
+                    This email was sent by the M2C MarkDowns Quality Control team.
+                  </p>
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  await transporter.sendMail({
+    from: `"M2C Quality Control" <${process.env.SMTP_USER}>`,
+    to,
+    subject: `⏰ Reminder: Inspection for ${vendorName || 'vendor'} starts soon`,
+    html,
+  });
+};
+
+module.exports = { sendVendorApprovalEmail, sendVendorRejectionEmail, sendQCCheckerCredentialsEmail, sendStaffCredentialsEmail, sendTestEmail, sendInspectionReminderEmail };

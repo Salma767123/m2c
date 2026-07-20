@@ -321,7 +321,6 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
       {/* Section 1: General Information */}
       <Section title="Section 1 — General Information" icon={ClipboardList} accent="bg-brand-50 text-brand-700">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <InfoRow label="Client" value={fd.client} />
           <InfoRow label="Vendor" value={fd.vendor} />
           <InfoRow label="Factory" value={fd.factory} />
           <InfoRow label="Service Location" value={fd.serviceLocation} />

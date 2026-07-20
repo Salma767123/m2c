@@ -17,6 +17,11 @@ export interface ProductFormData {
   originalPrice?: number;
   discount?: number;
   gstPercentage?: number;
+  // Vendor payout economics (attached by the backend on vendor-facing responses only).
+  // What the vendor is actually paid: GST on their base price, and the per-unit total.
+  vendorGstRate?: number;
+  vendorTaxAmount?: number;
+  vendorTotalAmount?: number;
 
   // Single Unit Configuration
   singleUnitSize?: string;
@@ -119,6 +124,10 @@ export interface ProductVariant {
   priceVisibility?: 'IN_ONLY' | 'COM_ONLY' | 'BOTH';
   stock: number;
   images: string[];
+  // Vendor payout economics (vendor-facing responses only) — see Product above.
+  vendorGstRate?: number;
+  vendorTaxAmount?: number;
+  vendorTotalAmount?: number;
 }
 
 export interface ProductImage {

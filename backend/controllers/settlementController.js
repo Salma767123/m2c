@@ -1,5 +1,75 @@
 const { prisma } = require('../config/database');
 
+const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+
+/**
+ * Attach the vendor line items to each settlement.
+ *
+ * A settlement is one vendor's payout for one order, so its lines are exactly that
+ * order's OrderItems for that vendor. Each line carries the payout figures FROZEN at
+ * order time (vendorUnitPrice / vendorLineBase / vendorLineTax) — all INR, all the
+ * vendor's own price, never M2C's selling price.
+ *
+ * `lineItemsAvailable` tells the client whether the frozen snapshot exists: items
+ * created before that snapshot leave these columns null, and the UI shows a "detail
+ * unavailable" note instead of inventing per-line numbers. The settlement's own
+ * baseAmount/taxAmount/amount are always correct regardless.
+ *
+ * One grouped query for all orders in the batch, then map in memory — no N+1.
+ */
+async function attachSettlementLineItems(settlements) {
+    const list = Array.isArray(settlements) ? settlements : [settlements];
+    if (list.length === 0) return settlements;
+
+    const orderIds = [...new Set(list.map(s => s.orderId).filter(Boolean))];
+    const items = orderIds.length
+        ? await prisma.orderItem.findMany({
+            where: { orderId: { in: orderIds } },
+            select: {
+                id: true, orderId: true, vendorId: true,
+                productName: true, productImage: true, sku: true,
+                size: true, color: true, quantity: true,
+                vendorUnitPrice: true, vendorLineBase: true,
+                vendorLineTax: true, vendorGstRate: true,
+            },
+        })
+        : [];
+
+    // Key by orderId + vendorId — a multi-vendor order yields several settlements, and
+    // each must see only its own lines.
+    const byKey = new Map();
+    for (const it of items) {
+        const key = `${it.orderId}:${it.vendorId}`;
+        if (!byKey.has(key)) byKey.set(key, []);
+        byKey.get(key).push(it);
+    }
+
+    const decorated = list.map(s => {
+        const lines = byKey.get(`${s.orderId}:${s.vendorId}`) || [];
+        const lineItems = lines.map(l => ({
+            id: l.id,
+            productName: l.productName,
+            productImage: l.productImage,
+            sku: l.sku,
+            size: l.size,
+            color: l.color,
+            quantity: l.quantity,
+            unitPrice: l.vendorUnitPrice,
+            taxableValue: l.vendorLineBase,
+            gstRate: l.vendorGstRate,
+            gstAmount: l.vendorLineTax,
+            lineTotal: l.vendorLineBase != null
+                ? round2((l.vendorLineBase || 0) + (l.vendorLineTax || 0))
+                : null,
+        }));
+        // The snapshot is available only if every line has the frozen base recorded.
+        const lineItemsAvailable = lineItems.length > 0 && lineItems.every(l => l.taxableValue != null);
+        return { ...s, lineItems: lineItemsAvailable ? lineItems : [], lineItemsAvailable };
+    });
+
+    return Array.isArray(settlements) ? decorated : decorated[0];
+}
+
 // Admin: Get all settlements
 const getAllSettlements = async (req, res) => {
     try {
@@ -46,7 +116,7 @@ const getSettlementById = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            data: settlement
+            data: await attachSettlementLineItems(settlement)
         });
     } catch (error) {
         console.error('Error fetching settlement:', error);
@@ -160,12 +230,31 @@ const getVendorSettlements = async (req, res) => {
                         invoiceNo: true,
                     },
                 },
+                // Vendor's own registration details for the settlement advice
+                // "Paid To" block — GSTIN + registered business address. This is
+                // the vendor's own data (they own this record), so no PII concern.
+                vendor: {
+                    select: {
+                        companyName: true,
+                        gstNumber: true,
+                        businessAddress: true,
+                        addressLine2: true,
+                        addressLine3: true,
+                        landmark: true,
+                        businessCity: true,
+                        businessState: true,
+                        businessZipCode: true,
+                        businessCountry: true,
+                    },
+                },
             },
         });
 
+        const withLines = await attachSettlementLineItems(settlements);
+
         res.status(200).json({
             success: true,
-            data: settlements
+            data: withLines
         });
     } catch (error) {
         console.error('Error fetching vendor settlements:', error);

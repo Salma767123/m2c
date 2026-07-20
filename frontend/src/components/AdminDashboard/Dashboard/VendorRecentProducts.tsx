@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Badge } from '@/components/UI/Badge'
 import { Package, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import { formatPrice } from "@/lib/currency";
 
 // Mirrors the All Products / Vendor Requests view route: a readable slug plus
 // the product id, separated by a double dash.
@@ -53,7 +54,7 @@ export default function VendorRecentProducts({ products }: { products: any[] }) 
                 </div>
               </div>
               <div className="text-right shrink-0 flex items-center gap-2">
-                <p className="font-bold text-slate-900">${item.price}</p>
+                <p className="font-bold text-slate-900">{formatPrice(item.price ?? 0, 'INR')}</p>
                 <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-brand-500 transition-colors" />
               </div>
             </Link>

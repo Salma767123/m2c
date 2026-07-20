@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Check, ArrowLeft, ArrowRight, AlertTriangle } from "lucide-react"
+import { Check, ArrowLeft, ArrowRight, AlertTriangle, AlarmClockOff } from "lucide-react"
 import FactoryDetails from "./Steps/FactoryDetails"
 import LegalRegistration from "./Steps/LegalRegistration"
 import ProductionInfo from "./Steps/ProductionInfo"
@@ -52,6 +52,8 @@ type Step = ValidationStep
 export default function InspectionForm({ vendorName, vendorId, onComplete }: InspectionFormProps) {
   const [currentStep, setCurrentStep] = useState<Step>("factoryDetails")
   const [loading, setLoading] = useState(true)
+  // Set when the booked window elapsed before start — blocks the form entirely.
+  const [expiredError, setExpiredError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [checkerCoords, setCheckerCoords] = useState<{ checkerLatitude: number; checkerLongitude: number } | null>(null)
   const [inspectionId, setInspectionId] = useState<string | null>(null)
@@ -380,6 +382,11 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
                 if (cancelled) return
                 // 400 with "already" = backend rejected because already started — benign.
                 const msg: string = startErr?.message || ""
+                // Booked window elapsed before start — block the form; it's EXPIRED now.
+                if (startErr?.code === 'INSPECTION_EXPIRED' || (startErr?.status === 409 && /window has passed|expired/i.test(msg))) {
+                  setExpiredError(msg || 'This inspection can no longer be started — its scheduled time window has passed. Please ask the admin to schedule a new assignment.')
+                  return
+                }
                 if (startErr?.status === 400 && /already/i.test(msg)) return
                 console.error("Auto-start failed:", startErr)
                 showErrorToast(
@@ -575,6 +582,31 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-xl text-slate-600 font-semibold">Loading assignment details...</div>
+      </div>
+    )
+  }
+
+  if (expiredError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-[#f7f7f5]">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 max-w-md w-full text-center space-y-5">
+          <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto bg-amber-50">
+            <AlarmClockOff className="w-7 h-7 text-amber-500" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 mb-1">Inspection Window Expired</h2>
+            <p className="text-slate-600 text-sm leading-relaxed">{expiredError}</p>
+            <p className="text-slate-500 text-xs leading-relaxed mt-2">
+              The admin has been notified and can assign a new inspection for this vendor.
+            </p>
+          </div>
+          <button
+            onClick={onComplete}
+            className="w-full px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 text-white transition-colors"
+          >
+            Back to Vendor List
+          </button>
+        </div>
       </div>
     )
   }

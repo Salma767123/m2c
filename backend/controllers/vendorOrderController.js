@@ -530,6 +530,12 @@ const reshipVendorOrder = async (req, res) => {
                             // Dropping it (as this did) left the reshipped line out of
                             // every INR revenue aggregate — see utils/orderCurrency.js.
                             totalPriceINR: item.totalPriceINR,
+                            // Same reasoning for the frozen vendor payout snapshot: copy,
+                            // don't recompute, so the reshipped line still reconciles.
+                            vendorUnitPrice: item.vendorUnitPrice,
+                            vendorLineBase: item.vendorLineBase,
+                            vendorLineTax: item.vendorLineTax,
+                            vendorGstRate: item.vendorGstRate,
                         })),
                     },
                     statusHistory: {

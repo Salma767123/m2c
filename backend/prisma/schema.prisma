@@ -1077,6 +1077,21 @@ model OrderItem {
   // by currency without a join. They aggregate this instead. See utils/orderCurrency.js.
   totalPriceINR Float?
 
+  // ── Vendor payout snapshot (always INR) ─────────────────────────────────────
+  // What M2C owes the VENDOR for this line, frozen at order time. Distinct from the
+  // fields above, which are what the CUSTOMER paid at M2C's marked-up selling price.
+  //
+  // Frozen, not recomputed on read: the vendor is paid basePrice x qty, but basePrice
+  // can change afterwards, and a settlement statement must keep summing to the amount
+  // that was actually settled. `attachVendorPrices` derives the same figure live for
+  // list views; these columns are the authoritative record a payout advice is built
+  // from. All nullable — legacy items predate them, and readers show "—" rather than
+  // inventing a number.
+  vendorUnitPrice Float? // Vendor's own unit price (Product.basePrice / Variant.price)
+  vendorLineBase  Float? // vendorUnitPrice x quantity, before the vendor's GST
+  vendorLineTax   Float? // GST on vendorLineBase; 0 for unregistered vendors
+  vendorGstRate   Float? // Rate applied to this line (HSN-driven), for the statement
+
   // Vendor Information
   vendorId   String @db.ObjectId
   vendorName String
@@ -1799,6 +1814,13 @@ model Inspection {
   reviewedAt  DateTime?
   reviewedBy  String?   @db.ObjectId
 
+  // Scheduling lifecycle. reminderSentAt guards the 1-hour-before reminder so
+  // the cron sweep never double-notifies. expiredAt stamps when a SCHEDULED
+  // assignment blew past its booked window (scheduledDate+time+duration)
+  // without the checker starting — see utils/inspectionSchedule.js.
+  reminderSentAt DateTime?
+  expiredAt      DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1819,6 +1841,9 @@ enum InspectionStatus {
   REINSPECTION
   COMPLETED
   CANCELLED
+  // Booked window (scheduledDate + scheduledTime + estimatedDuration) elapsed
+  // before the checker started. Terminal — frees the vendor for reassignment.
+  EXPIRED
 }
 
 enum InspectionResult {
