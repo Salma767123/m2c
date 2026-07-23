@@ -7,6 +7,10 @@ export interface ContactEnquiry {
   phone?: string;
   subject: string;
   message: string;
+  /** Marketing attribution slug — see lib/enquirySources.ts. Null on legacy rows. */
+  hearAboutUs?: string | null;
+  /** Free text captured when hearAboutUs is "other". */
+  hearAboutUsOther?: string | null;
   status: 'new' | 'read' | 'replied' | 'closed';
   repliedAt?: string;
   closedAt?: string;
@@ -21,6 +25,8 @@ export interface ContactEnquiryStats {
   read: number;
   replied: number;
   closed: number;
+  /** Counts keyed by source slug, plus `unspecified`. Powers the source report. */
+  bySource?: Record<string, number>;
 }
 
 class ContactEnquiryService {
@@ -31,6 +37,8 @@ class ContactEnquiryService {
     phone?: string;
     subject: string;
     message: string;
+    hearAboutUs?: string;
+    hearAboutUsOther?: string;
   }): Promise<{ success: boolean; message: string; data?: ContactEnquiry }> {
     const response = await axios.post('/contact-enquiries/submit', data);
     return response.data;
@@ -80,6 +88,15 @@ class ContactEnquiryService {
   // Admin: Get statistics
   async getStats(): Promise<{ success: boolean; data: ContactEnquiryStats }> {
     const response = await axios.get('/contact-enquiries/stats');
+    return response.data;
+  }
+
+  // Analytics: "How did you hear about us?" breakdown for a period.
+  async getSourceReport(period: string): Promise<{
+    success: boolean;
+    data: { period: string; total: number; sources: { value: string; count: number }[] };
+  }> {
+    const response = await axios.get('/contact-enquiries/source-report', { params: { period } });
     return response.data;
   }
 }

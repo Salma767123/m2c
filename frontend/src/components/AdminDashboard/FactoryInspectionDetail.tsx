@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
     ArrowLeft, Building2, ShieldCheck, Factory,
     CheckCircle, XCircle, AlertTriangle, Clock,
-    FileText, ClipboardList, Package, Settings, Download, Camera, MapPin
+    FileText, ClipboardList, Package, Settings, Download, Camera, MapPin, Video
 } from 'lucide-react'
 import { Badge } from '@/components/UI/Badge'
 import vendorService from '@/services/vendorService'
@@ -15,6 +15,7 @@ import { formatCheckerName } from '@/lib/checkerUtils'
 import { fieldLabelForKey } from '@/lib/inspectionFieldLabel'
 import { formatTime12 } from '@/lib/utils'
 import VendorInspectionData from '@/components/AdminDashboard/Vendors/VendorInspectionData'
+import { describeLocationVerification, inspectionTypeLabel } from "@/lib/checkerLocation"
 
 async function fetchImgDataUrl(url: string): Promise<string | null> {
     try {
@@ -178,6 +179,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 overallResult: fd.inspectionStatus,
                 inspectorRemarks: fd.inspectorRemarks || inspection.notes,
                 checker: inspection.checker || null,
+                inspectionType: inspection.inspectionType,
                 location: inspection.checkerLatitude != null
                     ? { latitude: inspection.checkerLatitude, longitude: inspection.checkerLongitude! }
                     : null,
@@ -251,6 +253,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 overallResult: fd.inspectionStatus,
                 inspectorRemarks: fd.inspectorRemarks || inspection.notes,
                 checker: inspection.checker || null,
+                inspectionType: inspection.inspectionType,
                 location: inspection.checkerLatitude != null
                     ? { latitude: inspection.checkerLatitude, longitude: inspection.checkerLongitude! }
                     : null,
@@ -278,6 +281,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
     const isFormData = rawItems && !Array.isArray(rawItems) && typeof rawItems === 'object'
     const formData = isFormData ? rawItems : {}
     const assignedItems = Array.isArray(rawItems) ? rawItems : []
+    const locationVerification = describeLocationVerification(inspection)
 
     // New format: submitted via the 9-step checker form
     const isNewFormat = isFormData && typeof formData.verifications === 'object' && formData.verifications !== null
@@ -635,32 +639,45 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 </Section>
             )}
 
-            {/* ── Location Verification ── */}
-            {(inspection.locationVerified !== undefined || inspection.checkerLatitude != null) && (
-                <Section title="Location Verification" icon={MapPin}
-                    accent={inspection.locationVerified ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}>
-                    <div className="flex items-center gap-3 mb-4">
-                        {inspection.locationVerified ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 border border-emerald-200">
-                                <CheckCircle className="w-3.5 h-3.5" />Location Verified ✓
-                            </span>
-                        ) : (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200 border border-red-200">
-                                <XCircle className="w-3.5 h-3.5" />Location Mismatch
-                            </span>
-                        )}
-                        {inspection.locationDistanceM != null && (
-                            <span className="text-xs text-slate-500">Distance: <strong>{inspection.locationDistanceM}m</strong> (threshold: 500m)</span>
-                        )}
-                    </div>
+            {/* ── Inspection Type & Location ── */}
+            <Section title="Inspection Type & Location" icon={MapPin}
+                accent={
+                    locationVerification.state === 'verified' ? 'bg-emerald-50 text-emerald-800'
+                        : locationVerification.state === 'mismatch' ? 'bg-red-50 text-red-800'
+                            : locationVerification.state === 'virtual' ? 'bg-sky-50 text-sky-800'
+                                : 'bg-amber-50 text-amber-800'
+                }>
+                <div className="flex items-center gap-3 mb-4 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border bg-slate-100 text-slate-700 border-slate-200">
+                        {inspectionTypeLabel(inspection.inspectionType)}
+                    </span>
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${
+                        locationVerification.state === 'verified' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : locationVerification.state === 'mismatch' ? 'bg-red-50 text-red-700 border-red-200'
+                                : locationVerification.state === 'virtual' ? 'bg-sky-50 text-sky-700 border-sky-200'
+                                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                        {locationVerification.state === 'verified'
+                            ? <CheckCircle className="w-3.5 h-3.5" />
+                            : locationVerification.state === 'virtual'
+                                ? <Video className="w-3.5 h-3.5" />
+                                : <XCircle className="w-3.5 h-3.5" />}
+                        {locationVerification.label}
+                    </span>
+                    {locationVerification.detail && (
+                        <span className="text-xs text-slate-500">{locationVerification.detail}</span>
+                    )}
+                </div>
+                {/* Coordinates only for a physical inspection — a virtual one has none. */}
+                {locationVerification.showCoords && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <InfoCard label="Checker Latitude" value={inspection.checkerLatitude?.toFixed(6)} />
                         <InfoCard label="Checker Longitude" value={inspection.checkerLongitude?.toFixed(6)} />
                         <InfoCard label="Vendor Latitude" value={inspection.vendorLatitude?.toFixed(6)} />
                         <InfoCard label="Vendor Longitude" value={inspection.vendorLongitude?.toFixed(6)} />
                     </div>
-                </Section>
-            )}
+                )}
+            </Section>
 
             {/* ── Assigned Items ── */}
             {assignedItems.length > 0 && (

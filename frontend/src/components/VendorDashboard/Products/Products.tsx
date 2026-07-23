@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
-import { Plus, Edit, Eye, Trash2, ChevronLeft, ChevronRight, Search, Package, CheckCircle2, Clock, AlertTriangle } from 'lucide-react'
+import { Plus, Edit, Eye, Trash2, ChevronLeft, ChevronRight, Search, Package, CheckCircle2, Clock, AlertTriangle, Handshake } from 'lucide-react'
 import { productService, type Product, type ProductStats } from '@/services/productService'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
@@ -24,6 +24,8 @@ function getPageRange(current: number, total: number): Array<number | '…'> {
   return pages;
 }
 
+import VendorNegotiationModal from './VendorNegotiationModal';
+
 export default function Products() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
@@ -33,6 +35,8 @@ export default function Products() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [cardFilter, setCardFilter] = useState<'all' | 'active' | 'pending' | 'out'>('all');
+  // Product open in the price-negotiation modal (opened from the row action).
+  const [negotiateFor, setNegotiateFor] = useState<{ id: string; name: string } | null>(null);
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [deleteModal, setDeleteModal] = useState<{ show: boolean; product: Product | null; loading: boolean }>({
@@ -374,9 +378,11 @@ export default function Products() {
                                 ? 'bg-orange-50 text-orange-700 border-orange-200'
                                 : product.approvalStatus === 'REJECTED'
                                   ? 'bg-red-50 text-red-700 border-red-200'
-                                  : 'bg-slate-50 text-slate-700 border-slate-200'
+                                  : product.approvalStatus === 'NEGOTIATION'
+                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                    : 'bg-slate-50 text-slate-700 border-slate-200'
                           }`}>
-                          {product.approvalStatus === 'REINSPECTION' ? 'Reinspection Required' : product.approvalStatus?.toLowerCase()}
+                          {product.approvalStatus === 'REINSPECTION' ? 'Reinspection Required' : product.approvalStatus === 'NEGOTIATION' ? 'Under Negotiation' : product.approvalStatus?.toLowerCase()}
                         </span>
                         {product.approvalStatus === 'REJECTED' && product.rejectionReason && (
                           <div className="text-xs text-red-600 max-w-40 truncate mt-0.5" title={product.rejectionReason}>
@@ -387,6 +393,16 @@ export default function Products() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
+                        {product.approvalStatus === 'NEGOTIATION' && (
+                          <button
+                            onClick={() => setNegotiateFor({ id: product.id, name: product.name })}
+                            className="p-1.5 rounded-lg text-purple-600 hover:text-purple-700 hover:bg-purple-50 transition-colors relative"
+                            title="Price negotiation — admin has proposed a price"
+                          >
+                            <Handshake className="h-4 w-4" />
+                            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-purple-500" />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleViewProduct(product)}
                           className="p-1.5 rounded-lg text-slate-500 hover:text-brand-500 hover:bg-brand-50 transition-colors"
@@ -451,6 +467,15 @@ export default function Products() {
         onConfirm={confirmDeleteProduct}
         onCancel={() => setDeleteModal({ show: false, product: null, loading: false })}
       />
+
+      {negotiateFor && (
+        <VendorNegotiationModal
+          productId={negotiateFor.id}
+          productName={negotiateFor.name}
+          onClose={() => setNegotiateFor(null)}
+          onChanged={() => loadProducts(pagination.currentPage)}
+        />
+      )}
     </div>
   )
 }

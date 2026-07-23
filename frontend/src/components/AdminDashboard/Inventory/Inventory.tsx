@@ -52,7 +52,7 @@ interface InventoryItem {
   createdAt: string
   updatedAt: string
   hasProductCreated: boolean
-  productApprovalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | null
+  productApprovalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | 'NEGOTIATION' | null
   hasVariants?: boolean
   variants?: InventoryVariant[]
 }

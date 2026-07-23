@@ -12,6 +12,7 @@ import {
   type ReportMeta,
 } from "@/lib/productInspectionReportPdf"
 import { showSuccessToast } from "@/lib/toast-utils"
+import { GEOFENCE_DISABLED, getCurrentCoords } from "@/lib/checkerLocation"
 
 const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<string> => {
   return new Promise((resolve) => {
@@ -78,13 +79,12 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
   const [confirmRemoveDoc, setConfirmRemoveDoc] = useState(false)
   const [confirmRemoveReport, setConfirmRemoveReport] = useState(false)
 
+  // Position for the report's "GPS Location" row. Best-effort — a failure must not
+  // block report generation; the submit path captures its own reading and is the one
+  // that actually enforces the geofence.
   useEffect(() => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) return
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      () => { },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-    )
+    if (GEOFENCE_DISABLED) return
+    getCurrentCoords().then(setCoords).catch(() => { })
   }, [])
 
   useEffect(() => {

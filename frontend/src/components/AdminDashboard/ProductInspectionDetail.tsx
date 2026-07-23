@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
     ArrowLeft, ShieldCheck,
     CheckCircle, XCircle, AlertTriangle,
-    Truck, Camera, Download, FlaskConical, Star, Check, X, FileText
+    Truck, Camera, Download, FlaskConical, Star, Check, X, FileText, MapPin, Video
 } from 'lucide-react'
 import { Badge } from '@/components/UI/Badge'
 import productService from '@/services/productService'
@@ -14,9 +14,11 @@ import { generateProductInspectionPdf } from '@/lib/productInspectionReportPdf'
 import reinspectionService, { AuditLogEntry } from '@/services/reinspectionService'
 import InspectionAuditTimeline from './ReInspection/InspectionAuditTimeline'
 import ApproveProductModal, { type ApprovableProduct } from './Products/ApproveProductModal'
+import ProductRejectionModal from './Products/ProductRejectionModal'
 import { adminProductService } from '@/services/adminProductService'
 import { hasPermission } from '@/lib/auth'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
+import { describeLocationVerification, inspectionTypeLabel } from "@/lib/checkerLocation"
 
 interface Props {
     productId: string
@@ -135,7 +137,6 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
     // Admin decision state — only used in the Vendor Requests context.
     const [showApproveModal, setShowApproveModal] = useState(false)
     const [showRejectModal, setShowRejectModal] = useState(false)
-    const [rejectReason, setRejectReason] = useState('')
     const [actionLoading, setActionLoading] = useState(false)
 
     const loadProduct = useCallback(async (opts?: { silent?: boolean }) => {
@@ -161,15 +162,13 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
 
     useEffect(() => { loadProduct() }, [loadProduct])
 
-    const handleReject = async () => {
-        if (!rejectReason.trim()) { showErrorToast('Reason required', 'Please enter a rejection reason.'); return }
+    const handleReject = async (reason: string) => {
         setActionLoading(true)
         try {
-            const res = await adminProductService.rejectProduct(productId, rejectReason.trim())
+            const res = await adminProductService.rejectProduct(productId, reason)
             if (res.success) {
                 showSuccessToast('Product Rejected', 'The vendor has been notified of the rejection.')
                 setShowRejectModal(false)
-                setRejectReason('')
                 await loadProduct({ silent: true })
             } else {
                 showErrorToast('Rejection Failed', res.message || 'Unable to reject product.')
@@ -191,6 +190,12 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
                 productName: (product as any).name,
                 vendorName: (product as any).vendor?.companyName || fd.vendor,
                 checker: (product as any).assignedQc || null,
+                // Coordinates recorded when the CHECKER submitted, read from the stored
+                // snapshot — never the viewer's own position.
+                inspectionType: fd.inspectionType,
+                location: fd.checkerLocation?.checkerLatitude != null
+                    ? { latitude: fd.checkerLocation.checkerLatitude, longitude: fd.checkerLocation.checkerLongitude }
+                    : undefined,
                 generatedAt: new Date(),
             }
             const pdf = generateProductInspectionPdf(fd, meta, {})
@@ -211,6 +216,12 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
             productName: (product as any).name,
             vendorName: (product as any).vendor?.companyName || fd.vendor,
             checker: (product as any).assignedQc || null,
+            // Coordinates recorded when the CHECKER submitted, read from the stored
+            // snapshot — never the viewer's own position.
+            inspectionType: fd.inspectionType,
+            location: fd.checkerLocation?.checkerLatitude != null
+                ? { latitude: fd.checkerLocation.checkerLatitude, longitude: fd.checkerLocation.checkerLongitude }
+                : undefined,
             generatedAt: new Date(),
         }
         try {
@@ -259,6 +270,21 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
     }
 
     const formData = (product as any).qcInspectionData
+    const checkerLocation = (formData?.checkerLocation ?? null) as {
+        checkerLatitude?: number | null
+        checkerLongitude?: number | null
+        vendorLatitude?: number | null
+        vendorLongitude?: number | null
+        distanceMeters?: number | null
+        verified?: boolean
+    } | null
+    const inspectionType = (formData?.inspectionType as string | undefined) ?? undefined
+    const locationVerification = describeLocationVerification({
+        inspectionType,
+        locationVerified: checkerLocation?.verified,
+        locationDistanceM: checkerLocation?.distanceMeters,
+        checkerLatitude: checkerLocation?.checkerLatitude,
+    })
     const approvalStatus = (product as any).approvalStatus
 
     // Admin decision actions belong here (the QC report) — but only when this
@@ -660,7 +686,49 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
                     <PhotoGallery photos={formData.companyIdCards} title="Company ID Cards" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
                 </Section>
 
-                {/* Review & Final Decision — mirrors Checker portal */}
+                {/* Inspection type + where the checker was when they submitted. Product
+                    QC has no lat/lng columns, so this rides inside qcInspectionData —
+                    see backend/utils/locationUtils.buildLocationSnapshot. */}
+                {(checkerLocation || inspectionType) && (
+                    <Section title="Inspection Type & Location" icon={MapPin}
+                        accent={
+                            locationVerification.state === 'verified' ? 'bg-emerald-50 text-emerald-800'
+                                : locationVerification.state === 'mismatch' ? 'bg-red-50 text-red-800'
+                                    : locationVerification.state === 'virtual' ? 'bg-sky-50 text-sky-800'
+                                        : 'bg-amber-50 text-amber-800'
+                        }>
+                        <div className="flex items-center gap-3 mb-4 flex-wrap">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border bg-slate-100 text-slate-700 border-slate-200">
+                                {inspectionTypeLabel(inspectionType)}
+                            </span>
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${
+                                locationVerification.state === 'verified' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : locationVerification.state === 'mismatch' ? 'bg-red-50 text-red-700 border-red-200'
+                                        : locationVerification.state === 'virtual' ? 'bg-sky-50 text-sky-700 border-sky-200'
+                                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>
+                                {locationVerification.state === 'verified'
+                                    ? <CheckCircle className="w-3.5 h-3.5" />
+                                    : locationVerification.state === 'virtual'
+                                        ? <Video className="w-3.5 h-3.5" />
+                                        : <XCircle className="w-3.5 h-3.5" />}
+                                {locationVerification.label}
+                            </span>
+                            {locationVerification.detail && (
+                                <span className="text-xs text-slate-500">{locationVerification.detail}</span>
+                            )}
+                        </div>
+                        {locationVerification.showCoords && checkerLocation && (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <InfoCard label="Checker Latitude" value={checkerLocation.checkerLatitude?.toFixed(6)} />
+                                <InfoCard label="Checker Longitude" value={checkerLocation.checkerLongitude?.toFixed(6)} />
+                                <InfoCard label="Vendor Latitude" value={checkerLocation.vendorLatitude?.toFixed(6)} />
+                                <InfoCard label="Vendor Longitude" value={checkerLocation.vendorLongitude?.toFixed(6)} />
+                            </div>
+                        )}
+                    </Section>
+                )}
+
                 <Section title="Review & Final Decision" icon={Star} accent="bg-slate-50 text-slate-700">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                         <div className="rounded-xl border border-slate-200 p-4">
@@ -762,38 +830,19 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
                 />
             )}
 
-            {canDecide && showRejectModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !actionLoading && setShowRejectModal(false)}>
-                    <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-                        <div>
-                            <h3 className="text-lg font-bold text-slate-900">Reject Product</h3>
-                            <p className="text-sm text-slate-500 mt-1">The vendor will be notified with the reason below.</p>
-                        </div>
-                        <textarea
-                            value={rejectReason}
-                            onChange={(e) => setRejectReason(e.target.value)}
-                            rows={4}
-                            placeholder="Reason for rejection (e.g. failed on-site tests, packaging defects)…"
-                            className="w-full rounded-lg border border-slate-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                        />
-                        <div className="flex items-center justify-end gap-3">
-                            <button
-                                onClick={() => { setShowRejectModal(false); setRejectReason('') }}
-                                disabled={actionLoading}
-                                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 disabled:opacity-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleReject}
-                                disabled={actionLoading || !rejectReason.trim()}
-                                className="px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                            >
-                                {actionLoading ? 'Rejecting…' : 'Reject Product'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            {canDecide && (
+                <ProductRejectionModal
+                    isOpen={showRejectModal}
+                    onClose={() => setShowRejectModal(false)}
+                    onConfirm={handleReject}
+                    isLoading={actionLoading}
+                    product={{
+                        id: (product as any).id,
+                        name: (product as any).name,
+                        sku: (product as any).baseSku,
+                        vendorName: (product as any).vendor?.companyName,
+                    }}
+                />
             )}
         </div>
     )

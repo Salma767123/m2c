@@ -113,19 +113,80 @@ function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
  * Threshold in meters — inspections where the checker is further than
  * this from the vendor's factory are **blocked**.
  */
-const LOCATION_THRESHOLD_METERS = 500;
+const LOCATION_THRESHOLD_METERS = 1000;
 
 /**
  * Whether the checker→vendor geofence is disabled.
  *
- * Disabled everywhere by default — dev AND production — so inspections never
- * require GPS or the browser location prompt. To turn the geofence back on,
- * set `ENABLE_GEOFENCE=true` in the environment.
+ * ENABLED by default. Set `ENABLE_GEOFENCE=false` to switch it off — an escape hatch
+ * for a GPS outage in production, not a normal operating mode.
+ *
+ * Note this only governs the *distance* check. A vendor with no saved coordinates is
+ * never blocked (there is nothing to measure against); the inspection proceeds and is
+ * recorded as location-unverified. See `verifyCheckerAtVendor`.
  *
  * @returns {boolean}
  */
 function isGeofenceDisabled() {
-  return process.env.ENABLE_GEOFENCE !== "true";
+  return String(process.env.ENABLE_GEOFENCE).toLowerCase() === "false";
+}
+
+/**
+ * Parse one user-supplied coordinate into a number, or null when unusable.
+ *
+ * Accepts numbers and strings (forms post strings). Rejects blanks, non-numerics and
+ * out-of-range values rather than storing them: a bad coordinate silently relocates the
+ * factory and would either block every inspector or wave all of them through.
+ *
+ * @param {unknown} value
+ * @param {'latitude'|'longitude'} kind
+ * @returns {number|null}
+ */
+function parseCoordinate(value, kind) {
+  if (value === null || value === undefined) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  const limit = kind === "latitude" ? 90 : 180;
+  if (n < -limit || n > limit) return null;
+  return n;
+}
+
+/**
+ * Resolve the coordinate pair to persist for a vendor address.
+ *
+ * A human-entered pair always wins over one derived from a Google Maps link: the form
+ * field is explicit intent, the link is a guess parsed out of a URL. Both halves must
+ * be present — a lone latitude is not a location.
+ *
+ * Returns `{}` (not nulls) when nothing usable is supplied, so callers can spread it
+ * into a Prisma payload without clobbering existing stored values on a partial update.
+ *
+ * @param {object}  opts
+ * @param {unknown} opts.latitude   Raw form value.
+ * @param {unknown} opts.longitude  Raw form value.
+ * @param {string}  [opts.mapLink]  Optional Google Maps link to fall back to.
+ * @param {string}  [opts.latField]  Prisma column for latitude.
+ * @param {string}  [opts.lngField]  Prisma column for longitude.
+ */
+function resolveVendorCoordinates({
+  latitude,
+  longitude,
+  mapLink,
+  latField = "factoryLatitude",
+  lngField = "factoryLongitude",
+}) {
+  const lat = parseCoordinate(latitude, "latitude");
+  const lng = parseCoordinate(longitude, "longitude");
+  if (lat !== null && lng !== null) {
+    return { [latField]: lat, [lngField]: lng };
+  }
+  const derived = mapLink ? parseMapLinkCoordinates(mapLink) : null;
+  if (derived) {
+    return { [latField]: derived.latitude, [lngField]: derived.longitude };
+  }
+  return {};
 }
 
 /**
@@ -151,14 +212,23 @@ async function verifyCheckerAtVendor({
   checkerLongitude,
   prisma,
   label,
+  inspectionType,
 }) {
   const prefix = label ? `${label} — ` : "";
 
-  // Dev/non-production: skip the geofence entirely so inspections can be run
-  // without GPS. Never trips in production (see isGeofenceDisabled).
+  // Virtual (online) inspection — the checker is not on-site, so there is nothing to
+  // geofence. This is the single point that makes a virtual inspection skip location
+  // for EVERY caller (factory start, factory submit, product approve/reject): they all
+  // route through this guard, so none of them need their own virtual branch.
+  if (String(inspectionType).toUpperCase() === "VIRTUAL") {
+    console.log(`[Geofence] ${prefix}VIRTUAL inspection — location not applicable.`);
+    return { ok: true, vendorLat: null, vendorLng: null, distanceM: null, skipped: true, verified: false, reason: "VIRTUAL" };
+  }
+
+  // Escape hatch only (ENABLE_GEOFENCE=false). Enabled by default.
   if (isGeofenceDisabled()) {
-    console.log(`[Geofence] ${prefix}DISABLED (${process.env.NODE_ENV || "no NODE_ENV"}) — skipping location check.`);
-    return { ok: true, vendorLat: null, vendorLng: null, distanceM: 0, skipped: true };
+    console.log(`[Geofence] ${prefix}DISABLED via ENABLE_GEOFENCE=false — skipping location check.`);
+    return { ok: true, vendorLat: null, vendorLng: null, distanceM: null, skipped: true, verified: false };
   }
 
   if (checkerLatitude == null || checkerLongitude == null) {
@@ -199,22 +269,28 @@ async function verifyCheckerAtVendor({
     }
   }
 
+  // Vendor has no coordinates on file — there is nothing to measure against, so the
+  // inspection is ALLOWED and recorded as location-unverified rather than blocked.
+  //
+  // Blocking here would strand every vendor registered before coordinates became a
+  // form field, and the checker cannot fix the vendor's record themselves. The
+  // checker's own GPS is still captured and stored, so the report stays auditable and
+  // an admin can verify it after the fact.
   if (vendorLat == null || vendorLng == null) {
     const vendorTag = vendor?.companyName
       ? `${vendor.companyName} (${vendor.id || "?"})`
       : `vendor ${vendor?.id || "?"}`;
     console.log(
-      `[Geofence] ${prefix}SKIPPED — ${vendorTag} has no factoryLatitude/Longitude ` +
-        `and no parseable mapLink. Responding with 400 "Vendor location not set".`,
+      `[Geofence] ${prefix}UNVERIFIED — ${vendorTag} has no factory coordinates ` +
+        `and no parseable mapLink. Allowing, and recording the checker's GPS only.`,
     );
     return {
-      ok: false,
-      status: 400,
-      body: {
-        error: "Vendor location not set",
-        message:
-          "The vendor's factory location (Map Embed Link) has not been configured. Please contact admin to set the vendor's map location before submitting the inspection.",
-      },
+      ok: true,
+      vendorLat: null,
+      vendorLng: null,
+      distanceM: null,
+      verified: false,
+      reason: "VENDOR_LOCATION_NOT_SET",
     };
   }
 
@@ -255,7 +331,7 @@ async function verifyCheckerAtVendor({
     };
   }
 
-  return { ok: true, vendorLat, vendorLng, distanceM };
+  return { ok: true, vendorLat, vendorLng, distanceM, verified: true };
 }
 
 /**
@@ -270,23 +346,64 @@ async function verifyCheckerAtVendor({
  * @returns {string}
  */
 function buildLocationStamp(geo, checkerLatitude, checkerLongitude) {
+  if (geo?.reason === "VIRTUAL") {
+    return "Virtual (online) inspection — location not applicable";
+  }
   if (!geo || geo.skipped) {
     return "Location check skipped (geofence disabled)";
   }
   if (checkerLatitude == null || checkerLongitude == null) {
     return "Location not captured (no GPS sent by checker)";
   }
-  return (
-    `Verified at factory — ${Math.round(geo.distanceM || 0)}m from vendor ` +
-    `(checker ${Number(checkerLatitude).toFixed(6)},${Number(checkerLongitude).toFixed(6)})`
-  );
+  const at = `checker ${Number(checkerLatitude).toFixed(6)},${Number(checkerLongitude).toFixed(6)}`;
+  // Vendor had no coordinates to measure against. Say so — claiming "Verified at
+  // factory — 0m" here would assert a check that never ran.
+  if (geo.verified === false || geo.distanceM == null) {
+    return `Location recorded but NOT verified — vendor has no factory coordinates on file (${at})`;
+  }
+  return `Verified at factory — ${Math.round(geo.distanceM)}m from vendor (${at})`;
+}
+
+/**
+ * Structured location snapshot for storage alongside an inspection's form data.
+ *
+ * Product inspections have no lat/lng columns of their own — the result is a JSON blob
+ * on `Product.qcInspectionData` — so the coordinates ride along inside it. That is what
+ * lets the admin product-inspection view and the PDF report show where the checker
+ * stood, the same as the factory-inspection flow does from its own columns.
+ *
+ * `verified` is explicit rather than inferred from `distanceM` so a reader never has to
+ * guess whether a null distance means "far away" or "nothing to compare against".
+ *
+ * @param {{skipped?: boolean, verified?: boolean, vendorLat?: number|null, vendorLng?: number|null, distanceM?: number|null, reason?: string}} geo
+ * @param {number|string|null|undefined} checkerLatitude
+ * @param {number|string|null|undefined} checkerLongitude
+ */
+function buildLocationSnapshot(geo, checkerLatitude, checkerLongitude) {
+  const lat = parseCoordinate(checkerLatitude, "latitude");
+  const lng = parseCoordinate(checkerLongitude, "longitude");
+  return {
+    checkerLatitude: lat,
+    checkerLongitude: lng,
+    vendorLatitude: geo?.vendorLat ?? null,
+    vendorLongitude: geo?.vendorLng ?? null,
+    distanceMeters: geo?.distanceM != null ? Math.round(geo.distanceM) : null,
+    thresholdMeters: LOCATION_THRESHOLD_METERS,
+    verified: geo?.verified === true,
+    geofenceSkipped: geo?.skipped === true,
+    reason: geo?.reason || null,
+    capturedAt: new Date().toISOString(),
+  };
 }
 
 module.exports = {
   parseMapLinkCoordinates,
+  buildLocationSnapshot,
   haversineDistanceMeters,
   LOCATION_THRESHOLD_METERS,
   isGeofenceDisabled,
+  parseCoordinate,
+  resolveVendorCoordinates,
   verifyCheckerAtVendor,
   buildLocationStamp,
 };

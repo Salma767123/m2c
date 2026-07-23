@@ -289,6 +289,7 @@ export const generateInvoiceHTML = (order: CustomerOrder): string => {
           <p>Thank you for your business!</p>
           <p>This is a computer-generated invoice. No signature required.</p>
           <p>Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+          <p><a href="https://www.m2cmarkdowns.com" style="color:#e01a1b; text-decoration:none; font-weight:600;">www.m2cmarkdowns.com</a></p>
         </div>
       </body>
     </html>

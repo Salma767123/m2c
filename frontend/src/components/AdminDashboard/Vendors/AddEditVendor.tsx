@@ -61,9 +61,15 @@ interface VendorFormData {
   state: string;
   zipCode: string;
   country: string;
+  /** Factory-site coordinates. Strings — see CompanyDetails.FormData for why. */
+  latitude: string;
+  longitude: string;
   /** Factory ownership — owned / rented / lease. Mirrored to warehouse
    *  `ownershipType` when "Same as warehouse" is checked. */
   factoryOwnershipType: string;
+  /** Acquisition channel — how the vendor found us. */
+  referralSource: string;
+  referralSourceDetail: string;
   sameAsWarehouse: boolean;
   logo: string | null;
   logoFile: File | null;
@@ -99,6 +105,8 @@ interface VendorFormData {
   warehouseState: string;
   warehouseZip: string;
   warehouseCountry: string;
+  warehouseLatitude: string;
+  warehouseLongitude: string;
   // Slot-keyed Record in edit mode (`{ nameBoard: {file,url,name}, ... }`)
   // mirroring WarehouseDetails state. Pre-fill defaults to empty `{}`; the
   // component's normaliseFactoryImages also tolerates the legacy array shape
@@ -257,7 +265,11 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     state: "",
     zipCode: "",
     country: "India",
+    latitude: "",
+    longitude: "",
     factoryOwnershipType: "",
+    referralSource: "",
+    referralSourceDetail: "",
     sameAsWarehouse: false,
     logo: null,
     logoFile: null,
@@ -285,6 +297,8 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     warehouseState: "",
     warehouseZip: "",
     warehouseCountry: "India",
+    warehouseLatitude: "",
+    warehouseLongitude: "",
     factoryImages: {},
     factorySiteImages: {},
     factorySiteCapacity: "",
@@ -663,7 +677,12 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         state: vendor.businessState || "",
         zipCode: vendor.businessZipCode || "",
         country: vendor.businessCountry || "India",
+        // Float columns → strings for the form. `?? ''` not `|| ''` so a real 0 survives.
+        latitude: vendor.factoryLatitude != null ? String(vendor.factoryLatitude) : "",
+        longitude: vendor.factoryLongitude != null ? String(vendor.factoryLongitude) : "",
         factoryOwnershipType: vendor.factoryOwnershipType || "",
+        referralSource: (vendor as any).referralSource || "",
+        referralSourceDetail: (vendor as any).referralSourceDetail || "",
         // `sameAsWarehouse` has no DB column — it's a UI-only mirror flag
         // captured at registration time. Restore it for the edit form by
         // comparing the company-address columns against the warehouse-address
@@ -720,6 +739,8 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         warehouseState: vendor.warehouseState || "",
         warehouseZip: vendor.warehouseZipCode || "",
         warehouseCountry: vendor.warehouseCountry || "India",
+        warehouseLatitude: vendor.warehouseLatitude != null ? String(vendor.warehouseLatitude) : "",
+        warehouseLongitude: vendor.warehouseLongitude != null ? String(vendor.warehouseLongitude) : "",
         // Same slot-keyed Record feeds both steps: WarehouseDetails reads
         // `factoryImages`, CompanyDetails reads `factorySiteImages`. Seeding
         // only one of them left the Company Details photo slots empty in edit

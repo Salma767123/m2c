@@ -83,7 +83,15 @@ exports.getProductReviews = async (req, res) => {
                 user: {
                     select: {
                         name: true,
-                        image: true
+                        image: true,
+                        // Reviewer's country — shown on the storefront. Prefer the
+                        // profile country, else fall back to their default address.
+                        country: true,
+                        addresses: {
+                            where: { isDefault: true },
+                            select: { country: true },
+                            take: 1,
+                        },
                     }
                 }
             },
@@ -92,7 +100,14 @@ exports.getProductReviews = async (req, res) => {
             }
         });
 
-        res.status(200).json({ success: true, data: reviews });
+        // Flatten the country onto user and drop the raw addresses list.
+        const data = reviews.map((r) => {
+            const country = r.user?.country || r.user?.addresses?.[0]?.country || null;
+            const user = r.user ? { name: r.user.name, image: r.user.image, country } : null;
+            return { ...r, user };
+        });
+
+        res.status(200).json({ success: true, data });
     } catch (error) {
         console.error('Error fetching reviews:', error);
         res.status(500).json({ success: false, message: 'Error fetching reviews', error: error.message });

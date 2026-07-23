@@ -1,6 +1,11 @@
 const { prisma } = require('../config/database');
 const { resolveBase64InValue } = require('../config/cloudinary');
 const { validateInspectionPayload } = require('../utils/inspectionValidation');
+const {
+    verifyCheckerAtVendor,
+    buildLocationStamp,
+    LOCATION_THRESHOLD_METERS,
+} = require('../utils/locationUtils');
 
 // Create an Inspection Assignment
 const createInspection = async (req, res) => {
@@ -146,6 +151,7 @@ const getInspectionsByChecker = async (req, res) => {
                     scheduledDate: true,
                     priority: true,
                     status: true,
+                    inspectionType: true,
                     completedAt: true,
                     result: true,
                     score: true,
@@ -199,6 +205,13 @@ const startInspection = async (req, res) => {
         if (inspection.checkerId !== checkerId) {
             return res.status(403).json({ error: 'Unauthorized to start this inspection' });
         }
+
+        // Inspection type is chosen when the checker first starts. On a restart of an
+        // already-started inspection, the original choice stands — it can't change
+        // mid-inspection, so the stored value wins over anything the client re-sends.
+        const inspectionType = inspection.status === 'SCHEDULED'
+            ? (String(req.body.inspectionType).toUpperCase() === 'VIRTUAL' ? 'VIRTUAL' : 'PHYSICAL')
+            : inspection.inspectionType;
 
         // Both SCHEDULED (first start) and IN_PROGRESS (retry) re-verify
         // against the CURRENT vendor coordinates — so if admin updates the
@@ -254,120 +267,46 @@ const startInspection = async (req, res) => {
             });
         }
 
-        // Dev/non-production: skip the geofence and start the inspection without GPS.
-        const { isGeofenceDisabled } = require('../utils/locationUtils');
-        if (isGeofenceDisabled()) {
-            console.log(`[Geofence] startInspection ${id} — DISABLED (${process.env.NODE_ENV || 'no NODE_ENV'}) — skipping location check.`);
-            const hasCoords = checkerLatitude != null && checkerLongitude != null;
-            const updatedInspection = await prisma.inspection.update({
-                where: { id },
-                data: {
-                    ...(hasCoords ? { checkerLatitude: parseFloat(checkerLatitude), checkerLongitude: parseFloat(checkerLongitude) } : {}),
-                    locationVerified: false,
-                    ...(inspection.status === 'SCHEDULED' ? { status: 'IN_PROGRESS', startedAt: new Date() } : {}),
-                },
-                include: { vendor: true },
-            });
-            return res.json({
-                success: true,
-                message: 'Inspection started (geofence disabled)',
-                inspection: updatedInspection,
-                locationVerification: { verified: false, reason: 'Geofence disabled' },
-            });
-        }
-
         // ── Location verification ──────────────────────────────────────
-        if (checkerLatitude == null || checkerLongitude == null) {
-            return res.status(400).json({
-                error: 'Location required',
-                message: 'Your current GPS location is required to start an inspection. Please enable location services and try again.',
-            });
-        }
-
-        // Fetch vendor factory coordinates — ALWAYS fresh from DB so admin
-        // edits to the mapLink take effect on the next start call.
+        // Delegates to the shared guard so start, submit and the product-inspection
+        // endpoints all apply one rule. This used to be an inline copy that drifted:
+        // it allowed a start when the vendor had no coordinates while the shared guard
+        // rejected the same case, so a vendor could pass the start and fail the submit.
         const vendor = await prisma.vendor.findUnique({
             where: { id: inspection.vendorId },
-            select: { factoryLatitude: true, factoryLongitude: true, companyName: true, mapLink: true },
+            select: { id: true, factoryLatitude: true, factoryLongitude: true, companyName: true, mapLink: true },
         });
 
-        let vendorLat = vendor?.factoryLatitude;
-        let vendorLng = vendor?.factoryLongitude;
-
-        // If vendor doesn't have stored coordinates, try to parse from mapLink on the fly
-        if ((vendorLat == null || vendorLng == null) && vendor?.mapLink) {
-            const { parseMapLinkCoordinates } = require('../utils/locationUtils');
-            const coords = parseMapLinkCoordinates(vendor.mapLink);
-            if (coords) {
-                vendorLat = coords.latitude;
-                vendorLng = coords.longitude;
-                // Persist for future lookups (fire-and-forget)
-                prisma.vendor.update({
-                    where: { id: inspection.vendorId },
-                    data: { factoryLatitude: vendorLat, factoryLongitude: vendorLng },
-                }).catch(e => console.error('Failed to backfill vendor coords:', e));
-            }
+        const geo = await verifyCheckerAtVendor({
+            vendor,
+            checkerLatitude: checkerLatitude != null ? parseFloat(checkerLatitude) : null,
+            checkerLongitude: checkerLongitude != null ? parseFloat(checkerLongitude) : null,
+            prisma,
+            label: `startInspection ${id}`,
+            inspectionType,
+        });
+        if (!geo.ok) {
+            return res.status(geo.status).json(geo.body);
         }
 
         const wasScheduled = inspection.status === 'SCHEDULED';
-
-        if (vendorLat == null || vendorLng == null) {
-            // Vendor has no factory coordinates and no parseable mapLink.
-            // Skip the geofence check rather than blocking the inspection — admin
-            // can set the map location later; the inspector should not be blocked.
-            console.warn(
-                `[Geofence] startInspection ${id} — ${vendor?.companyName || 'vendor'} (${inspection.vendorId}) ` +
-                `has no factory coordinates and no parseable mapLink. Skipping geofence, allowing start.`
-            );
-            const updatedInspection = await prisma.inspection.update({
-                where: { id },
-                data: {
-                    checkerLatitude: parseFloat(checkerLatitude),
-                    checkerLongitude: parseFloat(checkerLongitude),
-                    locationVerified: false,
-                    ...(wasScheduled ? { status: 'IN_PROGRESS', startedAt: new Date() } : {}),
-                },
-                include: { vendor: true },
-            });
-            return res.json({
-                success: true,
-                message: 'Inspection started (vendor location not configured — geofence skipped)',
-                inspection: updatedInspection,
-                locationVerification: { verified: false, reason: 'Vendor location not configured' },
-            });
-        }
-
-        const { haversineDistanceMeters, LOCATION_THRESHOLD_METERS } = require('../utils/locationUtils');
-        const distanceM = haversineDistanceMeters(checkerLatitude, checkerLongitude, vendorLat, vendorLng);
-        const locationVerified = distanceM <= LOCATION_THRESHOLD_METERS;
-
-        // Diagnostic — show both vendor and checker coords on every start.
-        console.log(
-            `[Geofence] startInspection ${id} — ${vendor?.companyName || 'vendor'} (${inspection.vendorId})\n` +
-            `  vendor:  ${vendorLat}, ${vendorLng}\n` +
-            `  checker: ${checkerLatitude}, ${checkerLongitude}\n` +
-            `  distance: ${Math.round(distanceM)}m / ${LOCATION_THRESHOLD_METERS}m → ${locationVerified ? '✓ PASS' : '✗ MISMATCH'}`,
-        );
-
-        if (!locationVerified) {
-            return res.status(403).json({
-                error: 'Location mismatch',
-                message: `You are approximately ${Math.round(distanceM)}m (straight-line) from the vendor's factory. You must be within ${LOCATION_THRESHOLD_METERS}m to start an inspection. Note: Google Maps may show a longer distance as it measures road/walking routes. Please travel closer to the factory location and try again.`,
-                distanceMeters: Math.round(distanceM),
-                thresholdMeters: LOCATION_THRESHOLD_METERS,
-            });
-        }
+        const hasCheckerCoords = checkerLatitude != null && checkerLongitude != null;
 
         // ── All checks passed — start (or refresh) the inspection ───────
         const updatedInspection = await prisma.inspection.update({
             where: { id },
             data: {
-                checkerLatitude: parseFloat(checkerLatitude),
-                checkerLongitude: parseFloat(checkerLongitude),
-                vendorLatitude: vendorLat,
-                vendorLongitude: vendorLng,
-                locationVerified: true,
-                locationDistanceM: Math.round(distanceM),
+                inspectionType,
+                // Record the checker's GPS whenever it was sent, even on an unverified
+                // run — the report stays auditable and an admin can check it later.
+                // A virtual inspection sends no GPS, so nothing is written here.
+                ...(hasCheckerCoords ? {
+                    checkerLatitude: parseFloat(checkerLatitude),
+                    checkerLongitude: parseFloat(checkerLongitude),
+                } : {}),
+                ...(geo.vendorLat != null ? { vendorLatitude: geo.vendorLat, vendorLongitude: geo.vendorLng } : {}),
+                locationVerified: geo.verified === true,
+                ...(geo.distanceM != null ? { locationDistanceM: Math.round(geo.distanceM) } : {}),
                 // Flip status + stamp startedAt only on the very first start.
                 ...(wasScheduled ? { status: 'IN_PROGRESS', startedAt: new Date() } : {}),
             },
@@ -378,12 +317,19 @@ const startInspection = async (req, res) => {
 
         res.json({
             success: true,
-            message: 'Inspection started',
+            message: geo.verified === true
+                ? 'Inspection started'
+                : geo.reason === 'VIRTUAL'
+                    ? 'Virtual inspection started (no location captured)'
+                    : geo.skipped
+                        ? 'Inspection started (geofence disabled)'
+                        : 'Inspection started — location could not be verified (vendor has no factory coordinates on file)',
             inspection: updatedInspection,
             locationVerification: {
-                verified: true,
-                distanceMeters: Math.round(distanceM),
+                verified: geo.verified === true,
+                ...(geo.distanceM != null ? { distanceMeters: Math.round(geo.distanceM) } : {}),
                 thresholdMeters: LOCATION_THRESHOLD_METERS,
+                ...(geo.reason ? { reason: geo.reason } : {}),
             },
         });
     } catch (error) {
@@ -503,22 +449,21 @@ const completeInspection = async (req, res) => {
                 companyName: true,
             },
         });
-        const { verifyCheckerAtVendor, buildLocationStamp } = require('../utils/locationUtils');
+        // Type was fixed at start — the stored value is authoritative, so a virtual
+        // inspection skips the geofence at submit exactly as it did at start.
         const geo = await verifyCheckerAtVendor({
             vendor,
             checkerLatitude,
             checkerLongitude,
             prisma,
             label: `completeInspection ${id}`,
+            inspectionType: inspection.inspectionType,
         });
+        // The "vendor has no coordinates" and "virtual" cases are handled inside the
+        // guard now (both return ok with verified:false), so every remaining failure is
+        // a real block: missing checker GPS, or the checker being outside the radius.
         if (!geo.ok) {
-            // When vendor has no location configured, skip the geofence — mirrors
-            // the silent skip already in startInspection (VendorInspectionForm.tsx:189).
-            if (geo.body?.error === 'Vendor location not set') {
-                console.log(`[Geofence] completeInspection ${id} — vendor has no location, skipping geofence`);
-            } else {
-                return res.status(geo.status).json(geo.body);
-            }
+            return res.status(geo.status).json(geo.body);
         }
 
         // Defence-in-depth: validate the payload server-side. The UI blocks this
@@ -563,26 +508,25 @@ const completeInspection = async (req, res) => {
             locationDetails: formData.factoryAddress || formData.locationDetails || null,
         } : {};
 
-        // Location snapshot — only persisted when the geofence actually ran and
-        // GPS was supplied. When the geofence is skipped (dev, or vendor without
-        // a configured location), coords may be null; don't write NaN/locationVerified.
+        // Location snapshot, refreshed to the SUBMIT-time GPS so the audit trail
+        // reflects where the checker stood when finalising — not where they started.
+        //
+        // Every part is conditional because the three outcomes differ:
+        //   • verified   — checker GPS + vendor coords + distance, locationVerified true
+        //   • unverified — checker GPS only (vendor has no coords on file)
+        //   • skipped    — geofence switched off; record GPS if the client sent any
+        // Writing `locationVerified: true` or `Math.round(null)` in the latter two would
+        // fabricate a verification that never ran.
         const hasCoords = checkerLatitude != null && checkerLongitude != null;
-        const locationFields = geo.skipped
-            ? {
-                ...(hasCoords ? { checkerLatitude: parseFloat(checkerLatitude), checkerLongitude: parseFloat(checkerLongitude) } : {}),
-                locationVerified: false,
-            }
-            : {
-                // Refresh location snapshot to the SUBMIT-time GPS (overwriting
-                // the start-time values) so the audit trail reflects where the
-                // checker was when finalising the inspection.
+        const locationFields = {
+            ...(hasCoords ? {
                 checkerLatitude: parseFloat(checkerLatitude),
                 checkerLongitude: parseFloat(checkerLongitude),
-                vendorLatitude: geo.vendorLat,
-                vendorLongitude: geo.vendorLng,
-                locationVerified: true,
-                locationDistanceM: Math.round(geo.distanceM),
-            };
+            } : {}),
+            ...(geo.vendorLat != null ? { vendorLatitude: geo.vendorLat, vendorLongitude: geo.vendorLng } : {}),
+            locationVerified: geo.verified === true,
+            ...(geo.distanceM != null ? { locationDistanceM: Math.round(geo.distanceM) } : {}),
+        };
 
         const updatedInspection = await prisma.inspection.update({
             where: { id },

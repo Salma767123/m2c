@@ -14,6 +14,7 @@ import qcCheckerService from "@/services/qcCheckerService"
 import { formatCheckerName } from "@/lib/checkerUtils"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 import { validateStep, validateAll, hasErrors, groupFieldErrors, type Step as ValidationStep, type StepErrors, type AllErrors } from "./validation"
+import { GEOFENCE_DISABLED, getCurrentCoords as sharedGetCurrentCoords } from "@/lib/checkerLocation"
 
 interface InspectionFormProps {
   vendorName: string
@@ -21,31 +22,15 @@ interface InspectionFormProps {
   onComplete: () => void
 }
 
-// Read the checker's current GPS position. The backend geofences the start
-// request against the vendor's factory, so coordinates are mandatory. Rejects
-// with a user-friendly message when the browser can't (or isn't allowed to)
-// provide a location.
-function getCurrentCoords(): Promise<{ checkerLatitude: number; checkerLongitude: number }> {
-  return new Promise((resolve, reject) => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      reject(new Error("Location is not supported by this browser. Please use a device with GPS/location enabled."))
-      return
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ checkerLatitude: pos.coords.latitude, checkerLongitude: pos.coords.longitude }),
-      (err) => {
-        const message =
-          err.code === err.PERMISSION_DENIED
-            ? "Location permission was denied. Please allow location access for this site and refresh the page to start the inspection."
-            : err.code === err.POSITION_UNAVAILABLE
-              ? "Your location could not be determined. Please check that location services are enabled and try again."
-              : "Timed out while getting your location. Please try again."
-        reject(new Error(message))
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    )
-  })
+// Wraps the shared capture in this file's legacy {checkerLatitude,checkerLongitude}
+// shape. Returns nulls when the geofence is switched off so the browser never prompts —
+// this form used to ignore the flag and prompt unconditionally.
+async function getCurrentCoords(): Promise<{ checkerLatitude: number | null; checkerLongitude: number | null }> {
+  if (GEOFENCE_DISABLED) return { checkerLatitude: null, checkerLongitude: null }
+  const c = await sharedGetCurrentCoords()
+  return { checkerLatitude: c.latitude, checkerLongitude: c.longitude }
 }
+
 
 type Step = ValidationStep
 
@@ -55,7 +40,7 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
   // Set when the booked window elapsed before start — blocks the form entirely.
   const [expiredError, setExpiredError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [checkerCoords, setCheckerCoords] = useState<{ checkerLatitude: number; checkerLongitude: number } | null>(null)
+  const [checkerCoords, setCheckerCoords] = useState<{ checkerLatitude: number | null; checkerLongitude: number | null } | null>(null)
   const [inspectionId, setInspectionId] = useState<string | null>(null)
   const [cycleNumber, setCycleNumber] = useState(1)
   const [previousRejectionReason, setPreviousRejectionReason] = useState<string | null>(null)

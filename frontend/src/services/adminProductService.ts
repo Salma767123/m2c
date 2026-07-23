@@ -51,7 +51,7 @@ export interface AdminProduct {
     notes: string;
   } | null;
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
-  approvalStatus: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION';
+  approvalStatus: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | 'NEGOTIATION';
   approvedAt?: string;
   approvedBy?: string;
   rejectionReason?: string;
@@ -148,7 +148,7 @@ class AdminProductService {
   async getAllProducts(params?: {
     page?: number;
     limit?: number;
-    approvalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION';
+    approvalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | 'NEGOTIATION';
     status?: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
     search?: string;
     dateFrom?: string;

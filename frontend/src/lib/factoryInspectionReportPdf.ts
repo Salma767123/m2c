@@ -35,6 +35,8 @@ export interface FactoryReportMeta {
   overallResult?: string
   inspectorRemarks?: string
   checker?: FactoryReportChecker | null
+  /** 'PHYSICAL' | 'VIRTUAL'. Decides whether GPS coordinates are printed. */
+  inspectionType?: string | null
   location?: { latitude: number; longitude: number } | null
   generatedAt?: Date
 }
@@ -653,6 +655,7 @@ export function generateFactoryInspectionPdf(
 
   // ── K. Inspection Details ───────────────────────────────────────────────────
   const loc = meta.location
+  const isVirtual = String(meta.inspectionType).toUpperCase() === "VIRTUAL"
   sectionTitle("K. Inspection Details")
   runTable(
     [["Field", "Value"]],
@@ -661,11 +664,15 @@ export function generateFactoryInspectionPdf(
       ["Checker ID",       val(meta.checker?.checkerId)],
       ["Inspector Email",  val(meta.checker?.email)],
       ["Inspector Phone",  val(meta.checker?.phone)],
+      ["Inspection Type",          isVirtual ? "Virtual Inspection" : "Physical Inspection"],
       ["Inspection Date",          fmtDate(meta.inspectionDate)],
       ["Inspection Start Time",    meta.inspectionStartedAt ? new Date(meta.inspectionStartedAt).toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "—"],
       ["Inspection Complete Time", generatedAt.toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })],
       ["Overall Result",           val(meta.overallResult)],
-      ["GPS Location",             loc ? `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}` : "Not available"],
+      // Virtual inspections have no location — show the type in place of coordinates.
+      ...(isVirtual
+        ? []
+        : [["GPS Location", loc ? `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}` : "Not available"]]),
       ["Inspector Remarks",        val(meta.inspectorRemarks)],
     ]
   )

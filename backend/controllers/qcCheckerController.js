@@ -944,6 +944,7 @@ const getVendorDetails = async (req, res) => {
                     submittedAt: true,
                     result: true,
                     status: true,
+                    inspectionType: true,
                     score: true,
                     cycleNumber: true,
                     itemsToInspect: true,
@@ -957,6 +958,8 @@ const getVendorDetails = async (req, res) => {
                     poNumber: true,
                     clientName: true,
                     scheduledDate: true,
+                    scheduledTime: true,     // assigned time slot — was omitted, so the card's clock rendered empty
+                    estimatedDuration: true, // expected length of the inspection
                     status: true,
                     priority: true,
                     cycleNumber: true,
@@ -1036,6 +1039,7 @@ const getActiveInspectionForVendor = async (req, res) => {
         const inspectionSelect = {
             id: true,
             status: true,
+            inspectionType: true, // so a continued inspection reuses its chosen type
             itemsToInspect: true,
             scheduledDate: true,
             scheduledTime: true,
@@ -1828,6 +1832,7 @@ const approveProductByQc = async (req, res) => {
 
         const { productId } = req.params;
         const { formData, checkerLatitude, checkerLongitude } = req.body;
+        const inspectionType = String(req.body.inspectionType).toUpperCase() === 'VIRTUAL' ? 'VIRTUAL' : 'PHYSICAL';
         const qcCheckerId = req.user.id;
 
         const product = await prisma.product.findFirst({
@@ -1864,13 +1869,14 @@ const approveProductByQc = async (req, res) => {
         }
 
         // ── Location verification — checker must be at the vendor factory ──
-        const { verifyCheckerAtVendor, buildLocationStamp } = require('../utils/locationUtils');
+        const { verifyCheckerAtVendor, buildLocationStamp, buildLocationSnapshot } = require('../utils/locationUtils');
         const geo = await verifyCheckerAtVendor({
             vendor: product.vendor,
             checkerLatitude,
             checkerLongitude,
             prisma,
             label: `approveProduct ${productId}`,
+            inspectionType,
         });
         if (!geo.ok) {
             return res.status(geo.status).json(geo.body);
@@ -1904,7 +1910,12 @@ const approveProductByQc = async (req, res) => {
             data: {
                 approvalStatus,
                 status: productStatus,
-                qcInspectionData: cleanFormData,
+                // Embed the checker's location alongside the form data. Product QC has
+                // no lat/lng columns, so this JSON is the only place the coordinates can
+                // live — and it's what the admin view and PDF report read.
+                qcInspectionData: cleanFormData
+                    ? { ...cleanFormData, inspectionType, checkerLocation: buildLocationSnapshot(geo, checkerLatitude, checkerLongitude) }
+                    : { inspectionType, checkerLocation: buildLocationSnapshot(geo, checkerLatitude, checkerLongitude) },
                 // Stamp the QC submission time so "Last Inspected" reflects the
                 // actual inspection date (approvedAt is only set later, on the
                 // admin's final decision).
@@ -1971,6 +1982,7 @@ const rejectProductByQc = async (req, res) => {
 
         const { productId } = req.params;
         const { reason, formData, checkerLatitude, checkerLongitude } = req.body;
+        const inspectionType = String(req.body.inspectionType).toUpperCase() === 'VIRTUAL' ? 'VIRTUAL' : 'PHYSICAL';
         const qcCheckerId = req.user.id;
 
         if (!reason) {
@@ -2011,13 +2023,14 @@ const rejectProductByQc = async (req, res) => {
         }
 
         // ── Location verification — checker must be at the vendor factory ──
-        const { verifyCheckerAtVendor, buildLocationStamp } = require('../utils/locationUtils');
+        const { verifyCheckerAtVendor, buildLocationStamp, buildLocationSnapshot } = require('../utils/locationUtils');
         const geo = await verifyCheckerAtVendor({
             vendor: product.vendor,
             checkerLatitude,
             checkerLongitude,
             prisma,
             label: `rejectProduct ${productId}`,
+            inspectionType,
         });
         if (!geo.ok) {
             return res.status(geo.status).json(geo.body);
@@ -2040,6 +2053,8 @@ const rejectProductByQc = async (req, res) => {
                 rejectionNotes: notes || null,
                 status: 'INACTIVE',
                 qcInspectionData: cleanFormData
+                    ? { ...cleanFormData, inspectionType, checkerLocation: buildLocationSnapshot(geo, checkerLatitude, checkerLongitude) }
+                    : { inspectionType, checkerLocation: buildLocationSnapshot(geo, checkerLatitude, checkerLongitude) }
             }
         });
 

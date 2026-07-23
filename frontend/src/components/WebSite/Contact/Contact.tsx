@@ -6,14 +6,23 @@ import Reveal from '@/components/WebSite/Shared/Reveal';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { enquiryService } from '@/services/enquiryService';
 import { contactEnquiryService } from '@/services/contactEnquiryService';
+import { HEAR_ABOUT_US_OPTIONS } from '@/lib/enquirySources';
+import Dropdown from '@/components/UI/Dropdown';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     subject: '',
-    message: ''
+    message: '',
+    hearAboutUs: '',
+    hearAboutUsOther: ''
   });
+
+  // The custom Dropdown is a button, not a form control, so native `required`
+  // can't validate it — this drives the inline error instead.
+  const [hearAboutUsError, setHearAboutUsError] = useState(false);
+  const [hearAboutUsOtherError, setHearAboutUsOtherError] = useState(false);
 
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [vendorFormData, setVendorFormData] = useState({
@@ -29,16 +38,31 @@ const Contact = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.hearAboutUs) {
+      setHearAboutUsError(true);
+      document.getElementById('hearAboutUs')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    // "Other" is only useful if they say what it was.
+    if (formData.hearAboutUs === 'other' && !formData.hearAboutUsOther.trim()) {
+      setHearAboutUsOtherError(true);
+      document.getElementById('hearAboutUsOther')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     try {
       await contactEnquiryService.submitEnquiry({
         name: formData.name,
         email: formData.email,
         subject: formData.subject,
-        message: formData.message
+        message: formData.message,
+        hearAboutUs: formData.hearAboutUs || undefined,
+        hearAboutUsOther: formData.hearAboutUs === 'other' ? formData.hearAboutUsOther.trim() : undefined
       });
-      
+
       // Reset form
-      setFormData({ name: '', email: '', subject: '', message: '' });
+      setFormData({ name: '', email: '', subject: '', message: '', hearAboutUs: '', hearAboutUsOther: '' });
+      setHearAboutUsError(false);
+      setHearAboutUsOtherError(false);
       showSuccessToast('Message Sent!', 'Thank you for your message! We will get back to you soon.');
     } catch (error: any) {
       console.error('Contact form error:', error);
@@ -46,7 +70,7 @@ const Contact = () => {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
@@ -261,6 +285,68 @@ const Contact = () => {
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-colors"
                     placeholder="What is this regarding?"
                   />
+                </div>
+
+                <div>
+                  <label htmlFor="hearAboutUs" className="block text-sm font-medium text-gray-700 mb-2">
+                    How Did You Hear About Us? *
+                  </label>
+                  {/* Shared Dropdown (same control as checkout / admin) — a native
+                      <select> renders the OS menu, which ignores the brand theme. */}
+                  <Dropdown
+                    id="hearAboutUs"
+                    value={formData.hearAboutUs}
+                    options={HEAR_ABOUT_US_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                    placeholder="Please select an option"
+                    onChange={(val) => {
+                      const next = val as string;
+                      setFormData((prev) => ({
+                        ...prev,
+                        hearAboutUs: next,
+                        // Drop any stale text when switching away from "Other".
+                        hearAboutUsOther: next === 'other' ? prev.hearAboutUsOther : '',
+                      }));
+                      setHearAboutUsError(false);
+                      setHearAboutUsOtherError(false);
+                    }}
+                    error={hearAboutUsError}
+                    // Match the sibling inputs exactly: no fill (the panel's
+                    // #f7f7f5 shows through) and the same gray-200 border. The
+                    // shared Dropdown defaults to bg-white / slate-300, so both
+                    // need overriding. The popup list stays white on its own.
+                    buttonClassName="py-3 rounded-xl !bg-transparent !border-gray-200"
+                  />
+                  {hearAboutUsError && (
+                    <p className="mt-1.5 text-sm text-[#e01a1b]">Please select an option.</p>
+                  )}
+
+                  {/* "Other" needs the actual answer, otherwise the bucket is
+                      meaningless in the source report. */}
+                  {formData.hearAboutUs === 'other' && (
+                    <div className="mt-3">
+                      <label htmlFor="hearAboutUsOther" className="block text-sm font-medium text-gray-700 mb-2">
+                        Please tell us how *
+                      </label>
+                      <input
+                        type="text"
+                        id="hearAboutUsOther"
+                        name="hearAboutUsOther"
+                        maxLength={200}
+                        value={formData.hearAboutUsOther}
+                        onChange={(e) => {
+                          handleChange(e);
+                          if (e.target.value.trim()) setHearAboutUsOtherError(false);
+                        }}
+                        className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-colors ${
+                          hearAboutUsOtherError ? 'border-[#e01a1b] bg-red-50/40' : 'border-gray-200'
+                        }`}
+                        placeholder="e.g. Saw your stall at a local market"
+                      />
+                      {hearAboutUsOtherError && (
+                        <p className="mt-1.5 text-sm text-[#e01a1b]">Please tell us how you heard about us.</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>

@@ -165,6 +165,12 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
       productName: product.name,
       vendorName: product.vendor?.companyName || fd.vendor,
       checker: assignedQc || null,
+      // Coordinates recorded when the CHECKER submitted, read from the stored
+      // snapshot — never the viewer's own position.
+      inspectionType: fd.inspectionType,
+      location: fd.checkerLocation?.checkerLatitude != null
+          ? { latitude: fd.checkerLocation.checkerLatitude, longitude: fd.checkerLocation.checkerLongitude }
+          : undefined,
       generatedAt: new Date(),
     }
     try {
@@ -243,6 +249,12 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
         productName: product.name,
         vendorName: product.vendor?.companyName || fd.vendor,
         checker: assignedQc || null,
+        // Coordinates recorded when the CHECKER submitted, read from the stored
+        // snapshot — never the viewer's own position.
+        inspectionType: fd.inspectionType,
+        location: fd.checkerLocation?.checkerLatitude != null
+            ? { latitude: fd.checkerLocation.checkerLatitude, longitude: fd.checkerLocation.checkerLongitude }
+            : undefined,
         inspectionStartedAt: fd.inspectionStartedAt,
         generatedAt: new Date(),
       }

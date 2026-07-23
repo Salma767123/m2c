@@ -23,6 +23,8 @@ import {
 import { qcCheckerService } from "@/services/qcCheckerService"
 import { formatCheckerName } from "@/lib/checkerUtils"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
+import { captureCoordsForSubmit, type InspectionType } from "@/lib/checkerLocation"
+import InspectionTypeDialog from "@/components/Checker/Vendor/InspectionTypeDialog"
 import {
     validateStep,
     validateAll,
@@ -41,6 +43,9 @@ type Step = ValidationStep
 // localStorage quota — when the full save fails we fall back to a lighter draft
 // that keeps all answers/text and drops the photo blobs (they must be re-added).
 const draftKeyFor = (productId: string) => `m2c:pi-draft:${productId}`
+// The chosen inspection type is persisted separately from the form draft so a reload
+// mid-inspection doesn't re-prompt (and doesn't lose the choice).
+const typeKeyFor = (productId: string) => `m2c:pi-type:${productId}`
 
 // Deep-strip base64 data URIs (photos + drawn signatures) from a value, keeping
 // structure and all text so the lighter fallback draft still restores progress.
@@ -89,6 +94,13 @@ export default function ProductInspectionForm({
     const [reviewMode, setReviewMode] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [errors, setErrors] = useState<AllErrors>({})
+    // Physical vs virtual — chosen in the mandatory dialog before the form is usable.
+    const [inspectionType, setInspectionType] = useState<InspectionType | null>(() => {
+        try {
+            const v = typeof window !== "undefined" ? window.localStorage.getItem(typeKeyFor(productId)) : null
+            return v === "PHYSICAL" || v === "VIRTUAL" ? v : null
+        } catch { return null }
+    })
 
     // ── Exit-confirmation guard ───────────────────────────────────────────────
     const [showExitConfirm, setShowExitConfirm] = useState(false)
@@ -452,16 +464,25 @@ export default function ProductInspectionForm({
             // explicit "Rejected" hits the reject endpoint; "Approved",
             // "On Hold" and "Re-Inspection" go through approve, which derives
             // the final approvalStatus from inspectionStatus on the backend.
+            // Capture the device GPS before submitting — for a PHYSICAL inspection.
+            // captureCoordsForSubmit returns null for a virtual one, so no location is
+            // captured or validated; the geofence is skipped end to end.
+            const type: InspectionType = inspectionType ?? "PHYSICAL"
+            const coords = await captureCoordsForSubmit(type)
+
             if (formData.inspectionStatus === "Rejected") {
                 const reason = (formData.reviewerRemarks || "").trim() || "Rejected during QC product inspection"
-                await qcCheckerService.rejectProduct(productId, reason, cleanedData)
+                await qcCheckerService.rejectProduct(productId, reason, cleanedData, coords, type)
             } else {
-                await qcCheckerService.approveProduct(productId, cleanedData)
+                await qcCheckerService.approveProduct(productId, cleanedData, coords, type)
             }
 
             allowLeaveRef.current = true
-            // Inspection submitted — the draft is no longer needed.
-            try { window.localStorage.removeItem(draftKeyFor(productId)) } catch { /* ignore */ }
+            // Inspection submitted — the draft and the saved type are no longer needed.
+            try {
+                window.localStorage.removeItem(draftKeyFor(productId))
+                window.localStorage.removeItem(typeKeyFor(productId))
+            } catch { /* ignore */ }
             showSuccessToast("Success", "Product inspection submitted successfully.")
             onComplete()
         } catch (error: any) {
@@ -474,6 +495,18 @@ export default function ProductInspectionForm({
     // ── Render ────────────────────────────────────────────────────────────────
     return (
         <div ref={rootRef} className="min-h-screen font-sans bg-[#f7f7f5]">
+            {/* Mandatory type selection — shown until the checker chooses. Cancelling
+                backs out of the inspection. */}
+            {!inspectionType && (
+                <InspectionTypeDialog
+                    subjectName={productName}
+                    onSelect={(type) => {
+                        setInspectionType(type)
+                        try { window.localStorage.setItem(typeKeyFor(productId), type) } catch { /* ignore */ }
+                    }}
+                    onCancel={() => { (onCancel ?? onComplete)() }}
+                />
+            )}
             <div className="p-8 max-w-5xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">

@@ -6,7 +6,9 @@ import {
   ArrowLeft,
   Calendar,
   Clock,
+  Timer,
   MapPin,
+  Video,
   Factory,
   Phone,
   Mail,
@@ -37,6 +39,19 @@ import { isDocImageUrl, downloadDoc } from "@/lib/docDownload"
 import DocViewerModal from "@/components/UI/DocViewerModal"
 import { FACILITY_META, withUnit } from "./Steps/VI_Step5_Manufacturing"
 import { Country } from "country-state-city"
+
+// Present an estimatedDuration for reading. The field is a free string: sometimes it
+// already carries a unit ("6 hours", "1 Hour"), sometimes it's a bare number ("6").
+// A bare number is hours — the deadline logic treats it that way — so label it.
+function formatDuration(raw?: string | null): string {
+  if (!raw) return ''
+  const s = String(raw).trim()
+  if (!s) return ''
+  if (/[a-z]/i.test(s)) return s // already has a unit
+  const n = parseFloat(s)
+  if (Number.isNaN(n)) return s
+  return `${n} ${n === 1 ? 'hour' : 'hours'}`
+}
 
 // Map country name → ISO code so we can render flag *images* (via flagcdn).
 // Flag emoji don't render on Windows, which shows the bare ISO letters instead.
@@ -393,6 +408,10 @@ export default function VendorDetail({
           { key: "factoryState", label: "State", condition: fullVendor.factoryState },
           { key: "factoryZipCode", label: "ZIP / Postal Code", condition: fullVendor.factoryZipCode },
           { key: "factoryCountry", label: "Country", condition: fullVendor.factoryCountry },
+          // The coordinates this inspection is geofenced against. Shown so a checker
+          // can see up front whether location verification will apply here.
+          { key: "factoryLatitude", label: "Latitude", condition: fullVendor.factoryLatitude != null },
+          { key: "factoryLongitude", label: "Longitude", condition: fullVendor.factoryLongitude != null },
         ]
       },
       {
@@ -1355,6 +1374,11 @@ export default function VendorDetail({
                   })()}
                 </div>
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-slate-600">
+                  <span className="inline-flex items-center gap-1 font-medium text-slate-700">
+                    {String(insp.inspectionType).toUpperCase() === 'VIRTUAL'
+                      ? <><Video className="w-3.5 h-3.5 text-sky-500" /> Virtual</>
+                      : <><MapPin className="w-3.5 h-3.5 text-slate-400" /> Physical</>}
+                  </span>
                   <span>
                     Scheduled: {insp.scheduledDate}
                     {insp.scheduledTime ? ` at ${formatTime12(insp.scheduledTime)}` : ''}
@@ -1409,15 +1433,25 @@ export default function VendorDetail({
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-6 text-sm text-slate-600">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    <span>{inspection.scheduledDate}</span>
+                <div className="flex items-center gap-x-6 gap-y-2 text-sm text-slate-600 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-slate-400" />
+                    <span>{inspection.scheduledDate || 'Date not set'}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    <span>{formatTime12(inspection.scheduledTime)}</span>
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-slate-400" />
+                    <span>
+                      {inspection.scheduledTime
+                        ? formatTime12(inspection.scheduledTime)
+                        : 'Time not set'}
+                    </span>
                   </div>
+                  {formatDuration(inspection.estimatedDuration) && (
+                    <div className="flex items-center gap-1.5">
+                      <Timer className="w-4 h-4 text-slate-400" />
+                      <span>{formatDuration(inspection.estimatedDuration)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )) : <p className="text-sm text-slate-500 text-center py-8">No pending inspections found.</p>}

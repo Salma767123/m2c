@@ -113,7 +113,14 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
     state = '',
     country = 'United States',
     currency = '$',
+    // Settings-driven (Admin → Settings → Company Website); falls back to the
+    // brand domain so every invoice carries a way back to the store.
+    companyWebsite = 'www.m2cmarkdowns.com',
   } = adminSettings;
+
+  // Show the domain bare (no scheme) but link it with one.
+  const websiteDisplay = String(companyWebsite || '').replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+  const websiteHref = websiteDisplay ? `https://${websiteDisplay}` : '';
 
   // Fallback to website logo if no custom company logo is set
   if (!companyLogo) {
@@ -332,6 +339,7 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
       <div style="font-size:13px; font-weight:600; color:#1a1a1a; margin-bottom:4px;">Thank you for shopping with ${escapeHtml(companyName)}!</div>
       <div style="font-size:11px; color:#9ca3af;">This is a computer generated invoice and does not require a signature.</div>
       ${gstNumber ? `<div style="font-size:11px; color:#9ca3af; margin-top:3px;">GSTIN: ${escapeHtml(gstNumber)}${(state || country) ? ` | ${escapeHtml([state, country].filter(Boolean).join(', '))}` : ''}</div>` : ''}
+      ${websiteDisplay ? `<div style="font-size:11px; margin-top:6px;"><a href="${escapeHtml(websiteHref)}" style="color:#e01a1b; text-decoration:none; font-weight:600;">${escapeHtml(websiteDisplay)}</a></div>` : ''}
     </div>
   </div>
 </body>

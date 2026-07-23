@@ -1,9 +1,23 @@
 const { prisma } = require('../config/database');
 
+// Accepted "How did you hear about us?" slugs. Mirrors
+// frontend/src/lib/enquirySources.ts — keep both in sync. Stored verbatim so
+// enquiries can be grouped by source in reports.
+const HEAR_ABOUT_US_VALUES = [
+    'search_engine',
+    'social_media',
+    'referral',
+    'existing_customer',
+    'advertisement',
+    'trade_show',
+    'email_newsletter',
+    'other',
+];
+
 // Public: Submit a contact enquiry (from Contact Us page)
 const submitContactEnquiry = async (req, res) => {
     try {
-        const { name, email, phone, subject, message } = req.body;
+        const { name, email, phone, subject, message, hearAboutUs, hearAboutUsOther } = req.body;
 
         if (!name || !email || !subject || !message) {
             return res.status(400).json({
@@ -12,6 +26,15 @@ const submitContactEnquiry = async (req, res) => {
             });
         }
 
+        // Only persist a recognised attribution slug — free-form values would
+        // fragment the source report. Anything unknown falls back to null.
+        const source = HEAR_ABOUT_US_VALUES.includes(hearAboutUs) ? hearAboutUs : null;
+        // Free text is only meaningful for "other"; anything else is discarded so
+        // it can't contradict the selected source. Capped to keep the field sane.
+        const sourceOther = source === 'other' && typeof hearAboutUsOther === 'string'
+            ? hearAboutUsOther.trim().slice(0, 200) || null
+            : null;
+
         const enquiry = await prisma.contactEnquiry.create({
             data: {
                 name,
@@ -19,6 +42,8 @@ const submitContactEnquiry = async (req, res) => {
                 phone: phone || null,
                 subject,
                 message,
+                hearAboutUs: source,
+                hearAboutUsOther: sourceOther,
                 status: 'new'
             }
         });
@@ -179,13 +204,29 @@ const deleteContactEnquiry = async (req, res) => {
 // Admin: Get enquiry statistics
 const getContactEnquiryStats = async (req, res) => {
     try {
-        const [total, newCount, readCount, repliedCount, closedCount] = await Promise.all([
+        // Per-source counts drive the "How did you hear about us?" report. Counted
+        // with one query per known slug rather than groupBy: on MongoDB an enquiry
+        // created before this field exists has no `hearAboutUs` key at all (absent
+        // ≠ null), so grouping would misreport. "Unspecified" is derived from the
+        // total, which covers both legacy rows and blank submissions.
+        const [total, newCount, readCount, repliedCount, closedCount, ...sourceCounts] = await Promise.all([
             prisma.contactEnquiry.count(),
             prisma.contactEnquiry.count({ where: { status: 'new' } }),
             prisma.contactEnquiry.count({ where: { status: 'read' } }),
             prisma.contactEnquiry.count({ where: { status: 'replied' } }),
-            prisma.contactEnquiry.count({ where: { status: 'closed' } })
+            prisma.contactEnquiry.count({ where: { status: 'closed' } }),
+            ...HEAR_ABOUT_US_VALUES.map((value) =>
+                prisma.contactEnquiry.count({ where: { hearAboutUs: value } })
+            ),
         ]);
+
+        const bySource = {};
+        let attributed = 0;
+        HEAR_ABOUT_US_VALUES.forEach((value, i) => {
+            bySource[value] = sourceCounts[i];
+            attributed += sourceCounts[i];
+        });
+        bySource.unspecified = Math.max(0, total - attributed);
 
         res.json({
             success: true,
@@ -194,7 +235,8 @@ const getContactEnquiryStats = async (req, res) => {
                 new: newCount,
                 read: readCount,
                 replied: repliedCount,
-                closed: closedCount
+                closed: closedCount,
+                bySource
             }
         });
     } catch (error) {
@@ -206,8 +248,51 @@ const getContactEnquiryStats = async (req, res) => {
     }
 };
 
+// Admin: "How did you hear about us?" breakdown for the Analytics page.
+// Period-aware so it honours the Analytics period selector.
+const getContactEnquirySourceReport = async (req, res) => {
+    try {
+        const { period = '30days' } = req.query;
+        const now = Date.now();
+        const DAY = 24 * 60 * 60 * 1000;
+        let startDate;
+        switch (period) {
+            case 'today': startDate = new Date(new Date().setHours(0, 0, 0, 0)); break;
+            case '7days': startDate = new Date(now - 7 * DAY); break;
+            case '3months': startDate = new Date(now - 90 * DAY); break;
+            case '6months': startDate = new Date(now - 180 * DAY); break;
+            case '1year': startDate = new Date(now - 365 * DAY); break;
+            case 'all': startDate = null; break;
+            default: startDate = new Date(now - 30 * DAY); break;
+        }
+        const where = startDate ? { createdAt: { gte: startDate } } : {};
+
+        // One count per known slug (see getContactEnquiryStats for why groupBy is
+        // avoided on MongoDB); "unspecified" is derived from the period total.
+        const [total, ...counts] = await Promise.all([
+            prisma.contactEnquiry.count({ where }),
+            ...HEAR_ABOUT_US_VALUES.map((value) =>
+                prisma.contactEnquiry.count({ where: { ...where, hearAboutUs: value } })
+            ),
+        ]);
+
+        let attributed = 0;
+        const sources = HEAR_ABOUT_US_VALUES.map((value, i) => {
+            attributed += counts[i];
+            return { value, count: counts[i] };
+        });
+        sources.push({ value: 'unspecified', count: Math.max(0, total - attributed) });
+
+        res.json({ success: true, data: { period, total, sources } });
+    } catch (error) {
+        console.error('Error building enquiry source report:', error);
+        res.status(500).json({ success: false, message: 'Failed to build source report' });
+    }
+};
+
 module.exports = {
     submitContactEnquiry,
+    getContactEnquirySourceReport,
     getAllContactEnquiries,
     getContactEnquiryById,
     updateContactEnquiryStatus,

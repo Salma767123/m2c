@@ -1,4 +1,5 @@
 const { prisma } = require('../config/database');
+const { REFERRAL_SOURCE_LABELS } = require('../utils/referralSources');
 
 // Helper: get date range based on period string
 const getDateRange = (period) => {
@@ -475,6 +476,7 @@ const getVendorsReport = async (req, res) => {
             allVendors,
             topVendors,
             newVendors,
+            referralGroups,
         ] = await Promise.all([
             prisma.vendor.count({ where: { status: 'APPROVED' } }),
             prisma.orderItem.groupBy({
@@ -487,7 +489,39 @@ const getVendorsReport = async (req, res) => {
                 take: 10,
             }),
             prisma.vendor.count({ where: { createdAt: { gte: start, lte: end } } }),
+            // Acquisition channels are deliberately ALL-TIME, not period-scoped:
+            // "where do most vendors come from" is a lifetime question, and a
+            // 30-day window would render a near-empty chart on most days.
+            prisma.vendor.groupBy({
+                by: ['referralSource'],
+                _count: { id: true },
+            }),
         ]);
+
+        // Shape for the chart. Vendors registered before this field existed have a
+        // null source — surfaced honestly as "Not recorded" rather than dropped, so
+        // the totals still reconcile against the vendor count.
+        const REFERRAL_COLORS = {
+            'google': '#4285f4',
+            'online-ads': '#f59e0b',
+            'linkedin': '#0a66c2',
+            'instagram': '#e1306c',
+            'facebook': '#1877f2',
+            'youtube': '#ff0000',
+            'referral': '#10b981',
+            'trade-show': '#8b5cf6',
+            'others': '#6b7280',
+        };
+        const referralSourceData = referralGroups
+            .map((g) => ({
+                key: g.referralSource || 'not-recorded',
+                name: g.referralSource
+                    ? (REFERRAL_SOURCE_LABELS[g.referralSource] || g.referralSource)
+                    : 'Not recorded',
+                value: g._count.id,
+                color: g.referralSource ? (REFERRAL_COLORS[g.referralSource] || '#6b7280') : '#cbd5e1',
+            }))
+            .sort((a, b) => b.value - a.value);
 
         res.json({
             success: true,
@@ -495,6 +529,9 @@ const getVendorsReport = async (req, res) => {
                 metrics: {
                     totalActive: allVendors,
                     newThisPeriod: newVendors,
+                },
+                charts: {
+                    referralSourceData,
                 },
                 tables: {
                     topVendors: topVendors.map((v, i) => ({
@@ -716,6 +753,7 @@ const getQcFactoryReports = async (req, res) => {
                     id: true,
                     status: true,
                     result: true,
+                    inspectionType: true,
                     createdAt: true,
                     completedAt: true,
                     vendor: { select: { id: true, vendorCode: true, companyName: true, email: true } },

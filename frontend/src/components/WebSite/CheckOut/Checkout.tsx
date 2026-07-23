@@ -14,7 +14,7 @@ import {
   ShoppingBag
 } from "lucide-react"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
-import { formatPrice, getCurrency, getRegionalPrice, convertUSDtoINR } from '@/lib/currency'
+import { formatPrice, getCurrency, getRegionalPrice, convertUSDtoINR, convertINRtoUSD } from '@/lib/currency'
 import bagTypeService from "@/services/bagTypeService"
 import ShippingForm from "./CheckoutProcess/ShippingForm"
 import PaymentForm from "./CheckoutProcess/PaymentForm"
@@ -365,6 +365,13 @@ export default function Checkout() {
   // True when Step 1 can proceed: either a saved address is selected, or the new-address form is valid.
   const canAdvanceShipping = useNewAddress ? shippingValid : !!selectedAddressId
 
+  // The server rejects an order whose line has an unresolved shipping mode, so
+  // block here too — reaching /checkout directly must not bypass the cart's choice.
+  const itemsMissingTransport = cartItems.filter((item) => {
+    const types = (item.product as any)?.logisticsConfig?.transportTypes
+    return Array.isArray(types) && types.length > 1 && !(item as any).transportType
+  })
+
   // If the user opted to save a new address to the address book, persist it before advancing.
   // A save failure is surfaced but does NOT block checkout — the user should still be able to complete the order.
   const handleShippingStepAdvance = async () => {
@@ -486,23 +493,40 @@ export default function Checkout() {
   }
 
   const calculateTotals = () => {
-    const subtotal = cartItems.reduce((sum, item) => sum + (getItemPrice(item) * item.quantity), 0)
-    // Calculate logistics-based shipping from product configs
-    let logisticsShipping = 0;
+    // Round PER LINE, exactly as the server does (orderController: each itemTotal
+    // is round2'd before being added to subtotal). Summing raw floats here and
+    // rounding once at the end drifts a cent or two from the server's figure —
+    // and since this total is what Razorpay charges while the server's is what
+    // the invoice states, that gap is a real payment/invoice mismatch.
+    const r2line = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
+    const subtotal = cartItems.reduce((sum, item) => sum + r2line(getItemPrice(item) * item.quantity), 0)
+    // Calculate logistics-based shipping from product configs. The per-kg rates
+    // are stored in RUPEES, so a USD order must convert — otherwise a ₹50 charge
+    // would display as $50. Mirrors utils/logistics.js on the server, which is
+    // what actually charges it.
+    let logisticsShippingInr = 0;
     if (!freeShippingApplied) {
       for (const item of cartItems) {
         const config = (item.product as any)?.logisticsConfig;
         if (config) {
-          const result = calculateLogistics(config as LogisticsConfig, item.quantity);
-          logisticsShipping += result.totalShippingCost;
+          // Price with the mode chosen in the cart; fall back to the only option
+          // when there is no choice. Matches orderController's resolution exactly.
+          const types = Array.isArray(config.transportTypes) ? config.transportTypes : [];
+          const mode = ((item as any).transportType || types[0]) as 'AIR' | 'SHIP' | undefined;
+          const result = calculateLogistics(config as LogisticsConfig, item.quantity, mode);
+          logisticsShippingInr += result.totalShippingCost;
         }
       }
     }
-    const shipping = freeShippingApplied ? 0 : logisticsShipping;
+    const shipping = freeShippingApplied
+      ? 0
+      : r2line(getCurrency() === 'USD' ? convertINRtoUSD(logisticsShippingInr) : logisticsShippingInr);
+    // Same per-line rounding and same base (the rounded line total) the server
+    // uses, so the tax shown here equals the tax the server will store.
     const tax = cartItems.reduce((sum, item) => {
-      const itemSubtotal = getItemPrice(item) * item.quantity
+      const itemSubtotal = r2line(getItemPrice(item) * item.quantity)
       const gstRate = item.product?.gstPercentage ? item.product.gstPercentage / 100 : 0
-      return sum + (itemSubtotal * gstRate)
+      return sum + r2line(itemSubtotal * gstRate)
     }, 0)
 
     // Round every component to 2dp BEFORE summing, mirroring the server
@@ -689,6 +713,10 @@ export default function Checkout() {
         discount: orderSummary.discount,
         freeShipping: freeShippingApplied,
         bagTypeId: selectedBagTypeId || undefined,
+        // Required: the server re-validates this coupon and derives the discount
+        // from it. Omitting it makes the server compute a zero discount, which
+        // then fails the payment-amount reconciliation.
+        couponCode: couponCode || undefined,
         currency: getCurrency(),
       })
 
@@ -968,6 +996,7 @@ export default function Checkout() {
                         item.product?.inStock === false ||
                         (item.product?.availableStock !== undefined && item.quantity > item.product?.availableStock)
                       ) ||
+                      itemsMissingTransport.length > 0 ||
                       (currentStep === 1 && !canAdvanceShipping)
                     }
                     className="btn-shine px-5 sm:px-6 lg:px-8 py-2.5 sm:py-3 bg-[#e01a1b] hover:bg-[#c41617] text-white font-semibold rounded-full transition-all duration-300 hover:-translate-y-0.5 shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center gap-2 text-sm sm:text-base"
@@ -975,6 +1004,15 @@ export default function Checkout() {
                     {placingOrder && <Loader2 className="w-4 h-4 animate-spin" />}
                     {currentStep === 3 ? (placingOrder ? "Placing Order..." : "Place Order") : "Continue"}
                   </button>
+                  {/* A disabled button with no reason is a dead end — say what's wrong
+                      and where to fix it. */}
+                  {itemsMissingTransport.length > 0 && (
+                    <p className="text-xs text-amber-700 mt-2 text-right">
+                      Choose a shipping method for{" "}
+                      {itemsMissingTransport.map((i) => i.product?.name).filter(Boolean).join(", ")} in your{" "}
+                      <Link href="/cart" className="font-semibold underline">cart</Link>.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1072,22 +1110,6 @@ export default function Checkout() {
                     <span className="text-slate-600">Tax (GST)</span>
                     <span className="font-medium">{formatPrice(orderSummary.tax)}</span>
                   </div>
-                  {/* GST Breakdown by Product */}
-                  {cartItems.some(item => item.product?.gstPercentage) && (
-                    <div className="pl-4 space-y-1">
-                      {cartItems.map((item) => {
-                        if (!item.product?.gstPercentage) return null
-                        const itemSubtotal = item.price * item.quantity
-                        const itemTax = itemSubtotal * (item.product.gstPercentage / 100)
-                        return (
-                          <div key={item.id} className="flex justify-between text-xs text-slate-500">
-                            <span className="truncate max-w-[150px]">{item.product.name} ({item.product.gstPercentage}%)</span>
-                            <span>{formatPrice(itemTax)}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
                   {orderSummary.discount > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Discount</span>

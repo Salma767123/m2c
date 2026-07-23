@@ -151,6 +151,9 @@ export interface CreateOrderParams {
     discount?: number;
     freeShipping?: boolean;
     bagTypeId?: string;
+    /** Coupon code, if one was applied. The server re-validates it and derives the
+     *  discount itself — the client's discount figure is advisory only. */
+    couponCode?: string;
     currency?: string;
 }
 

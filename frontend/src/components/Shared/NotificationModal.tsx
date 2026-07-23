@@ -6,6 +6,7 @@ import {
   Bell, X, CheckCheck, ArrowLeft, Search,
   Check, Package, CreditCard, Star, AlertCircle, ShoppingCart,
   Calendar, Factory,
+  Handshake,
 } from 'lucide-react'
 import { notificationService, AppNotification } from '@/services/notificationService'
 
@@ -48,9 +49,17 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   INSPECTION_SUBMITTED:          <Check        className="h-5 w-5 text-teal-600" />,
   REINSPECTION_COMPLETED:        <Check        className="h-5 w-5 text-green-600" />,
   INSPECTION_FINAL_REJECTED:     <AlertCircle  className="h-5 w-5 text-red-600" />,
+  PRICE_NEGOTIATION_OFFER:       <Handshake    className="h-5 w-5 text-purple-600" />,
+  PRICE_NEGOTIATION_COUNTER:     <Handshake    className="h-5 w-5 text-amber-600" />,
+  PRICE_NEGOTIATION_ACCEPTED:    <Check        className="h-5 w-5 text-green-600" />,
+  PRICE_NEGOTIATION_REJECTED:    <AlertCircle  className="h-5 w-5 text-red-600" />,
 }
 
 const BG_MAP: Record<string, string> = {
+  PRICE_NEGOTIATION_OFFER: 'bg-purple-50',
+  PRICE_NEGOTIATION_COUNTER: 'bg-amber-50',
+  PRICE_NEGOTIATION_ACCEPTED: 'bg-green-50',
+  PRICE_NEGOTIATION_REJECTED: 'bg-red-50',
   ORDER_RECEIVED: 'bg-blue-50', ORDER_CONFIRMED: 'bg-green-50',
   ORDER_IN_TRANSIT_TO_ADMIN_HUB: 'bg-blue-50', ORDER_RECEIVED_AT_ADMIN_HUB: 'bg-teal-50',
   ORDER_SHIPPED_TO_CUSTOMER: 'bg-purple-50', ORDER_DELIVERED: 'bg-green-50',
@@ -84,7 +93,8 @@ export interface CategoryDef {
 /** Default categories shown in Vendor / Admin panels */
 export const DEFAULT_CATEGORIES: CategoryDef[] = [
   { key: 'orders', label: 'Orders', types: ['ORDER_RECEIVED','ORDER_CONFIRMED','ORDER_IN_TRANSIT_TO_ADMIN_HUB','ORDER_RECEIVED_AT_ADMIN_HUB','ORDER_SHIPPED_TO_CUSTOMER','ORDER_DELIVERED','ORDER_CANCELLED','NEW_ORDER','ORDER_STATUS_CHANGE','ORDER_RETURNED','ORDER_VENDOR_PROCESSING','ORDER_APPROVED_BY_ADMIN_HUB'] },
-  { key: 'products', label: 'Products', types: ['PRODUCT_APPROVED','PRODUCT_REJECTED','REINSPECTION_REQUIRED','QC_ASSIGNED','PRODUCT_PENDING_APPROVAL','INSPECTION_COMPLETED','REINSPECTION_RESULT','LOW_STOCK_ALERT','OUT_OF_STOCK'] },
+  { key: 'products', label: 'Products', types: ['PRODUCT_APPROVED','PRODUCT_REJECTED','REINSPECTION_REQUIRED','QC_ASSIGNED','PRODUCT_PENDING_APPROVAL','INSPECTION_COMPLETED','INSPECTION_EXPIRED','REINSPECTION_RESULT','LOW_STOCK_ALERT','OUT_OF_STOCK'] },
+  { key: 'pricing', label: 'Pricing', types: ['PRICE_NEGOTIATION_OFFER','PRICE_NEGOTIATION_COUNTER','PRICE_NEGOTIATION_ACCEPTED','PRICE_NEGOTIATION_REJECTED'] },
   { key: 'payments', label: 'Payments', types: ['PAYMENT_RECEIVED','PAYMENT_OVERDUE'] },
   { key: 'support', label: 'Support', types: ['SUPPORT_REPLY','NEW_SUPPORT_TICKET','NEW_ENQUIRY','REVIEW_RECEIVED'] },
   { key: 'system', label: 'System', types: ['VENDOR_STATUS_CHANGED','NEW_VENDOR_REGISTRATION'] },
@@ -119,11 +129,16 @@ export const USER_CATEGORIES: CategoryDef[] = [
 /** Categories relevant to the Quality Checker workflow */
 export const QC_CATEGORIES: CategoryDef[] = [
   { key: 'assignments', label: 'Assignments', types: ['VENDOR_ASSIGNED','PRODUCT_ASSIGNED','QC_ASSIGNED'] },
-  { key: 'inspections', label: 'Inspections', types: ['INSPECTION_SCHEDULED','REINSPECTION_RAISED','INSPECTION_COMPLETED','INSPECTION_SUBMITTED','REINSPECTION_COMPLETED','INSPECTION_FINAL_REJECTED','REINSPECTION_REQUIRED','REINSPECTION_RESULT'] },
+  // INSPECTION_REMINDER / INSPECTION_EXPIRED are the scheduling notifications a
+  // checker receives (1-hour-before reminder + missed-window expiry) — they live
+  // here rather than in a standalone tab.
+  { key: 'inspections', label: 'Inspections', types: ['INSPECTION_SCHEDULED','INSPECTION_REMINDER','INSPECTION_EXPIRED','REINSPECTION_RAISED','INSPECTION_COMPLETED','INSPECTION_SUBMITTED','REINSPECTION_COMPLETED','INSPECTION_FINAL_REJECTED','REINSPECTION_REQUIRED','REINSPECTION_RESULT'] },
   { key: 'vendor_status', label: 'Vendor Status', types: ['VENDOR_STATUS_CHANGED'] },
   { key: 'approvals', label: 'Approvals', types: ['PRODUCT_APPROVED','PRODUCT_PENDING_APPROVAL'] },
   { key: 'rejections', label: 'Rejections', types: ['PRODUCT_REJECTED','INSPECTION_FINAL_REJECTED'] },
-  { key: 'support', label: 'Support', types: ['SUPPORT_REPLY','NEW_SUPPORT_TICKET','NEW_ENQUIRY'] },
+  // 'Support' tab removed — a QC checker never receives SUPPORT_REPLY (that goes
+  // to vendors/users) or NEW_SUPPORT_TICKET / NEW_ENQUIRY (admin-only), so the
+  // tab was permanently empty.
 ]
 
 function timeAgo(dateStr: string): string {

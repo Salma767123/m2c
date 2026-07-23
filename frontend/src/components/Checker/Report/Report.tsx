@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import {
   CheckCircle, XCircle,
-  Factory, Package, Search, X, ChevronLeft, ChevronRight, RotateCw,
+  Factory, Package, Search, X, ChevronLeft, ChevronRight, RotateCw, MapPin, Video,
 } from "lucide-react"
 import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalendar"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -215,6 +215,7 @@ export default function ReportsPage() {
       inspectionDate: fmtDate(insp.completedAt || insp.scheduledDate),
       priority: insp.priority || "—",
       result: insp.result || "—",
+      inspectionType: insp.inspectionType,
     }
   }
 
@@ -390,8 +391,9 @@ export default function ReportsPage() {
               <Table>
                 <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50">
                   <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
-                    <TableHead className="w-[24%] font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
-                    <TableHead className="w-[20%] font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor ID</TableHead>
+                    <TableHead className="w-[22%] font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                    <TableHead className="w-[10%] font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Type</TableHead>
+                    <TableHead className="w-[18%] font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor ID</TableHead>
                     <TableHead className="w-[15%] font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Assigned Date</TableHead>
                     <TableHead className="w-[15%] font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Completed On</TableHead>
                     <TableHead className="w-[13%] font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Priority</TableHead>
@@ -407,6 +409,13 @@ export default function ReportsPage() {
                           <div className="font-medium text-slate-900">{row.vendor}</div>
                         </TableCell>
                         <TableCell className="text-slate-500 text-xs font-mono truncate" title={row.vendorId}>{row.vendorId}</TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600">
+                            {String(row.inspectionType).toUpperCase() === 'VIRTUAL'
+                              ? <><Video className="w-3.5 h-3.5 text-sky-500" /> Virtual</>
+                              : <><MapPin className="w-3.5 h-3.5 text-slate-400" /> Physical</>}
+                          </span>
+                        </TableCell>
                         <TableCell className="text-slate-600 text-sm">{row.assignedDate}</TableCell>
                         <TableCell className="text-slate-600 text-sm">{row.inspectionDate}</TableCell>
                         <TableCell>{getPriorityBadge(row.priority)}</TableCell>

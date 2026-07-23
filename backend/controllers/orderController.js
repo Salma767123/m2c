@@ -6,6 +6,8 @@ const { notifications } = require('../utils/notificationService');
 const { checkAndAlertLowStock } = require('../utils/lowStockAlert');
 const { withRetry } = require('../utils/dbRetry');
 const { resolveUsdRate, toINR, resolveUnitPrice } = require('../utils/orderCurrency');
+const { evaluateCoupon } = require('../utils/couponPricing');
+const { calculateLogistics, convertShippingToOrderCurrency, qualifiesForFreeShipping } = require('../utils/logistics');
 
 /** Round a money value to 2 decimals, avoiding float artefacts (e.g. 115.19999). */
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -47,14 +49,27 @@ const createOrder = async (req, res) => {
         // generateInvoiceNo is intentionally NOT included here — it mutates the
         // invoice-sequence counter, so we only call it after all validation
         // passes (otherwise a rejected request would burn an invoice number).
-        const needsRazorpayVerification = Boolean(razorpayOrderId && razorpaySignature && paymentId);
+        // Any non-COD order MUST carry a verifiable payment. This used to be
+        // opt-in (`razorpayOrderId && razorpaySignature && paymentId`), which meant
+        // POSTing an order with no payment fields skipped verification entirely and
+        // still got written `paymentStatus: 'PAID'` below.
+        const isPrepaid = paymentMethod !== 'COD';
+        const needsRazorpayVerification = isPrepaid;
+        if (isPrepaid && !(razorpayOrderId && razorpaySignature && paymentId)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Payment verification failed - missing payment details'
+            });
+        }
 
         const [cart, user, bagType, paymentSettings, existingOrderForPayment] = await Promise.all([
             prisma.cart.findFirst({ where: { userId }, include: { items: true } }),
             prisma.user.findUnique({ where: { id: userId } }),
             bagTypeId ? prisma.bagType.findUnique({ where: { id: bagTypeId } }) : Promise.resolve(null),
             needsRazorpayVerification
-                ? prisma.paymentSettings.findFirst({ select: { razorpayKeySecret: true } })
+                // keyId is needed as well: the amount reconciliation below fetches the
+                // Razorpay order to confirm the customer actually paid this cart's total.
+                ? prisma.paymentSettings.findFirst({ select: { razorpayKeyId: true, razorpayKeySecret: true } })
                 : Promise.resolve(null),
             // Idempotency guard: a gateway payment id can only ever produce one
             // order. If the client retries after a network failure (response
@@ -125,6 +140,13 @@ const createOrder = async (req, res) => {
         // consistent. Snapshotting also stops admin rate edits rewriting this order.
         const orderExchangeRate = currency === 'USD' ? await resolveUsdRate(prisma) : null;
         let subtotal = 0;
+        // Customer GST accumulated per line below. The client also sends a `tax`,
+        // but it is advisory only — this server-side figure is what gets stored.
+        let computedTax = 0;
+        // Shipping accumulated per line from each product's logisticsConfig, in INR
+        // (the per-kg rates are entered in rupees). Converted to the order currency
+        // once the goods subtotal is known.
+        let computedShippingInr = 0;
         const orderItemsData = [];
         const stockUpdates = [];
         const vendorTotals = {}; // Tracks vendor amounts using their base prices
@@ -188,6 +210,55 @@ const createOrder = async (req, res) => {
             const itemTotal = round2(unitPrice * item.quantity);
             subtotal += itemTotal;
 
+            // Customer GST, recomputed from the product's own rate against the SAME
+            // base the customer is charged (itemTotal). Never trust the client's
+            // figure: this lands on a document titled "TAX INVOICE" and feeds every
+            // revenue report, so a posted `tax: 0` would understate a legal filing.
+            // Rounded per line so the printed lines reconcile with the printed total.
+            // A product saved without a GST rate is charged 0% — and the same null
+            // also zeroes the VENDOR's tax below, which is a payout shortfall, not
+            // just a reporting gap. Log it so the catalogue gap is visible and can be
+            // backfilled; hard-failing here would reject legitimate existing rows at
+            // the checkout step, which is the worst possible place to surface it.
+            if (product.gstPercentage == null) {
+                console.warn(
+                    `[createOrder] Product ${product.id} (${product.name}) has no gstPercentage — ` +
+                    `charging 0% GST to the customer and paying 0 tax to the vendor.`
+                );
+            }
+            const customerGstRate = product.gstPercentage || 0;
+            const itemTax = round2(itemTotal * customerGstRate / 100);
+            computedTax += itemTax;
+
+            // Shipping for this line, from the product's own logistics config.
+            // Same calculator the storefront uses (utils/logistics.js is a port of
+            // lib/logistics.ts) so the quoted figure and the charged figure agree.
+            //
+            // AIR and SHIP have different per-kg rates and delivery windows, so when a
+            // product offers both the customer must have picked one in the cart — we
+            // will not silently choose on their behalf and bill them for it.
+            const allowedTransports = Array.isArray(product.logisticsConfig?.transportTypes)
+                ? product.logisticsConfig.transportTypes
+                : [];
+            if (allowedTransports.length > 1 && !item.transportType) {
+                return res.status(400).json({
+                    success: false,
+                    error: `Please choose a shipping method for "${product.name}" before placing the order.`,
+                });
+            }
+            if (item.transportType && !allowedTransports.includes(item.transportType)) {
+                return res.status(400).json({
+                    success: false,
+                    error: `The selected shipping method is not available for "${product.name}".`,
+                });
+            }
+            // Resolved mode: the explicit choice, else the only option, else none.
+            const lineTransport = item.transportType || allowedTransports[0] || null;
+
+            computedShippingInr += calculateLogistics(
+                product.logisticsConfig, item.quantity, lineTransport || undefined
+            ).totalShippingCost;
+
             // Calculate Vendor Settlement using vendor's base price.
             //
             // M2C buys from the vendor and resells, so the vendor makes a taxable
@@ -225,6 +296,7 @@ const createOrder = async (req, res) => {
                 unitPrice: unitPrice,
                 totalPrice: itemTotal,
                 totalPriceINR: toINR(itemTotal, currency, orderExchangeRate),
+                transportType: lineTransport,
                 // Freeze the vendor payout for this line so the settlement statement can
                 // itemise it later. Vendor money is always INR — vendorPrice is basePrice,
                 // never converted. Mirrors the vendorTotals accumulation above.
@@ -287,14 +359,183 @@ const createOrder = async (req, res) => {
           discount = 1.6760000000000002.
         */
         const roundedSubtotal = round2(subtotal);
-        const roundedShipping = round2(shippingCost);
-        const roundedTax = round2(tax);
-        const roundedDiscount = round2(discount);
+        // Server-computed GST wins over the client's figure. The client value is
+        // only compared, so a genuine mismatch (stale cart price, tampering) is
+        // visible in the logs instead of silently becoming the invoiced tax.
+        const roundedTax = round2(computedTax);
+        const clientTax = round2(Number(tax) || 0);
+        if (Math.abs(clientTax - roundedTax) > 0.01) {
+            console.warn(
+                `[createOrder] Client tax ${clientTax} != server tax ${roundedTax} ` +
+                `(user ${userId}, ${currency}). Storing the server figure.`
+            );
+        }
+        // ── Discount: re-derived server-side from the coupon row ─────────────
+        // The client reads `discount` out of localStorage, so it is attacker-
+        // controlled. Re-run the same validator the /coupons/apply endpoint uses,
+        // against the server's own subtotal. No coupon code => no discount, whatever
+        // the client claimed. An invalid/expired coupon fails the order rather than
+        // silently charging full price after the customer already paid the
+        // discounted amount — the payment reconciliation above would reject it anyway.
+        let roundedDiscount = 0;
+        let validatedCouponCode = null;
+        let couponGrantsFreeShipping = false;
+        if (couponCode) {
+            const evaluated = await evaluateCoupon({
+                code: couponCode,
+                cartTotal: roundedSubtotal,
+                userId,
+                currency,
+            });
+            if (!evaluated.ok) {
+                return res.status(400).json({
+                    success: false,
+                    error: `Coupon could not be applied: ${evaluated.message}`,
+                });
+            }
+            roundedDiscount = round2(evaluated.discountAmount);
+            validatedCouponCode = evaluated.code;
+            couponGrantsFreeShipping = Boolean(evaluated.freeShipping);
+        }
+        const clientDiscount = round2(Number(discount) || 0);
+        if (Math.abs(clientDiscount - roundedDiscount) > 0.01) {
+            console.warn(
+                `[createOrder] Client discount ${clientDiscount} != server discount ${roundedDiscount} ` +
+                `(user ${userId}, coupon ${couponCode || 'none'}). Storing the server figure.`
+            );
+        }
+        // ── Shipping: re-derived server-side ────────────────────────────────
+        // Computed from each product's own logisticsConfig (see utils/logistics.js,
+        // a port of the storefront's lib/logistics.ts) rather than trusting the
+        // client's number. The per-kg rates are in rupees, so convert into the
+        // order's currency using this order's rate snapshot — otherwise a ₹50
+        // shipping charge would be billed as $50 on a .com order.
+        const freeShipping = await qualifiesForFreeShipping({
+            prisma,
+            userId,
+            cartTotalInr: currency === 'USD'
+                ? toINR(roundedSubtotal, currency, orderExchangeRate)
+                : roundedSubtotal,
+            couponGrantsFreeShipping,
+        });
+        const roundedShipping = freeShipping
+            ? 0
+            : Math.max(0, convertShippingToOrderCurrency(
+                computedShippingInr, currency, orderExchangeRate
+            ));
+        const clientShipping = round2(Number(shippingCost) || 0);
+        if (Math.abs(clientShipping - roundedShipping) > 0.01) {
+            console.warn(
+                `[createOrder] Client shipping ${clientShipping} != server shipping ${roundedShipping} ` +
+                `(user ${userId}, ${currency}, freeShipping=${freeShipping}). Storing the server figure.`
+            );
+        }
+
         const roundedBagPrice = round2(bagTypePrice);
 
-        const totalAmount = round2(
+        // Clamp at zero. A discount larger than the goods value must never produce a
+        // negative order that would read as money owed to the customer.
+        const totalAmount = Math.max(0, round2(
             roundedSubtotal + roundedShipping + roundedTax - roundedDiscount + roundedBagPrice
-        );
+        ));
+
+        // ── Payment amount reconciliation ────────────────────────────────────
+        // The HMAC signature proves the payment exists and is ours — it does NOT
+        // prove it was for THIS cart. Without this check, a valid signature from an
+        // earlier ₹10 order verifies fine against a ₹10,000 basket. This is the only
+        // point in the request where the server knows both the captured amount and
+        // its own computed total, so the comparison belongs here.
+        if (needsRazorpayVerification) {
+            try {
+                const Razorpay = require('razorpay');
+                const rzp = new Razorpay({
+                    key_id: paymentSettings.razorpayKeyId,
+                    key_secret: paymentSettings.razorpayKeySecret,
+                });
+                const rzpOrder = await rzp.orders.fetch(razorpayOrderId);
+
+                // Step 1 — did the customer actually pay the full amount the Razorpay
+                // order was raised for? Both figures come from Razorpay in paise, so
+                // this is exact and currency-independent.
+                const orderPaise = Number(rzpOrder?.amount || 0);
+                const paidPaise = Number(rzpOrder?.amount_paid || 0);
+                if (!paidPaise) {
+                    return res.status(400).json({
+                        success: false,
+                        error: 'Payment verification failed - payment not captured'
+                    });
+                }
+                if (paidPaise < orderPaise) {
+                    console.error(
+                        `[createOrder] Underpayment: paid ${paidPaise} of ${orderPaise} paise ` +
+                        `(user ${userId}, rzpOrder ${razorpayOrderId}).`
+                    );
+                    return res.status(400).json({
+                        success: false,
+                        error: 'Payment verification failed - payment incomplete'
+                    });
+                }
+
+                // Step 2 — was that payment raised for THIS cart? paymentController
+                // stamps the quote onto the Razorpay order's notes at creation time,
+                // so compare in the ORDER'S OWN CURRENCY against that snapshot.
+                //
+                // Deliberately NOT re-converting with the live FX rate: the customer
+                // may sit on the payment page for minutes, and an admin editing the
+                // exchange rate in that window would otherwise make a perfectly good
+                // payment fail reconciliation (money taken, no order created). The
+                // quote is immutable once the Razorpay order exists, so comparing
+                // like-for-like removes FX from this check entirely.
+                const quotedAmount = Number(rzpOrder?.notes?.quotedAmount);
+                const quotedCurrency = String(rzpOrder?.notes?.quotedCurrency || '').toUpperCase();
+
+                let expected = null;
+                let paid = null;
+                let unit = currency;
+                if (Number.isFinite(quotedAmount) && quotedCurrency === currency) {
+                    expected = totalAmount;
+                    paid = quotedAmount;
+                } else {
+                    // Fallback for orders raised before the quote was stamped: compare
+                    // in INR using this order's own rate snapshot.
+                    unit = 'INR';
+                    expected = currency === 'USD'
+                        ? toINR(totalAmount, currency, orderExchangeRate)
+                        : totalAmount;
+                    paid = round2(paidPaise / 100);
+                }
+
+                // Tolerance covers cent-level rounding only — same units on both
+                // sides, so anything larger is a genuine mismatch.
+                const tolerance = Math.max(0.02, round2(Number(expected) * 0.005));
+                if (expected != null && paid < expected - tolerance) {
+                    console.error(
+                        `[createOrder] Payment amount mismatch: paid ${paid} vs expected ${expected} ${unit} ` +
+                        `(user ${userId}, rzpOrder ${razorpayOrderId}).`
+                    );
+                    return res.status(400).json({
+                        success: false,
+                        error: 'Payment verification failed - amount does not match your order'
+                    });
+                }
+                if (expected != null && paid > expected + tolerance) {
+                    // Overpayment is not a security risk, but it means the quote and
+                    // the recomputed total drifted — worth seeing in the logs.
+                    console.warn(
+                        `[createOrder] Customer overpaid: ${paid} vs ${expected} ${unit} ` +
+                        `(user ${userId}, rzpOrder ${razorpayOrderId}).`
+                    );
+                }
+            } catch (rzpErr) {
+                // A verification that cannot complete must not silently pass: this is
+                // the guard standing between a signature and a real captured payment.
+                console.error('[createOrder] Razorpay reconciliation failed:', rzpErr.message);
+                return res.status(400).json({
+                    success: false,
+                    error: 'Payment verification failed - could not confirm payment'
+                });
+            }
+        }
 
         // Group vendor totals for Settlements (Now calculated in the main cart loop)
 
@@ -332,7 +573,7 @@ const createOrder = async (req, res) => {
                     bagTypeId: bagTypeId || undefined,
                     bagTypeName,
                     bagTypePrice: roundedBagPrice,
-                    couponCode: couponCode || null,
+                    couponCode: validatedCouponCode,
                     currency,
                     exchangeRate: orderExchangeRate,
                     // INR twins — every cross-order aggregate sums these, not the originals.
@@ -378,9 +619,9 @@ const createOrder = async (req, res) => {
             }
 
             // Increment coupon usedCount if a coupon was applied
-            if (couponCode) {
+            if (validatedCouponCode) {
                 await tx.coupon.updateMany({
-                    where: { code: couponCode },
+                    where: { code: validatedCouponCode },
                     data: { usedCount: { increment: 1 } },
                 });
             }

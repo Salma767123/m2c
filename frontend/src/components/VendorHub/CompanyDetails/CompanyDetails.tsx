@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/UI/Button";
 import { Building2, Globe, Mail, Phone, MapPin, Image, Home, Building, User, Users, Scale, HelpCircle, Loader2, Briefcase, ArrowRight, Upload, Eye, RefreshCw, X, CheckCircle2, ChevronDown, AlertCircle, Camera } from "lucide-react";
-import { ToggleButton, PhoneInput, parsePhone, CountrySelect, validatePhoneE164, PHONE_COUNTRY_CODES, AddressAutocomplete, AccordionSection, LocalLandlineInput, type LocalLandlineValue } from "@/components/VendorHub/FormUI";
+import { ToggleButton, PhoneInput, parsePhone, CountrySelect, validatePhoneE164, PHONE_COUNTRY_CODES, AccordionSection, CoordinateFields, validateCoordinate, COORDINATE_HELP, LocalLandlineInput, type LocalLandlineValue } from "@/components/VendorHub/FormUI";
 import { IconFile, IconFileText } from "@tabler/icons-react";
 import { handleUpload, validateUpload, notifyUploadError, notifyUploadSuccess } from "@/lib/toast-utils";
 import ImageCropModal from "@/components/UI/ImageCropModal";
@@ -58,6 +58,11 @@ interface FormData {
   state: string;
   zipCode: string;
   country: string;
+  /** Factory-site coordinates. Held as strings so a half-typed "11." survives editing
+   *  and so an exact 0 is not swallowed by the `value || ''` FormData serialiser.
+   *  These are the coordinates the QC inspection geofence measures against. */
+  latitude: string;
+  longitude: string;
   /** Ownership of the factory facility — "owned" | "rented" | "lease". */
   factoryOwnershipType: string;
   sameAsWarehouse: boolean;
@@ -454,6 +459,8 @@ export default function CompanyDetails({
     state: data.state || "",
     zipCode: data.zipCode || "",
     country: data.country || "India",
+    latitude: data.latitude ?? "",
+    longitude: data.longitude ?? "",
     factoryOwnershipType: data.factoryOwnershipType || "",
     sameAsWarehouse: data.sameAsWarehouse || false,
     // Preserve File refs across re-mounts / render-phase resyncs. The old
@@ -538,6 +545,8 @@ export default function CompanyDetails({
     state: 'address',
     zipCode: 'address',
     country: 'address',
+    latitude: 'address',
+    longitude: 'address',
     factoryOwnershipType: 'address',
     // Document uploads now live inline within the Business Profile section
     // (next to their corresponding regulatory field), so their errors map
@@ -669,6 +678,8 @@ export default function CompanyDetails({
       state: data.state || "",
       zipCode: data.zipCode || "",
       country: data.country || "India",
+      latitude: data.latitude ?? "",
+      longitude: data.longitude ?? "",
       factoryOwnershipType: data.factoryOwnershipType || "",
       sameAsWarehouse: data.sameAsWarehouse || false,
       // Same File-preservation as the init block above — render-phase sync
@@ -738,6 +749,10 @@ export default function CompanyDetails({
       updatedData.warehouseState = currentFormData.state;
       updatedData.warehouseZip = currentFormData.zipCode;
       updatedData.warehouseCountry = currentFormData.country;
+      // Coordinates travel with the address — without this the linked warehouse
+      // would show the legal address but keep stale (or empty) coordinates.
+      updatedData.warehouseLatitude = currentFormData.latitude;
+      updatedData.warehouseLongitude = currentFormData.longitude;
       // WarehouseDetails reads `data.ownershipType` (the field is shared,
       // not prefixed). Mirror factory ownership to it.
       updatedData.ownershipType = currentFormData.factoryOwnershipType;
@@ -760,6 +775,8 @@ export default function CompanyDetails({
       updatedData.warehouseState = '';
       updatedData.warehouseZip = '';
       updatedData.warehouseCountry = '';
+      updatedData.warehouseLatitude = '';
+      updatedData.warehouseLongitude = '';
       updatedData.ownershipType = '';
       updatedData.warehousingCapacity = '';
       updatedData.factoryImages = {};
@@ -1492,6 +1509,13 @@ export default function CompanyDetails({
     if (!currentFormData.state) newErrors.state = 'State is required';
     if (!currentFormData.zipCode) newErrors.zipCode = 'ZIP Code is required';
     if (!currentFormData.country) newErrors.country = 'Country is required';
+    // Required: these are the coordinates the QC inspection geofence measures a checker
+    // against, so a vendor saved without them can never be location-verified. Range is
+    // also enforced — a bad pair misplaces the factory with no visible symptom.
+    const latErr = validateCoordinate(currentFormData.latitude, 'latitude');
+    if (latErr) newErrors.latitude = latErr;
+    const lngErr = validateCoordinate(currentFormData.longitude, 'longitude');
+    if (lngErr) newErrors.longitude = lngErr;
     if (!currentFormData.factoryOwnershipType) {
       newErrors.factoryOwnershipType = 'Please select your factory ownership type';
     } else if (!FACTORY_OWNERSHIP_IDS.has(currentFormData.factoryOwnershipType)) {
@@ -1670,7 +1694,7 @@ export default function CompanyDetails({
       return 'empty';
     }
     if (section === 'address') {
-      const required = [formData.address, formData.city, formData.state, formData.zipCode, formData.country, formData.factoryOwnershipType];
+      const required = [formData.address, formData.city, formData.state, formData.zipCode, formData.country, formData.factoryOwnershipType, formData.latitude, formData.longitude];
       // `country` defaults to "India", so a filled country alone doesn't mean
       // the user has started this section — exclude it from the "in progress"
       // trigger so an untouched address reads as empty, not "In progress".
@@ -2669,36 +2693,6 @@ export default function CompanyDetails({
             )}
           </div>
 
-          {/* Location search shortcut */}
-          <div>
-            <label htmlFor="addressSearch" className="block text-sm font-semibold text-slate-700 mb-1">
-              Search Location{' '}
-              <span className="text-slate-400 text-xs font-normal">(optional shortcut)</span>
-            </label>
-            <AddressAutocomplete
-              id="addressSearch"
-              onSelect={(s) => {
-                setFormData((prev) => ({
-                  ...prev,
-                  address: s.line1 || prev.address,
-                  city: s.city || prev.city,
-                  state: s.state || prev.state,
-                  zipCode: s.postcode || prev.zipCode,
-                  country: s.country || prev.country,
-                }));
-                setErrors((prev) => ({
-                  ...prev,
-                  address: '',
-                  city: '',
-                  state: '',
-                  zipCode: '',
-                  country: '',
-                }));
-                centerNotice.info('Address Auto-filled', s.displayName);
-              }}
-            />
-          </div>
-
           {/* Address Line 1 + Line 2 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -2893,6 +2887,20 @@ export default function CompanyDetails({
               )}
             </div>
           </div>
+
+          {/* Factory-site coordinates. These are what the QC inspection geofence
+              measures a checker against, so they are required — a vendor saved without
+              them cannot be location-verified during an inspection. */}
+          <CoordinateFields
+            idPrefix="factory"
+            latitude={formData.latitude}
+            longitude={formData.longitude}
+            latError={touched.latitude ? errors.latitude : ''}
+            lngError={touched.longitude ? errors.longitude : ''}
+            onChange={(field, value) => handleInputChange(field, value)}
+            onBlur={(field) => handleBlur(field)}
+            helpText={COORDINATE_HELP}
+          />
 
           {/* Warehousing Capacity */}
           <div className="w-full max-w-xs">

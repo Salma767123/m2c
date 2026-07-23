@@ -11,6 +11,7 @@ import type { Verifications } from "@/components/Checker/Vendor/Steps/VI_VerifyF
 import type { InspectorMeta } from "@/components/Checker/Vendor/Steps/VI_Step8_FinalReview"
 import type { FactoryEvidenceState } from "@/components/Checker/Vendor/Steps/VI_Step2_WarehouseFactory"
 import { notifyUploadSuccess } from "@/lib/toast-utils"
+import { GEOFENCE_DISABLED, getCurrentCoords } from "@/lib/checkerLocation"
 
 const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<string> =>
   new Promise((resolve) => {
@@ -81,9 +82,10 @@ interface Props {
   errors?: Record<string, string>
   factoryEvidence?: FactoryEvidenceState | null
   inspectionStartedAt?: string | null
+  inspectionType?: string
 }
 
-export default function VendorDocumentation({ vendor, verifications, meta, docData, onDocDataChange, errors = {}, factoryEvidence, inspectionStartedAt }: Props) {
+export default function VendorDocumentation({ vendor, verifications, meta, docData, onDocDataChange, errors = {}, factoryEvidence, inspectionStartedAt, inspectionType }: Props) {
   const signedDocInputRef = useRef<HTMLInputElement | null>(null)
   const sigPadRef = useRef<SignatureCanvasType | null>(null)
   const sigCanvasContainerRef = useRef<HTMLDivElement | null>(null)
@@ -98,18 +100,11 @@ export default function VendorDocumentation({ vendor, verifications, meta, docDa
   const [confirmRemoveDoc, setConfirmRemoveDoc] = useState(false)
   const [confirmRemoveReport, setConfirmRemoveReport] = useState(false)
 
+  // Position for the report's "GPS Location" row. Best-effort — see the sibling
+  // comment in Steps/Documentation.tsx.
   useEffect(() => {
-    // Skip the location request (and its browser prompt) — geofencing is off
-    // everywhere by default (mirrors VendorInspectionForm / the backend). Set
-    // NEXT_PUBLIC_ENABLE_GEOFENCE=true to re-enable.
-    const geofenceDisabled = process.env.NEXT_PUBLIC_ENABLE_GEOFENCE !== "true"
-    if (geofenceDisabled) return
-    if (typeof navigator === "undefined" || !navigator.geolocation) return
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      () => { },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-    )
+    if (GEOFENCE_DISABLED) return
+    getCurrentCoords().then(setCoords).catch(() => { })
   }, [])
 
   useEffect(() => {
@@ -138,6 +133,7 @@ export default function VendorDocumentation({ vendor, verifications, meta, docDa
     overallResult: meta.overallResult,
     inspectorRemarks: meta.inspectorRemarks,
     checker: checker ? { name: formatCheckerName(checker), checkerId: checker.checkerId, email: checker.email, phone: checker.phone || (checker as any).mobile } : null,
+    inspectionType,
     location: coords,
     generatedAt: new Date(),
   })

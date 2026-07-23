@@ -166,8 +166,12 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         state: data.state || '',
         zipCode: data.zipCode || '',
         country: data.country || 'India',
+        latitude: data.latitude || '',
+        longitude: data.longitude || '',
         factoryOwnershipType: data.factoryOwnershipType || '',
-        
+        referralSource: data.referralSource || '',
+        referralSourceDetail: data.referralSourceDetail || '',
+
         // Owner Profile
         ownerName: data.ownerName || '',
         designation: data.designation || '',
@@ -197,6 +201,8 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         warehouseState: data.warehouseState || data.state || '',
         warehouseZip: data.warehouseZip || data.zipCode || '',
         warehouseCountry: data.warehouseCountry || data.country || 'India',
+        warehouseLatitude: data.warehouseLatitude || data.latitude || '',
+        warehouseLongitude: data.warehouseLongitude || data.longitude || '',
         
         // Vendor Type & Products
         vendorType: data.vendorType || ['manufacturer'],

@@ -7,7 +7,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@
 import Dropdown from '@/components/UI/Dropdown';
 import {
   BarChart3, Download, TrendingUp, DollarSign, Users, FileText,
-  Package, Store, ShoppingCart, Clock, PieChart, Activity,
+  Package, Store, ShoppingCart, Clock, PieChart, Activity, Megaphone,
   ArrowUp, ArrowDown, Minus, RefreshCw, CheckCircle, XCircle,
   AlertCircle, Loader2,
 } from 'lucide-react';
@@ -698,6 +698,40 @@ export default function AdminReports() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Where vendors come from — all-time acquisition mix. A horizontal bar
+              reads better than a pie for ~9 channels with a long tail. */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Megaphone className="w-5 h-5 text-slate-600" />
+                How Vendors Found Us
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(data.charts?.referralSourceData || []).length > 0 ? (
+                <ResponsiveContainer width="100%" height={Math.max(240, (data.charts?.referralSourceData?.length || 0) * 40)}>
+                  <BarChart
+                    data={data.charts?.referralSourceData || []}
+                    layout="vertical"
+                    margin={{ left: 24, right: 24, top: 8, bottom: 8 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} />
+                    <Tooltip formatter={(v: any) => [`${v} vendor${v === 1 ? '' : 's'}`, 'Vendors']} />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                      {(data.charts?.referralSourceData || []).map((entry: any, i: number) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-slate-400 text-center py-10">No vendor source data yet.</p>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader><CardTitle>Top Vendors by Revenue</CardTitle></CardHeader>
