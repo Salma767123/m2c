@@ -37,6 +37,7 @@ import {
   ChevronRight,
   AlertCircle,
   RotateCcw,
+  Megaphone,
 } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
@@ -62,6 +63,42 @@ const COUNTRY_ISO: Record<string, string> = {}
 Country.getAllCountries().forEach((c) => { COUNTRY_ISO[c.name] = c.isoCode })
 function withFlags(countries: string[]): { flagIso: string; label: string }[] {
   return countries.map((name) => ({ flagIso: COUNTRY_ISO[name] || "", label: name }))
+}
+
+/**
+ * Latitude / longitude readout for an address card.
+ *
+ * Renders nothing when neither value is stored *and* no hint is supplied — most
+ * addresses have no coordinates and two empty rows would be noise. The factory card
+ * passes a hint because a missing pair there has a real consequence: the QC inspection
+ * geofence has nothing to verify against.
+ */
+const CoordinatePair = ({
+  latitude,
+  longitude,
+  emptyHint,
+}: {
+  latitude?: number | string | null
+  longitude?: number | string | null
+  emptyHint?: string
+}) => {
+  const has = (v: unknown) => v !== null && v !== undefined && String(v).trim() !== ''
+  if (!has(latitude) && !has(longitude)) {
+    return emptyHint ? (
+      <div>
+        <p className="text-sm text-slate-500 font-semibold mb-1">Coordinates</p>
+        <p className="text-sm text-amber-700">{emptyHint}</p>
+      </div>
+    ) : null
+  }
+  return (
+    <div>
+      <p className="text-sm text-slate-500 font-semibold mb-1">Coordinates</p>
+      <p className="font-medium font-mono text-sm">
+        {has(latitude) ? latitude : '—'}, {has(longitude) ? longitude : '—'}
+      </p>
+    </div>
+  )
 }
 
 interface VendorViewProps {
@@ -580,6 +617,20 @@ const businessTypeLabel = (raw: string): string => {
   return BUSINESS_TYPE_LABELS[raw] || raw;
 };
 
+// Acquisition channel labels — ids match backend/utils/referralSources.js.
+const REFERRAL_SOURCE_LABELS: Record<string, string> = {
+  'google': 'Google / Search',
+  'online-ads': 'Online Ads',
+  'linkedin': 'LinkedIn',
+  'instagram': 'Instagram',
+  'facebook': 'Facebook',
+  'youtube': 'YouTube',
+  'referral': 'Referral / Word of Mouth',
+  'trade-show': 'Trade Show / Exhibition',
+  'others': 'Others',
+};
+const referralSourceLabel = (raw: string): string => (raw ? (REFERRAL_SOURCE_LABELS[raw] || raw) : '');
+
 // Tab Components
 function OverviewTab({ vendor }: { vendor: VendorProfile }) {
   return (
@@ -703,6 +754,26 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                     </div>
                   </div>
                 )}
+
+                {/* Always rendered, even when empty: vendors who registered before this
+                    field existed have no value, and hiding the row makes it impossible
+                    to tell "not asked" from "feature missing". */}
+                <div className="flex items-center space-x-3">
+                  <Megaphone className="h-4 w-4 text-slate-400" />
+                  <div>
+                    <p className="text-sm text-slate-500">How They Heard About Us</p>
+                    {(vendor as any).referralSource ? (
+                      <p className="font-medium">
+                        {referralSourceLabel((vendor as any).referralSource)}
+                        {(vendor as any).referralSourceDetail && (
+                          <span className="text-slate-500 font-normal"> — {(vendor as any).referralSourceDetail}</span>
+                        )}
+                      </p>
+                    ) : (
+                      <p className="font-medium text-slate-400 italic">Not recorded</p>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -1220,6 +1291,13 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
                 </p>
                 {vendor.businessCountry && <p className="font-medium">{vendor.businessCountry}</p>}
               </div>
+              {/* Factory coordinates — the pair the QC inspection geofence measures
+                  against, so surface whether they are actually set. */}
+              <CoordinatePair
+                latitude={(vendor as any).factoryLatitude}
+                longitude={(vendor as any).factoryLongitude}
+                emptyHint="Not set — QC inspections at this vendor cannot be location-verified."
+              />
               {(vendor as any).factorySize && (
                 <div>
                   <p className="text-sm text-slate-500">Warehousing Capacity</p>
@@ -1284,6 +1362,14 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
                   {vendor.warehouseCountry && <p className="font-medium">{vendor.warehouseCountry}</p>}
                 </div>
               )}
+              {/* When linked, the warehouse coordinates are a mirror of the factory
+                  pair, so show whichever is stored rather than a blank row. */}
+              <div className="mt-3">
+                <CoordinatePair
+                  latitude={isSameAsLegal ? (v.warehouseLatitude ?? v.factoryLatitude) : v.warehouseLatitude}
+                  longitude={isSameAsLegal ? (v.warehouseLongitude ?? v.factoryLongitude) : v.warehouseLongitude}
+                />
+              </div>
               {vendor.warehouseSize && (
                 <div className="mt-3">
                   <p className="text-sm text-slate-500">Warehousing Capacity</p>

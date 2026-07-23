@@ -8,6 +8,27 @@ const { usdFromINR } = require('../utils/orderCurrency');
 const { stripAdminPricing, attachVendorPayout } = require('../utils/vendorPricing');
 const { getCurrentExchangeRate } = require('./exchangeRateController');
 
+/**
+ * Validate the product's GST rate.
+ *
+ * A null rate used to persist silently and then be read as 0% at checkout — so the
+ * customer was under-charged tax on a document titled "TAX INVOICE", AND the vendor
+ * was under-paid their own GST (the same field drives both, see orderController).
+ * Requiring it here removes the ambiguity at the source: an admin who genuinely sells
+ * a zero-rated good must now enter 0 explicitly rather than leaving the field blank.
+ *
+ * @returns {string|null} An error message, or null when the value is acceptable.
+ */
+const validateGstPercentage = (v) => {
+  if (v === null || v === undefined || v === '') {
+    return 'GST rate is required. Enter 0 if this product is zero-rated.';
+  }
+  const n = parseFloat(v);
+  if (!Number.isFinite(n)) return 'GST rate must be a number';
+  if (n < 0 || n > 100) return 'GST rate must be between 0 and 100';
+  return null;
+};
+
 /** Parse a money input to a number, or null when it is absent/blank/non-numeric. */
 const numOrNull = (v) => {
   if (v === null || v === undefined || v === '') return null;
@@ -186,6 +207,11 @@ const createProduct = async (req, res) => {
         success: false,
         message: 'At least one variant is required when variants are enabled'
       });
+    }
+
+    const gstError = validateGstPercentage(gstPercentage);
+    if (gstError) {
+      return res.status(400).json({ success: false, message: gstError });
     }
 
     // If connecting to inventory, validate and update inventory item
@@ -688,6 +714,16 @@ const updateProduct = async (req, res) => {
       }
     }
 
+    // Only enforced when the caller actually sends the field, so a partial update
+    // that never touches GST is unaffected — but an explicit blank is rejected
+    // rather than silently persisting null (which reads as 0% at checkout).
+    if (updateData.gstPercentage !== undefined) {
+      const gstError = validateGstPercentage(updateData.gstPercentage);
+      if (gstError) {
+        return res.status(400).json({ success: false, message: gstError });
+      }
+    }
+
     // Start transaction for update
     const result = await prisma.$transaction(async (tx) => {
       // Calculate total stock from variants if we are updating variants
@@ -715,7 +751,7 @@ const updateProduct = async (req, res) => {
             discount: updateData.discount ? parseFloat(updateData.discount) : null
           }),
           ...(updateData.gstPercentage !== undefined && {
-            gstPercentage: updateData.gstPercentage !== null && updateData.gstPercentage !== '' ? parseFloat(updateData.gstPercentage) : null
+            gstPercentage: parseFloat(updateData.gstPercentage)
           }),
 
           // Single Unit Pricing Configuration
@@ -1138,12 +1174,33 @@ const approveProduct = async (req, res) => {
       });
     }
 
-    // Ensure the product was approved by QC first
-    if (product.approvalStatus !== 'QC_APPROVED') {
+    // QC clearance is the entry requirement. A product mid-negotiation
+    // (NEGOTIATION) is ALSO approvable — a negotiation only ever starts from a
+    // QC_APPROVED product, and it stays NEGOTIATION until the admin finalises.
+    // Approving from NEGOTIATION is how the admin publishes once a price is
+    // agreed (or after the vendor walked away and the admin keeps the current
+    // price). The open-offer guard below is what actually blocks a premature
+    // approval while a price is still being haggled.
+    if (!['QC_APPROVED', 'NEGOTIATION'].includes(product.approvalStatus)) {
       return res.status(400).json({
         success: false,
         message: 'Product must be approved by QC (QC_APPROVED) before Admin approval'
       });
+    }
+
+    // Block approval while a price offer is still awaiting a response — the
+    // vendor's buying price is not yet settled. (Also sweeps any offer that
+    // has since expired.)
+    {
+      const { getOpenOffer, expireStaleOffers } = require('./priceNegotiationController');
+      await expireStaleOffers(id);
+      const openOffer = await getOpenOffer(id);
+      if (openOffer) {
+        return res.status(409).json({
+          success: false,
+          message: `A price offer (₹${openOffer.proposedPrice}) is awaiting a response. Resolve the negotiation before approving.`,
+        });
+      }
     }
 
     // ── Vendor-proposed category gate ──────────────────────────────────────
@@ -1403,6 +1460,14 @@ const rejectProduct = async (req, res) => {
         message: 'Product is already rejected'
       });
     }
+
+    // Rejecting ends any live price talks: leaving an offer PENDING would show
+    // the vendor an actionable negotiation for a product that is already dead,
+    // and would block a later re-approval on the open-offer check above.
+    await prisma.priceNegotiation.updateMany({
+      where: { productId: id, status: 'PENDING' },
+      data: { status: 'CANCELLED', respondedAt: new Date() },
+    });
 
     // Update product approval status
     const updatedProduct = await prisma.product.update({
@@ -1701,6 +1766,11 @@ const createProductByAdmin = async (req, res) => {
         success: false,
         message: 'At least one variant is required when variants are enabled'
       });
+    }
+
+    const gstError = validateGstPercentage(gstPercentage);
+    if (gstError) {
+      return res.status(400).json({ success: false, message: gstError });
     }
 
     // Check if base SKU already exists
@@ -2032,6 +2102,16 @@ const updateProductByAdmin = async (req, res) => {
       }
     }
 
+    // Only enforced when the caller actually sends the field, so a partial update
+    // that never touches GST is unaffected — but an explicit blank is rejected
+    // rather than silently persisting null (which reads as 0% at checkout).
+    if (updateData.gstPercentage !== undefined) {
+      const gstError = validateGstPercentage(updateData.gstPercentage);
+      if (gstError) {
+        return res.status(400).json({ success: false, message: gstError });
+      }
+    }
+
     // Start transaction for update
     const result = await prisma.$transaction(async (tx) => {
       // Calculate newTotalStock based on variants or direct totalStock
@@ -2056,7 +2136,7 @@ const updateProductByAdmin = async (req, res) => {
           discount: updateData.discount ? parseFloat(updateData.discount) : null
         }),
         ...(updateData.gstPercentage !== undefined && {
-          gstPercentage: updateData.gstPercentage !== null && updateData.gstPercentage !== '' ? parseFloat(updateData.gstPercentage) : null
+          gstPercentage: parseFloat(updateData.gstPercentage)
         }),
         ...(updateData.adminFixedPrice !== undefined && {
           adminFixedPrice: updateData.adminFixedPrice ? parseFloat(updateData.adminFixedPrice) : null

@@ -9,7 +9,7 @@ import { publicProductService, PublicProduct } from "@/services/publicProductSer
 import { userAuthService } from "@/services/userAuthService"
 import bagTypeService, { BagType } from "@/services/bagTypeService"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
-import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, getCurrency } from "@/lib/currency"
+import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, getCurrency, convertINRtoUSD } from "@/lib/currency"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
 import Reveal from "@/components/WebSite/Shared/Reveal"
 
@@ -51,6 +51,8 @@ interface OrderItem {
   material?: string
   discount?: number
   gstPercentage?: number
+  /** Chosen shipping mode for this line. Required when the product offers a choice. */
+  transportType?: 'AIR' | 'SHIP' | null
   variantDetails?: {
     size: string
     color: string
@@ -203,6 +205,7 @@ export default function Order() {
                 material: item.product?.material,
                 discount: liveDiscount,
                 gstPercentage: item.product?.gstPercentage,
+                transportType: item.transportType ?? null,
                 variantDetails: hasVariant ? {
                   size: item.variant.size,
                   color: item.variant.color,
@@ -358,6 +361,16 @@ export default function Order() {
     )
   }
 
+  /** Transport modes a product offers. >1 means the customer must choose. */
+  const transportOptionsFor = (item: OrderItem): Array<'AIR' | 'SHIP'> => {
+    const types = (item as any).product?.logisticsConfig?.transportTypes
+    return Array.isArray(types) ? types : []
+  }
+
+  /** A line still needs a decision from the customer before checkout. */
+  const needsTransportChoice = (item: OrderItem) =>
+    transportOptionsFor(item).length > 1 && !item.transportType
+
   const updateQuantity = (id: string, productId: string, newQuantity: number) => {
     if (newQuantity < 1) {
       removeItem(id)
@@ -474,17 +487,25 @@ export default function Order() {
   const calculateSummary = (): OrderSummary => {
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
     // Calculate logistics-based shipping from product configs
-    let logisticsShipping = 0
+    // Per-kg rates are stored in RUPEES — convert for a USD cart so the figure
+    // matches what checkout quotes and what the server charges.
+    let logisticsShippingInr = 0
     if (!freeShippingApplied) {
       for (const item of cartItems) {
         const config = (item as any).product?.logisticsConfig
         if (config) {
-          const result = calculateLogistics(config as LogisticsConfig, item.quantity)
-          logisticsShipping += result.totalShippingCost
+          // Price with the mode the customer picked; fall back to the only option
+          // when there is no choice. Matches orderController's resolution exactly.
+          const types = Array.isArray(config.transportTypes) ? config.transportTypes : []
+          const mode = (item.transportType || types[0]) as 'AIR' | 'SHIP' | undefined
+          const result = calculateLogistics(config as LogisticsConfig, item.quantity, mode)
+          logisticsShippingInr += result.totalShippingCost
         }
       }
     }
-    const shipping = freeShippingApplied ? 0 : logisticsShipping
+    const shipping = freeShippingApplied
+      ? 0
+      : (getCurrency() === 'USD' ? convertINRtoUSD(logisticsShippingInr) : logisticsShippingInr)
     const discount = discountAmount
 
     // Calculate tax based on individual product GST percentages
@@ -664,6 +685,44 @@ export default function Order() {
                               </button>
                             </div>
                           </div>
+
+                          {/* Shipping method — only when the product actually offers a
+                              choice. AIR and SHIP carry different rates and delivery
+                              windows, so this changes what the customer pays. */}
+                          {transportOptionsFor(item).length > 1 && (() => {
+                            // The rate/delivery choice lives on the product page (its
+                            // Shipping card). The cart deep-links there — highlighting
+                            // that card — and the product page writes the choice back to
+                            // this line and returns here.
+                            const cfg = (item as any).product?.logisticsConfig || {}
+                            const shippingHref = `/products/${item.productId}?selectShipping=1&cartItem=${item.id}`
+                            if (!item.transportType) {
+                              return (
+                                <Link
+                                  href={shippingHref}
+                                  className="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-colors"
+                                >
+                                  <Truck className="w-4 h-4" />
+                                  Select shipping method
+                                  <span className="text-red-500">*</span>
+                                  <ArrowRight className="w-3.5 h-3.5" />
+                                </Link>
+                              )
+                            }
+                            const days = item.transportType === 'AIR' ? cfg.airDeliveryDays : cfg.shipDeliveryDays
+                            return (
+                              <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3.5 py-2.5">
+                                <Truck className="w-4 h-4 text-slate-500" />
+                                <span className="text-xs font-medium text-slate-700">
+                                  Shipping: <span className="font-semibold text-slate-900">{item.transportType === 'AIR' ? 'Air' : 'Sea'}</span>
+                                  {days ? <span className="text-slate-400"> · {days} days</span> : null}
+                                </span>
+                                <Link href={shippingHref} className="text-xs font-semibold text-[#e01a1b] hover:underline ml-1">
+                                  Change
+                                </Link>
+                              </div>
+                            )
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -827,22 +886,6 @@ export default function Order() {
                       <span className="text-slate-600">Tax (GST)</span>
                       <span className="font-medium">{formatPrice(summary.tax)}</span>
                     </div>
-                    {/* GST Breakdown by Product */}
-                    {cartItems.some(item => item.gstPercentage) && (
-                      <div className="pl-4 space-y-1">
-                        {cartItems.map((item) => {
-                          if (!item.gstPercentage) return null
-                          const itemSubtotal = item.price * item.quantity
-                          const itemTax = itemSubtotal * (item.gstPercentage / 100)
-                          return (
-                            <div key={item.id} className="flex justify-between text-xs text-slate-500">
-                              <span className="truncate max-w-[150px]">{item.name} ({item.gstPercentage}%)</span>
-                              <span>{formatPrice(itemTax)}</span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
                     {summary.discount > 0 && (
                       <div className="flex justify-between text-green-600">
                         <span>Discount</span>
@@ -865,7 +908,15 @@ export default function Order() {
                     </div>
                   </div>
 
-                  {cartItems.some(item => !item.inStock || (item.availableStock !== undefined && item.quantity > item.availableStock)) ? (
+                  {cartItems.some(needsTransportChoice) ? (
+                    <button
+                      disabled
+                      className="w-full bg-slate-300 text-slate-500 font-semibold py-4 px-6 rounded-xl shadow-none flex items-center justify-center gap-2 mb-4 cursor-not-allowed"
+                    >
+                      <Truck className="w-5 h-5" />
+                      Choose a shipping method to proceed
+                    </button>
+                  ) : cartItems.some(item => !item.inStock || (item.availableStock !== undefined && item.quantity > item.availableStock)) ? (
                     <button
                       disabled
                       className="w-full bg-slate-300 text-slate-500 font-semibold py-4 px-6 rounded-xl shadow-none flex items-center justify-center gap-2 mb-4 cursor-not-allowed"

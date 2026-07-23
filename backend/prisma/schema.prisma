@@ -200,6 +200,12 @@ model CartItem {
   quantity  Int     @default(1)
   price     Float // Store price at time of adding to cart
   currency  String  @default("INR") // INR or USD
+  // Shipping mode the customer picked for this line: "AIR" | "SHIP".
+  // Required before checkout whenever the product offers a choice, because AIR and
+  // SHIP have different per-kg rates and delivery windows (Product.logisticsConfig).
+  // Null when the product has no logistics config, or exactly one transport type
+  // (nothing to choose — the server resolves it).
+  transportType String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -334,6 +340,19 @@ model Vendor {
   // ticks "Same as warehouse" in CompanyDetails.
   factoryOwnershipType String?
 
+  // Acquisition — how the vendor found M2C. Asked on the last registration step
+  // so admins can report on which channels actually bring vendors in.
+  // Plain String (not a Prisma enum) because the list is frontend-driven and an
+  // "others" answer stores free text; enums also have no cheap MongoDB migration
+  // path for the legacy rows that pre-date this field. Values:
+  // google | online-ads | linkedin | instagram | facebook | youtube |
+  // referral | trade-show | others
+  referralSource       String?
+  // Free text: the referrer's name when referralSource is 'referral', or the
+  // typed channel when 'others'. Kept separate so the report groupBy stays a
+  // clean low-cardinality key instead of splintering into a long tail.
+  referralSourceDetail String?
+
   // Contact & Trade Information
   businessPhone   String
   landlineNumber  String? // Local landline assembled (STD+number, India +91)
@@ -413,8 +432,16 @@ model Vendor {
   warehouseSize    String?
   storageCapacity  String?
   mapLink          String? // Google Maps embed link
-  factoryLatitude  Float? // Auto-extracted from mapLink
-  factoryLongitude Float? // Auto-extracted from mapLink
+  /// Coordinates of the LEGAL ADDRESS & FACTORY SITE — entered directly on the
+  /// registration/admin form. These are the authoritative factory coordinates and the
+  /// ones the QC geofence measures against (utils/locationUtils.verifyCheckerAtVendor).
+  /// A `mapLink` can still back-fill them, but a value typed by a human always wins.
+  factoryLatitude  Float?
+  factoryLongitude Float?
+  /// Coordinates of the WAREHOUSE address. Recorded for completeness — inspections are
+  /// geofenced against the factory pair above, not these.
+  warehouseLatitude  Float?
+  warehouseLongitude Float?
 
   // Vendor Type & Products
   vendorType        VendorType
@@ -460,6 +487,9 @@ model Vendor {
 
   // Additional Information
   bankDetails VendorBankDetails?
+
+  /// Price negotiations raised against this vendor's products.
+  priceNegotiations PriceNegotiation[]
   references  VendorReference[]
   inventory   Inventory[]
   products    Product[]
@@ -863,6 +893,17 @@ model Product {
   assignedQc       QCChecker? @relation("ProductQCChecker", fields: [assignedQcId], references: [id])
   qcInspectionData Json? // Stores the product inspection form data
 
+  // ── Price negotiation ──────────────────────────────────────────────
+  // The vendor's buying price agreed with the admin. Null until a
+  // negotiation closes; once set it becomes the vendor's payout price
+  // (orderController pays `basePrice`, so accepting an offer writes the
+  // agreed figure into basePrice and mirrors it here for audit).
+  // `basePriceOriginal` keeps what the vendor first asked, so the admin
+  // panel can always show "asked X → agreed Y".
+  agreedPrice       Float?
+  basePriceOriginal Float?
+  negotiations      PriceNegotiation[]
+
   // Re-inspection tracking
   inspectionCycleNumber  Int       @default(1)
   previousInspectionData Json[]    @default([]) // Array of past qcInspectionData snapshots
@@ -943,6 +984,28 @@ enum ProductApprovalStatus {
   APPROVED
   REJECTED
   REINSPECTION
+  // Admin and vendor are agreeing the vendor's buying price. Sits between
+  // QC_APPROVED and APPROVED. Deliberately ONE status: who moved last and
+  // what was offered lives on PriceNegotiation rows, not here — adding a
+  // status per negotiation step would force every product filter, badge and
+  // index in the app to learn six new values for no gain.
+  NEGOTIATION
+}
+
+/// Which side made a given negotiation offer.
+enum NegotiationParty {
+  ADMIN
+  VENDOR
+}
+
+/// Lifecycle of a single negotiation round (one offer).
+enum NegotiationRoundStatus {
+  PENDING // awaiting the other side's response
+  ACCEPTED // other side accepted this offer — negotiation closes
+  REJECTED // other side rejected outright — negotiation closes
+  COUNTERED // other side replied with a new price (superseded by the next round)
+  EXPIRED // no response within the expiry window
+  CANCELLED // withdrawn (e.g. product re-inspected mid-negotiation)
 }
 
 enum PriceVisibility {
@@ -1076,6 +1139,9 @@ model OrderItem {
   // parent Order's — so product/vendor/category revenue groupBys cannot even filter
   // by currency without a join. They aggregate this instead. See utils/orderCurrency.js.
   totalPriceINR Float?
+  // Shipping mode this line was actually charged and must be dispatched by.
+  // Snapshotted from the cart so warehouse/fulfilment sees what the customer paid for.
+  transportType String?
 
   // ── Vendor payout snapshot (always INR) ─────────────────────────────────────
   // What M2C owes the VENDOR for this line, frozen at order time. Distinct from the
@@ -1534,6 +1600,15 @@ model ContactEnquiry {
   phone     String?
   subject   String
   message   String
+  /// Marketing attribution — "How did you hear about us?". Stores a stable slug
+  /// (search_engine | social_media | referral | existing_customer |
+  /// advertisement | trade_show | email_newsletter | other) so enquiries can be
+  /// grouped in reports. Null on enquiries submitted before this field existed.
+  hearAboutUs String?
+  /// Free text captured when hearAboutUs is "other". Kept separate so the source
+  /// report still groups these under a single "Other" bucket instead of
+  /// fragmenting into one-off values.
+  hearAboutUsOther String?
   status    String    @default("new") // new | read | replied | closed
   repliedAt DateTime?
   closedAt  DateTime?
@@ -1777,6 +1852,12 @@ model Inspection {
   priority          String // high, medium, low
   estimatedDuration String
 
+  // How the inspection was carried out. PHYSICAL means the checker was on-site and is
+  // geofenced against the vendor's factory; VIRTUAL means it was done online, so no
+  // location is captured or validated. Chosen at start. Defaults to PHYSICAL so every
+  // inspection created before this field reads as an on-site one.
+  inspectionType InspectionType @default(PHYSICAL)
+
   // Status & Timing
   status      InspectionStatus @default(SCHEDULED)
   startedAt   DateTime?
@@ -1849,6 +1930,11 @@ enum InspectionStatus {
 enum InspectionResult {
   PASSED
   FAILED
+}
+
+enum InspectionType {
+  PHYSICAL // On-site — checker GPS captured and geofenced against the vendor factory.
+  VIRTUAL  // Online — no location capture or validation.
 }
 
 // ============================================
@@ -1969,4 +2055,67 @@ model ProductView {
   @@index([category])
   @@index([productId, sessionId, createdAt])
   @@map("product_views")
+}
+
+// ============================================
+// PRICE NEGOTIATION
+// ============================================
+
+/// One offer in an admin↔vendor price negotiation.
+///
+/// Append-only: every offer, counter-offer and response is a row, so the
+/// product page can render the full timeline ("who proposed what, why, when")
+/// without reconstructing it from status changes.
+///
+/// Negotiation is PRODUCT-level, not variant-level, on purpose: the vendor is
+/// paid `Product.basePrice` per line (orderController), and variant prices are
+/// not used for settlement. `proposedPercent` lets one agreement scale every
+/// variant proportionally instead of forcing a round per variant.
+model PriceNegotiation {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  productId String  @db.ObjectId
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  vendorId  String  @db.ObjectId
+  vendor    Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  /// 1-based; increments per offer so the timeline orders deterministically
+  /// even when two rows share a timestamp.
+  round Int
+
+  proposedBy NegotiationParty
+  /// Admin id or vendor id — whoever created this row. Plain String, not
+  /// @db.ObjectId: this is an audit stamp, not a relation, and the two sides
+  /// come from different collections. Constraining it to ObjectId turns any
+  /// non-conforming id into a 500 instead of a harmless unlinked stamp.
+  proposedById String?
+
+  /// Offered vendor buying price (INR, product level).
+  proposedPrice Float
+  /// Offered price as a % of the vendor's ORIGINAL asking price. Stored so
+  /// variant prices can be scaled by the same factor on acceptance.
+  proposedPercent Float?
+  /// The price this offer was responding to — lets the UI show "₹200 → ₹150"
+  /// per row without walking backwards through the timeline.
+  previousPrice Float?
+
+  /// Structured reason code (e.g. MARKET_PRICE_LOWER, BULK_ORDER) plus free text.
+  reasonCode String?
+  message    String?
+
+  status NegotiationRoundStatus @default(PENDING)
+
+  /// Set when the other side responds to this row.
+  respondedAt   DateTime?
+  respondedById String?
+
+  /// Offers auto-expire so a silent vendor cannot park a product forever.
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId, round])
+  @@index([vendorId, status])
+  @@index([status, expiresAt])
+  @@map("price_negotiations")
 }

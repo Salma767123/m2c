@@ -14,7 +14,7 @@ import {
   ArrowLeft,
   ArrowRight,
 } from "lucide-react";
-import { CountrySelect, ToggleButton, AccordionSection } from "@/components/VendorHub/FormUI";
+import { CountrySelect, ToggleButton, AccordionSection, CoordinateFields, validateCoordinate, COORDINATE_HELP } from "@/components/VendorHub/FormUI";
 import { scrollToFirstError } from "@/lib/formErrorScroll";
 import { validateUpload, notifyUploadError, notifyUploadSuccess } from "@/lib/toast-utils";
 import { centerNotice } from "@/components/UI/CenterNotice";
@@ -134,6 +134,10 @@ export default function WarehouseDetails({
     // Keeps the two steps consistent when "Same as warehouse" is off but
     // the warehouse is still in the same country (the common case).
     warehouseCountry: data.warehouseCountry || data.country || "India",
+    // Strings, not numbers — a half-typed "11." must survive editing, and an exact 0
+    // must not be swallowed by the `value || ''` FormData serialiser.
+    warehouseLatitude: data.warehouseLatitude ?? "",
+    warehouseLongitude: data.warehouseLongitude ?? "",
     factoryImages: normaliseFactoryImages(data.factoryImages),
   });
 
@@ -173,6 +177,8 @@ export default function WarehouseDetails({
       // Fall back to the company country first (matches whatever the user
       // already picked on the previous step) before any hard-coded default.
       warehouseCountry: data.warehouseCountry || data.country || "India",
+      warehouseLatitude: data.warehouseLatitude ?? "",
+      warehouseLongitude: data.warehouseLongitude ?? "",
       factoryImages: normaliseFactoryImages(data.factoryImages),
     });
   }
@@ -242,6 +248,12 @@ export default function WarehouseDetails({
         newErrors.warehouseZip = 'ZIP / postal code is required';
       if (!formData.warehouseCountry)
         newErrors.warehouseCountry = 'Please select a country';
+      // Required, same as the factory pair. Skipped entirely when linked — those
+      // values are mirrored from the already-validated factory coordinates.
+      const latErr = validateCoordinate(formData.warehouseLatitude, 'latitude');
+      if (latErr) newErrors.warehouseLatitude = latErr;
+      const lngErr = validateCoordinate(formData.warehouseLongitude, 'longitude');
+      if (lngErr) newErrors.warehouseLongitude = lngErr;
     }
 
     // Required factory image slots (Change 11)
@@ -394,6 +406,8 @@ export default function WarehouseDetails({
     warehouseState: 'address',
     warehouseZip: 'address',
     warehouseCountry: 'address',
+    warehouseLatitude: 'address',
+    warehouseLongitude: 'address',
   };
   // factory image slot errors are handled separately in the photos section
 
@@ -406,7 +420,7 @@ export default function WarehouseDetails({
       if (isLinked) {
         return formData.warehouseAddress && formData.warehouseCity ? 'complete' : 'partial';
       }
-      const required = [formData.warehouseAddress, formData.warehouseCity, formData.warehouseState, formData.warehouseZip, formData.warehouseCountry];
+      const required = [formData.warehouseAddress, formData.warehouseCity, formData.warehouseState, formData.warehouseZip, formData.warehouseCountry, formData.warehouseLatitude, formData.warehouseLongitude];
       // `warehouseCountry` defaults to "India", so exclude it from the
       // "in progress" trigger — an untouched address reads as empty.
       const userEntered = [formData.warehouseAddress, formData.warehouseCity, formData.warehouseState, formData.warehouseZip];
@@ -837,6 +851,31 @@ export default function WarehouseDetails({
                 <p className="text-red-600 text-xs mt-1 font-medium" role="alert">{errors.warehouseZip}</p>
               )}
             </div>
+          </div>
+
+          {/* Warehouse coordinates. When linked to the legal address these are mirrored
+              from the factory pair (see CompanyDetails.buildPersistPayload) and locked. */}
+          <div className="mt-4">
+            <CoordinateFields
+              idPrefix="warehouse"
+              latitude={formData.warehouseLatitude}
+              longitude={formData.warehouseLongitude}
+              disabled={isLinked}
+              latError={!isLinked && touched.warehouseLatitude ? errors.warehouseLatitude : ''}
+              lngError={!isLinked && touched.warehouseLongitude ? errors.warehouseLongitude : ''}
+              onChange={(field, value) =>
+                handleInputChange(field === 'latitude' ? 'warehouseLatitude' : 'warehouseLongitude', value)
+              }
+              onBlur={(field) =>
+                handleBlur(field === 'latitude' ? 'warehouseLatitude' : 'warehouseLongitude')
+              }
+              required={!isLinked}
+              helpText={
+                isLinked
+                  ? 'Synced from the Legal Address & Factory Site coordinates.'
+                  : COORDINATE_HELP
+              }
+            />
           </div>
         </AccordionSection>
 

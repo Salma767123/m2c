@@ -4,8 +4,9 @@ const { uploadToCloudinary, deleteFromCloudinary, resolveBase64InValue } = requi
 const { prisma } = require('../config/database');
 const { normalizeCategoryValues } = require('../utils/categoryResolver');
 const { generateVendorCode, reconcileAndGenerate } = require('../utils/vendorCodeGenerator');
-const { parseMapLinkCoordinates } = require('../utils/locationUtils');
+const { resolveVendorCoordinates } = require('../utils/locationUtils');
 const { syncVendorCustomCategories } = require('../utils/customCategories');
+const { REFERRAL_SOURCES } = require('../utils/referralSources');
 const {
   sendVendorApprovalEmail,
   sendVendorRejectionEmail,
@@ -228,6 +229,10 @@ const registerVendor = async (req, res) => {
       country,
       factoryOwnershipType,   // owned / rented / lease for the factory site
 
+      // Acquisition — how the vendor found us (last registration step)
+      referralSource,
+      referralSourceDetail,
+
       // Owner Profile
       ownerName,
       designation,             // Proprietor / CEO / Director / Founder / custom
@@ -254,6 +259,11 @@ const registerVendor = async (req, res) => {
       warehouseZip,
       warehouseCountry,
       mapLink,
+      // Coordinates typed on the form. Authoritative — a mapLink is only a fallback.
+      latitude,
+      longitude,
+      warehouseLatitude,
+      warehouseLongitude,
 
       // Vendor Type & Products
       vendorType,
@@ -687,6 +697,14 @@ const registerVendor = async (req, res) => {
       aadhaarNumber: aadhaarNumber || null,
       factoryOwnershipType: factoryOwnershipType || null,
 
+      // Acquisition — normalise to the known option ids so the report groupBy
+      // stays clean; anything unrecognised is treated as 'others' with the raw
+      // value preserved in the detail column.
+      referralSource: REFERRAL_SOURCES.has(referralSource) ? referralSource : (referralSource ? 'others' : null),
+      referralSourceDetail: (referralSourceDetail && String(referralSourceDetail).trim())
+        || (referralSource && !REFERRAL_SOURCES.has(referralSource) ? String(referralSource).trim() : null)
+        || null,
+
       // Contact & Trade Information
       businessPhone: phone,
       landlineNumber: landlineNumber || null,
@@ -757,12 +775,15 @@ const registerVendor = async (req, res) => {
       warehouseSize: warehousingCapacity ? `${warehousingCapacity} sq ft` : null,
       storageCapacity: warehousingCapacity,
       mapLink: mapLink || null,
-      ...(() => {
-        const coords = parseMapLinkCoordinates(mapLink);
-        return coords
-          ? { factoryLatitude: coords.latitude, factoryLongitude: coords.longitude }
-          : {};
-      })(),
+      // Factory coordinates — the pair the QC inspection geofence measures against.
+      // A value typed on the form wins; mapLink is parsed only as a fallback.
+      ...resolveVendorCoordinates({ latitude, longitude, mapLink }),
+      ...resolveVendorCoordinates({
+        latitude: warehouseLatitude,
+        longitude: warehouseLongitude,
+        latField: 'warehouseLatitude',
+        lngField: 'warehouseLongitude',
+      }),
 
       // Vendor Type & Products
       vendorType: getVendorTypeEnum(parsedVendorType),
@@ -1763,6 +1784,17 @@ const updateVendorById = async (req, res) => {
       businessCountry: updateData.country || 'India',
       factoryOwnershipType: updateData.factoryOwnershipType || null,
 
+      // Acquisition — same normalisation as registration so an admin edit and a
+      // self-registration can never store the channel in two different shapes.
+      referralSource: REFERRAL_SOURCES.has(updateData.referralSource)
+        ? updateData.referralSource
+        : (updateData.referralSource ? 'others' : null),
+      referralSourceDetail: (updateData.referralSourceDetail && String(updateData.referralSourceDetail).trim())
+        || (updateData.referralSource && !REFERRAL_SOURCES.has(updateData.referralSource)
+          ? String(updateData.referralSource).trim()
+          : null)
+        || null,
+
       // Owner Profile
       ownerName: updateData.ownerName,
       designation: updateData.designation || null,
@@ -1812,12 +1844,17 @@ const updateVendorById = async (req, res) => {
       productionCapacity: updateProductionCapacity,
       storageCapacity: updateData.warehousingCapacity,
       mapLink: updateData.mapLink || null,
-      ...(() => {
-        const coords = parseMapLinkCoordinates(updateData.mapLink);
-        return coords
-          ? { factoryLatitude: coords.latitude, factoryLongitude: coords.longitude }
-          : {};
-      })(),
+      ...resolveVendorCoordinates({
+        latitude: updateData.latitude,
+        longitude: updateData.longitude,
+        mapLink: updateData.mapLink,
+      }),
+      ...resolveVendorCoordinates({
+        latitude: updateData.warehouseLatitude,
+        longitude: updateData.warehouseLongitude,
+        latField: 'warehouseLatitude',
+        lngField: 'warehouseLongitude',
+      }),
 
       // Vendor Type & Products
       // Mirror registerVendor: keep both legacy single-enum and the role

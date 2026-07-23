@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { GEOFENCE_DISABLED, getCurrentCoords, captureCoordsForSubmit, type CheckerCoords, type InspectionType } from '@/lib/checkerLocation'
+import InspectionTypeDialog from './InspectionTypeDialog'
 import { Check, ArrowLeft, ArrowRight, AlertTriangle, ShieldAlert, Clock, Save, AlarmClockOff } from 'lucide-react'
 import { HighlightFieldsProvider } from './Steps/VI_VerifyField'
 import type { Verifications } from './Steps/VI_VerifyField'
@@ -39,40 +41,19 @@ const STEPS = [
   { id: 9, label: 'Documentation',   short: '9' },
 ]
 
-// Geofencing is disabled everywhere by default — dev AND production — so
-// inspections never require GPS or the browser location prompt. Set
-// NEXT_PUBLIC_ENABLE_GEOFENCE=true to turn it back on. The backend applies the
-// same rule (see utils/locationUtils.isGeofenceDisabled).
-const GEOFENCE_DISABLED = process.env.NEXT_PUBLIC_ENABLE_GEOFENCE !== 'true'
-
-function getCurrentCoords(): Promise<{ checkerLatitude: number; checkerLongitude: number }> {
-  return new Promise((resolve, reject) => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      reject(new Error('Location is not supported by this browser. Please use a device with GPS/location enabled.'))
-      return
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ checkerLatitude: pos.coords.latitude, checkerLongitude: pos.coords.longitude }),
-      (err) => {
-        const message =
-          err.code === err.PERMISSION_DENIED
-            ? 'Location permission was denied. Please allow location access for this site and refresh the page to start the inspection.'
-            : err.code === err.POSITION_UNAVAILABLE
-              ? 'Your location could not be determined. Please check that location services are enabled and try again.'
-              : 'Timed out while getting your location. Please try again.'
-        reject(new Error(message))
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    )
-  })
-}
 
 export default function VendorInspectionForm({ vendorId, vendorName, onComplete }: Props) {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<{ type: 'not_assigned' | 'submitted' | 'unknown' | 'expired'; message: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [checkerCoords, setCheckerCoords] = useState<{ checkerLatitude: number; checkerLongitude: number } | null>(null)
+  const [checkerCoords, setCheckerCoords] = useState<CheckerCoords | null>(null)
+  // Physical vs virtual. Chosen in the mandatory dialog on first start, or read back
+  // from the inspection when continuing an already-started one.
+  const [inspectionType, setInspectionType] = useState<InspectionType | null>(null)
+  // Inspection id awaiting a type choice → drives the mandatory dialog. Non-null only
+  // for a SCHEDULED (never-started) inspection.
+  const [typeDialogFor, setTypeDialogFor] = useState<string | null>(null)
   const [vendor, setVendor] = useState<any>(null)
   const [inspection, setInspection] = useState<any>(null)
   const [cycleNumber, setCycleNumber] = useState(1)
@@ -191,37 +172,6 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
     if (prefilledRef.current) return
     let cancelled = false
 
-    async function autoStart(inspId: string) {
-      try {
-        // Dev/non-production: start without GPS so the browser never prompts.
-        if (GEOFENCE_DISABLED) {
-          const res = await qcCheckerService.startInspection(inspId, { checkerLatitude: null, checkerLongitude: null } as any)
-          if (res?.inspection && !cancelled) setInspection(res.inspection)
-          return
-        }
-        const coords = await getCurrentCoords()
-        if (cancelled) return
-        setCheckerCoords(coords)
-        const res = await qcCheckerService.startInspection(inspId, coords)
-        if (res?.inspection && !cancelled) setInspection(res.inspection)
-      } catch (err: any) {
-        if (cancelled) return
-        const msg: string = err?.message || ''
-        // Booked window elapsed before the checker started — block the form with
-        // a full-page warning; the assignment is now EXPIRED and needs a reassign.
-        if (err?.code === 'INSPECTION_EXPIRED' || (err?.status === 409 && /window has passed|expired/i.test(msg))) {
-          setLoadError({ type: 'expired', message: msg || 'This inspection can no longer be started — its scheduled time window has passed. Please ask the admin to schedule a new assignment.' })
-          return
-        }
-        if (err?.status === 400 && /already/i.test(msg)) return
-        // Vendor has no map location configured — geofence can't run, but the
-        // inspection form should still be usable. Don't surface this as an error.
-        if (/vendor location not set/i.test(msg)) return
-        console.error('Auto-start failed:', err)
-        showErrorToast('Could not start inspection', msg || 'Please enable location services and refresh the page.')
-      }
-    }
-
     async function load() {
       try {
         const cached = qcCheckerService.getCheckerData?.()
@@ -276,7 +226,12 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
           else if (insp.rejectionReason) setPreviousRejectionReason(insp.rejectionReason)
 
           if (insp.status === 'SCHEDULED') {
-            autoStart(insp.id)
+            // Never started — ask the checker how before capturing anything. The dialog
+            // then calls handleStartWithType, which starts the inspection.
+            setTypeDialogFor(insp.id)
+          } else {
+            // Continuing an already-started inspection — its type is fixed, reuse it.
+            setInspectionType((insp.inspectionType as InspectionType) || 'PHYSICAL')
           }
         }
 
@@ -299,6 +254,42 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
     load()
     return () => { cancelled = true }
   }, [vendorId])
+
+  // ── Start the inspection with the chosen type ──────────────────────────────
+  // Invoked from the mandatory type dialog. Physical captures + verifies GPS;
+  // virtual sends none. Mirrors the backend guard: the type decides everything.
+  const handleStartWithType = async (inspId: string, type: InspectionType) => {
+    setInspectionType(type)
+    setTypeDialogFor(null)
+    try {
+      if (type === 'VIRTUAL' || GEOFENCE_DISABLED) {
+        const res = await qcCheckerService.startInspection(inspId, { checkerLatitude: null, checkerLongitude: null, inspectionType: type } as any)
+        if (res?.inspection) setInspection(res.inspection)
+        return
+      }
+      const coords = await getCurrentCoords()
+      setCheckerCoords(coords)
+      const res = await qcCheckerService.startInspection(inspId, {
+        checkerLatitude: coords.latitude,
+        checkerLongitude: coords.longitude,
+        inspectionType: type,
+      })
+      if (res?.inspection) setInspection(res.inspection)
+    } catch (err: any) {
+      const msg: string = err?.message || ''
+      // Booked window elapsed before the checker started — block the form with a
+      // full-page warning; the assignment is now EXPIRED and needs a reassign.
+      if (err?.code === 'INSPECTION_EXPIRED' || (err?.status === 409 && /window has passed|expired/i.test(msg))) {
+        setLoadError({ type: 'expired', message: msg || 'This inspection can no longer be started — its scheduled time window has passed. Please ask the admin to schedule a new assignment.' })
+        return
+      }
+      if (err?.status === 400 && /already/i.test(msg)) return
+      // Everything else here is a genuine block (GPS denied, or the checker is outside
+      // the allowed radius) and must be shown, not swallowed.
+      console.error('Start failed:', err)
+      showErrorToast('Could not start inspection', msg || 'Please enable location services and try again.')
+    }
+  }
 
   // ── Verification state handler ─────────────────────────────────────────────
   const handleVerificationChange = (key: string, ok: boolean | null, remarks: string) => {
@@ -445,13 +436,15 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
 
     setSubmitting(true)
 
-    // Use GPS captured at inspection start; re-fetch only if not available.
-    // Skipped entirely outside production — no location prompt, no requirement.
+    // Reuse the GPS captured at start; re-fetch only if missing. captureCoordsForSubmit
+    // returns null for a virtual inspection (and when the geofence is off), so no
+    // location is captured or required in that case.
+    const effectiveType = inspectionType ?? (inspection?.inspectionType as InspectionType) ?? 'PHYSICAL'
     let coords = checkerCoords
-    if (!coords && !GEOFENCE_DISABLED) {
+    if (!coords) {
       try {
-        coords = await getCurrentCoords()
-        setCheckerCoords(coords)
+        coords = await captureCoordsForSubmit(effectiveType)
+        if (coords) setCheckerCoords(coords)
       } catch (gpsErr: any) {
         showErrorToast('Location Required', gpsErr?.message || 'Please enable location services and try again.')
         setSubmitting(false)
@@ -479,8 +472,9 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
         inspectionStatus: meta.overallResult,
         inspectorRemarks: meta.inspectorRemarks,
         cycleNumber,
-        checkerLatitude: coords?.checkerLatitude ?? null,
-        checkerLongitude: coords?.checkerLongitude ?? null,
+        inspectionType: effectiveType,
+        checkerLatitude: coords?.latitude ?? null,
+        checkerLongitude: coords?.longitude ?? null,
         clientSignature: docData.clientSignature || null,
         inspectorEvidenceImages: inspectorEvidenceImages.length > 0 ? inspectorEvidenceImages : null,
       }
@@ -550,6 +544,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
           onDocDataChange={(patch) => setDocData(prev => ({ ...prev, ...patch }))}
           factoryEvidence={factoryEvidence}
           inspectionStartedAt={inspection?.startedAt ?? formOpenedAtRef.current}
+          inspectionType={inspectionType ?? (inspection?.inspectionType as InspectionType) ?? 'PHYSICAL'}
         />
       )
       default: return null
@@ -608,6 +603,15 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
 
   return (
     <div ref={rootRef} className="min-h-screen font-sans bg-[#f7f7f5]">
+      {/* Mandatory type selection — blocks the form until the checker chooses how the
+          inspection is being carried out. Cancelling backs out of the inspection. */}
+      {typeDialogFor && (
+        <InspectionTypeDialog
+          subjectName={vendor?.companyName || vendorName}
+          onSelect={(type) => handleStartWithType(typeDialogFor, type)}
+          onCancel={() => { setTypeDialogFor(null); onComplete() }}
+        />
+      )}
       <div className="p-8 max-w-5xl mx-auto">
         {/* Header */}
         <div className="mb-8 flex items-center gap-4">

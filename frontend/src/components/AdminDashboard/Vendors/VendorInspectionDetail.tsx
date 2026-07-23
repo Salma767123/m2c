@@ -268,6 +268,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
       checker: qc
         ? { name: qc.name, checkerId: qc.checkerId, email: qc.email, phone: qc.phone || qc.mobile }
         : ((formData as any).inspectorName ? { name: (formData as any).inspectorName } : null),
+      inspectionType: inspection?.inspectionType,
       location:
         inspection?.checkerLatitude != null && inspection?.checkerLongitude != null
           ? { latitude: inspection.checkerLatitude, longitude: inspection.checkerLongitude }

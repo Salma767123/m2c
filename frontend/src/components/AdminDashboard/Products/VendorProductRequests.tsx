@@ -9,9 +9,11 @@ import Dropdown from '@/components/UI/Dropdown'
 import DateRangeCalendar from '@/components/Shared/DateRangeCalendar'
 import { Breadcrumb } from '../Breadcrumb/Breadcrumb'
 import ApproveProductModal, { type ApprovableProduct } from './ApproveProductModal'
+import ProductRejectionModal from './ProductRejectionModal'
+import PriceNegotiationModal from './PriceNegotiationModal'
 import {
   Eye, Check, X, Search, Package, UserPlus, UserCog, CheckCircle,
-  ChevronLeft, ChevronRight, Clock, ShoppingBag, AlertTriangle, XCircle,
+  ChevronLeft, ChevronRight, Clock, ShoppingBag, AlertTriangle, XCircle, Handshake,
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { adminProductService } from '@/services/adminProductService'
@@ -29,7 +31,7 @@ interface VendorProductRequest {
   originalPrice?: number
   totalStock: number
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'
-  approvalStatus: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION'
+  approvalStatus: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | 'NEGOTIATION'
   approvedAt?: string
   rejectionReason?: string
   createdAt: string
@@ -96,6 +98,8 @@ const getApprovalStatusBadge = (status: string) => {
       return <Badge className="bg-red-50 text-red-700 border border-red-200 font-bold">Rejected</Badge>
     case 'REINSPECTION':
       return <Badge className="bg-orange-50 text-orange-700 border border-orange-200 font-bold">Re-Inspection</Badge>
+    case 'NEGOTIATION':
+      return <Badge className="bg-purple-50 text-purple-700 border border-purple-200 font-bold">Under Negotiation</Badge>
     default:
       return <Badge className="bg-slate-100 text-slate-600 border border-slate-200 font-bold">{status}</Badge>
   }
@@ -122,11 +126,14 @@ export default function VendorProductRequests() {
   // ── Modal state ───────────────────────────────────────────────────────────
   const [showRejectionModal, setShowRejectionModal] = useState(false)
   const [rejectingRequestId, setRejectingRequestId] = useState<string | null>(null)
+  const [rejectLoading, setRejectLoading] = useState(false)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [assigningRequestId, setAssigningRequestId] = useState<string | null>(null)
   const [selectedQcChecker, setSelectedQcChecker] = useState<string>('')
   const [showApprovalModal, setShowApprovalModal] = useState(false)
   const [approvingRequest, setApprovingRequest] = useState<VendorProductRequest | null>(null)
+  // Product currently open in the price-negotiation modal.
+  const [negotiateFor, setNegotiateFor] = useState<{ id: string; name: string } | null>(null)
 
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -216,6 +223,7 @@ export default function VendorProductRequests() {
 
   const handleReject = async (reason: string) => {
     if (!rejectingRequestId) return
+    setRejectLoading(true)
     try {
       const response = await adminProductService.rejectProduct(rejectingRequestId, reason.trim())
       if (response.success) {
@@ -223,7 +231,11 @@ export default function VendorProductRequests() {
         setShowRejectionModal(false); setRejectingRequestId(null)
         loadRequests(pagination.currentPage); loadStatusCounts()
       }
-    } catch (error: any) { showErrorToast('Rejection Failed', error.message || 'Unable to reject product.') }
+    } catch (error: any) {
+      showErrorToast('Rejection Failed', error.message || 'Unable to reject product.')
+    } finally {
+      setRejectLoading(false)
+    }
   }
 
   const handleAssignClick = (requestId: string) => {
@@ -329,6 +341,7 @@ export default function VendorProductRequests() {
                     { value: 'all',          label: 'All Statuses' },
                     { value: 'PENDING',      label: 'Pending QC' },
                     { value: 'QC_APPROVED',  label: 'QC Approved' },
+                    { value: 'NEGOTIATION',  label: 'Under Negotiation' },
                     { value: 'APPROVED',     label: 'Approved' },
                     { value: 'REJECTED',     label: 'Rejected' },
                     { value: 'REINSPECTION', label: 'Re-Inspection' },
@@ -463,9 +476,18 @@ export default function VendorProductRequests() {
                               <Eye className="h-4 w-4" />
                             </button>
                           )}
-                          {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'REINSPECTION') && (
+                          {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'REINSPECTION' || request.approvalStatus === 'NEGOTIATION') && (
                             <>
-                              {request.approvalStatus === 'QC_APPROVED' && hasPermission('vendor_product_requests:approve') && (
+                              {(request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'NEGOTIATION') && hasPermission('vendor_product_requests:approve') && (
+                                <button
+                                  title="Review & Negotiate Price"
+                                  onClick={() => setNegotiateFor({ id: request.id, name: request.name })}
+                                  className="p-2 rounded-lg text-purple-600 hover:text-purple-700 hover:bg-purple-50 transition-colors"
+                                >
+                                  <Handshake className="h-4 w-4" />
+                                </button>
+                              )}
+                              {(request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'NEGOTIATION') && hasPermission('vendor_product_requests:approve') && (
                                 <button
                                   title="Final Approve & Set Price"
                                   onClick={() => handleApproveClick(request.id)}
@@ -557,6 +579,16 @@ export default function VendorProductRequests() {
 
       </div>
 
+      {/* ══ Price Negotiation Modal ═════════════════════════════════════════ */}
+      {negotiateFor && (
+        <PriceNegotiationModal
+          productId={negotiateFor.id}
+          productName={negotiateFor.name}
+          onClose={() => setNegotiateFor(null)}
+          onChanged={() => { loadRequests(pagination.currentPage); loadStatusCounts() }}
+        />
+      )}
+
       {/* ══ Approval Modal ══════════════════════════════════════════════════ */}
       <ApproveProductModal
         product={approvingRequest as unknown as ApprovableProduct}
@@ -566,45 +598,24 @@ export default function VendorProductRequests() {
       />
 
 
-      {/* ══ Rejection Modal ══════════════════════════════════════════════════ */}
-      {showRejectionModal && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">Reject Product Request</h3>
-              <button type="button" onClick={() => { setShowRejectionModal(false); setRejectingRequestId(null) }}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="text-sm text-slate-500 mb-4">Please provide a reason for rejecting this product request. The vendor will be notified.</p>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Rejection Reason</label>
-              <textarea
-                id="rejectionReason"
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none text-sm resize-none"
-                placeholder="Enter reason for rejection…"
-                rows={4}
-              />
-            </div>
-            <div className="flex justify-end gap-3">
-              <button type="button" onClick={() => { setShowRejectionModal(false); setRejectingRequestId(null) }}
-                className="px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-                Cancel
-              </button>
-              <button type="button"
-                onClick={() => {
-                  const reasonInput = document.getElementById('rejectionReason') as HTMLTextAreaElement
-                  const reason = reasonInput.value.trim()
-                  if (reason) { handleReject(reason) } else { showErrorToast('Validation Error', 'Please provide a rejection reason') }
-                }}
-                className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors shadow-xs">
-                Reject Product
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ══ Rejection Modal — shared product-rejection wizard ════════════════ */}
+      {(() => {
+        const rejectingRequest = requests.find(r => r.id === rejectingRequestId)
+        return (
+          <ProductRejectionModal
+            isOpen={showRejectionModal}
+            onClose={() => { setShowRejectionModal(false); setRejectingRequestId(null) }}
+            onConfirm={handleReject}
+            isLoading={rejectLoading}
+            product={rejectingRequest ? {
+              id: rejectingRequest.id,
+              name: rejectingRequest.name,
+              sku: rejectingRequest.baseSku,
+              vendorName: rejectingRequest.vendor?.companyName,
+            } : null}
+          />
+        )
+      })()}
 
       {/* ══ Assign QC Checker Modal ══════════════════════════════════════════ */}
       {showAssignModal && (() => {

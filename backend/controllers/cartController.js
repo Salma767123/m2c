@@ -296,7 +296,12 @@ const getCart = async (req, res) => {
             singleUnitSize: product.singleUnitSize,
             singleUnitColor: product.singleUnitColor,
             singleUnitColorHex: product.singleUnitColorHex,
-            baseSku: product.baseSku
+            baseSku: product.baseSku,
+            // Selected above but previously dropped here, so the storefront's
+            // shipping calculator never had a config to work with and quoted ₹0 on
+            // every order. The server now charges shipping from this same config,
+            // so the client must receive it to show the customer the same number.
+            logisticsConfig: product.logisticsConfig
           } : null
         };
       })
@@ -325,10 +330,20 @@ const getCart = async (req, res) => {
 const updateCartItem = async (req, res) => {
   try {
     const { itemId } = req.params;
-    const { quantity } = req.body;
+    const { quantity, transportType } = req.body;
     const userId = req.userId;
 
-    if (!quantity || quantity < 1) {
+    // Either field may be updated independently — the cart's transport selector
+    // changes only transportType, the +/- steppers change only quantity.
+    const wantsQuantity = quantity !== undefined;
+    const wantsTransport = transportType !== undefined;
+    if (!wantsQuantity && !wantsTransport) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nothing to update'
+      });
+    }
+    if (wantsQuantity && (!quantity || quantity < 1)) {
       return res.status(400).json({
         success: false,
         error: 'Valid quantity is required'
@@ -356,6 +371,7 @@ const updateCartItem = async (req, res) => {
       select: {
         totalStock: true,
         inStock: true,
+        logisticsConfig: true,
         variants: cartItem.variantId ? {
           where: { id: cartItem.variantId },
           select: { stock: true }
@@ -367,17 +383,33 @@ const updateCartItem = async (req, res) => {
       ? product.variants[0].stock
       : product?.totalStock;
 
-    if (!product || !product.inStock || availableStock < quantity) {
+    if (wantsQuantity && (!product || !product.inStock || availableStock < quantity)) {
       return res.status(400).json({
         success: false,
         error: `Insufficient stock available${availableStock != null ? ` (${availableStock} left)` : ''}`
       });
     }
 
-    // Update quantity
+    // Only accept a transport the product actually offers — otherwise the order
+    // would be priced with a rate the vendor never configured.
+    if (wantsTransport && transportType !== null) {
+      const allowed = Array.isArray(product?.logisticsConfig?.transportTypes)
+        ? product.logisticsConfig.transportTypes
+        : [];
+      if (!allowed.includes(transportType)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Selected shipping method is not available for this product'
+        });
+      }
+    }
+
     await prisma.cartItem.update({
       where: { id: itemId },
-      data: { quantity }
+      data: {
+        ...(wantsQuantity ? { quantity } : {}),
+        ...(wantsTransport ? { transportType } : {}),
+      }
     });
 
     // Get updated cart

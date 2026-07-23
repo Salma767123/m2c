@@ -7,6 +7,8 @@ export interface CartItem {
   variantId?: string;
   quantity: number;
   price: number;
+  /** Shipping mode chosen for this line — required when the product offers a choice. */
+  transportType?: 'AIR' | 'SHIP' | null;
   product?: {
     id: string;
     name: string;
@@ -14,6 +16,8 @@ export interface CartItem {
     basePrice: number;
     description?: string;
     gstPercentage?: number;
+    /** Per-product shipping rules. Rates inside are in INR — convert for USD carts. */
+    logisticsConfig?: any;
     inStock?: boolean;
     availableStock?: number;
     originalPrice?: number;
@@ -92,6 +96,16 @@ class CartService {
       return result;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to update cart item');
+    }
+  }
+
+  /** Set the shipping mode ('AIR' | 'SHIP') for one cart line. */
+  async setTransportType(itemId: string, transportType: 'AIR' | 'SHIP'): Promise<CartResponse> {
+    try {
+      const response = await axios.put(`/cart/${itemId}`, { transportType });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error?.response?.data?.error || error.message || 'Failed to set shipping method');
     }
   }
 

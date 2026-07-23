@@ -325,6 +325,14 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
           <div className="mt-10 pt-6 border-t border-slate-100 text-center">
             <p className="text-sm text-slate-500">Thank you for your purchase!</p>
             <p className="text-xs text-slate-400 mt-1">This is a computer-generated invoice and does not require a signature.</p>
+            <a
+              href="https://www.m2cmarkdowns.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-2 text-xs font-semibold text-brand-500 hover:underline"
+            >
+              www.m2cmarkdowns.com
+            </a>
           </div>
         </div>
       </div>

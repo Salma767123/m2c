@@ -89,55 +89,39 @@ export default function ExchangeRateTab() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Input */}
-          <div>
-            <label htmlFor="exchange-rate" className="block text-sm font-semibold text-slate-700 mb-2">
-              1 USD = ₹
-            </label>
-            <div className="flex gap-3">
-              <input
-                id="exchange-rate"
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={rate}
-                onChange={(e) => setRate(e.target.value)}
-                className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-lg font-semibold"
-                placeholder="83.50"
-              />
-              <button
-                onClick={handleSave}
-                disabled={saving || !rate || parseFloat(rate) <= 0}
-                className="flex items-center gap-2 px-6 py-2.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
-              >
-                {saving ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4" />
-                )}
-                {saving ? 'Updating...' : 'Update'}
-              </button>
-            </div>
-            {lastUpdated && (
-              <p className="text-xs text-slate-500 mt-2">
-                Last updated: {new Date(lastUpdated).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-              </p>
-            )}
+        <div className="max-w-xl">
+          <label htmlFor="exchange-rate" className="block text-sm font-semibold text-slate-700 mb-2">
+            1 USD = ₹
+          </label>
+          <div className="flex gap-3">
+            <input
+              id="exchange-rate"
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={rate}
+              onChange={(e) => setRate(e.target.value)}
+              className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-lg font-semibold"
+              placeholder="83.50"
+            />
+            <button
+              onClick={handleSave}
+              disabled={saving || !rate || parseFloat(rate) <= 0}
+              className="flex items-center gap-2 px-6 py-2.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+            >
+              {saving ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+              {saving ? 'Updating...' : 'Update'}
+            </button>
           </div>
-
-          {/* Preview */}
-          <div>
-            <p className="text-sm font-semibold text-slate-700 mb-2">Price Preview</p>
-            <div className="bg-slate-50 rounded-lg p-4 space-y-2">
-              {[500, 1000, 2500, 5000, 10000].map((inr) => (
-                <div key={inr} className="flex justify-between text-sm">
-                  <span className="text-slate-600">₹{inr.toLocaleString('en-IN')}</span>
-                  <span className="font-semibold text-slate-900">${previewPrice(inr)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          {lastUpdated && (
+            <p className="text-xs text-slate-500 mt-2">
+              Last updated: {new Date(lastUpdated).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </p>
+          )}
         </div>
 
         {/* Info Box */}

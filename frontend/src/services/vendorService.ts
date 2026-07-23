@@ -38,9 +38,19 @@ export interface VendorRegistrationData {
   state: string;
   zipCode: string;
   country: string;
+  /** Factory-site coordinates, as typed by the user. Strings on the wire: the FormData
+   *  serialiser drops falsy values, so a numeric 0 would vanish. The backend parses
+   *  them into Vendor.factoryLatitude / factoryLongitude, which the QC inspection
+   *  geofence measures against. */
+  latitude?: string;
+  longitude?: string;
   /** Factory ownership — owned / rented / lease. Mirrored to warehouse
    *  `ownershipType` when the user ticks "Same as warehouse". */
   factoryOwnershipType?: string;
+  /** How the vendor heard about us (acquisition channel id). */
+  referralSource?: string;
+  /** Free text for referral/others — referrer name or the typed channel. */
+  referralSourceDetail?: string;
 
   // Owner Profile
   ownerName: string;
@@ -89,6 +99,10 @@ export interface VendorRegistrationData {
   warehouseState: string;
   warehouseZip: string;
   warehouseCountry: string;
+  /** Warehouse coordinates. Mirrored from the factory pair when the vendor ticks
+   *  "same as legal address". */
+  warehouseLatitude?: string;
+  warehouseLongitude?: string;
 
   // Vendor Type & Products
   vendorType: string | string[];
@@ -329,6 +343,12 @@ export interface VendorProfile {
   warehouseState?: string;
   warehouseZipCode?: string;
   warehouseCountry?: string;
+  /** Persisted coordinates (numbers on read — Prisma Float columns). The factory pair
+   *  is what the QC inspection geofence measures against. */
+  factoryLatitude?: number | null;
+  factoryLongitude?: number | null;
+  warehouseLatitude?: number | null;
+  warehouseLongitude?: number | null;
   /** Step 6 free-text logistics / compliance fields. */
   packagingCapabilities?: string;
   logisticsPartners?: string;

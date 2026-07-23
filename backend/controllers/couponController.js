@@ -1,4 +1,5 @@
 const { prisma } = require('../config/database');
+const { evaluateCoupon } = require('../utils/couponPricing');
 
 // Create a new coupon (Admin only)
 const createCoupon = async (req, res) => {
@@ -210,142 +211,31 @@ const deleteCoupon = async (req, res) => {
 // Validate and apply coupon
 const applyCoupon = async (req, res) => {
     try {
-        const { code, cartTotal, userId, currency: rawCurrency } = req.body;
-        const currency = (rawCurrency || 'INR').toUpperCase() === 'USD' ? 'USD' : 'INR';
-        const symbol = currency === 'USD' ? '$' : '₹';
+        // All validation and discount math lives in utils/couponPricing so this
+        // endpoint and orderController.createOrder can never drift apart. The
+        // shopper previews here; the order recomputes with the same rules.
+        const { code, cartTotal, userId, currency } = req.body;
 
-        // Get exchange rate for converting INR coupon values to USD
-        let exchangeRate = 1;
-        if (currency === 'USD') {
-            const { getCurrentExchangeRate } = require('./exchangeRateController');
-            exchangeRate = await getCurrentExchangeRate();
+        const result = await evaluateCoupon({ code, cartTotal, userId, currency });
+        if (!result.ok) {
+            return res.status(400).json({ success: false, message: result.message });
         }
 
-        if (!code) {
-            return res.status(400).json({
-                success: false,
-                message: 'Coupon code is required'
-            });
-        }
-
-        const coupon = await prisma.coupon.findUnique({
-            where: { code }
-        });
-
-        if (!coupon) {
-            return res.status(404).json({
-                success: false,
-                message: 'Invalid coupon code'
-            });
-        }
-
-        // Check if active
-        if (!coupon.isActive) {
-            return res.status(400).json({
-                success: false,
-                message: 'This coupon is no longer active'
-            });
-        }
-
-        // Check expiry
-        const now = new Date();
-        if (now < coupon.startDate || now > coupon.expiryDate) {
-            return res.status(400).json({
-                success: false,
-                message: 'This coupon has expired or is not yet valid'
-            });
-        }
-
-        // Check usage limit
-        if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
-            return res.status(400).json({
-                success: false,
-                message: 'This coupon has reached its usage limit'
-            });
-        }
-
-        // Convert min purchase to cart currency
-        const minPurchase = currency === 'USD' && coupon.minPurchaseAmount
-            ? Math.round((coupon.minPurchaseAmount / exchangeRate) * 100) / 100
-            : coupon.minPurchaseAmount;
-
-        // Check minimum purchase amount
-        if (minPurchase && cartTotal < minPurchase) {
-            return res.status(400).json({
-                success: false,
-                message: `Minimum purchase amount of ${symbol}${minPurchase} required`
-            });
-        }
-
-        // Check per-user limit
-        if (userId && coupon.perUserLimit > 0) {
-            const userUsageCount = await prisma.order.count({
-                where: {
-                    customerId: userId,
-                    couponCode: coupon.code,
-                },
-            });
-            if (userUsageCount >= coupon.perUserLimit) {
-                return res.status(400).json({
-                    success: false,
-                    message: `You've already used this coupon ${coupon.perUserLimit === 1 ? '' : `${coupon.perUserLimit} times`}`,
-                });
-            }
-        }
-
-        // Check free shipping Nth order condition
-        if (coupon.freeShipping && coupon.freeShippingOrderNumbers && coupon.freeShippingOrderNumbers.length > 0 && userId) {
-            const userOrderCount = await prisma.order.count({ where: { customerId: userId } });
-            const nextOrderNumber = userOrderCount + 1;
-
-            if (!coupon.freeShippingOrderNumbers.includes(nextOrderNumber)) {
-                const orderList = coupon.freeShippingOrderNumbers
-                    .map(n => `${n}${getOrdinalSuffix(n)}`)
-                    .join(', ');
-                return res.status(400).json({
-                    success: false,
-                    message: `This coupon gives free shipping on your ${orderList} order(s). Your next order is #${nextOrderNumber}.`
-                });
-            }
-        }
-
-        // Calculate discount — convert INR values to USD if needed
-        let discountAmount = 0;
-        if (coupon.discountType === 'PERCENTAGE') {
-            discountAmount = (cartTotal * coupon.discountValue) / 100;
-
-            // Convert max discount cap to cart currency
-            const maxCap = currency === 'USD' && coupon.maxDiscountAmount
-                ? Math.round((coupon.maxDiscountAmount / exchangeRate) * 100) / 100
-                : coupon.maxDiscountAmount;
-
-            if (maxCap && discountAmount > maxCap) {
-                discountAmount = maxCap;
-            }
-        } else {
-            // FIXED_AMOUNT — convert to cart currency
-            discountAmount = currency === 'USD'
-                ? Math.round((coupon.discountValue / exchangeRate) * 100) / 100
-                : coupon.discountValue;
-        }
-
-        // Ensure discount doesn't exceed total
-        if (discountAmount > cartTotal) {
-            discountAmount = cartTotal;
-        }
+        // Re-read for the presentational fields the cart UI shows.
+        const coupon = await prisma.coupon.findUnique({ where: { code: result.code } });
 
         res.json({
             success: true,
             data: {
-                code: coupon.code,
-                discountType: coupon.discountType,
-                discountValue: coupon.discountValue,
-                discountAmount,
-                minPurchaseAmount: coupon.minPurchaseAmount,
-                freeShipping: coupon.freeShipping || false,
-                freeShippingOrderNumbers: coupon.freeShippingOrderNumbers || []
+                code: result.code,
+                discountType: result.discountType,
+                discountValue: result.discountValue,
+                discountAmount: result.discountAmount,
+                minPurchaseAmount: coupon?.minPurchaseAmount,
+                freeShipping: result.freeShipping,
+                freeShippingOrderNumbers: coupon?.freeShippingOrderNumbers || []
             },
-            message: coupon.freeShipping
+            message: result.freeShipping
                 ? 'Coupon applied successfully — Free shipping included!'
                 : 'Coupon applied successfully'
         });

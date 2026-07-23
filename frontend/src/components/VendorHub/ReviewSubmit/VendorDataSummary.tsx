@@ -1,7 +1,20 @@
 'use client';
 
 import React, { useState } from 'react';
-import { SquarePen, Calendar, Building2, Warehouse, UserCircle, Tags, Factory, ShieldCheck, Briefcase, Globe, FileText } from 'lucide-react';
+import { SquarePen, Calendar, Building2, Warehouse, UserCircle, Tags, Factory, ShieldCheck, Briefcase, Globe, FileText, Megaphone } from 'lucide-react';
+
+// Acquisition-channel labels — ids match backend/utils/referralSources.js.
+const REFERRAL_SOURCE_LABELS: Record<string, string> = {
+  'google': 'Google / Search',
+  'online-ads': 'Online Ads',
+  'linkedin': 'LinkedIn',
+  'instagram': 'Instagram',
+  'facebook': 'Facebook',
+  'youtube': 'YouTube',
+  'referral': 'Referral / Word of Mouth',
+  'trade-show': 'Trade Show / Exhibition',
+  'others': 'Others',
+};
 import { AccordionSection, getLandlineDisplay, formatLocalLandline, formatIntlLandline } from '../FormUI';
 import { buildFullName, calculateDuration, toExternalUrl, resolveOwnerDesignation } from '@/lib/utils';
 
@@ -117,7 +130,9 @@ const AddressRows: React.FC<{
   state?: string;
   country?: string;
   zip?: string;
-}> = ({ line1, line2, line3, landmark, city, state, country, zip }) => (
+  latitude?: string | number | null;
+  longitude?: string | number | null;
+}> = ({ line1, line2, line3, landmark, city, state, country, zip, latitude, longitude }) => (
   <>
     <InfoRow label="Address Line 1" value={line1} />
     {line2 && <InfoRow label="Address Line 2" value={line2} />}
@@ -127,6 +142,14 @@ const AddressRows: React.FC<{
     <InfoRow label="State / Province" value={state} />
     <InfoRow label="Country" value={country} />
     <InfoRow label="ZIP / Postal Code" value={zip} />
+    {/* Coordinates are optional — only shown when the vendor supplied them, so an
+        empty pair doesn't add two blank rows to every review page. */}
+    {latitude !== undefined && latitude !== null && String(latitude).trim() !== '' && (
+      <InfoRow label="Latitude" value={String(latitude)} />
+    )}
+    {longitude !== undefined && longitude !== null && String(longitude).trim() !== '' && (
+      <InfoRow label="Longitude" value={String(longitude)} />
+    )}
   </>
 );
 
@@ -517,6 +540,8 @@ export default function VendorDataSummary({
             state={data.state}
             country={data.country}
             zip={data.zipCode}
+            latitude={data.latitude}
+            longitude={data.longitude}
           />
           <InfoRow
             label="Warehousing Capacity"
@@ -564,6 +589,8 @@ export default function VendorDataSummary({
                 state={data.warehouseState}
                 country={data.warehouseCountry}
                 zip={data.warehouseZip}
+                latitude={data.warehouseLatitude}
+                longitude={data.warehouseLongitude}
               />
               <SubHeader>Factory &amp; Facility Photos</SubHeader>
               <FactoryPhotoGrid images={data.factoryImages} />
@@ -1014,6 +1041,22 @@ export default function VendorDataSummary({
               <InfoRow label="Import Countries" value={(data.importCountries || []).join(', ') || 'None'} />
               <InfoRow label="Export Countries" value={(data.exportCountries || []).join(', ') || 'None'} />
             </>
+          )}
+        </div>
+      </AccordionSection>
+
+      {/* How the vendor found us — from the last step of Contact & Trade. */}
+      <AccordionSection {...sectionProps('howHeard', 'How You Heard About Us', 'Acquisition channel', <Megaphone className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('contact'))}>
+        <div className="flex flex-col">
+          <InfoRow
+            label="Channel"
+            value={data.referralSource ? (REFERRAL_SOURCE_LABELS[data.referralSource] || data.referralSource) : 'Not specified'}
+          />
+          {data.referralSourceDetail && (
+            <InfoRow
+              label={data.referralSource === 'referral' ? 'Referred By' : 'Details'}
+              value={data.referralSourceDetail}
+            />
           )}
         </div>
       </AccordionSection>

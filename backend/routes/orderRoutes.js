@@ -39,7 +39,7 @@ router.get('/admin/:id/invoice', requireAdminRole, requirePermission(['invoices:
 
         // Fetch company info for invoice header (logo, name, GST, etc.)
         const company = await prisma.companyInfo.findFirst({
-            select: { companyName: true, gstNumber: true, registeredAddress: true, state: true, country: true, companyLogo: true }
+            select: { companyName: true, gstNumber: true, registeredAddress: true, state: true, country: true, companyLogo: true, companyWebsite: true }
         });
 
         const html = getOrderInvoiceHTML(order, company ? {
@@ -49,6 +49,7 @@ router.get('/admin/:id/invoice', requireAdminRole, requirePermission(['invoices:
             address: company.registeredAddress,
             state: company.state,
             country: company.country,
+            companyWebsite: company.companyWebsite,
         } : {});
         res.setHeader('Content-Type', 'text/html');
         res.send(html);
@@ -101,7 +102,7 @@ router.get('/:id/invoice', async (req, res) => {
         if (order.customerId !== userId) return res.status(403).json({ success: false, error: 'Unauthorized' });
 
         const company = await prisma.companyInfo.findFirst({
-            select: { companyName: true, gstNumber: true, registeredAddress: true, state: true, country: true, companyLogo: true }
+            select: { companyName: true, gstNumber: true, registeredAddress: true, state: true, country: true, companyLogo: true, companyWebsite: true }
         });
 
         const html = getOrderInvoiceHTML(order, company ? {
@@ -111,6 +112,7 @@ router.get('/:id/invoice', async (req, res) => {
             address: company.registeredAddress,
             state: company.state,
             country: company.country,
+            companyWebsite: company.companyWebsite,
         } : {});
         res.setHeader('Content-Type', 'text/html');
         res.send(html);

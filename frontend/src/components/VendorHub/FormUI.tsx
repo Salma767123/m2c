@@ -19,7 +19,6 @@ import type { ReactNode } from 'react';
 import { ChevronDown, Check, Search, MapPin, Loader2, AlertCircle, CheckCircle2, Plus, X } from 'lucide-react';
 import { Country, type ICountry } from 'country-state-city';
 import { parsePhoneNumberFromString, validatePhoneNumberLength } from 'libphonenumber-js';
-import { searchAddress, type AddressSuggestion } from '@/lib/addressSearch';
 
 // ── Shared input chrome ─────────────────────────────────────────────────
 
@@ -1648,217 +1647,126 @@ export function CountrySelect({
   );
 }
 
-// ── AddressAutocomplete — type-to-search address suggestions ────────────
-//
-// Backed by Nominatim (OpenStreetMap) via `lib/addressSearch.ts`. The user
-// types into a normal-looking input; results appear in a popover below.
-// Picking one fires `onSelect` with the parsed address parts so callers
-// can auto-fill Line 1, City, State, ZIP, and Country in one shot.
-//
-// Debounced 400ms so we don't hammer Nominatim's free endpoint. Aborts
-// stale requests when the query changes again.
+// ── Geographic coordinates ─────────────────────────────────────────────
 
-export interface AddressAutocompleteProps {
-  onSelect: (suggestion: AddressSuggestion) => void;
-  placeholder?: string;
-  disabled?: boolean;
-  id?: string;
+/**
+ * Validate a latitude/longitude string. Returns an error message, or '' when accepted.
+ *
+ * `required` is the normal case: these coordinates are what the QC inspection geofence
+ * measures a checker against, so a vendor saved without them cannot be location-verified
+ * at all. Pass `required: false` only where the pair is genuinely optional.
+ *
+ * Range is checked strictly because a transposed or mistyped pair silently places the
+ * factory in the wrong hemisphere — which would either block every inspector or pass
+ * all of them, with no visible symptom until someone reads a report.
+ */
+export function validateCoordinate(
+  value: string | undefined | null,
+  kind: 'latitude' | 'longitude',
+  required = true,
+): string {
+  const label = kind === 'latitude' ? 'Latitude' : 'Longitude';
+  const raw = (value ?? '').trim();
+  if (!raw) return required ? `${label} is required` : '';
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return `Enter a valid ${kind} (numbers only)`;
+  const limit = kind === 'latitude' ? 90 : 180;
+  if (n < -limit || n > limit) return `${label} must be between -${limit} and ${limit}`;
+  return '';
 }
 
-export function AddressAutocomplete({
-  onSelect,
-  placeholder = 'Search address (e.g. 12 Anna Salai, Chennai)…',
-  disabled,
-  id,
-}: AddressAutocompleteProps) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<AddressSuggestion[]>([]);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [highlight, setHighlight] = useState(0);
+/**
+ * Standard instructions for the coordinate pair.
+ *
+ * Written as steps, not as a description of what coordinates are: a vendor filling this
+ * form knows their factory's address but usually has no idea where to find its latitude
+ * and longitude, and an unexplained required field is where registrations stall.
+ */
+export const COORDINATE_HELP =
+  'Open Google Maps, right-click your factory location, then click the numbers at the top of the menu to copy them — the first is Latitude, the second Longitude.';
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const baseId = useId();
-  const listboxId = `${baseId}-listbox`;
-  const optionId = (i: number) => `${baseId}-opt-${i}`;
+interface CoordinateFieldsProps {
+  latitude: string;
+  longitude: string;
+  onChange: (field: 'latitude' | 'longitude', value: string) => void;
+  onBlur?: (field: 'latitude' | 'longitude') => void;
+  /** Field-name prefix so ids stay unique when two sections render this on one page. */
+  idPrefix: string;
+  latError?: string;
+  lngError?: string;
+  disabled?: boolean;
+  /** Marks the pair required (asterisk instead of "optional"). Defaults to true. */
+  required?: boolean;
+  /** Shown under the pair. Explains how to obtain the numbers. */
+  helpText?: React.ReactNode;
+}
 
-  // Debounced search — fire 400ms after last keystroke
-  useEffect(() => {
-    const trimmed = query.trim();
-    if (trimmed.length < 3) {
-      setResults([]);
-      setLoading(false);
-      abortRef.current?.abort();
-      return;
-    }
-    const timer = setTimeout(() => {
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setLoading(true);
-      searchAddress(trimmed, controller.signal).then((items) => {
-        if (controller.signal.aborted) return;
-        setResults(items);
-        setHighlight(0);
-        setLoading(false);
-        setOpen(true);
-      });
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [query]);
+/**
+ * Latitude / longitude input pair.
+ *
+ * Free text rather than `type="number"`: a number input silently drops a trailing
+ * decimal point while typing ("12." becomes ""), which makes entering coordinates
+ * infuriating. Validation happens on the string instead.
+ */
+export function CoordinateFields({
+  latitude,
+  longitude,
+  onChange,
+  onBlur,
+  idPrefix,
+  latError,
+  lngError,
+  disabled = false,
+  required = true,
+  helpText,
+}: CoordinateFieldsProps) {
+  const value = (kind: 'latitude' | 'longitude') => (kind === 'latitude' ? latitude : longitude) ?? '';
 
-  // Click-outside to close
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  // Abort in-flight search on unmount
-  useEffect(() => () => abortRef.current?.abort(), []);
-
-  // Keep highlighted row in view
-  useEffect(() => {
-    if (!open || !listRef.current) return;
-    const el = listRef.current.children[highlight] as HTMLElement | undefined;
-    el?.scrollIntoView({ block: 'nearest' });
-  }, [highlight, open]);
-
-  const choose = (s: AddressSuggestion) => {
-    onSelect(s);
-    setQuery('');
-    setResults([]);
-    setOpen(false);
-    requestAnimationFrame(() => inputRef.current?.blur());
+  const field = (kind: 'latitude' | 'longitude') => {
+    const isLat = kind === 'latitude';
+    const id = `${idPrefix}-${kind}`;
+    const error = isLat ? latError : lngError;
+    return (
+      <div>
+        <label htmlFor={id} className="block text-sm font-semibold text-slate-700 mb-1">
+          {isLat ? 'Latitude' : 'Longitude'}{' '}
+          {required
+            ? <span className="text-brand-500" aria-hidden="true">*</span>
+            : <span className="text-slate-400 text-xs font-normal">(optional)</span>}
+        </label>
+        <input
+          id={id}
+          name={id}
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          value={value(kind)}
+          disabled={disabled}
+          readOnly={disabled}
+          onChange={(e) => onChange(kind, e.target.value)}
+          onBlur={() => onBlur?.(kind)}
+          data-field={id}
+          data-invalid={error ? 'true' : undefined}
+          aria-invalid={error ? true : undefined}
+          className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors ${
+            error
+              ? 'border-red-400 focus:ring-2 focus:ring-red-500/30'
+              : 'border-slate-300 hover:border-slate-400 focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500'
+          } ${disabled ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
+          placeholder={isLat ? 'e.g. 11.664325' : 'e.g. 78.146011'}
+        />
+        {error && <p className="text-red-500 text-xs mt-1" role="alert">{error}</p>}
+      </div>
+    );
   };
-
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (!open || results.length === 0) {
-      if (e.key === 'Escape') setOpen(false);
-      return;
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlight((h) => Math.min(results.length - 1, h + 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlight((h) => Math.max(0, h - 1));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (results[highlight]) choose(results[highlight]);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setOpen(false);
-    }
-  };
-
-  const activeOptionId = results[highlight] ? optionId(highlight) : undefined;
 
   return (
-    <div className="relative" ref={containerRef}>
-      <div className="relative">
-        <MapPin
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400"
-          aria-hidden="true"
-        />
-        <input
-          ref={inputRef}
-          id={id}
-          type="search"
-          role="combobox"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            if (e.target.value.trim().length >= 3) setOpen(true);
-          }}
-          onFocus={() => {
-            if (results.length > 0) setOpen(true);
-          }}
-          onKeyDown={onKeyDown}
-          placeholder={placeholder}
-          disabled={disabled}
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          aria-autocomplete="list"
-          aria-controls={open ? listboxId : undefined}
-          aria-expanded={open}
-          aria-activedescendant={activeOptionId}
-          className="w-full text-base sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 pl-10 pr-10 py-3 border border-slate-300 rounded-lg bg-white transition-colors hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 disabled:bg-slate-50 disabled:cursor-not-allowed"
-        />
-        {loading && (
-          <Loader2
-            className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-500 animate-spin"
-            aria-label="Searching addresses"
-          />
-        )}
+    <div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {field('latitude')}
+        {field('longitude')}
       </div>
-
-      {open && (query.trim().length >= 3 || results.length > 0) && (
-        <div
-          className="absolute left-0 right-0 top-[calc(100%+6px)] z-(--z-dropdown) overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5"
-          role="dialog"
-          aria-label="Address suggestions"
-        >
-          {loading && results.length === 0 ? (
-            <div className="px-3 py-4 text-center text-sm text-slate-500">
-              <Loader2 className="inline-block h-4 w-4 animate-spin mr-2 text-brand-500" aria-hidden="true" />
-              Searching…
-            </div>
-          ) : results.length === 0 ? (
-            <div className="px-3 py-4 text-center">
-              <p className="text-sm font-medium text-slate-700">No matches</p>
-              <p className="mt-1 text-xs text-slate-500">
-                Try a more specific query, or fill the address manually below.
-              </p>
-            </div>
-          ) : (
-            <ul
-              ref={listRef}
-              id={listboxId}
-              role="listbox"
-              aria-label="Address suggestions"
-              className="max-h-72 overflow-y-auto py-1"
-              style={{ overscrollBehavior: 'contain' }}
-            >
-              {results.map((s, i) => {
-                const isHi = i === highlight;
-                return (
-                  <li
-                    key={s.id}
-                    id={optionId(i)}
-                    role="option"
-                    aria-selected={isHi}
-                    onMouseEnter={() => setHighlight(i)}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => choose(s)}
-                    className={`flex cursor-pointer items-start gap-2.5 px-3 py-2.5 text-sm text-slate-700 transition-colors ${
-                      isHi ? 'bg-slate-100' : ''
-                    }`}
-                    style={{ touchAction: 'manipulation' }}
-                  >
-                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-medium text-slate-900 truncate">
-                        {s.line1 || s.city || s.displayName.split(',')[0]}
-                      </span>
-                      <span className="block text-xs text-slate-500 truncate">
-                        {s.displayName}
-                      </span>
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      )}
+      {helpText && <p className="mt-1.5 text-xs text-slate-500">{helpText}</p>}
     </div>
   );
 }

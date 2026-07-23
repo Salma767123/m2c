@@ -423,9 +423,23 @@ class QCCheckerService {
     }
 
     // Approve Product
-    async approveProduct(productId: string, formData?: any): Promise<{ success: boolean; message: string; data: any }> {
+    //
+    // `coords` is the checker's device GPS. The backend geofences product inspections
+    // against the vendor's factory exactly as it does factory inspections, and rejects
+    // the call with 400 "Location required" when the pair is absent.
+    async approveProduct(
+        productId: string,
+        formData?: any,
+        coords?: { latitude: number; longitude: number } | null,
+        inspectionType?: 'PHYSICAL' | 'VIRTUAL',
+    ): Promise<{ success: boolean; message: string; data: any }> {
         try {
-            const response = await axios.post(`/qc-checkers/products/${productId}/approve`, { formData }, {
+            const response = await axios.post(`/qc-checkers/products/${productId}/approve`, {
+                formData,
+                inspectionType,
+                checkerLatitude: coords?.latitude ?? null,
+                checkerLongitude: coords?.longitude ?? null,
+            }, {
                 headers: {
                     'Authorization': `Bearer ${this.getCheckerToken()}`
                 }
@@ -437,10 +451,22 @@ class QCCheckerService {
         }
     }
 
-    // Reject Product
-    async rejectProduct(productId: string, rejectionReason: string, formData?: any): Promise<{ success: boolean; message: string; data: any }> {
+    // Reject Product — same location contract as approveProduct above.
+    async rejectProduct(
+        productId: string,
+        rejectionReason: string,
+        formData?: any,
+        coords?: { latitude: number; longitude: number } | null,
+        inspectionType?: 'PHYSICAL' | 'VIRTUAL',
+    ): Promise<{ success: boolean; message: string; data: any }> {
         try {
-            const response = await axios.post(`/qc-checkers/products/${productId}/reject`, { reason: rejectionReason, formData }, {
+            const response = await axios.post(`/qc-checkers/products/${productId}/reject`, {
+                reason: rejectionReason,
+                formData,
+                inspectionType,
+                checkerLatitude: coords?.latitude ?? null,
+                checkerLongitude: coords?.longitude ?? null,
+            }, {
                 headers: {
                     'Authorization': `Bearer ${this.getCheckerToken()}`
                 }
@@ -482,9 +508,11 @@ class QCCheckerService {
     // Start an Inspection.
     // The backend geofences the checker against the vendor factory, so the
     // current GPS coordinates must be sent in the request body.
+    // `coords` may be explicit nulls when the geofence is switched off — the server
+    // then records the run as location-unverified instead of blocking it.
     async startInspection(
         inspectionId: string,
-        coords?: { checkerLatitude: number; checkerLongitude: number }
+        coords?: { checkerLatitude: number | null; checkerLongitude: number | null; inspectionType?: 'PHYSICAL' | 'VIRTUAL' }
     ): Promise<{ success: boolean; message: string; inspection: any }> {
         try {
             const response = await axios.post(`/inspections/${inspectionId}/start`, coords || {}, {

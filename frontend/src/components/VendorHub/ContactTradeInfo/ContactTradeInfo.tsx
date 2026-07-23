@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/UI/Button';
-import { Phone, Mail, User, Plus, Trash2, Globe, MapPin, Camera, X, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Phone, Mail, User, Plus, Trash2, Globe, MapPin, Camera, X, ArrowLeft, ArrowRight, Megaphone } from 'lucide-react';
 import Image from 'next/image';
 import Dropdown from '@/components/UI/Dropdown';
 import { PhoneInput, LocalLandlineInput, parsePhone, CountryMultiSelect, validatePhoneE164, AccordionSection, TitleSelect, type LocalLandlineValue } from '@/components/VendorHub/FormUI';
@@ -63,6 +63,27 @@ const parseName = (name: string) => {
 const parseIntlLandline = (value: string) => {
   const { dial, national } = parsePhone(value);
   return { countryCode: dial, std: '', number: national };
+};
+
+// "How did you hear about us?" — acquisition channels. Ids must stay in sync with
+// backend/utils/referralSources.js, which is what the admin report groups by.
+const REFERRAL_SOURCE_OPTIONS = [
+  { id: 'google', label: 'Google / Search' },
+  { id: 'online-ads', label: 'Online Ads' },
+  { id: 'linkedin', label: 'LinkedIn' },
+  { id: 'instagram', label: 'Instagram' },
+  { id: 'facebook', label: 'Facebook' },
+  { id: 'youtube', label: 'YouTube' },
+  { id: 'referral', label: 'Referral / Word of Mouth' },
+  { id: 'trade-show', label: 'Trade Show / Exhibition' },
+  { id: 'others', label: 'Others' },
+];
+const REFERRAL_SOURCE_IDS = new Set(REFERRAL_SOURCE_OPTIONS.map((o) => o.id));
+// These two carry a follow-up: who referred you / which channel exactly.
+const REFERRAL_DETAIL_REQUIRED = new Set(['referral', 'others']);
+const REFERRAL_DETAIL_LABEL: Record<string, string> = {
+  referral: 'Who referred you?',
+  others: 'Please specify',
 };
 
 export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }: ContactTradeInfoProps) {
@@ -126,6 +147,8 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       hasImportExport: data.hasImportExport || '',
       importCountries: data.importCountries || [],
       exportCountries: data.exportCountries || [],
+      referralSource: data.referralSource || '',
+      referralSourceDetail: data.referralSourceDetail || '',
     };
   });
 
@@ -137,7 +160,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
   //   - 'mainContact':  primary person we'll talk to
   //   - 'alternates':   secondary contacts (optional, multi-add)
   //   - 'tradeFlow':    import/export experience + countries
-  type SectionKey = 'mainContact' | 'alternates' | 'tradeFlow';
+  type SectionKey = 'mainContact' | 'alternates' | 'tradeFlow' | 'howHeard';
   const [activeSection, setActiveSection] = useState<SectionKey>('mainContact');
 
   // Maps error keys → owning section. Used in handleNext to auto-open
@@ -153,6 +176,8 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
     hasImportExport: 'tradeFlow',
     importCountries: 'tradeFlow',
     exportCountries: 'tradeFlow',
+    referralSource: 'howHeard',
+    referralSourceDetail: 'howHeard',
   };
 
   // Returns 'complete' | 'partial' | 'empty' per section — drives the
@@ -181,6 +206,14 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       }
       if (formData.hasImportExport === 'no') return 'complete';
       return 'empty';
+    }
+    if (section === 'howHeard') {
+      if (!formData.referralSource) return 'empty';
+      // 'others' and 'referral' ask for a detail, so they're only complete once it's given.
+      if (REFERRAL_DETAIL_REQUIRED.has(formData.referralSource)) {
+        return formData.referralSourceDetail?.trim() ? 'complete' : 'partial';
+      }
+      return 'complete';
     }
     return 'empty';
   };
@@ -253,6 +286,8 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       hasImportExport: data.hasImportExport || '',
       importCountries: data.importCountries || [],
       exportCountries: data.exportCountries || [],
+      referralSource: data.referralSource || '',
+      referralSourceDetail: data.referralSourceDetail || '',
     });
   }, [data]);
 
@@ -700,6 +735,17 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       if (formData.exportCountries.length === 0) {
         newErrors['exportCountries'] = 'Please select at least one export country';
       }
+    }
+
+    // How did you hear about us — required, since the whole point is a complete
+    // acquisition picture; a mostly-empty report answers nothing.
+    if (!formData.referralSource) {
+      newErrors['referralSource'] = 'Please tell us how you heard about us';
+    } else if (!REFERRAL_SOURCE_IDS.has(formData.referralSource)) {
+      newErrors['referralSource'] = 'Invalid selection';
+    } else if (REFERRAL_DETAIL_REQUIRED.has(formData.referralSource) && !formData.referralSourceDetail?.trim()) {
+      newErrors['referralSourceDetail'] =
+        formData.referralSource === 'referral' ? 'Please tell us who referred you' : 'Please specify';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -1588,6 +1634,89 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                   <p className="text-red-500 text-sm mt-1">{errors['exportCountries']}</p>
                 )}
               </div>
+            </div>
+          )}
+        </div>
+      </AccordionSection>
+
+      <AccordionSection
+        {...sectionProps('howHeard')}
+        icon={<Megaphone className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="How Did You Hear About Us?"
+        subtitle="Helps us understand where our vendors come from"
+      >
+        <div className="space-y-4">
+          <div id="referralSource">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Where did you first hear about M2C? <span className="text-red-500">*</span>
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {REFERRAL_SOURCE_OPTIONS.map((opt) => {
+                const selected = formData.referralSource === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      handleInputChange('referralSource', opt.id);
+                      handleBlur('referralSource');
+                      setErrors((prev) => ({ ...prev, referralSource: '' }));
+                      // Detail only applies to some options — clear it when switching away
+                      // so a stale "who referred you" answer can't ride along with e.g. LinkedIn.
+                      if (!REFERRAL_DETAIL_REQUIRED.has(opt.id)) {
+                        handleInputChange('referralSourceDetail', '');
+                        setErrors((prev) => ({ ...prev, referralSourceDetail: '' }));
+                      }
+                    }}
+                    className={`h-11 px-3 rounded-lg border text-sm font-medium transition-colors text-left ${
+                      selected
+                        ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500/30'
+                        : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
+                    }`}
+                    aria-pressed={selected}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            {errors['referralSource'] && touched['referralSource'] && (
+              <p className="text-red-500 text-sm mt-2">{errors['referralSource']}</p>
+            )}
+          </div>
+
+          {REFERRAL_DETAIL_REQUIRED.has(formData.referralSource) && (
+            <div id="referralSourceDetail">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {REFERRAL_DETAIL_LABEL[formData.referralSource] || 'Please specify'}{' '}
+                <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="referralSourceDetail"
+                value={formData.referralSourceDetail}
+                onChange={(e) => {
+                  handleInputChange('referralSourceDetail', e.target.value);
+                  if (errors['referralSourceDetail'] && e.target.value.trim()) {
+                    setErrors((prev) => ({ ...prev, referralSourceDetail: '' }));
+                  }
+                }}
+                onBlur={() => handleBlur('referralSourceDetail')}
+                placeholder={
+                  formData.referralSource === 'referral'
+                    ? "Name of the person or company who referred you"
+                    : 'Tell us where you heard about us'
+                }
+                maxLength={100}
+                className={`w-full h-11 px-3 rounded-lg border text-sm focus:outline-none focus:ring-2 ${
+                  errors['referralSourceDetail'] && touched['referralSourceDetail']
+                    ? 'border-red-500 bg-red-50/40 focus:ring-red-500/30'
+                    : 'border-slate-300 focus:ring-brand-500/30 focus:border-transparent'
+                }`}
+              />
+              {errors['referralSourceDetail'] && touched['referralSourceDetail'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['referralSourceDetail']}</p>
+              )}
             </div>
           )}
         </div>

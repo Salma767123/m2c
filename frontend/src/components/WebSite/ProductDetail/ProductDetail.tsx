@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Breadcrumb from '../Navigation/Breadcrumb';
 import { productService, Product, ProductVariant } from '@/services/productService';
 import { cartService } from '@/services/cartService';
@@ -11,8 +12,9 @@ import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-
 import { wishlistService } from '@/services/wishlistService';
 import { trackProductView } from '@/services/analyticsService';
 import reviewService from '@/services/reviewService';
+import { getCountryName, getCountryFlag } from '@/components/WebSite/CheckOut/CheckoutProcess/constants';
 import Image from 'next/image';
-import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, isVisibleInRegion } from '@/lib/currency';
+import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, isVisibleInRegion, getCurrency, convertINRtoUSD } from '@/lib/currency';
 import { calculateLogistics, formatWeight, formatDimensions, LogisticsConfig } from '@/lib/logistics';
 import PromotionalPopup from '@/components/WebSite/PromotionalPopup/PromotionalPopup';
 import Reveal from '@/components/WebSite/Shared/Reveal';
@@ -36,8 +38,20 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
   const [imageRef, setImageRef] = useState<HTMLImageElement | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [transportOverride, setTransportOverride] = useState<'AIR' | 'SHIP' | null>(null);
+
+  // Deep-link from the cart: "?selectShipping=1&cartItem=<id>" means the shopper
+  // came here specifically to choose a shipping method for a line already in their
+  // cart. We scroll to + highlight the Shipping card and, on save, write the choice
+  // back to that cart line and return them to the cart.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnCartItemId = searchParams.get('cartItem');
+  const shouldSelectShipping = searchParams.get('selectShipping') === '1';
+  const shippingCardRef = useRef<HTMLDivElement | null>(null);
+  const [highlightShipping, setHighlightShipping] = useState(false);
+  const [savingShipping, setSavingShipping] = useState(false);
   // Reviews
-  const [reviews, setReviews] = useState<{ id: string; rating: number; comment?: string; createdAt: string; user?: { name: string } }[]>([]);
+  const [reviews, setReviews] = useState<{ id: string; rating: number; comment?: string; createdAt: string; user?: { name: string; country?: string | null } }[]>([]);
   const [showReviews, setShowReviews] = useState(false);
   const [loadingReviews, setLoadingReviews] = useState(false);
 
@@ -110,6 +124,20 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
     if (!product?.logisticsConfig) return null;
     return calculateLogistics(product.logisticsConfig as LogisticsConfig, quantity, transportOverride || undefined);
   }, [product?.logisticsConfig, quantity, transportOverride]);
+
+  // Arrived from the cart to pick a shipping method: scroll the Shipping card into
+  // view and pulse a highlight so it's obvious what to do. MUST stay above the early
+  // returns below — a hook after a conditional return changes hook order across
+  // renders (Rules of Hooks). The guard lives inside the effect, not around it.
+  useEffect(() => {
+    if (!shouldSelectShipping || !product?.logisticsConfig) return;
+    const t = setTimeout(() => {
+      shippingCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightShipping(true);
+      setTimeout(() => setHighlightShipping(false), 2600);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [shouldSelectShipping, product?.logisticsConfig]);
 
   if (loading) {
     /*
@@ -286,6 +314,20 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
     } catch (error: any) {
       console.error('Error adding to cart:', error);
       showErrorToast('Failed to Add', error.message || 'Unable to add item to cart. Please try again.');
+    }
+  };
+
+  // Persist the chosen method to the originating cart line, then go back to the cart.
+  const handleSaveShippingAndReturn = async () => {
+    if (!returnCartItemId || !logisticsResult) return;
+    setSavingShipping(true);
+    try {
+      await cartService.setTransportType(returnCartItemId, logisticsResult.selectedTransport);
+      showSuccessToast('Shipping method saved', 'Returning you to your cart.');
+      router.push('/cart');
+    } catch (error: any) {
+      showErrorToast('Could not save', error?.message || 'Please try again.');
+      setSavingShipping(false);
     }
   };
 
@@ -816,7 +858,15 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
 
                         {/* Smart Logistics Section */}
                         {logisticsResult && product.logisticsConfig && (
-                          <div className="order-5 bg-white border border-gray-200 rounded-xl p-4 mt-4 space-y-3">
+                          <div
+                            ref={shippingCardRef}
+                            id="shipping-logistics"
+                            className={`order-5 bg-white border rounded-xl p-4 mt-4 space-y-3 transition-all duration-500 ${
+                              highlightShipping
+                                ? 'border-[#e01a1b] ring-4 ring-[#e01a1b]/25 shadow-lg'
+                                : 'border-gray-200'
+                            }`}
+                          >
                             <div className="flex items-center justify-between">
                               <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
                                 <Truck className="w-4 h-4 text-[#e01a1b]" />
@@ -886,7 +936,9 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                               <div className="bg-gray-50 rounded-lg p-2.5 text-center">
                                 <div className="text-xs text-gray-500 mb-0.5">Shipping Cost</div>
                                 <div className="text-sm font-bold text-gray-900">
-                                  {logisticsResult.totalShippingCost === 0 ? 'FREE' : formatPrice(logisticsResult.totalShippingCost)}
+                                  {logisticsResult.totalShippingCost === 0
+                                    ? 'FREE'
+                                    : formatPrice(getCurrency() === 'USD' ? convertINRtoUSD(logisticsResult.totalShippingCost) : logisticsResult.totalShippingCost)}
                                 </div>
                               </div>
                             </div>
@@ -915,6 +967,21 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                 <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                                 <span>{(product.logisticsConfig as LogisticsConfig).notes}</span>
                               </div>
+                            )}
+
+                            {/* Save & return — only when the shopper came here from the
+                                cart to fill in this line's shipping method. */}
+                            {returnCartItemId && (
+                              <button
+                                onClick={handleSaveShippingAndReturn}
+                                disabled={savingShipping}
+                                className="w-full mt-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-[#e01a1b] text-white text-sm font-semibold hover:bg-[#c41617] disabled:opacity-60 transition-colors"
+                              >
+                                <Check className="w-4 h-4" />
+                                {savingShipping
+                                  ? 'Saving…'
+                                  : `Use ${logisticsResult.selectedTransport === 'AIR' ? 'Air' : 'Sea'} & return to cart`}
+                              </button>
                             )}
                           </div>
                         )}
@@ -1017,7 +1084,12 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                 {product.weight && (
                   <div className="flex justify-between py-3 border-b border-gray-100">
                     <span className="font-semibold text-gray-700">Weight</span>
-                    <span className="text-gray-600">{product.weight}</span>
+                    {/* Show the admin's own unit (g / kg …) instead of a bare number.
+                        Skip it only if the value already contains letters. */}
+                    <span className="text-gray-600">
+                      {product.weight}
+                      {product.weightUnit && !/[a-z]/i.test(String(product.weight)) ? ` ${product.weightUnit}` : ''}
+                    </span>
                   </div>
                 )}
 
@@ -1182,6 +1254,17 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                             <p className="font-semibold text-gray-900 text-sm">{review.user?.name || 'Customer'}</p>
                             <p className="text-xs text-gray-400">
                               {new Date(review.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {(() => {
+                                // Reviewer's country, taken from their profile / default address.
+                                const countryName = getCountryName(review.user?.country);
+                                if (!countryName) return null;
+                                const flag = getCountryFlag(review.user?.country);
+                                return (
+                                  <span className="ml-1.5 border-l border-gray-300 pl-1.5">
+                                    {flag ? `${flag} ` : ''}{countryName}
+                                  </span>
+                                );
+                              })()}
                             </p>
                           </div>
                         </div>

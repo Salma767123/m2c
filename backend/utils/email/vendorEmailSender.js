@@ -55,10 +55,10 @@ function getVendorApprovalEmailTemplate({ companyName, ownerName, email, passwor
         <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .header { background: linear-gradient(135deg, #e01a1b 0%, #a31314 100%); color: #ffffff; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
             .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-            .credentials-box { background: #fff; border: 2px solid #4CAF50; border-radius: 8px; padding: 20px; margin: 20px 0; }
-            .button { display: inline-block; background: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+            .credentials-box { background: #fff; border: 2px solid #e01a1b; border-radius: 8px; padding: 20px; margin: 20px 0; }
+            .button { display: inline-block; background: #e01a1b; color: #ffffff !important; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
             .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 15px; border-radius: 5px; margin: 20px 0; }
             .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
         </style>
@@ -94,7 +94,7 @@ function getVendorApprovalEmailTemplate({ companyName, ownerName, email, passwor
                 </div>
                 
                 <div style="text-align: center;">
-                    <a href="${loginUrl}" class="button">Access Your Dashboard</a>
+                    <a href="${loginUrl}" class="button" style="display: inline-block; background: #e01a1b; color: #ffffff !important; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0;">Access Your Dashboard</a>
                 </div>
                 
                 <h3>What's Next?</h3>
@@ -257,7 +257,9 @@ function getVendorSuspensionEmailTemplate({ companyName, ownerName, email, reaso
  * Send approval email with credentials to vendor
  */
 async function sendVendorApprovalEmail({ companyName, ownerName, email, password }) {
-  const loginUrl = process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/vendor` : 'http://localhost:3000/vendor';
+  // Deliberately NOT FRONTEND_URL — that is localhost in development (it feeds
+  // CORS + OAuth redirects), and this link is delivered to a real vendor.
+  const loginUrl = `${process.env.PUBLIC_SITE_URL || 'https://m2cmarkdowns.com'}/vendor`;
   
   const emailTemplate = getVendorApprovalEmailTemplate({ 
     companyName, 
@@ -359,8 +361,8 @@ async function sendNewVendorRegistrationEmailToAdmins({ companyName, ownerName, 
             </tr>
           </table>
           <div style="text-align: center; margin-top: 24px;">
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/dashboard/vendors"
-               style="display: inline-block; background: #2563eb; color: white; padding: 12px 28px; border-radius: 6px; text-decoration: none; font-weight: 600;">
+            <a href="${process.env.PUBLIC_SITE_URL || 'https://m2cmarkdowns.com'}/admin/dashboard/vendors"
+               style="display: inline-block; background: #e01a1b; color: #ffffff !important; padding: 12px 28px; border-radius: 6px; text-decoration: none; font-weight: 600;">
               Review Application
             </a>
           </div>
@@ -465,9 +467,7 @@ function getLowStockEmailTemplate({ companyName, ownerName, productName, categor
  * Send the low-stock alert email to a vendor.
  */
 async function sendLowStockAlertEmail({ to, companyName, ownerName, productName, category, sku, currentStock, minStock, lowUnits }) {
-  const dashboardUrl = process.env.FRONTEND_URL
-    ? `${process.env.FRONTEND_URL}/vendor/dashboard/inventory`
-    : 'http://localhost:3000/vendor/dashboard/inventory';
+  const dashboardUrl = `${process.env.PUBLIC_SITE_URL || 'https://m2cmarkdowns.com'}/vendor/dashboard/inventory`;
 
   const emailTemplate = getLowStockEmailTemplate({
     companyName, ownerName, productName, category, sku, currentStock, minStock, lowUnits, dashboardUrl,

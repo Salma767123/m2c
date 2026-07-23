@@ -10,6 +10,7 @@ import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalenda
 import { Mail, Phone, Eye, Trash2, MessageSquare, Search, ChevronLeft, ChevronRight, Inbox, Reply, CheckCircle } from 'lucide-react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { hasPermission } from '@/lib/auth';
+import { getHearAboutUsLabel, HEAR_ABOUT_US_OPTIONS } from '@/lib/enquirySources';
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
 
 const PAGE_SIZE = 10;
@@ -35,7 +36,11 @@ export default function WebsiteEnquiryManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [stats, setStats] = useState({ total: 0, new: 0, read: 0, replied: 0, closed: 0 });
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [stats, setStats] = useState<{
+    total: number; new: number; read: number; replied: number; closed: number;
+    bySource?: Record<string, number>;
+  }>({ total: 0, new: 0, read: 0, replied: 0, closed: 0 });
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; subject: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -128,6 +133,10 @@ export default function WebsiteEnquiryManagement() {
 
   // Client-side created-date filter (status + search are handled server-side).
   const filteredEnquiries = enquiries.filter((e) => {
+    // "unspecified" covers legacy rows and blank submissions alike.
+    if (sourceFilter !== 'all') {
+      if (sourceFilter === 'unspecified' ? Boolean(e.hearAboutUs) : e.hearAboutUs !== sourceFilter) return false;
+    }
     if (!dateFrom && !dateTo) return true;
     const d = e.createdAt ? fmtDate(new Date(e.createdAt)) : '';
     if (!d) return false;
@@ -221,6 +230,18 @@ export default function WebsiteEnquiryManagement() {
                 placeholder="Filter by Status"
               />
             </div>
+            <div className="w-full md:w-64">
+              <Dropdown
+                value={sourceFilter}
+                options={[
+                  { value: 'all', label: 'All Sources' },
+                  ...HEAR_ABOUT_US_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+                  { value: 'unspecified', label: 'Not specified' },
+                ]}
+                onChange={(value) => { setSourceFilter(value as string); setCurrentPage(1); }}
+                placeholder="Heard About Us"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -240,6 +261,7 @@ export default function WebsiteEnquiryManagement() {
                     <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Name</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Contact</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Subject</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Heard Via</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Date</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Actions</th>
@@ -267,6 +289,25 @@ export default function WebsiteEnquiryManagement() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-slate-900 max-w-xs truncate">{enquiry.subject}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {enquiry.hearAboutUs ? (
+                          <div className="max-w-[190px]">
+                            <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 whitespace-nowrap">
+                              {getHearAboutUsLabel(enquiry.hearAboutUs)}
+                            </span>
+                            {enquiry.hearAboutUsOther && (
+                              <div
+                                className="text-xs text-slate-500 mt-1 truncate"
+                                title={enquiry.hearAboutUsOther}
+                              >
+                                {enquiry.hearAboutUsOther}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">Not specified</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600">
                         {new Date(enquiry.createdAt).toLocaleDateString()}
@@ -353,6 +394,19 @@ export default function WebsiteEnquiryManagement() {
                 <div>
                   <label className="text-sm font-semibold text-slate-600">Subject</label>
                   <div className="text-slate-900">{selectedEnquiry.subject}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-slate-600">How They Heard About Us</label>
+                  <div className="text-slate-900">
+                    {selectedEnquiry.hearAboutUs
+                      ? getHearAboutUsLabel(selectedEnquiry.hearAboutUs)
+                      : <span className="text-slate-400 italic">Not specified</span>}
+                  </div>
+                  {selectedEnquiry.hearAboutUsOther && (
+                    <div className="mt-1.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 whitespace-pre-wrap">
+                      {selectedEnquiry.hearAboutUsOther}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm font-semibold text-slate-600">Message</label>

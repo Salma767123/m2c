@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { BarChart3, Flame, Globe } from 'lucide-react';
+import { BarChart3, Flame, Globe, MessageSquare } from 'lucide-react';
 import ProductHeatMap from '@/components/AdminDashboard/Analytics/ProductHeatMap';
 import PageAnalytics from '@/components/AdminDashboard/Analytics/PageAnalytics';
+import EnquirySources from '@/components/AdminDashboard/Analytics/EnquirySources';
 import PermissionGuard from '@/components/AdminDashboard/PermissionGuard';
 
 const PERIODS = [
@@ -18,6 +19,7 @@ const PERIODS = [
 const TABS = [
   { id: 'heatmap', label: 'Product Heat Map', icon: Flame },
   { id: 'pages', label: 'Page Analytics', icon: Globe },
+  { id: 'enquiries', label: 'Enquiry Sources', icon: MessageSquare },
 ];
 
 export default function AnalyticsPage() {
@@ -79,6 +81,7 @@ export default function AnalyticsPage() {
       {/* Content */}
       {activeTab === 'heatmap' && <ProductHeatMap period={period} />}
       {activeTab === 'pages' && <PageAnalytics period={period} />}
+      {activeTab === 'enquiries' && <EnquirySources period={period} />}
     </div>
     </PermissionGuard>
   );

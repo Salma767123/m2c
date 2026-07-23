@@ -51,6 +51,10 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 };
 
 const BG_MAP: Record<string, string> = {
+  PRICE_NEGOTIATION_OFFER: 'bg-purple-50',
+  PRICE_NEGOTIATION_COUNTER: 'bg-amber-50',
+  PRICE_NEGOTIATION_ACCEPTED: 'bg-green-50',
+  PRICE_NEGOTIATION_REJECTED: 'bg-red-50',
   ORDER_RECEIVED: 'bg-blue-50',
   ORDER_CONFIRMED: 'bg-green-50',
   ORDER_IN_TRANSIT_TO_ADMIN_HUB: 'bg-blue-50',
