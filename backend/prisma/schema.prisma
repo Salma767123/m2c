@@ -842,6 +842,12 @@ model Product {
   material             String?
   fabricSpecifications Json? // FabricSpecification object
 
+  // Who actually MADE this item (distinct from the Vendor, who sells it). Entered by the
+  // vendor on the product form and shown on every product/inspection surface.
+  // Shape: { photo, title, fullName, role, experience, description }. `photo` is a
+  // Cloudinary URL (the base64 upload is resolved on save, like the product images).
+  manufacturerInfo Json?
+
   // Variants Management
   variants    ProductVariant[]
   hasVariants Boolean          @default(false)
@@ -892,6 +898,10 @@ model Product {
   assignedQcId     String?    @db.ObjectId
   assignedQc       QCChecker? @relation("ProductQCChecker", fields: [assignedQcId], references: [id])
   qcInspectionData Json? // Stores the product inspection form data
+  // Scheduling captured when the admin assigns a QC checker to this product — mirrors
+  // the factory Inspection's schedule fields (products have no separate Inspection row).
+  // Shape: { clientName, scheduledDate (YYYY-MM-DD), scheduledTime (HH:MM), priority, estimatedDuration }.
+  qcAssignment     Json?
 
   // ── Price negotiation ──────────────────────────────────────────────
   // The vendor's buying price agreed with the admin. Null until a
@@ -1043,11 +1053,6 @@ model Order {
   totalAmount  Float
   couponCode   String?
 
-  // Bag Add-on
-  bagTypeId    String? @db.ObjectId
-  bagTypeName  String?
-  bagTypePrice Float?  @default(0)
-
   // Currency
   currency String @default("INR") // INR or USD
   // Snapshot of ExchangeRate.rate (INR per 1 USD) at the moment of purchase.
@@ -1065,7 +1070,6 @@ model Order {
   taxINR          Float?
   shippingCostINR Float?
   discountINR     Float?
-  bagTypePriceINR Float?
 
   // Payment Information
   paymentStatus PaymentStatus @default(PENDING)
@@ -1345,22 +1349,6 @@ model FreeShippingOffer {
 // BAG TYPE MANAGEMENT
 // ============================================
 
-model BagType {
-  id          String  @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
-  description String?
-  price       Float
-  priceINR    Float? // Price for .in domain
-  priceUSD    Float? // Price for .com domain
-  image       String?
-  isActive    Boolean @default(true)
-  sortOrder   Int     @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("bag_types")
-}
 
 enum DiscountType {
   PERCENTAGE

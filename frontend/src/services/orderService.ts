@@ -76,8 +76,6 @@ export interface VendorShipment {
         orderDate?: string;
         shippingAddress?: any;
         invoiceNo?: string;
-        bagTypeName?: string;
-        bagTypePrice?: number;
         trackingReference?: string;
     };
     statusHistory?: any[];
@@ -100,9 +98,6 @@ export interface Order {
     currency?: 'INR' | 'USD';
     /** INR-per-USD rate snapshotted at purchase. Null on INR/pre-snapshot orders. */
     exchangeRate?: number | null;
-    bagTypeId?: string;
-    bagTypeName?: string;
-    bagTypePrice?: number;
     items: OrderItem[];
     shipments?: VendorShipment[];
     createdAt: string;
@@ -150,7 +145,6 @@ export interface CreateOrderParams {
     tax?: number;
     discount?: number;
     freeShipping?: boolean;
-    bagTypeId?: string;
     /** Coupon code, if one was applied. The server re-validates it and derives the
      *  discount itself — the client's discount figure is advisory only. */
     couponCode?: string;

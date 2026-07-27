@@ -6,7 +6,8 @@ import Breadcrumb from '../Navigation/Breadcrumb';
 import { productService, Product, ProductVariant } from '@/services/productService';
 import { cartService } from '@/services/cartService';
 import { userAuthService } from '@/services/userAuthService';
-import { Star, Heart, Truck, Shield, RotateCcw, Package, Plane, Ship, AlertTriangle, Info, Box, Check } from 'lucide-react';
+import { Star, Heart, Truck, Shield, RotateCcw, Package, Plane, Ship, AlertTriangle, Info, Box, Check, User, Award, Clock } from 'lucide-react';
+import { hasManufacturerInfo, manufacturerDisplayName } from '@/lib/manufacturerInfo';
 import { useToast } from '@/hooks/use-toast';
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils';
 import { wishlistService } from '@/services/wishlistService';
@@ -442,6 +443,13 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
   const availableStock = selectedVariant
     ? selectedVariant.stock
     : (product.inventory?.baseStock ?? product.totalStock ?? 0);
+
+  // A variant product is still purchasable through its BASE unit (the "Default
+  // Variant" card, selectedVariant === null) — that is a valid selection, not an
+  // empty one. So the only truly un-buyable state is a variant product whose base
+  // has no stock AND every variant is hidden in this region: nothing to sell.
+  const baseHasStock = (product.inventory?.baseStock ?? product.totalStock ?? 0) > 0;
+  const nothingBuyable = product.hasVariants && visibleVariants.length === 0 && !baseHasStock;
 
   // Get current price based on region + selected variant
   const currentPrice = selectedVariant
@@ -1025,10 +1033,16 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                             <div className="order-4 w-full">
                               <button
                                 onClick={handleAddToCart}
-                                className="btn-shine w-full flex justify-center mx-auto bg-[#e01a1b] text-white hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 py-3 px-6 rounded-full font-bold uppercase transition-all duration-300 active:scale-95 text-xs tracking-[1.5px]"
+                                disabled={nothingBuyable}
+                                className="btn-shine w-full flex justify-center mx-auto bg-[#e01a1b] text-white hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 py-3 px-6 rounded-full font-bold uppercase transition-all duration-300 active:scale-95 text-xs tracking-[1.5px] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                               >
-                                  Add to cart
+                                  {nothingBuyable ? 'Not available' : 'Add to cart'}
                                 </button>
+                                {nothingBuyable && (
+                                  <p className="text-xs text-amber-700 mt-2 text-center">
+                                    This product isn&apos;t available in your region right now.
+                                  </p>
+                                )}
                               </div>
                             </>
                           )}
@@ -1083,7 +1097,9 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                 )}
                 {product.weight && (
                   <div className="flex justify-between py-3 border-b border-gray-100">
-                    <span className="font-semibold text-gray-700">Weight</span>
+                    {/* "Item Weight" (the whole product) — distinct from the "Fabric
+                        Weight" shown under Fabric Specifications. */}
+                    <span className="font-semibold text-gray-700">Item Weight</span>
                     {/* Show the admin's own unit (g / kg …) instead of a bare number.
                         Skip it only if the value already contains letters. */}
                     <span className="text-gray-600">
@@ -1142,7 +1158,10 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                         .filter(([, value]) => value != null && String(value).trim() !== '')
                         .map(([key, value]) => {
                           const LABELS: Record<string, string> = {
-                            weightValue: 'Weight', gsm: 'GSM', length: 'Length', breadth: 'Breadth',
+                            // "Fabric Weight" not just "Weight": the product-details
+                            // section also has a Weight row (the item's gross weight),
+                            // and two bare "Weight"s with different numbers confuse shoppers.
+                            weightValue: 'Fabric Weight', gsm: 'GSM', length: 'Length', breadth: 'Breadth',
                             weave: 'Type of Weave', composition: 'Composition',
                           }
                           const UNITS: Record<string, string> = { weightValue: 'g', length: 'cm', breadth: 'cm', gsm: 'GSM' }
@@ -1215,6 +1234,61 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
               </div>
             )
           }
+
+          {/* Meet the Maker — manufacturer information */}
+          {hasManufacturerInfo(product.manufacturerInfo) && (() => {
+            const m = product.manufacturerInfo!
+            const name = manufacturerDisplayName(m)
+            return (
+              <div className="mt-6 sm:mt-8 bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
+                <Reveal>
+                  <h3 className="font-playfair text-xl sm:text-2xl font-semibold text-[#1a1a1a] mb-1 tracking-tight">Meet the Maker</h3>
+                  <p className="text-sm text-gray-500 mb-5 sm:mb-6">The hands behind this product</p>
+                </Reveal>
+                <div className="flex flex-col sm:flex-row sm:items-start gap-5 sm:gap-6">
+                  {/* Photo */}
+                  <div className="shrink-0 mx-auto sm:mx-0">
+                    {m.photo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={m.photo}
+                        alt={name || 'Manufacturer'}
+                        className="w-28 h-28 sm:w-32 sm:h-32 rounded-full object-cover ring-4 ring-[#e01a1b]/10 border border-gray-100 shadow-sm"
+                      />
+                    ) : (
+                      <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-300">
+                        <User className="w-12 h-12" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Text */}
+                  <div className="flex-1 min-w-0 text-center sm:text-left">
+                    {name && (
+                      <p className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a] tracking-tight">{name}</p>
+                    )}
+                    {(m.role || m.experience) && (
+                      <div className="mt-2.5 flex flex-wrap justify-center sm:justify-start gap-2">
+                        {m.role && m.role.trim() && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#e01a1b]/[0.06] text-[#e01a1b] text-xs font-semibold">
+                            <Award className="w-3.5 h-3.5" /> {m.role}
+                          </span>
+                        )}
+                        {m.experience && m.experience.trim() && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">
+                            <Clock className="w-3.5 h-3.5" /> {m.experience} experience
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {m.description && m.description.trim() && (
+                      <p className="mt-4 text-sm sm:text-[15px] text-gray-600 leading-relaxed whitespace-pre-line">{m.description}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Customer Reviews */}
           {showReviews && (

@@ -3,6 +3,8 @@
 import { useRef, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Building2, MapPin, Phone, Mail, User, ChevronDown, Calendar, Info, Eye, X } from 'lucide-react'
+import ManufacturerInfoCard from '@/components/Shared/ManufacturerInfoCard'
+import { hasManufacturerInfo } from '@/lib/manufacturerInfo'
 
 const READONLY_CLS =
   'w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-700 cursor-not-allowed text-sm'
@@ -299,6 +301,12 @@ export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {
             <InfoBlock label="Product Name" value={p.name} />
             <InfoBlock label="Category" value={p.category} />
           </div>
+          {/* Who made the item */}
+          {hasManufacturerInfo((p as any).manufacturerInfo) && (
+            <div className="px-5 pb-5">
+              <ManufacturerInfoCard info={(p as any).manufacturerInfo} variant="plain" />
+            </div>
+          )}
         </div>
       )}
 

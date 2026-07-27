@@ -270,33 +270,20 @@ const Header = () => {
       {/* Main Header */}
       <header className="relative z-30 bg-white shadow-lg border-b border-gray-100 transition-all duration-300">
         <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="flex items-center h-[68px] sm:h-18 md:h-20 xl:h-28 gap-2 sm:gap-3 md:gap-4">
+          <div className="flex items-center justify-between h-24 sm:h-24 md:h-28 lg:h-32 xl:h-36 gap-2 sm:gap-3 md:gap-4">
 
-            {/* Section 1: Logo (30% on desktop, 50% on mobile/tablet) */}
-            <div className="w-[50%] md:w-[30%] flex justify-start shrink-0">
-              <Link href="/" className="flex items-center">
-                <CompanyLogo
-                  className="h-11 sm:h-12 md:h-14 lg:h-20 xl:h-24 w-auto object-contain"
-                  skeletonClassName="h-11 sm:h-12 md:h-14 lg:h-20 xl:h-24 aspect-square bg-gray-100"
-                  fallbackSizes="(max-width: 640px) 44px, (max-width: 768px) 48px, (max-width: 1024px) 56px, (max-width: 1280px) 80px, 120px"
-                  priority
-                />
-              </Link>
-            </div>
+            {/* Logo */}
+            <Link href="/" className="flex items-center shrink-0">
+              <CompanyLogo
+                className="h-16 sm:h-20 md:h-24 lg:h-28 xl:h-32 w-auto object-contain"
+                skeletonClassName="h-16 sm:h-20 md:h-24 lg:h-28 xl:h-32 aspect-square bg-gray-100"
+                fallbackSizes="(max-width: 640px) 64px, (max-width: 768px) 80px, (max-width: 1024px) 96px, (max-width: 1280px) 112px, 128px"
+                priority
+              />
+            </Link>
 
-            {/* Section 2: Company Name (40% on desktop, hidden on mobile/tablet) */}
-            <div className="hidden md:flex w-[40%] justify-center px-1 sm:px-2 lg:px-4">
-              <Link href="/" className="flex items-center">
-                <div className="text-center">
-                  <h1 className="font-playfair text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl 2xl:text-3xl font-medium text-[#1a1a1a] whitespace-nowrap tracking-tight">
-                    M 2 C MarkDowns Private Limited
-                  </h1>
-                </div>
-              </Link>
-            </div>
-
-            {/* Section 3: Action Icons (30% on desktop, 50% on mobile/tablet) */}
-            <div className="w-[50%] md:w-[30%] flex items-center justify-end gap-1 sm:gap-1.5 md:gap-3 shrink-0">
+            {/* Action Icons */}
+            <div className="flex items-center justify-end gap-1 sm:gap-1.5 md:gap-3 shrink-0">
               {/* Notifications (logged-in users only) */}
               {isUserLoggedIn && (
                 <NotificationDropdown categories={USER_CATEGORIES} colorScheme="brand" />

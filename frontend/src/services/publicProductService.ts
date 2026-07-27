@@ -1,4 +1,5 @@
 import axios from '@/lib/axios';
+import { getRegion } from '@/lib/currency';
 
 export interface PublicProduct {
   id: string;
@@ -105,7 +106,7 @@ class PublicProductService {
     inStock?: boolean;
   }): Promise<ProductsResponse> {
     try {
-      const response = await axios.get('/products/public', { params });
+      const response = await axios.get('/products/public', { params: { ...params, region: getRegion() } });
       return response.data;
     } catch (error: any) {
       return {
@@ -123,7 +124,8 @@ class PublicProductService {
           search: tag,
           limit,
           sortBy: 'createdAt',
-          sortOrder: 'desc'
+          sortOrder: 'desc',
+          region: getRegion(),
         }
       });
       return response.data;
@@ -138,7 +140,7 @@ class PublicProductService {
   // Get single product by ID
   async getProduct(id: string): Promise<{ success: boolean; data?: PublicProduct; message?: string }> {
     try {
-      const response = await axios.get(`/products/public/${id}`);
+      const response = await axios.get(`/products/public/${id}`, { params: { region: getRegion() } });
       return response.data;
     } catch (error: any) {
       return {

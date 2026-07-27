@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Package, Eye, Download, Star, Truck, CheckCircle, Clock, AlertCircle, ChevronLeft, ChevronRight, ShoppingBag } from 'lucide-react'
+import { Package, Eye, Download, Star, Truck, CheckCircle, Clock, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import orderService, { Order as APIOrder } from '@/services/orderService'
 import Reveal from '@/components/WebSite/Shared/Reveal'
 import { formatPrice } from '@/lib/currency'
@@ -241,16 +241,6 @@ export default function OrderHistory() {
                     </div>
                   ))}
 
-                  {/* Bag Add-on */}
-                  {order.bagTypeName && order.bagTypePrice && order.bagTypePrice > 0 && (
-                    <div className="flex items-center justify-between px-3 py-2 text-sm text-slate-600">
-                      <div className="flex items-center gap-2">
-                        <ShoppingBag className="w-4 h-4 text-amber-600" />
-                        <span>Bag: {order.bagTypeName}</span>
-                      </div>
-                      <span className="font-medium text-slate-900">{money(order.bagTypePrice, order)}</span>
-                    </div>
-                  )}
                 </div>
 
                 {/* Order Actions */}

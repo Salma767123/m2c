@@ -8,6 +8,7 @@ const { withRetry } = require('../utils/dbRetry');
 const { resolveUsdRate, toINR, resolveUnitPrice } = require('../utils/orderCurrency');
 const { evaluateCoupon } = require('../utils/couponPricing');
 const { calculateLogistics, convertShippingToOrderCurrency, qualifiesForFreeShipping } = require('../utils/logistics');
+const { isVisibleInRegion } = require('../utils/regionVisibility');
 
 /** Round a money value to 2 decimals, avoiding float artefacts (e.g. 115.19999). */
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -28,7 +29,6 @@ const createOrder = async (req, res) => {
             shippingCost = 0,
             tax = 0,
             discount = 0,
-            bagTypeId = null,
             couponCode = null,
             currency = 'INR',
         } = req.body;
@@ -62,10 +62,9 @@ const createOrder = async (req, res) => {
             });
         }
 
-        const [cart, user, bagType, paymentSettings, existingOrderForPayment] = await Promise.all([
+        const [cart, user, paymentSettings, existingOrderForPayment] = await Promise.all([
             prisma.cart.findFirst({ where: { userId }, include: { items: true } }),
             prisma.user.findUnique({ where: { id: userId } }),
-            bagTypeId ? prisma.bagType.findUnique({ where: { id: bagTypeId } }) : Promise.resolve(null),
             needsRazorpayVerification
                 // keyId is needed as well: the amount reconciliation below fetches the
                 // Razorpay order to confirm the customer actually paid this cart's total.
@@ -124,13 +123,6 @@ const createOrder = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 error: 'User not found'
-            });
-        }
-
-        if (bagTypeId && (!bagType || !bagType.isActive)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Selected bag type is not available'
             });
         }
 
@@ -198,6 +190,18 @@ const createOrder = async (req, res) => {
                 return res.status(400).json({
                     success: false,
                     error: `Insufficient stock for product: ${product.name}`
+                });
+            }
+
+            // Region gate — the last line of defence. A cart built on .in can't be
+            // checked out on .com (and vice-versa): the item may have been added
+            // before a visibility change, or the region switched mid-session. Uses
+            // the order currency (INR=.in, USD=.com).
+            const skuVisibility = variant ? variant.priceVisibility : product.priceVisibility;
+            if (!isVisibleInRegion(skuVisibility, currency)) {
+                return res.status(400).json({
+                    success: false,
+                    error: `"${product.name}" is not available in your region. Please remove it to continue.`
                 });
             }
 
@@ -327,15 +331,6 @@ const createOrder = async (req, res) => {
             }
         }
 
-        // 4. Resolve bag type pricing (bag was already fetched + validated in
-        // the parallel pre-flight above).
-        const bagTypeName = bagType ? bagType.name : null;
-        // Same chain as the line items — a bag priced only in INR must be converted
-        // for a USD order, never charged as-is.
-        const bagTypePrice = bagType
-            ? resolveUnitPrice(bagType, currency, orderExchangeRate)
-            : 0;
-
         // 5. Create Order
         // Generate unique Order ID (invoiceNo was already generated in parallel
         // pre-flight, so no extra round trip here).
@@ -431,12 +426,10 @@ const createOrder = async (req, res) => {
             );
         }
 
-        const roundedBagPrice = round2(bagTypePrice);
-
         // Clamp at zero. A discount larger than the goods value must never produce a
         // negative order that would read as money owed to the customer.
         const totalAmount = Math.max(0, round2(
-            roundedSubtotal + roundedShipping + roundedTax - roundedDiscount + roundedBagPrice
+            roundedSubtotal + roundedShipping + roundedTax - roundedDiscount
         ));
 
         // ── Payment amount reconciliation ────────────────────────────────────
@@ -570,9 +563,6 @@ const createOrder = async (req, res) => {
                     tax: roundedTax,
                     discount: roundedDiscount,
                     totalAmount,
-                    bagTypeId: bagTypeId || undefined,
-                    bagTypeName,
-                    bagTypePrice: roundedBagPrice,
                     couponCode: validatedCouponCode,
                     currency,
                     exchangeRate: orderExchangeRate,
@@ -581,7 +571,6 @@ const createOrder = async (req, res) => {
                     taxINR: round2(toINR(roundedTax, currency, orderExchangeRate)),
                     shippingCostINR: round2(toINR(roundedShipping, currency, orderExchangeRate)),
                     discountINR: round2(toINR(roundedDiscount, currency, orderExchangeRate)),
-                    bagTypePriceINR: round2(toINR(roundedBagPrice, currency, orderExchangeRate)),
                     paymentStatus: paymentMethod === 'COD' ? 'PENDING' : 'PAID',
                     paymentMethod,
                     paymentId,

@@ -17,9 +17,7 @@ import {
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { adminProductService } from '@/services/adminProductService'
-import qcCheckerService from '@/services/qcCheckerService'
 import { hasPermission } from '@/lib/auth'
-import { formatCheckerName } from '@/lib/checkerUtils'
 
 interface VendorProductRequest {
   id: string
@@ -111,7 +109,6 @@ export default function VendorProductRequests() {
   // ── Data state ────────────────────────────────────────────────────────────
   const [requests, setRequests] = useState<VendorProductRequest[]>([])
   const [loading, setLoading] = useState(true)
-  const [qcCheckers, setQcCheckers] = useState<{ id: string; name: string }[]>([])
   const [statusCounts, setStatusCounts] = useState<StatusCounts>({
     total: 0, pending: 0, qcApproved: 0, approved: 0, rejected: 0, reinspection: 0,
   })
@@ -127,9 +124,6 @@ export default function VendorProductRequests() {
   const [showRejectionModal, setShowRejectionModal] = useState(false)
   const [rejectingRequestId, setRejectingRequestId] = useState<string | null>(null)
   const [rejectLoading, setRejectLoading] = useState(false)
-  const [showAssignModal, setShowAssignModal] = useState(false)
-  const [assigningRequestId, setAssigningRequestId] = useState<string | null>(null)
-  const [selectedQcChecker, setSelectedQcChecker] = useState<string>('')
   const [showApprovalModal, setShowApprovalModal] = useState(false)
   const [approvingRequest, setApprovingRequest] = useState<VendorProductRequest | null>(null)
   // Product currently open in the price-negotiation modal.
@@ -183,16 +177,7 @@ export default function VendorProductRequests() {
     } catch { /* counts are informational */ }
   }, [])
 
-  const loadQcCheckers = useCallback(async () => {
-    try {
-      const response = await qcCheckerService.getAllQCCheckers({ status: 'ACTIVE' })
-      if (response.success && response.data) setQcCheckers(response.data)
-    } catch (error) {
-      console.error('Error fetching QC checkers:', error)
-    }
-  }, [])
-
-  useEffect(() => { loadQcCheckers(); loadStatusCounts() }, [loadQcCheckers, loadStatusCounts])
+  useEffect(() => { loadStatusCounts() }, [loadStatusCounts])
   useEffect(() => { loadRequests(pagination.currentPage) }, [pagination.currentPage, loadRequests])
 
   // ── Filter handlers ───────────────────────────────────────────────────────
@@ -238,25 +223,11 @@ export default function VendorProductRequests() {
     }
   }
 
+  // Open the full assignment page (mirrors the factory "Create QC Assignment" page)
+  // instead of the compact modal, so the admin can also set client/date/time/priority/
+  // duration for the product inspection.
   const handleAssignClick = (requestId: string) => {
-    const req = requests.find(r => r.id === requestId)
-    setAssigningRequestId(requestId); setSelectedQcChecker(req?.assignedQcId ?? ''); setShowAssignModal(true)
-  }
-
-  const handleAssignQC = async () => {
-    if (!assigningRequestId || !selectedQcChecker) { showErrorToast('Validation Error', 'Please select a QC Checker'); return }
-    const wasReassign = Boolean(requests.find(r => r.id === assigningRequestId)?.assignedQcId)
-    try {
-      const response = await adminProductService.assignQCChecker(assigningRequestId, selectedQcChecker)
-      if (response.success) {
-        showSuccessToast(
-          wasReassign ? 'QC Checker Reassigned' : 'QC Checker Assigned',
-          wasReassign ? 'The product has been reassigned to a new Quality Checker.' : 'The product has been assigned for inspection.'
-        )
-        setShowAssignModal(false); setAssigningRequestId(null); setSelectedQcChecker('')
-        loadRequests(pagination.currentPage)
-      }
-    } catch (error: any) { showErrorToast(wasReassign ? 'Reassignment Failed' : 'Assignment Failed', error.message || 'Unable to assign QC Checker.') }
+    router.push(`/admin/dashboard/products/vendor-requests/assign/${requestId}`)
   }
 
   const handleViewDetails = (request: VendorProductRequest) => {
@@ -618,60 +589,6 @@ export default function VendorProductRequests() {
       })()}
 
       {/* ══ Assign QC Checker Modal ══════════════════════════════════════════ */}
-      {showAssignModal && (() => {
-        const assigningRequest = requests.find(r => r.id === assigningRequestId)
-        const currentQcId = assigningRequest?.assignedQcId ?? ''
-        const isReassign = Boolean(currentQcId)
-        const isUnchanged = isReassign && selectedQcChecker === currentQcId
-        return (
-          <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-900">{isReassign ? 'Reassign QC Checker' : 'Assign QC Checker'}</h3>
-                <button type="button" onClick={() => { setShowAssignModal(false); setAssigningRequestId(null); setSelectedQcChecker('') }}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <p className="text-sm text-slate-500 mb-4">
-                {isReassign ? 'Select a different Quality Checker to take over inspection of this product.' : 'Select a Quality Checker to inspect this product before it can be approved.'}
-              </p>
-              {isReassign && assigningRequest?.assignedQc?.name && (
-                <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <div className="text-xs uppercase tracking-wide text-slate-400 mb-1">Currently assigned</div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-emerald-500" />
-                    <span className="text-sm font-medium text-slate-900">{assigningRequest.assignedQc.name}</span>
-                    {assigningRequest.assignedQc.checkerId && (
-                      <span className="text-xs font-mono text-slate-400">({assigningRequest.assignedQc.checkerId})</span>
-                    )}
-                  </div>
-                </div>
-              )}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">QC Checker</label>
-                <Dropdown
-                  value={selectedQcChecker}
-                  onChange={(v) => setSelectedQcChecker(v as string)}
-                  placeholder="Select a QC Checker"
-                  options={qcCheckers.map(qc => ({ value: qc.id, label: formatCheckerName(qc) }))}
-                />
-              </div>
-              <div className="flex justify-end gap-3">
-                <button type="button" onClick={() => { setShowAssignModal(false); setAssigningRequestId(null); setSelectedQcChecker('') }}
-                  className="px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-                  Cancel
-                </button>
-                <button type="button" onClick={handleAssignQC} disabled={!selectedQcChecker || isUnchanged}
-                  title={isUnchanged ? 'Select a different QC Checker to reassign' : undefined}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 rounded-xl transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed">
-                  {isReassign ? 'Reassign' : 'Assign'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
     </div>
   )
 }

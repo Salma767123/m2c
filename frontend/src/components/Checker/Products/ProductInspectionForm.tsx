@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Check, ArrowLeft, ArrowRight, AlertTriangle, RotateCcw } from "lucide-react"
+import { Check, ArrowLeft, ArrowRight, AlertTriangle, RotateCcw, AlarmClockOff } from "lucide-react"
 
 // ── Step components ───────────────────────────────────────────────────────────
 import PI_Step1_GeneralInfo from "@/components/Checker/Vendor/Steps/PI_Step1_GeneralInfo"
@@ -22,6 +22,7 @@ import {
 // ── Services + utilities ──────────────────────────────────────────────────────
 import { qcCheckerService } from "@/services/qcCheckerService"
 import { formatCheckerName } from "@/lib/checkerUtils"
+import { isInspectionWindowElapsed, formatAssignmentWindow } from "@/lib/inspectionSchedule"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 import { captureCoordsForSubmit, type InspectionType } from "@/lib/checkerLocation"
 import InspectionTypeDialog from "@/components/Checker/Vendor/InspectionTypeDialog"
@@ -94,6 +95,8 @@ export default function ProductInspectionForm({
     const [reviewMode, setReviewMode] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [errors, setErrors] = useState<AllErrors>({})
+    // Set when the admin-booked window has elapsed — blocks the form entirely.
+    const [expiredError, setExpiredError] = useState<string | null>(null)
     // Physical vs virtual — chosen in the mandatory dialog before the form is usable.
     const [inspectionType, setInspectionType] = useState<InspectionType | null>(() => {
         try {
@@ -299,6 +302,17 @@ export default function ProductInspectionForm({
                 const product = res.data.product
                 const v = product?.vendor || {}
 
+                // Booked window elapsed before opening → block the form; the
+                // assignment must be rescheduled by the admin (backend enforces too).
+                const a = product?.qcAssignment
+                if (a?.scheduledDate && isInspectionWindowElapsed(a.scheduledDate, a.scheduledTime, a.estimatedDuration)) {
+                    setExpiredError(
+                        `This inspection's scheduled window (${formatAssignmentWindow(a.scheduledDate, a.scheduledTime, a.estimatedDuration)}) has passed. It can no longer be started — please ask the admin to schedule a new assignment.`
+                    )
+                    prefilledRef.current = productId
+                    return
+                }
+
                 setFormData((prev) => ({
                     ...prev,
                     vendor: prev.vendor || v.companyName || vendorName,
@@ -486,13 +500,44 @@ export default function ProductInspectionForm({
             showSuccessToast("Success", "Product inspection submitted successfully.")
             onComplete()
         } catch (error: any) {
-            showErrorToast("Submission Failed", error.message || "Unable to submit inspection.")
+            // Backend deadline guard — surface the expired screen rather than a toast.
+            const msg: string = error?.message || ""
+            if (error?.code === "INSPECTION_EXPIRED" || error?.status === 409 && /window|expired/i.test(msg)) {
+                setExpiredError(msg || "This inspection's scheduled window has passed and can no longer be submitted.")
+            } else {
+                showErrorToast("Submission Failed", error.message || "Unable to submit inspection.")
+            }
         } finally {
             setSubmitting(false)
         }
     }
 
     // ── Render ────────────────────────────────────────────────────────────────
+    if (expiredError) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-6 bg-[#f7f7f5]">
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 max-w-md w-full text-center space-y-5">
+                    <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto bg-amber-50">
+                        <AlarmClockOff className="w-7 h-7 text-amber-500" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900 mb-1">Inspection Window Expired</h2>
+                        <p className="text-slate-600 text-sm leading-relaxed">{expiredError}</p>
+                        <p className="text-slate-500 text-xs leading-relaxed mt-2">
+                            The admin has been asked to schedule a new assignment for this product.
+                        </p>
+                    </div>
+                    <button
+                        onClick={onComplete}
+                        className="w-full px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 text-white transition-colors"
+                    >
+                        Back to Products
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div ref={rootRef} className="min-h-screen font-sans bg-[#f7f7f5]">
             {/* Mandatory type selection — shown until the checker chooses. Cancelling

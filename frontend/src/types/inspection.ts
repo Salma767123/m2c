@@ -164,6 +164,15 @@ export interface ProductDetailData {
   fabricType?: string | null
   material?: string | null
   fabricSpecifications?: Record<string, unknown> | null
+  // Who made the item (distinct from the selling vendor)
+  manufacturerInfo?: {
+    photo?: string
+    title?: string
+    fullName?: string
+    role?: string
+    experience?: string
+    description?: string
+  } | null
   // Dispatch & Shipping
   dispatchTimeline?: {
     processingDays: number
@@ -188,4 +197,11 @@ export interface ProductDetailData {
   variants?: ProductVariant[]
   vendor?: ProductDetailVendor
   assignedQc?: AssignedQcSummary | null
+  /** Admin-booked QC schedule for this product (from the Create QC Assignment form). */
+  qcAssignment?: {
+    clientName?: string | null
+    scheduledDate?: string | null
+    scheduledTime?: string | null
+    estimatedDuration?: string | null
+  } | null
 }

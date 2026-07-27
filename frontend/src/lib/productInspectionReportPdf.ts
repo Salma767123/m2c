@@ -239,6 +239,20 @@ export function generateProductInspectionPdf(
         )
     }
 
+    // ── C2. Manufacturer (who made the item) ───────────────────────────────────
+    const mi = p.manufacturerInfo || {}
+    const mfrName = [mi.title, mi.fullName].filter((x: unknown) => x && String(x).trim()).join(" ").trim()
+    if (mfrName || mi.role || mi.experience || mi.description) {
+        sectionTitle("Manufacturer Information")
+        const mfrRows: [string, string][] = [
+            ["Name", val(mfrName)],
+            ["Role", val(mi.role)],
+            ["Experience", val(mi.experience)],
+            ["Description", val(mi.description)],
+        ]
+        runTable([["Field", "Value"]], mfrRows.filter(([, value]) => value !== "—"))
+    }
+
     // ── D. Product Verification ────────────────────────────────────────────────
     sectionTitle("D. Product Verification")
     const verEntries = Object.entries(formData.productVerifications || {})

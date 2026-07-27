@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
     ArrowLeft, ShieldCheck,
     CheckCircle, XCircle, AlertTriangle,
-    Truck, Camera, Download, FlaskConical, Star, Check, X, FileText, MapPin, Video
+    Truck, Camera, Download, FlaskConical, Star, Check, X, FileText, MapPin, Video, Factory
 } from 'lucide-react'
 import { Badge } from '@/components/UI/Badge'
 import productService from '@/services/productService'
@@ -19,6 +19,8 @@ import { adminProductService } from '@/services/adminProductService'
 import { hasPermission } from '@/lib/auth'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { describeLocationVerification, inspectionTypeLabel } from "@/lib/checkerLocation"
+import ManufacturerInfoCard from "@/components/Shared/ManufacturerInfoCard"
+import { hasManufacturerInfo } from "@/lib/manufacturerInfo"
 
 interface Props {
     productId: string
@@ -685,6 +687,13 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
                     <PhotoGallery photos={formData.photocopyDocuments} title="Photocopy Documents" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
                     <PhotoGallery photos={formData.companyIdCards} title="Company ID Cards" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
                 </Section>
+
+                {/* Who made the item — shown when the vendor supplied it. */}
+                {hasManufacturerInfo((product as any).manufacturerInfo) && (
+                    <Section title="Manufacturer Information" icon={Factory} accent="bg-slate-50 text-slate-700">
+                        <ManufacturerInfoCard info={(product as any).manufacturerInfo} variant="plain" />
+                    </Section>
+                )}
 
                 {/* Inspection type + where the checker was when they submitted. Product
                     QC has no lat/lng columns, so this rides inside qcInspectionData —

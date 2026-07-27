@@ -56,7 +56,9 @@ async function main() {
     await prisma.category.create({
       data: {
         name,
-        description: 'Vendor-proposed category — awaiting admin review (backfilled from existing products).',
+        // No auto-generated description — the PENDING status + isCustom flag already
+        // mark it as vendor-proposed. Left empty for the admin to fill.
+        description: '',
         slug,
         status: 'PENDING',
         isCustom: true,

@@ -17,6 +17,8 @@ import { productService, type ProductFormData as ServiceProductFormData } from '
 import { gstSettingsService, type GSTSetting } from '@/services/gstSettingsService'
 import { categoryService, Category } from '@/services/categoryService'
 import { parseDimensions, combineDimensions } from '@/lib/dimensions'
+import ImageCropModal from '@/components/UI/ImageCropModal'
+import { TitleSelect } from '@/components/VendorHub/FormUI'
 
 // 1 → A, 26 → Z, 27 → AA … (mirrors the backend variant-suffix logic).
 const variantAlphaSuffix = (n: number): string => {
@@ -179,6 +181,17 @@ interface ProductFormData {
   material: string
   fabricSpecifications: FabricSpecification
 
+  // Who made the item (distinct from the selling vendor). Photo is a base64 data URL
+  // while editing; the backend resolves it to a Cloudinary URL on save.
+  manufacturerInfo: {
+    photo: string
+    title: string
+    fullName: string
+    role: string
+    experience: string
+    description: string
+  }
+
   // Variants Management
   variants: ProductVariant[]
   hasVariants: boolean
@@ -274,6 +287,16 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       careInstructions: []
     },
 
+    // Manufacturer (who made the item)
+    manufacturerInfo: {
+      photo: '',
+      title: '',
+      fullName: '',
+      role: '',
+      experience: '',
+      description: '',
+    },
+
     // Variants Management
     variants: [],
     hasVariants: false,
@@ -310,6 +333,35 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const [selectedTag, setSelectedTag] = useState('')
   const [careModalOpen, setCareModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('basic')
+
+  // ── Manufacturer photo crop ────────────────────────────────────────────────
+  // Mirrors the OwnerProfile pattern: pick a file → crop in ImageCropModal → store the
+  // cropped JPEG as a base64 data URL in formData.manufacturerInfo.photo. The backend
+  // resolves that to a Cloudinary URL on save.
+  const [mfrCropState, setMfrCropState] = useState<{ src: string; name: string } | null>(null)
+  const setManufacturerField = (field: keyof ProductFormData['manufacturerInfo'], value: string) => {
+    setFormData(prev => ({ ...prev, manufacturerInfo: { ...prev.manufacturerInfo, [field]: value } }))
+  }
+  const openMfrPhotoCropper = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      showErrorToast('Invalid file', 'Please choose an image file (PNG, JPG or WebP).')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showErrorToast('Image too large', 'Please choose an image under 5 MB.')
+      return
+    }
+    setMfrCropState({ src: URL.createObjectURL(file), name: file.name })
+  }
+  const closeMfrCropper = () => {
+    setMfrCropState(prev => { if (prev) URL.revokeObjectURL(prev.src); return null })
+  }
+  const onMfrPhotoCropped = (file: File) => {
+    const reader = new FileReader()
+    reader.onloadend = () => setManufacturerField('photo', reader.result as string)
+    reader.readAsDataURL(file)
+    closeMfrCropper()
+  }
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [shippingConfirmed, setShippingConfirmed] = useState(false)
@@ -351,6 +403,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const productTabs = [
     { id: 'basic', label: 'Basic Info' },
     { id: 'fabric', label: 'Fabric & Specs' },
+    { id: 'manufacturer', label: 'Manufacturer' },
     { id: 'variants', label: 'Variants' },
     { id: 'pricing', label: 'Pricing' },
     { id: 'inventory', label: 'Inventory' },
@@ -642,6 +695,18 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   gsm: fs.gsm || '',
                   weave: fs.weave || '',
                   careInstructions: Array.isArray(fs.careInstructions) ? fs.careInstructions : [],
+                }
+              })(),
+
+              manufacturerInfo: (() => {
+                const mi = (product as any).manufacturerInfo || {}
+                return {
+                  photo: mi.photo || '',
+                  title: mi.title || '',
+                  fullName: mi.fullName || '',
+                  role: mi.role || '',
+                  experience: mi.experience || '',
+                  description: mi.description || '',
                 }
               })(),
 
@@ -1896,6 +1961,118 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         })}
                       </div>
                     )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Manufacturer Tab — who actually MADE this item */}
+            {activeTab === 'manufacturer' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Manufacturer Information</CardTitle>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Who made this item? This is shown to the admin and the QC inspector on every product and inspection page. All fields are optional.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Photo */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Profile Photo</label>
+                    <div className="flex items-center gap-4">
+                      <div className="w-24 h-24 rounded-full border-2 border-dashed border-slate-300 overflow-hidden flex items-center justify-center bg-slate-50 shrink-0">
+                        {formData.manufacturerInfo.photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={formData.manufacturerInfo.photo} alt="Manufacturer" className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon className="w-8 h-8 text-slate-300" />
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <input
+                          id="mfr-photo-input"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) openMfrPhotoCropper(f); e.target.value = '' }}
+                        />
+                        <label
+                          htmlFor="mfr-photo-input"
+                          className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                        >
+                          <Upload className="w-4 h-4" />
+                          {formData.manufacturerInfo.photo ? 'Change Photo' : 'Upload Photo'}
+                        </label>
+                        {formData.manufacturerInfo.photo && (
+                          <button
+                            type="button"
+                            onClick={() => setManufacturerField('photo', '')}
+                            className="inline-flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700"
+                          >
+                            <X className="w-3.5 h-3.5" /> Remove
+                          </button>
+                        )}
+                        <span className="text-xs text-slate-400">PNG, JPG or WebP, up to 5 MB. Square works best.</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Title + Full Name */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Title</label>
+                      <TitleSelect
+                        value={formData.manufacturerInfo.title}
+                        onChange={(v) => setManufacturerField('title', v)}
+                        id="mfr-title"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Full Name</label>
+                      <input
+                        type="text"
+                        value={formData.manufacturerInfo.fullName}
+                        onChange={(e) => setManufacturerField('fullName', e.target.value)}
+                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                        placeholder="e.g. Ravi Kumar"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Role + Experience */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Role</label>
+                      <input
+                        type="text"
+                        value={formData.manufacturerInfo.role}
+                        onChange={(e) => setManufacturerField('role', e.target.value)}
+                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                        placeholder="e.g. Master Weaver, Production Head"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Experience</label>
+                      <input
+                        type="text"
+                        value={formData.manufacturerInfo.experience}
+                        onChange={(e) => setManufacturerField('experience', e.target.value)}
+                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                        placeholder="e.g. 12 years"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Short Description</label>
+                    <textarea
+                      value={formData.manufacturerInfo.description}
+                      onChange={(e) => setManufacturerField('description', e.target.value)}
+                      rows={4}
+                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors resize-y"
+                      placeholder="A short note about the maker — their craft, specialisation, workshop…"
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -3172,6 +3349,18 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         text={uploadResult.text}
         onClose={() => setUploadResult(prev => ({ ...prev, show: false }))}
       />
+
+      {/* Manufacturer photo cropper */}
+      {mfrCropState && (
+        <ImageCropModal
+          src={mfrCropState.src}
+          fileName={mfrCropState.name}
+          title="Crop Manufacturer Photo"
+          cropShape="round"
+          onCancel={closeMfrCropper}
+          onCropped={onMfrPhotoCropped}
+        />
+      )}
     </div>
   )
 }

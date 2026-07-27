@@ -63,11 +63,20 @@ async function syncVendorCustomCategories(vendorId, additionalCategories) {
       await prisma.category.create({
         data: {
           name,
-          description: 'Vendor-proposed category — awaiting admin review.',
+          // No auto-generated description. The PENDING status + isCustom flag already
+          // mark it as vendor-proposed; a machine sentence in the Description field just
+          // looks like real content the admin has to clear. Left empty for the admin to
+          // fill (or the vendor's own text, if collected later).
+          description: '',
           slug,
           status: 'PENDING',
           isCustom: true,
           createdByVendorId: vendorId,
+          // MUST be explicit null, not omitted. On MongoDB, Prisma's
+          // `where: { parentId: null }` (the admin list's showRootOnly filter) matches
+          // an explicit null but NOT an absent field — so a row created without this key
+          // is a root category that never shows up in the Categories module.
+          parentId: null,
         },
       });
       taken.add(name.toLowerCase());

@@ -37,6 +37,18 @@ const getPrevDateRange = (period) => {
     return { start: new Date(start - length), end: start };
 };
 
+// Map vendor DB ids → human-friendly vendorCode (VND-xxx) for report tables.
+// Reports must NEVER surface the raw Mongo _id — see all *report table mappings.
+const resolveVendorCodes = async (vendorIds) => {
+    const ids = [...new Set((vendorIds || []).filter(Boolean))];
+    if (!ids.length) return {};
+    const rows = await prisma.vendor.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, vendorCode: true },
+    });
+    return Object.fromEntries(rows.map((r) => [r.id, r.vendorCode]));
+};
+
 // ============================================
 // GET OVERVIEW REPORT
 // ============================================
@@ -183,6 +195,8 @@ const getOverviewReport = async (req, res) => {
             color: STATUS_COLORS[s.status] || '#6b7280',
         }));
 
+        const overviewVendorCodes = await resolveVendorCodes(topVendors.map(v => v.vendorId));
+
         res.json({
             success: true,
             data: {
@@ -211,7 +225,7 @@ const getOverviewReport = async (req, res) => {
                     })),
                     topVendors: topVendors.map((v, i) => ({
                         rank: i + 1,
-                        id: v.vendorId,
+                        vendorCode: overviewVendorCodes[v.vendorId] || '-',
                         name: v.vendorName,
                         revenue: v._sum.totalPriceINR || 0,
                         orders: v._count.id,
@@ -386,7 +400,6 @@ const getOrdersReport = async (req, res) => {
                         status: o.status,
                         paymentStatus: o.paymentStatus,
                         date: o.createdAt,
-                        internalId: o.id,
                     })),
                 },
             },
@@ -435,6 +448,14 @@ const getSettlementReport = async (req, res) => {
         const totalProcessing = statusBreakdown.find(s => s.status === 'Processing')?._sum?.amount || 0;
         const totalAmount = settlements.reduce((s, x) => s + x.amount, 0);
 
+        // Settlement.orderId is the Order's Mongo _id — resolve it to the
+        // human-readable order number (ORD-xxx) shown across the admin panel.
+        const settlementOrderIds = [...new Set(settlements.map(s => s.orderId).filter(Boolean))];
+        const orderNoRows = settlementOrderIds.length
+            ? await prisma.order.findMany({ where: { id: { in: settlementOrderIds } }, select: { id: true, orderId: true } })
+            : [];
+        const orderNoMap = Object.fromEntries(orderNoRows.map(o => [o.id, o.orderId]));
+
         res.json({
             success: true,
             data: {
@@ -446,14 +467,16 @@ const getSettlementReport = async (req, res) => {
                     count: settlements.length,
                 },
                 tables: {
+                    // Settlement money is always the vendor's payout in INR.
                     settlements: settlements.map(s => ({
-                        id: s.settlementNumber || s.id,
+                        id: s.settlementNumber || '-',
                         vendor: s.vendorName || '-',
                         amount: s.amount,
+                        currency: 'INR',
                         status: s.status,
                         dueDate: s.dueDate,
                         date: s.createdAt,
-                        orderId: s.orderId,
+                        orderId: orderNoMap[s.orderId] || '-',
                     })),
                 },
             },
@@ -523,6 +546,8 @@ const getVendorsReport = async (req, res) => {
             }))
             .sort((a, b) => b.value - a.value);
 
+        const vendorReportCodes = await resolveVendorCodes(topVendors.map(v => v.vendorId));
+
         res.json({
             success: true,
             data: {
@@ -536,7 +561,7 @@ const getVendorsReport = async (req, res) => {
                 tables: {
                     topVendors: topVendors.map((v, i) => ({
                         rank: i + 1,
-                        id: v.vendorId,
+                        vendorCode: vendorReportCodes[v.vendorId] || '-',
                         name: v.vendorName,
                         revenue: v._sum.totalPriceINR || 0,
                         orders: v._count.id,
@@ -593,7 +618,13 @@ const getProductsReport = async (req, res) => {
                     lowStock: lowStockProducts.length,
                 },
                 tables: {
-                    lowStockProducts,
+                    // Drop the raw Mongo _id — reports show baseSku, never the DB id.
+                    lowStockProducts: lowStockProducts.map(p => ({
+                        name: p.name,
+                        baseSku: p.baseSku,
+                        totalStock: p.totalStock,
+                        lowStockThreshold: p.lowStockThreshold,
+                    })),
                     topSellingProducts: topSellingProducts.map(p => ({
                         name: p.productName,
                         revenue: p._sum.totalPriceINR || 0,

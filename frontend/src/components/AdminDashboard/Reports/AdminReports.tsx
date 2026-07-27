@@ -25,6 +25,27 @@ import { formatOrderAmount } from "@/lib/currency";
 
 type ReportTab = 'overview' | 'sales' | 'orders' | 'settlement' | 'financial' | 'vendors' | 'products' | 'customers';
 
+// Report table cells carry raw ISO timestamps (e.g. "2026-07-22T04:54:48.398Z").
+// Exports (PDF/Excel) dump values verbatim, so format any ISO date/datetime into a
+// human-readable label; return null for everything else so callers keep their own
+// handling (numbers stay numeric in Excel, etc.).
+const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function readableReportDate(val: unknown): string | null {
+  let d: Date | null = null;
+  let dateOnly = false;
+  if (val instanceof Date) {
+    d = val;
+  } else if (typeof val === 'string' && (ISO_DATETIME_RE.test(val) || ISO_DATE_RE.test(val))) {
+    d = new Date(val);
+    dateOnly = ISO_DATE_RE.test(val);
+  }
+  if (!d || isNaN(d.getTime())) return null;
+  return dateOnly
+    ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
 const PERIOD_OPTIONS = [
   { value: 'today', label: 'Today' },
   { value: '7days', label: 'Last 7 Days' },
@@ -96,7 +117,9 @@ export default function AdminReports() {
           const formatted = rows.map(r => {
             const row: Record<string, any> = {};
             for (const [h, val] of Object.entries(r)) {
-              if (typeof val === 'number' && !Number.isInteger(val)) row[h] = parseFloat(val.toFixed(2));
+              const asDate = readableReportDate(val);
+              if (asDate) row[h] = asDate;
+              else if (typeof val === 'number' && !Number.isInteger(val)) row[h] = parseFloat(val.toFixed(2));
               else row[h] = val;
             }
             return row;
@@ -129,24 +152,29 @@ export default function AdminReports() {
 
     try {
       const doc = new jsPDF();
+      // Brand red (#e01a1b) — matches the app theme across all report PDFs.
+      const BRAND_RGB: [number, number, number] = [224, 26, 27];
       let hasData = false;
       const tables = data.tables as Record<string, any[]>;
       let yPos = 20;
 
       doc.setFontSize(16);
+      doc.setTextColor(...BRAND_RGB);
       doc.text(`${reportType.toUpperCase()} REPORT - ${period.replace(/(\d+)/, '$1 ').toUpperCase()}`, 14, yPos);
       yPos += 10;
 
       for (const [key, rows] of Object.entries(tables)) {
         if (Array.isArray(rows) && rows.length > 0) {
           doc.setFontSize(12);
+          doc.setTextColor(51, 65, 85); // slate-700 for section headings
           doc.text(key.replace(/([a-z])([A-Z])/g, '$1 $2').toUpperCase(), 14, yPos);
           yPos += 5;
 
           const headers = Object.keys(rows[0]);
           const dataRows = rows.map(r => headers.map(h => {
             const val = r[h];
-            if (val instanceof Date) return val.toLocaleDateString();
+            const asDate = readableReportDate(val);
+            if (asDate) return asDate;
             if (typeof val === 'object' && val !== null) return JSON.stringify(val);
             if (typeof val === 'number' && !Number.isInteger(val)) return val.toFixed(2);
             return String(val ?? '');
@@ -158,7 +186,7 @@ export default function AdminReports() {
             body: dataRows,
             theme: 'grid',
             styles: { fontSize: 8 },
-            headStyles: { fillColor: [17, 24, 39] }, // bg-slate-900
+            headStyles: { fillColor: BRAND_RGB, textColor: [255, 255, 255] }, // brand red header
           });
 
           yPos = (doc as any).lastAutoTable.finalY + 15;
@@ -393,7 +421,7 @@ export default function AdminReports() {
             <CardContent>
               <div className="space-y-3">
                 {(data.tables?.topVendors || []).map((v: any) => (
-                  <div key={v.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                  <div key={v.rank} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
                     <div className="flex items-center gap-4">
                       <div className="w-9 h-9 rounded-full bg-brand-500 text-white flex items-center justify-center text-sm font-bold">#{v.rank}</div>
                       <div>
@@ -747,7 +775,7 @@ export default function AdminReports() {
                 </TableHeader>
                 <TableBody>
                   {(data.tables?.topVendors || []).map((v: any) => (
-                    <TableRow key={v.id}>
+                    <TableRow key={v.rank}>
                       <TableCell className="font-bold text-slate-700">#{v.rank}</TableCell>
                       <TableCell className="font-medium text-slate-900">{v.name}</TableCell>
                       <TableCell className="font-semibold">{fmt(v.revenue)}</TableCell>
@@ -795,7 +823,7 @@ export default function AdminReports() {
                   </TableHeader>
                   <TableBody>
                     {(data.tables?.lowStockProducts || []).map((p: any) => (
-                      <TableRow key={p.id}>
+                      <TableRow key={p.baseSku}>
                         <TableCell className="font-medium text-slate-900">{p.name}</TableCell>
                         <TableCell className="font-mono text-xs text-slate-500">{p.baseSku}</TableCell>
                         <TableCell>

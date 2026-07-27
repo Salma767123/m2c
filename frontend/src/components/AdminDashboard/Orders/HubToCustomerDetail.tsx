@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Package, CreditCard, User, MapPin, Truck, Star, CheckCircle, XCircle, AlertTriangle, ShoppingBag } from "lucide-react";
+import { ArrowLeft, Package, CreditCard, User, MapPin, Truck, Star, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order, VendorShipment } from "@/services/orderService";
@@ -374,24 +374,6 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           ))}
         </div>
       </div>
-
-      {/* Bag Add-on */}
-      {order.bagTypeName && order.bagTypePrice && order.bagTypePrice > 0 && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-          <div className="flex items-center gap-2 mb-4">
-            <ShoppingBag className="h-5 w-5 text-slate-600" />
-            <h2 className="text-lg font-semibold text-slate-900">Bag Add-on</h2>
-          </div>
-          <div className="flex items-center gap-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-            <ShoppingBag className="h-8 w-8 text-amber-600 shrink-0" />
-            <div className="flex-1">
-              <p className="font-medium text-slate-900">{order.bagTypeName}</p>
-              <p className="text-sm text-slate-600 mt-0.5">Customer requested this bag with their order</p>
-            </div>
-            <p className="text-lg font-bold text-slate-900 shrink-0">{money(order.bagTypePrice)}</p>
-          </div>
-        </div>
-      )}
 
       {/* Payment Method */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">

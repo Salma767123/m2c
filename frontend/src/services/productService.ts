@@ -1,4 +1,5 @@
 import axios from '@/lib/axios';
+import { getRegion } from '@/lib/currency';
 
 export interface ProductFormData {
   // Inventory Connection
@@ -31,6 +32,16 @@ export interface ProductFormData {
   // Product Rating & Reviews
   rating?: number;
   reviews?: number;
+
+  // Who made the item (JSON on Product). Distinct from the vendor who sells it.
+  manufacturerInfo?: {
+    photo?: string;
+    title?: string;
+    fullName?: string;
+    role?: string;
+    experience?: string;
+    description?: string;
+  };
 
   // Fabric & Specifications
   fabricType?: string;
@@ -305,7 +316,9 @@ class ProductService {
     };
   }> {
     try {
-      const response = await axios.get('/products/public', { params });
+      // Region gates visibility server-side (IN_ONLY/COM_ONLY). Sending it here is
+      // what makes the filter and pagination correct — without it every product leaks.
+      const response = await axios.get('/products/public', { params: { ...params, region: getRegion() } });
       return response.data;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to fetch products');
@@ -315,7 +328,7 @@ class ProductService {
   // Get single public product (for website - no authentication required)
   async getPublicProduct(id: string): Promise<{ success: boolean; data?: Product; message?: string }> {
     try {
-      const response = await axios.get(`/products/public/${id}`);
+      const response = await axios.get(`/products/public/${id}`, { params: { region: getRegion() } });
       return response.data;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to fetch product');
