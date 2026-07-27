@@ -19,8 +19,7 @@ import {
   Download,
   MessageCircle,
   AlertCircle,
-  Clock,
-  ShoppingBag
+  Clock
 } from "lucide-react"
 import { formatPrice } from '@/lib/currency'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
@@ -370,16 +369,6 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                     </div>
                   ))}
 
-                  {/* Bag Add-on */}
-                  {orderDetails.bagTypeName && orderDetails.bagTypePrice && orderDetails.bagTypePrice > 0 && (
-                    <div className="flex items-center justify-between px-4 py-3 bg-amber-50/50 border border-amber-100 rounded-xl text-sm">
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <ShoppingBag className="w-4 h-4 text-amber-600" />
-                        <span>Bag: {orderDetails.bagTypeName}</span>
-                      </div>
-                      <span className="font-semibold text-slate-900">{money(orderDetails.bagTypePrice)}</span>
-                    </div>
-                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -441,12 +430,6 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                     <div className="flex justify-between">
                       <span className="text-slate-600">Discount</span>
                       <span className="font-medium text-green-600">-{money(orderDetails.discount)}</span>
-                    </div>
-                  )}
-                  {orderDetails.bagTypePrice && orderDetails.bagTypePrice > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">Bag ({orderDetails.bagTypeName})</span>
-                      <span className="font-medium">{money(orderDetails.bagTypePrice)}</span>
                     </div>
                   )}
                   <div className="border-t border-slate-200 pt-4">

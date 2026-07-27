@@ -45,7 +45,6 @@ const defaultRoles = [
             'reinspection_review:view', 'reinspection_review:approve',
             'all_products:view', 'all_products:create', 'all_products:edit', 'all_products:delete',
             'all_products:approve',
-            'bag_types:view', 'bag_types:create', 'bag_types:edit', 'bag_types:delete',
             'categories:view', 'categories:create', 'categories:edit', 'categories:delete',
             'inventory:view', 'inventory:create', 'inventory:edit', 'inventory:update_stock',
             'coupons:view', 'coupons:create', 'coupons:edit',

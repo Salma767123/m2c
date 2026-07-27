@@ -99,8 +99,6 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
     tax = 0,
     discount = 0,
     totalAmount = 0,
-    bagTypeName,
-    bagTypePrice = 0,
     paymentMethod,
     paymentStatus,
   } = order;
@@ -203,7 +201,6 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
 
   const summaryRows = [
     summaryRow('Subtotal', `${sym}${fmt(subtotal)}`),
-    bagTypePrice > 0 ? summaryRow(`Bag (${escapeHtml(bagTypeName || 'Add-on')})`, `${sym}${fmt(bagTypePrice)}`) : '',
     discount > 0 ? summaryRow('Discount', `− ${sym}${fmt(discount)}`, { color: '#16a34a' }) : '',
     summaryRow('Shipping', shippingCost > 0 ? `${sym}${fmt(shippingCost)}` : 'Free'),
     tax > 0 ? summaryRow(gstNumber ? 'Tax (GST)' : 'Tax', `${sym}${fmt(tax)}`) : '',

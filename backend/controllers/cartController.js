@@ -1,4 +1,5 @@
 const { prisma } = require('../config/database');
+const { isVisibleInRegion } = require('../utils/regionVisibility');
 
 // Add item to cart
 const addToCart = async (req, res) => {
@@ -25,6 +26,7 @@ const addToCart = async (req, res) => {
         priceUSD: true,
         inStock: true,
         totalStock: true,
+        priceVisibility: true,
         variants: variantId ? {
           where: { id: variantId },
           select: {
@@ -34,6 +36,7 @@ const addToCart = async (req, res) => {
             priceINR: true,
             priceUSD: true,
             stock: true,
+            priceVisibility: true,
           }
         } : false
       }
@@ -50,6 +53,17 @@ const addToCart = async (req, res) => {
       return res.status(404).json({
         success: false,
         error: 'Product variant not found'
+      });
+    }
+
+    // Region gate: the specific SKU (variant if chosen, else the product) must be
+    // visible in the caller's storefront. `currency` maps 1:1 to region (INR=.in,
+    // USD=.com). Stops an out-of-region product being added by a crafted request.
+    const skuVisibility = variantId ? product.variants[0].priceVisibility : product.priceVisibility;
+    if (!isVisibleInRegion(skuVisibility, currency)) {
+      return res.status(400).json({
+        success: false,
+        error: 'This product is not available in your region'
       });
     }
 

@@ -108,7 +108,6 @@ const navigation: NavigationItem[] = [
         icon: Package,
         subItems: [
           { title: "All Products", href: "/admin/dashboard/products", permission: "all_products:view" },
-          { title: "Bag Types", href: "/admin/dashboard/bag-types", permission: "bag_types:view" },
         ],
       },
       {

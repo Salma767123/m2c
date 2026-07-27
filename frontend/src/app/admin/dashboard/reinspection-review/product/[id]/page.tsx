@@ -6,6 +6,8 @@ import axios from '@/lib/axios';
 import reinspectionService, { AuditLogEntry, AdminReviewPayload } from '@/services/reinspectionService';
 import InspectionAuditTimeline from '@/components/AdminDashboard/ReInspection/InspectionAuditTimeline';
 import AdminReviewModal from '@/components/AdminDashboard/ReInspection/AdminReviewModal';
+import ManufacturerInfoCard from '@/components/Shared/ManufacturerInfoCard';
+import { hasManufacturerInfo } from '@/lib/manufacturerInfo';
 import { Badge } from '@/components/UI/Badge';
 import { Button } from '@/components/UI/Button';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
@@ -203,6 +205,12 @@ export default function ProductInspectionReviewPage() {
             <div>Category: <span className="font-medium">{product.category}</span></div>
             <div>Price: <span className="font-medium">&#8377;{product.basePrice}</span></div>
           </div>
+          {hasManufacturerInfo((product as any).manufacturerInfo) && (
+            <div className="mt-3 pt-3 border-t border-slate-100">
+              <div className="text-xs text-slate-500 mb-2">Manufacturer</div>
+              <ManufacturerInfoCard info={(product as any).manufacturerInfo} variant="plain" />
+            </div>
+          )}
         </div>
       </div>
 

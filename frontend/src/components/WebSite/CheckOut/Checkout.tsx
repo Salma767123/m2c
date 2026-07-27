@@ -15,7 +15,6 @@ import {
 } from "lucide-react"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
 import { formatPrice, getCurrency, getRegionalPrice, convertUSDtoINR, convertINRtoUSD } from '@/lib/currency'
-import bagTypeService from "@/services/bagTypeService"
 import ShippingForm from "./CheckoutProcess/ShippingForm"
 import PaymentForm from "./CheckoutProcess/PaymentForm"
 import ReviewOrder from "./CheckoutProcess/ReviewOrder"
@@ -143,16 +142,11 @@ export default function Checkout() {
   const [freeShippingApplied, setFreeShippingApplied] = useState(false)
   const [freeShippingMessage, setFreeShippingMessage] = useState("")
 
-  const [selectedBagTypeId, setSelectedBagTypeId] = useState<string | null>(null)
-  const [bagTypeName, setBagTypeName] = useState("")
-  const [bagTypePrice, setBagTypePrice] = useState(0)
-
   const [orderSummary, setOrderSummary] = useState({
     subtotal: 0,
     shipping: 0,
     tax: 0,
     discount: 0,
-    bagCost: 0,
     total: 0
   })
 
@@ -177,43 +171,11 @@ export default function Checkout() {
       }
     }
 
-    // Load selected bag type — use localStorage for ID, then re-validate price from API
-    const savedBag = localStorage.getItem('selectedBagType')
-    if (savedBag) {
-      try {
-        const { id, name, price } = JSON.parse(savedBag)
-        setSelectedBagTypeId(id)
-        setBagTypeName(name)
-        setBagTypePrice(price) // Temporary — will be corrected below from API
-
-        // Re-fetch the bag type from API to get the correct regional price
-        bagTypeService.getActiveBagTypes().then(res => {
-          if (res.success && res.data) {
-            const liveBag = res.data.find(b => b.id === id)
-            if (liveBag) {
-              const correctPrice = getRegionalPrice({ basePrice: liveBag.price, priceINR: liveBag.priceINR, priceUSD: liveBag.priceUSD })
-              setBagTypeName(liveBag.name)
-              setBagTypePrice(correctPrice)
-              // Update localStorage with correct price
-              localStorage.setItem('selectedBagType', JSON.stringify({ id: liveBag.id, name: liveBag.name, price: correctPrice }))
-            } else {
-              // Bag no longer active — clear selection
-              setSelectedBagTypeId(null)
-              setBagTypeName('')
-              setBagTypePrice(0)
-              localStorage.removeItem('selectedBagType')
-            }
-          }
-        }).catch(() => { /* keep localStorage value as fallback */ })
-      } catch {
-        localStorage.removeItem('selectedBagType')
-      }
-    }
   }, [])
 
   useEffect(() => {
     calculateTotals()
-  }, [cartItems, formData.shippingMethod, discountAmount, bagTypePrice])
+  }, [cartItems, formData.shippingMethod, discountAmount])
 
   const fetchCart = async () => {
     try {
@@ -539,12 +501,11 @@ export default function Checkout() {
     const roundedShipping = r2(shipping)
     const roundedTax = r2(tax)
     const roundedDiscount = r2(discountAmount)
-    const roundedBag = r2(bagTypePrice)
 
-    // Calculate total with discount + bag cost, ensure >= 0
+    // Calculate total with discount, ensure >= 0
     const total = Math.max(
       0,
-      r2(roundedSubtotal + roundedShipping + roundedTax - roundedDiscount + roundedBag)
+      r2(roundedSubtotal + roundedShipping + roundedTax - roundedDiscount)
     )
 
     setOrderSummary({
@@ -552,7 +513,6 @@ export default function Checkout() {
       shipping: roundedShipping,
       tax: roundedTax,
       discount: roundedDiscount,
-      bagCost: roundedBag,
       total
     })
   }
@@ -712,7 +672,6 @@ export default function Checkout() {
         tax: orderSummary.tax,
         discount: orderSummary.discount,
         freeShipping: freeShippingApplied,
-        bagTypeId: selectedBagTypeId || undefined,
         // Required: the server re-validates this coupon and derives the discount
         // from it. Omitting it makes the server compute a zero discount, which
         // then fails the payment-amount reconciliation.
@@ -725,11 +684,9 @@ export default function Checkout() {
         // render immediately without re-fetching what we already have.
         stashRecentOrder(response.data)
         localStorage.removeItem('appliedCoupon')
-        localStorage.removeItem('selectedBagType')
         router.push(`/order-confirmation?id=${response.data.id}`)
       } else {
         localStorage.removeItem('appliedCoupon')
-        localStorage.removeItem('selectedBagType')
         router.push("/order-confirmation")
       }
     } catch (error: any) {
@@ -1075,17 +1032,6 @@ export default function Checkout() {
                       </div>
                     )
                   })}
-
-                  {/* Bag Add-on */}
-                  {bagTypeName && bagTypePrice > 0 && (
-                    <div className="flex items-center justify-between px-1 py-2 text-sm text-slate-600">
-                      <div className="flex items-center gap-2">
-                        <ShoppingBag className="w-4 h-4 text-amber-600" />
-                        <span>Bag: {bagTypeName}</span>
-                      </div>
-                      <span className="font-medium text-slate-900">{formatPrice(bagTypePrice)}</span>
-                    </div>
-                  )}
                 </div>
 
                 <div className="space-y-4 mb-6 border-t border-slate-200 pt-4">
@@ -1114,12 +1060,6 @@ export default function Checkout() {
                     <div className="flex justify-between text-green-600">
                       <span>Discount</span>
                       <span className="font-medium">-{formatPrice(orderSummary.discount)}</span>
-                    </div>
-                  )}
-                  {orderSummary.bagCost > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">Bag ({bagTypeName})</span>
-                      <span className="font-medium">{formatPrice(orderSummary.bagCost)}</span>
                     </div>
                   )}
                   <div className="border-t border-slate-200 pt-4">

@@ -7,6 +7,8 @@ import { adminProductService } from '@/services/adminProductService'
 import { categoryService, Category } from '@/services/categoryService'
 import Dropdown from '@/components/UI/Dropdown'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
+import ManufacturerInfoCard from '@/components/Shared/ManufacturerInfoCard'
+import { hasManufacturerInfo } from '@/lib/manufacturerInfo'
 
 // Minimal product shape the modal needs — compatible with both the All Products
 // (AdminProduct) list and the Vendor Product Requests list.
@@ -16,6 +18,12 @@ export interface ApprovableProduct {
   vendor?: { companyName?: string } | null
   basePrice: number
   originalPrice?: number | null
+  // Physical specs — shown read-only so the admin can judge the margin. GSM
+  // lives inside fabricSpecifications; weight/dimensions are product columns.
+  weight?: string | null
+  weightUnit?: string | null
+  dimensions?: string | null
+  fabricSpecifications?: Record<string, unknown> | null
   variants?: Array<{
     id: string
     variantName?: string | null
@@ -68,6 +76,19 @@ export default function ApproveProductModal({ product, open, onClose, onApproved
   const [originalPriceINR, setOriginalPriceINR] = useState('')
   const [priceVisibility, setPriceVisibility] = useState<'IN_ONLY' | 'COM_ONLY' | 'BOTH'>('BOTH')
   const [submitting, setSubmitting] = useState(false)
+  // Profit margin % applied over the vendor base price to fill selling prices.
+  const [margin, setMargin] = useState('')
+  // Keys of fields that failed validation — used to red-outline them on submit.
+  // Keys: 'adminPrice', 'originalPrice', `vp:<id>` (variant price),
+  // `vop:<id>` (variant original price).
+  const [invalid, setInvalid] = useState<Set<string>>(new Set())
+  const clearInvalid = (key: string) =>
+    setInvalid((prev) => {
+      if (!prev.has(key)) return prev
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
 
   // ── Vendor-proposed category gate ────────────────────────────────────────
   // The product may sit on a category the vendor invented (status PENDING), which
@@ -105,6 +126,8 @@ export default function ApproveProductModal({ product, open, onClose, onApproved
     setOriginalPrice(product.originalPrice != null ? String(product.originalPrice) : '')
     setOriginalPriceINR('')
     setPriceVisibility('BOTH')
+    setMargin('')
+    setInvalid(new Set())
     const p: Record<string, string> = {}
     const op: Record<string, string> = {}
     variants.forEach((v) => {
@@ -118,28 +141,88 @@ export default function ApproveProductModal({ product, open, onClose, onApproved
 
   if (!open || !product) return null
 
+  const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
+
+  // Border/focus classes for a price input, red when flagged invalid.
+  const borderCls = (bad: boolean) => bad
+    ? 'border-red-400 ring-2 ring-red-200 focus:ring-red-300 focus:border-red-400'
+    : 'border-slate-300 focus:ring-brand-500/40 focus:border-brand-500'
+
+  // Apply a profit margin over the VENDOR base price to fill every selling
+  // price at once — product base and each variant. Margin sits on the vendor's
+  // buying price (product.basePrice / variant.price), which is exactly the
+  // figure the negotiation settles. The admin can still hand-edit any field
+  // afterwards; re-typing the margin recomputes from the vendor base again.
+  const applyMargin = (pctStr: string) => {
+    setMargin(pctStr)
+    const pct = parseFloat(pctStr)
+    if (isNaN(pct)) return
+    const factor = 1 + pct / 100
+    if (product.basePrice != null) setAdminPrice(String(round2(product.basePrice * factor)))
+    const next: Record<string, string> = {}
+    variants.forEach((v) => { if (v.price != null) next[v.id] = String(round2(v.price * factor)) })
+    if (Object.keys(next).length) setVariantPrices((prev) => ({ ...prev, ...next }))
+  }
+
+  // Read-only physical specs used to judge the margin.
+  const fs = (product.fabricSpecifications || {}) as Record<string, unknown>
+  const specGsm = fs.gsm != null && fs.gsm !== '' ? `${fs.gsm} GSM` : null
+  const specWeight = product.weight
+    ? `${product.weight}${product.weightUnit ? ` ${product.weightUnit}` : ''}`
+    : (fs.weightValue != null && fs.weightValue !== '' ? `${fs.weightValue} g` : null)
+  const specDims = product.dimensions
+    || (fs.length && fs.breadth ? `${fs.length} × ${fs.breadth} cm` : null)
+  const specs = [
+    specGsm && { label: 'GSM', value: specGsm },
+    specWeight && { label: 'Weight', value: specWeight },
+    specDims && { label: 'Dimensions', value: specDims },
+  ].filter(Boolean) as Array<{ label: string; value: string }>
+
   const handleSubmit = async () => {
+    // Collect EVERY invalid field in one pass so all get outlined at once,
+    // rather than surfacing them one toast at a time.
+    const bad = new Set<string>()
+    let msg = ''
+
     if (!adminPrice || parseFloat(adminPrice) <= 0) {
-      showErrorToast('Invalid Price', 'Please enter a valid admin selling price'); return
+      bad.add('adminPrice'); msg ||= 'Enter a valid admin selling price'
     }
     if (!originalPrice || parseFloat(originalPrice) <= 0) {
-      showErrorToast('Invalid Price', 'Please enter a valid original price'); return
-    }
-    if (parseFloat(originalPrice) <= parseFloat(adminPrice)) {
-      showErrorToast('Invalid Price', 'Original price must be greater than selling price'); return
-    }
-    if (hasVariants) {
-      if (variants.some((v) => !variantPrices[v.id] || parseFloat(variantPrices[v.id]) <= 0)) {
-        showErrorToast('Invalid Prices', 'Please enter valid admin prices for all variants'); return
-      }
-      if (variants.some((v) => !variantOriginalPrices[v.id] || parseFloat(variantOriginalPrices[v.id]) <= 0)) {
-        showErrorToast('Invalid Prices', 'Please enter valid original prices for all variants'); return
-      }
-      if (variants.some((v) => parseFloat(variantOriginalPrices[v.id]) <= parseFloat(variantPrices[v.id]))) {
-        showErrorToast('Invalid Prices', 'Original price must be greater than admin price for all variants'); return
-      }
+      bad.add('originalPrice'); msg ||= 'Enter a valid original price (MRP)'
+    } else if (adminPrice && parseFloat(originalPrice) <= parseFloat(adminPrice)) {
+      bad.add('originalPrice'); msg ||= 'Original price (MRP) must be greater than the selling price'
     }
 
+    if (hasVariants) {
+      variants.forEach((v) => {
+        const price = variantPrices[v.id]
+        const orig = variantOriginalPrices[v.id]
+        if (!price || parseFloat(price) <= 0) {
+          bad.add(`vp:${v.id}`); msg ||= 'Enter a valid admin price for every variant'
+        }
+        if (!orig || parseFloat(orig) <= 0) {
+          bad.add(`vop:${v.id}`); msg ||= 'Enter a valid original price for every variant'
+        } else if (price && parseFloat(orig) <= parseFloat(price)) {
+          bad.add(`vop:${v.id}`); msg ||= 'Each variant’s original price must exceed its admin price'
+        }
+      })
+    }
+
+    if (bad.size > 0) {
+      setInvalid(bad)
+      showErrorToast('Check the highlighted fields', msg)
+      // Bring the first offending field into view and focus it.
+      const firstKey = ['adminPrice', 'originalPrice', ...variants.flatMap((v) => [`vp:${v.id}`, `vop:${v.id}`])]
+        .find((k) => bad.has(k))
+      if (firstKey) {
+        const el = document.querySelector<HTMLInputElement>(`[data-field="${firstKey}"]`)
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        setTimeout(() => el?.focus(), 300)
+      }
+      return
+    }
+
+    setInvalid(new Set())
     setSubmitting(true)
     try {
       const variantPricesNum = hasVariants
@@ -222,7 +305,29 @@ export default function ApproveProductModal({ product, open, onClose, onApproved
         <div className="mb-6 p-4 bg-brand-50/40 border border-brand-100 rounded-xl">
           <p className="text-sm font-bold text-slate-900">{product.name}</p>
           {product.vendor?.companyName && <p className="text-sm text-slate-600">{product.vendor.companyName}</p>}
-          <p className="text-xs text-slate-500 mt-0.5">Vendor Base Price: ₹{product.basePrice}</p>
+          <p className="text-sm text-slate-600 mt-1">
+            Vendor Base Price: <span className="text-base font-bold text-slate-900">₹{product.basePrice}</span>
+          </p>
+
+          {/* Physical specs — reference for setting the margin */}
+          {specs.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-brand-100 flex flex-wrap gap-2.5">
+              {specs.map((s) => (
+                <span key={s.label} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{s.label}</span>
+                  <span className="text-sm text-slate-900 font-bold">{s.value}</span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Who made the item */}
+          {hasManufacturerInfo((product as any).manufacturerInfo) && (
+            <div className="mt-3 pt-3 border-t border-brand-100">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Manufacturer</p>
+              <ManufacturerInfoCard info={(product as any).manufacturerInfo} variant="plain" />
+            </div>
+          )}
         </div>
 
         {/* Vendor-proposed category — must be resolved before publishing */}
@@ -283,26 +388,48 @@ export default function ApproveProductModal({ product, open, onClose, onApproved
         {/* Base Pricing */}
         <section className="mb-6">
           <h4 className="text-[11px] font-bold uppercase tracking-wider text-brand-500 mb-3">Base Pricing (INR)</h4>
+
+          {/* Profit margin — fills all selling prices from the vendor base */}
+          <div className="mb-4 p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <label className="text-sm font-semibold text-slate-800">Profit Margin (%)</label>
+            <div className="mt-1.5 flex items-center gap-3">
+              <div className="relative w-32">
+                <input
+                  type="number" value={margin} onChange={(e) => applyMargin(e.target.value)} onFocus={(e) => e.currentTarget.select()}
+                  className="w-full pl-3 pr-7 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none text-sm"
+                  placeholder="e.g. 20" step="0.1" min="0" disabled={submitting}
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">%</span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Applies over the vendor base price to auto-fill the selling price below and every variant.
+                {margin && !isNaN(parseFloat(margin)) && (
+                  <> Base ₹{product.basePrice} → <span className="font-semibold text-slate-700">₹{round2(product.basePrice * (1 + parseFloat(margin) / 100))}</span></>
+                )}
+              </p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-sm font-semibold text-slate-800">Admin Selling Price (₹) <span className="text-brand-500">*</span></label>
                 <span className="text-xs text-slate-400">Base ₹{product.basePrice}</span>
               </div>
-              <input type="number" value={adminPrice} onChange={(e) => setAdminPrice(e.target.value)} onFocus={(e) => e.currentTarget.select()}
-                className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none text-sm"
+              <input type="number" data-field="adminPrice" value={adminPrice} onChange={(e) => { setAdminPrice(e.target.value); clearInvalid('adminPrice') }} onFocus={(e) => e.currentTarget.select()}
+                className={`w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:outline-none text-sm ${borderCls(invalid.has('adminPrice'))}`}
                 placeholder="Enter selling price" step="0.01" min="0" disabled={submitting} />
               <p className="text-xs text-slate-400 mt-1">Final price customers see.</p>
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-sm font-semibold text-slate-800">Original Price (₹) <span className="text-brand-500">*</span></label>
+                <label className="text-sm font-semibold text-slate-800">Original Price / MRP (₹) <span className="text-brand-500">*</span></label>
                 {discountPct != null && <span className="text-xs font-semibold text-emerald-600">{discountPct}% off</span>}
               </div>
-              <input type="number" value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)} onFocus={(e) => e.currentTarget.select()}
-                className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none text-sm"
+              <input type="number" data-field="originalPrice" value={originalPrice} onChange={(e) => { setOriginalPrice(e.target.value); clearInvalid('originalPrice') }} onFocus={(e) => e.currentTarget.select()}
+                className={`w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:outline-none text-sm ${borderCls(invalid.has('originalPrice'))}`}
                 placeholder="Enter original price" step="0.01" min="0" disabled={submitting} />
-              <p className="text-xs text-slate-400 mt-1">Struck-through to show the discount.</p>
+              <p className="text-xs text-slate-400 mt-1">Shown with a strikethrough to display the discount.</p>
             </div>
           </div>
         </section>
@@ -387,16 +514,16 @@ export default function ApproveProductModal({ product, open, onClose, onApproved
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-slate-600 mb-1">Admin Price (₹) *</label>
-                        <input type="number" value={variantPrices[variant.id] || ''} onFocus={(e) => e.currentTarget.select()}
-                          onChange={(e) => setVariantPrices((prev) => ({ ...prev, [variant.id]: e.target.value }))}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 text-sm"
+                        <input type="number" data-field={`vp:${variant.id}`} value={variantPrices[variant.id] || ''} onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => { setVariantPrices((prev) => ({ ...prev, [variant.id]: e.target.value })); clearInvalid(`vp:${variant.id}`) }}
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 text-sm ${borderCls(invalid.has(`vp:${variant.id}`))}`}
                           placeholder="Selling price" step="0.01" min="0" disabled={submitting} />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-600 mb-1">Original Price (₹) *</label>
-                        <input type="number" value={variantOriginalPrices[variant.id] || ''} onFocus={(e) => e.currentTarget.select()}
-                          onChange={(e) => setVariantOriginalPrices((prev) => ({ ...prev, [variant.id]: e.target.value }))}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 text-sm"
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Original Price / MRP (₹) *</label>
+                        <input type="number" data-field={`vop:${variant.id}`} value={variantOriginalPrices[variant.id] || ''} onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => { setVariantOriginalPrices((prev) => ({ ...prev, [variant.id]: e.target.value })); clearInvalid(`vop:${variant.id}`) }}
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 text-sm ${borderCls(invalid.has(`vop:${variant.id}`))}`}
                           placeholder="Original price" step="0.01" min="0" disabled={submitting} />
                         {vDiscount != null && <p className="text-xs text-emerald-600 mt-1">{vDiscount}% off</p>}
                       </div>

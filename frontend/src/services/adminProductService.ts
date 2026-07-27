@@ -74,6 +74,13 @@ export interface AdminProduct {
     status?: string;
   } | null;
   qcInspectionData?: Record<string, any> | null;
+  qcAssignment?: {
+    clientName?: string;
+    scheduledDate?: string;
+    scheduledTime?: string;
+    priority?: string;
+    estimatedDuration?: string;
+  } | null;
   inspectionCycleNumber?: number;
   inventory?: {
     id: string;
@@ -289,10 +296,21 @@ class AdminProductService {
     }
   }
 
-  // Assign QC Checker to a product
-  async assignQCChecker(id: string, qcCheckerId: string): Promise<{ success: boolean; data?: AdminProduct; message?: string }> {
+  // Assign QC Checker to a product, with an optional inspection schedule (mirrors the
+  // factory assignment form). A bare call with just qcCheckerId still works.
+  async assignQCChecker(
+    id: string,
+    qcCheckerId: string,
+    schedule?: {
+      clientName?: string
+      scheduledDate?: string
+      scheduledTime?: string
+      priority?: string
+      estimatedDuration?: string
+    },
+  ): Promise<{ success: boolean; data?: AdminProduct; message?: string }> {
     try {
-      const response = await axios.post(`/products/admin/${id}/assign-qc`, { qcCheckerId });
+      const response = await axios.post(`/products/admin/${id}/assign-qc`, { qcCheckerId, ...(schedule || {}) });
       return response.data;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to assign QC checker');

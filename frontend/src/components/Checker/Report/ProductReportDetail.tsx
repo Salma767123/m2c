@@ -12,6 +12,8 @@ import {
 import { Badge } from "@/components/UI/Badge"
 import qcCheckerService from "@/services/qcCheckerService"
 import { generateProductInspectionPdf } from "@/lib/productInspectionReportPdf"
+import ManufacturerInfoCard from "@/components/Shared/ManufacturerInfoCard"
+import { hasManufacturerInfo } from "@/lib/manufacturerInfo"
 
 interface ProductReportDetailProps {
   productId: string
@@ -340,6 +342,13 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
           <InfoRow label="Service Type" value={fd.serviceType} />
         </div>
       </Section>
+
+      {/* Manufacturer — from the product snapshot captured at inspection, else live */}
+      {hasManufacturerInfo(fd.productData?.manufacturerInfo || (product as any).manufacturerInfo) && (
+        <Section title="Manufacturer Information" icon={ClipboardList} accent="bg-brand-50 text-brand-700">
+          <ManufacturerInfoCard info={fd.productData?.manufacturerInfo || (product as any).manufacturerInfo} variant="plain" />
+        </Section>
+      )}
 
       {/* Section 2: Product Verification */}
       <Section title="Section 2 — Product Verification" icon={ClipboardList} accent="bg-brand-50 text-brand-700">

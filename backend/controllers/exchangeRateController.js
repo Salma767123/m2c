@@ -151,21 +151,7 @@ async function recalculateAllUSDPrices(exchangeRate) {
     variantsUpdated++;
   }
 
-  // Also recalculate BagType USD prices
-  const bags = await prisma.bagType.findMany({
-    where: { price: { gt: 0 } },
-    select: { id: true, price: true, priceINR: true },
-  });
-
-  for (const bag of bags) {
-    const inrPrice = bag.priceINR || bag.price;
-    await prisma.bagType.update({
-      where: { id: bag.id },
-      data: { priceUSD: Math.round((inrPrice / exchangeRate) * 100) / 100 },
-    });
-  }
-
-  return { productsUpdated, variantsUpdated, bagsUpdated: bags.length };
+  return { productsUpdated, variantsUpdated };
 }
 
 /**

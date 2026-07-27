@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import { Button } from "@/components/UI/Button"
 import Link from 'next/link'
@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/UI/Table"
-import { Eye, Edit, Trash2, CheckCircle, XCircle, Filter, ChevronLeft, ChevronRight, Package, Clock, ShieldCheck, AlertTriangle } from "lucide-react"
+import { Eye, Edit, Trash2, CheckCircle, XCircle, Filter, ChevronLeft, ChevronRight, ChevronDown, Package, Clock, ShieldCheck, AlertTriangle } from "lucide-react"
 import { formatDate, formatPrice } from "@/lib/utils"
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Dropdown from '@/components/UI/Dropdown'
@@ -51,12 +51,22 @@ interface Product {
   }>
   variants?: Array<{
     id: string
+    variantName?: string
     size: string
     color: string
+    colorHex?: string
+    sku?: string
     price: number
     originalPrice?: number
     stock: number
   }>
+}
+
+// Human label for a variant: its name, else "Size / Color", else a numbered fallback.
+function variantLabel(v: { variantName?: string; size?: string; color?: string }, i: number): string {
+  if (v.variantName && v.variantName.trim()) return v.variantName
+  const parts = [v.size, v.color].filter((p) => p && String(p).trim())
+  return parts.length ? parts.join(' / ') : `Variant ${i + 1}`
 }
 
 function getPageRange(current: number, total: number): Array<number | '…'> {
@@ -104,6 +114,13 @@ const getApprovalBadge = (status: string) => {
 export default function ProductsTable() {
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  // Rows expanded to reveal their per-variant breakdown (mirrors the vendor inventory).
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const toggleExpanded = (id: string) => setExpandedIds(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
   const [filters, setFilters] = useState({
     approvalStatus: '',
     status: '',
@@ -392,11 +409,28 @@ export default function ProductsTable() {
                   No products found
                 </TableCell>
               </TableRow>
-            ) : products.map((product) => (
-              <TableRow key={product.id}>
+            ) : products.map((product) => {
+              const variants = product.variants || []
+              const hasVariants = variants.length > 0
+              const isExpanded = expandedIds.has(product.id)
+              return (
+              <Fragment key={product.id}>
+              <TableRow className={isExpanded && hasVariants ? 'bg-brand-50/40 hover:bg-brand-50/50 [&>td:first-child]:shadow-[inset_3px_0_0_0_var(--color-brand-500,#e01a1b)]' : ''}>
                 <TableCell>
                   <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                    {hasVariants ? (
+                      <button
+                        onClick={() => toggleExpanded(product.id)}
+                        className={`flex items-center justify-center h-6 w-6 shrink-0 rounded-lg border transition-all ${isExpanded ? 'bg-brand-500 border-brand-500 text-white' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 hover:bg-slate-50'}`}
+                        title={isExpanded ? 'Hide variants' : 'Show variants'}
+                        aria-expanded={isExpanded}
+                      >
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-300 ${isExpanded ? '' : '-rotate-90'}`} />
+                      </button>
+                    ) : (
+                      <span className="inline-block w-6 shrink-0" />
+                    )}
+                    <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center shrink-0">
                       {product.images?.[0]?.url ? (
                         <img
                           src={product.images[0].url}
@@ -409,7 +443,10 @@ export default function ProductsTable() {
                     </div>
                     <div>
                       <div className="font-medium text-slate-900">{product.name}</div>
-                      <div className="text-sm text-slate-500">{product.vendor.companyName}</div>
+                      <div className="text-sm text-slate-500">
+                        {product.vendor.companyName}
+                        {hasVariants && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-md bg-brand-50 text-brand-600 text-[11px] font-semibold">{variants.length} variant{variants.length === 1 ? '' : 's'}</span>}
+                      </div>
                     </div>
                   </div>
                 </TableCell>
@@ -516,7 +553,55 @@ export default function ProductsTable() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+
+              {/* Per-variant breakdown — child rows under the parent, mirroring the
+                  vendor inventory module's expandable rows. */}
+              {hasVariants && isExpanded && variants.map((v, vi) => {
+                const isLast = vi === variants.length - 1
+                return (
+                  <TableRow
+                    key={v.id}
+                    className="bg-brand-50/40 hover:bg-brand-50/70 transition-colors animate-in fade-in slide-in-from-top-1 duration-200 [&>td]:py-2 [&>td]:border-0"
+                  >
+                    <TableCell className="!pl-6">
+                      <div className="flex items-stretch gap-2.5">
+                        {/* Tree connector: vertical spine + branch into the row */}
+                        <div className="relative w-4 shrink-0">
+                          <span className={`absolute left-1/2 top-0 w-px bg-brand-200 ${isLast ? 'h-1/2' : 'h-full'}`} />
+                          <span className="absolute left-1/2 top-1/2 h-px w-2 bg-brand-200" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {v.colorHex && (
+                            <span className="w-3.5 h-3.5 rounded-full border border-slate-200 shrink-0" style={{ backgroundColor: v.colorHex }} />
+                          )}
+                          <div>
+                            <div className="text-[13px] font-medium text-slate-700">{variantLabel(v, vi)}</div>
+                            {v.sku && <div className="font-mono text-[11px] text-slate-400">{v.sku}</div>}
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
+                    <TableCell>
+                      <div className="text-[13px] font-medium text-slate-800">{formatPrice(v.price)}</div>
+                      {v.originalPrice && v.originalPrice > v.price && (
+                        <div className="text-[11px] text-slate-400 line-through">{formatPrice(v.originalPrice)}</div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className={`text-[13px] font-semibold ${v.stock === 0 ? 'text-red-600' : 'text-slate-700'}`}>{v.stock}</span>
+                    </TableCell>
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                )
+              })}
+              </Fragment>
+              )
+            })}
           </TableBody>
         </Table>
 

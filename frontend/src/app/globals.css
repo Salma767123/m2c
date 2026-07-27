@@ -4,6 +4,21 @@ button, [role="button"], a, select, summary, [type="checkbox"], [type="radio"] {
   cursor: pointer;
 }
 
+/* Remove the up/down stepper arrows from every number input, app-wide.
+   `type="number"` is kept (numeric keyboard + validation) but the spinner —
+   which changes the value on scroll/click and is easy to nudge by accident —
+   is hidden everywhere. One rule covers all 29+ forms; no per-field markup. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* Prevent horizontal page scroll caused by stray overflow elements */
 html, body {
   overflow-x: hidden;

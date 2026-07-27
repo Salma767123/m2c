@@ -2,11 +2,13 @@ const { prisma } = require('../config/database');
 const {
   resolveProductImageUrls,
   resolveVariantImageUrls,
+  resolveBase64InValue,
 } = require('../config/cloudinary');
 const { generateBaseSku, reconcileBaseSku, variantSkuFor } = require('../utils/skuGenerator');
 const { usdFromINR } = require('../utils/orderCurrency');
 const { stripAdminPricing, attachVendorPayout } = require('../utils/vendorPricing');
 const { getCurrentExchangeRate } = require('./exchangeRateController');
+const { visibilityWhere, isVisibleInRegion } = require('../utils/regionVisibility');
 
 /**
  * Validate the product's GST rate.
@@ -177,12 +179,21 @@ const createProduct = async (req, res) => {
       status,
 
       // Logistics Configuration
-      logisticsConfig
+      logisticsConfig,
+
+      // Who made the item (JSON: photo, title, fullName, role, experience, description)
+      manufacturerInfo
     } = req.body;
 
     // Resolve base64 images to URLs
     let { images, variants } = req.body;
     ({ images, variants } = await ensureImageUrls({ images, variants }));
+
+    // The manufacturer photo arrives as a base64 data URL like the product images —
+    // resolve it (and any embedded base64) to a hosted Cloudinary URL on save.
+    const resolvedManufacturerInfo = manufacturerInfo
+      ? await resolveBase64InValue(manufacturerInfo, { folder: 'manufacturer-photos' })
+      : null;
 
     // Validate required fields. SKU is NOT required from the client — it is
     // auto-generated server-side (immutable, globally unique) below.
@@ -298,6 +309,7 @@ const createProduct = async (req, res) => {
           fabricType,
           material,
           fabricSpecifications: fabricSpecifications || {},
+          manufacturerInfo: resolvedManufacturerInfo || undefined,
           hasVariants: hasVariants || false,
           baseSku,
           variantSeq: variantCount,
@@ -641,6 +653,11 @@ const updateProduct = async (req, res) => {
     if (updateData.images !== undefined) updateData.images = resolved.images;
     if (updateData.variants !== undefined) updateData.variants = resolved.variants;
 
+    // Resolve the manufacturer photo (base64 → Cloudinary) if it was edited.
+    if (updateData.manufacturerInfo !== undefined && updateData.manufacturerInfo !== null) {
+      updateData.manufacturerInfo = await resolveBase64InValue(updateData.manufacturerInfo, { folder: 'manufacturer-photos' });
+    }
+
     // Check if product exists and belongs to vendor
     const existingProduct = await prisma.product.findFirst({
       where: {
@@ -763,6 +780,7 @@ const updateProduct = async (req, res) => {
           ...(updateData.fabricSpecifications !== undefined && {
             fabricSpecifications: updateData.fabricSpecifications
           }),
+          ...(updateData.manufacturerInfo !== undefined && { manufacturerInfo: updateData.manufacturerInfo }),
           ...(updateData.hasVariants !== undefined && { hasVariants: updateData.hasVariants }),
           ...(updateData.baseSku && { baseSku: updateData.baseSku }),
           ...(updateData.__nextVariantSeq !== undefined && { variantSeq: updateData.__nextVariantSeq }),
@@ -921,11 +939,24 @@ const updateProduct = async (req, res) => {
     if (finalizedProduct) {
       let trueTotalStock = finalizedProduct.totalStock;
 
-      // If it has variants, strictly enforce sum
+      // Total stock = the inventory's base pool (non-variant units) + the sum of
+      // variant stocks. This matches the order-deduction invariant
+      // (orderController: newTotalStock = inventory.baseStock + variantSum).
+      // Using variantSum alone silently dropped the base pool and corrupted
+      // totalStock (and inventory.currentStock) for products that carry base
+      // stock alongside variants.
       if (finalizedProduct.hasVariants && finalizedProduct.variants.length > 0) {
-        trueTotalStock = finalizedProduct.variants.reduce((sum, v) => sum + v.stock, 0);
+        const variantSum = finalizedProduct.variants.reduce((sum, v) => sum + v.stock, 0);
+        let baseStock = 0;
+        if (existingProduct.inventoryItemId) {
+          const inv = await prisma.inventory.findUnique({
+            where: { id: existingProduct.inventoryItemId },
+            select: { baseStock: true },
+          });
+          baseStock = inv?.baseStock || 0;
+        }
+        trueTotalStock = baseStock + variantSum;
 
-        // If the stored totalStock doesn't match sum of variants, update it
         if (trueTotalStock !== finalizedProduct.totalStock) {
           await prisma.product.update({
             where: { id },
@@ -1515,11 +1546,23 @@ const rejectProduct = async (req, res) => {
 const assignQCCheckerToProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { qcCheckerId } = req.body;
+    // qcCheckerId is required; the schedule fields mirror the factory assignment form.
+    const { qcCheckerId, clientName, scheduledDate, scheduledTime, priority, estimatedDuration } = req.body;
 
     if (!qcCheckerId) {
       return res.status(400).json({ error: 'QC Checker ID is required' });
     }
+
+    // Build the schedule snapshot only from fields the admin actually supplied, so a
+    // bare { qcCheckerId } call (legacy / quick reassign) still works and doesn't wipe
+    // an existing schedule with blanks.
+    const qcAssignment = {};
+    if (clientName !== undefined) qcAssignment.clientName = clientName;
+    if (scheduledDate !== undefined) qcAssignment.scheduledDate = scheduledDate;
+    if (scheduledTime !== undefined) qcAssignment.scheduledTime = scheduledTime;
+    if (priority !== undefined) qcAssignment.priority = priority;
+    if (estimatedDuration !== undefined) qcAssignment.estimatedDuration = estimatedDuration;
+    const hasSchedule = Object.keys(qcAssignment).length > 0;
 
     // Verify QC Checker exists
     const checker = await prisma.qCChecker.findUnique({ where: { id: qcCheckerId } });
@@ -1544,13 +1587,12 @@ const assignQCCheckerToProduct = async (req, res) => {
       });
     }
 
-    // Update the product with the new checker
+    // Update the product with the new checker (+ schedule, when supplied)
     const updatedProduct = await prisma.product.update({
       where: { id },
       data: {
         assignedQcId: qcCheckerId,
-        // We could optionally reset the qcInspectionData, but maybe it's better to keep it for reference?
-        // qcInspectionData: null 
+        ...(hasSchedule ? { qcAssignment: { ...(product.qcAssignment || {}), ...qcAssignment } } : {}),
       },
       include: {
         assignedQc: {
@@ -1720,12 +1762,19 @@ const createProductByAdmin = async (req, res) => {
       approvalStatus, // Admin can set approval status directly
 
       // Logistics Configuration
-      logisticsConfig
+      logisticsConfig,
+
+      // Who made the item (JSON: photo, title, fullName, role, experience, description)
+      manufacturerInfo
     } = req.body;
 
     // Resolve base64 images to URLs
     let { images, variants } = req.body;
     ({ images, variants } = await ensureImageUrls({ images, variants }));
+
+    const resolvedManufacturerInfo = manufacturerInfo
+      ? await resolveBase64InValue(manufacturerInfo, { folder: 'manufacturer-photos' })
+      : null;
 
     // Validate required fields
     if (!vendorId) {
@@ -1881,6 +1930,7 @@ const createProductByAdmin = async (req, res) => {
           fabricType,
           material,
           fabricSpecifications: fabricSpecifications || {},
+          manufacturerInfo: resolvedManufacturerInfo || undefined,
           hasVariants: hasVariants || false,
           baseSku,
           variantSeq: variantCount,
@@ -2039,6 +2089,11 @@ const updateProductByAdmin = async (req, res) => {
     if (updateData.images !== undefined) updateData.images = resolved.images;
     if (updateData.variants !== undefined) updateData.variants = resolved.variants;
 
+    // Resolve the manufacturer photo (base64 → Cloudinary) if it was edited.
+    if (updateData.manufacturerInfo !== undefined && updateData.manufacturerInfo !== null) {
+      updateData.manufacturerInfo = await resolveBase64InValue(updateData.manufacturerInfo, { folder: 'manufacturer-photos' });
+    }
+
     // Check if product exists
     const existingProduct = await prisma.product.findUnique({
       where: { id },
@@ -2114,10 +2169,22 @@ const updateProductByAdmin = async (req, res) => {
 
     // Start transaction for update
     const result = await prisma.$transaction(async (tx) => {
-      // Calculate newTotalStock based on variants or direct totalStock
+      // Calculate newTotalStock based on variants or direct totalStock.
+      // For variant products the total is the base pool (non-variant units held
+      // on the linked inventory) PLUS the sum of variant stocks — matching the
+      // order-deduction invariant. Summing variants alone dropped the base pool.
       let newTotalStock = undefined;
       if (updateData.hasVariants && updateData.variants && updateData.variants.length > 0) {
-        newTotalStock = updateData.variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+        const variantSum = updateData.variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+        let baseStock = 0;
+        if (existingProduct.inventoryItemId) {
+          const inv = await tx.inventory.findUnique({
+            where: { id: existingProduct.inventoryItemId },
+            select: { baseStock: true },
+          });
+          baseStock = inv?.baseStock || 0;
+        }
+        newTotalStock = baseStock + variantSum;
       } else if (updateData.totalStock !== undefined) {
         newTotalStock = parseInt(updateData.totalStock);
       }
@@ -2164,6 +2231,7 @@ const updateProductByAdmin = async (req, res) => {
         ...(updateData.fabricSpecifications !== undefined && {
           fabricSpecifications: updateData.fabricSpecifications
         }),
+        ...(updateData.manufacturerInfo !== undefined && { manufacturerInfo: updateData.manufacturerInfo }),
         ...(updateData.hasVariants !== undefined && { hasVariants: updateData.hasVariants }),
         ...(updateData.baseSku && { baseSku: updateData.baseSku }),
 
@@ -2491,7 +2559,10 @@ const getAllProductsForAdmin = async (req, res) => {
               variantName: true,
               size: true,
               color: true,
+              colorHex: true,
+              sku: true,
               price: true,
+              originalPrice: true,
               stock: true
             }
           }
@@ -2573,12 +2644,9 @@ const getPublicProducts = async (req, res) => {
       approvalStatus: 'APPROVED'
     };
 
-    // Filter by region visibility
-    if (region === 'IN') {
-      where.priceVisibility = { in: ['IN_ONLY', 'BOTH'] };
-    } else if (region === 'US') {
-      where.priceVisibility = { in: ['COM_ONLY', 'BOTH'] };
-    }
+    // Region visibility — applied server-side so IN_ONLY/COM_ONLY products are neither
+    // sent over the wire to the wrong storefront nor counted in pagination totals.
+    Object.assign(where, visibilityWhere(region));
 
     if (tag) {
       where.tags = { has: tag };
@@ -2721,6 +2789,7 @@ const getPublicProducts = async (req, res) => {
         priceVisibility: true,
         dimensions: true,
         weight: true,
+        weightUnit: true,
         createdAt: true
       }
     });
@@ -2819,12 +2888,14 @@ const getPublicProduct = async (req, res) => {
         fabricType: true,
         material: true,
         fabricSpecifications: true,
+        manufacturerInfo: true, // who made the item — shown on the storefront product page
         uom: true,
         priceINR: true,
         priceUSD: true,
         priceVisibility: true,
         dimensions: true,
         weight: true,
+        weightUnit: true,
         dispatchTimeline: true,
         logisticsConfig: true,
         createdAt: true,
@@ -2845,8 +2916,28 @@ const getPublicProduct = async (req, res) => {
       });
     }
 
-    // Sanitize logisticsConfig — only expose customer-facing fields, not admin internals
+    // Region gate: an out-of-region product must not be openable by direct URL, and
+    // its payload must never ship to the wrong storefront. Treated as not-found so we
+    // don't reveal that it exists elsewhere. `region` comes from the query (the .in /
+    // .com frontend sends its own region).
+    if (!isVisibleInRegion(product.priceVisibility, req.query.region)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found or not available'
+      });
+    }
+
+    // Drop variants hidden in this region so their SKUs/prices never ship to the
+    // wrong storefront — the client would hide them anyway, but the data shouldn't
+    // leave the server. Mirrors the product-level gate above.
     let publicProduct = { ...product };
+    if (Array.isArray(publicProduct.variants)) {
+      publicProduct.variants = publicProduct.variants.filter(
+        (v) => isVisibleInRegion(v.priceVisibility, req.query.region)
+      );
+    }
+
+    // Sanitize logisticsConfig — only expose customer-facing fields, not admin internals
     if (product.logisticsConfig) {
       const lc = product.logisticsConfig;
       publicProduct.logisticsConfig = {

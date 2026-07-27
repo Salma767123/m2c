@@ -1705,6 +1705,26 @@ const getProductDetails = async (req, res) => {
 };
 
 // ============================
+// Deadline guard for product inspections. The admin books a window on
+// Product.qcAssignment (scheduledDate + scheduledTime + estimatedDuration); once
+// that whole window has elapsed the checker can no longer start or submit the
+// inspection — mirrors the factory inspection deadline. Returns a ready-to-send
+// 409 body when expired, else null. Products with no schedule are never blocked.
+const productInspectionExpiredResponse = (qcAssignment) => {
+    const { isInspectionWindowElapsed, getInspectionDeadline } = require('../utils/inspectionSchedule');
+    const sched = qcAssignment || {};
+    if (!isInspectionWindowElapsed(sched)) return null;
+    const deadline = getInspectionDeadline(sched);
+    const until = deadline
+        ? `, valid until ${deadline.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}`
+        : '';
+    return {
+        success: false,
+        code: 'INSPECTION_EXPIRED',
+        message: `This inspection can no longer be started — its scheduled window (${sched.scheduledDate || ''} ${sched.scheduledTime || ''}${until}) has already ended. Please ask the admin to schedule a new assignment.`,
+    };
+};
+
 // QC Checker: Start Product Inspection
 //   Pre-flight geofence check before the checker fills the form. Mirrors
 //   the factory `startInspection` endpoint so the backend logs both sides
@@ -1742,6 +1762,10 @@ const startProductInspectionByQc = async (req, res) => {
                 message: 'Product not found or not assigned to you',
             });
         }
+
+        // Booked window elapsed → cannot start this inspection.
+        const startExpired = productInspectionExpiredResponse(product.qcAssignment);
+        if (startExpired) return res.status(409).json(startExpired);
 
         const { verifyCheckerAtVendor, LOCATION_THRESHOLD_METERS } = require('../utils/locationUtils');
         const geo = await verifyCheckerAtVendor({
@@ -1819,6 +1843,10 @@ const approveProductByQc = async (req, res) => {
                 message: `Product inspection already completed with status: ${product.approvalStatus}`
             });
         }
+
+        // Booked window elapsed → cannot record this inspection.
+        const approveExpired = productInspectionExpiredResponse(product.qcAssignment);
+        if (approveExpired) return res.status(409).json(approveExpired);
 
         // ── Location verification — checker must be at the vendor factory ──
         const { verifyCheckerAtVendor, buildLocationStamp, buildLocationSnapshot } = require('../utils/locationUtils');
@@ -1973,6 +2001,10 @@ const rejectProductByQc = async (req, res) => {
                 message: `Product inspection already completed with status: ${product.approvalStatus}`
             });
         }
+
+        // Booked window elapsed → cannot record this inspection.
+        const rejectExpired = productInspectionExpiredResponse(product.qcAssignment);
+        if (rejectExpired) return res.status(409).json(rejectExpired);
 
         // ── Location verification — checker must be at the vendor factory ──
         const { verifyCheckerAtVendor, buildLocationStamp, buildLocationSnapshot } = require('../utils/locationUtils');

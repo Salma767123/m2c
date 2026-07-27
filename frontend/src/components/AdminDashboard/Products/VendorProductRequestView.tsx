@@ -35,6 +35,7 @@ import qcCheckerService from '@/services/qcCheckerService'
 import { formatCheckerName } from '@/lib/checkerUtils'
 import { hasPermission } from '@/lib/auth'
 import { openDoc } from '@/lib/docViewerBus'
+import ManufacturerInfoCard from '@/components/Shared/ManufacturerInfoCard'
 
 /** Card wrapper matching the vendor product-view page's section headings. */
 function SpecSection({ icon, title, action, children }: { icon: React.ReactNode; title: string; action?: React.ReactNode; children: React.ReactNode }) {
@@ -762,6 +763,9 @@ export default function VendorProductRequestView({ requestId, context = 'vendor-
               )}
             </SpecSection>
           )}
+
+          {/* Manufacturer — who made the item (renders nothing if the vendor left it blank) */}
+          <ManufacturerInfoCard info={(product as any).manufacturerInfo} />
 
           {/* Variants with Images */}
           {product.hasVariants && product.variants && product.variants.length > 0 && (

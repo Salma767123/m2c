@@ -45,7 +45,7 @@ const RATE_OVERRIDE = rateArg ? parseFloat(rateArg.split('=')[1]) : null;
     const orders = await prisma.order.findMany({
         select: {
             id: true, orderId: true, currency: true, exchangeRate: true, totalAmountINR: true,
-            totalAmount: true, tax: true, shippingCost: true, discount: true, bagTypePrice: true,
+            totalAmount: true, tax: true, shippingCost: true, discount: true,
             items: { select: { id: true, totalPrice: true, totalPriceINR: true } },
         },
     });
@@ -66,7 +66,6 @@ const RATE_OVERRIDE = rateArg ? parseFloat(rateArg.split('=')[1]) : null;
             taxINR: toINR(o.tax, o.currency, rate),
             shippingCostINR: toINR(o.shippingCost, o.currency, rate),
             discountINR: toINR(o.discount, o.currency, rate),
-            bagTypePriceINR: toINR(o.bagTypePrice, o.currency, rate),
         };
         // Persist the rate we actually used, so the conversion is auditable later.
         if (approx) data.exchangeRate = rate;

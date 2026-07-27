@@ -446,8 +446,12 @@ class QCCheckerService {
             });
             return response.data;
         } catch (error: any) {
-            const msg = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to approve product';
-            throw new Error(msg);
+            const data = error?.response?.data || {};
+            const msg = data.message || data.error || error?.message || 'Failed to approve product';
+            const err = new Error(msg) as Error & { status?: number; code?: string };
+            err.status = error?.response?.status;
+            err.code = data.code;
+            throw err;
         }
     }
 
@@ -473,8 +477,12 @@ class QCCheckerService {
             });
             return response.data;
         } catch (error: any) {
-            const msg = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to reject product';
-            throw new Error(msg);
+            const data = error?.response?.data || {};
+            const msg = data.message || data.error || error?.message || 'Failed to reject product';
+            const err = new Error(msg) as Error & { status?: number; code?: string };
+            err.status = error?.response?.status;
+            err.code = data.code;
+            throw err;
         }
     }
 

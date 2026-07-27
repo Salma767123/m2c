@@ -156,13 +156,6 @@ const PERMISSION_MODULES = [
                 ],
             },
             {
-                key: 'bag_types',
-                name: 'Bag Types',
-                description: 'Bag type presets and ordering',
-                actions: { view: true, create: true, edit: true, delete: true },
-                extra: [],
-            },
-            {
                 key: 'categories',
                 name: 'Categories',
                 description: 'Category and subcategory management',
@@ -290,14 +283,14 @@ const LEGACY_PERMISSION_MAP = {
     create_users: ['staff_management:create'],
     edit_users: ['customer_management:suspend', 'staff_management:edit', 'staff_management:suspend'],
     delete_users: ['customer_management:delete', 'staff_management:delete'],
-    view_products: ['all_products:view', 'vendor_product_requests:view', 'bag_types:view'],
-    create_products: ['all_products:create', 'bag_types:create'],
+    view_products: ['all_products:view', 'vendor_product_requests:view'],
+    create_products: ['all_products:create'],
     edit_products: [
         'all_products:edit', 'all_products:approve',
         'vendor_product_requests:edit', 'vendor_product_requests:approve', 'vendor_product_requests:assign_qc',
-        'reinspection_review:approve', 'bag_types:edit',
+        'reinspection_review:approve',
     ],
-    delete_products: ['all_products:delete', 'bag_types:delete'],
+    delete_products: ['all_products:delete'],
     view_orders: ['vendor_to_hub:view', 'hub_to_customer:view'],
     create_orders: [],
     edit_orders: [

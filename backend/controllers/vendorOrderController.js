@@ -14,10 +14,10 @@ const VENDOR_STATUS_NOTIFY = {
 // Shared include for shipment queries — keeps response shape consistent.
 //
 // The order `select` is a WHITELIST, deliberately. Every money field on Order
-// (totalAmount, subtotal, tax, discount, shippingCost, bagTypePrice) is what the
-// CUSTOMER paid at M2C's marked-up price — the vendor is paid from Product.basePrice
-// instead, so those figures would expose M2C's margin. They are omitted, and nothing
-// in the vendor portal reads them. Vendor-facing money comes from attachVendorPrices.
+// (totalAmount, subtotal, tax, discount, shippingCost) is what the CUSTOMER paid
+// at M2C's marked-up price — the vendor is paid from Product.basePrice instead, so
+// those figures would expose M2C's margin. They are omitted, and nothing in the
+// vendor portal reads them. Vendor-facing money comes from attachVendorPrices.
 const SHIPMENT_INCLUDE = {
     items: true,
     order: {
@@ -32,9 +32,6 @@ const SHIPMENT_INCLUDE = {
             shippingAddress: true,
             customerEmail: true,
             customerPhone: true,
-            // bagTypeName is packaging the vendor may need to pack against; its price
-            // is M2C's, so it stays out.
-            bagTypeName: true,
             paymentId: true,
             invoiceNo: true,
         },

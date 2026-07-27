@@ -21,9 +21,14 @@ import {
     ImageIcon,
     ClipboardCheck,
     History,
+    AlarmClockOff,
+    CalendarClock,
 } from "lucide-react"
 import { qcCheckerService } from "@/services/qcCheckerService"
+import { isInspectionWindowElapsed, formatAssignmentWindow } from "@/lib/inspectionSchedule"
 import { CareIcon, CARE_INSTRUCTIONS, CATEGORY_COLORS, CATEGORY_BORDER } from "@/components/VendorDashboard/Products/CareInstructionModal"
+import ManufacturerInfoCard from "@/components/Shared/ManufacturerInfoCard"
+import { hasManufacturerInfo } from "@/lib/manufacturerInfo"
 
 interface ProductDetailProps {
     productId: string
@@ -105,6 +110,18 @@ const resolveHex = (name?: string | null, hex?: string | null): string | undefin
     if (hex && /^#[0-9a-fA-F]{3,8}$/.test(hex.trim())) return hex.trim()
     const n = (name || "").trim().toLowerCase()
     return COLOR_NAME_HEX[n]
+}
+
+// Stock breakdown for display. The backend keeps
+//   product.totalStock = inventory.baseStock (non-variant pool) + sum(variant stocks)
+// (see orderController / productController). So the authoritative TOTAL is
+// product.totalStock, and the base pool is recovered as total − variantSum.
+const stockBreakdown = (product: ProductDetailData) => {
+    const variants = product.variants || []
+    const total = product.totalStock ?? 0
+    const variantSum = variants.reduce((sum, v) => sum + (v.stock || 0), 0)
+    const baseStock = Math.max(0, total - variantSum)
+    return { total, variantSum, baseStock, hasVariants: variants.length > 0 }
 }
 
 export default function ProductDetail({ productId, onBack, onStartInspection }: ProductDetailProps) {
@@ -224,7 +241,12 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
         )
     }
 
-    const canStartInspection = ["PENDING", "REINSPECTION"].includes(product.approvalStatus)
+    // The admin-booked window (date + time + duration). Once it has fully
+    // elapsed the checker can no longer start this inspection — mirrors the
+    // factory inspection deadline; the backend enforces the same rule.
+    const sched = product.qcAssignment
+    const windowElapsed = isInspectionWindowElapsed(sched?.scheduledDate, sched?.scheduledTime, sched?.estimatedDuration)
+    const canStartInspection = ["PENDING", "REINSPECTION"].includes(product.approvalStatus) && !windowElapsed
     const primaryImage =
         product.images?.find((i) => i.isPrimary)?.url ||
         product.images?.[0]?.url ||
@@ -279,8 +301,38 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                                 <FileText className="w-4 h-4" /> Start Inspection
                             </button>
                         )}
+                        {["PENDING", "REINSPECTION"].includes(product.approvalStatus) && windowElapsed && (
+                            <span
+                                title="The scheduled inspection window has passed. Ask the admin to reschedule."
+                                className="flex items-center gap-2 px-4 py-3 bg-red-50 text-red-700 border border-red-200 font-semibold rounded-xl"
+                            >
+                                <AlarmClockOff className="w-4 h-4" /> Inspection Window Expired
+                            </span>
+                        )}
                     </div>
                 </div>
+
+                {/* Assigned inspection schedule (from the admin's QC assignment) */}
+                {sched?.scheduledDate && (
+                    <div className={`flex items-center gap-3 rounded-2xl border px-5 py-4 mb-6 ${windowElapsed ? "bg-red-50 border-red-200" : "bg-brand-50/60 border-brand-100"}`}>
+                        {windowElapsed
+                            ? <AlarmClockOff className="w-5 h-5 text-red-600 shrink-0" />
+                            : <CalendarClock className="w-5 h-5 text-brand-500 shrink-0" />}
+                        <div className="min-w-0">
+                            <p className={`text-xs font-semibold uppercase tracking-wide ${windowElapsed ? "text-red-700" : "text-brand-600"}`}>
+                                {windowElapsed ? "Inspection Window Expired" : "Scheduled Inspection Window"}
+                            </p>
+                            <p className="text-sm font-medium text-slate-900">
+                                {formatAssignmentWindow(sched.scheduledDate, sched.scheduledTime, sched.estimatedDuration)}
+                            </p>
+                            {windowElapsed && (
+                                <p className="text-xs text-red-600 mt-0.5">
+                                    This inspection can no longer be started — please ask the admin to reschedule.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {/* Summary Card */}
                 <div className="bg-brand-50/40 border border-brand-100/60 rounded-2xl p-6 mb-6">
@@ -533,6 +585,15 @@ function OverviewTab({ product, primaryImage }: { product: ProductDetailData; pr
                     </div>
                 )}
 
+                {/* Manufacturer — who made the item */}
+                {hasManufacturerInfo((product as any).manufacturerInfo) && (
+                    <div>
+                        <Section title="Manufacturer Information">
+                            <ManufacturerInfoCard info={(product as any).manufacturerInfo} variant="plain" />
+                        </Section>
+                    </div>
+                )}
+
                 {/* Dispatch & Shipping */}
                 {(dt || product.weight) && (
                     <div>
@@ -622,6 +683,34 @@ function ImagesTab({
                         ))}
                     </div>
                 )}
+            </Section>
+
+            <Section title="Base Product">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Base Color</p>
+                        {product.singleUnitColor
+                            ? <ColorValue name={product.singleUnitColor} hex={product.singleUnitColorHex} />
+                            : <span className="text-sm text-slate-400">Not specified</span>}
+                    </div>
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Total Stock</p>
+                        {(() => {
+                            const s = stockBreakdown(product)
+                            const uom = product.uom ? ` ${uomLabel(product.uom)}` : ""
+                            return (
+                                <>
+                                    <span className="text-sm font-semibold text-slate-900">{s.total}{uom && <span className="font-normal text-slate-500">{uom}</span>}</span>
+                                    {s.hasVariants && (
+                                        <span className="block text-xs text-slate-500 mt-0.5">
+                                            {s.baseStock} base + {s.variantSum} across variants
+                                        </span>
+                                    )}
+                                </>
+                            )
+                        })()}
+                    </div>
+                </div>
             </Section>
 
             <Section title={`Variants (${variants.length})`}>
