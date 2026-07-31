@@ -231,25 +231,34 @@ const updateBankDetails = async (req, res) => {
 // Update company logo
 const updateLogo = async (req, res) => {
   try {
-    let { companyLogo } = req.body;
-    companyLogo = await uploadDataUriIfBase64(companyLogo, { folder: 'company' });
-    
+    // Accepts either/both logos so the same endpoint updates the primary logo
+    // and the secondary (non-brand pages) logo. Only the keys present in the
+    // body are touched, so updating one never clears the other.
+    const data = {};
+    if (Object.prototype.hasOwnProperty.call(req.body, 'companyLogo')) {
+      data.companyLogo = await uploadDataUriIfBase64(req.body.companyLogo, { folder: 'company' });
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, 'secondaryLogo')) {
+      data.secondaryLogo = await uploadDataUriIfBase64(req.body.secondaryLogo, { folder: 'company' });
+    }
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ success: false, error: 'No logo provided' });
+    }
+    data.updatedBy = req.user?.id;
+
     // Get existing company info
     let companyInfo = await prisma.companyInfo.findFirst();
-    
+
     if (!companyInfo) {
       return res.status(404).json({
         success: false,
         error: 'Company info not found. Please update basic information first.'
       });
     }
-    
+
     companyInfo = await prisma.companyInfo.update({
       where: { id: companyInfo.id },
-      data: {
-        companyLogo,
-        updatedBy: req.user?.id
-      }
+      data
     });
     
     res.json({
@@ -273,6 +282,7 @@ const getPublicCompanyInfo = async (req, res) => {
       select: {
         companyName: true,
         companyLogo: true,
+        secondaryLogo: true,
         companyEmail: true,
         companyPhone: true,
         companyWebsite: true,
@@ -292,6 +302,7 @@ const getPublicCompanyInfo = async (req, res) => {
       data: {
         companyName: companyInfo?.companyName || 'M2C MarkDowns Private Limited',
         companyLogo: companyInfo?.companyLogo || null,
+        secondaryLogo: companyInfo?.secondaryLogo || null,
         companyEmail: companyInfo?.companyEmail || null,
         companyPhone: companyInfo?.companyPhone || null,
         companyWebsite: companyInfo?.companyWebsite || null,

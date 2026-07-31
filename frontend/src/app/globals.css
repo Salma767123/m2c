@@ -20,6 +20,18 @@ input[type="number"] {
 }
 
 /* Prevent horizontal page scroll caused by stray overflow elements */
+/* Global compaction lever. The app is built almost entirely with rem-based
+   Tailwind utilities (text-*, px-*, py-*, gap-*, w-*), so lowering the root
+   font-size scales ALL of them down proportionally at once — a uniform,
+   reversible ~10% tightening of type, padding and spacing across every page.
+   Tailwind's breakpoints are px-based, so responsive behaviour is unchanged
+   (only the content inside each breakpoint gets more compact). Expressed as a
+   percentage of the browser default so user zoom / accessibility settings are
+   still respected. */
+html {
+  font-size: 91%;
+}
+
 html, body {
   overflow-x: hidden;
   max-width: 100%;
@@ -149,6 +161,21 @@ html, body {
   animation: m2c-progress 5s linear forwards;
 }
 
+/* Infinite horizontal marquee for the home notice board. The track holds the cards
+   twice; translating by -50% lands exactly on the duplicate, so the loop is seamless. */
+@keyframes m2c-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: m2c-marquee var(--marquee-duration, 45s) linear infinite;
+  will-change: transform;
+}
+/* Pause the scroll while the viewer is reading a card. */
+.marquee-hover-pause:hover .animate-marquee {
+  animation-play-state: paused;
+}
+
 /* Premium underline accent that grows on hover (used on nav/footer links). */
 .link-underline {
   position: relative;
@@ -185,7 +212,8 @@ html, body {
   .animate-brand-bar,
   .animate-accent-bar,
   .animate-float-slow,
-  .animate-float-slower {
+  .animate-float-slower,
+  .animate-marquee {
     animation: none !important;
   }
 }

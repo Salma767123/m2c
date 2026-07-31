@@ -206,6 +206,10 @@ model CartItem {
   // Null when the product has no logistics config, or exactly one transport type
   // (nothing to choose — the server resolves it).
   transportType String?
+  // Courier partner the customer picked for this line (catalog id, e.g. "blue-dart").
+  // Region- and mode-specific: domestic couriers on .in, international on .com; the
+  // choices depend on transportType (AIR vs SHIP). See utils/couriers.js.
+  courier String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1146,6 +1150,19 @@ model OrderItem {
   // Shipping mode this line was actually charged and must be dispatched by.
   // Snapshotted from the cart so warehouse/fulfilment sees what the customer paid for.
   transportType String?
+  // Courier partner the customer chose for this line (catalog id, e.g. "blue-dart"),
+  // snapshotted from the cart so fulfilment/admin dispatches with the carrier the
+  // customer selected. See utils/couriers.js for the label.
+  courier String?
+
+  // ── Offer snapshot (customer-side only) ─────────────────────────────────────
+  // When an automatic Offer reduced this line's selling price, these freeze what the
+  // pre-offer price was and which offer applied, so the invoice/order history can show
+  // "was ₹X, offer −₹Y". All nullable — lines with no offer (and every legacy line)
+  // leave them unset. The vendor payout fields above are untouched: an offer is
+  // absorbed by M2C's margin, never passed to the vendor.
+  originalUnitPrice Float? // unitPrice before the offer, in the order currency
+  appliedOffer      Json? // { offerId, title, type, savingPerUnit } snapshot
 
   // ── Vendor payout snapshot (always INR) ─────────────────────────────────────
   // What M2C owes the VENDOR for this line, frozen at order time. Distinct from the
@@ -1330,6 +1347,83 @@ model Coupon {
 }
 
 // ============================================
+// OFFERS (automatic, code-less promotions)
+// ============================================
+//
+// Distinct from Coupon: an Offer needs no code. It is an admin-scheduled, time-boxed
+// price reduction on the SELLING price (adminFixedPrice/priceINR) of a product, a
+// whole category, or the entire store. It surfaces as a badge on the storefront and is
+// applied automatically at checkout.
+//
+// Cost is always absorbed by M2C's margin, never the vendor: the order path discounts
+// only the customer's unitPrice, while the vendor settlement keeps using basePrice.
+// So an Offer changes nothing in the settlement / vendor-payout modules.
+model Offer {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  bannerImage String? // Cloudinary URL, optional (offers page / campaign strip)
+
+  type  OfferType // how the discount is computed
+  scope OfferScope // what it targets
+
+  // Discount magnitude. Which field is read depends on `type`:
+  //   PERCENTAGE / QUANTITY / THRESHOLD → discountPercent (0-100)
+  //   FLAT                               → discountFlatINR (INR source of truth)
+  discountPercent Float? // 0-100
+  discountFlatINR Float? // per-unit rupees off; USD derived from the FX rate at read
+
+  // Percentage cap, mirrors Coupon.maxDiscountAmount — a % offer can't exceed this
+  // many rupees off per unit. Null = uncapped.
+  maxDiscountINR Float?
+
+  // Quantity / BOGO parameters (unused by PERCENTAGE/FLAT/THRESHOLD)
+  minQty Int? // QUANTITY: buy at least this many of the line to trigger; BOGO: buy N
+  getQty Int? // BOGO: number of cheapest units given free per `minQty` bought
+
+  // Cart-threshold parameter (THRESHOLD only): subtotal (INR) must reach this
+  minCartValueINR Float?
+
+  // Targeting, read according to `scope`:
+  //   PRODUCT  → productIds     (Product.id list)
+  //   CATEGORY → categoryNames  (Product.category string list)
+  //   STORE    → applies to everything, both lists ignored
+  productIds    String[] @default([])
+  categoryNames String[] @default([])
+
+  // Which storefront the offer runs on. Reuses the product visibility enum so an
+  // IN_ONLY offer never applies to a .com (USD) order and vice-versa.
+  region PriceVisibility @default(BOTH)
+
+  // Higher wins when several offers match the same product. Ties broken by deepest
+  // scope (PRODUCT > CATEGORY > STORE) then largest saving — resolved in code.
+  priority Int @default(0)
+
+  startsAt DateTime @default(now())
+  endsAt   DateTime
+  isActive Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("offers")
+}
+
+enum OfferType {
+  PERCENTAGE // % off the selling price
+  FLAT // fixed rupees off per unit
+  QUANTITY // buy `minQty`+ of a line → discountPercent off that line
+  BOGO // buy `minQty`, get `getQty` cheapest units free
+  THRESHOLD // cart subtotal ≥ minCartValueINR → discountPercent off matching lines
+}
+
+enum OfferScope {
+  PRODUCT
+  CATEGORY
+  STORE
+}
+
+// ============================================
 // FREE SHIPPING OFFERS
 // ============================================
 
@@ -1412,7 +1506,8 @@ model CompanyInfo {
 
   // Basic Company Information
   companyName    String
-  companyLogo    String?
+  companyLogo    String? // Primary logo — home, contact, about, terms, privacy, returns
+  secondaryLogo  String? // Secondary logo — shown in the header on all other pages
   companyEmail   String?
   companyPhone   String?
   companyWebsite String?

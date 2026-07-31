@@ -145,23 +145,24 @@ export default function VendorLogin() {
   return (
     <div className={`min-h-screen flex bg-white font-sans${authChecked ? "" : " invisible"}`}>
       {/* Left Side - Professional Branding */}
-      <div className="hidden lg:flex lg:flex-1 relative bg-[#000000]">
+      <div className="hidden lg:flex lg:flex-1 relative bg-gradient-to-br from-brand-600 to-brand-700">
         <div className="flex items-center justify-center w-full p-12">
           <div className="max-w-lg text-center text-white">
             {/* Logo Section */}
             <div className="mb-8">
-              <div className="inline-flex items-center justify-center w-44 h-36 mb-6">
+              {/* Compact white card that hugs the logo so it stays visible on the red panel */}
+              <div className="inline-flex items-center justify-center bg-white rounded-xl px-5 py-3 mb-6 shadow-lg">
                 <CompanyLogo
-                  className="w-[190px] h-[150px] object-contain"
-                  skeletonClassName="h-[150px] aspect-square bg-white/10"
-                  fallbackWidth={190}
-                  fallbackHeight={150}
+                  className="w-[240px] h-auto object-contain"
+                  skeletonClassName="h-[52px] w-[240px] bg-gray-100"
+                  fallbackWidth={240}
+                  fallbackHeight={52}
                 />
               </div>
               <h1 className="text-4xl font-bold mb-3">
                 Vendor Portal
               </h1>
-              <p className="text-xl text-gray-100 font-medium">
+              <p className="text-xl text-white/90 font-medium">
                 Manage your business and grow your sales
               </p>
             </div>
@@ -200,11 +201,7 @@ export default function VendorLogin() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="bg-white/20 backdrop-blur-md rounded-lg p-6 h-28 flex flex-col items-center justify-center transition-all duration-300 hover:bg-white/25 hover:shadow-lg hover:scale-[1.02] cursor-default">
-                <div className="text-3xl font-bold text-white mb-2">500+</div>
-                <div className="text-sm text-white/80 font-medium">Active Vendors</div>
-              </div>
+            <div className="grid grid-cols-2 gap-4 text-center">
               <div className="bg-white/20 backdrop-blur-md rounded-lg p-6 h-28 flex flex-col items-center justify-center transition-all duration-300 hover:bg-white/25 hover:shadow-lg hover:scale-[1.02] cursor-default">
                 <div className="text-3xl font-bold text-white mb-2">24/7</div>
                 <div className="text-sm text-white/80 font-medium">Support</div>
@@ -249,10 +246,10 @@ export default function VendorLogin() {
                     value={loginData.email}
                     onChange={handleLoginChange}
                     onBlur={() => validateEmail(loginData.email)}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:border-brand-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${
                       emailError
                         ? "border-red-500 focus:ring-red-200"
-                        : "border-gray-300 focus:ring-[#455a64]"
+                        : "border-gray-300 focus:ring-brand-500/40"
                     }`}
                     placeholder="Enter your email"
                     autoFocus
@@ -281,7 +278,7 @@ export default function VendorLogin() {
                       name="password"
                       value={loginData.password}
                       onChange={handleLoginChange}
-                      className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:border-[#455a64] focus:ring-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500"
+                      className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:border-brand-500 focus:ring-brand-500/40 transition-all duration-200 bg-white text-gray-900 placeholder-gray-500"
                       placeholder="Enter your password"
                       required
                     />
@@ -310,7 +307,7 @@ export default function VendorLogin() {
                       name="rememberMe"
                       checked={loginData.rememberMe}
                       onChange={handleLoginChange}
-                      className="w-4 h-4 text-gray-700 border-gray-300 rounded focus:ring-[#455a64]"
+                      className="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500/40"
                     />
                     <span className="ml-2 text-sm text-gray-700">
                       Remember me
@@ -318,7 +315,7 @@ export default function VendorLogin() {
                   </label>
                   <Link 
                     href="/vendor/forgot-password"
-                    className="text-sm text-gray-700 hover:text-gray-900 font-medium transition-colors"
+                    className="text-sm text-brand-600 hover:text-brand-700 font-medium transition-colors"
                   >
                     Forgot password?
                   </Link>
@@ -328,7 +325,7 @@ export default function VendorLogin() {
                 <Button 
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-gray-900 hover:bg-gray-700 text-white py-3 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"
+                  className="w-full bg-brand-500 hover:bg-brand-600 text-white py-3 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"
                 >
                   <Lock className="w-4 h-4 mr-2" />
                   {isLoading ? 'Signing in...' : 'Sign In to Dashboard'}
@@ -361,7 +358,7 @@ export default function VendorLogin() {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full border-2 border-gray-500 text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 py-3 text-sm font-semibold rounded-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-md"
+                className="w-full border-2 border-brand-500 text-brand-600 bg-white hover:bg-[#fff1f1] hover:border-brand-600 py-3 text-sm font-semibold rounded-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-md"
                 onClick={() => window.location.href = '/vendor/register'}
               >
                 Get Started - Register Now

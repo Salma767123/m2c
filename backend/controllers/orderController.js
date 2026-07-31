@@ -9,6 +9,8 @@ const { resolveUsdRate, toINR, resolveUnitPrice } = require('../utils/orderCurre
 const { evaluateCoupon } = require('../utils/couponPricing');
 const { calculateLogistics, convertShippingToOrderCurrency, qualifiesForFreeShipping } = require('../utils/logistics');
 const { isVisibleInRegion } = require('../utils/regionVisibility');
+const { isValidCourier } = require('../utils/couriers');
+const { applyBestOffer, qualifyingThresholdIds } = require('../utils/offers');
 
 /** Round a money value to 2 decimals, avoiding float artefacts (e.g. 115.19999). */
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -148,7 +150,8 @@ const createOrder = async (req, res) => {
         // pushes the downstream transaction past its 5s default on cold starts.
         // Invoice-no generation runs alongside the product fetches because it
         // is independent of cart contents (saves one more round trip).
-        const [productsForItems, invoiceNo] = await Promise.all([
+        const orderNow = new Date();
+        const [productsForItems, invoiceNo, activeOffers] = await Promise.all([
             Promise.all(
                 cart.items.map((item) =>
                     prisma.product.findUnique({
@@ -162,7 +165,25 @@ const createOrder = async (req, res) => {
                 )
             ),
             generateInvoiceNo(prisma),
+            // Live offers, loaded once for the whole cart. Empty (the common case)
+            // means the pricing below is byte-identical to the pre-offer behaviour.
+            prisma.offer.findMany({
+                where: { isActive: true, startsAt: { lte: orderNow }, endsAt: { gte: orderNow } },
+            }),
         ]);
+
+        // THRESHOLD offers ("spend ₹X, get Y% off") fire on the whole-cart value, which
+        // isn't known until the lines are priced. A lightweight pre-pass sums the INR
+        // selling price of every buyable line so we know which threshold offers qualify
+        // before the real pricing loop runs. Empty offers → empty set → no effect.
+        let preSubtotalINR = 0;
+        for (let i = 0; i < cart.items.length; i++) {
+            const p = productsForItems[i];
+            if (!p) continue;
+            const v = cart.items[i].variantId && p.variants?.length > 0 ? p.variants[0] : null;
+            preSubtotalINR += resolveUnitPrice(v || p, 'INR', null) * cart.items[i].quantity;
+        }
+        const thresholdEligibleIds = qualifyingThresholdIds(activeOffers, preSubtotalINR, currency, orderNow);
 
         for (let i = 0; i < cart.items.length; i++) {
             const item = cart.items[i];
@@ -208,7 +229,26 @@ const createOrder = async (req, res) => {
             // Price the line in the order's currency. Shared with the storefront's
             // getRegionalPrice() chain — see resolveUnitPrice() for why a USD order
             // must convert from INR rather than fall through to an INR field.
-            const unitPrice = resolveUnitPrice(variant || product, currency, orderExchangeRate);
+            const sellingUnitPrice = resolveUnitPrice(variant || product, currency, orderExchangeRate);
+
+            // Apply the best automatic Offer to the SELLING price only. This never
+            // touches vendorPrice below, so the vendor settlement is unchanged — M2C's
+            // margin absorbs the discount. With no live offers, applyBestOffer returns
+            // the price untouched and offer=null, so this is a no-op for every existing
+            // order. Offer eligibility (category/product, region, min-qty) is resolved
+            // server-side here; the storefront badge is only advisory.
+            const offerResult = applyBestOffer({
+                product,
+                sellingUnitPrice,
+                quantity: item.quantity,
+                currency,
+                rate: orderExchangeRate,
+                offers: activeOffers,
+                now: orderNow,
+                thresholdEligibleIds,
+            });
+            const unitPrice = offerResult.unitPrice;
+
             // Round per line as well: the invoice prints each item's totalPrice,
             // so the printed item lines must sum to the printed subtotal.
             const itemTotal = round2(unitPrice * item.quantity);
@@ -259,6 +299,27 @@ const createOrder = async (req, res) => {
             // Resolved mode: the explicit choice, else the only option, else none.
             const lineTransport = item.transportType || allowedTransports[0] || null;
 
+            // Courier partner: required whenever the product ships (has a transport),
+            // and must be one the catalog offers for this order's region + mode. The
+            // region comes from the order currency (INR=.in, USD=.com). Frozen onto the
+            // line so fulfilment/admin dispatches with the carrier the customer chose.
+            let lineCourier = null;
+            if (allowedTransports.length > 0) {
+                if (!item.courier) {
+                    return res.status(400).json({
+                        success: false,
+                        error: `Please choose a courier partner for "${product.name}" before placing the order.`,
+                    });
+                }
+                if (!isValidCourier(item.courier, currency, lineTransport)) {
+                    return res.status(400).json({
+                        success: false,
+                        error: `The selected courier is not available for "${product.name}".`,
+                    });
+                }
+                lineCourier = item.courier;
+            }
+
             computedShippingInr += calculateLogistics(
                 product.logisticsConfig, item.quantity, lineTransport || undefined
             ).totalShippingCost;
@@ -301,6 +362,11 @@ const createOrder = async (req, res) => {
                 totalPrice: itemTotal,
                 totalPriceINR: toINR(itemTotal, currency, orderExchangeRate),
                 transportType: lineTransport,
+                courier: lineCourier,
+                // Offer snapshot (customer-side only). Unset when no offer applied, so
+                // legacy/no-offer lines are written exactly as before.
+                originalUnitPrice: offerResult.offer ? offerResult.originalUnitPrice : undefined,
+                appliedOffer: offerResult.offer || undefined,
                 // Freeze the vendor payout for this line so the settlement statement can
                 // itemise it later. Vendor money is always INR — vendorPrice is basePrice,
                 // never converted. Mirrors the vendorTotals accumulation above.

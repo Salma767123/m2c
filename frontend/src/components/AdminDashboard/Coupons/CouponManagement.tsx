@@ -394,7 +394,7 @@ const CouponManagement = () => {
                       </div>
                       <div className="text-xs text-slate-500 mt-1">
                         Min: ₹{coupon.minPurchaseAmount || 0}
-                        {coupon.maxDiscountAmount && ` | Max: ₹${coupon.maxDiscountAmount}`}
+                        {coupon.maxDiscountAmount ? ` | Max: ₹${coupon.maxDiscountAmount}` : ''}
                       </div>
                       {coupon.freeShipping && (
                         <div className="flex items-center gap-1 mt-1.5">
@@ -412,14 +412,14 @@ const CouponManagement = () => {
                         <div className="font-medium text-slate-900">
                           {coupon.usedCount || 0} / {coupon.usageLimit || '∞'}
                         </div>
-                        {coupon.usageLimit && (
+                        {coupon.usageLimit ? (
                           <div className="w-full bg-slate-200 rounded-full h-2 mt-1">
                             <div
                               className="bg-brand-500 h-2 rounded-full"
                               style={{ width: `${((coupon.usedCount || 0) / coupon.usageLimit) * 100}%` }}
                             />
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     </TableCell>
                     <TableCell>

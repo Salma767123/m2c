@@ -393,14 +393,20 @@ export default function Products() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        {product.approvalStatus === 'NEGOTIATION' && (
+                        {/* Live negotiation while under negotiation; afterwards the
+                            same button stays as a read-only history view so an
+                            approved/rejected product's price talks aren't hidden. */}
+                        {(product.approvalStatus === 'NEGOTIATION' ||
+                          product.agreedPrice != null || product.basePriceOriginal != null) && (
                           <button
                             onClick={() => setNegotiateFor({ id: product.id, name: product.name })}
                             className="p-1.5 rounded-lg text-purple-600 hover:text-purple-700 hover:bg-purple-50 transition-colors relative"
-                            title="Price negotiation — admin has proposed a price"
+                            title={product.approvalStatus === 'NEGOTIATION' ? 'Price negotiation — admin has proposed a price' : 'View negotiation history'}
                           >
                             <Handshake className="h-4 w-4" />
-                            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-purple-500" />
+                            {product.approvalStatus === 'NEGOTIATION' && (
+                              <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-purple-500" />
+                            )}
                           </button>
                         )}
                         <button

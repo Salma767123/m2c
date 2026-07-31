@@ -12,6 +12,7 @@ import { wishlistService } from '@/services/wishlistService';
 import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, isVisibleInRegion } from '@/lib/currency';
+import type { ActiveOffer } from '@/lib/offers';
 
 interface ProductCardProps {
   product: ServiceProduct | PublicProduct | MockProduct;
@@ -188,8 +189,15 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
   const isActuallyInStock = currentStock > 0;
 
-  const savings = regionalOriginalPrice && regionalOriginalPrice > (displayPrice || 0)
-    ? regionalOriginalPrice - (displayPrice || 0)
+  // Automatic offer (attached by the backend for PublicProduct). When present it
+  // defines the effective price and the strike-through, taking precedence over the
+  // product's own MRP discount so the two never stack visually.
+  const activeOffer: ActiveOffer | undefined = (product as PublicProduct).activeOffer;
+  const effectivePrice = activeOffer ? activeOffer.offerPrice : displayPrice;
+  const strikePrice = activeOffer ? activeOffer.originalPrice : regionalOriginalPrice;
+
+  const savings = strikePrice && strikePrice > (effectivePrice || 0)
+    ? strikePrice - (effectivePrice || 0)
     : null;
 
   return (
@@ -203,7 +211,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
         <div className="relative h-full flex flex-col bg-white font-sans rounded-[1.35rem] overflow-hidden">
           {/* Media */}
-          <div className="relative h-52 sm:h-64 md:h-72 w-full overflow-hidden shrink-0 bg-[radial-gradient(120%_100%_at_50%_0%,#faf9f7_0%,#eceae6_100%)]">
+          <div className="relative h-36 sm:h-40 md:h-48 w-full overflow-hidden shrink-0 bg-[radial-gradient(120%_100%_at_50%_0%,#faf9f7_0%,#eceae6_100%)]">
             <Image
               src={imageUrl}
               alt={product.name}
@@ -223,11 +231,15 @@ const ProductCard = ({ product }: ProductCardProps) => {
             {/* Sheen sweep across the image on hover */}
             <div className="pointer-events-none absolute inset-0 -translate-x-full skew-x-12 bg-linear-to-r from-transparent via-white/30 to-transparent transition-transform duration-[1000ms] ease-out group-hover:translate-x-full" />
 
-            {product.discount && (
+            {activeOffer ? (
+              <div className="absolute top-3 left-3 z-10 rounded-full bg-linear-to-r from-[#e01a1b] to-[#ff5a36] px-2.5 py-1 text-[11px] font-bold tracking-wide text-white shadow-[0_6px_18px_rgba(224,26,27,0.5)] ring-1 ring-white/40">
+                {activeOffer.badge}
+              </div>
+            ) : product.discount ? (
               <div className="absolute top-3 left-3 z-10 rounded-full bg-linear-to-r from-[#e01a1b] to-[#ff5a36] px-2.5 py-1 text-[11px] font-bold tracking-wide text-white shadow-[0_6px_18px_rgba(224,26,27,0.5)] ring-1 ring-white/40">
                 {product.discount}% OFF
               </div>
-            )}
+            ) : null}
 
             {/* Wishlist Button — frosted glass pill */}
             <button
@@ -260,14 +272,14 @@ const ProductCard = ({ product }: ProductCardProps) => {
           </div>
 
           {/* Body */}
-          <div className="p-4 sm:p-4.5 flex flex-col grow justify-between">
+          <div className="p-3 sm:p-3.5 flex flex-col grow justify-between">
             {/* Top content - flexible */}
             <div className="grow">
-              <h3 className="font-playfair text-base sm:text-lg font-semibold text-[#1a1a1a] mb-1.5 break-words tracking-tight transition-colors duration-300 group-hover:text-[#e01a1b]">
+              <h3 className="font-playfair text-sm sm:text-base font-semibold text-[#1a1a1a] mb-1 break-words tracking-tight transition-colors duration-300 group-hover:text-[#e01a1b]">
                 {product.name}
               </h3>
 
-              <div className="flex items-center mb-2.5">
+              <div className="flex items-center mb-2">
                 <div className="flex items-center flex-wrap gap-1">
                   {[...Array(5)].map((_, i) => (
                     <Star
@@ -286,12 +298,12 @@ const ProductCard = ({ product }: ProductCardProps) => {
                   so the digits stay crisp and evenly spaced. */}
               <div className="flex items-end justify-between gap-2 flex-wrap">
                 <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="text-2xl sm:text-[1.75rem] leading-none font-extrabold text-[#1a1a1a] tracking-tight tabular-nums">
-                    {formatPrice(displayPrice || 0)}
+                  <span className="text-xl sm:text-2xl leading-none font-extrabold text-[#1a1a1a] tracking-tight tabular-nums">
+                    {formatPrice(effectivePrice || 0)}
                   </span>
-                  {regionalOriginalPrice && regionalOriginalPrice > (displayPrice || 0) ? (
+                  {strikePrice && strikePrice > (effectivePrice || 0) ? (
                     <span className="text-sm text-gray-400 line-through tabular-nums">
-                      {formatPrice(regionalOriginalPrice)}
+                      {formatPrice(strikePrice)}
                     </span>
                   ) : null}
                 </div>
@@ -306,7 +318,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
             {/* Bottom content - fixed at bottom */}
             <div className="shrink-0">
               {/* Hairline divider for a refined split */}
-              <div className="h-px w-full bg-linear-to-r from-transparent via-gray-200 to-transparent my-3" />
+              <div className="h-px w-full bg-linear-to-r from-transparent via-gray-200 to-transparent my-2.5" />
 
               {/* Quantity + Add to Cart */}
               <div className="flex items-center gap-2">
@@ -334,7 +346,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
                 <button
                   onClick={handleAddToCart}
                   disabled={!isActuallyInStock || isAddingToCart || (isActuallyInStock && quantity > currentStock)}
-                  className={`btn-shine group/btn flex-1 py-2.5 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-2 ${isActuallyInStock
+                  className={`btn-shine group/btn flex-1 py-2 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-2 ${isActuallyInStock
                     ? 'bg-linear-to-r from-[#e01a1b] to-[#ff4d2d] text-white shadow-[0_8px_22px_-6px_rgba(224,26,27,0.6)] hover:shadow-[0_16px_34px_-8px_rgba(224,26,27,0.75)] hover:brightness-110 active:scale-[0.97]'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed ring-1 ring-gray-200'
                     } disabled:cursor-not-allowed`}

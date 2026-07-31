@@ -5,10 +5,13 @@ import { useRouter } from 'next/navigation'
 import Header from '@/components/WebSite/Header/Header';
 import Footer from '@/components/WebSite/Footer/Footer';
 import HeroSection from '@/components/WebSite/HeroSection/HeroSection';
+import NoticeBoard from '@/components/WebSite/NoticeBoard/NoticeBoard';
 import Category from '@/components/WebSite/Category/Category';
 import FeaturedProducts from '@/components/WebSite/Featured/Products';
 import TopSelling from '@/components/WebSite/Featured/TopSelling';
 import BestSeller from '@/components/WebSite/Featured/BestSeller';
+import BrandPromo from '@/components/WebSite/BrandPromo/BrandPromo';
+import DownloadApp from '@/components/WebSite/DownloadApp/DownloadApp';
 import ValueSection from '@/components/WebSite/Footer/ValueSection';
 import SEOHead from '@/components/SEO/SEOHead';
 import { isAuthenticated } from '@/lib/auth';
@@ -109,10 +112,13 @@ export default function Home() {
       />
       <Header />
       <HeroSection />
+      <NoticeBoard />
       <Category />
       <FeaturedProducts />
+      <BrandPromo />
       <TopSelling />
       <BestSeller />
+      <DownloadApp />
       <ValueSection />
       <Footer />
       <div className="grid grid-cols-1 md:grid-cols-3 justify-center gap-4 py-8 m-8">

@@ -44,7 +44,7 @@ export default function TopSelling() {
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 md:gap-6 lg:gap-8">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="h-48 sm:h-64 md:h-72 w-full bg-gray-200 animate-pulse" />
+                <div className="h-36 sm:h-40 md:h-48 w-full bg-gray-200 animate-pulse" />
                 <div className="p-4 space-y-3">
                   <div className="h-3 w-16 bg-gray-100 rounded animate-pulse" />
                   <div className="h-5 w-3/4 bg-gray-200 rounded animate-pulse" />

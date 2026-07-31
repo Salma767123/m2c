@@ -13,6 +13,7 @@ const MainFooterContent = () => {
   const [companyInfo, setCompanyInfo] = useState<PublicCompanyInfo>({
     companyName: 'M2C MarkDowns Private Limited',
     companyLogo: null,
+    secondaryLogo: null,
     companyEmail: null,
     companyPhone: null,
     companyWebsite: null,

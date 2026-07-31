@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order } from "@/services/orderService";
 import { formatPrice } from "@/lib/currency";
+import { courierName } from "@/lib/couriers";
 import { hubService, Hub } from "@/services/hubService";
 import { MapPin as HubIcon } from "lucide-react";
 import axiosInstance from "@/lib/axios";
@@ -222,6 +223,15 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                                                 <p className="text-xs text-slate-500 uppercase">Subtotal</p>
                                                 <p className="text-sm font-medium text-slate-900">{money(item.totalPrice)}</p>
                                             </div>
+                                            {(item.transportType || item.courier) && (
+                                                <div>
+                                                    <p className="text-xs text-slate-500 uppercase">Shipping</p>
+                                                    <p className="text-sm font-medium text-slate-900">
+                                                        {item.transportType === 'AIR' ? 'Air Freight' : item.transportType === 'SHIP' ? 'Sea Freight' : '—'}
+                                                        {item.courier ? <span className="text-slate-500"> · {courierName(item.courier)}</span> : null}
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

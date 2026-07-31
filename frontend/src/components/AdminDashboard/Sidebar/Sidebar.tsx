@@ -24,6 +24,7 @@ import {
   ClipboardCheck,
   Layers,
   Ticket,
+  Percent,
   ShoppingCart,
   FileBarChart,
   ShoppingBag,
@@ -122,6 +123,13 @@ const navigation: NavigationItem[] = [
         title: "Coupons",
         icon: Ticket,
         href: "/admin/dashboard/coupons",
+        permission: "coupons:view",
+      },
+      {
+        title: "Offers",
+        icon: Percent,
+        href: "/admin/dashboard/offers",
+        // Reuses the coupons permission set (offers live in the promotions area).
         permission: "coupons:view",
       },
       {

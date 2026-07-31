@@ -5,10 +5,37 @@ const {
   resolveBase64InValue,
 } = require('../config/cloudinary');
 const { generateBaseSku, reconcileBaseSku, variantSkuFor } = require('../utils/skuGenerator');
-const { usdFromINR } = require('../utils/orderCurrency');
+const { usdFromINR, resolveUsdRate } = require('../utils/orderCurrency');
 const { stripAdminPricing, attachVendorPayout } = require('../utils/vendorPricing');
 const { getCurrentExchangeRate } = require('./exchangeRateController');
-const { visibilityWhere, isVisibleInRegion } = require('../utils/regionVisibility');
+const { visibilityWhere, isVisibleInRegion, normalizeRegion } = require('../utils/regionVisibility');
+const { buildActiveOffer } = require('../utils/offers');
+
+/**
+ * Load live per-product offers for a storefront request and return a decorator that
+ * attaches an `activeOffer` badge to each product. Additive and fail-open: any error
+ * (or simply no offers configured) yields a decorator that returns products unchanged,
+ * so the catalogue never breaks because of the offers layer. THRESHOLD offers are
+ * cart-level and are intentionally not attached to individual products.
+ */
+async function buildOfferDecorator(region) {
+  try {
+    const now = new Date();
+    const offers = await prisma.offer.findMany({
+      where: { isActive: true, startsAt: { lte: now }, endsAt: { gte: now } },
+    });
+    if (offers.length === 0) return (p) => p;
+    const currency = normalizeRegion(region) === 'US' ? 'USD' : 'INR';
+    const rate = currency === 'USD' ? await resolveUsdRate(prisma) : null;
+    return (p) => {
+      const activeOffer = buildActiveOffer(p, offers, currency, rate, now);
+      return activeOffer ? { ...p, activeOffer } : p;
+    };
+  } catch (e) {
+    console.warn('[products] offer enrichment skipped:', e.message);
+    return (p) => p;
+  }
+}
 
 /**
  * Validate the product's GST rate.
@@ -2632,6 +2659,11 @@ const getPublicProducts = async (req, res) => {
       inStock,
       tag,
       colors,
+      sizes,
+      materials,
+      fabricTypes,
+      minDiscount,
+      newArrivals,
       minRating,
       region
     } = req.query;
@@ -2723,6 +2755,59 @@ const getPublicProducts = async (req, res) => {
       });
     }
 
+    // Size filter — single-unit size or any variant size
+    if (sizes) {
+      const sizeList = sizes.split(',').map(s => s.trim()).filter(Boolean);
+      if (sizeList.length) {
+        where.AND = where.AND || [];
+        where.AND.push({
+          OR: [
+            { singleUnitSize: { in: sizeList, mode: 'insensitive' } },
+            { variants: { some: { size: { in: sizeList, mode: 'insensitive' } } } }
+          ]
+        });
+      }
+    }
+
+    // Material filter
+    if (materials) {
+      const list = materials.split(',').map(s => s.trim()).filter(Boolean);
+      if (list.length) {
+        where.AND = where.AND || [];
+        where.AND.push({ material: { in: list, mode: 'insensitive' } });
+      }
+    }
+
+    // Fabric type filter
+    if (fabricTypes) {
+      const list = fabricTypes.split(',').map(s => s.trim()).filter(Boolean);
+      if (list.length) {
+        where.AND = where.AND || [];
+        where.AND.push({ fabricType: { in: list, mode: 'insensitive' } });
+      }
+    }
+
+    // Discount filter — the product or one of its variants is at least N% off
+    if (minDiscount) {
+      const d = parseFloat(minDiscount);
+      if (!isNaN(d) && d > 0) {
+        where.AND = where.AND || [];
+        where.AND.push({
+          OR: [
+            { discount: { gte: d } },
+            { variants: { some: { discount: { gte: d } } } }
+          ]
+        });
+      }
+    }
+
+    // New arrivals — created within the last 30 days
+    if (newArrivals === 'true') {
+      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      where.AND = where.AND || [];
+      where.AND.push({ createdAt: { gte: cutoff } });
+    }
+
     // Rating filter
     if (minRating) {
       where.rating = { gte: parseFloat(minRating) };
@@ -2796,10 +2881,15 @@ const getPublicProducts = async (req, res) => {
 
     const totalPages = Math.ceil(totalItems / parseInt(limit));
 
+    // Attach the live offer badge (if any) to each product. Additive: products with no
+    // matching offer are returned untouched.
+    const decorate = await buildOfferDecorator(region);
+    const decoratedItems = products.map(decorate);
+
     res.json({
       success: true,
       data: {
-        items: products,
+        items: decoratedItems,
         pagination: {
           currentPage: parseInt(page),
           totalPages,
@@ -2816,6 +2906,111 @@ const getPublicProducts = async (req, res) => {
       success: false,
       message: 'Failed to fetch products'
     });
+  }
+};
+
+// Public endpoint: available filter facets for the storefront.
+// Everything is computed live from the ACTIVE/APPROVED catalogue (optionally
+// scoped to the current search/category context) — no hardcoded option lists.
+const getPublicProductFacets = async (req, res) => {
+  try {
+    const { search, category, subCategory, region } = req.query;
+
+    const where = { status: 'ACTIVE', approvalStatus: 'APPROVED' };
+    Object.assign(where, visibilityWhere(region));
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { tags: { has: search } }
+      ];
+    }
+    if (category) where.category = { equals: category, mode: 'insensitive' };
+    if (subCategory) where.subCategory = { equals: subCategory, mode: 'insensitive' };
+
+    // Minimal projection — just what the facets need.
+    const products = await prisma.product.findMany({
+      where,
+      select: {
+        singleUnitColor: true,
+        singleUnitColorHex: true,
+        singleUnitSize: true,
+        material: true,
+        fabricType: true,
+        basePrice: true,
+        adminFixedPrice: true,
+        discount: true,
+        originalPrice: true,
+        variants: {
+          select: { color: true, colorHex: true, size: true, discount: true, price: true, originalPrice: true }
+        }
+      }
+    });
+
+    // key (lowercased) -> { value, hex?, count }
+    const colorMap = new Map();
+    const sizeMap = new Map();
+    const materialMap = new Map();
+    const fabricMap = new Map();
+    let minPrice = Infinity;
+    let maxPrice = 0;
+    let maxDiscount = 0;
+
+    const addColor = (name, hex) => {
+      if (name == null || String(name).trim() === '') return;
+      const value = String(name).trim();
+      const key = value.toLowerCase();
+      const ex = colorMap.get(key);
+      if (ex) { ex.count++; if (!ex.hex && hex) ex.hex = hex; }
+      else colorMap.set(key, { value, hex: hex || null, count: 1 });
+    };
+    const addTo = (map, val) => {
+      if (val == null || String(val).trim() === '') return;
+      const value = String(val).trim();
+      const key = value.toLowerCase();
+      const ex = map.get(key);
+      if (ex) ex.count++;
+      else map.set(key, { value, count: 1 });
+    };
+    const discountFrom = (orig, eff) =>
+      (typeof orig === 'number' && typeof eff === 'number' && orig > eff)
+        ? Math.round((1 - eff / orig) * 100) : 0;
+
+    for (const p of products) {
+      addColor(p.singleUnitColor, p.singleUnitColorHex);
+      addTo(sizeMap, p.singleUnitSize);
+      addTo(materialMap, p.material);
+      addTo(fabricMap, p.fabricType);
+
+      const eff = p.adminFixedPrice != null ? p.adminFixedPrice : p.basePrice;
+      if (typeof eff === 'number') { minPrice = Math.min(minPrice, eff); maxPrice = Math.max(maxPrice, eff); }
+      maxDiscount = Math.max(maxDiscount, typeof p.discount === 'number' ? p.discount : discountFrom(p.originalPrice, eff));
+
+      for (const v of (p.variants || [])) {
+        addColor(v.color, v.colorHex);
+        addTo(sizeMap, v.size);
+        if (typeof v.price === 'number') { minPrice = Math.min(minPrice, v.price); maxPrice = Math.max(maxPrice, v.price); }
+        maxDiscount = Math.max(maxDiscount, typeof v.discount === 'number' ? v.discount : discountFrom(v.originalPrice, v.price));
+      }
+    }
+
+    const byCount = (a, b) => b.count - a.count || a.value.localeCompare(b.value);
+
+    res.json({
+      success: true,
+      data: {
+        colors: [...colorMap.values()].sort(byCount),
+        sizes: [...sizeMap.values()].sort(byCount),
+        materials: [...materialMap.values()].sort(byCount),
+        fabricTypes: [...fabricMap.values()].sort(byCount),
+        priceRange: { min: minPrice === Infinity ? 0 : Math.floor(minPrice), max: Math.ceil(maxPrice) },
+        maxDiscount: Math.round(maxDiscount)
+      }
+    });
+  } catch (error) {
+    console.error('Get product facets error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch product facets' });
   }
 };
 
@@ -2962,6 +3157,10 @@ const getPublicProduct = async (req, res) => {
         notes: lc.notes || '',
       };
     }
+
+    // Attach the live offer badge (if any). Additive: no matching offer → unchanged.
+    const decorate = await buildOfferDecorator(req.query.region);
+    publicProduct = decorate(publicProduct);
 
     res.json({
       success: true,
@@ -3178,6 +3377,7 @@ module.exports = {
   assignQCCheckerToProduct,
   getAllProductsForAdmin,
   getPublicProducts,
+  getPublicProductFacets,
   getPublicProduct,
   updateVariantStocks
 };

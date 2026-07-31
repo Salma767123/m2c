@@ -11,6 +11,10 @@ import {
   X,
   User,
   Settings,
+  Truck,
+  Store,
+  Headphones,
+  ChevronDown,
 } from "lucide-react";
 import { IconUserFilled } from '@tabler/icons-react';
 import Category from "./CategoryBar/CategoryBar";
@@ -24,9 +28,15 @@ import { USER_CATEGORIES } from "@/components/Shared/NotificationModal";
 import CompanyLogo from "@/components/Shared/CompanyLogo";
 import { subscribeToAuthChange, dispatchAuthChange } from "@/lib/authEvents";
 
+// Pages that show the PRIMARY logo. Every other page shows the secondary logo.
+// Edit this list to move a page between the two logos.
+const PRIMARY_LOGO_ROUTES = ['/', '/contact', '/about', '/terms', '/privacy', '/returns'];
+
 const Header = () => {
   const pathname = usePathname();
   const router = useRouter();
+  // Home + the brand/legal pages use the primary logo; all others the secondary.
+  const logoVariant = PRIMARY_LOGO_ROUTES.includes(pathname) ? 'primary' : 'secondary';
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -267,73 +277,136 @@ const Header = () => {
     <div className="sticky top-0 z-50 font-sans isolate">
       {/* Brand accent bar — a live sliver of primary colour across the top */}
       <div className="h-1 w-full animate-brand-bar" />
-      {/* Main Header */}
-      <header className="relative z-30 bg-white shadow-lg border-b border-gray-100 transition-all duration-300">
+
+      {/* Utility strip — quick links (Amazon/Flipkart pattern). Desktop only. */}
+      <div className="hidden md:block bg-[#1a1a1a] text-white">
+        <div className="max-w-7xl 2xl:max-w-420 mx-auto px-4 md:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-8 text-xs">
+            <span className="text-gray-300">Direct from Manufacturer to Customer</span>
+            <div className="flex items-center gap-4 lg:gap-5">
+              <Link href="/order" className="inline-flex items-center gap-1.5 text-gray-200 hover:text-white transition-colors">
+                <Truck className="w-3.5 h-3.5" /> Track Order
+              </Link>
+              <span className="h-3 w-px bg-white/20" />
+              <Link href="/contact" className="inline-flex items-center gap-1.5 text-gray-200 hover:text-white transition-colors">
+                <Headphones className="w-3.5 h-3.5" /> Help Centre
+              </Link>
+              <span className="h-3 w-px bg-white/20" />
+              <Link href="/vendor" className="inline-flex items-center gap-1.5 text-gray-200 hover:text-white transition-colors">
+                <Store className="w-3.5 h-3.5" /> Sell on M2C
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Header — no heavy shadow: it used to cast over the category nav
+          below and make it look 'hidden behind'. The nav row carries the one
+          subtle shadow at the bottom of the sticky header stack. */}
+      <header className="relative z-30 bg-white border-b border-gray-100 transition-all duration-300">
         <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-24 sm:h-24 md:h-28 lg:h-32 xl:h-36 gap-2 sm:gap-3 md:gap-4">
+          <div className="flex items-center justify-between h-14 sm:h-16 md:h-18 lg:h-20 xl:h-24 gap-2 sm:gap-3 md:gap-4">
 
             {/* Logo */}
             <Link href="/" className="flex items-center shrink-0">
               <CompanyLogo
-                className="h-16 sm:h-20 md:h-24 lg:h-28 xl:h-32 w-auto object-contain"
-                skeletonClassName="h-16 sm:h-20 md:h-24 lg:h-28 xl:h-32 aspect-square bg-gray-100"
-                fallbackSizes="(max-width: 640px) 64px, (max-width: 768px) 80px, (max-width: 1024px) 96px, (max-width: 1280px) 112px, 128px"
+                variant={logoVariant}
+                className="h-12 sm:h-14 md:h-16 lg:h-18 xl:h-20 w-auto object-contain"
+                skeletonClassName="h-12 sm:h-14 md:h-16 lg:h-18 xl:h-20 aspect-square bg-gray-100"
+                fallbackSizes="(max-width: 640px) 48px, (max-width: 768px) 56px, (max-width: 1024px) 64px, (max-width: 1280px) 72px, 80px"
                 priority
               />
             </Link>
 
+            {/* Prominent inline search — the primary way to find products
+                (Amazon/Flipkart/Myntra pattern). Fills the header on md+; on
+                mobile the compact search icon in the actions opens the modal. */}
+            <form onSubmit={handleSearchSubmit} className="hidden md:flex flex-1 min-w-0 max-w-3xl mx-3 lg:mx-6">
+              <div className="relative w-full">
+                <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search for products, categories & more"
+                  aria-label="Search products"
+                  className="w-full pl-10 pr-28 py-2.5 lg:py-3 rounded-full bg-gray-50 border border-gray-200 text-sm text-gray-800 placeholder-gray-400 focus:bg-white focus:border-[#e01a1b] focus:ring-4 focus:ring-[#e01a1b]/10 outline-none transition-all"
+                />
+                <button
+                  type="submit"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 bg-[#e01a1b] hover:bg-[#c41617] text-white text-sm font-semibold px-5 py-2 rounded-full transition-colors"
+                >
+                  <Search className="w-4 h-4" />
+                  <span className="hidden 2xl:inline">Search</span>
+                </button>
+              </div>
+            </form>
+
             {/* Action Icons */}
-            <div className="flex items-center justify-end gap-1 sm:gap-1.5 md:gap-3 shrink-0">
+            <div className="flex items-center justify-end gap-1 sm:gap-2 shrink-0">
               {/* Notifications (logged-in users only) */}
               {isUserLoggedIn && (
                 <NotificationDropdown categories={USER_CATEGORIES} colorScheme="brand" />
               )}
 
-              {/* Wishlist */}
+              {/* Wishlist — same format as Account & Cart */}
               <Link
                 href="/wishlist"
-                className="relative p-2 text-[#222222] hover:text-white hover:bg-[#e01a1b] rounded-lg transition-all duration-200 transform hover:scale-105"
+                className="order-3 flex items-center gap-1.5 px-2.5 lg:px-3 py-2 rounded-lg text-gray-700 hover:text-[#e01a1b] hover:bg-[#fff1f1] text-sm font-medium transition-colors"
               >
-                <Heart className="w-5 h-5 md:w-6 md:h-6" />
-                {wishlistCount > 0 && (
-                  <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 bg-[#e01a1b] text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-medium text-xs shadow-[0_2px_6px_rgba(224,26,27,0.5)] ring-2 ring-white">
-                    {wishlistCount > 99 ? '99+' : wishlistCount}
-                  </span>
-                )}
+                <span className="relative">
+                  <Heart className="w-5 h-5 text-[#e01a1b]" />
+                  {wishlistCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-[#e01a1b] text-white rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center font-semibold text-[10px] ring-2 ring-white">
+                      {wishlistCount > 99 ? '99+' : wishlistCount}
+                    </span>
+                  )}
+                </span>
+                <span className="hidden 2xl:inline">Wishlist</span>
               </Link>
 
-              {/* Cart */}
+              {/* Cart — same format as Account & Wishlist */}
               <Link
                 href="/cart"
-                className="relative p-2 text-[#222222] hover:text-white hover:bg-[#e01a1b] rounded-lg transition-all duration-200 transform hover:scale-105"
+                className="order-2 flex items-center gap-1.5 px-2.5 lg:px-3 py-2 rounded-lg text-gray-700 hover:text-[#e01a1b] hover:bg-[#fff1f1] text-sm font-medium transition-colors"
               >
-                <ShoppingCart className="w-5 h-5 md:w-6 md:h-6" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 bg-[#e01a1b] text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-medium text-xs shadow-[0_2px_6px_rgba(224,26,27,0.5)] ring-2 ring-white">
-                    {cartCount > 99 ? '99+' : cartCount}
-                  </span>
-                )}
+                <span className="relative">
+                  <ShoppingCart className="w-5 h-5 text-[#e01a1b]" />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-[#e01a1b] text-white rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center font-semibold text-[10px] ring-2 ring-white">
+                      {cartCount > 99 ? '99+' : cartCount}
+                    </span>
+                  )}
+                </span>
+                <span className="hidden 2xl:inline">Cart</span>
               </Link>
 
-              {/* Search Icon */}
+              {/* Search Icon — mobile only (desktop uses the inline bar) */}
               <button
                 onClick={() => setShowSearchModal(true)}
-                className="p-2 text-[#222222] hover:text-white hover:bg-[#e01a1b] rounded-lg transition-all duration-200 transform hover:scale-110"
+                className="order-5 md:hidden p-2 text-[#222222] hover:text-white hover:bg-[#e01a1b] rounded-lg transition-all duration-200 transform hover:scale-110"
                 aria-label="Search"
               >
                 <Search className="w-5 h-5 md:w-6 md:h-6" />
               </button>
 
-              {/* User Account Dropdown */}
+              {/* User Account Dropdown — bordered pill, first in the cluster */}
               <div
-                className="hidden lg:block relative"
+                className="order-4 hidden lg:block relative"
                 ref={accountDropdownRef}
               >
                 <button
                   onClick={() => setShowAccountDropdown(!showAccountDropdown)}
-                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-[#222222] bg-white rounded-lg transition-all duration-200 text-xs sm:text-sm md:text-base font-semibold hover:scale-105 transform"
+                  className="flex items-center gap-1.5 px-2.5 lg:px-3 py-2 rounded-lg text-gray-700 hover:text-[#e01a1b] hover:bg-[#fff1f1] text-sm font-medium transition-colors"
                 >
-                  <IconUserFilled className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                  <User className="w-5 h-5 text-[#e01a1b] shrink-0" />
+                  <span className="max-w-[90px] truncate">
+                    {isUserLoggedIn && userName ? userName.split(' ')[0].slice(0, 10) : 'Sign In'}
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${showAccountDropdown ? 'rotate-180' : ''}`} />
+                  <span className="sr-only">
+                    {isUserLoggedIn && userName ? userName.split(' ')[0].slice(0, 10) : 'Account'}
+                  </span>
                 </button>
 
                 {showAccountDropdown && (
@@ -541,7 +614,7 @@ const Header = () => {
         )}
       </header>
 
-      {/* Category Bar */}
+      {/* Category navigation — Myntra-style horizontal nav with mega-menus */}
       <div className="relative z-20">
         <Category />
       </div>

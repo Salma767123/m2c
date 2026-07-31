@@ -17,11 +17,52 @@ function getPageRange(current: number, total: number): Array<number | '…'> {
   pages.push(total);
   return pages;
 }
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { productService, Product } from '@/services/productService';
 import { categoryService } from '@/services/categoryService';
 import { isVisibleInRegion } from '@/lib/currency';
+
+// Live filter facets returned by the backend (all computed from real products).
+interface ProductFacets {
+  colors: Array<{ value: string; hex: string | null; count: number }>;
+  sizes: Array<{ value: string; count: number }>;
+  materials: Array<{ value: string; count: number }>;
+  fabricTypes: Array<{ value: string; count: number }>;
+  priceRange: { min: number; max: number };
+  maxDiscount: number;
+}
+
+// Collapsible filter section (Myntra/Flipkart style), open by default.
+function CollapsibleSection({ title, count, defaultOpen = true, children }: { title: string; count?: number; defaultOpen?: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const mounted = useRef(false);
+
+  // When the user expands a section (especially one near the bottom edge), scroll
+  // just enough to bring its revealed content into view. Skip the very first run
+  // so default-open sections don't hijack scroll on mount.
+  useEffect(() => {
+    if (!mounted.current) { mounted.current = true; return; }
+    if (open) {
+      requestAnimationFrame(() => {
+        sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    }
+  }, [open]);
+
+  return (
+    <div ref={sectionRef} className="border-t border-gray-200 pt-4">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between text-left">
+        <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-900">
+          {title}{count != null && count > 0 ? <span className="ml-1 font-normal normal-case text-gray-400">({count})</span> : null}
+        </h4>
+        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="mt-3">{children}</div>}
+    </div>
+  );
+}
 
 const Products = () => {
   const searchParams = useSearchParams();
@@ -39,7 +80,9 @@ const Products = () => {
   const [sortBy, setSortBy] = useState('createdAt');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
+  // Open by default on desktop so shoppers see the filters immediately; the
+  // mobile media-query effect below force-closes it on small screens.
+  const [showFilters, setShowFilters] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
 
   // Pagination
@@ -51,6 +94,19 @@ const Products = () => {
   const [priceRange, setPriceRange] = useState({ min: 0, max: 100000 });
   const [selectedRating, setSelectedRating] = useState(0);
   const [inStockOnly, setInStockOnly] = useState(false);
+  // Dynamic facet filters (all driven by real product data)
+  const [facets, setFacets] = useState<ProductFacets | null>(null);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
+  const [selectedFabricTypes, setSelectedFabricTypes] = useState<string[]>([]);
+  const [minDiscount, setMinDiscount] = useState(0);
+  const [newArrivals, setNewArrivals] = useState(false);
+
+  const toggleInArray = (setter: React.Dispatch<React.SetStateAction<string[]>>, value: string) => {
+    setter((arr) => (arr.includes(value) ? arr.filter((x) => x !== value) : [...arr, value]));
+    setCurrentPage(1);
+  };
 
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
@@ -79,16 +135,11 @@ const Products = () => {
               setCategoryName(foundCategory.name);
               setSelectedCategory(foundCategory.name);
 
-              if (subcategoryParam && foundCategory.subcategories) {
-                const foundSubcategory = foundCategory.subcategories.find(
-                  (sub: any) => sub.slug.toLowerCase() === subcategoryParam.toLowerCase()
-                );
-
-                if (foundSubcategory) {
-                  setSubcategoryName(foundSubcategory.name);
-                  setSelectedSubcategory(foundSubcategory.name);
-                }
-              }
+              // A sub-category in the URL is intentionally NOT auto-applied as a
+              // filter: landing shows the whole category, and the shopper narrows
+              // it via the sidebar if they want. This avoids an empty result when
+              // a sub-category has no products yet.
+              void subcategoryParam;
             }
           }
         }
@@ -99,6 +150,22 @@ const Products = () => {
 
     fetchCategories();
   }, [categoryParam, subcategoryParam]);
+
+  // Fetch available filter facets (live from the catalogue) for the current
+  // search/category context. Re-runs when the context changes so the options
+  // always reflect what's actually available.
+  useEffect(() => {
+    let ignore = false;
+    productService
+      .getPublicProductFacets({
+        search: searchTerm || undefined,
+        category: selectedCategory !== 'All' ? selectedCategory : undefined,
+        subCategory: selectedSubcategory || undefined,
+      })
+      .then((res) => { if (!ignore && res.success) setFacets(res.data); })
+      .catch(() => { /* facets are optional — ignore */ });
+    return () => { ignore = true; };
+  }, [searchTerm, selectedCategory, selectedSubcategory]);
 
   // Fetch products from API
   useEffect(() => {
@@ -119,7 +186,13 @@ const Products = () => {
           sortBy: sortBy === 'price-low' || sortBy === 'price-high' ? 'basePrice' : sortBy,
           sortOrder: sortBy === 'price-low' ? 'asc' : 'desc',
           inStock: inStockOnly || undefined,
-          minRating: selectedRating > 0 ? selectedRating : undefined
+          minRating: selectedRating > 0 ? selectedRating : undefined,
+          colors: selectedColors.length ? selectedColors.join(',') : undefined,
+          sizes: selectedSizes.length ? selectedSizes.join(',') : undefined,
+          materials: selectedMaterials.length ? selectedMaterials.join(',') : undefined,
+          fabricTypes: selectedFabricTypes.length ? selectedFabricTypes.join(',') : undefined,
+          minDiscount: minDiscount > 0 ? minDiscount : undefined,
+          newArrivals: newArrivals || undefined,
         };
 
         const response = await productService.getPublicProducts(params);
@@ -145,7 +218,7 @@ const Products = () => {
     return () => {
       ignore = true;
     };
-  }, [currentPage, searchTerm, selectedCategory, selectedSubcategory, priceRange, sortBy, inStockOnly, selectedRating, searchStringParam]);
+  }, [currentPage, searchTerm, selectedCategory, selectedSubcategory, priceRange, sortBy, inStockOnly, selectedRating, selectedColors, selectedSizes, selectedMaterials, selectedFabricTypes, minDiscount, newArrivals, searchStringParam]);
 
   // Handle URL change reflecting updated searches
   useEffect(() => {
@@ -219,23 +292,36 @@ const Products = () => {
     setSubcategoryName('');
     setSearchTerm('');
     setInStockOnly(false);
+    setSelectedColors([]);
+    setSelectedSizes([]);
+    setSelectedMaterials([]);
+    setSelectedFabricTypes([]);
+    setMinDiscount(0);
+    setNewArrivals(false);
     setCurrentPage(1);
   };
 
   // All filtering is now done server-side
   const filteredProducts = products.filter(p => isVisibleInRegion((p as any).priceVisibility));
 
-  const activeFiltersCount = (selectedCategory !== 'All' ? 1 : 0) +
-    (selectedSubcategory ? 1 : 0) +
+  // Category / sub-category come from navigation (the URL), not user-applied
+  // filters — so they're excluded from the "Filters (N)" badge count.
+  const activeFiltersCount =
     (selectedRating > 0 ? 1 : 0) +
     (priceRange.min > 0 || priceRange.max < 100000 ? 1 : 0) +
-    (inStockOnly ? 1 : 0);
+    (inStockOnly ? 1 : 0) +
+    selectedColors.length +
+    selectedSizes.length +
+    selectedMaterials.length +
+    selectedFabricTypes.length +
+    (minDiscount > 0 ? 1 : 0) +
+    (newArrivals ? 1 : 0);
 
   // Shared filter content renderer to avoid duplication
   const renderFilterContent = (isMobileDrawer: boolean) => (
     <div className="space-y-6">
-      {/* In Stock Filter */}
-      <div>
+      {/* Quick toggles */}
+      <div className="space-y-3">
         <label className="flex items-center cursor-pointer">
           <input
             type="checkbox"
@@ -243,11 +329,22 @@ const Products = () => {
             onChange={(e) => {
               setInStockOnly(e.target.checked);
               setCurrentPage(1);
-              if (isMobileDrawer) closeMobileFilters();
             }}
             className="rounded border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
           />
           <span className="ml-2 text-sm font-medium text-gray-700">In Stock Only</span>
+        </label>
+        <label className="flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={newArrivals}
+            onChange={(e) => {
+              setNewArrivals(e.target.checked);
+              setCurrentPage(1);
+            }}
+            className="rounded border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
+          />
+          <span className="ml-2 text-sm font-medium text-gray-700">New Arrivals</span>
         </label>
       </div>
 
@@ -399,6 +496,105 @@ const Products = () => {
           </label>
         </div>
       </div>
+
+      {/* ── Dynamic facets (only rendered when the catalogue actually has them) ── */}
+
+      {/* Discount — buckets capped at the real maximum available discount */}
+      {facets && facets.maxDiscount >= 10 && (
+        <CollapsibleSection title="Discount">
+          <div className="space-y-2">
+            {[10, 20, 30, 40, 50].filter((d) => d <= facets.maxDiscount).map((d) => (
+              <label key={d} className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name={isMobileDrawer ? 'discount-mobile' : 'discount'}
+                  checked={minDiscount === d}
+                  onChange={() => { setMinDiscount(d); setCurrentPage(1); }}
+                  className="border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
+                />
+                <span className="ml-2 text-sm text-gray-700">{d}% and above</span>
+              </label>
+            ))}
+            {minDiscount > 0 && (
+              <button type="button" onClick={() => { setMinDiscount(0); setCurrentPage(1); }} className="text-xs text-[#e01a1b] hover:text-[#c41617] font-medium">Clear</button>
+            )}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* Color — swatches from real variant/single-unit colours */}
+      {facets && facets.colors.length > 0 && (
+        <CollapsibleSection title="Color" count={facets.colors.length}>
+          <div className="flex flex-wrap gap-2">
+            {facets.colors.map((c) => {
+              const active = selectedColors.includes(c.value);
+              return (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => toggleInArray(setSelectedColors, c.value)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${active ? 'border-[#e01a1b] bg-[#fff1f1] text-[#e01a1b]' : 'border-gray-200 text-gray-700 hover:border-gray-300'}`}
+                >
+                  <span className="w-3.5 h-3.5 rounded-full ring-1 ring-black/10 shrink-0" style={{ backgroundColor: c.hex || '#cccccc' }} />
+                  {c.value}
+                  <span className="text-gray-400">{c.count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* Size */}
+      {facets && facets.sizes.length > 0 && (
+        <CollapsibleSection title="Size" count={facets.sizes.length}>
+          <div className="flex flex-wrap gap-2">
+            {facets.sizes.map((s) => {
+              const active = selectedSizes.includes(s.value);
+              return (
+                <button
+                  key={s.value}
+                  type="button"
+                  onClick={() => toggleInArray(setSelectedSizes, s.value)}
+                  className={`rounded-md border px-3 py-1 text-xs font-medium transition-colors ${active ? 'border-[#e01a1b] bg-[#fff1f1] text-[#e01a1b]' : 'border-gray-200 text-gray-700 hover:border-gray-300'}`}
+                >
+                  {s.value}
+                </button>
+              );
+            })}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* Material */}
+      {facets && facets.materials.length > 0 && (
+        <CollapsibleSection title="Material" count={facets.materials.length}>
+          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+            {facets.materials.map((m) => (
+              <label key={m.value} className="flex items-center cursor-pointer">
+                <input type="checkbox" checked={selectedMaterials.includes(m.value)} onChange={() => toggleInArray(setSelectedMaterials, m.value)} className="rounded border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]" />
+                <span className="ml-2 text-sm text-gray-700 flex-1 min-w-0 truncate">{m.value}</span>
+                <span className="text-xs text-gray-400 shrink-0">{m.count}</span>
+              </label>
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* Fabric Type */}
+      {facets && facets.fabricTypes.length > 0 && (
+        <CollapsibleSection title="Fabric Type" count={facets.fabricTypes.length}>
+          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+            {facets.fabricTypes.map((f) => (
+              <label key={f.value} className="flex items-center cursor-pointer">
+                <input type="checkbox" checked={selectedFabricTypes.includes(f.value)} onChange={() => toggleInArray(setSelectedFabricTypes, f.value)} className="rounded border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]" />
+                <span className="ml-2 text-sm text-gray-700 flex-1 min-w-0 truncate">{f.value}</span>
+                <span className="text-xs text-gray-400 shrink-0">{f.count}</span>
+              </label>
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
     </div>
   );
 
@@ -424,25 +620,16 @@ const Products = () => {
       </section>
 
       {/* Filters and Search */}
-      <section className="py-8 bg-white">
+      <section className="py-3 bg-white">
         <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            {/* Search - Left Side */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search products..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full pl-10 pr-4 py-2 text-gray-600 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#e01a1b] focus:border-[#e01a1b]"
-              />
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            {/* Results count — left, in line with the controls */}
+            <div className="text-sm text-gray-600">
+              Showing {filteredProducts.length} of {totalItems} products
+              {categoryName && ` in ${categoryName}`}
+              {searchTerm && ` matching "${searchTerm}"`}
             </div>
-
-            {/* Controls - Right Side */}
+            {/* Controls - Right Side (inline search removed — the header search is the single entry point) */}
             <div className="flex flex-wrap items-center gap-3">
               {/* Filter Toggle */}
               <button
@@ -497,13 +684,6 @@ const Products = () => {
             </div>
           </div>
 
-          {/* Results Count */}
-          <div className="mt-4 text-sm text-gray-600">
-            Showing {filteredProducts.length} of {totalItems} products
-            {categoryName && ` in ${categoryName}`}
-            {subcategoryName && ` > ${subcategoryName}`}
-            {searchTerm && ` matching "${searchTerm}"`}
-          </div>
         </div>
       </section>
 
@@ -561,7 +741,7 @@ const Products = () => {
             {/* Desktop Sidebar Filters — hidden on mobile via hidden lg:block */}
             {showFilters && (
               <div className="hidden lg:block w-80 shrink-0">
-                <div className="bg-gray-100 rounded-lg p-6 sticky top-4">
+                <div className="bg-gray-100 rounded-lg p-6 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
                     {activeFiltersCount > 0 && (
@@ -582,10 +762,10 @@ const Products = () => {
             <div className="flex-1 min-w-0">
               {loading ? (
                 /* Product grid skeleton — mirrors the 2/2/3-column ProductCard layout below. */
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-5">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden">
-                      <div className="h-48 sm:h-64 md:h-72 w-full bg-gray-200 animate-pulse" />
+                      <div className="h-36 sm:h-40 md:h-48 w-full bg-gray-200 animate-pulse" />
                       <div className="p-4 space-y-3">
                         <div className="h-3 w-16 bg-gray-100 rounded animate-pulse" />
                         <div className="h-5 w-3/4 bg-gray-200 rounded animate-pulse" />
@@ -613,7 +793,7 @@ const Products = () => {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-5">
                     {filteredProducts.map((product, index) => (
                       <Reveal key={product.id} delay={index * 90}>
                         <ProductCard product={product} />

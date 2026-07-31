@@ -42,16 +42,6 @@ export default function Category() {
     fetchCategories();
   }, []);
 
-  const categoryCount = categories.length;
-  const maxColumns = Math.min(categoryCount, 4); // Maximum 4 columns, but adjust if fewer categories
-  
-  // Dynamic grid class based on category count
-  const getGridClass = () => {
-    if (maxColumns <= 2) return "grid-cols-1 md:grid-cols-2 items-center justify-center mx-auto";
-    if (maxColumns === 3) return "grid-cols-2 md:grid-cols-3 items-center justify-center mx-auto";
-    return "grid-cols-2 md:grid-cols-3 lg:grid-cols-3";
-  };
-
   if (loading) {
     // Skeleton mirrors the loaded section (header row + responsive category
     // grid). We render six placeholder tiles — enough to fill two rows on
@@ -67,11 +57,11 @@ export default function Category() {
             </div>
             <div className="h-10 w-32 sm:w-40 bg-gray-200 rounded-lg animate-pulse shrink-0 mx-auto lg:mx-0" />
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6 items-center justify-center mx-auto">
+          <div className="flex flex-wrap justify-center sm:justify-start gap-5 sm:gap-6 lg:gap-8">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="text-center">
-                <div className="relative w-full aspect-square mb-4 overflow-hidden rounded-md bg-gray-200 animate-pulse" />
-                <div className="h-5 w-32 bg-gray-200 rounded animate-pulse mx-auto" />
+              <div key={i} className="w-36 sm:w-44 lg:w-52 text-center">
+                <div className="relative w-full aspect-square mb-4 overflow-hidden rounded-2xl bg-gray-200 animate-pulse" />
+                <div className="h-5 w-full max-w-[8rem] bg-gray-200 rounded animate-pulse mx-auto" />
               </div>
             ))}
           </div>
@@ -114,9 +104,9 @@ export default function Category() {
           </div>
         </Reveal>
 
-        <div className={`grid ${getGridClass()} gap-6 items-center justify-center mx-auto`}>
+        <div className="flex flex-wrap justify-center sm:justify-start gap-5 sm:gap-6 lg:gap-8">
           {categories.map((category, index) => (
-            <Reveal key={category.id} delay={index * 80} className="w-full max-w-[220px] mx-auto">
+            <Reveal key={category.id} delay={index * 80} className="w-36 sm:w-44 lg:w-52">
               <Link
                 href={`/categories/${category.slug}`}
                 className="group block text-center"
