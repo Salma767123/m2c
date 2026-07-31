@@ -125,7 +125,7 @@ export default function HeroSection() {
       role="region"
       aria-label="Hero image carousel"
     >
-      <div className="relative w-full h-[150px] min-[400px]:h-[170px] sm:h-[250px] md:h-[350px] lg:h-[450px] xl:h-[650px] 2xl:h-[750px]">
+      <div className="relative w-full h-[105px] min-[400px]:h-[119px] sm:h-[175px] md:h-[245px] lg:h-[315px] xl:h-[455px] 2xl:h-[525px]">
         {/* Hero Images - fully visible on all screen sizes */}
         {slides.map((slide, index) => (
           <div

@@ -30,24 +30,28 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { companyInfoService } from '@/services/companyInfoService';
 
+// Both admin-uploaded logos are fetched together and cached for the session.
+//   primary   → companyLogo   (home / contact / about / terms / privacy / returns)
+//   secondary → secondaryLogo (header on all other pages)
+// A `null` field means the admin hasn't uploaded that logo; the secondary
+// variant then falls back to the primary, and finally to the bundled asset.
+interface LogoPair { companyLogo: string | null; secondaryLogo: string | null; }
 // `undefined` = not yet fetched (consumers should render the skeleton)
-// `null`      = fetch resolved but admin hasn't uploaded a logo (use bundled fallback)
-// `<url>`     = fetch resolved with an admin-uploaded logo URL
-let cachedLogoUrl: string | null | undefined = undefined;
-let inflightFetch: Promise<string | null> | null = null;
+let cachedLogos: LogoPair | undefined = undefined;
+let inflightFetch: Promise<LogoPair> | null = null;
 
-function loadCompanyLogo(): Promise<string | null> {
-  if (cachedLogoUrl !== undefined) return Promise.resolve(cachedLogoUrl);
+function loadCompanyLogos(): Promise<LogoPair> {
+  if (cachedLogos !== undefined) return Promise.resolve(cachedLogos);
   if (inflightFetch) return inflightFetch;
   inflightFetch = companyInfoService
     .getPublicCompanyInfo()
     .then(info => {
-      cachedLogoUrl = info.companyLogo ?? null;
-      return cachedLogoUrl;
+      cachedLogos = { companyLogo: info.companyLogo ?? null, secondaryLogo: info.secondaryLogo ?? null };
+      return cachedLogos;
     })
     .catch(() => {
-      cachedLogoUrl = null;
-      return null;
+      cachedLogos = { companyLogo: null, secondaryLogo: null };
+      return cachedLogos;
     })
     .finally(() => {
       inflightFetch = null;
@@ -75,6 +79,12 @@ interface CompanyLogoProps {
   priority?: boolean;
   /** Alt text for both the dynamic <img> and the static fallback. */
   alt?: string;
+  /**
+   * Which admin-uploaded logo to show. `'primary'` (default) uses the main
+   * company logo. `'secondary'` uses the secondary logo, falling back to the
+   * primary when no secondary has been uploaded.
+   */
+  variant?: 'primary' | 'secondary';
 }
 
 export default function CompanyLogo({
@@ -85,22 +95,30 @@ export default function CompanyLogo({
   fallbackSizes,
   priority,
   alt = 'Company Logo',
+  variant = 'primary',
 }: CompanyLogoProps) {
-  const [logoUrl, setLogoUrl] = useState<string | null | undefined>(cachedLogoUrl);
+  const [logos, setLogos] = useState<LogoPair | undefined>(cachedLogos);
 
   useEffect(() => {
-    if (cachedLogoUrl !== undefined) {
-      setLogoUrl(cachedLogoUrl);
+    if (cachedLogos !== undefined) {
+      setLogos(cachedLogos);
       return;
     }
     let cancelled = false;
-    loadCompanyLogo().then(url => {
-      if (!cancelled) setLogoUrl(url);
+    loadCompanyLogos().then(pair => {
+      if (!cancelled) setLogos(pair);
     });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // Resolve the URL for the requested variant (secondary falls back to primary).
+  const logoUrl = logos === undefined
+    ? undefined
+    : variant === 'secondary'
+      ? (logos.secondaryLogo || logos.companyLogo)
+      : logos.companyLogo;
 
   // Still loading — render skeleton in the layout box the logo will fill.
   // The skeleton bg color is NOT hardcoded here: surfaces sit on widely

@@ -160,6 +160,10 @@ export interface Product extends ProductFormData {
   id: string;
   slug?: string;
   vendorId: string;
+  // Price-negotiation economics — set when a negotiation opens/agrees and kept
+  // afterwards, so they also flag that a (now historical) negotiation exists.
+  agreedPrice?: number | null;
+  basePriceOriginal?: number | null;
   createdAt: string;
   updatedAt: string;
   variants?: ProductVariant[];
@@ -300,6 +304,11 @@ class ProductService {
     inStock?: boolean;
     tag?: string;
     colors?: string;
+    sizes?: string;
+    materials?: string;
+    fabricTypes?: string;
+    minDiscount?: number;
+    newArrivals?: boolean;
     minRating?: number;
   }): Promise<{
     success: boolean;
@@ -323,6 +332,27 @@ class ProductService {
     } catch (error: any) {
       throw new Error(error.message || 'Failed to fetch products');
     }
+  }
+
+  // Available filter facets for the storefront — colours/sizes/materials/fabric
+  // types/price range/max discount, all computed live from the real catalogue.
+  async getPublicProductFacets(params?: {
+    search?: string;
+    category?: string;
+    subCategory?: string;
+  }): Promise<{
+    success: boolean;
+    data: {
+      colors: Array<{ value: string; hex: string | null; count: number }>;
+      sizes: Array<{ value: string; count: number }>;
+      materials: Array<{ value: string; count: number }>;
+      fabricTypes: Array<{ value: string; count: number }>;
+      priceRange: { min: number; max: number };
+      maxDiscount: number;
+    };
+  }> {
+    const response = await axios.get('/products/public/facets', { params: { ...params, region: getRegion() } });
+    return response.data;
   }
 
   // Get single public product (for website - no authentication required)

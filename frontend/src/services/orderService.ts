@@ -20,6 +20,10 @@ export interface OrderItem {
     color?: string;
     colorHex?: string;
     shipmentId?: string;
+    /** Shipping mode the customer chose for this line ('AIR' | 'SHIP'). */
+    transportType?: 'AIR' | 'SHIP' | null;
+    /** Courier partner id the customer chose (see lib/couriers). */
+    courier?: string | null;
 }
 
 export interface AdminReviewData {

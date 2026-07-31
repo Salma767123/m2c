@@ -1,5 +1,6 @@
 import axios from '@/lib/axios';
-import { getCurrency } from '@/lib/currency';
+import { getCurrency, getRegion } from '@/lib/currency';
+import type { ActiveOffer } from '@/lib/offers';
 
 export interface CartItem {
   id: string;
@@ -9,6 +10,8 @@ export interface CartItem {
   price: number;
   /** Shipping mode chosen for this line — required when the product offers a choice. */
   transportType?: 'AIR' | 'SHIP' | null;
+  /** Courier partner id (see lib/couriers) chosen for this line. */
+  courier?: string | null;
   product?: {
     id: string;
     name: string;
@@ -21,6 +24,11 @@ export interface CartItem {
     inStock?: boolean;
     availableStock?: number;
     originalPrice?: number;
+    adminFixedPrice?: number;
+    priceINR?: number | null;
+    priceUSD?: number | null;
+    originalPriceINR?: number | null;
+    originalPriceUSD?: number | null;
     category?: string;
     rating?: number;
     reviews?: number;
@@ -29,6 +37,8 @@ export interface CartItem {
     singleUnitColor?: string;
     singleUnitSize?: string;
     singleUnitColorHex?: string;
+    /** Live automatic offer for this line, attached by the backend cart enrichment. */
+    activeOffer?: ActiveOffer;
   };
   variant?: {
     variantName?: string;
@@ -60,11 +70,24 @@ class CartService {
     }
   }
 
-  // Add item to cart
-  async addToCart(productId: string, quantity: number = 1, variantId?: string): Promise<CartResponse> {
+  // Add item to cart. Optionally carries the shipping choice (transport + courier)
+  // made on the product page so the line lands in the cart ready to check out.
+  async addToCart(
+    productId: string,
+    quantity: number = 1,
+    variantId?: string,
+    shipping?: { transportType?: 'AIR' | 'SHIP' | null; courier?: string | null }
+  ): Promise<CartResponse> {
     try {
       const currency = getCurrency();
-      const response = await axios.post('/cart/add', { productId, quantity, variantId, currency });
+      const response = await axios.post('/cart/add', {
+        productId,
+        quantity,
+        variantId,
+        currency,
+        ...(shipping?.transportType !== undefined ? { transportType: shipping.transportType } : {}),
+        ...(shipping?.courier !== undefined ? { courier: shipping.courier } : {}),
+      });
       const result: CartResponse = response.data;
       if (result.success && result.data) {
         this._notify(result.data.itemCount);
@@ -78,7 +101,8 @@ class CartService {
   // Get cart items
   async getCart(): Promise<CartResponse> {
     try {
-      const response = await axios.get('/cart');
+      // Region drives which offers apply and the currency they're priced in.
+      const response = await axios.get('/cart', { params: { region: getRegion() } });
       return response.data;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to fetch cart');
@@ -99,10 +123,10 @@ class CartService {
     }
   }
 
-  /** Set the shipping mode ('AIR' | 'SHIP') for one cart line. */
-  async setTransportType(itemId: string, transportType: 'AIR' | 'SHIP'): Promise<CartResponse> {
+  /** Set the shipping mode and courier for one cart line. */
+  async setShipping(itemId: string, transportType: 'AIR' | 'SHIP', courier: string): Promise<CartResponse> {
     try {
-      const response = await axios.put(`/cart/${itemId}`, { transportType });
+      const response = await axios.put(`/cart/${itemId}`, { transportType, courier });
       return response.data;
     } catch (error: any) {
       throw new Error(error?.response?.data?.error || error.message || 'Failed to set shipping method');

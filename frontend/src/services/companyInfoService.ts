@@ -4,6 +4,7 @@ export interface CompanyInfo {
   id: string;
   companyName: string;
   companyLogo?: string;
+  secondaryLogo?: string;
   companyEmail?: string;
   companyPhone?: string;
   companyWebsite?: string;
@@ -63,6 +64,7 @@ export interface UpdateBankDetailsData {
 export interface PublicCompanyInfo {
   companyName: string;
   companyLogo: string | null;
+  secondaryLogo: string | null;
   companyEmail: string | null;
   companyPhone: string | null;
   companyWebsite: string | null;
@@ -80,6 +82,7 @@ const LOGO_CACHE_KEY = 'companyInfo_public';
 const DEFAULT_INFO: PublicCompanyInfo = {
   companyName: 'M2C MarkDowns Private Limited',
   companyLogo: null,
+  secondaryLogo: null,
   companyEmail: null,
   companyPhone: null,
   companyWebsite: null,
@@ -165,13 +168,23 @@ export const companyInfoService = {
     }
   },
 
-  // Update company logo
+  // Update company logo (primary — brand pages)
   updateLogo: async (companyLogo: string) => {
     try {
       const response = await axios.put('/company-info/logo', { companyLogo });
       return response.data;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to update company logo');
+    }
+  },
+
+  // Update secondary logo (shown in the header on non-brand pages)
+  updateSecondaryLogo: async (secondaryLogo: string) => {
+    try {
+      const response = await axios.put('/company-info/logo', { secondaryLogo });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to update secondary logo');
     }
   },
 

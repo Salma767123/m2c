@@ -1,10 +1,13 @@
 const { prisma } = require('../config/database');
-const { isVisibleInRegion } = require('../utils/regionVisibility');
+const { isVisibleInRegion, normalizeRegion } = require('../utils/regionVisibility');
+const { isValidCourier } = require('../utils/couriers');
+const { resolveUsdRate, resolveUnitPrice } = require('../utils/orderCurrency');
+const { buildActiveOffer, qualifyingThresholdIds } = require('../utils/offers');
 
 // Add item to cart
 const addToCart = async (req, res) => {
   try {
-    const { productId, quantity = 1, variantId, currency = 'INR' } = req.body;
+    const { productId, quantity = 1, variantId, currency = 'INR', transportType, courier } = req.body;
     const userId = req.userId;
 
     if (!productId) {
@@ -27,6 +30,7 @@ const addToCart = async (req, res) => {
         inStock: true,
         totalStock: true,
         priceVisibility: true,
+        logisticsConfig: true,
         variants: variantId ? {
           where: { id: variantId },
           select: {
@@ -76,6 +80,32 @@ const addToCart = async (req, res) => {
       });
     }
 
+    // Shipping selection (optional at add time, validated when supplied). The
+    // product page sends the chosen transport + courier so the line arrives in the
+    // cart ready to check out; both are re-validated at order time regardless.
+    const allowedTransports = Array.isArray(product?.logisticsConfig?.transportTypes)
+      ? product.logisticsConfig.transportTypes
+      : [];
+    if (transportType != null && !allowedTransports.includes(transportType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Selected shipping method is not available for this product'
+      });
+    }
+    // The courier list is region- and mode-specific, so a courier only makes sense
+    // alongside a transport the product offers.
+    const shippingMode = transportType != null ? transportType : (allowedTransports.length === 1 ? allowedTransports[0] : null);
+    if (courier != null && !isValidCourier(courier, currency, shippingMode)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Selected courier is not available for this shipping method'
+      });
+    }
+    const shippingFields = {
+      ...(transportType !== undefined ? { transportType } : {}),
+      ...(courier !== undefined ? { courier } : {}),
+    };
+
     // Get or create cart for user
     let cart = await prisma.cart.findFirst({
       where: { userId },
@@ -121,7 +151,9 @@ const addToCart = async (req, res) => {
         data: {
           quantity: existingItem.quantity + quantity,
           price, // Update price in case it changed
-          currency
+          currency,
+          // Re-adding from the product page carries a fresh shipping choice; apply it.
+          ...shippingFields,
         }
       });
     } else {
@@ -133,7 +165,8 @@ const addToCart = async (req, res) => {
           variantId: variantId || null,
           quantity,
           price,
-          currency
+          currency,
+          ...shippingFields,
         }
       });
     }
@@ -321,6 +354,42 @@ const getCart = async (req, res) => {
       })
     );
 
+    // Attach the live offer to each line so the cart/checkout shows exactly what
+    // checkout will charge (offers apply on the selling price at order time). Uses the
+    // same resolver as createOrder, including whole-cart THRESHOLD qualification.
+    // Additive + fail-open: no live offers, or any error, leaves items untouched.
+    try {
+      const now = new Date();
+      const offers = await prisma.offer.findMany({
+        where: { isActive: true, startsAt: { lte: now }, endsAt: { gte: now } },
+      });
+      if (offers.length > 0) {
+        const currency = normalizeRegion(req.query.region) === 'US' ? 'USD' : 'INR';
+        const rate = currency === 'USD' ? await resolveUsdRate(prisma) : null;
+
+        // Whole-cart INR subtotal (pre-offer selling price) to test THRESHOLD offers.
+        let preSubtotalINR = 0;
+        for (const it of itemsWithProducts) {
+          const sku = it.variant || it.product;
+          if (sku) preSubtotalINR += resolveUnitPrice(sku, 'INR', null) * it.quantity;
+        }
+        const thresholdIds = qualifyingThresholdIds(offers, preSubtotalINR, currency, now);
+
+        for (const it of itemsWithProducts) {
+          if (!it.product) continue;
+          // Resolve against the chosen SKU's price but keep the product's id/category
+          // so scope matching (product/category) stays correct for variants.
+          const priced = it.variant
+            ? { ...it.product, priceINR: it.variant.priceINR, priceUSD: it.variant.priceUSD, adminFixedPrice: it.variant.adminFixedPrice, basePrice: it.variant.price }
+            : it.product;
+          const activeOffer = buildActiveOffer(priced, offers, currency, rate, now, it.quantity, thresholdIds);
+          if (activeOffer) it.product.activeOffer = activeOffer;
+        }
+      }
+    } catch (e) {
+      console.warn('[cart] offer enrichment skipped:', e.message);
+    }
+
     const total = itemsWithProducts.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
     res.json({
@@ -344,14 +413,15 @@ const getCart = async (req, res) => {
 const updateCartItem = async (req, res) => {
   try {
     const { itemId } = req.params;
-    const { quantity, transportType } = req.body;
+    const { quantity, transportType, courier } = req.body;
     const userId = req.userId;
 
-    // Either field may be updated independently — the cart's transport selector
-    // changes only transportType, the +/- steppers change only quantity.
+    // Any field may be updated independently — the cart's transport selector changes
+    // transportType (+ courier), the +/- steppers change only quantity.
     const wantsQuantity = quantity !== undefined;
     const wantsTransport = transportType !== undefined;
-    if (!wantsQuantity && !wantsTransport) {
+    const wantsCourier = courier !== undefined;
+    if (!wantsQuantity && !wantsTransport && !wantsCourier) {
       return res.status(400).json({
         success: false,
         error: 'Nothing to update'
@@ -406,14 +476,23 @@ const updateCartItem = async (req, res) => {
 
     // Only accept a transport the product actually offers — otherwise the order
     // would be priced with a rate the vendor never configured.
-    if (wantsTransport && transportType !== null) {
-      const allowed = Array.isArray(product?.logisticsConfig?.transportTypes)
-        ? product.logisticsConfig.transportTypes
-        : [];
-      if (!allowed.includes(transportType)) {
+    const allowed = Array.isArray(product?.logisticsConfig?.transportTypes)
+      ? product.logisticsConfig.transportTypes
+      : [];
+    if (wantsTransport && transportType !== null && !allowed.includes(transportType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Selected shipping method is not available for this product'
+      });
+    }
+    // Validate the courier against the region (from the line's currency) and the
+    // resolved transport mode (the new choice if supplied, else the stored one).
+    if (wantsCourier && courier !== null) {
+      const mode = wantsTransport ? transportType : (cartItem.transportType || (allowed.length === 1 ? allowed[0] : null));
+      if (!isValidCourier(courier, cartItem.currency, mode)) {
         return res.status(400).json({
           success: false,
-          error: 'Selected shipping method is not available for this product'
+          error: 'Selected courier is not available for this shipping method'
         });
       }
     }
@@ -423,6 +502,7 @@ const updateCartItem = async (req, res) => {
       data: {
         ...(wantsQuantity ? { quantity } : {}),
         ...(wantsTransport ? { transportType } : {}),
+        ...(wantsCourier ? { courier } : {}),
       }
     });
 

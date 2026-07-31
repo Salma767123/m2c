@@ -80,6 +80,10 @@ export default function PriceNegotiationModal({
   const askPrice = product?.basePriceOriginal ?? product?.basePrice ?? null;
   // A price is settled: there's an agreed figure and no offer is on the table.
   const isAgreed = !!product?.agreedPrice && !openOffer;
+  // Once the product is finalised the negotiation is frozen — we still show the
+  // full history, but every action (counter/accept/decline/re-open) is hidden so
+  // the record stays visible without being editable.
+  const isFinalised = product?.approvalStatus === 'APPROVED' || product?.approvalStatus === 'REJECTED';
 
   const act = async (fn: () => Promise<any>, successMsg: string) => {
     setSubmitting(true);
@@ -128,7 +132,7 @@ export default function PriceNegotiationModal({
           <div>
             <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
               <Handshake className="h-5 w-5 text-brand-500" />
-              Review &amp; Negotiate Price
+              {isFinalised ? 'Negotiation History' : 'Review & Negotiate Price'}
             </h3>
             <p className="text-sm text-slate-500">{productName || product?.name}</p>
           </div>
@@ -217,7 +221,15 @@ export default function PriceNegotiationModal({
 
             {/* ── Actions ─────────────────────────────────────────────── */}
             <div className="rounded-xl border border-slate-200 p-4">
-              {awaitingVendor ? (
+              {isFinalised ? (
+                <p className="text-sm text-slate-600">
+                  This product is{' '}
+                  <strong className={product?.approvalStatus === 'APPROVED' ? 'text-green-700' : 'text-red-700'}>
+                    {product?.approvalStatus === 'APPROVED' ? 'approved' : 'rejected'}
+                  </strong>
+                  . The negotiation is closed — the history above is kept for reference and can no longer be changed.
+                </p>
+              ) : awaitingVendor ? (
                 <p className="text-sm text-amber-700">
                   Waiting for the vendor to respond to your offer of <strong>{money(openOffer?.proposedPrice)}</strong>.
                   You can’t send another offer until they reply.
@@ -381,12 +393,12 @@ export default function PriceNegotiationModal({
             </div>
 
             {/* Accepting the vendor's price outright — no negotiation needed. */}
-            {!openOffer && !product?.agreedPrice && (
+            {!isFinalised && !openOffer && !product?.agreedPrice && (
               <p className="text-center text-xs text-slate-500">
                 Happy with {money(product?.basePrice)}? Close this and use <strong>Approve &amp; Set Price</strong> to publish directly.
               </p>
             )}
-            {product?.agreedPrice && (
+            {!isFinalised && product?.agreedPrice && (
               <div className="rounded-xl bg-green-50 px-4 py-3 text-center text-sm text-green-800 ring-1 ring-green-200">
                 Price agreed. Close this and use <strong>Approve &amp; Set Price</strong> to set the margin and publish.
               </div>

@@ -32,6 +32,11 @@ interface VendorProductRequest {
   approvalStatus: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | 'NEGOTIATION'
   approvedAt?: string
   rejectionReason?: string
+  // Negotiation economics — set the moment a negotiation is opened/agreed and
+  // never cleared, so they double as a "this product had a negotiation" flag
+  // that survives final approval/rejection.
+  agreedPrice?: number | null
+  basePriceOriginal?: number | null
   createdAt: string
   vendor: {
     id: string
@@ -102,6 +107,12 @@ const getApprovalStatusBadge = (status: string) => {
       return <Badge className="bg-slate-100 text-slate-600 border border-slate-200 font-bold">{status}</Badge>
   }
 }
+
+// A negotiation was raised on this product if either economics field is set —
+// both persist after final approval/rejection, so we can still surface the
+// (now read-only) history.
+const hasNegotiationHistory = (r: { agreedPrice?: number | null; basePriceOriginal?: number | null }) =>
+  r.agreedPrice != null || r.basePriceOriginal != null
 
 export default function VendorProductRequests() {
   const router = useRouter()
@@ -447,17 +458,26 @@ export default function VendorProductRequests() {
                               <Eye className="h-4 w-4" />
                             </button>
                           )}
+                          {/* Negotiation access — persists after approval/rejection.
+                              While QC-approved / under negotiation it's the live
+                              "Review & Negotiate" action; once finalised it stays as a
+                              read-only "View Negotiation History" so nothing is hidden. */}
+                          {(() => {
+                            const canNegotiate = (request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'NEGOTIATION') && hasPermission('vendor_product_requests:approve')
+                            const canViewHistory = (request.approvalStatus === 'APPROVED' || request.approvalStatus === 'REJECTED') && hasNegotiationHistory(request) && hasPermission('vendor_product_requests:view')
+                            if (!canNegotiate && !canViewHistory) return null
+                            return (
+                              <button
+                                title={canNegotiate ? 'Review & Negotiate Price' : 'View Negotiation History'}
+                                onClick={() => setNegotiateFor({ id: request.id, name: request.name })}
+                                className="p-2 rounded-lg text-purple-600 hover:text-purple-700 hover:bg-purple-50 transition-colors"
+                              >
+                                <Handshake className="h-4 w-4" />
+                              </button>
+                            )
+                          })()}
                           {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'REINSPECTION' || request.approvalStatus === 'NEGOTIATION') && (
                             <>
-                              {(request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'NEGOTIATION') && hasPermission('vendor_product_requests:approve') && (
-                                <button
-                                  title="Review & Negotiate Price"
-                                  onClick={() => setNegotiateFor({ id: request.id, name: request.name })}
-                                  className="p-2 rounded-lg text-purple-600 hover:text-purple-700 hover:bg-purple-50 transition-colors"
-                                >
-                                  <Handshake className="h-4 w-4" />
-                                </button>
-                              )}
                               {(request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'NEGOTIATION') && hasPermission('vendor_product_requests:approve') && (
                                 <button
                                   title="Final Approve & Set Price"

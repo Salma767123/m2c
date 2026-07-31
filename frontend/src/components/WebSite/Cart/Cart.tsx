@@ -9,7 +9,9 @@ import { publicProductService, PublicProduct } from "@/services/publicProductSer
 import { userAuthService } from "@/services/userAuthService"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, getCurrency, convertINRtoUSD } from "@/lib/currency"
+import { applyOfferToPrice, type ActiveOffer } from "@/lib/offers"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
+import { courierName } from "@/lib/couriers"
 import Reveal from "@/components/WebSite/Shared/Reveal"
 import {
   ShoppingCart,
@@ -34,6 +36,9 @@ interface OrderItem {
   name: string
   price: number
   originalPrice?: number
+  /** Automatic offer applied to this line + the pre-offer price to strike through. */
+  activeOffer?: ActiveOffer
+  offerStrikePrice?: number
   images: string[]
   category: string
   rating?: number
@@ -47,6 +52,8 @@ interface OrderItem {
   gstPercentage?: number
   /** Chosen shipping mode for this line. Required when the product offers a choice. */
   transportType?: 'AIR' | 'SHIP' | null
+  /** Chosen courier partner id (see lib/couriers). Required for shipping products. */
+  courier?: string | null
   variantDetails?: {
     size: string
     color: string
@@ -117,12 +124,21 @@ export default function Order() {
                   };
                 }
 
+                // Automatic offer (attached by the public product endpoint).
+                const activeOffer: ActiveOffer | undefined = (product as any).activeOffer;
+                const effectivePrice = activeOffer
+                  ? applyOfferToPrice(finalPrice, activeOffer, getCurrency(), item.quantity, convertINRtoUSD)
+                  : finalPrice;
+                const offerStrikePrice = activeOffer && effectivePrice < finalPrice ? finalPrice : undefined;
+
                 return {
                   id: item.id, // Use local cart item ID
                   productId: item.productId,
                   name: product.name,
-                  price: finalPrice,
+                  price: effectivePrice,
                   originalPrice: getRegionalOriginalPrice(product as any) ?? undefined,
+                  activeOffer,
+                  offerStrikePrice,
                   images: finalImages,
                   category: product.category,
                   rating: product.rating,
@@ -178,12 +194,22 @@ export default function Order() {
                 ? (item.variant.discount ?? item.product?.discount)
                 : item.product?.discount;
 
+              // Automatic offer (attached by the backend). Bake it into `price` so the
+              // subtotal, tax and coupon math all use exactly what checkout will charge.
+              const activeOffer: ActiveOffer | undefined = item.product?.activeOffer;
+              const effectivePrice = activeOffer
+                ? applyOfferToPrice(livePrice, activeOffer, getCurrency(), item.quantity, convertINRtoUSD)
+                : livePrice;
+              const offerStrikePrice = activeOffer && effectivePrice < livePrice ? livePrice : undefined;
+
               return {
                 id: item.id,
                 productId: item.productId,
                 name: item.product?.name || 'Unknown Product',
-                price: livePrice,
+                price: effectivePrice,
                 originalPrice: liveOriginalPrice ?? undefined,
+                activeOffer,
+                offerStrikePrice,
                 images: imgArray,
                 category: item.product?.category || '',
                 rating: item.product?.rating,
@@ -196,6 +222,7 @@ export default function Order() {
                 discount: liveDiscount,
                 gstPercentage: item.product?.gstPercentage,
                 transportType: item.transportType ?? null,
+                courier: item.courier ?? null,
                 variantDetails: hasVariant ? {
                   size: item.variant.size,
                   color: item.variant.color,
@@ -310,9 +337,13 @@ export default function Order() {
     return Array.isArray(types) ? types : []
   }
 
-  /** A line still needs a decision from the customer before checkout. */
-  const needsTransportChoice = (item: OrderItem) =>
-    transportOptionsFor(item).length > 1 && !item.transportType
+  /** A line still needs a shipping decision (transport and/or courier) before checkout. */
+  const needsTransportChoice = (item: OrderItem) => {
+    const opts = transportOptionsFor(item)
+    if (opts.length === 0) return false // no logistics — nothing to choose
+    if (opts.length > 1 && !item.transportType) return true // must pick a mode
+    return !item.courier // shipping products must have a courier
+  }
 
   const updateQuantity = (id: string, productId: string, newQuantity: number) => {
     if (newQuantity < 1) {
@@ -589,10 +620,17 @@ export default function Order() {
 
                         {/* Price and Quantity */}
                         <div className="flex items-center justify-between flex-wrap gap-3 mt-3 sm:mt-4">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-lg sm:text-xl font-bold text-slate-900">{formatPrice(item.price)}</span>
-                            {item.originalPrice && (
+                            {item.offerStrikePrice ? (
+                              <span className="text-xs sm:text-sm text-slate-500 line-through">{formatPrice(item.offerStrikePrice)}</span>
+                            ) : item.originalPrice ? (
                               <span className="text-xs sm:text-sm text-slate-500 line-through">{formatPrice(item.originalPrice)}</span>
+                            ) : null}
+                            {item.activeOffer && (
+                              <span className="inline-flex items-center rounded-full bg-linear-to-r from-[#e01a1b] to-[#ff5a36] px-2 py-0.5 text-[10px] font-bold text-white">
+                                {item.activeOffer.badge}
+                              </span>
                             )}
                           </div>
 
@@ -628,14 +666,14 @@ export default function Order() {
                           {/* Shipping method — only when the product actually offers a
                               choice. AIR and SHIP carry different rates and delivery
                               windows, so this changes what the customer pays. */}
-                          {transportOptionsFor(item).length > 1 && (() => {
-                            // The rate/delivery choice lives on the product page (its
-                            // Shipping card). The cart deep-links there — highlighting
+                          {transportOptionsFor(item).length >= 1 && (() => {
+                            // The rate/delivery + courier choice lives on the product page
+                            // (its Shipping card). The cart deep-links there — highlighting
                             // that card — and the product page writes the choice back to
                             // this line and returns here.
                             const cfg = (item as any).product?.logisticsConfig || {}
                             const shippingHref = `/products/${item.productId}?selectShipping=1&cartItem=${item.id}`
-                            if (!item.transportType) {
+                            if (needsTransportChoice(item)) {
                               return (
                                 <Link
                                   href={shippingHref}
@@ -648,13 +686,16 @@ export default function Order() {
                                 </Link>
                               )
                             }
-                            const days = item.transportType === 'AIR' ? cfg.airDeliveryDays : cfg.shipDeliveryDays
+                            const mode = item.transportType || (Array.isArray(cfg.transportTypes) ? cfg.transportTypes[0] : undefined)
+                            const days = mode === 'AIR' ? cfg.airDeliveryDays : cfg.shipDeliveryDays
                             return (
                               <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3.5 py-2.5">
                                 <Truck className="w-4 h-4 text-slate-500" />
                                 <span className="text-xs font-medium text-slate-700">
-                                  Shipping: <span className="font-semibold text-slate-900">{item.transportType === 'AIR' ? 'Air' : 'Sea'}</span>
+                                  Shipping: <span className="font-semibold text-slate-900">{mode === 'AIR' ? 'Air' : 'Sea'}</span>
                                   {days ? <span className="text-slate-400"> · {days} days</span> : null}
+                                  {item.courier ? <span className="text-slate-400"> · </span> : null}
+                                  {item.courier ? <span className="font-semibold text-slate-900">{courierName(item.courier)}</span> : null}
                                 </span>
                                 <Link href={shippingHref} className="text-xs font-semibold text-[#e01a1b] hover:underline ml-1">
                                   Change

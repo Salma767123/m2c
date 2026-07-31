@@ -372,45 +372,57 @@ const CouponModal = ({
                         <div>
                           <label className="block text-sm font-semibold text-slate-700 mb-2">
                             Discount Value <span className="text-red-500">*</span>
+                            <span className="text-slate-400 text-xs font-normal ml-1">{formData.discountType === 'PERCENTAGE' ? '(%)' : '(₹ INR)'}</span>
                           </label>
-                          <input
-                            type="number"
-                            required
-                            min="0"
-                            value={formData.discountValue || ''}
-                            onChange={(e) => setFormData({ ...formData, discountValue: Number(e.target.value) })}
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                            placeholder={formData.discountType === 'PERCENTAGE' ? '10' : '200'}
-                          />
+                          <div className="relative">
+                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{formData.discountType === 'PERCENTAGE' ? '%' : '₹'}</span>
+                            <input
+                              type="number"
+                              required
+                              min="0"
+                              value={formData.discountValue || ''}
+                              onChange={(e) => setFormData({ ...formData, discountValue: Number(e.target.value) })}
+                              className="w-full pl-8 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
+                              placeholder={formData.discountType === 'PERCENTAGE' ? '10' : '200'}
+                            />
+                          </div>
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-semibold text-slate-700 mb-2">
                             Min Purchase <span className="text-red-500">*</span>
+                            <span className="text-slate-400 text-xs font-normal ml-1">(₹ INR)</span>
                           </label>
-                          <input
-                            type="number"
-                            required
-                            min="0"
-                            value={formData.minPurchaseAmount || ''}
-                            onChange={(e) => setFormData({ ...formData, minPurchaseAmount: Number(e.target.value) })}
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                            placeholder="500"
-                          />
+                          <div className="relative">
+                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₹</span>
+                            <input
+                              type="number"
+                              required
+                              min="0"
+                              value={formData.minPurchaseAmount || ''}
+                              onChange={(e) => setFormData({ ...formData, minPurchaseAmount: Number(e.target.value) })}
+                              className="w-full pl-8 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
+                              placeholder="500"
+                            />
+                          </div>
                         </div>
                         <div>
                           <label className="block text-sm font-semibold text-slate-700 mb-2">
                             Max Discount <span className="text-slate-500 text-xs">(Optional)</span>
+                            <span className="text-slate-400 text-xs font-normal ml-1">(₹ INR)</span>
                           </label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={formData.maxDiscountAmount || ''}
-                            onChange={(e) => setFormData({ ...formData, maxDiscountAmount: Number(e.target.value) })}
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                            placeholder="100"
-                          />
+                          <div className="relative">
+                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₹</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={formData.maxDiscountAmount || ''}
+                              onChange={(e) => setFormData({ ...formData, maxDiscountAmount: Number(e.target.value) })}
+                              className="w-full pl-8 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
+                              placeholder="100"
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>

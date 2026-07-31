@@ -63,6 +63,9 @@ export default function VendorNegotiationModal({
   const awaitingMe = data?.awaiting === 'VENDOR';
   const roundsLeft = data ? data.maxRounds - data.roundsUsed : 0;
   const askPrice = product?.basePriceOriginal ?? product?.basePrice ?? null;
+  // Once the product is approved/rejected the negotiation is frozen — show the
+  // history read-only rather than hiding it.
+  const isFinalised = product?.approvalStatus === 'APPROVED' || product?.approvalStatus === 'REJECTED';
 
   const act = async (fn: () => Promise<any>, msg: string) => {
     setSubmitting(true);
@@ -116,7 +119,7 @@ export default function VendorNegotiationModal({
           <div>
             <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
               <Handshake className="h-5 w-5 text-brand-500" />
-              Price Negotiation
+              {isFinalised ? 'Negotiation History' : 'Price Negotiation'}
             </h3>
             <p className="text-sm text-slate-500">{productName || product?.name}</p>
           </div>
@@ -160,7 +163,13 @@ export default function VendorNegotiationModal({
             </div>
 
             {/* ── Response controls ─────────────────────────────────────── */}
-            {awaitingMe && openOffer ? (
+            {isFinalised ? (
+              <p className={`rounded-xl px-4 py-3 text-sm ring-1 ${product?.approvalStatus === 'APPROVED' ? 'bg-green-50 text-green-800 ring-green-200' : 'bg-red-50 text-red-800 ring-red-200'}`}>
+                This product is <strong>{product?.approvalStatus === 'APPROVED' ? 'approved' : 'rejected'}</strong>
+                {product?.agreedPrice != null && <> at an agreed price of <strong>{money(product.agreedPrice)}</strong></>}.
+                The negotiation is closed — this history is kept for your reference.
+              </p>
+            ) : awaitingMe && openOffer ? (
               <div className="rounded-xl border border-slate-200 p-4">
                 {rejectStage === 'idle' && (
                   <>

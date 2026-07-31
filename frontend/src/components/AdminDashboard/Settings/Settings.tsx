@@ -89,6 +89,7 @@ export default function Settings() {
   const [companyInfo, setCompanyInfo] = useState({
     companyName: "M2C Marketplace Pvt Ltd",
     companyLogo: "",
+    secondaryLogo: "",
     gstNumber: "29ABCDE1234F1Z5",
     panNumber: "ABCDE1234F",
     cinNumber: "U74999KA2020PTC123456",
@@ -130,6 +131,8 @@ export default function Settings() {
   const [loadingCompanyInfo, setLoadingCompanyInfo] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadingSecondaryLogo, setUploadingSecondaryLogo] = useState(false);
+  const [secondaryLogoPreview, setSecondaryLogoPreview] = useState<string | null>(null);
 
   // Password visibility states
   const [showRazorpaySecret, setShowRazorpaySecret] = useState(false);
@@ -192,6 +195,7 @@ export default function Settings() {
             setCompanyInfo({
               companyName: companyResponse.data.companyName || "",
               companyLogo: companyResponse.data.companyLogo || "",
+              secondaryLogo: companyResponse.data.secondaryLogo || "",
               gstNumber: companyResponse.data.gstNumber || "",
               panNumber: companyResponse.data.panNumber || "",
               cinNumber: companyResponse.data.cinNumber || "",
@@ -416,6 +420,55 @@ export default function Settings() {
     setLogoPreview(null);
     // Reset file input
     const fileInput = document.getElementById('logo-upload') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
+  };
+
+  // ── Secondary logo (shown in the header on non-brand pages) ──
+  const handleSecondaryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showErrorToast("Invalid File", "Please upload an image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showErrorToast("File Too Large", "Please upload an image smaller than 5MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setSecondaryLogoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveSecondaryLogo = async () => {
+    if (!secondaryLogoPreview) return;
+
+    try {
+      setUploadingSecondaryLogo(true);
+      const response = await companyInfoService.updateSecondaryLogo(secondaryLogoPreview);
+
+      if (response.success) {
+        setCompanyInfo(prev => ({
+          ...prev,
+          secondaryLogo: secondaryLogoPreview
+        }));
+        setSecondaryLogoPreview(null);
+        showSuccessToast("Logo Saved", "Secondary logo has been saved successfully");
+      }
+    } catch (error: any) {
+      showErrorToast("Save Failed", error.message || "Failed to save secondary logo");
+    } finally {
+      setUploadingSecondaryLogo(false);
+    }
+  };
+
+  const handleCancelSecondaryLogo = () => {
+    setSecondaryLogoPreview(null);
+    const fileInput = document.getElementById('secondary-logo-upload') as HTMLInputElement;
     if (fileInput) fileInput.value = '';
   };
 
@@ -909,8 +962,9 @@ export default function Settings() {
                 <div className="p-2 bg-brand-100 rounded-lg">
                   <ImageIcon className="w-5 h-5 text-brand-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900">Company Logo</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Primary Logo</h3>
               </div>
+              <p className="text-xs text-slate-500 mb-4 -mt-2">Shown in the header on Home, Contact, About, Terms &amp; Conditions, Privacy Policy and Returns &amp; FAQ pages.</p>
               <div className="flex items-center gap-6">
                 <div className="w-32 h-32 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center bg-slate-50">
                   {logoPreview || companyInfo.companyLogo ? (
@@ -968,6 +1022,80 @@ export default function Settings() {
                     )}
                   </div>
                   {logoPreview && (
+                    <p className="text-xs text-brand-600 mt-2">Preview - Click "Save Logo" to upload</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Secondary Logo — shown in the header on all other pages */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-brand-100 rounded-lg">
+                  <ImageIcon className="w-5 h-5 text-brand-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900">Secondary Logo</h3>
+              </div>
+              <p className="text-xs text-slate-500 mb-4 -mt-2">Shown in the header on all other pages (Products, Categories, Cart, Checkout, Profile, Orders&hellip;). If left empty, the primary logo is used everywhere.</p>
+              <div className="flex items-center gap-6">
+                <div className="w-32 h-32 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center bg-slate-50">
+                  {secondaryLogoPreview || companyInfo.secondaryLogo ? (
+                    <img
+                      src={secondaryLogoPreview || companyInfo.secondaryLogo}
+                      alt="Secondary Logo"
+                      className="w-full h-full object-contain rounded-lg"
+                    />
+                  ) : (
+                    <div className="text-center">
+                      <ImageIcon className="h-12 w-12 text-slate-400 mx-auto mb-2" />
+                      <p className="text-xs text-slate-500">No logo</p>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-slate-600 mb-3">Upload the secondary logo. Recommended size: 512x512px</p>
+                  <input
+                    type="file"
+                    id="secondary-logo-upload"
+                    accept="image/*"
+                    onChange={handleSecondaryLogoUpload}
+                    disabled={currentUser.role !== "super_admin" || uploadingSecondaryLogo}
+                    className="hidden"
+                  />
+                  <div className="flex items-center gap-2">
+                    <label
+                      htmlFor="secondary-logo-upload"
+                      className={`flex items-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer ${currentUser.role !== "super_admin" || uploadingSecondaryLogo || secondaryLogoPreview
+                        ? "opacity-50 cursor-not-allowed pointer-events-none"
+                        : ""
+                        }`}
+                    >
+                      <Upload className="h-4 w-4" />
+                      Choose Logo
+                    </label>
+                    {secondaryLogoPreview && canManageSettings && (
+                      <>
+                        <button
+                          onClick={handleSaveSecondaryLogo}
+                          disabled={uploadingSecondaryLogo}
+                          className="flex items-center gap-2 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Save className="h-4 w-4" />
+                          {uploadingSecondaryLogo ? "Saving..." : "Save Logo"}
+                        </button>
+                        <button
+                          onClick={handleCancelSecondaryLogo}
+                          disabled={uploadingSecondaryLogo}
+                          className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {secondaryLogoPreview && (
                     <p className="text-xs text-brand-600 mt-2">Preview - Click "Save Logo" to upload</p>
                   )}
                 </div>

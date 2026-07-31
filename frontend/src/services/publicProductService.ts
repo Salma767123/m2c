@@ -1,5 +1,6 @@
 import axios from '@/lib/axios';
 import { getRegion } from '@/lib/currency';
+import type { ActiveOffer } from '@/lib/offers';
 
 export interface PublicProduct {
   id: string;
@@ -73,6 +74,9 @@ export interface PublicProduct {
     totalDays: number;
   };
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
+  // Live automatic offer for this product in the current region, attached by the
+  // backend enrichment. Absent when no offer applies.
+  activeOffer?: ActiveOffer;
 }
 
 export interface ProductsResponse {
@@ -121,7 +125,7 @@ class PublicProductService {
     try {
       const response = await axios.get('/products/public', {
         params: {
-          search: tag,
+          tag,
           limit,
           sortBy: 'createdAt',
           sortOrder: 'desc',

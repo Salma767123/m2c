@@ -77,6 +77,23 @@ class CouponService {
         }
     }
 
+    // Public promotional coupon messages (e.g. "Use code SAVE10 for 10% off") for the
+    // home notice board. Returns [] on any error so the board never breaks the page.
+    async getPromotionalCoupons(limit = 10): Promise<Array<{ message: string; image: string | null; link: string }>> {
+        try {
+            const response = await axios.get('/coupons/promotional', { params: { limit }, timeout: 5000 });
+            const arr = response.data?.success && Array.isArray(response.data.data) ? response.data.data : [];
+            // Tolerate both the new {message,image,link} shape and the old string[] shape.
+            return arr
+                .map((c: any) => (typeof c === 'string'
+                    ? { message: c, image: null, link: '/products' }
+                    : { message: c?.message, image: c?.image ?? null, link: c?.link || '/products' }))
+                .filter((c: { message?: string }) => c.message && c.message.trim());
+        } catch {
+            return [];
+        }
+    }
+
     async getPopupCoupon(category: string): Promise<PopupCoupon | null> {
         try {
             const response = await axios.get('/coupons/popup', { params: { category }, timeout: 5000 });

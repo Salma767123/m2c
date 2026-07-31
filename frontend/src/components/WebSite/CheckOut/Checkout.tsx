@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
 import { formatPrice, getCurrency, getRegionalPrice, convertUSDtoINR, convertINRtoUSD } from '@/lib/currency'
+import { applyOfferToPrice, type ActiveOffer } from '@/lib/offers'
 import ShippingForm from "./CheckoutProcess/ShippingForm"
 import PaymentForm from "./CheckoutProcess/PaymentForm"
 import ReviewOrder from "./CheckoutProcess/ReviewOrder"
@@ -327,11 +328,14 @@ export default function Checkout() {
   // True when Step 1 can proceed: either a saved address is selected, or the new-address form is valid.
   const canAdvanceShipping = useNewAddress ? shippingValid : !!selectedAddressId
 
-  // The server rejects an order whose line has an unresolved shipping mode, so
-  // block here too — reaching /checkout directly must not bypass the cart's choice.
+  // The server rejects an order whose line has an unresolved shipping mode or missing
+  // courier, so block here too — reaching /checkout directly must not bypass the
+  // cart's choice. A shipping product (>=1 transport) always needs a courier.
   const itemsMissingTransport = cartItems.filter((item) => {
     const types = (item.product as any)?.logisticsConfig?.transportTypes
-    return Array.isArray(types) && types.length > 1 && !(item as any).transportType
+    if (!Array.isArray(types) || types.length === 0) return false
+    if (types.length > 1 && !(item as any).transportType) return true
+    return !(item as any).courier
   })
 
   // If the user opted to save a new address to the address book, persist it before advancing.
@@ -441,17 +445,18 @@ export default function Checkout() {
     })
   }
 
-  /** Resolve the correct regional price for a checkout cart item */
+  /** Resolve the correct regional price for a checkout cart item, offer applied.
+   *  Applying the offer here flows it into subtotal, tax, total and therefore the
+   *  Razorpay amount — which the server's createOrder re-derives and reconciles, so
+   *  the quoted total always equals the charged total. */
   const getItemPrice = (item: CartItem) => {
-    // Use variant regional pricing if variant exists, otherwise product pricing
-    if (item.variant) {
-      return getRegionalPrice(item.variant as any)
-    }
-    if (item.product) {
-      return getRegionalPrice(item.product as any)
-    }
-    // Fallback to stored cart price
-    return item.price
+    const base = item.variant
+      ? getRegionalPrice(item.variant as any)
+      : item.product
+        ? getRegionalPrice(item.product as any)
+        : item.price
+    const offer: ActiveOffer | undefined = item.product?.activeOffer
+    return offer ? applyOfferToPrice(base, offer, getCurrency(), item.quantity, convertINRtoUSD) : base
   }
 
   const calculateTotals = () => {
@@ -1028,7 +1033,14 @@ export default function Checkout() {
                             )}
                           </div>
                         </div>
-                        <span className="font-medium text-slate-900">{formatPrice(getItemPrice(item) * item.quantity)}</span>
+                        <div className="flex flex-col items-end">
+                          <span className="font-medium text-slate-900">{formatPrice(getItemPrice(item) * item.quantity)}</span>
+                          {item.product?.activeOffer && (
+                            <span className="mt-0.5 inline-flex items-center rounded-full bg-[#e01a1b]/10 text-[#e01a1b] px-1.5 py-0.5 text-[9px] font-bold">
+                              {item.product.activeOffer.badge}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     )
                   })}

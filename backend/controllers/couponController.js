@@ -336,30 +336,32 @@ const getPromotionalCoupons = async (req, res) => {
                 description: true,
                 discountType: true,
                 discountValue: true,
-                isActive: true
+                isActive: true,
+                popupImage: true, // admin-uploaded image, shown as the card background
+                applicableCategories: true // where the coupon applies → card links there
             },
             take: parseInt(limit),
             orderBy: { createdAt: 'desc' }
         });
 
-        // Transform coupons into promotional messages
-        const promotionalMessages = coupons.map(coupon => {
-            // Use description if available, otherwise create from coupon data
-            if (coupon.description && coupon.description.trim()) {
-                return coupon.description;
-            }
-            
-            // Create promotional message from coupon data
-            const discountText = coupon.discountType === 'PERCENTAGE' 
-                ? `${coupon.discountValue}% off`
-                : `₹${coupon.discountValue} off`;
-            
-            return `Use code ${coupon.code} for ${discountText}`;
+        // Transform coupons into promotional cards { message, image, link }.
+        const promotionalCards = coupons.map(coupon => {
+            // Use description if available, otherwise build a message from coupon data.
+            const message = (coupon.description && coupon.description.trim())
+                ? coupon.description
+                : `Use code ${coupon.code} for ${coupon.discountType === 'PERCENTAGE' ? `${coupon.discountValue}% off` : `₹${coupon.discountValue} off`}`;
+
+            // The card should take the shopper to where the coupon applies: the first
+            // applicable category's listing, else the full catalogue.
+            const cat = Array.isArray(coupon.applicableCategories) ? coupon.applicableCategories.find(Boolean) : null;
+            const link = cat ? `/products?category=${encodeURIComponent(cat)}` : '/products';
+
+            return { message, image: coupon.popupImage || null, link };
         });
 
         res.json({
             success: true,
-            data: promotionalMessages.filter(msg => msg && msg.trim()) // Filter out empty messages
+            data: promotionalCards.filter(c => c.message && c.message.trim())
         });
     } catch (error) {
         console.error('Get promotional coupons error:', error);
