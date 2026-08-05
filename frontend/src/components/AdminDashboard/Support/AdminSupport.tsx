@@ -7,7 +7,6 @@ import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
 import DateRangeCalendar from "@/components/Shared/DateRangeCalendar";
-import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import supportService, { SupportTicket } from "@/services/supportService";
 import { hasPermission } from "@/lib/auth";
 import { useEffect } from "react";
@@ -165,17 +164,16 @@ export default function AdminSupport({ scope = "all" }: { scope?: SupportScope }
   ];
 
   return (
-    <div className="p-6 space-y-6">
-      <Breadcrumb />
+    <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{SCOPE_TITLE[scope].title}</h1>
-          <p className="text-slate-600 mt-1">{SCOPE_TITLE[scope].subtitle}</p>
+          <h1 className="text-xl font-bold text-slate-900">{SCOPE_TITLE[scope].title}</h1>
+          <p className="text-sm text-slate-500">{SCOPE_TITLE[scope].subtitle}</p>
         </div>
       </div>
 
       {/* Interactive metric cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {metricCards.map(({ key, label, subtitle, count, Icon, iconBg, iconColor, countColor, activeClass }) => {
           const isActive = statusFilter === key;
           const pct = stats.total > 0 && key !== "all" ? Math.round((count / stats.total) * 100) : null;
@@ -187,15 +185,15 @@ export default function AdminSupport({ scope = "all" }: { scope?: SupportScope }
                 isActive ? activeClass : "border-slate-200/80 hover:border-slate-300"
               }`}
             >
-              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
-                <span className="text-sm font-medium text-slate-500">{label}</span>
+              <div className="flex flex-row items-center justify-between px-3.5 pt-3 pb-1">
+                <span className="text-[13px] font-medium text-slate-500">{label}</span>
                 <div className={`p-1.5 rounded-lg ${iconBg} transition-transform duration-150 group-hover:scale-110`}>
                   <Icon className={`h-4 w-4 ${iconColor}`} />
                 </div>
               </div>
-              <div className="px-4 pb-4">
-                <div className={`text-2xl font-bold ${countColor}`}>{count}</div>
-                <p className="text-xs text-slate-400 mt-0.5">{pct !== null ? `${pct}% of total` : subtitle}</p>
+              <div className="px-3.5 pb-3">
+                <div className={`text-xl font-bold ${countColor}`}>{count}</div>
+                <p className="text-[11px] text-slate-400 mt-0.5">{pct !== null ? `${pct}% of total` : subtitle}</p>
               </div>
             </button>
           );
@@ -276,9 +274,10 @@ export default function AdminSupport({ scope = "all" }: { scope?: SupportScope }
       </Card>
 
       {/* Tickets Table */}
-      <Card>
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
         <Table>
-          <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
+          <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11 [&_th]:px-4">
             <TableRow>
               <TableHead>Ticket ID</TableHead>
               <TableHead>Raised By</TableHead>
@@ -293,7 +292,7 @@ export default function AdminSupport({ scope = "all" }: { scope?: SupportScope }
           <TableBody>
             {paginatedItems.length > 0 ? (
               paginatedItems.map((ticket) => (
-                <TableRow key={ticket.id} className="hover:bg-slate-50/60 transition-colors">
+                <TableRow key={ticket.id} className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0">
                   <TableCell>
                     <div className="font-mono font-medium text-slate-900">{ticket.ticketId}</div>
                   </TableCell>
@@ -360,17 +359,18 @@ export default function AdminSupport({ scope = "all" }: { scope?: SupportScope }
             )}
           </TableBody>
         </Table>
-      </Card>
+        </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-end gap-3 text-sm">
+        <div className="flex items-center justify-end gap-3 text-sm px-4 py-3 border-t border-slate-100">
           <div className="flex items-center gap-1">
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-            {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+            {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/20' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

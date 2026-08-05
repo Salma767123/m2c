@@ -337,7 +337,7 @@ export default function CategoryLists() {
   const renderCategoryRow = (category: Category, isSubcategory = false) => {
     if (isSubcategory || !canDrag) {
       return (
-        <TableRow key={category.id} className={isSubcategory ? 'bg-slate-50' : ''}>
+        <TableRow key={category.id} className={`transition-colors duration-150 border-b border-slate-100 last:border-0 ${isSubcategory ? 'bg-slate-50 hover:bg-slate-100' : 'hover:bg-slate-50/60'}`}>
           <TableCell className="text-center">
             <span className="text-sm font-medium text-slate-500">{category.sortOrder}</span>
           </TableCell>
@@ -438,12 +438,12 @@ export default function CategoryLists() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Categories</h1>
-          <p className="text-slate-600">Manage your product categories and subcategories</p>
+          <h1 className="text-xl font-bold text-slate-900">Categories</h1>
+          <p className="text-sm text-slate-500">Manage your product categories and subcategories</p>
         </div>
         {hasPermission('categories:create') && (
           <Link href="/admin/dashboard/categories/add">
@@ -456,7 +456,7 @@ export default function CategoryLists() {
       </div>
 
       {/* Summary Stats — styled like the Vendor Product Requests metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Main Categories',     subtitle: 'Root level categories',        value: stats?.total || 0,        Icon: Folders,     iconBg: 'bg-brand-50',   iconColor: 'text-brand-500',   countColor: 'text-slate-900' },
           { label: 'Active Categories',   subtitle: 'Currently visible',            value: stats?.active || 0,       Icon: CheckCircle, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500', countColor: 'text-emerald-700' },
@@ -464,15 +464,15 @@ export default function CategoryLists() {
           { label: 'Total Products',      subtitle: 'Across all categories',        value: categories.reduce((sum, c) => sum + c.productCount, 0), Icon: Package, iconBg: 'bg-purple-50', iconColor: 'text-purple-500', countColor: 'text-purple-700' },
         ].map(({ label, subtitle, value, Icon, iconBg, iconColor, countColor }) => (
           <div key={label} className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
-            <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
-              <span className="text-sm font-medium text-slate-500">{label}</span>
+            <div className="flex flex-row items-center justify-between px-3.5 pt-3 pb-1">
+              <span className="text-[13px] font-medium text-slate-500">{label}</span>
               <div className={`p-1.5 rounded-lg ${iconBg}`}>
                 <Icon className={`h-4 w-4 ${iconColor}`} />
               </div>
             </div>
-            <div className="px-4 pb-4">
-              <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
-              <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+            <div className="px-3.5 pb-3">
+              <div className={`text-xl font-bold ${countColor}`}>{value}</div>
+              <p className="text-[11px] text-slate-400 mt-0.5">{subtitle}</p>
             </div>
           </div>
         ))}
@@ -517,21 +517,21 @@ export default function CategoryLists() {
       </Card>
 
       {/* Categories Table */}
-      <Card>
-        <CardContent className="p-0">
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-700"></div>
               <span className="ml-3 text-slate-600">Loading categories...</span>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
               onDragEnd={handleDragEnd}
             >
               <Table>
-                <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
+                <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11 [&_th]:px-4">
                   <TableRow>
                     <TableHead className="w-[120px] pl-6">Order</TableHead>
                     <TableHead>Category Name</TableHead>
@@ -571,18 +571,18 @@ export default function CategoryLists() {
                 </TableBody>
               </Table>
             </DndContext>
+            </div>
           )}
-        </CardContent>
         {totalPages > 1 && (
-          <div className="flex items-center justify-end gap-3 text-sm p-4 border-t border-slate-200">
+          <div className="flex items-center justify-end gap-3 text-sm px-4 py-3 border-t border-slate-100">
             <div className="flex items-center gap-1">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-              {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+              {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/20' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
             </div>
           </div>
         )}
-      </Card>
+      </div>
 
       <DeleteConfirmModal
         show={!!deleteTarget}
@@ -654,7 +654,7 @@ function SortableCategoryRow({ category, toggleExpanded, expandedCategories, han
   };
 
   return (
-    <TableRow ref={setNodeRef} style={style} className={isDragging ? 'bg-white' : ''}>
+    <TableRow ref={setNodeRef} style={style} className={`transition-colors duration-150 border-b border-slate-100 last:border-0 ${isDragging ? 'bg-white' : 'hover:bg-slate-50/60'}`}>
       <TableCell className="pl-6">
         <div className="flex items-center gap-3">
           <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1.5 bg-white border border-slate-300 shadow-sm hover:bg-slate-50 rounded-md text-slate-700 transition-colors" title="Drag to reorder">

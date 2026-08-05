@@ -1,46 +1,22 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { bannerService, BannerImage } from "@/services/bannerService";
-
-const fallbackSlides = [
-  {
-    id: "1",
-    imageUrl: "/assets/images/hero/hs1.webp",
-    altText: "Hero slide 1",
-    displayOrder: 0,
-  },
-  {
-    id: "2",
-    imageUrl: "/assets/images/hero/hs2.webp",
-    altText: "Hero slide 2",
-    displayOrder: 1,
-  },
-  {
-    id: "3",
-    imageUrl: "/assets/images/hero/hs3.webp",
-    altText: "Hero slide 3",
-    displayOrder: 2,
-  },
-  {
-    id: "4",
-    imageUrl: "/assets/images/hero/hs4.webp",
-    altText: "Hero slide 4",
-    displayOrder: 3,
-  },
-];
+import { bannerService, BannerImage, bannerHref } from "@/services/bannerService";
 
 export default function HeroSection() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [slides, setSlides] =
     useState<
-      Pick<BannerImage, "id" | "imageUrl" | "altText" | "displayOrder">[]
-    >(fallbackSlides);
+      Pick<BannerImage, "id" | "imageUrl" | "altText" | "displayOrder" | "linkType" | "linkValue">[]
+    >([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch dynamic banners
+  // Fetch dynamic banners. No hardcoded fallback — a skeleton shows while loading,
+  // and the section renders nothing if there are no admin-configured banners.
   useEffect(() => {
     const fetchBanners = async () => {
       try {
@@ -53,8 +29,9 @@ export default function HeroSection() {
           setSlides(response.data);
         }
       } catch (error) {
-        // Keep fallback slides on error
         console.error("Failed to fetch banners:", error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchBanners();
@@ -66,7 +43,7 @@ export default function HeroSection() {
 
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
-    }, 5000);
+    }, 2500);
 
     return () => clearInterval(interval);
   }, [isAutoPlaying, currentSlide, slides.length]);
@@ -115,6 +92,16 @@ export default function HeroSection() {
     setIsAutoPlaying(false);
   };
 
+  // Skeleton while banners load — same aspect ratio as the carousel so the page
+  // doesn't jump when the real banner comes in.
+  if (loading) {
+    return (
+      <section className="relative bg-[#e8e8e8] font-sans overflow-hidden" aria-hidden="true">
+        <div className="relative w-full aspect-[2800/800] bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse" />
+      </section>
+    );
+  }
+
   if (slides.length === 0) return null;
 
   return (
@@ -125,29 +112,45 @@ export default function HeroSection() {
       role="region"
       aria-label="Hero image carousel"
     >
-      <div className="relative w-full h-[105px] min-[400px]:h-[119px] sm:h-[175px] md:h-[245px] lg:h-[315px] xl:h-[455px] 2xl:h-[525px]">
+      {/* Fixed aspect ratio == the admin crop ratio (2800×800 = 3.5:1) so a cropped
+          banner fills the frame exactly with no extra cropping on any screen. */}
+      <div className="relative w-full aspect-[2800/800]">
         {/* Hero Images - fully visible on all screen sizes */}
-        {slides.map((slide, index) => (
-          <div
-            key={slide.id}
-            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-              index === currentSlide ? "opacity-100" : "opacity-0"
-            }`}
-            aria-hidden={index !== currentSlide}
-          >
+        {slides.map((slide, index) => {
+          const href = bannerHref(slide);
+          const img = (
             <Image
               src={slide.imageUrl}
               alt={slide.altText || `Banner slide ${index + 1}`}
               fill
-              className={`object-contain md:object-cover object-center ${
-                index === currentSlide ? "animate-ken-burns" : ""
-              }`}
+              className={`object-cover object-center ${index === currentSlide ? "animate-hero-parallax" : ""}`}
               priority={index === 0}
               sizes="100vw"
               unoptimized={slide.imageUrl.startsWith("http")}
             />
-          </div>
-        ))}
+          );
+          return (
+            <div
+              key={slide.id}
+              className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+                index === currentSlide ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+              }`}
+              aria-hidden={index !== currentSlide}
+            >
+              {/* When the banner links somewhere, the whole slide is clickable.
+                  Only the active slide receives pointer events — the invisible
+                  stacked slides above must not swallow the click. tabIndex -1 keeps
+                  hidden links out of the tab order. */}
+              {href ? (
+                <Link href={href} className="block w-full h-full cursor-pointer" tabIndex={index === currentSlide ? 0 : -1} aria-label={slide.altText || `Banner ${index + 1}`}>
+                  {img}
+                </Link>
+              ) : (
+                img
+              )}
+            </div>
+          );
+        })}
 
         {/* Subtle edge vignette for a premium, framed look (desktop) */}
         <div className="pointer-events-none absolute inset-0 z-[5] hidden md:block bg-linear-to-t from-black/15 via-transparent to-transparent" />

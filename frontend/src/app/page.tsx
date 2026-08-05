@@ -7,6 +7,7 @@ import Footer from '@/components/WebSite/Footer/Footer';
 import HeroSection from '@/components/WebSite/HeroSection/HeroSection';
 import NoticeBoard from '@/components/WebSite/NoticeBoard/NoticeBoard';
 import Category from '@/components/WebSite/Category/Category';
+import CategoryStrip from '@/components/WebSite/CategoryStrip/CategoryStrip';
 import FeaturedProducts from '@/components/WebSite/Featured/Products';
 import TopSelling from '@/components/WebSite/Featured/TopSelling';
 import BestSeller from '@/components/WebSite/Featured/BestSeller';
@@ -111,13 +112,14 @@ export default function Home() {
         defaultDescription="Discover quality products and reliable suppliers on M2C Marketplace"
       />
       <Header />
+      <CategoryStrip />
       <HeroSection />
       <NoticeBoard />
-      <Category />
       <FeaturedProducts />
       <BrandPromo />
       <TopSelling />
       <BestSeller />
+      <Category />
       <DownloadApp />
       <ValueSection />
       <Footer />

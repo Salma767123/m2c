@@ -7,7 +7,6 @@ import { roleService, Role } from '@/services/roleService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
 import Dropdown from '@/components/UI/Dropdown';
-import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb';
 import {
     ArrowLeft,
     Save,
@@ -140,7 +139,6 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
 
     return (
         <div className="space-y-6">
-            <Breadcrumb />
 
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">

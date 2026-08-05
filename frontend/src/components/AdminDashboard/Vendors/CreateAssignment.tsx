@@ -6,7 +6,6 @@ import { ArrowLeft, Calendar, Clock, Factory, MapPin, FileText, CheckCircle, Ale
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import Dropdown from "../../UI/Dropdown";
-import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { formatTime12 } from "@/lib/utils";
 import vendorService from "@/services/vendorService";
@@ -246,7 +245,6 @@ export default function CreateAssignment() {
 
   return (
     <div className="p-6">
-      <Breadcrumb />
 
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">

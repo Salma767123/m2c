@@ -1,5 +1,4 @@
 import { use } from 'react'
-import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb'
 import AddEditCategory from '@/components/AdminDashboard/Categories/AddEditCategory'
 import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
@@ -15,7 +14,6 @@ export default function EditCategoryPage({ params }: EditCategoryPageProps) {
   return (
     <PermissionGuard permission="categories:edit">
       <div className="space-y-6">
-        <Breadcrumb />
         <AddEditCategory categoryId={id} isEdit={true} />
       </div>
     </PermissionGuard>

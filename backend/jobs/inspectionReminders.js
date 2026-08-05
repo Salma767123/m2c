@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const { prisma } = require('../config/database');
 const { createNotification, createNotificationForRole } = require('../controllers/notificationController');
-const { sendInspectionReminderEmail } = require('../utils/emailService');
+const { sendTemplatedEmail } = require('../utils/emailTemplateRenderer');
 const { parseScheduledStart, getInspectionDeadline, isInspectionExpired, HOUR_MS } = require('../utils/inspectionSchedule');
 
 // How close to the scheduled start the "starting soon" reminder fires. We look
@@ -81,14 +81,30 @@ async function runInspectionScheduleSweep() {
         }).catch(() => {});
 
         if (insp.checker?.email) {
-            sendInspectionReminderEmail({
+            const checkerName = insp.checker.name;
+            const scheduledDate = insp.scheduledDate;
+            const scheduledTime = insp.scheduledTime;
+            const estimatedDuration = insp.estimatedDuration;
+
+            // Value paragraph + optional Location block collapse into one var.
+            const estimatedDurationAndLocationBlock =
+                `<p style="margin:0 0 ${factoryLocation ? '14px' : '0'};color:#111827;font-size:15px;font-weight:600;">${estimatedDuration || '—'}</p>`
+                + (factoryLocation
+                    ? `<p style="margin:0 0 6px;color:#6b7280;font-size:13px;">Location</p><p style="margin:0;color:#111827;font-size:15px;font-weight:600;">${factoryLocation}</p>`
+                    : '');
+
+            sendTemplatedEmail({
+                key: 'inspection_reminder',
                 to: insp.checker.email,
-                checkerName: insp.checker.name,
-                vendorName,
-                scheduledDate: insp.scheduledDate,
-                scheduledTime: insp.scheduledTime,
-                estimatedDuration: insp.estimatedDuration,
-                factoryLocation,
+                data: {
+                    checkerGreeting: checkerName || 'there',
+                    vendorNameStrong: vendorName || 'a vendor',
+                    vendorNameOrDash: vendorName || '—',
+                    scheduledDateOrDash: scheduledDate || '—',
+                    scheduledTimeOrDash: scheduledTime || '—',
+                    estimatedDurationAndLocationBlock,
+                    vendorNameSubject: vendorName || 'vendor',
+                },
             }).catch((e) => console.error('[Cron] Reminder email failed for', insp.id, e?.message || e));
         }
 

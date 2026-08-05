@@ -473,13 +473,13 @@ export default function VendorsTable() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
 
       {/* ── 1. Page Header ── */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Vendors Management</h1>
-          <p className="text-slate-500 mt-0.5">Manage registered vendors and their approval workflow.</p>
+          <h1 className="text-xl font-bold text-slate-900">Vendors Management</h1>
+          <p className="text-sm text-slate-500">Manage registered vendors and their approval workflow.</p>
         </div>
         {hasPermission('vendor_management:create') && (
           <Link href="/admin/dashboard/vendors/add" className="shrink-0">
@@ -492,7 +492,7 @@ export default function VendorsTable() {
       </div>
 
       {/* ── 2. Metric Cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {metricCards.map(({ key, label, subtitle, count, Icon, iconBg, iconColor, countColor, activeClass }) => {
           const isActive = statusFilter === key
           const pct = statusCounts.total > 0 && key !== ''
@@ -506,15 +506,15 @@ export default function VendorsTable() {
                 isActive ? activeClass : 'border-slate-200/80 hover:border-slate-300'
               }`}
             >
-              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
-                <span className="text-sm font-medium text-slate-500">{label}</span>
+              <div className="flex flex-row items-center justify-between px-3.5 pt-3 pb-1">
+                <span className="text-[13px] font-medium text-slate-500">{label}</span>
                 <div className={`p-1.5 rounded-lg ${iconBg} transition-transform duration-150 group-hover:scale-110`}>
                   <Icon className={`h-4 w-4 ${iconColor}`} />
                 </div>
               </div>
-              <div className="px-4 pb-4">
-                <div className={`text-2xl font-bold ${countColor}`}>{count}</div>
-                <p className="text-xs text-slate-400 mt-0.5">
+              <div className="px-3.5 pb-3">
+                <div className={`text-xl font-bold ${countColor}`}>{count}</div>
+                <p className="text-[11px] text-slate-400 mt-0.5">
                   {pct !== null ? `${pct}% of total` : subtitle}
                 </p>
               </div>

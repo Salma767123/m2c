@@ -120,9 +120,9 @@ export default function NoticeBoard() {
   }
 
   return (
-    <section className="relative bg-linear-to-b from-[#f7f6f4] to-white border-t border-black/5 py-4 sm:py-5">
+    <section className="relative bg-linear-to-b from-[#f7f6f4] to-white border-t border-black/5 py-1">
       {/* Section eyebrow */}
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 mb-3 flex items-center gap-2">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 mb-1 flex items-center gap-2">
         <Sparkles className="w-4 h-4 text-[#e01a1b]" />
         <h2 className="text-xs sm:text-sm font-bold uppercase tracking-[0.14em] text-gray-700">
           What&apos;s happening
@@ -180,7 +180,7 @@ export default function NoticeBoard() {
 }
 
 const CARD =
-  'group relative shrink-0 w-64 sm:w-72 h-28 rounded-2xl overflow-hidden ring-1 ring-black/5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300'
+  'group relative shrink-0 w-80 sm:w-96 md:w-[26rem] h-40 sm:h-44 rounded-2xl overflow-hidden ring-1 ring-black/5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300'
 
 function scrollToDownloadApp() {
   document.getElementById('download-app')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -287,8 +287,8 @@ function NoticeCard({ notice }: { notice: Notice }) {
   const img = p.images?.find((i) => i.isPrimary)?.url || p.images?.[0]?.url
   return (
     <Link href={`/products/${p.slug || p.id}`} className={`${CARD} bg-white`}>
-      <div className="h-full p-3 flex items-center gap-3">
-        <div className="relative w-20 h-20 shrink-0 rounded-xl overflow-hidden bg-gray-100">
+      <div className="h-full p-3.5 flex items-center gap-3">
+        <div className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-gray-100">
           {img ? (
             <Image src={img} alt={p.name} fill className="object-cover" unoptimized={img.startsWith('http')} sizes="80px" />
           ) : (

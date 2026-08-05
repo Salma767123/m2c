@@ -14,7 +14,7 @@ import {
   ShoppingBag
 } from "lucide-react"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
-import { formatPrice, getCurrency, getRegionalPrice, convertUSDtoINR, convertINRtoUSD } from '@/lib/currency'
+import { formatPrice, getCurrency, getRegion, getRegionalPrice, convertUSDtoINR, convertINRtoUSD } from '@/lib/currency'
 import { applyOfferToPrice, type ActiveOffer } from '@/lib/offers'
 import ShippingForm from "./CheckoutProcess/ShippingForm"
 import PaymentForm from "./CheckoutProcess/PaymentForm"
@@ -480,7 +480,7 @@ export default function Checkout() {
           // when there is no choice. Matches orderController's resolution exactly.
           const types = Array.isArray(config.transportTypes) ? config.transportTypes : [];
           const mode = ((item as any).transportType || types[0]) as 'AIR' | 'SHIP' | undefined;
-          const result = calculateLogistics(config as LogisticsConfig, item.quantity, mode);
+          const result = calculateLogistics(config as LogisticsConfig, item.quantity, mode, getRegion());
           logisticsShippingInr += result.totalShippingCost;
         }
       }

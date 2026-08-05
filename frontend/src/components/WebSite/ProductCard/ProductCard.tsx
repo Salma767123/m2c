@@ -211,7 +211,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
         <div className="relative h-full flex flex-col bg-white font-sans rounded-[1.35rem] overflow-hidden">
           {/* Media */}
-          <div className="relative h-36 sm:h-40 md:h-48 w-full overflow-hidden shrink-0 bg-[radial-gradient(120%_100%_at_50%_0%,#faf9f7_0%,#eceae6_100%)]">
+          <div className="relative h-32 sm:h-36 md:h-40 w-full overflow-hidden shrink-0 bg-[radial-gradient(120%_100%_at_50%_0%,#faf9f7_0%,#eceae6_100%)]">
             <Image
               src={imageUrl}
               alt={product.name}
@@ -272,14 +272,14 @@ const ProductCard = ({ product }: ProductCardProps) => {
           </div>
 
           {/* Body */}
-          <div className="p-3 sm:p-3.5 flex flex-col grow justify-between">
+          <div className="p-2.5 sm:p-3 flex flex-col grow justify-between">
             {/* Top content - flexible */}
             <div className="grow">
               <h3 className="font-playfair text-sm sm:text-base font-semibold text-[#1a1a1a] mb-1 break-words tracking-tight transition-colors duration-300 group-hover:text-[#e01a1b]">
                 {product.name}
               </h3>
 
-              <div className="flex items-center mb-2">
+              <div className="flex items-center mb-1.5">
                 <div className="flex items-center flex-wrap gap-1">
                   {[...Array(5)].map((_, i) => (
                     <Star
@@ -318,7 +318,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
             {/* Bottom content - fixed at bottom */}
             <div className="shrink-0">
               {/* Hairline divider for a refined split */}
-              <div className="h-px w-full bg-linear-to-r from-transparent via-gray-200 to-transparent my-2.5" />
+              <div className="h-px w-full bg-linear-to-r from-transparent via-gray-200 to-transparent my-2" />
 
               {/* Quantity + Add to Cart */}
               <div className="flex items-center gap-2">
@@ -346,7 +346,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
                 <button
                   onClick={handleAddToCart}
                   disabled={!isActuallyInStock || isAddingToCart || (isActuallyInStock && quantity > currentStock)}
-                  className={`btn-shine group/btn flex-1 py-2 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-2 ${isActuallyInStock
+                  className={`btn-shine group/btn flex-1 min-w-0 whitespace-nowrap py-2 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-2 ${isActuallyInStock
                     ? 'bg-linear-to-r from-[#e01a1b] to-[#ff4d2d] text-white shadow-[0_8px_22px_-6px_rgba(224,26,27,0.6)] hover:shadow-[0_16px_34px_-8px_rgba(224,26,27,0.75)] hover:brightness-110 active:scale-[0.97]'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed ring-1 ring-gray-200'
                     } disabled:cursor-not-allowed`}

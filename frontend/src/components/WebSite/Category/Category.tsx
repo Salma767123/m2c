@@ -48,9 +48,9 @@ export default function Category() {
     // desktop and one on mobile — so the skeleton looks intentional even
     // when the actual category count comes back smaller.
     return (
-      <section className="py-8 sm:py-12 lg:py-16 bg-white font-sans">
+      <section className="py-6 sm:py-8 lg:py-10 bg-white font-sans">
         <div className="max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 sm:gap-6 lg:gap-8 mb-8 sm:mb-10 md:mb-12 lg:mb-16">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 sm:gap-6 lg:gap-8 mb-5 sm:mb-6 lg:mb-8">
             <div className="flex-1 space-y-3">
               <div className="h-7 md:h-8 w-48 md:w-64 bg-gray-200 rounded animate-pulse mx-auto lg:mx-0" />
               <div className="h-4 w-full max-w-md bg-gray-100 rounded animate-pulse mx-auto lg:mx-0" />
@@ -75,9 +75,9 @@ export default function Category() {
   }
 
   return (
-    <section className="py-8 sm:py-12 lg:py-16 bg-white font-sans">
+    <section className="py-6 sm:py-8 lg:py-10 bg-white font-sans">
       <div className="max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-        <Reveal className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-4 sm:gap-6 lg:gap-8 mb-8 sm:mb-10 md:mb-12 lg:mb-16">
+        <Reveal className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-4 sm:gap-6 lg:gap-8 mb-5 sm:mb-6 lg:mb-8">
           <div className="text-center lg:text-left flex-1">
             <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
               <span className="h-px w-6 bg-[#e01a1b]" />

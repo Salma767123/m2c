@@ -10,7 +10,6 @@ import reinspectionService, {
 import { Badge } from '@/components/UI/Badge';
 import { Button } from '@/components/UI/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table';
-import { Card, CardContent } from '@/components/UI/Card';
 import Dropdown from '@/components/UI/Dropdown';
 import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar';
 import {
@@ -143,11 +142,11 @@ export default function ReinspectionReviewDashboard() {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Re-Inspection Review</h1>
+          <h1 className="text-xl font-bold text-slate-900">Re-Inspection Review</h1>
           <p className="text-sm text-slate-500 mt-1">Review submitted and rejected inspections</p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
@@ -158,7 +157,7 @@ export default function ReinspectionReviewDashboard() {
 
       {/* Stats Cards — the Factory/Product cards jump to that tab */}
       {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: 'Total Pending',   subtitle: 'Awaiting review', value: stats.totalPendingReview,                              Icon: IconClock,         iconBg: 'bg-brand-50',   iconColor: 'text-brand-500',   countColor: 'text-slate-900',  tab: null,        activeClass: '' },
             { label: 'Factory Pending', subtitle: 'Factory queue',   value: stats.factory.pendingReview,                           Icon: IconBuilding,      iconBg: 'bg-blue-50',    iconColor: 'text-blue-500',    countColor: 'text-blue-700',   tab: 'factory',   activeClass: 'border-blue-400 bg-blue-50/60' },
@@ -169,15 +168,15 @@ export default function ReinspectionReviewDashboard() {
             const isActive = clickable && activeTab === tab;
             const body = (
               <>
-                <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
-                  <span className="text-sm font-medium text-slate-500">{label}</span>
+                <div className="flex flex-row items-center justify-between px-3.5 pt-3 pb-1">
+                  <span className="text-[13px] font-medium text-slate-500">{label}</span>
                   <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace('50', '100') : iconBg} transition-transform duration-150 ${clickable ? 'group-hover:scale-110' : ''}`}>
                     <Icon size={16} className={iconColor} />
                   </div>
                 </div>
-                <div className="px-4 pb-4">
-                  <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
-                  <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+                <div className="px-3.5 pb-3">
+                  <div className={`text-xl font-bold ${countColor}`}>{value}</div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{subtitle}</p>
                 </div>
               </>
             );
@@ -258,8 +257,7 @@ export default function ReinspectionReviewDashboard() {
           </div>
         </div>
 
-        <Card>
-          <CardContent className="p-0">
+        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center py-16">
@@ -280,7 +278,7 @@ export default function ReinspectionReviewDashboard() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200">
+              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
                 <span className="text-sm text-slate-500">
                   Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
                 </span>
@@ -294,8 +292,7 @@ export default function ReinspectionReviewDashboard() {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+        </div>
       </div>
     </div>
   );
@@ -332,7 +329,7 @@ function FactoryTable({
       </TableHeader>
       <TableBody>
         {inspections.map(ins => (
-          <TableRow key={ins.id}>
+          <TableRow key={ins.id} className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0">
             <TableCell>
               <div className="font-medium text-slate-900">{ins.vendor.companyName}</div>
               <div className="text-xs text-slate-500">
@@ -402,7 +399,7 @@ function ProductTable({
       </TableHeader>
       <TableBody>
         {inspections.map(product => (
-          <TableRow key={product.id}>
+          <TableRow key={product.id} className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0">
             <TableCell>
               <div className="font-medium text-slate-900">{product.name}</div>
               <div className="text-xs text-slate-500">SKU: {product.baseSku}</div>

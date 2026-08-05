@@ -1,5 +1,5 @@
 const { prisma } = require('../config/database');
-const { sendVendorApprovalEmail, sendVendorRejectionEmail } = require('../utils/emailService');
+const { sendTemplatedEmail } = require('../utils/emailTemplateRenderer');
 
 // Public: Submit a vendor enquiry (from Contact page)
 const submitEnquiry = async (req, res) => {
@@ -146,12 +146,15 @@ const approveEnquiry = async (req, res) => {
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
         const registrationLink = `${frontendUrl}/vendor/register`;
 
-        // Send the approval email with registration link
-        await sendVendorApprovalEmail({
+        // Send the approval email with registration link (DB-driven template)
+        const approvalEmail = await sendTemplatedEmail({
+            key: 'vendor_enquiry_approval',
             to: enquiry.email,
-            name: enquiry.name,
-            companyName: enquiry.companyName,
-            registrationLink
+            data: {
+                name: enquiry.name,
+                companyName: enquiry.companyName,
+                registrationLink,
+            },
         });
 
         // Update status in DB
@@ -165,7 +168,9 @@ const approveEnquiry = async (req, res) => {
 
         res.json({
             success: true,
-            message: `Approval email sent to ${enquiry.email}`,
+            message: approvalEmail.sent
+                ? `Approval email sent to ${enquiry.email}`
+                : `Enquiry approved (approval email is turned off)`,
             data: updated
         });
     } catch (error) {
@@ -195,16 +200,15 @@ const rejectEnquiry = async (req, res) => {
             });
         }
 
-        // Optionally send rejection email
-        try {
-            await sendVendorRejectionEmail({
-                to: enquiry.email,
+        // Optionally send rejection email (DB-driven template; never throws)
+        await sendTemplatedEmail({
+            key: 'vendor_enquiry_rejection',
+            to: enquiry.email,
+            data: {
                 name: enquiry.name,
-                companyName: enquiry.companyName
-            });
-        } catch (emailErr) {
-            console.warn('Could not send rejection email:', emailErr.message);
-        }
+                companyName: enquiry.companyName,
+            },
+        });
 
         const updated = await prisma.vendorEnquiry.update({
             where: { id },

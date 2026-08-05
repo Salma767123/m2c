@@ -35,6 +35,11 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
     sortOrder: 0
   })
 
+  // True while the category image is uploading to Cloudinary. Kept separate from
+  // categoryData.image so the preview never renders a broken <img> (a sentinel like
+  // "uploading..." would fail to load and flash the onError fallback image).
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+
   const [subcategories, setSubcategories] = useState<SubcategoryFormData[]>([])
   const [newSubcategory, setNewSubcategory] = useState<SubcategoryFormData>({
     name: '',
@@ -168,9 +173,9 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
         return
       }
       try {
-        // Show loading state
-        setCategoryData(prev => ({ ...prev, image: 'uploading...' }))
-        
+        // Show loading state (a boolean flag — never a fake image src)
+        setIsUploadingImage(true)
+
         // Create FormData for file upload
         const formData = new FormData()
         formData.append('file', file)
@@ -203,6 +208,8 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
         console.error('Image upload error:', error)
         showErrorToast('Upload Failed', error instanceof Error ? error.message : 'Failed to upload image. Please try again.')
         setCategoryData(prev => ({ ...prev, image: '' }))
+      } finally {
+        setIsUploadingImage(false)
       }
     }
   }
@@ -792,7 +799,12 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {categoryData.image ? (
+                  {isUploadingImage ? (
+                    <div className="w-full h-32 rounded border border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-2 text-slate-500">
+                      <div className="h-6 w-6 rounded-full border-2 border-slate-300 border-t-brand-500 animate-spin" />
+                      <p className="text-xs font-medium">Uploading…</p>
+                    </div>
+                  ) : categoryData.image ? (
                     <div className="relative">
                       <img
                         src={categoryData.image}

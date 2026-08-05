@@ -7,7 +7,6 @@ import {
   RefreshCw, Calendar, BadgeCheck,
 } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
-import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { qcCheckerService, QCCheckerData } from "@/services/qcCheckerService";
 import { showErrorToast } from "@/lib/toast-utils";
 import { formatCheckerName } from "@/lib/checkerUtils";
@@ -87,7 +86,6 @@ export default function QCCheckerDetail() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
-      <Breadcrumb />
 
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">

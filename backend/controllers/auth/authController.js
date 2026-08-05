@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const { prisma } = require("../../config/database");
 const sessionManager = require("../../utils/auth/sessionManager");
 const { sendEmail: sendSMTPEmail, sendEmailWithEnv } = require("../../config/connectSMTP");
+const { sendTemplatedEmail } = require("../../utils/emailTemplateRenderer");
 
 // Email helper - uses SMTP configuration
 const sendEmail = async (emailData) => {
@@ -187,29 +188,8 @@ const register = async (req, res) => {
       }
     }
 
-    // Send verification email via Kafka (non-blocking)
+    // Verification link for the DB-driven email template (non-blocking send below).
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
-    const emailData = {
-      to: email,
-      subject: "Verify Your Email - Employee Management System",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Welcome to Employee Management System!</h2>
-          <p>Hi ${name},</p>
-          <p>Thank you for registering. Please click the button below to verify your email address:</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${verificationUrl}" 
-               style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-              Verify Email
-            </a>
-          </div>
-          <p>Or copy and paste this link in your browser:</p>
-          <p style="word-break: break-all; color: #6B7280;">${verificationUrl}</p>
-          <p>This link will expire in 24 hours.</p>
-          <p>If you didn't create this account, please ignore this email.</p>
-        </div>
-      `,
-    };
 
     // Send response immediately
     res.status(201).json({
@@ -224,13 +204,17 @@ const register = async (req, res) => {
       },
     });
 
-    // Send email after response (non-blocking)
+    // Send email after response (non-blocking). Security template — always sends.
     setImmediate(async () => {
-      try {
-        await sendEmail(emailData);
+      const result = await sendTemplatedEmail({
+        key: "email_verification",
+        to: email,
+        data: { name, verificationUrl },
+      });
+      if (result.sent) {
         console.log(`✅ Verification email sent to: ${email}`);
-      } catch (err) {
-        console.error("Failed to send email:", err);
+      } else {
+        console.error("Failed to send verification email:", result.reason, result.error?.message || "");
       }
     });
 
@@ -852,69 +836,44 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    // Send reset email with appropriate reset URL based on user type
+    // Send reset email with appropriate reset URL based on user type. The
+    // subject varies only by account type, which the DB template renders from
+    // the {{accountType}} variable (subject: "Reset Your {{accountType}} Password").
     let resetUrl;
     let userName;
-    let emailSubject;
+    let accountType;
 
     if (userType === "vendor") {
       resetUrl = `${process.env.FRONTEND_URL}/vendor/reset-password?token=${resetToken}`;
       userName = user.ownerName || user.companyName;
-      emailSubject = "Reset Your Vendor Account Password";
+      accountType = "Vendor Account";
       console.log("🔗 Vendor reset URL:", resetUrl);
     } else if (userType === "admin") {
       resetUrl = `${process.env.FRONTEND_URL}/admin/reset-password?token=${resetToken}`;
       userName = user.name;
-      emailSubject = "Reset Your Admin Account Password";
+      accountType = "Admin Account";
     } else {
       resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
       userName = user.name;
-      emailSubject = "Reset Your Account Password";
+      accountType = "Account";
     }
 
-    const emailData = {
-      to: email,
-      subject: emailSubject,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Password Reset Request</h2>
-          <p>Hi ${userName},</p>
-          <p>You requested to reset your password. Click the button below to reset it:</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${resetUrl}" 
-               style="background-color: #DC2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-              Reset Password
-            </a>
-          </div>
-          <p>Or copy and paste this link in your browser:</p>
-          <p style="word-break: break-all; color: #6B7280;">${resetUrl}</p>
-          <p>This link will expire in 1 hour.</p>
-          <p>If you didn't request this, please ignore this email.</p>
-        </div>
-      `,
-    };
-
-    // Send password reset email
+    // Send password reset email (security template — always sends).
     console.log("📧 Sending password reset email...");
-    try {
-      const emailResult = await sendEmail(emailData);
-      if (!emailResult.success) {
-        console.error("❌ Email sending failed:", emailResult.message);
-        // Still return success to user for security reasons (don't reveal if email exists)
-        return res.json({
-          success: true,
-          message: "If an account with that email exists, a password reset link has been sent.",
-        });
-      }
-      console.log("✅ Password reset email sent successfully to:", email);
-    } catch (emailError) {
-      console.error("❌ Email sending error:", emailError);
+    const emailResult = await sendTemplatedEmail({
+      key: "password_reset",
+      to: email,
+      data: { userName, resetUrl, accountType },
+    });
+    if (!emailResult.sent) {
+      console.error("❌ Password reset email failed:", emailResult.reason, emailResult.error?.message || "");
       // Still return success to user for security reasons (don't reveal if email exists)
       return res.json({
         success: true,
         message: "If an account with that email exists, a password reset link has been sent.",
       });
     }
+    console.log("✅ Password reset email sent successfully to:", email);
 
     res.json({
       success: true,

@@ -8,10 +8,31 @@ export interface LogisticsConfig {
   transportTypes: ('AIR' | 'SHIP')[];
   weightRanges: Array<{ minWeight: number; maxWeight: number; recommendedTransport: 'AIR' | 'SHIP' }>;
   airDeliveryDays: number;
+  // The SHIP lane means different things per market: SEA freight internationally (.com)
+  // vs SURFACE / road domestically (.in). shipDeliveryDays / shipCostPerKg hold the SEA
+  // (international) figures; surface* hold the domestic figures. calculateLogistics picks
+  // the right pair from `region`. surface* fall back to ship* for legacy products.
   shipDeliveryDays: number;
-  airCostPerKg: number;
   shipCostPerKg: number;
+  surfaceDeliveryDays?: number;
+  surfaceCostPerKg?: number;
+  airCostPerKg: number;
   notes: string;
+}
+
+export type ShipRegion = 'IN' | 'US' | null | undefined;
+
+// Resolve the SHIP lane's (days, cost) for a market. Domestic India uses the surface
+// figures (falling back to the legacy ship values); everyone else uses sea/ship.
+function shipLane(config: LogisticsConfig, region: ShipRegion): { days: number; costPerKg: number } {
+  const isDomestic = region === 'IN';
+  if (isDomestic) {
+    return {
+      days: config.surfaceDeliveryDays ?? config.shipDeliveryDays,
+      costPerKg: config.surfaceCostPerKg ?? config.shipCostPerKg,
+    };
+  }
+  return { days: config.shipDeliveryDays, costPerKg: config.shipCostPerKg };
 }
 
 export interface LogisticsCalculation {
@@ -35,7 +56,10 @@ export function toKg(weight: number, uom: 'KG' | 'GRAM' | 'TON'): number {
 export function calculateLogistics(
   config: LogisticsConfig,
   quantity: number,
-  overrideTransport?: 'AIR' | 'SHIP'
+  overrideTransport?: 'AIR' | 'SHIP',
+  // Market the quote is for. Only affects the SHIP lane (SEA vs SURFACE cost/days).
+  // Omitted → international (sea) figures, matching the pre-region behaviour.
+  region?: ShipRegion
 ): LogisticsCalculation {
   const unitWeightKg = toKg(config.unitWeight, config.weightUom);
   const totalWeightKg = unitWeightKg * quantity;
@@ -60,13 +84,14 @@ export function calculateLogistics(
     ? overrideTransport
     : recommendedTransport;
 
+  const ship = shipLane(config, region);
   const deliveryDays = selectedTransport === 'AIR'
     ? config.airDeliveryDays
-    : config.shipDeliveryDays;
+    : ship.days;
 
   const shippingCostPerKg = selectedTransport === 'AIR'
     ? config.airCostPerKg
-    : config.shipCostPerKg;
+    : ship.costPerKg;
 
   const totalShippingCost = Math.round(totalWeightKg * shippingCostPerKg * 100) / 100;
 

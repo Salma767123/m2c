@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { ArrowLeft, Building2, User, Mail, Phone, MapPin, Calendar, CheckCircle, XCircle, FileText, ClipboardCheck, Clock, Factory, Shield, Wrench, Camera, AlertTriangle, Eye, Download, Loader2, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
-import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { Badge } from "../../UI/Badge";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import vendorService from "@/services/vendorService";
@@ -388,7 +387,6 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
   if (fetchError) {
     return (
       <div className="p-6">
-        <Breadcrumb />
         <div className="flex items-center gap-4 mb-6">
           <Link href="/admin/dashboard/vendors/assign-qc" className="text-slate-500 hover:text-slate-900"><ArrowLeft className="h-6 w-6" /></Link>
           <h1 className="text-2xl font-bold text-slate-900">Vendor Inspection Details</h1>
@@ -407,7 +405,6 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
   if (!inspection) {
     return (
       <div className="p-6">
-        <Breadcrumb />
         <div className="flex items-center gap-4 mb-6">
           <Link href="/admin/dashboard/vendors/assign-qc" className="text-slate-500 hover:text-slate-900"><ArrowLeft className="h-6 w-6" /></Link>
           <h1 className="text-2xl font-bold text-slate-900">Vendor Inspection Details</h1>
@@ -432,7 +429,6 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
 
   return (
     <div className="p-6">
-      <Breadcrumb />
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">

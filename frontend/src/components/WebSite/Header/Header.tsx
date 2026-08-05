@@ -284,10 +284,14 @@ const Header = () => {
           <div className="flex items-center justify-between h-8 text-xs">
             <span className="text-gray-300">Direct from Manufacturer to Customer</span>
             <div className="flex items-center gap-4 lg:gap-5">
-              <Link href="/order" className="inline-flex items-center gap-1.5 text-gray-200 hover:text-white transition-colors">
-                <Truck className="w-3.5 h-3.5" /> Track Order
-              </Link>
-              <span className="h-3 w-px bg-white/20" />
+              {isUserLoggedIn && (
+                <>
+                  <Link href="/order" className="inline-flex items-center gap-1.5 text-gray-200 hover:text-white transition-colors">
+                    <Truck className="w-3.5 h-3.5" /> Track Order
+                  </Link>
+                  <span className="h-3 w-px bg-white/20" />
+                </>
+              )}
               <Link href="/contact" className="inline-flex items-center gap-1.5 text-gray-200 hover:text-white transition-colors">
                 <Headphones className="w-3.5 h-3.5" /> Help Centre
               </Link>
@@ -305,14 +309,14 @@ const Header = () => {
           subtle shadow at the bottom of the sticky header stack. */}
       <header className="relative z-30 bg-white border-b border-gray-100 transition-all duration-300">
         <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14 sm:h-16 md:h-18 lg:h-20 xl:h-24 gap-2 sm:gap-3 md:gap-4">
+          <div className="flex items-center justify-between h-12 sm:h-14 md:h-16 lg:h-18 xl:h-20 gap-2 sm:gap-3 md:gap-4">
 
             {/* Logo */}
             <Link href="/" className="flex items-center shrink-0">
               <CompanyLogo
                 variant={logoVariant}
-                className="h-12 sm:h-14 md:h-16 lg:h-18 xl:h-20 w-auto object-contain"
-                skeletonClassName="h-12 sm:h-14 md:h-16 lg:h-18 xl:h-20 aspect-square bg-gray-100"
+                className="h-10 sm:h-12 md:h-14 lg:h-16 xl:h-18 w-auto object-contain"
+                skeletonClassName="h-10 sm:h-12 md:h-14 lg:h-16 xl:h-18 aspect-square bg-gray-100"
                 fallbackSizes="(max-width: 640px) 48px, (max-width: 768px) 56px, (max-width: 1024px) 64px, (max-width: 1280px) 72px, 80px"
                 priority
               />

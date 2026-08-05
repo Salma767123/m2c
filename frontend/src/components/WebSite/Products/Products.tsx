@@ -2,6 +2,7 @@
 
 import ProductCard from '../ProductCard/ProductCard';
 import Category from '@/components/WebSite/CategoryCopy/Category';
+import VendorPartnerCTA from '@/components/WebSite/VendorPartnerCTA/VendorPartnerCTA';
 import Reveal from '@/components/WebSite/Shared/Reveal';
 import SectionBackdrop from '@/components/WebSite/Shared/SectionBackdrop';
 import { Search, Filter, ChevronDown, Star, ChevronLeft, ChevronRight, X } from 'lucide-react';
@@ -37,23 +38,24 @@ interface ProductFacets {
 function CollapsibleSection({ title, count, defaultOpen = true, children }: { title: string; count?: number; defaultOpen?: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
   const sectionRef = useRef<HTMLDivElement>(null);
-  const mounted = useRef(false);
 
-  // When the user expands a section (especially one near the bottom edge), scroll
-  // just enough to bring its revealed content into view. Skip the very first run
-  // so default-open sections don't hijack scroll on mount.
-  useEffect(() => {
-    if (!mounted.current) { mounted.current = true; return; }
-    if (open) {
-      requestAnimationFrame(() => {
-        sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      });
-    }
-  }, [open]);
+  // Toggle open/close. Only a genuine user expand nudges the revealed content into
+  // view — never on mount/re-render, so the page always loads at the very top.
+  const handleToggle = () => {
+    setOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        requestAnimationFrame(() => {
+          sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      }
+      return next;
+    });
+  };
 
   return (
     <div ref={sectionRef} className="border-t border-gray-200 pt-4">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between text-left">
+      <button type="button" onClick={handleToggle} className="flex w-full items-center justify-between text-left">
         <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-900">
           {title}{count != null && count > 0 ? <span className="ml-1 font-normal normal-case text-gray-400">({count})</span> : null}
         </h4>
@@ -64,11 +66,21 @@ function CollapsibleSection({ title, count, defaultOpen = true, children }: { ti
   );
 }
 
+// Homepage collections, driven by product tags. The `?collection=` URL param maps a
+// clean slug to the exact tag stored on products, so "View All" on each home section
+// deep-links here pre-filtered.
+const COLLECTIONS = [
+  { key: 'featured', label: 'Featured', tag: 'Featured' },
+  { key: 'top-selling', label: 'Top Selling', tag: 'Top Selling' },
+  { key: 'best-seller', label: 'Best Seller', tag: 'Best Seller' },
+];
+
 const Products = () => {
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get('category');
   const subcategoryParam = searchParams.get('subcategory');
   const searchStringParam = searchParams.get('search');
+  const collectionParam = searchParams.get('collection');
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,6 +114,10 @@ const Products = () => {
   const [selectedFabricTypes, setSelectedFabricTypes] = useState<string[]>([]);
   const [minDiscount, setMinDiscount] = useState(0);
   const [newArrivals, setNewArrivals] = useState(false);
+  // Collection filter (Featured / Top Selling / Best Seller), seeded from ?collection=.
+  const [selectedCollection, setSelectedCollection] = useState(
+    COLLECTIONS.some((c) => c.key === collectionParam) ? (collectionParam as string) : ''
+  );
 
   const toggleInArray = (setter: React.Dispatch<React.SetStateAction<string[]>>, value: string) => {
     setter((arr) => (arr.includes(value) ? arr.filter((x) => x !== value) : [...arr, value]));
@@ -193,6 +209,7 @@ const Products = () => {
           fabricTypes: selectedFabricTypes.length ? selectedFabricTypes.join(',') : undefined,
           minDiscount: minDiscount > 0 ? minDiscount : undefined,
           newArrivals: newArrivals || undefined,
+          tag: COLLECTIONS.find((c) => c.key === selectedCollection)?.tag || undefined,
         };
 
         const response = await productService.getPublicProducts(params);
@@ -218,7 +235,14 @@ const Products = () => {
     return () => {
       ignore = true;
     };
-  }, [currentPage, searchTerm, selectedCategory, selectedSubcategory, priceRange, sortBy, inStockOnly, selectedRating, selectedColors, selectedSizes, selectedMaterials, selectedFabricTypes, minDiscount, newArrivals, searchStringParam]);
+  }, [currentPage, searchTerm, selectedCategory, selectedSubcategory, priceRange, sortBy, inStockOnly, selectedRating, selectedColors, selectedSizes, selectedMaterials, selectedFabricTypes, minDiscount, newArrivals, selectedCollection, searchStringParam]);
+
+  // Keep the collection filter in sync when the ?collection= param changes while
+  // already on this page (e.g. jumping between the home sections' "View All" links).
+  useEffect(() => {
+    setSelectedCollection(COLLECTIONS.some((c) => c.key === collectionParam) ? (collectionParam as string) : '');
+    setCurrentPage(1);
+  }, [collectionParam]);
 
   // Handle URL change reflecting updated searches
   useEffect(() => {
@@ -298,6 +322,7 @@ const Products = () => {
     setSelectedFabricTypes([]);
     setMinDiscount(0);
     setNewArrivals(false);
+    setSelectedCollection('');
     setCurrentPage(1);
   };
 
@@ -315,7 +340,8 @@ const Products = () => {
     selectedMaterials.length +
     selectedFabricTypes.length +
     (minDiscount > 0 ? 1 : 0) +
-    (newArrivals ? 1 : 0);
+    (newArrivals ? 1 : 0) +
+    (selectedCollection ? 1 : 0);
 
   // Shared filter content renderer to avoid duplication
   const renderFilterContent = (isMobileDrawer: boolean) => (
@@ -346,6 +372,35 @@ const Products = () => {
           />
           <span className="ml-2 text-sm font-medium text-gray-700">New Arrivals</span>
         </label>
+      </div>
+
+      {/* Collections Filter — Featured / Top Selling / Best Seller (product tags) */}
+      <div>
+        <h4 className="text-base font-medium text-gray-900 mb-3">Collections</h4>
+        <div className="space-y-3">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="radio"
+              name={isMobileDrawer ? 'collection-mobile' : 'collection'}
+              checked={selectedCollection === ''}
+              onChange={() => { setSelectedCollection(''); setCurrentPage(1); }}
+              className="border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
+            />
+            <span className="ml-2 text-sm font-medium text-gray-700">All Products</span>
+          </label>
+          {COLLECTIONS.map((c) => (
+            <label key={c.key} className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                name={isMobileDrawer ? 'collection-mobile' : 'collection'}
+                checked={selectedCollection === c.key}
+                onChange={() => { setSelectedCollection(c.key); setCurrentPage(1); }}
+                className="border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
+              />
+              <span className="ml-2 text-sm font-medium text-gray-700">{c.label}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
       {/* Price Range Filter */}
@@ -598,20 +653,37 @@ const Products = () => {
     </div>
   );
 
+  // HD banner backdrop for the collection header — prefer the CURRENT category's
+  // own photo (contextual), else the first category with an image. Falls back to
+  // the plain light header when nothing is available.
+  const bannerImage: string | undefined = (
+    (categoryName && categoriesList.find((c) => c?.name === categoryName && c?.image)?.image) ||
+    categoriesList.find((c) => c?.image)?.image
+  ) as string | undefined;
+
   return (
     <div className='font-sans'>
       {/* Hero Section */}
-      <section className="relative bg-[#f7f7f5] py-6 sm:py-8 font-sans">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className={`relative overflow-hidden font-sans ${bannerImage ? 'py-10 sm:py-12 lg:py-14' : 'bg-[#f7f7f5] py-6 sm:py-8'}`}>
+        {bannerImage && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={bannerImage} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            {/* readability overlays: darken + a brand-tinted vignette */}
+            <div className="absolute inset-0 bg-linear-to-b from-black/65 via-black/45 to-black/65" />
+            <div className="absolute inset-0 bg-[radial-gradient(120%_120%_at_50%_0%,rgba(224,26,27,0.28)_0%,transparent_55%)]" />
+          </>
+        )}
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Reveal className="text-center">
-            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
-              <span className="h-px w-6 bg-[#e01a1b]" />
+            <span className={`inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] mb-3 ${bannerImage ? 'text-white/90' : 'text-[#e01a1b]'}`}>
+              <span className={`h-px w-6 ${bannerImage ? 'bg-white/70' : 'bg-[#e01a1b]'}`} />
               Shop
             </span>
-            <h1 className="font-playfair text-2xl sm:text-3xl lg:text-5xl font-semibold text-[#1a1a1a] mb-4 sm:mb-6 tracking-tight">
+            <h1 className={`font-playfair text-2xl sm:text-3xl lg:text-5xl font-semibold mb-4 sm:mb-6 tracking-tight ${bannerImage ? 'text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)]' : 'text-[#1a1a1a]'}`}>
               Our Product Collection
             </h1>
-            <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className={`text-base sm:text-lg lg:text-xl max-w-3xl mx-auto ${bannerImage ? 'text-white/90' : 'text-gray-600'}`}>
               Discover authentic, handcrafted textiles made by skilled artisans using traditional techniques
               passed down through generations.
             </p>
@@ -688,7 +760,7 @@ const Products = () => {
       </section>
 
       {/* Main Content with Sidebar */}
-      <section className="relative overflow-hidden bg-linear-to-b from-[#faf9f7] via-white to-[#fdf6f6] py-6 sm:py-8 lg:py-12">
+      <section className="relative overflow-hidden bg-linear-to-b from-[#faf9f7] via-white to-[#fdf6f6] py-6 sm:py-8 lg:py-10">
         <SectionBackdrop />
         <div className="relative max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex lg:gap-8">
@@ -849,6 +921,9 @@ const Products = () => {
 
       {/* Categories Section */}
       <Category />
+
+      {/* Become a Vendor Partner — advertisement CTA */}
+      <VendorPartnerCTA />
     </div>
   );
 };

@@ -1,7 +1,7 @@
 const { prisma } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const { sendStaffCredentialsEmail } = require('../utils/emailService');
+const { sendTemplatedEmail } = require('../utils/emailTemplateRenderer');
 
 // ==========================================
 // CUSTOMER MANAGEMENT
@@ -499,21 +499,20 @@ exports.createStaff = async (req, res) => {
             }
         });
 
-        try {
-            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-            const loginLink = `${frontendUrl}/admin/login`;
-            const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
-            await sendStaffCredentialsEmail({
-                to: email,
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const loginLink = `${frontendUrl}/admin/login`;
+        const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
+        await sendTemplatedEmail({
+            key: 'staff_credentials',
+            to: email,
+            data: {
                 name: `${firstName} ${lastName}`,
-                email: email,
+                email,
                 password: rawPassword,
                 loginLink,
-                verificationLink
-            });
-        } catch (emailError) {
-            console.error('Failed to send staff credentials email:', emailError);
-        }
+                verificationLink,
+            },
+        });
 
         res.status(201).json({ success: true, data: newStaff });
     } catch (error) {

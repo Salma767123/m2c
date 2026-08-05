@@ -1424,6 +1424,31 @@ enum OfferScope {
 }
 
 // ============================================
+// COURIER PARTNERS (admin-managed, dynamic)
+// ============================================
+//
+// Replaces the previously hard-coded courier catalogue. Admin curates the list; each
+// product then selects which of these couriers it ships with (Product.logisticsConfig
+// .courierIds). The storefront shows a product's selected couriers, filtered by the
+// shopper's region and the chosen transport mode.
+model Courier {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  code      String // short badge text, e.g. "BD", "DHL"
+  color     String   @default("#1a1a1a") // badge background colour (fallback when no logo)
+  logo      String? // optional uploaded logo image URL — shown instead of the code/colour badge
+  region    String // 'IN' (domestic) | 'US' (international)
+  modes     String[] @default([]) // which transport lanes: 'AIR' and/or 'SHIP'
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("couriers")
+}
+
+// ============================================
 // FREE SHIPPING OFFERS
 // ============================================
 
@@ -1546,6 +1571,66 @@ model CompanyInfo {
 }
 
 // ============================================
+// EMAIL TEMPLATES (admin-editable, DB-driven)
+// ============================================
+
+model EmailTemplate {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Stable identifier the backend code renders by (e.g. "vendor_approval_credentials").
+  // Never change once shipped — send-sites reference this.
+  key String @unique
+
+  // Grouping shown in the admin UI: "ACCOUNT" | "NOTIFICATIONS" | "SECURITY"
+  category String
+
+  name        String // Display title, e.g. "Vendor Account Approved"
+  description String // Subtitle preview, e.g. "Your {{brandName}} account has been approved"
+
+  subject  String // May contain {{variables}}
+
+  // Rendered, send-ready HTML (derived). Admins no longer edit this directly —
+  // it is regenerated from the structured text fields below + the code-side
+  // layout registry whenever the template is saved. The send path still just
+  // interpolates {{variables}} into this string.
+  bodyHtml String
+
+  // ── Structured, admin-editable text content ──
+  // The email is composed as: brand header (emoji + title + subtitle) → body
+  // message → auto tables/blocks → button → footer. Only these plain-text parts
+  // are editable in the UI; the structural pieces live in code.
+  emoji          String? // Header emoji, e.g. "🔑"
+  headerTitle    String? // Header title, e.g. "Welcome to QC Portal"
+  headerSubtitle String? // Header subtitle line
+  bodyText       String? // Main message, plain text; blank line = new paragraph; supports {{variables}}
+  buttonLabel    String? // CTA button label (only used if the template has a button)
+  footerText     String? // Footer line
+
+  // Display name shown in the "From" header, e.g. "QC Portal". Falls back to a
+  // global default when null.
+  fromName String?
+
+  // Variable names available to this template, for the editor's insert-chips.
+  variables String[] @default([])
+
+  // Admins can toggle a template off to stop it sending.
+  enabled Boolean @default(true)
+
+  // Security emails (password reset, email verification) always send and
+  // cannot be disabled in the UI.
+  isSecurity Boolean @default(false)
+
+  // Ordering within a category in the admin list.
+  sortOrder Int @default(0)
+
+  updatedBy String?  @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("email_templates")
+}
+
+// ============================================
 // VENDOR NOTIFICATION SETTINGS
 // ============================================
 
@@ -1622,6 +1707,14 @@ model BannerImage {
   altText      String?
   displayOrder Int      @default(0)
   isActive     Boolean  @default(true)
+  // Optional click-through target. When set, clicking the banner on the storefront
+  // navigates the shopper to the linked product/category page.
+  //   linkType  = 'product' | 'category' (null = not clickable)
+  //   linkValue = the target's slug (resolved to a URL on the storefront)
+  //   linkLabel = the target's display name, cached for the admin list/edit view
+  linkType     String?
+  linkValue    String?
+  linkLabel    String?
   updatedBy    String?  @db.ObjectId
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

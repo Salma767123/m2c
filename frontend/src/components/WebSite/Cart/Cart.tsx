@@ -8,7 +8,7 @@ import { couponService } from "@/services/couponService"
 import { publicProductService, PublicProduct } from "@/services/publicProductService"
 import { userAuthService } from "@/services/userAuthService"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
-import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, getCurrency, convertINRtoUSD } from "@/lib/currency"
+import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, getCurrency, getRegion, convertINRtoUSD } from "@/lib/currency"
 import { applyOfferToPrice, type ActiveOffer } from "@/lib/offers"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
 import { courierName } from "@/lib/couriers"
@@ -472,7 +472,7 @@ export default function Order() {
           // when there is no choice. Matches orderController's resolution exactly.
           const types = Array.isArray(config.transportTypes) ? config.transportTypes : []
           const mode = (item.transportType || types[0]) as 'AIR' | 'SHIP' | undefined
-          const result = calculateLogistics(config as LogisticsConfig, item.quantity, mode)
+          const result = calculateLogistics(config as LogisticsConfig, item.quantity, mode, getRegion())
           logisticsShippingInr += result.totalShippingCost
         }
       }

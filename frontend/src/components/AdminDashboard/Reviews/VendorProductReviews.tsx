@@ -6,7 +6,6 @@ import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
 import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalendar";
-import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import adminReviewService, { AdminOrderReview } from "@/services/adminReviewService";
 import { hasPermission } from "@/lib/auth";
 import { formatOrderAmount } from "@/lib/currency";
@@ -184,28 +183,27 @@ export default function VendorProductReviews() {
 
   return (
     <div className="p-6">
-      <Breadcrumb />
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Vendor Product Reviews</h1>
-        <p className="text-slate-600 mt-1">Quality check reviews given by admin after receiving products from vendors</p>
+        <h1 className="text-xl font-bold text-slate-900">Vendor Product Reviews</h1>
+        <p className="text-sm text-slate-500">Quality check reviews given by admin after receiving products from vendors</p>
       </div>
 
       {/* Stats — click the first three cards to filter the table below */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
         {metricCards.map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
           const clickable = key !== null;
           const isActive = clickable && filterStatus === key;
           const body = (
             <>
-              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
-                <span className="text-sm font-medium text-slate-500">{label}</span>
+              <div className="flex flex-row items-center justify-between px-3.5 pt-3 pb-1">
+                <span className="text-[13px] font-medium text-slate-500">{label}</span>
                 <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace("50", "100") : iconBg} transition-transform duration-150 ${clickable ? "group-hover:scale-110" : ""}`}>
                   <Icon className={`h-4 w-4 ${iconColor}`} />
                 </div>
               </div>
-              <div className="px-4 pb-4">
-                <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
-                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              <div className="px-3.5 pb-3">
+                <div className={`text-xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-[11px] text-slate-400 mt-0.5">{subtitle}</p>
               </div>
             </>
           );
@@ -265,15 +263,16 @@ export default function VendorProductReviews() {
       </Card>
 
       {/* Reviews Table */}
-      <Card>
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
         {loading ? (
           <div className="p-12 text-center">
             <RefreshCw className="h-8 w-8 animate-spin text-slate-400 mx-auto mb-3" />
             <p className="text-slate-500">Loading reviews...</p>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11 [&_th]:px-4">
               <TableRow>
                 <TableHead>Product</TableHead>
                 <TableHead>Vendor</TableHead>
@@ -287,7 +286,7 @@ export default function VendorProductReviews() {
             <TableBody>
               {paginatedReviews.length > 0 ? (
                 paginatedReviews.map((review) => (
-                  <TableRow key={review.id}>
+                  <TableRow key={review.id} className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0">
                     <TableCell>
                       <div className="flex items-center gap-3">
                         {review.productImage ? (
@@ -360,12 +359,12 @@ export default function VendorProductReviews() {
               )}
             </TableBody>
           </Table>
+          </div>
         )}
-      </Card>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-end gap-3 text-sm">
+        <div className="flex items-center justify-end gap-3 text-sm px-4 py-3 border-t border-slate-100">
           <div className="flex items-center gap-1">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -383,7 +382,7 @@ export default function VendorProductReviews() {
                   key={`p-${p}`}
                   onClick={() => setCurrentPage(p as number)}
                   aria-current={p === currentPage ? 'page' : undefined}
-                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/20' : 'text-slate-700 hover:bg-slate-100'}`}
                 >
                   {p}
                 </button>
@@ -400,6 +399,7 @@ export default function VendorProductReviews() {
           </div>
         </div>
       )}
+      </div>
 
       {/* Detail Modal */}
       {selectedReview && (

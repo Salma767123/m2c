@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Outfit, Playfair_Display } from "next/font/google";
+import { Outfit, Poppins } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/UI/Toaster";
 import PageTracker from "@/components/Analytics/PageTracker";
@@ -11,10 +11,13 @@ const outfit = Outfit({
   subsets: ["latin"],
 });
 
-const playfair = Playfair_Display({
+// Headings use Poppins. The variable name is kept as --font-playfair so every existing
+// `font-playfair` usage across the site switches to Poppins with no per-component edits.
+const playfair = Poppins({
   variable: "--font-playfair",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {

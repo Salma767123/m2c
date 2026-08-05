@@ -6,6 +6,8 @@ import { Package } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { categoryService } from '@/services/categoryService';
 import Reveal from '@/components/WebSite/Shared/Reveal';
+import TopSelling from '@/components/WebSite/Featured/TopSelling';
+import NoticeBoard from '@/components/WebSite/NoticeBoard/NoticeBoard';
 
 interface Category {
   id: string;
@@ -199,8 +201,19 @@ export default function Categories() {
               ))}
             </div>
           )}
+        </div>
+      </div>
 
-          <Reveal className="mt-10 sm:mt-12 lg:mt-16 bg-[#f7f7f5] rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-5 sm:p-6 lg:p-8 text-center">
+      {/* Top-selling products — same live rail as the home page */}
+      <TopSelling />
+
+      {/* What's Happening — live offers / coupons board */}
+      <NoticeBoard />
+
+      {/* Need Help card */}
+      <div className="pb-10 sm:pb-12 lg:pb-16">
+        <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+          <Reveal className="bg-[#f7f7f5] rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-5 sm:p-6 lg:p-8 text-center">
             <h2 className="font-playfair text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a1a1a] mb-3 sm:mb-4 tracking-tight">Need Help?</h2>
             <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
               Use our search feature or contact our support team for assistance finding specific products.
