@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Award, Eye, ShieldCheck } from 'lucide-react'
+import { useEffect } from 'react'
+import { Award, ShieldCheck } from 'lucide-react'
 import VerifyField, { SectionBlock, Verifications } from './VI_VerifyField'
-import DocViewerModal from '@/components/UI/DocViewerModal'
 
 interface Props {
   vendor: any
@@ -13,8 +12,6 @@ interface Props {
 }
 
 export default function VI_Step6_Certifications({ vendor: v, verifications, onChange, onRegisterFields }: Props) {
-  const [viewerDoc, setViewerDoc] = useState<{ url: string; name: string } | null>(null)
-
   const vf = (key: string, label: string, value: any, type?: any) => (
     <VerifyField key={key} fieldKey={key} label={label} value={value} type={type} verifications={verifications} onChange={onChange} />
   )
@@ -61,15 +58,7 @@ export default function VI_Step6_Certifications({ vendor: v, verifications, onCh
                       value={cert.name}
                       verifications={verifications}
                       onChange={onChange}
-                      headerAction={cert.documentUrl ? (
-                        <button
-                          type="button"
-                          onClick={() => setViewerDoc({ url: cert.documentUrl, name: cert.name || 'Certificate' })}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors shrink-0"
-                        >
-                          <Eye className="w-3 h-3" /> View
-                        </button>
-                      ) : undefined}
+                      documentUrl={cert.documentUrl || undefined}
                     />
                     {cert.expiryDate && vf(`${prefix}_expiryDate`, 'Expiry Date', cert.expiryDate, 'date')}
                     {cert.description && vf(`${prefix}_description`, 'Description', cert.description)}
@@ -92,13 +81,5 @@ export default function VI_Step6_Certifications({ vendor: v, verifications, onCh
         </SectionBlock>
       )}
     </div>
-    {viewerDoc && (
-      <DocViewerModal
-        url={viewerDoc.url}
-        name={viewerDoc.name}
-        readOnly
-        onClose={() => setViewerDoc(null)}
-      />
-    )}
   </>)
 }

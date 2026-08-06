@@ -212,9 +212,12 @@ interface VerifyFieldProps {
   type?: 'text' | 'image' | 'document' | 'list' | 'date' | 'url' | 'badge' | 'phone' | 'email'
   /** Optional action rendered in the top-right of the card, beside the label */
   headerAction?: React.ReactNode
+  /** When set, a "View" button opens this document and the Yes/No verification
+   *  stays LOCKED until the checker has opened & viewed it at least once. */
+  documentUrl?: string
 }
 
-export default function VerifyField({ fieldKey, label, value, verifications, onChange, type, headerAction }: VerifyFieldProps) {
+export default function VerifyField({ fieldKey, label, value, verifications, onChange, type, headerAction, documentUrl }: VerifyFieldProps) {
   const highlightedKeys = useContext(HighlightedFieldsCtx)
   const v = verifications[fieldKey] ?? { ok: null, remarks: '' }
   const isEmpty = value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)
@@ -222,10 +225,22 @@ export default function VerifyField({ fieldKey, label, value, verifications, onC
   const missingRemarks = v.ok === false && !v.remarks.trim()
   const needsHighlight = highlightedKeys.has(fieldKey) && (v.ok === null || missingRemarks)
 
-  const setOk = (ok: boolean) => onChange(fieldKey, ok, v.remarks)
+  // Document gate: a field carrying a document must be OPENED & VIEWED before its
+  // Yes/No verification unlocks. Touching the locked option reveals a hint.
+  const [docViewerOpen, setDocViewerOpen] = useState(false)
+  const [docViewed, setDocViewed] = useState(false)
+  const [showViewHint, setShowViewHint] = useState(false)
+  const gated = !!documentUrl && !docViewed
+  const openDoc = () => { setDocViewerOpen(true); setDocViewed(true); setShowViewHint(false) }
+
+  const setOk = (ok: boolean) => {
+    if (gated) { setShowViewHint(true); return }
+    onChange(fieldKey, ok, v.remarks)
+  }
   const setRemarks = (remarks: string) => onChange(fieldKey, v.ok, remarks)
 
   return (
+    <>
     <div
       id={`vf-${fieldKey}`}
       data-invalid={needsHighlight ? 'true' : undefined}
@@ -242,7 +257,19 @@ export default function VerifyField({ fieldKey, label, value, verifications, onC
       <div className="p-4">
         <div className="flex items-center justify-between gap-2 mb-1">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
-          {headerAction}
+          {documentUrl ? (
+            <button
+              type="button"
+              onClick={openDoc}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors shrink-0 ${
+                docViewed
+                  ? 'text-slate-600 bg-slate-50 border-slate-200 hover:bg-slate-100'
+                  : 'text-brand-700 bg-brand-50 border-brand-200 hover:bg-brand-100 ring-1 ring-brand-200/70'
+              }`}
+            >
+              <Eye className="w-3 h-3" /> {docViewed ? 'View again' : 'View'}
+            </button>
+          ) : headerAction}
         </div>
         <div className="min-h-[1.5rem]">
           {isEmpty
@@ -253,29 +280,45 @@ export default function VerifyField({ fieldKey, label, value, verifications, onC
       </div>
 
       <div className="border-t border-slate-100 px-4 py-3 flex flex-col gap-2">
-        <p className="text-xs font-semibold text-slate-600">Verification</p>
+        <p className="text-xs font-semibold text-slate-600">
+          Verification
+          {gated && <span className="ml-1 font-normal text-amber-600">· view the document to unlock</span>}
+        </p>
         <div className="flex gap-6">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
+          <label
+            className={`flex items-center gap-2 select-none ${gated ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+            onClick={(e) => { if (gated) { e.preventDefault(); setShowViewHint(true) } }}
+          >
             <input
               type="radio"
               name={`verify_${fieldKey}`}
               checked={v.ok === true}
               onChange={() => setOk(true)}
-              className="w-4 h-4 accent-emerald-600"
+              disabled={gated}
+              className="w-4 h-4 accent-emerald-600 disabled:opacity-40"
             />
-            <span className={`text-sm font-semibold ${v.ok === true ? 'text-emerald-700' : 'text-slate-600'}`}>Yes</span>
+            <span className={`text-sm font-semibold ${gated ? 'text-slate-400' : v.ok === true ? 'text-emerald-700' : 'text-slate-600'}`}>Yes</span>
           </label>
-          <label className="flex items-center gap-2 cursor-pointer select-none">
+          <label
+            className={`flex items-center gap-2 select-none ${gated ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+            onClick={(e) => { if (gated) { e.preventDefault(); setShowViewHint(true) } }}
+          >
             <input
               type="radio"
               name={`verify_${fieldKey}`}
               checked={v.ok === false}
               onChange={() => setOk(false)}
-              className="w-4 h-4 accent-red-600"
+              disabled={gated}
+              className="w-4 h-4 accent-red-600 disabled:opacity-40"
             />
-            <span className={`text-sm font-semibold ${v.ok === false ? 'text-red-700' : 'text-slate-600'}`}>No</span>
+            <span className={`text-sm font-semibold ${gated ? 'text-slate-400' : v.ok === false ? 'text-red-700' : 'text-slate-600'}`}>No</span>
           </label>
         </div>
+        {gated && showViewHint && (
+          <p className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 font-medium">
+            <Eye className="w-3.5 h-3.5 shrink-0" /> Please open and view the document first, then mark Yes or No.
+          </p>
+        )}
         {needsHighlight && (
           <p className="text-xs text-red-600 font-medium">
             {v.ok === null
@@ -303,6 +346,10 @@ export default function VerifyField({ fieldKey, label, value, verifications, onC
         )}
       </div>
     </div>
+    {docViewerOpen && documentUrl && (
+      <DocViewerModal url={documentUrl} name={label} readOnly onClose={() => setDocViewerOpen(false)} />
+    )}
+    </>
   )
 }
 
@@ -344,40 +391,19 @@ export function DocCard({ doc, index, fieldKey, verifications, onChange }: {
   verifications: Verifications
   onChange: (key: string, ok: boolean | null, remarks: string) => void
 }) {
-  const [viewerOpen, setViewerOpen] = useState(false)
   const url = doc.documentUrl || ''
   const name = doc.name || doc.type || `Document ${index + 1}`
   const isImg = isImageUrl(url, doc.name)
 
-  const viewButton = url ? (
-    <button
-      type="button"
-      onClick={() => setViewerOpen(true)}
-      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors shrink-0"
-    >
-      <Eye className="w-3 h-3" /> View
-    </button>
-  ) : undefined
-
   return (
-    <>
-      <VerifyField
-        fieldKey={fieldKey}
-        label={name}
-        value={url}
-        type={isImg ? 'image' : 'document'}
-        verifications={verifications}
-        onChange={onChange}
-        headerAction={viewButton}
-      />
-      {viewerOpen && url && (
-        <DocViewerModal
-          url={url}
-          name={name}
-          readOnly
-          onClose={() => setViewerOpen(false)}
-        />
-      )}
-    </>
+    <VerifyField
+      fieldKey={fieldKey}
+      label={name}
+      value={url}
+      type={isImg ? 'image' : 'document'}
+      verifications={verifications}
+      onChange={onChange}
+      documentUrl={url || undefined}
+    />
   )
 }

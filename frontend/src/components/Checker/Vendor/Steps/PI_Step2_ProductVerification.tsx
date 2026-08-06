@@ -1,8 +1,7 @@
 'use client'
 
-import { Package, Image as ImageIcon, Layers, Tag, Ruler, Upload, X, Eye } from 'lucide-react'
+import { Package, Image as ImageIcon, Layers, Tag, Ruler, Upload, X } from 'lucide-react'
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
 import VerifyField, { SectionBlock, HighlightFieldsProvider, type Verifications } from './VI_VerifyField'
 import ImageCropModal from '@/components/UI/ImageCropModal'
 import { getExpectedProductVerificationKeys } from '@/components/Checker/Products/validation'
@@ -111,7 +110,6 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
   }
 
   // ── Image viewer modal ───────────────────────────────────────────────────
-  const [viewingImage, setViewingImage] = useState<{ url: string; label: string } | null>(null)
 
   // ── Crop state for photo evidence ────────────────────────────────────────
   const [cropQueue, setCropQueue] = useState<File[]>([])
@@ -235,17 +233,7 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
                   type="image"
                   verifications={verifications}
                   onChange={onVerify}
-                  headerAction={
-                    imgUrl ? (
-                      <button
-                        type="button"
-                        onClick={() => setViewingImage({ url: imgUrl, label: imgLabel })}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-2 py-0.5 rounded-lg border border-brand-100 transition-colors"
-                      >
-                        <Eye className="w-3 h-3" /> View
-                      </button>
-                    ) : undefined
-                  }
+                  documentUrl={imgUrl || undefined}
                 />
               )
             })}
@@ -349,15 +337,7 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
                       <VerifyField fieldKey={`pv_var${vi}_image`} label="Variant Image"
                         value={variant.images[0]} type="image"
                         verifications={verifications} onChange={onVerify}
-                        headerAction={
-                          <button
-                            type="button"
-                            onClick={() => setViewingImage({ url: variant.images[0], label: `Variant ${vi + 1} Image` })}
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-2 py-0.5 rounded-lg border border-brand-100 transition-colors"
-                          >
-                            <Eye className="w-3 h-3" /> View
-                          </button>
-                        } />
+                        documentUrl={variant.images[0] || undefined} />
                     )}
                   </div>
                 </div>
@@ -504,34 +484,6 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
         onCropped={onEvidenceCropped}
       />
 
-      {/* ── Image viewer lightbox ─────────────────────────────────────────── */}
-      {viewingImage && typeof document !== 'undefined' && createPortal(
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/85 backdrop-blur-sm p-4"
-          onClick={() => setViewingImage(null)}
-        >
-          <div
-            className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => setViewingImage(null)}
-              className="absolute -top-4 -right-4 w-9 h-9 bg-white rounded-full shadow-xl flex items-center justify-center z-10 hover:bg-slate-50 transition-colors"
-              aria-label="Close viewer"
-            >
-              <X className="w-4 h-4 text-slate-700" />
-            </button>
-            <img
-              src={viewingImage.url}
-              alt={viewingImage.label}
-              className="max-w-full max-h-[80vh] rounded-xl object-contain shadow-2xl"
-            />
-            <p className="text-white/80 text-sm mt-3 text-center">{viewingImage.label}</p>
-          </div>
-        </div>,
-        document.body
-      )}
     </div>
     </HighlightFieldsProvider>
   )

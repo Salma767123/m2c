@@ -1,10 +1,9 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { Warehouse, MapPin, Image as ImageIcon, Camera, X, Eye } from 'lucide-react'
+import { Warehouse, MapPin, Image as ImageIcon, Camera, X } from 'lucide-react'
 import VerifyField, { SectionBlock, Verifications } from './VI_VerifyField'
 import ImageCropModal from '@/components/UI/ImageCropModal'
-import DocViewerModal from '@/components/UI/DocViewerModal'
 import { notifyUploadSuccess } from '@/lib/toast-utils'
 
 function getOwnershipTypeLabel(val: string) {
@@ -163,7 +162,6 @@ const WAREHOUSE_PHOTO_ORDER: Record<string, number> = {
 const isFactorySiteDoc = (name: string) => (name || '').startsWith('Factory Site')
 
 export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, onChange, onRegisterFields, factoryEvidence, onEvidenceChange, evidenceError }: Props) {
-  const [viewerImg, setViewerImg] = useState<{ url: string; name: string } | null>(null)
 
   const vf = (key: string, label: string, value: any, type?: any) => (
     <VerifyField key={key} fieldKey={key} label={label} value={value} type={type} verifications={verifications} onChange={onChange} />
@@ -263,20 +261,45 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
                   type="image"
                   verifications={verifications}
                   onChange={onChange}
-                  headerAction={img.url ? (
-                    <button
-                      type="button"
-                      onClick={() => setViewerImg({ url: img.url, name: img.label })}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors shrink-0"
-                    >
-                      <Eye className="w-3 h-3" /> View
-                    </button>
-                  ) : undefined}
+                  documentUrl={img.url || undefined}
                 />
               ))}
             </div>
           </div>
         )}
+
+        {/* Inspector Evidence Photos — Legal Address & Factory Site (sits right under
+            the Factory Images so evidence lines up with what it verifies). */}
+        <div id="inspector-evidence-photos" className="mt-6 pt-5 border-t border-slate-100">
+          <p className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+            <Camera className="w-4 h-4 text-brand-500" /> Inspector Evidence Photos — Legal Address &amp; Factory Site
+          </p>
+          <p className="text-xs text-slate-500 mb-3">Upload photos taken during the visit. All three are required.</p>
+          {evidenceError && (
+            <p className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
+              All three Legal Address &amp; Factory Site evidence photos are required before continuing.
+            </p>
+          )}
+          <div className={evidenceError ? 'ring-2 ring-red-300 ring-offset-2 rounded-xl p-2' : ''}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <EvidenceUpload
+                label="Factory Site Name Board"
+                value={factoryEvidence.nameBoard}
+                onChange={(photo) => onEvidenceChange('nameBoard', photo)}
+              />
+              <EvidenceUpload
+                label="Factory Site Front View"
+                value={factoryEvidence.frontView}
+                onChange={(photo) => onEvidenceChange('frontView', photo)}
+              />
+              <EvidenceUpload
+                label="Factory Site Route Map"
+                value={factoryEvidence.routeMap}
+                onChange={(photo) => onEvidenceChange('routeMap', photo)}
+              />
+            </div>
+          </div>
+        </div>
       </SectionBlock>
 
       {/* Section 2: Warehouse Address */}
@@ -331,103 +354,49 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
                   type="image"
                   verifications={verifications}
                   onChange={onChange}
-                  headerAction={img.url ? (
-                    <button
-                      type="button"
-                      onClick={() => setViewerImg({ url: img.url, name: img.label })}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors shrink-0"
-                    >
-                      <Eye className="w-3 h-3" /> View
-                    </button>
-                  ) : undefined}
+                  documentUrl={img.url || undefined}
                 />
               ))}
             </div>
           </div>
         )}
-      </SectionBlock>
 
-      {/* Inspector Evidence Photos */}
-      <div id="inspector-evidence-photos">
-        <SectionBlock title="Inspector Evidence Photos" icon={<Camera className="w-4 h-4" />}>
-          <p className="text-xs text-slate-500 mb-4">
-            Upload photos taken during the visit to serve as inspection evidence.{' '}
-            {isSameAsWarehouse
-              ? 'All three Legal Address & Factory Site photos are required.'
-              : 'All three Legal Address & Factory Site photos and all three Warehouse photos are required.'}
-          </p>
-          {evidenceError && (
-            <p className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
-              {isSameAsWarehouse
-                ? 'All three evidence photos are required before continuing.'
-                : 'All six evidence photos (Legal Address & Factory Site and Warehouse) are required before continuing.'}
+        {/* Inspector Evidence Photos — Warehouse (sits right under the Warehouse Images).
+            Only when the warehouse address differs from the Legal Address & Factory Site;
+            when they're the same, the factory-site evidence above already covers it. */}
+        {!isSameAsWarehouse && (
+          <div className="mt-6 pt-5 border-t border-slate-100">
+            <p className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+              <Camera className="w-4 h-4 text-brand-500" /> Inspector Evidence Photos — Warehouse
             </p>
-          )}
-
-          <div className={evidenceError ? 'ring-2 ring-red-300 ring-offset-2 rounded-xl p-2 space-y-8' : 'space-y-8'}>
-            {/* Group 1: Legal Address & Factory Site */}
-            <div>
-              <p className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-1.5">
-                <Warehouse className="w-4 h-4 text-brand-500" /> Legal Address &amp; Factory Site — Photo Evidence
+            <p className="text-xs text-slate-500 mb-3">Upload photos taken during the visit. All three are required.</p>
+            {evidenceError && (
+              <p className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
+                All three Warehouse evidence photos are required before continuing.
               </p>
+            )}
+            <div className={evidenceError ? 'ring-2 ring-red-300 ring-offset-2 rounded-xl p-2' : ''}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <EvidenceUpload
-                  label="Factory Site Name Board"
-                  value={factoryEvidence.nameBoard}
-                  onChange={(photo) => onEvidenceChange('nameBoard', photo)}
+                  label="Warehouse Name Board"
+                  value={factoryEvidence.warehouseNameBoard}
+                  onChange={(photo) => onEvidenceChange('warehouseNameBoard', photo)}
                 />
                 <EvidenceUpload
-                  label="Factory Site Front View"
-                  value={factoryEvidence.frontView}
-                  onChange={(photo) => onEvidenceChange('frontView', photo)}
+                  label="Warehouse Front View"
+                  value={factoryEvidence.warehouseFrontView}
+                  onChange={(photo) => onEvidenceChange('warehouseFrontView', photo)}
                 />
                 <EvidenceUpload
-                  label="Factory Site Route Map"
-                  value={factoryEvidence.routeMap}
-                  onChange={(photo) => onEvidenceChange('routeMap', photo)}
+                  label="Warehouse Route Map"
+                  value={factoryEvidence.warehouseRouteMap}
+                  onChange={(photo) => onEvidenceChange('warehouseRouteMap', photo)}
                 />
               </div>
             </div>
-
-            {/* Group 2: Warehouse — only when the warehouse address differs from
-                the Legal Address & Factory Site. When they're the same, the
-                factory-site photos above already cover the site. */}
-            {!isSameAsWarehouse && (
-              <div>
-                <p className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-brand-500" /> Warehouse — Photo Evidence
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <EvidenceUpload
-                    label="Warehouse Name Board"
-                    value={factoryEvidence.warehouseNameBoard}
-                    onChange={(photo) => onEvidenceChange('warehouseNameBoard', photo)}
-                  />
-                  <EvidenceUpload
-                    label="Warehouse Front View"
-                    value={factoryEvidence.warehouseFrontView}
-                    onChange={(photo) => onEvidenceChange('warehouseFrontView', photo)}
-                  />
-                  <EvidenceUpload
-                    label="Warehouse Route Map"
-                    value={factoryEvidence.warehouseRouteMap}
-                    onChange={(photo) => onEvidenceChange('warehouseRouteMap', photo)}
-                  />
-                </div>
-              </div>
-            )}
           </div>
-        </SectionBlock>
-      </div>
+        )}
+      </SectionBlock>
     </div>
-
-    {viewerImg && (
-      <DocViewerModal
-        url={viewerImg.url}
-        name={viewerImg.name}
-        readOnly
-        onClose={() => setViewerImg(null)}
-      />
-    )}
   </>)
 }
