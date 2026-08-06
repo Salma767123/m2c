@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { userManagementService, Customer } from '@/services/userManagementService';
-import { Card, CardContent } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
 import { Badge } from '@/components/UI/Badge';
 import {
@@ -13,7 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/UI/Table';
-import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb';
 import { hasPermission } from '@/lib/auth';
 import Dropdown from '@/components/UI/Dropdown';
 import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar';
@@ -224,21 +222,17 @@ export default function CustomerManagement() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Breadcrumb */}
-      <Breadcrumb />
+    <div className="space-y-4">
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Customer Management</h1>
-          <p className="text-slate-600">Manage customer accounts and their status</p>
-        </div>
-        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold text-slate-900">Customer Management</h1>
+          <p className="text-sm text-slate-500">Manage customer accounts and their status</p>
         </div>
       </div>
       {/* Stats Cards — click a card to filter the table below by that metric */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {statCards.map(({ key, title, value, subtitle, Icon, iconBg, iconColor, countColor, activeClass }) => {
           const isActive = statusFilter === key;
           const toggle = () => setStatusFilter((prev) => (key === 'all' || prev === key ? 'all' : key));
@@ -250,15 +244,15 @@ export default function CustomerManagement() {
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
               className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : 'border-slate-200/80 hover:border-slate-300'}`}
             >
-              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
-                <span className="text-sm font-medium text-slate-500">{title}</span>
+              <div className="flex flex-row items-center justify-between px-3.5 pt-3 pb-1">
+                <span className="text-[13px] font-medium text-slate-500">{title}</span>
                 <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace('50', '100') : iconBg} transition-transform duration-150 group-hover:scale-110`}>
                   <Icon className={`h-4 w-4 ${iconColor}`} />
                 </div>
               </div>
-              <div className="px-4 pb-4">
-                <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
-                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              <div className="px-3.5 pb-3">
+                <div className={`text-xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-[11px] text-slate-400 mt-0.5">{subtitle}</p>
               </div>
             </button>
           );
@@ -301,11 +295,11 @@ export default function CustomerManagement() {
           </div>
         </div>
       </div>
-      {/* Customers Table */}
-      <Card>
-        <CardContent>
+      {/* Customers Table — matches the Vendor Management table style */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
+            <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11 [&_th]:px-4">
               <TableRow>
                 <TableHead>Customer</TableHead>
                 <TableHead>Contact</TableHead>
@@ -329,7 +323,7 @@ export default function CustomerManagement() {
                 </TableRow>
               ) : (
                 paginatedCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
+                  <TableRow key={customer.id} className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0">
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center">
@@ -416,18 +410,18 @@ export default function CustomerManagement() {
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-end gap-3 text-sm">
+        {totalPages > 1 && (
+        <div className="flex items-center justify-end gap-3 text-sm px-4 py-3 border-t border-slate-100">
           <div className="flex items-center gap-1">
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
             {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
           </div>
         </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, Fragment } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
+import { Card, CardHeader, CardTitle } from "@/components/UI/Card"
 import { Button } from "@/components/UI/Button"
 import Link from 'next/link'
 import { Badge } from "@/components/UI/Badge"
@@ -274,7 +274,7 @@ export default function ProductsTable() {
         </div>
         
         {/* Metric Cards — click a card to filter by approval status */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
           {metricCards.map(({ key, label, subtitle, count, Icon, iconBg, iconColor, countColor, activeClass }) => {
             const isActive = filters.approvalStatus === key
             return (
@@ -284,15 +284,15 @@ export default function ProductsTable() {
                 onClick={() => handleMetricClick(key)}
                 className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : 'border-slate-200/80 hover:border-slate-300'}`}
               >
-                <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
-                  <span className="text-sm font-medium text-slate-500">{label}</span>
+                <div className="flex flex-row items-center justify-between px-3.5 pt-3 pb-1">
+                  <span className="text-[13px] font-medium text-slate-500">{label}</span>
                   <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace('50', '100') : iconBg} transition-transform duration-150 group-hover:scale-110`}>
                     <Icon className={`h-4 w-4 ${iconColor}`} />
                   </div>
                 </div>
-                <div className="px-4 pb-4">
-                  <div className={`text-2xl font-bold ${countColor}`}>{count}</div>
-                  <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+                <div className="px-3.5 pb-3">
+                  <div className={`text-xl font-bold ${countColor}`}>{count}</div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{subtitle}</p>
                 </div>
               </button>
             )
@@ -378,9 +378,10 @@ export default function ProductsTable() {
         </div>
       </CardHeader>
 
-      <CardContent>
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
         <Table>
-          <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
+          <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11 [&_th]:px-4">
             <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
               <TableHead>Product</TableHead>
               <TableHead>Vendor</TableHead>
@@ -415,7 +416,7 @@ export default function ProductsTable() {
               const isExpanded = expandedIds.has(product.id)
               return (
               <Fragment key={product.id}>
-              <TableRow className={isExpanded && hasVariants ? 'bg-brand-50/40 hover:bg-brand-50/50 [&>td:first-child]:shadow-[inset_3px_0_0_0_var(--color-brand-500,#e01a1b)]' : ''}>
+              <TableRow className={`transition-colors duration-150 border-b border-slate-100 last:border-0 ${isExpanded && hasVariants ? 'bg-brand-50/40 hover:bg-brand-50/50 [&>td:first-child]:shadow-[inset_3px_0_0_0_var(--color-brand-500,#e01a1b)]' : 'hover:bg-slate-50/60'}`}>
                 <TableCell>
                   <div className="flex items-center space-x-3">
                     {hasVariants ? (
@@ -604,18 +605,19 @@ export default function ProductsTable() {
             })}
           </TableBody>
         </Table>
+        </div>
 
         {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-end gap-3 text-sm mt-4">
+          <div className="flex items-center justify-end gap-3 text-sm px-4 py-3 border-t border-slate-100">
             <div className="flex items-center gap-1">
               <button onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))} disabled={pagination.currentPage === 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-              {getPageRange(pagination.currentPage, pagination.totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setPagination(prev => ({ ...prev, currentPage: p as number }))} aria-current={p === pagination.currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === pagination.currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+              {getPageRange(pagination.currentPage, pagination.totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setPagination(prev => ({ ...prev, currentPage: p as number }))} aria-current={p === pagination.currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === pagination.currentPage ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/20' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
               <button onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))} disabled={pagination.currentPage === pagination.totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
             </div>
           </div>
         )}
-      </CardContent>
+      </div>
 
       <ApproveProductModal
         product={approvingProduct as unknown as ApprovableProduct}

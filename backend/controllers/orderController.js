@@ -320,8 +320,11 @@ const createOrder = async (req, res) => {
                 lineCourier = item.courier;
             }
 
+            // Region drives the SHIP lane's cost (SURFACE domestic vs SEA international).
+            // The order currency is the source of truth: INR = .in, USD = .com.
             computedShippingInr += calculateLogistics(
-                product.logisticsConfig, item.quantity, lineTransport || undefined
+                product.logisticsConfig, item.quantity, lineTransport || undefined,
+                currency === 'INR' ? 'IN' : 'US'
             ).totalShippingCost;
 
             // Calculate Vendor Settlement using vendor's base price.

@@ -1,39 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Briefcase, Eye, FileText, Image as ImageIcon, Phone } from 'lucide-react'
+import { useEffect } from 'react'
+import { Briefcase, FileText, Image as ImageIcon, Phone } from 'lucide-react'
 import VerifyField, { SectionBlock, DocCard, Verifications } from './VI_VerifyField'
-import DocViewerModal from '@/components/UI/DocViewerModal'
 import { formatLocalLandline, formatIntlLandline } from '@/components/VendorHub/FormUI'
 
 const COMPANY_DOC_TYPES = ['GST_CERTIFICATE', 'PAN_CARD', 'COMPANY_REGISTRATION', 'AADHAAR_CARD', 'TRADE_LICENSE', 'EXPORT_LICENSE']
-
-// "View" header action for a regulatory-ID card whose certificate was
-// uploaded — opens the same read-only DocViewerModal DocCard uses.
-function DocViewAction({ doc }: { doc: any }) {
-  const [open, setOpen] = useState(false)
-  const url = doc?.documentUrl || ''
-  if (!url) return null
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors shrink-0"
-      >
-        <Eye className="w-3 h-3" /> View
-      </button>
-      {open && (
-        <DocViewerModal
-          url={url}
-          name={doc.name || doc.type || 'Document'}
-          readOnly
-          onClose={() => setOpen(false)}
-        />
-      )}
-    </>
-  )
-}
 
 function getBusinessTypeLabel(val: string) {
   const map: Record<string, string> = {
@@ -63,8 +35,8 @@ interface Props {
 }
 
 export default function VI_Step1_CompanyInfo({ vendor: v, verifications, onChange, onRegisterFields }: Props) {
-  const vf = (key: string, label: string, value: any, type?: any, headerAction?: React.ReactNode) => (
-    <VerifyField key={key} fieldKey={key} label={label} value={value} type={type} verifications={verifications} onChange={onChange} headerAction={headerAction} />
+  const vf = (key: string, label: string, value: any, type?: any, headerAction?: React.ReactNode, documentUrl?: string) => (
+    <VerifyField key={key} fieldKey={key} label={label} value={value} type={type} verifications={verifications} onChange={onChange} headerAction={headerAction} documentUrl={documentUrl} />
   )
 
   const companyDocs = Array.isArray(v.documents)
@@ -160,14 +132,14 @@ export default function VI_Step1_CompanyInfo({ vendor: v, verifications, onChang
       <SectionBlock title="Regulatory IDs & Documents" icon={<FileText className="w-4 h-4" />}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {v.gstNumber
-            ? vf('c_gstNumber', 'GST Number', v.gstNumber, undefined, <DocViewAction doc={gstDoc} />)
+            ? vf('c_gstNumber', 'GST Number', v.gstNumber, undefined, undefined, gstDoc?.documentUrl)
             : vf('c_unregistered', 'GST Status', 'Unregistered — no GST number')
           }
-          {v.panNumber && vf('c_panNumber', v.businessType === 'proprietorship' ? 'Proprietor PAN' : 'Company PAN', v.panNumber, undefined, <DocViewAction doc={panDoc} />)}
-          {v.companyIdNumber && vf('c_companyIdNumber', getCompanyIdLabel(v.businessType), v.companyIdNumber, undefined, <DocViewAction doc={companyIdDoc} />)}
+          {v.panNumber && vf('c_panNumber', v.businessType === 'proprietorship' ? 'Proprietor PAN' : 'Company PAN', v.panNumber, undefined, undefined, panDoc?.documentUrl)}
+          {v.companyIdNumber && vf('c_companyIdNumber', getCompanyIdLabel(v.businessType), v.companyIdNumber, undefined, undefined, companyIdDoc?.documentUrl)}
           {v.hasImportExport && vf('c_hasImportExport', 'Import/Export Activities', v.hasImportExport === 'yes' ? 'Yes' : v.hasImportExport === 'no' ? 'No' : v.hasImportExport)}
-          {v.iecCode && vf('c_iecCode', 'IEC Code', v.iecCode, undefined, <DocViewAction doc={iecDoc} />)}
-          {v.aadhaarNumber && vf('c_aadhaarNumber', 'Aadhaar Number', v.aadhaarNumber, undefined, <DocViewAction doc={aadhaarDoc} />)}
+          {v.iecCode && vf('c_iecCode', 'IEC Code', v.iecCode, undefined, undefined, iecDoc?.documentUrl)}
+          {v.aadhaarNumber && vf('c_aadhaarNumber', 'Aadhaar Number', v.aadhaarNumber, undefined, undefined, aadhaarDoc?.documentUrl)}
           {v.website && vf('c_website', 'Website', v.website, 'url')}
           {/* Docs with no owning ID card on this vendor (e.g. trade license) */}
           {unmatchedDocs.map((doc: any, idx: number) => (

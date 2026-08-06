@@ -97,9 +97,9 @@ export default function Category() {
   if (loading) {
     /* Skeleton mirrors the loaded section (header row + responsive category grid). */
     return (
-      <section className="py-8 sm:py-12 md:py-16 lg:py-20 bg-white font-sans">
+      <section className="py-6 sm:py-8 lg:py-10 bg-white font-sans">
         <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 sm:gap-6 lg:gap-8 mb-8 sm:mb-10 md:mb-12 lg:mb-16">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 sm:gap-6 lg:gap-8 mb-5 sm:mb-6 lg:mb-8">
             <div className="flex-1 space-y-3">
               <div className="h-7 md:h-8 lg:h-10 w-48 md:w-64 bg-gray-200 rounded animate-pulse mx-auto lg:mx-0" />
               <div className="h-4 md:h-5 w-full max-w-md bg-gray-100 rounded animate-pulse mx-auto lg:mx-0" />
@@ -126,12 +126,12 @@ export default function Category() {
 
   return (
     <section 
-      className="py-8 sm:py-12 md:py-16 lg:py-20 bg-white font-sans overflow-hidden"
+      className="py-6 sm:py-8 lg:py-10 bg-white font-sans overflow-hidden"
       aria-labelledby="category-heading"
     >
       <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         {/* Header Section */}
-        <Reveal className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 sm:gap-6 lg:gap-8 mb-8 sm:mb-10 md:mb-12 lg:mb-16">
+        <Reveal className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 sm:gap-6 lg:gap-8 mb-5 sm:mb-6 lg:mb-8">
           <div className="text-center lg:text-left flex-1">
             <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
               <span className="h-px w-6 bg-[#e01a1b]" />
@@ -210,7 +210,7 @@ export default function Category() {
                 spaceBetween: 36,
               },
             }}
-            className="categories-swiper pb-12! sm:pb-16!"
+            className="categories-swiper pb-4! sm:pb-6!"
             aria-label="Product categories carousel"
           >
             {categories.map((category, index) => (
@@ -257,7 +257,7 @@ export default function Category() {
         </div>
 
         {/* Mobile View All Button (Bottom) */}
-        <div className="flex justify-center mt-8 sm:mt-10 md:mt-12 lg:hidden">
+        <div className="flex justify-center mt-6 sm:mt-8 lg:hidden">
           <Link
             href="/categories"
             className="btn-shine inline-flex items-center justify-center bg-[#e01a1b] text-white px-6 sm:px-8 py-3 sm:py-3.5 rounded-full hover:bg-[#c41617] focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:ring-offset-2 shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 font-semibold text-sm sm:text-base"

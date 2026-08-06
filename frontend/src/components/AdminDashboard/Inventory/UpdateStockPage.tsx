@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
-import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb'
 import { Package, TrendingUp, TrendingDown, ArrowLeft, Loader2, Save } from 'lucide-react'
 import axiosInstance from '@/lib/axios'
 import inventoryService from '@/services/inventoryService'
@@ -297,7 +296,6 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
 
   return (
     <div className="space-y-6 pb-8">
-      <Breadcrumb />
 
       {/* Header */}
       <div className="flex items-center justify-between">

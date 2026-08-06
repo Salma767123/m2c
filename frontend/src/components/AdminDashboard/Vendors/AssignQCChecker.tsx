@@ -12,7 +12,6 @@ import { LoadingSpinner } from "@/components/UI/LoadingSpinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/UI/Table";
 import Dropdown from "@/components/UI/Dropdown";
 import DateRangeCalendar, { fmtDate, parseDate } from "@/components/Shared/DateRangeCalendar";
-import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 
 import vendorService from "@/services/vendorService";
 import qcCheckerService from "@/services/qcCheckerService";
@@ -315,14 +314,13 @@ export default function AssignQCChecker() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div>
-      <Breadcrumb />
-      <div className="space-y-6 mt-4">
+      <div className="space-y-4 mt-4">
 
         {/* ── 1. Page Header ── */}
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Assign QC Checker to Vendors</h1>
-            <p className="text-slate-500 mt-0.5">Manage QC checker assignments for vendor quality control.</p>
+            <h1 className="text-xl font-bold text-slate-900">Assign QC Checker to Vendors</h1>
+            <p className="text-sm text-slate-500">Manage QC checker assignments for vendor quality control.</p>
           </div>
           <Link href="/admin/dashboard/vendors/assign-qc-checker/add" className="shrink-0">
             <button className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold py-2 px-4 rounded-xl transition-colors shadow-xs shadow-brand-500/10 text-sm whitespace-nowrap">
@@ -333,7 +331,7 @@ export default function AssignQCChecker() {
         </div>
 
         {/* ── 2. Metric Cards — all interactive ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {metricCards.map(({ key, label, subtitle, count, Icon, iconBg, iconColor, countColor, activeClass }) => {
             const isActive = metricFilter === key;
             return (
@@ -345,15 +343,15 @@ export default function AssignQCChecker() {
                   isActive ? activeClass : "border-slate-200/80 hover:border-slate-300"
                 }`}
               >
-                <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
-                  <span className="text-sm font-medium text-slate-500">{label}</span>
+                <div className="flex flex-row items-center justify-between px-3.5 pt-3 pb-1">
+                  <span className="text-[13px] font-medium text-slate-500">{label}</span>
                   <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace("50", "100") : iconBg} transition-transform duration-150 group-hover:scale-110`}>
                     <Icon className={`h-4 w-4 ${iconColor}`} />
                   </div>
                 </div>
-                <div className="px-4 pb-4">
-                  <div className={`text-2xl font-bold ${countColor}`}>{count}</div>
-                  <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+                <div className="px-3.5 pb-3">
+                  <div className={`text-xl font-bold ${countColor}`}>{count}</div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{subtitle}</p>
                 </div>
               </button>
             );

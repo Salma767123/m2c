@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { prisma } = require('../config/database');
-const { sendQCCheckerCredentialsEmail, sendTestEmail } = require('../utils/emailService');
+const { sendTemplatedEmail } = require('../utils/emailTemplateRenderer');
 const { resolveBase64InValue } = require('../config/cloudinary');
 
 // Generate a random password
@@ -128,18 +128,16 @@ const createQCChecker = async (req, res) => {
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
         const loginLink = `${frontendUrl}/checker`;
 
-        try {
-            await sendQCCheckerCredentialsEmail({
-                to: email,
+        await sendTemplatedEmail({
+            key: 'qc_checker_credentials',
+            to: email,
+            data: {
                 name,
                 checkerId,
                 password: plainPassword,
                 loginLink,
-            });
-        } catch (emailError) {
-            console.error('Failed to send credentials email:', emailError.message);
-            // Still return success but with a warning
-        }
+            },
+        });
 
         // Return without password
         const { password: _, ...checkerData } = qcChecker;
@@ -486,17 +484,22 @@ const resendCredentials = async (req, res) => {
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
         const loginLink = `${frontendUrl}/checker`;
 
-        await sendQCCheckerCredentialsEmail({
+        const resendResult = await sendTemplatedEmail({
+            key: 'qc_checker_credentials',
             to: checker.email,
-            name: checker.name,
-            checkerId: checker.checkerId,
-            password: plainPassword,
-            loginLink,
+            data: {
+                name: checker.name,
+                checkerId: checker.checkerId,
+                password: plainPassword,
+                loginLink,
+            },
         });
 
         res.json({
             success: true,
-            message: `New credentials have been sent to ${checker.email}`,
+            message: resendResult.sent
+                ? `New credentials have been sent to ${checker.email}`
+                : `Credentials regenerated, but the credentials email is turned off`,
         });
     } catch (error) {
         console.error('Resend credentials error:', error);
@@ -2142,11 +2145,29 @@ const sendContactTestEmail = async (req, res) => {
             });
         }
 
-        await sendTestEmail({
+        const checkerName = req.user?.name || null;
+        const vendorNameVal = typeof vendorName === 'string' ? vendorName : null;
+
+        // Pre-compute the conditional HTML blocks the template expects as vars.
+        const vendorNameBlock = vendorNameVal ? ` for <strong>${vendorNameVal}</strong>` : '';
+        const checkerLineBlock = checkerName
+            ? `Quality checker <strong>${checkerName}</strong> is`
+            : 'Our quality team is';
+
+        const testResult = await sendTemplatedEmail({
+            key: 'vendor_email_verification_test',
             to: email.trim(),
-            checkerName: req.user?.name || null,
-            vendorName: typeof vendorName === 'string' ? vendorName : null
+            data: { vendorNameBlock, checkerLineBlock },
         });
+
+        if (!testResult.sent) {
+            return res.status(testResult.reason === 'disabled' ? 400 : 500).json({
+                success: false,
+                message: testResult.reason === 'disabled'
+                    ? 'The email verification test template is turned off'
+                    : 'Failed to send test email. Check SMTP configuration.'
+            });
+        }
 
         res.status(200).json({
             success: true,

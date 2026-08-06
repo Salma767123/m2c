@@ -8,7 +8,6 @@ import { Card, CardContent } from "../../UI/Card";
 import Dropdown from "../../UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { centerNotice } from "@/components/UI/CenterNotice";
-import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { qcCheckerService } from "@/services/qcCheckerService";
 import ImageCropModal from "@/components/UI/ImageCropModal";
 
@@ -165,7 +164,6 @@ export default function CreateQCChecker() {
           setCropSrc(null);
         }}
       />
-      <Breadcrumb />
 
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">

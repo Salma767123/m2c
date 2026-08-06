@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import AddEditRole from '@/components/AdminDashboard/RolesPermissions/AddEditRole'
-import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb'
 import { LoadingSpinner } from '@/components/UI/LoadingSpinner'
 import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 import { roleService, Role } from '@/services/roleService'
@@ -42,7 +41,6 @@ export default function EditRolePage() {
   return (
     <PermissionGuard permission="roles_permissions:edit">
       <div className="space-y-6">
-        <Breadcrumb />
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner />

@@ -1,0 +1,308 @@
+// AUTO-GENERATED seed data for the EmailTemplate model.
+// Extracted from the original hardcoded email HTML with ${...} -> {{...}}.
+// Edit templates in the admin UI (Settings -> Email Templates), not here.
+// Re-running the seeder only CREATES missing templates; it never overwrites edits.
+
+module.exports = [
+  {
+    "key": "vendor_enquiry_approval",
+    "category": "NOTIFICATIONS",
+    "name": "Vendor Enquiry Approved",
+    "description": "Sent to an applicant when their vendor enquiry is approved. Contains the unique registration link.",
+    "subject": "🎉 Vendor Application Approved – Complete Your Registration",
+    "bodyHtml": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Application Approved</title></head>\n<body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f5;padding:40px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <tr><td style=\"background-color:#e01a1b;padding:32px 40px;text-align:center;\">\n          <div style=\"font-size:30px;line-height:1;margin-bottom:8px;\">🎉</div>\n          <h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;\">Application Approved</h1>\n          <p style=\"margin:8px 0 0;color:#ffe2e2;font-size:14px;\">Complete your registration to get started</p>\n        </td></tr>\n        <tr><td style=\"padding:36px 40px;\">\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Dear {{name}},</p>\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Great news — your vendor application for {{companyName}} has been approved. Complete your registration to set up your account and start selling with us.</p>\n          <div style=\"text-align:center;margin-top:8px;\">\n            <a href=\"{{registrationLink}}\" style=\"display:inline-block;background-color:#e01a1b;color:#ffffff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;\">Complete Registration</a>\n          </div>\n        </td></tr>\n        <tr><td style=\"padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;\">\n          <p style=\"margin:0;color:#9ca3af;font-size:13px;\">This is an automated message. Please do not reply to this email.</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+    "fromName": "Marketplace Team",
+    "variables": [
+      "name",
+      "companyName",
+      "registrationLink"
+    ],
+    "isSecurity": false,
+    "sortOrder": 0,
+    "emoji": "🎉",
+    "headerTitle": "Application Approved",
+    "headerSubtitle": "Complete your registration to get started",
+    "bodyText": "Dear {{name}},\n\nGreat news — your vendor application for {{companyName}} has been approved. Complete your registration to set up your account and start selling with us.",
+    "buttonLabel": "Complete Registration",
+    "footerText": "This is an automated message. Please do not reply to this email."
+  },
+  {
+    "key": "vendor_enquiry_rejection",
+    "category": "NOTIFICATIONS",
+    "name": "Vendor Enquiry Rejected",
+    "description": "Sent to an applicant when their vendor enquiry for {{companyName}} is not approved.",
+    "subject": "Vendor Application Status – {{companyName}}",
+    "bodyHtml": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Application Status Update</title></head>\n<body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f5;padding:40px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <tr><td style=\"background-color:#e01a1b;padding:32px 40px;text-align:center;\">\n          <div style=\"font-size:30px;line-height:1;margin-bottom:8px;\">📋</div>\n          <h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;\">Application Status Update</h1>\n          <p style=\"margin:8px 0 0;color:#ffe2e2;font-size:14px;\">Regarding your vendor application</p>\n        </td></tr>\n        <tr><td style=\"padding:36px 40px;\">\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Dear {{name}},</p>\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Thank you for your interest in becoming a vendor. After carefully reviewing your application for {{companyName}}, we're unable to approve it at this time.</p>\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">You're welcome to address any gaps and reapply in the future. If you have questions about this decision, our support team is happy to help.</p>\n        </td></tr>\n        <tr><td style=\"padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;\">\n          <p style=\"margin:0;color:#9ca3af;font-size:13px;\">This is an automated message. Please do not reply to this email.</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+    "fromName": "Marketplace Team",
+    "variables": [
+      "name",
+      "companyName"
+    ],
+    "isSecurity": false,
+    "sortOrder": 1,
+    "emoji": "📋",
+    "headerTitle": "Application Status Update",
+    "headerSubtitle": "Regarding your vendor application",
+    "bodyText": "Dear {{name}},\n\nThank you for your interest in becoming a vendor. After carefully reviewing your application for {{companyName}}, we're unable to approve it at this time.\n\nYou're welcome to address any gaps and reapply in the future. If you have questions about this decision, our support team is happy to help.",
+    "buttonLabel": null,
+    "footerText": "This is an automated message. Please do not reply to this email."
+  },
+  {
+    "key": "qc_checker_credentials",
+    "category": "ACCOUNT",
+    "name": "QC Checker Credentials",
+    "description": "Sends a new QC Checker their Checker ID {{checkerId}} and password to log in to the QC Portal.",
+    "subject": "🔑 Your QC Checker Account Credentials – {{checkerId}}",
+    "bodyHtml": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Welcome to QC Portal</title></head>\n<body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f5;padding:40px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <tr><td style=\"background-color:#e01a1b;padding:32px 40px;text-align:center;\">\n          <div style=\"font-size:30px;line-height:1;margin-bottom:8px;\">🔑</div>\n          <h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;\">Welcome to QC Portal</h1>\n          <p style=\"margin:8px 0 0;color:#ffe2e2;font-size:14px;\">Your Quality Control Checker account is ready</p>\n        </td></tr>\n        <tr><td style=\"padding:36px 40px;\">\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Dear {{name}},</p>\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Your QC Checker account has been created. Use the credentials below to sign in to the Quality Control portal.</p>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 24px;\">\n                <tr style=\"border-bottom:1px solid #e5e7eb;\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Checker ID</td><td style=\"padding:12px 16px;color:#111827;font-family:monospace;font-weight:600;\">{{checkerId}}</td></tr>\n                <tr style=\"\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Password</td><td style=\"padding:12px 16px;color:#111827;font-family:monospace;font-weight:600;\">{{password}}</td></tr>\n          </table>\n          <div style=\"text-align:center;margin-top:8px;\">\n            <a href=\"{{loginLink}}\" style=\"display:inline-block;background-color:#e01a1b;color:#ffffff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;\">Log in to QC Portal</a>\n          </div>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;margin:0 0 24px;\">\n            <tr><td style=\"padding:14px 18px;color:#6b7280;font-size:13px;line-height:1.6;\">🔒 For your security, please change your password after your first login and keep your credentials private.</td></tr>\n          </table>\n        </td></tr>\n        <tr><td style=\"padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;\">\n          <p style=\"margin:0;color:#9ca3af;font-size:13px;\">This is an automated message. Please do not reply to this email.</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+    "fromName": "QC Portal",
+    "variables": [
+      "name",
+      "checkerId",
+      "password",
+      "loginLink"
+    ],
+    "isSecurity": false,
+    "sortOrder": 0,
+    "emoji": "🔑",
+    "headerTitle": "Welcome to QC Portal",
+    "headerSubtitle": "Your Quality Control Checker account is ready",
+    "bodyText": "Dear {{name}},\n\nYour QC Checker account has been created. Use the credentials below to sign in to the Quality Control portal.",
+    "buttonLabel": "Log in to QC Portal",
+    "footerText": "This is an automated message. Please do not reply to this email."
+  },
+  {
+    "key": "staff_credentials",
+    "category": "ACCOUNT",
+    "name": "Staff Credentials",
+    "description": "Sends a new staff member their Admin Portal login credentials plus an email verification link.",
+    "subject": "🔑 Your Admin Portal Account Credentials",
+    "bodyHtml": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Welcome to the Admin Portal</title></head>\n<body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f5;padding:40px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <tr><td style=\"background-color:#e01a1b;padding:32px 40px;text-align:center;\">\n          <div style=\"font-size:30px;line-height:1;margin-bottom:8px;\">🔑</div>\n          <h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;\">Welcome to the Admin Portal</h1>\n          <p style=\"margin:8px 0 0;color:#ffe2e2;font-size:14px;\">Your account has been created</p>\n        </td></tr>\n        <tr><td style=\"padding:36px 40px;\">\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Dear {{name}},</p>\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">An account has been created for you on the Admin Portal. Use the credentials below to sign in, then verify your email address to activate your account.</p>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 24px;\">\n                <tr style=\"border-bottom:1px solid #e5e7eb;\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Email</td><td style=\"padding:12px 16px;color:#111827;font-weight:600;\">{{email}}</td></tr>\n                <tr style=\"\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Password</td><td style=\"padding:12px 16px;color:#111827;font-family:monospace;font-weight:600;\">{{password}}</td></tr>\n          </table>\n          <div style=\"text-align:center;margin-top:8px;\">\n            <a href=\"{{verificationLink}}\" style=\"display:inline-block;background-color:#e01a1b;color:#ffffff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;\">Verify Email</a>\n          </div>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;margin:0 0 24px;\">\n            <tr><td style=\"padding:14px 18px;color:#6b7280;font-size:13px;line-height:1.6;\">After verifying, you can log in any time at <a href=\"{{loginLink}}\" style=\"color:#e01a1b;text-decoration:none;font-weight:600;\">the Admin Portal</a>. For your security, change your password after your first login.</td></tr>\n          </table>\n        </td></tr>\n        <tr><td style=\"padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;\">\n          <p style=\"margin:0;color:#9ca3af;font-size:13px;\">This is an automated message. Please do not reply to this email.</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+    "fromName": "Admin Portal",
+    "variables": [
+      "name",
+      "email",
+      "password",
+      "loginLink",
+      "verificationLink"
+    ],
+    "isSecurity": false,
+    "sortOrder": 1,
+    "emoji": "🔑",
+    "headerTitle": "Welcome to the Admin Portal",
+    "headerSubtitle": "Your account has been created",
+    "bodyText": "Dear {{name}},\n\nAn account has been created for you on the Admin Portal. Use the credentials below to sign in, then verify your email address to activate your account.",
+    "buttonLabel": "Verify Email",
+    "footerText": "This is an automated message. Please do not reply to this email."
+  },
+  {
+    "key": "vendor_email_verification_test",
+    "category": "NOTIFICATIONS",
+    "name": "Vendor Email Verification Test",
+    "description": "A no-action test email a QC checker sends to confirm a vendor contact email is reachable.",
+    "subject": "✅ Email Verification Test — M2C MarkDowns",
+    "bodyHtml": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Email Verification Test</title></head>\n<body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f5;padding:40px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <tr><td style=\"background-color:#e01a1b;padding:32px 40px;text-align:center;\">\n          <div style=\"font-size:30px;line-height:1;margin-bottom:8px;\">✅</div>\n          <h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;\">Email Verification Test</h1>\n          <p style=\"margin:8px 0 0;color:#ffe2e2;font-size:14px;\">Confirming this address is reachable</p>\n        </td></tr>\n        <tr><td style=\"padding:36px 40px;\">\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">{{checkerLineBlock}} reaching out{{vendorNameBlock}} to confirm that this email address is working and can receive messages from us.</p>\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">No action is needed — if you received this email, the address is verified. You can safely ignore this message.</p>\n        </td></tr>\n        <tr><td style=\"padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;\">\n          <p style=\"margin:0;color:#9ca3af;font-size:13px;\">This is an automated verification test. Please do not reply to this email.</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+    "fromName": "M2C Quality Control",
+    "variables": [
+      "vendorNameBlock",
+      "checkerLineBlock"
+    ],
+    "isSecurity": false,
+    "sortOrder": 2,
+    "emoji": "✅",
+    "headerTitle": "Email Verification Test",
+    "headerSubtitle": "Confirming this address is reachable",
+    "bodyText": "{{checkerLineBlock}} reaching out{{vendorNameBlock}} to confirm that this email address is working and can receive messages from us.\n\nNo action is needed — if you received this email, the address is verified. You can safely ignore this message.",
+    "buttonLabel": null,
+    "footerText": "This is an automated verification test. Please do not reply to this email."
+  },
+  {
+    "key": "inspection_reminder",
+    "category": "NOTIFICATIONS",
+    "name": "Inspection Reminder",
+    "description": "Reminds a QC checker (~1 hour before) that an assigned inspection for {{vendorNameStrong}} starts soon.",
+    "subject": "⏰ Reminder: Inspection for {{vendorNameSubject}} starts soon",
+    "bodyHtml": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Inspection Reminder</title></head>\n<body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f5;padding:40px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <tr><td style=\"background-color:#e01a1b;padding:32px 40px;text-align:center;\">\n          <div style=\"font-size:30px;line-height:1;margin-bottom:8px;\">⏰</div>\n          <h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;\">Inspection Reminder</h1>\n          <p style=\"margin:8px 0 0;color:#ffe2e2;font-size:14px;\">Your assigned inspection starts soon</p>\n        </td></tr>\n        <tr><td style=\"padding:36px 40px;\">\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Hi {{checkerGreeting}},</p>\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">This is a reminder that your inspection for {{vendorNameStrong}} is starting soon. Please reach the location on time — it can only be started within its scheduled window.</p>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 24px;\">\n                <tr style=\"border-bottom:1px solid #e5e7eb;\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Vendor</td><td style=\"padding:12px 16px;color:#111827;font-weight:600;\">{{vendorNameOrDash}}</td></tr>\n                <tr style=\"border-bottom:1px solid #e5e7eb;\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Date</td><td style=\"padding:12px 16px;color:#111827;font-weight:600;\">{{scheduledDateOrDash}}</td></tr>\n                <tr style=\"\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Time</td><td style=\"padding:12px 16px;color:#111827;font-weight:600;\">{{scheduledTimeOrDash}}</td></tr>\n          </table>\n          <p style=\"margin:0 0 6px;color:#6b7280;font-size:13px;\">Estimated Duration</p>\n          {{estimatedDurationAndLocationBlock}}\n        </td></tr>\n        <tr><td style=\"padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;\">\n          <p style=\"margin:0;color:#9ca3af;font-size:13px;\">This is an automated inspection reminder. Please do not reply to this email.</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+    "fromName": "M2C Quality Control",
+    "variables": [
+      "checkerGreeting",
+      "vendorNameStrong",
+      "vendorNameOrDash",
+      "scheduledDateOrDash",
+      "scheduledTimeOrDash",
+      "estimatedDurationAndLocationBlock",
+      "vendorNameSubject"
+    ],
+    "isSecurity": false,
+    "sortOrder": 3,
+    "emoji": "⏰",
+    "headerTitle": "Inspection Reminder",
+    "headerSubtitle": "Your assigned inspection starts soon",
+    "bodyText": "Hi {{checkerGreeting}},\n\nThis is a reminder that your inspection for {{vendorNameStrong}} is starting soon. Please reach the location on time — it can only be started within its scheduled window.",
+    "buttonLabel": null,
+    "footerText": "This is an automated inspection reminder. Please do not reply to this email."
+  },
+  {
+    "key": "vendor_approval_credentials",
+    "category": "ACCOUNT",
+    "name": "Vendor Account Approved",
+    "description": "Approve a registered vendor and send their login credentials for {{companyName}}",
+    "subject": "🎉 Welcome to Our Platform - Your Vendor Account is Approved!",
+    "bodyHtml": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Your Vendor Account is Approved</title></head>\n<body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f5;padding:40px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <tr><td style=\"background-color:#e01a1b;padding:32px 40px;text-align:center;\">\n          <div style=\"font-size:30px;line-height:1;margin-bottom:8px;\">🎉</div>\n          <h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;\">Your Vendor Account is Approved</h1>\n          <p style=\"margin:8px 0 0;color:#ffe2e2;font-size:14px;\">Welcome aboard — here are your login details</p>\n        </td></tr>\n        <tr><td style=\"padding:36px 40px;\">\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Dear {{ownerName}},</p>\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Congratulations! Your vendor account for {{companyName}} has been approved. You can now access your dashboard and start managing your business with us.</p>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 24px;\">\n                <tr style=\"border-bottom:1px solid #e5e7eb;\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Email</td><td style=\"padding:12px 16px;color:#111827;font-weight:600;\">{{email}}</td></tr>\n                <tr style=\"\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Password</td><td style=\"padding:12px 16px;color:#111827;font-family:monospace;font-weight:600;\">{{password}}</td></tr>\n          </table>\n          <div style=\"text-align:center;margin-top:8px;\">\n            <a href=\"{{loginUrl}}\" style=\"display:inline-block;background-color:#e01a1b;color:#ffffff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;\">Access Your Dashboard</a>\n          </div>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;margin:0 0 24px;\">\n            <tr><td style=\"padding:14px 18px;color:#6b7280;font-size:13px;line-height:1.6;\">🔒 For your security, please change your password immediately after your first login and keep your credentials private.</td></tr>\n          </table>\n        </td></tr>\n        <tr><td style=\"padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;\">\n          <p style=\"margin:0;color:#9ca3af;font-size:13px;\">This is an automated message. Please do not reply to this email.</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+    "fromName": null,
+    "variables": [
+      "companyName",
+      "ownerName",
+      "email",
+      "password",
+      "loginUrl"
+    ],
+    "isSecurity": false,
+    "sortOrder": 2,
+    "emoji": "🎉",
+    "headerTitle": "Your Vendor Account is Approved",
+    "headerSubtitle": "Welcome aboard — here are your login details",
+    "bodyText": "Dear {{ownerName}},\n\nCongratulations! Your vendor account for {{companyName}} has been approved. You can now access your dashboard and start managing your business with us.",
+    "buttonLabel": "Access Your Dashboard",
+    "footerText": "This is an automated message. Please do not reply to this email."
+  },
+  {
+    "key": "vendor_rejection",
+    "category": "NOTIFICATIONS",
+    "name": "Vendor Application Rejected",
+    "description": "Notify a vendor that their application for {{companyName}} was not approved",
+    "subject": "Application Status Update - {{companyName}}",
+    "bodyHtml": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Application Status Update</title></head>\n<body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f5;padding:40px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <tr><td style=\"background-color:#e01a1b;padding:32px 40px;text-align:center;\">\n          <div style=\"font-size:30px;line-height:1;margin-bottom:8px;\">📋</div>\n          <h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;\">Application Status Update</h1>\n          <p style=\"margin:8px 0 0;color:#ffe2e2;font-size:14px;\">Regarding your vendor application</p>\n        </td></tr>\n        <tr><td style=\"padding:36px 40px;\">\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Dear {{ownerName}},</p>\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Thank you for your interest in our platform. After careful review of your application for {{companyName}}, we're unable to approve it at this time.</p>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-left:4px solid #e01a1b;background:#fff5f5;border-radius:8px;margin:0 0 24px;\">\n            <tr><td style=\"padding:16px 18px;\">\n              <p style=\"margin:0 0 6px;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;\">Reason for decision</p>\n              <p style=\"margin:0;color:#111827;font-size:15px;line-height:1.6;\">{{reason}}</p>\n            </td></tr>\n          </table>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;margin:0 0 24px;\">\n            <tr><td style=\"padding:14px 18px;color:#6b7280;font-size:13px;line-height:1.6;\">We encourage you to address the points above and reapply in the future. If you have any questions, please contact our support team.</td></tr>\n          </table>\n        </td></tr>\n        <tr><td style=\"padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;\">\n          <p style=\"margin:0;color:#9ca3af;font-size:13px;\">This is an automated message. Please do not reply to this email.</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+    "fromName": null,
+    "variables": [
+      "companyName",
+      "ownerName",
+      "reason"
+    ],
+    "isSecurity": false,
+    "sortOrder": 4,
+    "emoji": "📋",
+    "headerTitle": "Application Status Update",
+    "headerSubtitle": "Regarding your vendor application",
+    "bodyText": "Dear {{ownerName}},\n\nThank you for your interest in our platform. After careful review of your application for {{companyName}}, we're unable to approve it at this time.",
+    "buttonLabel": null,
+    "footerText": "This is an automated message. Please do not reply to this email."
+  },
+  {
+    "key": "vendor_suspension",
+    "category": "NOTIFICATIONS",
+    "name": "Vendor Account Suspended",
+    "description": "Notify a vendor that their account for {{companyName}} has been suspended",
+    "subject": "Account Suspension Notice - {{companyName}}",
+    "bodyHtml": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Account Suspension Notice</title></head>\n<body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f5;padding:40px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <tr><td style=\"background-color:#e01a1b;padding:32px 40px;text-align:center;\">\n          <div style=\"font-size:30px;line-height:1;margin-bottom:8px;\">⚠️</div>\n          <h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;\">Account Suspension Notice</h1>\n          <p style=\"margin:8px 0 0;color:#ffe2e2;font-size:14px;\">Important update about your account</p>\n        </td></tr>\n        <tr><td style=\"padding:36px 40px;\">\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Dear {{ownerName}},</p>\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">We're writing to let you know that your vendor account for {{companyName}} has been temporarily suspended. While suspended, you won't be able to access your dashboard, receive new orders, or update listings.</p>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-left:4px solid #e01a1b;background:#fff5f5;border-radius:8px;margin:0 0 24px;\">\n            <tr><td style=\"padding:16px 18px;\">\n              <p style=\"margin:0 0 6px;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;\">Reason for suspension</p>\n              <p style=\"margin:0;color:#111827;font-size:15px;line-height:1.6;\">{{reason}}</p>\n            </td></tr>\n          </table>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;margin:0 0 24px;\">\n            <tr><td style=\"padding:14px 18px;color:#6b7280;font-size:13px;line-height:1.6;\">To resolve this and reactivate your account, please contact our support team.</td></tr>\n          </table>\n        </td></tr>\n        <tr><td style=\"padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;\">\n          <p style=\"margin:0;color:#9ca3af;font-size:13px;\">This is an automated message. Please do not reply to this email.</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+    "fromName": null,
+    "variables": [
+      "companyName",
+      "ownerName",
+      "reason"
+    ],
+    "isSecurity": false,
+    "sortOrder": 5,
+    "emoji": "⚠️",
+    "headerTitle": "Account Suspension Notice",
+    "headerSubtitle": "Important update about your account",
+    "bodyText": "Dear {{ownerName}},\n\nWe're writing to let you know that your vendor account for {{companyName}} has been temporarily suspended. While suspended, you won't be able to access your dashboard, receive new orders, or update listings.",
+    "buttonLabel": null,
+    "footerText": "This is an automated message. Please do not reply to this email."
+  },
+  {
+    "key": "new_vendor_registration_admin",
+    "category": "NOTIFICATIONS",
+    "name": "New Vendor Registration (Admin)",
+    "description": "Alert admins that {{companyName}} submitted a new vendor registration",
+    "subject": "New Vendor Registration — {{companyName}}",
+    "bodyHtml": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>New Vendor Registration</title></head>\n<body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f5;padding:40px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <tr><td style=\"background-color:#e01a1b;padding:32px 40px;text-align:center;\">\n          <div style=\"font-size:30px;line-height:1;margin-bottom:8px;\">🏷️</div>\n          <h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;\">New Vendor Registration</h1>\n          <p style=\"margin:8px 0 0;color:#ffe2e2;font-size:14px;\">A new vendor has submitted an application</p>\n        </td></tr>\n        <tr><td style=\"padding:36px 40px;\">\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">A new vendor has submitted a registration application. Review the details below and take action.</p>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 24px;\">\n                <tr style=\"border-bottom:1px solid #e5e7eb;\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Company</td><td style=\"padding:12px 16px;color:#111827;font-weight:600;\">{{companyName}}</td></tr>\n                <tr style=\"border-bottom:1px solid #e5e7eb;\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Owner</td><td style=\"padding:12px 16px;color:#111827;font-weight:600;\">{{ownerName}}</td></tr>\n                <tr style=\"border-bottom:1px solid #e5e7eb;\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Email</td><td style=\"padding:12px 16px;color:#111827;font-weight:600;\">{{vendorEmail}}</td></tr>\n                <tr style=\"border-bottom:1px solid #e5e7eb;\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Phone</td><td style=\"padding:12px 16px;color:#111827;font-weight:600;\">{{phoneDisplay}}</td></tr>\n                <tr style=\"\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Location</td><td style=\"padding:12px 16px;color:#111827;font-weight:600;\">{{locationDisplay}}</td></tr>\n          </table>\n          <div style=\"text-align:center;margin-top:8px;\">\n            <a href=\"{{reviewUrl}}\" style=\"display:inline-block;background-color:#e01a1b;color:#ffffff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;\">Review Application</a>\n          </div>\n        </td></tr>\n        <tr><td style=\"padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;\">\n          <p style=\"margin:0;color:#9ca3af;font-size:13px;\">This is an automated notification. Please do not reply to this email.</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+    "fromName": null,
+    "variables": [
+      "companyName",
+      "ownerName",
+      "vendorEmail",
+      "phoneDisplay",
+      "locationDisplay",
+      "reviewUrl"
+    ],
+    "isSecurity": false,
+    "sortOrder": 6,
+    "emoji": "🏷️",
+    "headerTitle": "New Vendor Registration",
+    "headerSubtitle": "A new vendor has submitted an application",
+    "bodyText": "A new vendor has submitted a registration application. Review the details below and take action.",
+    "buttonLabel": "Review Application",
+    "footerText": "This is an automated notification. Please do not reply to this email."
+  },
+  {
+    "key": "low_stock_alert",
+    "category": "NOTIFICATIONS",
+    "name": "Low Stock Alert",
+    "description": "Notify a vendor that {{productName}} has reached its low-stock alert level",
+    "subject": "⚠️ Low Stock Alert — {{productName}}",
+    "bodyHtml": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Low Stock Alert</title></head>\n<body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f5;padding:40px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <tr><td style=\"background-color:#e01a1b;padding:32px 40px;text-align:center;\">\n          <div style=\"font-size:30px;line-height:1;margin-bottom:8px;\">⚠️</div>\n          <h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;\">Low Stock Alert</h1>\n          <p style=\"margin:8px 0 0;color:#ffe2e2;font-size:14px;\">One or more products need restocking</p>\n        </td></tr>\n        <tr><td style=\"padding:36px 40px;\">\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Dear {{greetingName}},</p>\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">One or more products from {{companyName}} have reached their low-stock threshold. Review the details below and restock soon to avoid missing sales.</p>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 24px;\">\n                <tr style=\"border-bottom:1px solid #e5e7eb;\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Product</td><td style=\"padding:12px 16px;color:#111827;font-weight:600;\">{{productName}}</td></tr>\n                <tr style=\"border-bottom:1px solid #e5e7eb;\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">SKU</td><td style=\"padding:12px 16px;color:#111827;font-family:monospace;font-weight:600;\">{{skuDisplay}}</td></tr>\n                <tr style=\"border-bottom:1px solid #e5e7eb;\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Category</td><td style=\"padding:12px 16px;color:#111827;font-weight:600;\">{{categoryDisplay}}</td></tr>\n                <tr style=\"border-bottom:1px solid #e5e7eb;\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Current Stock</td><td style=\"padding:12px 16px;color:#111827;font-weight:600;\">{{currentStock}}</td></tr>\n                <tr style=\"\"><td style=\"padding:12px 16px;color:#6b7280;width:42%;\">Minimum</td><td style=\"padding:12px 16px;color:#111827;font-weight:600;\">{{minStock}}</td></tr>\n          </table>\n          {{unitsSection}}\n          <div style=\"text-align:center;margin-top:8px;\">\n            <a href=\"{{dashboardUrl}}\" style=\"display:inline-block;background-color:#e01a1b;color:#ffffff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;\">Go to Inventory</a>\n          </div>\n        </td></tr>\n        <tr><td style=\"padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;\">\n          <p style=\"margin:0;color:#9ca3af;font-size:13px;\">This is an automated stock alert. Please do not reply to this email.</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+    "fromName": null,
+    "variables": [
+      "greetingName",
+      "companyName",
+      "productName",
+      "skuDisplay",
+      "categoryDisplay",
+      "currentStock",
+      "minStock",
+      "unitsSection",
+      "dashboardUrl"
+    ],
+    "isSecurity": false,
+    "sortOrder": 7,
+    "emoji": "⚠️",
+    "headerTitle": "Low Stock Alert",
+    "headerSubtitle": "One or more products need restocking",
+    "bodyText": "Dear {{greetingName}},\n\nOne or more products from {{companyName}} have reached their low-stock threshold. Review the details below and restock soon to avoid missing sales.",
+    "buttonLabel": "Go to Inventory",
+    "footerText": "This is an automated stock alert. Please do not reply to this email."
+  },
+  {
+    "key": "email_verification",
+    "category": "SECURITY",
+    "name": "Email Verification",
+    "description": "Sent on self-registration; asks the new user to confirm their email address.",
+    "subject": "Verify Your Email - Employee Management System",
+    "bodyHtml": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Verify Your Email</title></head>\n<body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f5;padding:40px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <tr><td style=\"background-color:#e01a1b;padding:32px 40px;text-align:center;\">\n          <div style=\"font-size:30px;line-height:1;margin-bottom:8px;\">✉️</div>\n          <h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;\">Verify Your Email</h1>\n          <p style=\"margin:8px 0 0;color:#ffe2e2;font-size:14px;\">One quick step to activate your account</p>\n        </td></tr>\n        <tr><td style=\"padding:36px 40px;\">\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Hi {{name}},</p>\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Thanks for registering. Please confirm your email address to activate your account.</p>\n          <div style=\"text-align:center;margin-top:8px;\">\n            <a href=\"{{verificationUrl}}\" style=\"display:inline-block;background-color:#e01a1b;color:#ffffff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;\">Verify Email</a>\n          </div>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;margin:0 0 24px;\">\n            <tr><td style=\"padding:14px 18px;color:#6b7280;font-size:13px;line-height:1.6;\">This link will expire in 24 hours. If you didn't create this account, you can safely ignore this email.</td></tr>\n          </table>\n        </td></tr>\n        <tr><td style=\"padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;\">\n          <p style=\"margin:0;color:#9ca3af;font-size:13px;\">This is an automated message. Please do not reply to this email.</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+    "fromName": null,
+    "variables": [
+      "name",
+      "verificationUrl"
+    ],
+    "isSecurity": true,
+    "sortOrder": 0,
+    "emoji": "✉️",
+    "headerTitle": "Verify Your Email",
+    "headerSubtitle": "One quick step to activate your account",
+    "bodyText": "Hi {{name}},\n\nThanks for registering. Please confirm your email address to activate your account.",
+    "buttonLabel": "Verify Email",
+    "footerText": "This is an automated message. Please do not reply to this email."
+  },
+  {
+    "key": "password_reset",
+    "category": "SECURITY",
+    "name": "Password Reset",
+    "description": "Sent when a user (vendor / admin / customer) requests a password reset link.",
+    "subject": "Reset Your {{accountType}} Password",
+    "bodyHtml": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Password Reset Request</title></head>\n<body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f5;padding:40px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <tr><td style=\"background-color:#e01a1b;padding:32px 40px;text-align:center;\">\n          <div style=\"font-size:30px;line-height:1;margin-bottom:8px;\">🔒</div>\n          <h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;\">Password Reset Request</h1>\n          <p style=\"margin:8px 0 0;color:#ffe2e2;font-size:14px;\">Reset your {{accountType}} password</p>\n        </td></tr>\n        <tr><td style=\"padding:36px 40px;\">\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">Hi {{userName}},</p>\n          <p style=\"margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;\">We received a request to reset your password. Click the button below to choose a new one.</p>\n          <div style=\"text-align:center;margin-top:8px;\">\n            <a href=\"{{resetUrl}}\" style=\"display:inline-block;background-color:#e01a1b;color:#ffffff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;\">Reset Password</a>\n          </div>\n          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;margin:0 0 24px;\">\n            <tr><td style=\"padding:14px 18px;color:#6b7280;font-size:13px;line-height:1.6;\">This link will expire in 1 hour. If you didn't request this, you can safely ignore this email — your password won't change.</td></tr>\n          </table>\n        </td></tr>\n        <tr><td style=\"padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;\">\n          <p style=\"margin:0;color:#9ca3af;font-size:13px;\">This is an automated message. Please do not reply to this email.</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+    "fromName": null,
+    "variables": [
+      "userName",
+      "resetUrl",
+      "accountType"
+    ],
+    "isSecurity": true,
+    "sortOrder": 1,
+    "emoji": "🔒",
+    "headerTitle": "Password Reset Request",
+    "headerSubtitle": "Reset your {{accountType}} password",
+    "bodyText": "Hi {{userName}},\n\nWe received a request to reset your password. Click the button below to choose a new one.",
+    "buttonLabel": "Reset Password",
+    "footerText": "This is an automated message. Please do not reply to this email."
+  }
+];

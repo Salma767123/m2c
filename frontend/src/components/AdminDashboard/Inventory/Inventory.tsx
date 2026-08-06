@@ -12,7 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/UI/Table'
-import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb'
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Filter, Loader2, History, Edit, Trash2, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
@@ -250,15 +249,13 @@ export default function Inventory() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Breadcrumb */}
-      <Breadcrumb />
+    <div className="space-y-4">
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Inventory Management</h1>
-          <p className="text-slate-600">Track and manage your product inventory</p>
+          <h1 className="text-xl font-bold text-slate-900">Inventory Management</h1>
+          <p className="text-sm text-slate-500">Track and manage your product inventory</p>
         </div>
         {hasPermission('inventory:create') && (
           <Link href="/admin/dashboard/inventory/add">
@@ -271,7 +268,7 @@ export default function Inventory() {
       </div>
 
       {/* Inventory Stats — click the first three to filter the table by stock status */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { key: 'all',          label: 'Total Items',       subtitle: 'Unique products',  value: stats.totalItems,                       Icon: Package,       iconBg: 'bg-brand-50',   iconColor: 'text-brand-500',   countColor: 'text-slate-900',   activeClass: 'border-brand-400 bg-brand-50/50' },
           { key: 'low_stock',    label: 'Low Stock',         subtitle: 'Need restocking',  value: stats.lowStockItems,                    Icon: AlertTriangle, iconBg: 'bg-amber-50',   iconColor: 'text-amber-500',   countColor: 'text-amber-700',   activeClass: 'border-amber-400 bg-amber-50/60' },
@@ -282,15 +279,15 @@ export default function Inventory() {
           const isActive = clickable && statusFilter === key
           const body = (
             <>
-              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
-                <span className="text-sm font-medium text-slate-500">{label}</span>
+              <div className="flex flex-row items-center justify-between px-3.5 pt-3 pb-1">
+                <span className="text-[13px] font-medium text-slate-500">{label}</span>
                 <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace('50', '100') : iconBg} transition-transform duration-150 ${clickable ? 'group-hover:scale-110' : ''}`}>
                   <Icon className={`h-4 w-4 ${iconColor}`} />
                 </div>
               </div>
-              <div className="px-4 pb-4">
-                <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
-                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              <div className="px-3.5 pb-3">
+                <div className={`text-xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-[11px] text-slate-400 mt-0.5">{subtitle}</p>
               </div>
             </>
           )
@@ -362,8 +359,7 @@ export default function Inventory() {
       </Card>
 
       {/* Inventory Table */}
-      <Card>
-        <CardContent>
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
@@ -403,7 +399,7 @@ export default function Inventory() {
                       const isExpanded = expandedItems.has(item.id)
                       return (
                       <Fragment key={item.id}>
-                      <TableRow className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors duration-150">
+                      <TableRow className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors duration-150">
                         <TableCell>
                           <div className="flex items-start gap-2">
                             {canExpand ? (
@@ -553,18 +549,17 @@ export default function Inventory() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-end gap-3 text-sm mt-4">
+                <div className="flex items-center justify-end gap-3 text-sm px-4 py-3 border-t border-slate-100">
                   <div className="flex items-center gap-1">
                     <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-                    {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                    {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/20' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
                     <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
                   </div>
                 </div>
               )}
             </>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       {/* Delete Confirm Modal */}
       <DeleteConfirmModal

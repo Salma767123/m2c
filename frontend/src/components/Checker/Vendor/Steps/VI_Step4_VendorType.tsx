@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Tags, Globe, Image as ImageIcon, Eye } from 'lucide-react'
+import { Tags, Globe, Image as ImageIcon } from 'lucide-react'
 import VerifyField, { SectionBlock, Verifications } from './VI_VerifyField'
-import DocViewerModal from '@/components/UI/DocViewerModal'
 import { categoryService } from '@/services/categoryService'
 
 interface Props {
@@ -14,7 +13,6 @@ interface Props {
 }
 
 export default function VI_Step4_VendorType({ vendor: v, verifications, onChange, onRegisterFields }: Props) {
-  const [viewerImg, setViewerImg] = useState<{ url: string; name: string } | null>(null)
   const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({})
 
   useEffect(() => {
@@ -111,29 +109,13 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
                 type="image"
                 verifications={verifications}
                 onChange={onChange}
-                headerAction={photo.url ? (
-                  <button
-                    type="button"
-                    onClick={() => setViewerImg({ url: photo.url, name: photo.label })}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors shrink-0"
-                  >
-                    <Eye className="w-3 h-3" /> View
-                  </button>
-                ) : undefined}
+                documentUrl={photo.url || undefined}
               />
             ))}
           </div>
         </SectionBlock>
       )}
 
-      {viewerImg && (
-        <DocViewerModal
-          url={viewerImg.url}
-          name={viewerImg.name}
-          readOnly
-          onClose={() => setViewerImg(null)}
-        />
-      )}
     </div>
   )
 }

@@ -35,7 +35,7 @@ const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
  * @returns {{ totalShippingCost: number, totalWeightKg: number,
  *             selectedTransport: string|null, exceedsMaxWeight: boolean }}
  */
-function calculateLogistics(config, quantity, overrideTransport) {
+function calculateLogistics(config, quantity, overrideTransport, region) {
     const empty = {
         totalShippingCost: 0,
         totalWeightKg: 0,
@@ -67,8 +67,15 @@ function calculateLogistics(config, quantity, overrideTransport) {
         ? overrideTransport
         : recommendedTransport;
 
+    // The SHIP lane is SEA (international) or SURFACE (domestic India) depending on the
+    // market. Domestic uses surfaceCostPerKg, falling back to shipCostPerKg for legacy
+    // products that predate the split. AIR is a single shared lane.
+    const isDomestic = String(region || '').toUpperCase() === 'IN';
+    const shipCostPerKg = isDomestic
+        ? (config.surfaceCostPerKg != null ? config.surfaceCostPerKg : config.shipCostPerKg)
+        : config.shipCostPerKg;
     const shippingCostPerKg = Number(
-        selectedTransport === 'AIR' ? config.airCostPerKg : config.shipCostPerKg
+        selectedTransport === 'AIR' ? config.airCostPerKg : shipCostPerKg
     ) || 0;
 
     const totalShippingCost = round2(totalWeightKg * shippingCostPerKg);

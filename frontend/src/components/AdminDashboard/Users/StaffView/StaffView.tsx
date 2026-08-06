@@ -7,7 +7,6 @@ import { hasPermission } from '@/lib/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
 import { Badge } from '@/components/UI/Badge';
-import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb';
 import {
   ArrowLeft,
   Edit,
@@ -125,7 +124,6 @@ export default function StaffView() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumb />
 
       {/* Page Header */}
       <div className="flex items-center justify-between">

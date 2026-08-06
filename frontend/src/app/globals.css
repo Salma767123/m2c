@@ -158,7 +158,18 @@ html, body {
 /* Animated progress bar under the active hero dot. */
 .animate-hero-progress {
   transform-origin: left center;
-  animation: m2c-progress 5s linear forwards;
+  animation: m2c-progress 2.5s linear forwards;
+}
+
+/* Parallax slide-in for the active hero slide. Ends at scale(1)/translateX(0),
+   so the image settles to an exact fit — motion during the change, no crop after. */
+@keyframes m2c-hero-parallax {
+  0%   { opacity: 0.35; transform: translateX(5%) scale(1.05); }
+  100% { opacity: 1;    transform: translateX(0)  scale(1); }
+}
+.animate-hero-parallax {
+  animation: m2c-hero-parallax 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, opacity;
 }
 
 /* Infinite horizontal marquee for the home notice board. The track holds the cards
@@ -209,6 +220,7 @@ html, body {
     transform: none !important;
   }
   .animate-ken-burns,
+  .animate-hero-parallax,
   .animate-brand-bar,
   .animate-accent-bar,
   .animate-float-slow,

@@ -189,6 +189,7 @@ const enquiryRoutes = require("./routes/enquiryRoutes");
 const contactEnquiryRoutes = require("./routes/contactEnquiryRoutes");
 const couponRoutes = require("./routes/couponRoutes");
 const offerRoutes = require("./routes/offerRoutes");
+const courierRoutes = require("./routes/courierRoutes");
 const supportRoutes = require("./routes/supportRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const qcCheckerRoutes = require("./routes/qcCheckerRoutes");
@@ -204,6 +205,7 @@ const roleRoutes = require("./routes/roleRoutes");
 const adminDashboardRoutes = require("./routes/adminDashboardRoutes");
 const vendorDashboardRoutes = require("./routes/vendorDashboardRoutes");
 const seoSettingsRoutes = require("./routes/seoSettingsRoutes");
+const emailTemplateRoutes = require("./routes/emailTemplateRoutes");
 const bannerRoutes = require("./routes/bannerRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 
@@ -229,6 +231,7 @@ app.use("/api/enquiries", enquiryRoutes);
 app.use("/api/contact-enquiries", contactEnquiryRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/offers", offerRoutes);
+app.use("/api/couriers", courierRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/qc-checkers", qcCheckerRoutes);
 app.use("/api/invoice-settings", invoiceSettingsRoutes);
@@ -250,6 +253,8 @@ app.use("/api/notifications", notificationRoutes);
 
 const exchangeRateRoutes = require("./routes/exchangeRateRoutes");
 app.use("/api/exchange-rate", exchangeRateRoutes);
+
+app.use("/api/email-templates", emailTemplateRoutes);
 
 // Document proxy — fetches Cloudinary raw files server-side, bypassing browser CORS restrictions.
 // Accepts only Cloudinary hostnames to prevent open-proxy abuse.

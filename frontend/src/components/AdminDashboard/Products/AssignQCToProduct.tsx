@@ -6,7 +6,6 @@ import Link from "next/link";
 import { ArrowLeft, Calendar, Clock, Package, Factory, FileText, CheckCircle, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
 import Dropdown from "../../UI/Dropdown";
-import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { formatTime12 } from "@/lib/utils";
 import { adminProductService, AdminProduct } from "@/services/adminProductService";
@@ -140,7 +139,6 @@ export default function AssignQCToProduct({ productId }: { productId: string }) 
 
   return (
     <div className="p-6">
-      <Breadcrumb />
 
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">

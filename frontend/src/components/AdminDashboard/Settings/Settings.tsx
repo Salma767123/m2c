@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Mail, Phone, MapPin, Building2, Shield, Save, FileText, CreditCard, Upload, Image as ImageIcon, DollarSign, Key, Eye, EyeOff, Percent, Warehouse, Globe, Camera } from "lucide-react";
+import { User, Mail, Phone, MapPin, Building2, Shield, Save, FileText, CreditCard, Upload, Image as ImageIcon, DollarSign, Key, Eye, EyeOff, Percent, Warehouse, Globe, Camera, Truck } from "lucide-react";
 import ImageCropModal from "@/components/UI/ImageCropModal";
 import Dropdown from "@/components/UI/Dropdown";
 import GSTSettingsTab from "./GSTSettingsTab";
@@ -9,9 +9,10 @@ import HubSettingsTab from "./HubSettingsTab";
 import SEOSettingsTab from "./SEOSettingsTab";
 import BannerSettingsTab from "./BannerSettingsTab";
 import ExchangeRateTab from "./ExchangeRateTab";
+import EmailTemplatesTab from "./EmailTemplatesTab";
+import CourierManagement from "@/components/AdminDashboard/Couriers/CourierManagement";
 import InvoiceSettings from "../Billing/Settings/InvoiceSettings";
 import { Card, CardContent } from "../../UI/Card";
-import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { paymentSettingsService } from "@/services/paymentSettingsService";
 import { adminProfileService } from "@/services/adminProfileService";
@@ -49,7 +50,7 @@ export default function Settings() {
     zipCode: "10001",
   });
 
-  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "gst" | "hub" | "invoice" | "seo" | "banner" | "vendor-notif" | "exchange-rate">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "gst" | "hub" | "invoice" | "seo" | "banner" | "vendor-notif" | "exchange-rate" | "email-templates" | "couriers">("profile");
 
   // Profile form state
   const [profileData, setProfileData] = useState({
@@ -550,7 +551,6 @@ export default function Settings() {
 
   return (
     <div className="p-6">
-      <Breadcrumb />
 
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
@@ -661,6 +661,26 @@ export default function Settings() {
               >
                 <DollarSign className="h-4 w-4 inline mr-2" />
                 Exchange Rate
+              </button>
+              <button
+                onClick={() => setActiveTab("email-templates")}
+                className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "email-templates"
+                  ? "border-brand-500 text-brand-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+              >
+                <Mail className="h-4 w-4 inline mr-2" />
+                Email Templates
+              </button>
+              <button
+                onClick={() => setActiveTab("couriers")}
+                className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "couriers"
+                  ? "border-brand-500 text-brand-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+              >
+                <Truck className="h-4 w-4 inline mr-2" />
+                Courier Partners
               </button>
             </>
           )}
@@ -1838,6 +1858,14 @@ export default function Settings() {
       {/* Exchange Rate Tab */}
       {activeTab === "exchange-rate" && canAccessAdminSettings && (
         <ExchangeRateTab />
+      )}
+
+      {activeTab === "email-templates" && canAccessAdminSettings && (
+        <EmailTemplatesTab isReadOnly={isReadOnly} />
+      )}
+
+      {activeTab === "couriers" && canAccessAdminSettings && (
+        <CourierManagement />
       )}
     </div>
   );

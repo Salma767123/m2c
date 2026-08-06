@@ -6,7 +6,6 @@ import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import Dropdown from "../../UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
-import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 
 import supportService, { SupportTicket, TicketMessage } from "@/services/supportService";
 import { useEffect } from "react";
@@ -137,10 +136,6 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
 
   return (
     <div className="p-6 max-w-420 mx-auto space-y-6">
-      <Breadcrumb
-        customLabels={{ support: creatorLabel === "Customer" ? "Customer Support" : "Vendor Support" }}
-        hrefOverrides={{ support: listHref }}
-      />
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href={listHref} className="text-blue-600 hover:text-blue-700">

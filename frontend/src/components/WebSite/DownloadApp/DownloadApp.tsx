@@ -58,7 +58,7 @@ function GooglePlayBadge() {
 
 export default function DownloadApp() {
   return (
-    <section id="download-app" className="relative overflow-hidden bg-linear-to-br from-[#fdf6f6] via-[#fff5f5] to-[#faf9f7] py-12 sm:py-16 lg:py-20 font-sans scroll-mt-24">
+    <section id="download-app" className="relative overflow-hidden bg-linear-to-br from-[#fdf6f6] via-[#fff5f5] to-[#faf9f7] py-8 sm:py-10 lg:py-12 font-sans scroll-mt-24">
       {/* soft brand glows */}
       <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[#e01a1b]/10 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 right-0 h-72 w-72 rounded-full bg-[#e01a1b]/5 blur-3xl" />

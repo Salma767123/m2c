@@ -137,12 +137,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           <div className="max-w-lg text-center text-white">
             {/* Logo Section */}
             <div className="mb-8">
-              <div className="inline-flex items-center justify-center w-44 h-36 mb-6">
+              {/* Compact white card that hugs the logo so it stays visible on the dark panel */}
+              <div className="inline-flex items-center justify-center bg-white rounded-xl px-5 py-3 mb-6 shadow-lg">
                 <CompanyLogo
-                  className="w-[190px] h-[150px] object-contain"
-                  skeletonClassName="h-[150px] aspect-square bg-white/10"
-                  fallbackWidth={190}
-                  fallbackHeight={150}
+                  className="w-[240px] h-auto object-contain"
+                  skeletonClassName="h-[52px] w-[240px] bg-gray-100"
+                  fallbackWidth={240}
+                  fallbackHeight={52}
                 />
               </div>
               <h1 className="text-4xl font-bold mb-3">

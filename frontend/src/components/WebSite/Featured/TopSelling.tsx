@@ -32,9 +32,9 @@ export default function TopSelling() {
   if (isLoading) {
     // Skeleton mirrors the loaded section's structure (header + 4-card grid).
     return (
-      <section className="bg-[#f7f7f5] py-8 sm:py-12 md:py-16 lg:py-20 font-sans">
-        <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 sm:gap-6 lg:gap-8 mb-8 sm:mb-10 md:mb-12 lg:mb-16">
+      <section className="bg-[#f7f7f5] py-6 sm:py-8 lg:py-10 font-sans">
+        <div className="max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 sm:gap-6 lg:gap-8 mb-5 sm:mb-6 lg:mb-8">
             <div className="flex-1 space-y-3">
               <div className="h-7 md:h-8 w-48 md:w-64 bg-gray-200 rounded animate-pulse mx-auto lg:mx-0" />
               <div className="h-4 w-full max-w-md bg-gray-100 rounded animate-pulse mx-auto lg:mx-0" />
@@ -64,11 +64,11 @@ export default function TopSelling() {
   }
 
   return (
-    <section className="relative overflow-hidden bg-linear-to-b from-[#fdf6f6] via-[#faf9f7] to-white py-8 sm:py-12 md:py-16 lg:py-20 font-sans">
+    <section className="relative overflow-hidden bg-linear-to-b from-[#fdf6f6] via-[#faf9f7] to-white py-6 sm:py-8 lg:py-10 font-sans">
       <SectionBackdrop />
-      <div className="relative max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+      <div className="relative max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         {/* Header Section */}
-        <Reveal className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-4 sm:gap-6 lg:gap-8 mb-8 sm:mb-10 md:mb-12 lg:mb-16">
+        <Reveal className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-4 sm:gap-6 lg:gap-8 mb-5 sm:mb-6 lg:mb-8">
           <div className="text-center lg:text-left flex-1">
             <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
               <span className="h-px w-6 bg-[#e01a1b]" />
@@ -85,7 +85,7 @@ export default function TopSelling() {
           {/* View All Button */}
           <div className="flex justify-center lg:justify-end lg:ml-8 shrink-0">
             <Link
-              href="/products"
+              href="/products?collection=top-selling"
               className="group btn-shine inline-flex items-center gap-2 bg-[#e01a1b] text-white px-5 sm:px-7 md:px-8 py-2.5 sm:py-3 rounded-full hover:bg-[#c41617] transition-all duration-300 font-semibold text-xs sm:text-sm md:text-base whitespace-nowrap shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5"
             >
               <span className="hidden sm:inline">View All Products</span>
@@ -96,18 +96,18 @@ export default function TopSelling() {
         </Reveal>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 md:gap-6 lg:gap-8">
+        <div className="flex flex-wrap justify-center sm:justify-start gap-4 sm:gap-5 md:gap-6 lg:gap-8">
           {products.map((product, index) => (
-            <Reveal key={product.id} delay={index * 90} className="w-full">
+            <Reveal key={product.id} delay={index * 90} className="w-[calc(50%-0.5rem)] sm:w-52 md:w-56 lg:w-60 xl:w-64">
               <ProductCard product={product} />
             </Reveal>
           ))}
         </div>
 
         {/* Mobile View All Button (Bottom) */}
-        <div className="flex justify-center mt-8 sm:mt-10 md:mt-12 lg:hidden">
+        <div className="flex justify-center mt-6 sm:mt-8 lg:hidden">
           <Link
-            href="/products"
+            href="/products?collection=top-selling"
             className="group btn-shine inline-flex items-center gap-2 bg-[#e01a1b] text-white px-6 sm:px-8 py-3 sm:py-3.5 rounded-full hover:bg-[#c41617] transition-all duration-300 font-semibold text-sm sm:text-base shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:-translate-y-0.5"
           >
             View All Products

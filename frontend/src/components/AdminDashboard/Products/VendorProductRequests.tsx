@@ -7,7 +7,6 @@ import { LoadingSpinner } from '@/components/UI/LoadingSpinner'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
 import DateRangeCalendar from '@/components/Shared/DateRangeCalendar'
-import { Breadcrumb } from '../Breadcrumb/Breadcrumb'
 import ApproveProductModal, { type ApprovableProduct } from './ApproveProductModal'
 import ProductRejectionModal from './ProductRejectionModal'
 import PriceNegotiationModal from './PriceNegotiationModal'
@@ -263,14 +262,13 @@ export default function VendorProductRequests() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div>
-      <Breadcrumb />
-      <div className="space-y-6 mt-4">
+      <div className="space-y-4 mt-4">
 
         {/* ── Page Header ── */}
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Vendor Product Requests</h1>
-            <p className="text-slate-500 mt-0.5">Review and manage product submissions from vendors.</p>
+            <h1 className="text-xl font-bold text-slate-900">Vendor Product Requests</h1>
+            <p className="text-sm text-slate-500">Review and manage product submissions from vendors.</p>
           </div>
         </div>
 

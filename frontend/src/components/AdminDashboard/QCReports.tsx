@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Card, CardContent } from "@/components/UI/Card"
 import { Badge } from "@/components/UI/Badge"
 import {
     Table,
@@ -386,8 +385,8 @@ export default function QCReports() {
                         )}
                     </div>
 
-                    <Card>
-                        <CardContent className="p-0" style={{ minHeight: TABLE_MIN_HEIGHT_PX }}>
+                    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+                        <div className="overflow-x-auto" style={{ minHeight: TABLE_MIN_HEIGHT_PX }}>
                             <Table>
                                 <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                                     <TableRow>
@@ -434,7 +433,7 @@ export default function QCReports() {
                                         </TableRow>
                                     ) : (
                                         visibleFactory.map((report) => (
-                                            <TableRow key={report.id}>
+                                            <TableRow key={report.id} className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0">
                                                 <TableCell>
                                                     <div className="font-medium text-slate-900">{report.vendor?.companyName || 'Unknown Vendor'}</div>
                                                     <div className="text-xs text-slate-500">{report.vendor?.email}</div>
@@ -479,13 +478,11 @@ export default function QCReports() {
                                     )}
                                 </TableBody>
                             </Table>
-                        </CardContent>
-                    </Card>
+                        </div>
 
                     {/* Pagination */}
                     {factoryPagination.totalPages > 1 && (
-                        <div className="flex items-center justify-end gap-3 text-sm">
-                            {factoryPagination.totalPages > 1 && (
+                        <div className="flex items-center justify-end gap-3 px-4 py-3 border-t border-slate-100">
                                 <div className="flex items-center gap-1">
                                     <button
                                         onClick={() => setFactoryPage((p) => Math.max(1, p - 1))}
@@ -503,7 +500,7 @@ export default function QCReports() {
                                                 key={`f-${p}`}
                                                 onClick={() => setFactoryPage(p as number)}
                                                 aria-current={p === factoryPagination.page ? 'page' : undefined}
-                                                className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === factoryPagination.page ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                                                className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === factoryPagination.page ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/20' : 'text-slate-700 hover:bg-slate-100'}`}
                                             >
                                                 {p}
                                             </button>
@@ -518,9 +515,9 @@ export default function QCReports() {
                                         <ChevronRight className="w-4 h-4" />
                                     </button>
                                 </div>
-                            )}
                         </div>
                     )}
+                    </div>
                 </div>
             )}
 
@@ -583,8 +580,8 @@ export default function QCReports() {
                         )}
                     </div>
 
-                    <Card>
-                        <CardContent className="p-0" style={{ minHeight: TABLE_MIN_HEIGHT_PX }}>
+                    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+                        <div className="overflow-x-auto" style={{ minHeight: TABLE_MIN_HEIGHT_PX }}>
                             <Table>
                                 <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
                                     <TableRow>
@@ -637,7 +634,7 @@ export default function QCReports() {
                                             // admin's final approval (that is the Status column / product approval).
                                             const decision = product.qcDecision || product.finalDecision || '—'
                                             return (
-                                                <TableRow key={product.id}>
+                                                <TableRow key={product.id} className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0">
                                                     <TableCell>
                                                         <div className="font-medium text-slate-900">{product.name}</div>
                                                         <div className="text-xs text-slate-500">SKU: {product.baseSku}</div>
@@ -688,13 +685,11 @@ export default function QCReports() {
                                     )}
                                 </TableBody>
                             </Table>
-                        </CardContent>
-                    </Card>
+                        </div>
 
                     {/* Pagination */}
                     {productPagination.totalPages > 1 && (
-                        <div className="flex items-center justify-end gap-3 text-sm">
-                            {productPagination.totalPages > 1 && (
+                        <div className="flex items-center justify-end gap-3 px-4 py-3 border-t border-slate-100">
                                 <div className="flex items-center gap-1">
                                     <button
                                         onClick={() => setProductPage((p) => Math.max(1, p - 1))}
@@ -712,7 +707,7 @@ export default function QCReports() {
                                                 key={`p-${p}`}
                                                 onClick={() => setProductPage(p as number)}
                                                 aria-current={p === productPagination.page ? 'page' : undefined}
-                                                className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === productPagination.page ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                                                className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === productPagination.page ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/20' : 'text-slate-700 hover:bg-slate-100'}`}
                                             >
                                                 {p}
                                             </button>
@@ -727,9 +722,9 @@ export default function QCReports() {
                                         <ChevronRight className="w-4 h-4" />
                                     </button>
                                 </div>
-                            )}
                         </div>
                     )}
+                    </div>
                 </div>
             )}
         </div>

@@ -1,6 +1,19 @@
 const { prisma } = require('../config/database');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 
+// Normalise the optional click-through link from a request body into DB columns.
+// Only 'product' and 'category' are valid types with a non-empty value; anything
+// else (including an explicit "none") clears the link so a banner can be un-linked.
+const parseBannerLink = (body) => {
+    const type = body.linkType;
+    const value = body.linkValue;
+    const label = body.linkLabel;
+    if ((type === 'product' || type === 'category') && value) {
+        return { linkType: type, linkValue: String(value), linkLabel: label ? String(label) : null };
+    }
+    return { linkType: null, linkValue: null, linkLabel: null };
+};
+
 // Get all banners (admin - includes inactive)
 const getAllBanners = async (req, res) => {
     try {
@@ -31,7 +44,9 @@ const getActiveBanners = async (req, res) => {
                 id: true,
                 imageUrl: true,
                 altText: true,
-                displayOrder: true
+                displayOrder: true,
+                linkType: true,
+                linkValue: true
             }
         });
 
@@ -82,6 +97,7 @@ const addBanner = async (req, res) => {
                 altText: altText || null,
                 displayOrder,
                 isActive: true,
+                ...parseBannerLink(req.body),
                 updatedBy: req.user?.id
             }
         });
@@ -119,6 +135,10 @@ const updateBanner = async (req, res) => {
         if (altText !== undefined) updateData.altText = altText;
         if (isActive !== undefined) updateData.isActive = isActive === 'true' || isActive === true;
         if (displayOrder !== undefined) updateData.displayOrder = parseInt(displayOrder, 10);
+        // Link is updated as a unit whenever linkType is supplied (empty/none clears it).
+        if (req.body.linkType !== undefined) {
+            Object.assign(updateData, parseBannerLink(req.body));
+        }
 
         // Handle new image upload
         if (req.file) {

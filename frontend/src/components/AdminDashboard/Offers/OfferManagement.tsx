@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, Percent, Calendar, Tag, Loader2, X, ImageIcon, Upload } from 'lucide-react'
+import { Plus, Pencil, Trash2, Percent, Calendar, Tag, Loader2, X, ImageIcon, Upload, CheckCircle, Clock, XCircle, PauseCircle } from 'lucide-react'
 import { offerService, type Offer, type OfferInput, type OfferStatus } from '@/services/offerService'
 import { categoryService } from '@/services/categoryService'
 import { adminProductService, type AdminProduct } from '@/services/adminProductService'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import type { OfferType, OfferScope, OfferRegion } from '@/lib/offers'
+import Dropdown from '@/components/UI/Dropdown'
 
 const TYPE_LABELS: Record<OfferType, string> = {
   PERCENTAGE: 'Percentage off',
@@ -62,6 +63,8 @@ export default function OfferManagement() {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Offer | null>(null)
+  // Clickable metric cards filter the table by status; 'ALL' clears the filter.
+  const [statusFilter, setStatusFilter] = useState<OfferStatus | 'ALL'>('ALL')
 
   // `loading` starts true so the first render shows the spinner without a synchronous
   // setState in the effect (which the React-compiler lint flags). All state updates in
@@ -88,6 +91,20 @@ export default function OfferManagement() {
     return c
   }, [offers])
 
+  // Table respects the active metric-card filter.
+  const displayedOffers = useMemo(
+    () => (statusFilter === 'ALL' ? offers : offers.filter((o) => (o.status || 'PAUSED') === statusFilter)),
+    [offers, statusFilter],
+  )
+
+  // Metric cards — click to filter the table by that status (click the active one to clear).
+  const statCards = [
+    { key: 'ACTIVE' as const,    title: 'Active',    value: counts.ACTIVE,    subtitle: 'Live now',     Icon: CheckCircle, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500', countColor: 'text-emerald-700', activeClass: 'border-emerald-400 bg-emerald-50/60' },
+    { key: 'SCHEDULED' as const, title: 'Scheduled', value: counts.SCHEDULED, subtitle: 'Upcoming',     Icon: Clock,       iconBg: 'bg-indigo-50',  iconColor: 'text-indigo-500',  countColor: 'text-indigo-700',  activeClass: 'border-indigo-400 bg-indigo-50/60' },
+    { key: 'EXPIRED' as const,   title: 'Expired',   value: counts.EXPIRED,   subtitle: 'Past window',  Icon: XCircle,     iconBg: 'bg-red-50',     iconColor: 'text-red-500',     countColor: 'text-red-700',     activeClass: 'border-red-400 bg-red-50/60' },
+    { key: 'PAUSED' as const,    title: 'Paused',    value: counts.PAUSED,    subtitle: 'Disabled',     Icon: PauseCircle, iconBg: 'bg-amber-50',   iconColor: 'text-amber-500',   countColor: 'text-amber-700',   activeClass: 'border-amber-400 bg-amber-50/60' },
+  ]
+
   const openCreate = () => {
     setEditing(null)
     setModalOpen(true)
@@ -110,12 +127,12 @@ export default function OfferManagement() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <Percent className="w-6 h-6 text-[#e01a1b]" /> Offers
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-slate-500 mt-1">
             Automatic, code-less promotions. Applied on the selling price at checkout — vendor payouts are never affected.
           </p>
         </div>
@@ -127,43 +144,60 @@ export default function OfferManagement() {
         </button>
       </div>
 
-      {/* Metric cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        {(['ACTIVE', 'SCHEDULED', 'EXPIRED', 'PAUSED'] as OfferStatus[]).map((s) => (
-          <div key={s} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-            <p className="text-xs uppercase tracking-wide text-gray-400">{s.toLowerCase()}</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{counts[s]}</p>
-          </div>
-        ))}
+      {/* Metric cards — click a card to filter the table by that status */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        {statCards.map(({ key, title, value, subtitle, Icon, iconBg, iconColor, countColor, activeClass }) => {
+          const isActive = statusFilter === key
+          const toggle = () => setStatusFilter((prev) => (prev === key ? 'ALL' : key))
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={toggle}
+              className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : 'border-slate-200/80 hover:border-slate-300'}`}
+            >
+              <div className="flex flex-row items-center justify-between px-3.5 pt-3 pb-1">
+                <span className="text-[13px] font-medium text-slate-500">{title}</span>
+                <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace('50', '100') : iconBg} transition-transform duration-150 group-hover:scale-110`}>
+                  <Icon className={`h-4 w-4 ${iconColor}`} />
+                </div>
+              </div>
+              <div className="px-3.5 pb-3">
+                <div className={`text-xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-[11px] text-slate-400 mt-0.5">{subtitle}</p>
+              </div>
+            </button>
+          )
+        })}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16 text-gray-400">
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
-        ) : offers.length === 0 ? (
+        ) : displayedOffers.length === 0 ? (
           <div className="text-center py-16 text-gray-500">
             <Tag className="w-10 h-10 mx-auto text-gray-300 mb-3" />
-            <p>No offers yet. Create your first promotion.</p>
+            <p>{statusFilter === 'ALL' ? 'No offers yet. Create your first promotion.' : `No ${statusFilter.toLowerCase()} offers.`}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500 text-left">
+              <thead className="!bg-brand-500/[0.06] border-b border-brand-100/50 text-left">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Offer</th>
-                  <th className="px-4 py-3 font-medium">Discount</th>
-                  <th className="px-4 py-3 font-medium">Scope</th>
-                  <th className="px-4 py-3 font-medium">Region</th>
-                  <th className="px-4 py-3 font-medium">Window</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
+                  <th className="px-4 py-3 h-11 font-bold !text-brand-500/60 text-[10px] uppercase tracking-wider">Offer</th>
+                  <th className="px-4 py-3 h-11 font-bold !text-brand-500/60 text-[10px] uppercase tracking-wider">Discount</th>
+                  <th className="px-4 py-3 h-11 font-bold !text-brand-500/60 text-[10px] uppercase tracking-wider">Scope</th>
+                  <th className="px-4 py-3 h-11 font-bold !text-brand-500/60 text-[10px] uppercase tracking-wider">Region</th>
+                  <th className="px-4 py-3 h-11 font-bold !text-brand-500/60 text-[10px] uppercase tracking-wider">Window</th>
+                  <th className="px-4 py-3 h-11 font-bold !text-brand-500/60 text-[10px] uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 h-11 font-bold !text-brand-500/60 text-[10px] uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {offers.map((o) => (
-                  <tr key={o.id} className="hover:bg-gray-50">
+              <tbody>
+                {displayedOffers.map((o) => (
+                  <tr key={o.id} className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0">
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">{o.title}</div>
                       <div className="text-xs text-gray-400">{TYPE_LABELS[o.type]}</div>
@@ -385,35 +419,19 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Offer type *</label>
-              <select
-                value={form.type}
-                onChange={(e) => set('type', e.target.value as OfferType)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-[#e01a1b]/30 focus:border-[#e01a1b] outline-none"
-              >
-                {(Object.keys(TYPE_LABELS) as OfferType[]).map((k) => (
-                  <option key={k} value={k}>
-                    {TYPE_LABELS[k]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Applies to *</label>
-              <select
-                value={form.scope}
-                onChange={(e) => set('scope', e.target.value as OfferScope)}
-                disabled={form.type === 'THRESHOLD'}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-[#e01a1b]/30 focus:border-[#e01a1b] outline-none disabled:bg-gray-50"
-              >
-                {(Object.keys(SCOPE_LABELS) as OfferScope[]).map((k) => (
-                  <option key={k} value={k}>
-                    {SCOPE_LABELS[k]}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Dropdown
+              label="Offer type *"
+              value={form.type || 'PERCENTAGE'}
+              onChange={(v) => set('type', v as OfferType)}
+              options={(Object.keys(TYPE_LABELS) as OfferType[]).map((k) => ({ value: k, label: TYPE_LABELS[k] }))}
+            />
+            <Dropdown
+              label="Applies to *"
+              value={form.scope || 'STORE'}
+              onChange={(v) => set('scope', v as OfferScope)}
+              disabled={form.type === 'THRESHOLD'}
+              options={(Object.keys(SCOPE_LABELS) as OfferScope[]).map((k) => ({ value: k, label: SCOPE_LABELS[k] }))}
+            />
           </div>
 
           {/* Discount magnitude */}
@@ -559,20 +577,12 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
 
           {/* Region + priority + window + active */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Region</label>
-              <select
-                value={form.region}
-                onChange={(e) => set('region', e.target.value as OfferRegion)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white outline-none focus:border-[#e01a1b]"
-              >
-                {(Object.keys(REGION_LABELS) as OfferRegion[]).map((k) => (
-                  <option key={k} value={k}>
-                    {REGION_LABELS[k]}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Dropdown
+              label="Region"
+              value={form.region || 'BOTH'}
+              onChange={(v) => set('region', v as OfferRegion)}
+              options={(Object.keys(REGION_LABELS) as OfferRegion[]).map((k) => ({ value: k, label: REGION_LABELS[k] }))}
+            />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Priority (higher wins ties)</label>
               <input

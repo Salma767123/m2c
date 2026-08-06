@@ -1,46 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Upload, X, Image, Trash2, GripVertical, Plus, Eye, EyeOff, Info } from 'lucide-react';
+import { Save, Upload, X, Image, Trash2, GripVertical, Plus, Eye, EyeOff, Info, Link2, Edit } from 'lucide-react';
 import { Card, CardContent } from '../../UI/Card';
-import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils';
-import { bannerService, BannerImage } from '@/services/bannerService';
+import Dropdown from '../../UI/Dropdown';
+import SearchableSelect, { SearchableOption } from '../../UI/SearchableSelect';
+import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { bannerService, BannerImage, BannerLink, BANNER_LINK_ALL } from '@/services/bannerService';
+import { categoryService } from '@/services/categoryService';
+import { adminProductService } from '@/services/adminProductService';
 import { hasPermission } from '@/lib/auth';
+import BannerCropModal from './BannerCropModal';
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
 
-// Banner display spec — keep in sync with the homepage hero (2872 × 1152, ≈2.49:1)
-const TARGET_RATIO = 2872 / 1152;        // ≈ 2.493
-const RATIO_TOLERANCE = 0.12;            // ±12% deviation allowed before warning
-const MIN_BANNER_WIDTH = 1400;           // below this, banner looks soft on large screens
+// Banner display spec — the homepage hero is full-bleed (100vw) with fixed heights
+// per breakpoint, so it renders at roughly 3.5 : 1 on desktop. Uploads are cropped
+// to this exact ratio before saving, so there's no aspect-ratio guesswork.
+const REC_WIDTH = 2800;
+const REC_HEIGHT = 800;
+const TARGET_RATIO = REC_WIDTH / REC_HEIGHT; // 3.5 : 1
 
-/**
- * Reads an image file's natural dimensions and surfaces a non-blocking warning
- * if its aspect ratio or resolution deviates from the recommended banner spec.
- * Returns a Promise that resolves once dimensions are read (never rejects).
- */
-function checkBannerDimensions(file: File, dataUrl: string): Promise<void> {
-    return new Promise((resolve) => {
-        const img = new window.Image();
-        img.onload = () => {
-            const { naturalWidth: w, naturalHeight: h } = img;
-            if (w > 0 && h > 0) {
-                const ratio = w / h;
-                const deviation = Math.abs(ratio - TARGET_RATIO) / TARGET_RATIO;
-                if (deviation > RATIO_TOLERANCE) {
-                    showWarningToast(
-                        'Aspect ratio mismatch',
-                        `This image is ${w}×${h}px (${ratio.toFixed(2)}:1). The homepage banner uses 2872×1152px (2.49:1) — parts of this image will be cropped. You can still upload it.`,
-                    );
-                } else if (w < MIN_BANNER_WIDTH) {
-                    showWarningToast(
-                        'Low resolution',
-                        `This image is only ${w}px wide. Use at least 2872px wide so the banner stays sharp on large screens.`,
-                    );
-                }
-            }
-            resolve();
-        };
-        img.onerror = () => resolve();
-        img.src = dataUrl;
-    });
-}
+// Link-type options for the "Link to" dropdown.
+const LINK_TYPE_OPTIONS = [
+    { value: 'none', label: 'No link' },
+    { value: 'product', label: 'Product' },
+    { value: 'category', label: 'Category' },
+];
 
 export default function BannerSettingsTab() {
     const canManage = hasPermission('settings:edit');
@@ -56,12 +39,75 @@ export default function BannerSettingsTab() {
     const [editFile, setEditFile] = useState<File | null>(null);
     const [editFilePreview, setEditFilePreview] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    // Banner queued for deletion — drives the confirmation modal. Null when closed.
+    const [pendingDelete, setPendingDelete] = useState<{ id: string; order: number } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const editFileInputRef = useRef<HTMLInputElement>(null);
+    // Image awaiting a crop-to-ratio pass before it becomes the selected banner.
+    const [cropState, setCropState] = useState<{ src: string; fileName: string; target: 'new' | 'edit' } | null>(null);
+
+    // Click-through link options (loaded once) + the current form selections.
+    // linkValue holds the target's slug (product route accepts slug or id).
+    const [linkProducts, setLinkProducts] = useState<{ value: string; name: string; sku?: string }[]>([]);
+    const [linkCategories, setLinkCategories] = useState<{ value: string; name: string }[]>([]);
+    const [newLinkType, setNewLinkType] = useState<'none' | 'product' | 'category'>('none');
+    const [newLinkValue, setNewLinkValue] = useState('');
+    const [editLinkType, setEditLinkType] = useState<'none' | 'product' | 'category'>('none');
+    const [editLinkValue, setEditLinkValue] = useState('');
+
+    // Human label for a chosen link value (handles the "All …" sentinel + specific items).
+    const linkLabelFor = (type: 'product' | 'category', value: string): string | undefined => {
+        if (value === BANNER_LINK_ALL) return type === 'product' ? 'All products' : 'All categories';
+        return (type === 'product' ? linkProducts : linkCategories).find((o) => o.value === value)?.name;
+    };
+
+    // Options for the searchable target dropdown: an "All …" entry pinned on top,
+    // then every product (searchable by name + SKU) / category (by name).
+    const targetOptions = (type: 'none' | 'product' | 'category'): SearchableOption[] => {
+        if (type === 'product') {
+            return [
+                { value: BANNER_LINK_ALL, label: 'All products', pinned: true },
+                ...linkProducts.map((p) => ({ value: p.value, label: p.name, keywords: p.sku, hint: p.sku ? `SKU: ${p.sku}` : undefined })),
+            ];
+        }
+        if (type === 'category') {
+            return [
+                { value: BANNER_LINK_ALL, label: 'All categories', pinned: true },
+                ...linkCategories.map((c) => ({ value: c.value, label: c.name })),
+            ];
+        }
+        return [];
+    };
+
+    // Turn the form selections into the payload the service expects (+ cache the label).
+    const buildLink = (type: 'none' | 'product' | 'category', value: string): BannerLink => {
+        if (type === 'none' || !value) return { linkType: 'none' };
+        return { linkType: type, linkValue: value, linkLabel: linkLabelFor(type, value) };
+    };
 
     useEffect(() => {
         fetchBanners();
+        fetchLinkOptions();
     }, []);
+
+    // Load products + categories once to populate the "link to" dropdowns.
+    const fetchLinkOptions = async () => {
+        try {
+            const [catRes, prodRes] = await Promise.all([
+                categoryService.getCategories({ status: 'ACTIVE', showRootOnly: true }),
+                adminProductService.getAllProducts({ status: 'ACTIVE', limit: 500 }),
+            ]);
+            setLinkCategories(
+                (catRes.data || []).map((c: any) => ({ value: c.slug, name: c.name })).filter((o: any) => o.value)
+            );
+            setLinkProducts(
+                (prodRes.data?.products || []).map((p: any) => ({ value: p.slug || p.id, name: p.name, sku: p.baseSku }))
+            );
+        } catch (error) {
+            // Non-fatal: the link dropdowns just stay empty.
+            console.error('Failed to load banner link options:', error);
+        }
+    };
 
     const fetchBanners = async () => {
         try {
@@ -90,14 +136,14 @@ export default function BannerSettingsTab() {
             return;
         }
 
-        setSelectedFile(file);
+        // Open the cropper first so the saved image always matches the banner ratio.
         const reader = new FileReader();
         reader.onload = (e) => {
             const dataUrl = e.target?.result as string;
-            setFilePreview(dataUrl);
-            checkBannerDimensions(file, dataUrl);
+            setCropState({ src: dataUrl, fileName: file.name, target: 'new' });
         };
         reader.readAsDataURL(file);
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const handleEditFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,20 +159,33 @@ export default function BannerSettingsTab() {
             return;
         }
 
-        setEditFile(file);
         const reader = new FileReader();
         reader.onload = (e) => {
             const dataUrl = e.target?.result as string;
-            setEditFilePreview(dataUrl);
-            checkBannerDimensions(file, dataUrl);
+            setCropState({ src: dataUrl, fileName: file.name, target: 'edit' });
         };
         reader.readAsDataURL(file);
+        if (editFileInputRef.current) editFileInputRef.current.value = '';
+    };
+
+    // Cropped result → becomes the selected (new) or replacement (edit) banner image.
+    const handleCropped = (file: File, dataUrl: string) => {
+        if (cropState?.target === 'edit') {
+            setEditFile(file);
+            setEditFilePreview(dataUrl);
+        } else {
+            setSelectedFile(file);
+            setFilePreview(dataUrl);
+        }
+        setCropState(null);
     };
 
     const clearNewForm = () => {
         setSelectedFile(null);
         setFilePreview(null);
         setNewAltText('');
+        setNewLinkType('none');
+        setNewLinkValue('');
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
@@ -138,7 +197,7 @@ export default function BannerSettingsTab() {
 
         try {
             setUploading(true);
-            const response = await bannerService.addBanner(selectedFile, newAltText);
+            const response = await bannerService.addBanner(selectedFile, newAltText, buildLink(newLinkType, newLinkValue));
             if (response.success) {
                 showSuccessToast('Success', 'Banner added successfully');
                 clearNewForm();
@@ -168,6 +227,8 @@ export default function BannerSettingsTab() {
         setEditAltText(banner.altText || '');
         setEditFile(null);
         setEditFilePreview(null);
+        setEditLinkType((banner.linkType as 'product' | 'category') || 'none');
+        setEditLinkValue(banner.linkValue || '');
     };
 
     const cancelEditing = () => {
@@ -175,13 +236,15 @@ export default function BannerSettingsTab() {
         setEditAltText('');
         setEditFile(null);
         setEditFilePreview(null);
+        setEditLinkType('none');
+        setEditLinkValue('');
         if (editFileInputRef.current) editFileInputRef.current.value = '';
     };
 
     const handleUpdateBanner = async (id: string) => {
         try {
             setLoading(true);
-            const response = await bannerService.updateBanner(id, { altText: editAltText }, editFile || undefined);
+            const response = await bannerService.updateBanner(id, { altText: editAltText }, editFile || undefined, buildLink(editLinkType, editLinkValue));
             if (response.success) {
                 showSuccessToast('Success', 'Banner updated successfully');
                 cancelEditing();
@@ -194,7 +257,11 @@ export default function BannerSettingsTab() {
         }
     };
 
-    const handleDeleteBanner = async (id: string) => {
+    // The trash icon only opens the confirmation modal; the actual delete runs from
+    // confirmDeleteBanner once the admin confirms.
+    const confirmDeleteBanner = async () => {
+        if (!pendingDelete) return;
+        const { id } = pendingDelete;
         try {
             setDeletingId(id);
             const response = await bannerService.deleteBanner(id);
@@ -206,6 +273,7 @@ export default function BannerSettingsTab() {
             showErrorToast('Error', 'Failed to delete banner');
         } finally {
             setDeletingId(null);
+            setPendingDelete(null);
         }
     };
 
@@ -240,8 +308,71 @@ export default function BannerSettingsTab() {
         );
     }
 
+    // Shared "Link to" selector, reused by the add and edit forms.
+    const renderLinkSelector = (
+        type: 'none' | 'product' | 'category',
+        setType: (t: 'none' | 'product' | 'category') => void,
+        value: string,
+        setValue: (v: string) => void
+    ) => {
+        return (
+            <div>
+                <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1.5">
+                    <Link2 className="h-4 w-4 text-slate-400" /> Link to (optional)
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="sm:w-40">
+                        <Dropdown
+                            value={type}
+                            options={LINK_TYPE_OPTIONS}
+                            onChange={(v) => { setType(v as 'none' | 'product' | 'category'); setValue(''); }}
+                            buttonClassName="py-2 rounded-lg text-sm"
+                        />
+                    </div>
+                    {type !== 'none' && (
+                        <div className="flex-1 min-w-0">
+                            <SearchableSelect
+                                value={value}
+                                options={targetOptions(type)}
+                                placeholder={`Select a ${type}…`}
+                                searchPlaceholder={type === 'product' ? 'Search by name or SKU…' : 'Search by name…'}
+                                onChange={(v) => setValue(v)}
+                                buttonClassName="py-2 rounded-lg text-sm"
+                            />
+                        </div>
+                    )}
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                    Clicking this banner on the website opens the selected page.
+                </p>
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-6">
+            {cropState && (
+                <BannerCropModal
+                    src={cropState.src}
+                    aspect={TARGET_RATIO}
+                    fileName={cropState.fileName}
+                    onCancel={() => setCropState(null)}
+                    onCropped={handleCropped}
+                />
+            )}
+
+            {/* Delete confirmation — the trash icon opens this; nothing is removed
+                until the admin confirms. */}
+            <DeleteConfirmModal
+                show={!!pendingDelete}
+                title="Delete Banner"
+                subtitle="This banner will be removed from the homepage carousel. This action cannot be undone."
+                itemName={pendingDelete ? `Banner #${pendingDelete.order}` : undefined}
+                confirmLabel="Delete Permanently"
+                loading={!!deletingId}
+                onConfirm={confirmDeleteBanner}
+                onCancel={() => setPendingDelete(null)}
+            />
             {/* Add New Banner */}
             <Card>
                 <CardContent className="p-6">
@@ -262,13 +393,13 @@ export default function BannerSettingsTab() {
                                 <Info className="h-4 w-4 text-brand-600 shrink-0 mt-0.5" />
                                 <div className="text-xs text-brand-800 leading-5">
                                     <p className="font-semibold">
-                                        Recommended size: 2872 × 1152 px (aspect ratio ≈ 2.49 : 1)
+                                        Recommended size: {REC_WIDTH} × {REC_HEIGHT} px (aspect ratio {TARGET_RATIO.toFixed(1)} : 1)
                                     </p>
                                     <ul className="text-brand-700 mt-1 list-disc pl-4 space-y-0.5">
-                                        <li>Use a <strong>wide landscape</strong> image at the exact ratio above for a crisp, full fit.</li>
-                                        <li>Keep text, logos &amp; key products in the <strong>centre</strong> — outer edges may be cropped on mobile and desktop.</li>
-                                        <li>Make the background extend edge-to-edge so cropping never shows blank space.</li>
-                                        <li>Format: <strong>JPG, PNG or WebP</strong> (WebP preferred) · keep under 5MB for fast loading.</li>
+                                        <li>After you pick an image, a <strong>crop tool opens</strong> — position &amp; zoom to the frame, which is locked to the live banner ratio.</li>
+                                        <li>Use a <strong>wide landscape</strong> image so there's room to crop cleanly.</li>
+                                        <li>Keep text, logos &amp; key products in the <strong>centre</strong> — outer edges may be cropped on very wide screens.</li>
+                                        <li>Format: <strong>JPG, PNG or WebP</strong> · keep under 5MB for fast loading.</li>
                                     </ul>
                                 </div>
                             </div>
@@ -305,7 +436,7 @@ export default function BannerSettingsTab() {
                                                 Click to upload banner image
                                             </p>
                                             <p className="text-xs text-slate-400 mt-1">
-                                                JPG, PNG or WebP · up to 5MB · 2872 × 1152 px
+                                                JPG, PNG or WebP · up to 5MB · crop opens after selecting
                                             </p>
                                         </div>
                                     )}
@@ -320,18 +451,55 @@ export default function BannerSettingsTab() {
                             </div>
                         </div>
 
-                        {/* Alt Text */}
+                        {/* Alt text + click-through link — one balanced 3-column row */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">
-                                Alt Text (for accessibility)
-                            </label>
-                            <input
-                                type="text"
-                                value={newAltText}
-                                onChange={(e) => setNewAltText(e.target.value)}
-                                placeholder="Describe the banner image..."
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 text-sm"
-                            />
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                {/* Alt Text */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                        Alt Text (for accessibility)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={newAltText}
+                                        onChange={(e) => setNewAltText(e.target.value)}
+                                        placeholder="Describe the banner image..."
+                                        className="w-full h-10 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm"
+                                    />
+                                </div>
+
+                                {/* Link type */}
+                                <div>
+                                    <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1">
+                                        <Link2 className="h-4 w-4 text-slate-400" /> Link to
+                                    </label>
+                                    <Dropdown
+                                        value={newLinkType}
+                                        options={LINK_TYPE_OPTIONS}
+                                        onChange={(v) => { setNewLinkType(v as 'none' | 'product' | 'category'); setNewLinkValue(''); }}
+                                        buttonClassName="py-2 rounded-lg text-sm"
+                                    />
+                                </div>
+
+                                {/* Link target */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                        {newLinkType === 'category' ? 'Category' : newLinkType === 'product' ? 'Product' : 'Target'}
+                                    </label>
+                                    <SearchableSelect
+                                        value={newLinkValue}
+                                        options={targetOptions(newLinkType)}
+                                        placeholder={newLinkType === 'none' ? 'Pick a link type first' : `Select a ${newLinkType}…`}
+                                        searchPlaceholder={newLinkType === 'product' ? 'Search by name or SKU…' : 'Search by name…'}
+                                        disabled={newLinkType === 'none'}
+                                        onChange={(v) => setNewLinkValue(v)}
+                                        buttonClassName="py-2 rounded-lg text-sm"
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1.5">
+                                Clicking this banner on the website opens the selected page.
+                            </p>
                         </div>
 
                         {/* Submit Button */}
@@ -414,6 +582,7 @@ export default function BannerSettingsTab() {
                                                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 text-sm"
                                                     />
                                                     <p className="text-xs text-slate-400">Click the image to replace it</p>
+                                                    {renderLinkSelector(editLinkType, setEditLinkType, editLinkValue, setEditLinkValue)}
                                                     <div className="flex gap-2">
                                                         <button
                                                             onClick={() => handleUpdateBanner(banner.id)}
@@ -473,6 +642,12 @@ export default function BannerSettingsTab() {
                                                 <p className="text-xs text-slate-500 mt-1">
                                                     Order: {banner.displayOrder + 1} | {banner.isActive ? 'Active' : 'Hidden'}
                                                 </p>
+                                                {banner.linkType && (
+                                                    <p className="text-xs text-brand-600 mt-1 inline-flex items-center gap-1 truncate">
+                                                        <Link2 className="h-3 w-3 flex-shrink-0" />
+                                                        Links to {banner.linkType}: {banner.linkLabel || banner.linkValue}
+                                                    </p>
+                                                )}
                                             </div>
 
                                             {/* Actions */}
@@ -494,10 +669,10 @@ export default function BannerSettingsTab() {
                                                         className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
                                                         title="Edit banner"
                                                     >
-                                                        <Save className="h-4 w-4" />
+                                                        <Edit className="h-4 w-4" />
                                                     </button>
                                                     <button
-                                                        onClick={() => handleDeleteBanner(banner.id)}
+                                                        onClick={() => setPendingDelete({ id: banner.id, order: banner.displayOrder + 1 })}
                                                         disabled={deletingId === banner.id}
                                                         className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                                                         title="Delete banner"

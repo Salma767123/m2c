@@ -3144,6 +3144,13 @@ const getPublicProduct = async (req, res) => {
         // Customer sees delivery days and total cost — NOT per-kg rates
         airDeliveryDays: lc.airDeliveryDays || 7,
         shipDeliveryDays: lc.shipDeliveryDays || 30,
+        // Domestic (.in) surface lane — the storefront picks these on the .in region.
+        // Undefined (legacy products) falls back to the ship/sea figures in the calc.
+        surfaceDeliveryDays: lc.surfaceDeliveryDays,
+        surfaceCostPerKg: lc.surfaceCostPerKg,
+        // Which admin-managed couriers this product ships with (storefront filters the
+        // shown couriers to these). Empty/undefined → show all region+mode couriers.
+        courierIds: lc.courierIds || [],
         // Send cost per KG for client-side calculation but keep weight ranges internal
         airCostPerKg: lc.airCostPerKg || 0,
         shipCostPerKg: lc.shipCostPerKg || 0,

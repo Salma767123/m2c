@@ -15,6 +15,9 @@ import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-
 import { centerNotice } from '@/components/UI/CenterNotice'
 import { gstSettingsService, type GSTSetting } from '@/services/gstSettingsService'
 import { parseDimensions, combineDimensions } from '@/lib/dimensions'
+import { transportModeLabel } from '@/lib/couriers'
+import { courierService, type Courier } from '@/services/courierService'
+import CourierBadge from '@/components/Shared/CourierBadge'
 import ImageCropModal from '@/components/UI/ImageCropModal'
 import { TitleSelect } from '@/components/VendorHub/FormUI'
 
@@ -240,9 +243,16 @@ interface ProductFormData {
     transportTypes: string[]
     weightRanges: Array<{ minWeight: number; maxWeight: number; recommendedTransport: string }>
     airDeliveryDays: number
+    // SHIP lane splits by market: ship* = SEA (international, .com); surface* = SURFACE
+    // (domestic India, .in). Which fields the admin fills is driven by priceVisibility.
     shipDeliveryDays: number
+    surfaceDeliveryDays?: number
     airCostPerKg: number
     shipCostPerKg: number
+    surfaceCostPerKg?: number
+    // Ids of the admin-managed couriers this product ships with (see Courier module).
+    // The storefront shows these, filtered by the shopper's region + transport mode.
+    courierIds?: string[]
     notes: string
   }
 }
@@ -273,6 +283,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
   const [isLoadingGst, setIsLoadingGst] = useState(false)
   // True when "Others" is chosen to enter a custom tax rate.
   const [gstOthers, setGstOthers] = useState(false)
+
+  // Admin-managed couriers, for the logistics multi-select.
+  const [couriers, setCouriers] = useState<Courier[]>([])
+  useEffect(() => {
+    courierService.getActiveCouriers().then(setCouriers).catch(() => setCouriers([]))
+  }, [])
 
   const [formData, setFormData] = useState<ProductFormData>({
     // Inventory Connection (NEW)
@@ -380,8 +396,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
       ] as Array<{ minWeight: number; maxWeight: number; recommendedTransport: string }>,
       airDeliveryDays: 7,
       shipDeliveryDays: 30,
+      surfaceDeliveryDays: 7,
       airCostPerKg: 0,
       shipCostPerKg: 0,
+      surfaceCostPerKg: 0,
+      courierIds: [],
       notes: ''
     }
   })
@@ -741,8 +760,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                 ],
                 airDeliveryDays: 7,
                 shipDeliveryDays: 30,
+                surfaceDeliveryDays: 7,
                 airCostPerKg: 0,
                 shipCostPerKg: 0,
+                surfaceCostPerKg: 0,
+                courierIds: [],
                 notes: ''
               }
             })
@@ -3262,6 +3284,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                   <CardContent className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">Available Transport Types</label>
+                      {/* Labels + courier list follow the product's visibility: domestic
+                          (Air / Surface-Road, Indian couriers) for .in, international
+                          (Air / Sea Freight, global couriers) for .com. */}
                       <div className="flex gap-4">
                         {['AIR', 'SHIP'].map((type) => (
                           <label key={type} className="flex items-center gap-2 cursor-pointer">
@@ -3279,73 +3304,104 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                               }}
                               className="w-4 h-4 text-slate-700 border-slate-300 rounded focus:ring-brand-500/40"
                             />
-                            <span className="text-sm font-medium text-slate-700">{type === 'AIR' ? 'Air Freight' : 'Sea Freight'}</span>
+                            <span className="text-sm font-medium text-slate-700">{transportModeLabel(type as 'AIR' | 'SHIP', formData.priceVisibility)}</span>
                           </label>
                         ))}
                       </div>
+
+                      {/* Courier partner picker — the admin-managed couriers this product
+                          ships with. Eligible list is filtered by the product's visibility
+                          (region) and the selected transport modes; the admin ticks which
+                          apply. Stored in logisticsConfig.courierIds. */}
+                      {(() => {
+                        const vis = formData.priceVisibility || 'BOTH';
+                        const regions = vis === 'IN_ONLY' ? ['IN'] : vis === 'COM_ONLY' ? ['US'] : ['IN', 'US'];
+                        const modes = (formData.logisticsConfig?.transportTypes || []) as ('AIR' | 'SHIP')[];
+                        const eligible = couriers.filter(
+                          (c) => regions.includes(c.region) && c.modes.some((m) => modes.includes(m as 'AIR' | 'SHIP'))
+                        );
+                        const selected = formData.logisticsConfig?.courierIds || [];
+                        const toggle = (id: string) => setFormData(prev => {
+                          const cur = prev.logisticsConfig?.courierIds || [];
+                          const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+                          return { ...prev, logisticsConfig: { ...prev.logisticsConfig!, courierIds: next } };
+                        });
+                        return (
+                          <div className="mt-3 rounded-md bg-slate-50 border border-slate-200 p-3">
+                            <p className="text-xs font-semibold text-slate-600 mb-2">
+                              Courier partners for this product
+                              <span className="text-slate-400 font-medium"> · tick the ones buyers can choose ({selected.length} selected)</span>
+                            </p>
+                            {couriers.length === 0 ? (
+                              <p className="text-xs text-slate-400">No couriers configured. Add them under Catalog → Courier Partners.</p>
+                            ) : eligible.length === 0 ? (
+                              <p className="text-xs text-slate-400">No couriers match this product&apos;s region + transport modes. Add matching couriers, or adjust visibility/modes.</p>
+                            ) : (
+                              <div className="flex flex-wrap gap-2">
+                                {eligible.map((c) => {
+                                  const on = selected.includes(c.id);
+                                  return (
+                                    <button
+                                      key={c.id}
+                                      type="button"
+                                      onClick={() => toggle(c.id)}
+                                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border transition-colors ${on ? 'bg-[#e01a1b] text-white border-[#e01a1b]' : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400'}`}
+                                    >
+                                      <CourierBadge courier={c} className="w-4 h-4 rounded" codeClassName="text-[8px]" />
+                                      {c.name}
+                                      <span className="text-[9px] opacity-70">{c.region === 'IN' ? '.in' : '.com'}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Air Delivery Days</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={formData.logisticsConfig?.airDeliveryDays || ''}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            logisticsConfig: { ...prev.logisticsConfig!, airDeliveryDays: parseInt(e.target.value) || 7 }
-                          }))}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Ship Delivery Days</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={formData.logisticsConfig?.shipDeliveryDays || ''}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            logisticsConfig: { ...prev.logisticsConfig!, shipDeliveryDays: parseInt(e.target.value) || 30 }
-                          }))}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Air Cost per KG</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.logisticsConfig?.airCostPerKg || ''}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            logisticsConfig: { ...prev.logisticsConfig!, airCostPerKg: parseFloat(e.target.value) || 0 }
-                          }))}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                          placeholder="e.g. 100"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Ship Cost per KG</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.logisticsConfig?.shipCostPerKg || ''}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            logisticsConfig: { ...prev.logisticsConfig!, shipCostPerKg: parseFloat(e.target.value) || 0 }
-                          }))}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
-                          placeholder="e.g. 20"
-                        />
-                      </div>
-                    </div>
+                    {/* Per-lane delivery + cost. Air is one shared lane; the SHIP lane
+                        splits into Sea Freight (international, .com) and Surface / Road
+                        (domestic India, .in). Which lanes show follow the product's
+                        visibility, so a BOTH product can price Sea and Surface separately. */}
+                    {(() => {
+                      const vis = formData.priceVisibility || 'BOTH';
+                      const showSea = vis === 'COM_ONLY' || vis === 'BOTH';
+                      const showSurface = vis === 'IN_ONLY' || vis === 'BOTH';
+                      const lc = formData.logisticsConfig!;
+                      const setLC = (patch: Partial<typeof lc>) =>
+                        setFormData(prev => ({ ...prev, logisticsConfig: { ...prev.logisticsConfig!, ...patch } }));
+                      // Plain function (NOT a <Component/>) so inputs don't remount and
+                      // lose focus on each keystroke.
+                      const lane = (
+                        title: string, sub: string,
+                        days: number | undefined, cost: number | undefined,
+                        onDays: (v: number) => void, onCost: (v: number) => void, costPlaceholder: string,
+                      ) => (
+                        <div key={title} className="rounded-lg border border-slate-200 p-3">
+                          <p className="text-sm font-semibold text-slate-800">{title} <span className="text-xs font-normal text-slate-400">· {sub}</span></p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Delivery Days</label>
+                              <input type="number" min="1" value={days || ''} onChange={(e) => onDays(parseInt(e.target.value) || 0)}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Cost per KG (₹)</label>
+                              <input type="number" step="0.01" min="0" value={cost || ''} onChange={(e) => onCost(parseFloat(e.target.value) || 0)}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent" placeholder={costPlaceholder} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                      return (
+                        <div className="space-y-3">
+                          {lane('Air', 'express', lc.airDeliveryDays, lc.airCostPerKg, (v) => setLC({ airDeliveryDays: v }), (v) => setLC({ airCostPerKg: v }), 'e.g. 100')}
+                          {showSea && lane('Sea Freight', 'international · .com', lc.shipDeliveryDays, lc.shipCostPerKg, (v) => setLC({ shipDeliveryDays: v }), (v) => setLC({ shipCostPerKg: v }), 'e.g. 20')}
+                          {showSurface && lane('Surface / Road', 'domestic India · .in', lc.surfaceDeliveryDays, lc.surfaceCostPerKg, (v) => setLC({ surfaceDeliveryDays: v }), (v) => setLC({ surfaceCostPerKg: v }), 'e.g. 40')}
+                        </div>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
 

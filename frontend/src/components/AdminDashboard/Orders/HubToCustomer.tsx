@@ -152,9 +152,9 @@ export default function HubToCustomer() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Stats Cards — click a card to filter the table below by that status */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { key: "All", label: "Total Orders", subtitle: "All orders", value: orders.length, Icon: Package, iconBg: "bg-brand-50", iconColor: "text-brand-500", countColor: "text-slate-900", activeClass: "border-brand-400 bg-brand-50/50" },
           { key: "AT_HUB", label: "At Hub", subtitle: "Received / approved", value: orders.filter((o) => ["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB"].includes(o.status)).length, Icon: Warehouse, iconBg: "bg-teal-50", iconColor: "text-teal-500", countColor: "text-teal-700", activeClass: "border-teal-400 bg-teal-50/60" },
@@ -170,15 +170,15 @@ export default function HubToCustomer() {
               onClick={toggle}
               className={`text-left bg-white border rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm group ${isActive ? activeClass : "border-slate-200/80 hover:border-slate-300"}`}
             >
-              <div className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
-                <span className="text-sm font-medium text-slate-500">{label}</span>
+              <div className="flex flex-row items-center justify-between px-3.5 pt-3 pb-1">
+                <span className="text-[13px] font-medium text-slate-500">{label}</span>
                 <div className={`p-1.5 rounded-lg ${isActive ? iconBg.replace("50", "100") : iconBg} transition-transform duration-150 group-hover:scale-110`}>
                   <Icon className={`h-4 w-4 ${iconColor}`} />
                 </div>
               </div>
-              <div className="px-4 pb-4">
-                <div className={`text-2xl font-bold ${countColor}`}>{value}</div>
-                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              <div className="px-3.5 pb-3">
+                <div className={`text-xl font-bold ${countColor}`}>{value}</div>
+                <p className="text-[11px] text-slate-400 mt-0.5">{subtitle}</p>
               </div>
             </button>
           );
@@ -218,7 +218,8 @@ export default function HubToCustomer() {
       </div>
 
       {/* Orders Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
             <TableRow>
@@ -247,7 +248,7 @@ export default function HubToCustomer() {
                 const customer = order.customerName || "Unknown";
 
                 return (
-                  <TableRow key={order.id}>
+                  <TableRow key={order.id} className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0">
                     <TableCell className="font-medium">{order.orderId}</TableCell>
                     <TableCell>
                       {productName}
@@ -283,11 +284,11 @@ export default function HubToCustomer() {
             )}
           </TableBody>
         </Table>
-      </div>
+        </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-end gap-3 text-sm">
+        <div className="flex items-center justify-end gap-3 text-sm px-4 py-3 border-t border-slate-100">
           <div className="flex items-center gap-1">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -305,7 +306,7 @@ export default function HubToCustomer() {
                   key={`p-${p}`}
                   onClick={() => setCurrentPage(p as number)}
                   aria-current={p === currentPage ? 'page' : undefined}
-                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/20' : 'text-slate-700 hover:bg-slate-100'}`}
                 >
                   {p}
                 </button>
@@ -322,6 +323,7 @@ export default function HubToCustomer() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

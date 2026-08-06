@@ -2,7 +2,6 @@
 
 import { use } from 'react'
 import AddEditProduct from '@/components/AdminDashboard/Products/AddEditProduct'
-import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb'
 import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 interface EditVendorProductRequestPageProps {
@@ -17,7 +16,6 @@ export default function EditVendorProductRequestPage({ params }: EditVendorProdu
   return (
     <PermissionGuard permission="vendor_product_requests:edit">
       <div className="space-y-6">
-        <Breadcrumb />
         <AddEditProduct productId={id} isEdit={true} />
       </div>
     </PermissionGuard>

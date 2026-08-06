@@ -1,7 +1,6 @@
 'use client'
 
 import { use } from 'react'
-import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb'
 import ViewCategory from '@/components/AdminDashboard/Categories/ViewCategory'
 import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
@@ -17,7 +16,6 @@ export default function ViewCategoryPage({ params }: ViewCategoryPageProps) {
   return (
     <PermissionGuard permission="categories:view">
       <div className="space-y-6">
-        <Breadcrumb />
         <ViewCategory categoryId={id} />
       </div>
     </PermissionGuard>
