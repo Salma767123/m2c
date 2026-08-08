@@ -41,6 +41,8 @@ export default function VI_Step7_ContactTrade({ vendor: v, verifications, onChan
   const alternateContacts: any[] = Array.isArray(v.alternateContacts) ? v.alternateContacts : [];
 
   useEffect(() => {
+    // Key order drives the verification progress order, so it has to track the
+    // rendered order below: emails first, then phones, then landlines.
     const keys: string[] = [
       ...(mainContact
         ? [
@@ -50,10 +52,10 @@ export default function VI_Step7_ContactTrade({ vendor: v, verifications, onChan
             ...(mainContact.designation === 'Others' && mainContact.customDesignation ? ['ct_mainContact_customDesignation'] : []),
             ...(mainContact.department ? ['ct_mainContact_department'] : []),
             ...(mainContact.department === 'Others' && mainContact.customDepartment ? ['ct_mainContact_customDepartment'] : []),
-            ...(mainContact.phone1 ? ['ct_mainContact_phone1'] : []),
-            ...(mainContact.phone2 ? ['ct_mainContact_phone2'] : []),
             ...(mainContact.email1 ? ['ct_mainContact_email1'] : []),
             ...(mainContact.email2 ? ['ct_mainContact_email2'] : []),
+            ...(mainContact.phone1 ? ['ct_mainContact_phone1'] : []),
+            ...(mainContact.phone2 ? ['ct_mainContact_phone2'] : []),
             ...(contactLocalLandline(mainContact) ? ['ct_mainContact_localLandline'] : []),
             ...(contactIntlLandline(mainContact) ? ['ct_mainContact_intlLandline'] : []),
           ]
@@ -67,10 +69,10 @@ export default function VI_Step7_ContactTrade({ vendor: v, verifications, onChan
           ...(contact.designation === 'Others' && contact.customDesignation ? [`${prefix}_customDesignation`] : []),
           ...(contact.department ? [`${prefix}_department`] : []),
           ...(contact.department === 'Others' && contact.customDepartment ? [`${prefix}_customDepartment`] : []),
-          ...(contact.phone1 ? [`${prefix}_phone1`] : []),
-          ...(contact.phone2 ? [`${prefix}_phone2`] : []),
           ...(contact.email1 ? [`${prefix}_email1`] : []),
           ...(contact.email2 ? [`${prefix}_email2`] : []),
+          ...(contact.phone1 ? [`${prefix}_phone1`] : []),
+          ...(contact.phone2 ? [`${prefix}_phone2`] : []),
           ...(contactLocalLandline(contact) ? [`${prefix}_localLandline`] : []),
           ...(contactIntlLandline(contact) ? [`${prefix}_intlLandline`] : []),
         ];
@@ -99,10 +101,10 @@ export default function VI_Step7_ContactTrade({ vendor: v, verifications, onChan
             {mainContact.designation === 'Others' && mainContact.customDesignation && vf('ct_mainContact_customDesignation', 'Custom Designation', mainContact.customDesignation)}
             {mainContact.department && vf('ct_mainContact_department', 'Department', mainContact.department)}
             {mainContact.department === 'Others' && mainContact.customDepartment && vf('ct_mainContact_customDepartment', 'Custom Department', mainContact.customDepartment)}
-            {mainContact.phone1 && vf('ct_mainContact_phone1', 'Primary Phone', mainContact.phone1)}
-            {mainContact.phone2 && vf('ct_mainContact_phone2', 'Secondary Phone', mainContact.phone2)}
             {mainContact.email1 && vf('ct_mainContact_email1', 'Primary Email', mainContact.email1)}
             {mainContact.email2 && vf('ct_mainContact_email2', 'Secondary Email', mainContact.email2)}
+            {mainContact.phone1 && vf('ct_mainContact_phone1', 'Primary Phone', mainContact.phone1)}
+            {mainContact.phone2 && vf('ct_mainContact_phone2', 'Secondary Phone', mainContact.phone2)}
             {contactLocalLandline(mainContact) && vf('ct_mainContact_localLandline', 'Local Landline Number', contactLocalLandline(mainContact))}
             {contactIntlLandline(mainContact) && vf('ct_mainContact_intlLandline', 'International Landline Number', contactIntlLandline(mainContact))}
           </View>
@@ -123,10 +125,10 @@ export default function VI_Step7_ContactTrade({ vendor: v, verifications, onChan
                   {contact.designation === 'Others' && contact.customDesignation && vf(`${prefix}_customDesignation`, 'Custom Designation', contact.customDesignation)}
                   {contact.department && vf(`${prefix}_department`, 'Department', contact.department)}
                   {contact.department === 'Others' && contact.customDepartment && vf(`${prefix}_customDepartment`, 'Custom Department', contact.customDepartment)}
-                  {contact.phone1 && vf(`${prefix}_phone1`, 'Primary Phone', contact.phone1)}
-                  {contact.phone2 && vf(`${prefix}_phone2`, 'Secondary Phone', contact.phone2)}
                   {contact.email1 && vf(`${prefix}_email1`, 'Primary Email', contact.email1)}
                   {contact.email2 && vf(`${prefix}_email2`, 'Secondary Email', contact.email2)}
+                  {contact.phone1 && vf(`${prefix}_phone1`, 'Primary Phone', contact.phone1)}
+                  {contact.phone2 && vf(`${prefix}_phone2`, 'Secondary Phone', contact.phone2)}
                   {contactLocalLandline(contact) && vf(`${prefix}_localLandline`, 'Local Landline Number', contactLocalLandline(contact))}
                   {contactIntlLandline(contact) && vf(`${prefix}_intlLandline`, 'International Landline Number', contactIntlLandline(contact))}
                 </View>

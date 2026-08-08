@@ -6,13 +6,65 @@
 import React, { createContext, useContext, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Image, Modal, Linking, ActivityIndicator } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { FileText, Eye, X, ExternalLink, Check, Mail, Send } from 'lucide-react-native';
-import { isImageUrl, docFilename, getProxyUrl } from './fieldHelpers';
+import { FileText, Eye, X, ExternalLink, Check, Mail, Send, Phone } from 'lucide-react-native';
+import {
+  isImageUrl,
+  docFilename,
+  getProxyUrl,
+  normalizeUrl,
+  looksLikeUrl,
+  telHref,
+  looksLikePhone,
+} from './fieldHelpers';
 import qcCheckerService from '@/services/qcCheckerService';
 
 // Labels that identify a field as an email address (mirrors web EMAIL_LABEL_RE).
 const EMAIL_LABEL_RE = /e-?mail/i;
 const EMAIL_VALUE_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Phone / website labels — steps pass these values as plain text, so detect
+// them here once instead of tagging a type at every call site.
+const PHONE_LABEL_RE = /phone|mobile|landline|whats\s*app|fax|contact\s*(no|number)/i;
+const URL_LABEL_RE = /website|web\s*site|url|link/i;
+
+// Phone value: tap the number to open the dialer with it prefilled.
+function PhoneValue({ value }: { value: string }) {
+  const href = telHref(value);
+  return (
+    <TouchableOpacity
+      onPress={() => href && Linking.openURL(href).catch(() => {})}
+      disabled={!href}
+      hitSlop={6}
+      accessibilityRole="link"
+      accessibilityLabel={`Call ${value}`}
+      className="flex-row items-center self-start"
+      style={{ columnGap: 6 }}
+    >
+      <Phone size={14} color="#e01a1b" />
+      <Text className="text-sm font-semibold text-brand-600">{value}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// Website / map link: tap to open in the in-app browser. Values are normalized
+// first so scheme-less domains ("acme.com") still open.
+function UrlValue({ value }: { value: string }) {
+  const target = normalizeUrl(value);
+  return (
+    <TouchableOpacity
+      onPress={() => target && openDocument(target)}
+      disabled={!target}
+      hitSlop={6}
+      accessibilityRole="link"
+      accessibilityLabel={`Open ${value}`}
+      className="flex-row items-center self-start"
+      style={{ columnGap: 6 }}
+    >
+      <ExternalLink size={14} color="#e01a1b" />
+      <Text className="text-sm font-semibold text-brand-600 underline">{value}</Text>
+    </TouchableOpacity>
+  );
+}
 
 // Email value with a mailto: link plus a "Test" button that sends a real test
 // email through the backend so the checker can confirm the address is
@@ -45,6 +97,8 @@ function EmailValue({ value }: { value: string }) {
     <View className="flex-row items-center flex-wrap" style={{ columnGap: 8, rowGap: 6 }}>
       <TouchableOpacity
         onPress={() => Linking.openURL(`mailto:${value}`).catch(() => {})}
+        accessibilityRole="link"
+        accessibilityLabel={`Email ${value}`}
         className="flex-row items-center"
         style={{ columnGap: 6 }}
       >
@@ -80,6 +134,17 @@ export type FieldVerification = { ok: boolean | null; remarks: string };
 export type Verifications = Record<string, FieldVerification>;
 
 export type ValueType = 'text' | 'image' | 'document' | 'list' | 'date' | 'url' | 'badge' | 'phone' | 'email';
+
+// Colour families a country list can be rendered in. Steps can give Import and
+// Export different tones so the two lists don't read as one block.
+export type ListTone = 'brand' | 'sky' | 'emerald' | 'amber';
+
+const LIST_TONES: Record<ListTone, { chip: string; text: string }> = {
+  brand: { chip: 'bg-brand-50 border-brand-200', text: 'text-brand-700' },
+  sky: { chip: 'bg-sky-50 border-sky-200', text: 'text-sky-700' },
+  emerald: { chip: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700' },
+  amber: { chip: 'bg-amber-50 border-amber-200', text: 'text-amber-700' },
+};
 
 // ── Highlight context (set by the form on validation failure) ───────────────
 const HighlightedFieldsCtx = createContext<Set<string>>(new Set());
@@ -132,22 +197,35 @@ export function RenderValue({
   type,
   label,
   onImagePress,
+  listTone,
 }: {
   value: any;
   type?: ValueType;
   label?: string;
   onImagePress?: (url: string) => void;
+  listTone?: ListTone;
 }) {
   if (value === null || value === undefined || value === '') {
     return <Text className="text-slate-400 italic text-sm">Not provided</Text>;
   }
 
-  // Email — explicit type or auto-detected from the field label (mirrors web).
+  // Email / phone / website — explicit type or auto-detected from the field
+  // label, so every step gets tappable contact values without extra wiring.
   if (typeof value === 'string') {
+    const text = value.trim();
     const isEmail =
       type === 'email' ||
-      (!type && !!label && EMAIL_LABEL_RE.test(label) && EMAIL_VALUE_RE.test(value.trim()));
-    if (isEmail) return <EmailValue value={value.trim()} />;
+      (!type && !!label && EMAIL_LABEL_RE.test(label) && EMAIL_VALUE_RE.test(text));
+    if (isEmail) return <EmailValue value={text} />;
+
+    const isPhone =
+      type === 'phone' ||
+      (!type && !!label && PHONE_LABEL_RE.test(label) && looksLikePhone(text));
+    if (isPhone) return <PhoneValue value={text} />;
+
+    const isUrl =
+      type === 'url' || (!type && !!label && URL_LABEL_RE.test(label) && looksLikeUrl(text));
+    if (isUrl) return <UrlValue value={text} />;
   }
 
   if (type === 'image' || (type !== 'document' && typeof value === 'string' && isImageUrl(value))) {
@@ -155,7 +233,7 @@ export function RenderValue({
       <TouchableOpacity activeOpacity={0.85} onPress={() => onImagePress?.(value)}>
         <Image
           source={{ uri: value }}
-          style={{ width: 128, height: 128, borderRadius: 12 }}
+          style={{ width: '100%', aspectRatio: 1, borderRadius: 12 }}
           className="border border-slate-200"
           resizeMode="cover"
         />
@@ -172,14 +250,6 @@ export function RenderValue({
     );
   }
 
-  if (type === 'url' && typeof value === 'string') {
-    return (
-      <TouchableOpacity onPress={() => Linking.openURL(value).catch(() => {})}>
-        <Text className="text-brand-600 text-sm underline">{value}</Text>
-      </TouchableOpacity>
-    );
-  }
-
   if (type === 'date' && value) {
     const d = new Date(value);
     if (!isNaN(d.getTime())) {
@@ -191,26 +261,53 @@ export function RenderValue({
   if (Array.isArray(value) || type === 'list') {
     const items = Array.isArray(value) ? value : [value];
     if (items.length === 0) return <Text className="text-slate-400 italic text-sm">None</Text>;
+    const tone = LIST_TONES[listTone ?? 'brand'] ?? LIST_TONES.brand;
+    // Country lists always highlight, since a flag chip is already a piece of
+    // data the checker reads one by one. Every other list stays grey unless the
+    // step asks for a tone — if everything were tinted, nothing would stand out.
+    const forceTone = !!listTone;
     return (
-      <View className="flex-row flex-wrap" style={{ gap: 6 }}>
+      <View className="flex-row flex-wrap" style={{ gap: 8 }}>
         {items.map((item, i) => {
-          // Items may be a plain string, or a { flagIso, label } object for
-          // countries — the latter renders a real flag image (flagcdn).
-          const iso = item && typeof item === 'object' ? item.flagIso : undefined;
-          const text = item && typeof item === 'object' ? item.label : String(item);
+          // Items are either a plain string, or a { flagIso, label } object for
+          // countries.
+          const isCountry = !!item && typeof item === 'object' && 'label' in item;
+          const highlight = isCountry || forceTone;
+          const iso = isCountry ? (item as any).flagIso : undefined;
+          const text = isCountry ? (item as any).label : String(item);
           return (
             <View
               key={i}
-              className="flex-row items-center px-2.5 py-0.5 bg-slate-100 rounded-full border border-slate-200"
-              style={{ columnGap: 5 }}
+              className={
+                highlight
+                  ? `flex-row items-center px-3 py-1.5 rounded-full border ${tone.chip}`
+                  : 'flex-row items-center px-2.5 py-0.5 rounded-full border bg-slate-100 border-slate-200'
+              }
+              style={{ columnGap: 6 }}
             >
               {iso ? (
+                // w40 rather than w20: at a 20pt render width, w20 is visibly
+                // soft on 2x/3x screens.
                 <Image
-                  source={{ uri: `https://flagcdn.com/w20/${String(iso).toLowerCase()}.png` }}
-                  style={{ width: 16, height: 11, borderRadius: 2 }}
+                  source={{ uri: `https://flagcdn.com/w40/${String(iso).toLowerCase()}.png` }}
+                  style={{
+                    width: 20,
+                    height: 14,
+                    borderRadius: 2,
+                    borderWidth: 1,
+                    borderColor: 'rgba(15,23,42,0.12)',
+                  }}
                 />
               ) : null}
-              <Text className="text-slate-700 text-xs font-medium">{text}</Text>
+              <Text
+                className={
+                  highlight
+                    ? `text-[13px] font-bold ${tone.text}`
+                    : 'text-slate-700 text-xs font-medium'
+                }
+              >
+                {text}
+              </Text>
             </View>
           );
         })}
@@ -243,6 +340,11 @@ interface VerifyFieldProps {
   type?: ValueType;
   /** Optional action rendered in the top-right (e.g. a View button). */
   headerAction?: React.ReactNode;
+  /** Tighter padding + stacked Yes/No — for half-width grid cells. */
+  compact?: boolean;
+  /** Tint the list chips. Country lists tint regardless; other lists only
+   *  when this is set. */
+  listTone?: ListTone;
 }
 
 export default function VerifyField({
@@ -253,6 +355,8 @@ export default function VerifyField({
   onChange,
   type,
   headerAction,
+  compact = false,
+  listTone,
 }: VerifyFieldProps) {
   const highlightedKeys = useContext(HighlightedFieldsCtx);
   const [lightbox, setLightbox] = useState<string | null>(null);
@@ -272,9 +376,18 @@ export default function VerifyField({
         ? 'border-red-200 bg-red-50/40'
         : 'border-slate-200 bg-white';
 
+  // Compact cells sit two-per-row, so the Yes/No pair shrinks a little and the
+  // padding tightens — everything else behaves identically.
+  const pad = compact ? 'p-2.5' : 'p-4';
+  const footPad = compact ? 'px-2.5 py-2' : 'px-4 py-3';
+  const btnPad = compact ? 'py-2' : 'py-3';
+  const btnText = compact ? 'text-sm' : 'text-base';
+  const dot = compact ? 'w-5 h-5' : 'w-6 h-6';
+  const dotIcon = compact ? 13 : 15;
+
   return (
     <View className={`rounded-xl border ${borderCls}`}>
-      <View className="p-4">
+      <View className={pad}>
         <View className="flex-row items-center justify-between mb-1" style={{ columnGap: 8 }}>
           <Text className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide flex-1">{label}</Text>
           {headerAction}
@@ -283,25 +396,59 @@ export default function VerifyField({
           {isEmpty ? (
             <Text className="text-slate-400 italic text-sm">Not provided</Text>
           ) : (
-            <RenderValue value={value} type={type} label={label} onImagePress={(u) => setLightbox(u)} />
+            <RenderValue
+              value={value}
+              type={type}
+              label={label}
+              listTone={listTone}
+              onImagePress={(u) => setLightbox(u)}
+            />
           )}
         </View>
       </View>
 
-      <View className="border-t border-slate-100 px-4 py-3" style={{ rowGap: 8 }}>
-        <Text className="text-xs font-semibold text-slate-600">Verification</Text>
-        <View className="flex-row" style={{ columnGap: 24 }}>
-          <TouchableOpacity onPress={() => setOk(true)} activeOpacity={0.7} className="flex-row items-center" style={{ columnGap: 8 }}>
-            <View className={`w-5 h-5 rounded-full border-2 items-center justify-center ${v.ok === true ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300'}`}>
-              {v.ok === true && <Check size={12} color="#ffffff" strokeWidth={3} />}
+      <View className={`border-t border-slate-100 ${footPad}`} style={{ rowGap: 8 }}>
+        {!compact && <Text className="text-xs font-semibold text-slate-600">Verification</Text>}
+        {/* Large segmented Yes/No — the primary action on every card, so it
+            fills the row and the picked side stays solid-filled. */}
+        <View className="flex-row" style={{ columnGap: compact ? 8 : 12 }}>
+          <TouchableOpacity
+            onPress={() => setOk(true)}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: v.ok === true }}
+            className={`flex-1 flex-row items-center justify-center rounded-xl border-2 ${btnPad} ${
+              v.ok === true ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300 bg-white'
+            }`}
+            style={{ columnGap: compact ? 5 : 8 }}
+          >
+            <View
+              className={`${dot} rounded-full items-center justify-center ${
+                v.ok === true ? 'bg-white' : 'border-2 border-slate-300'
+              }`}
+            >
+              {v.ok === true && <Check size={dotIcon} color="#059669" strokeWidth={3.5} />}
             </View>
-            <Text className={`text-sm font-semibold ${v.ok === true ? 'text-emerald-700' : 'text-slate-600'}`}>Yes</Text>
+            <Text className={`${btnText} font-bold ${v.ok === true ? 'text-white' : 'text-slate-600'}`}>Yes</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setOk(false)} activeOpacity={0.7} className="flex-row items-center" style={{ columnGap: 8 }}>
-            <View className={`w-5 h-5 rounded-full border-2 items-center justify-center ${v.ok === false ? 'border-red-600 bg-red-600' : 'border-slate-300'}`}>
-              {v.ok === false && <View className="w-2 h-2 rounded-full bg-white" />}
+          <TouchableOpacity
+            onPress={() => setOk(false)}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: v.ok === false }}
+            className={`flex-1 flex-row items-center justify-center rounded-xl border-2 ${btnPad} ${
+              v.ok === false ? 'border-red-600 bg-red-600' : 'border-slate-300 bg-white'
+            }`}
+            style={{ columnGap: compact ? 5 : 8 }}
+          >
+            <View
+              className={`${dot} rounded-full items-center justify-center ${
+                v.ok === false ? 'bg-white' : 'border-2 border-slate-300'
+              }`}
+            >
+              {v.ok === false && <X size={dotIcon} color="#dc2626" strokeWidth={3.5} />}
             </View>
-            <Text className={`text-sm font-semibold ${v.ok === false ? 'text-red-700' : 'text-slate-600'}`}>No</Text>
+            <Text className={`${btnText} font-bold ${v.ok === false ? 'text-white' : 'text-slate-600'}`}>No</Text>
           </TouchableOpacity>
         </View>
         {needsHighlight && (
@@ -360,48 +507,36 @@ export function DocCard({
   fieldKey,
   verifications,
   onChange,
+  compact,
 }: {
   doc: { name?: string; documentUrl?: string; type?: string };
   index: number;
   fieldKey: string;
   verifications: Verifications;
   onChange: (key: string, ok: boolean | null, remarks: string) => void;
+  compact?: boolean;
 }) {
-  const [lightbox, setLightbox] = useState(false);
   const url = doc.documentUrl || '';
   const name = doc.name || doc.type || `Document ${index + 1}`;
   const isImg = isImageUrl(url, doc.name);
 
-  const viewButton = url ? (
-    <TouchableOpacity
-      onPress={() => (isImg ? setLightbox(true) : openDocument(url))}
-      className="flex-row items-center px-2.5 py-1 bg-brand-50 border border-brand-200 rounded-lg"
-      style={{ columnGap: 4 }}
-    >
-      <Eye size={12} color="#c41617" />
-      <Text className="text-xs font-semibold text-brand-700">View</Text>
-    </TouchableOpacity>
-  ) : undefined;
-
   return (
-    <>
-      <VerifyField
-        fieldKey={fieldKey}
-        label={name}
-        value={url}
-        type={isImg ? 'image' : 'document'}
-        verifications={verifications}
-        onChange={onChange}
-        headerAction={viewButton}
-      />
-      {lightbox && url && (
-        <ImageLightbox url={url} name={name} onClose={() => setLightbox(false)} />
-      )}
-    </>
+    <VerifyField
+      fieldKey={fieldKey}
+      label={name}
+      value={url}
+      type={isImg ? 'image' : 'document'}
+      verifications={verifications}
+      onChange={onChange}
+      compact={compact}
+      headerAction={url ? <ViewButton url={url} name={name} isImage={isImg} /> : undefined}
+    />
   );
 }
 
-// Shared "View" button for image/doc header actions inside steps.
+// Shared icon-only "view" action for image/doc header actions inside steps.
+// The eye icon alone carries the meaning — the label is exposed to screen
+// readers instead of taking up header width.
 export function ViewButton({ url, name, isImage }: { url: string; name: string; isImage: boolean }) {
   const [lightbox, setLightbox] = useState(false);
   if (!url) return null;
@@ -409,11 +544,14 @@ export function ViewButton({ url, name, isImage }: { url: string; name: string; 
     <>
       <TouchableOpacity
         onPress={() => (isImage ? setLightbox(true) : openDocument(url))}
-        className="flex-row items-center px-2.5 py-1 bg-brand-50 border border-brand-200 rounded-lg"
-        style={{ columnGap: 4 }}
+        activeOpacity={0.7}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${name}`}
+        className="items-center justify-center bg-brand-50 border border-brand-200 rounded-lg"
+        style={{ width: 32, height: 32 }}
       >
-        <Eye size={12} color="#c41617" />
-        <Text className="text-xs font-semibold text-brand-700">View</Text>
+        <Eye size={16} color="#c41617" strokeWidth={2.25} />
       </TouchableOpacity>
       {lightbox && <ImageLightbox url={url} name={name} onClose={() => setLightbox(false)} />}
     </>

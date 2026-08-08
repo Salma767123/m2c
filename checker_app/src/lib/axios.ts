@@ -38,6 +38,10 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error) => {
+    const method = error.config?.method?.toUpperCase() || "REQUEST";
+    const url = `${error.config?.baseURL ?? ""}${error.config?.url ?? ""}`;
+    const reqInfo = `${method} ${url}`;
+
     if (error.response) {
       const { status, data } = error.response;
 
@@ -49,6 +53,11 @@ axiosInstance.interceptors.response.use(
             error.config?.url?.includes("/auth/vendor") ||
             error.config?.url?.includes("/vendors/login") ||
             error.config?.url?.includes("/qc-checkers/login");
+
+          console.error(
+            `API Error [401] ${reqInfo}:`,
+            data?.error || data?.message || "Unauthorized",
+          );
 
           if (!isLoginAttempt) {
             // Clear tokens from AsyncStorage
@@ -71,24 +80,27 @@ axiosInstance.interceptors.response.use(
         }
         case 403:
           console.error(
-            "Access forbidden:",
+            `Access forbidden [403] ${reqInfo}:`,
             data?.error || "Insufficient permissions",
           );
           break;
         case 404:
           console.error(
-            "Resource not found:",
+            `Resource not found [404] ${reqInfo}:`,
             data?.error || "The requested resource was not found",
           );
           break;
         case 500:
           console.error(
-            "Server error:",
+            `Server error [500] ${reqInfo}:`,
             data?.error || "Internal server error",
           );
           break;
         default:
-          console.error("API Error:", data?.error || `HTTP ${status}`);
+          console.error(
+            `API Error [${status}] ${reqInfo}:`,
+            data?.error || data?.message || `HTTP ${status}`,
+          );
       }
 
       const errorMessage = data?.error || data?.message || `HTTP ${status}`;
@@ -96,7 +108,7 @@ axiosInstance.interceptors.response.use(
     }
 
     if (error.request) {
-      console.error("Network error:", error.message);
+      console.error(`Network error ${reqInfo}:`, error.message);
       return Promise.reject({
         message: "Network error. Please check your connection.",
         status: 0,
@@ -104,7 +116,7 @@ axiosInstance.interceptors.response.use(
       });
     }
 
-    console.error("Request error:", error.message);
+    console.error(`Request error ${reqInfo}:`, error.message);
     return Promise.reject({
       message: error.message || "Request failed",
       status: 0,
