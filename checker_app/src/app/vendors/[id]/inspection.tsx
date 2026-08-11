@@ -554,16 +554,23 @@ export default function VendorInspectionScreen() {
           <View className="flex-1" />
         )}
         {step === STEPS.length ? (
-          <TouchableOpacity
-            onPress={() => handleSubmit()}
-            disabled={submitting || !(docData.signedDocuments.length > 0 || docData.signedReport.length > 0)}
-            activeOpacity={0.85}
-            className="flex-1 flex-row items-center justify-center py-3 rounded-xl bg-emerald-600"
-            style={{ opacity: submitting || !(docData.signedDocuments.length > 0 || docData.signedReport.length > 0) ? 0.6 : 1 }}
-          >
-            <Check size={16} color="#ffffff" strokeWidth={2.5} />
-            <Text className="ml-2 font-bold text-sm text-white">{submitting ? 'Submitting…' : 'Submit Inspection Report'}</Text>
-          </TouchableOpacity>
+         <TouchableOpacity
+  onPress={() => handleSubmit()}
+  disabled={submitting || !(docData.signedDocuments.length > 0 || docData.signedReport.length > 0)}
+  activeOpacity={0.85}
+  className="flex-row items-center justify-center px-3 rounded-xl bg-emerald-600"
+  style={{
+    flex: 2,
+    minHeight: 46,
+    columnGap: 8,
+    opacity: submitting || !(docData.signedDocuments.length > 0 || docData.signedReport.length > 0) ? 0.6 : 1,
+  }}
+>
+  <Check size={16} color="#ffffff" strokeWidth={2.5} />
+  <Text className="font-bold text-sm text-white" numberOfLines={1}>
+    {submitting ? 'Submitting…' : 'Submit Inspection Report'}
+  </Text>
+</TouchableOpacity>
         ) : (
           <TouchableOpacity onPress={goNext} activeOpacity={0.85} className="flex-1 flex-row items-center justify-center py-3 rounded-xl bg-brand-500">
             <Save size={16} color="#ffffff" strokeWidth={2.5} />
