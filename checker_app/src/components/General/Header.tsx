@@ -9,6 +9,7 @@ import {
   fetchUnreadCount,
   onNotificationReceived,
 } from '@/services/notificationService';
+import qcCheckerService from '../../services/qcCheckerService';
 import NotificationsModal from './NotificationsModal';
 import { AppText } from '@/components/UI/AppText';
 import { brand, colors, radius, space, elevation, danger, info } from '@/constants/design';
@@ -20,6 +21,7 @@ export default function Header() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -34,6 +36,25 @@ export default function Header() {
       active = false;
       clearInterval(timer);
       unsub();
+    };
+  }, []);
+
+  // Profile photo for the avatar — fetched once on mount.
+  useEffect(() => {
+    let active = true;
+    const loadPhoto = async () => {
+      try {
+        const res = await qcCheckerService.getCheckerProfile();
+        if (active && res.success && res.data?.profilePhoto) {
+          setProfilePhoto(res.data.profilePhoto);
+        }
+      } catch (error) {
+        console.error('Error loading profile photo:', error);
+      }
+    };
+    loadPhoto();
+    return () => {
+      active = false;
     };
   }, []);
 
@@ -121,7 +142,17 @@ export default function Header() {
               accessibilityLabel="Account menu"
               style={styles.profileBtn}
             >
-              <User size={16} color={colors.white} strokeWidth={2.5} />
+              <View style={styles.avatar}>
+  {profilePhoto ? (
+    <Image
+      source={{ uri: profilePhoto }}
+      style={{ width: '100%', height: '100%' }}
+      resizeMode="cover"
+    />
+  ) : (
+    <User size={20} color={colors.white} strokeWidth={2.5} />
+  )}
+</View>
               <ChevronDown size={14} color={colors.white} strokeWidth={2} />
             </TouchableOpacity>
           </View>
@@ -158,8 +189,16 @@ export default function Header() {
               activeOpacity={0.7}
               style={styles.menuRow}
             >
-              <View style={[styles.menuIcon, { backgroundColor: info[100] }]}>
-                <UserCircle size={20} color={info[500]} />
+              <View style={[styles.menuIcon, { backgroundColor: info[100], overflow: 'hidden' }]}>
+                {profilePhoto ? (
+                  <Image
+                    source={{ uri: profilePhoto }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <UserCircle size={20} color={info[500]} />
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 <AppText variant="titleMd">View Profile</AppText>
@@ -205,14 +244,14 @@ export default function Header() {
 }
 
 const styles = StyleSheet.create({
-  iconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+iconBtn: {
+  width: 48,
+  height: 48,
+  borderRadius: radius.full,
+  backgroundColor: 'rgba(255,255,255,0.16)',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
   badge: {
     position: 'absolute',
     top: -2,
@@ -228,14 +267,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   profileBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    height: 42,
-    paddingHorizontal: 12,
-    borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-  },
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+  height: 48,
+  paddingLeft: 6,
+  paddingRight: 10,
+  borderRadius: radius.full,
+  backgroundColor: 'rgba(255,255,255,0.16)',
+},
+avatar: {
+  width: 36,
+  height: 36,
+  borderRadius: radius.full,
+  overflow: 'hidden',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: 'rgba(255,255,255,0.2)',
+},
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',

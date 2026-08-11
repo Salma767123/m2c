@@ -33,7 +33,8 @@
         "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "package": "com.anonymous.m2c_app",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "bundler": "metro",
@@ -59,7 +60,8 @@
         }
       ],
       "@react-native-firebase/app",
-      "@react-native-firebase/messaging"
+      "@react-native-firebase/messaging",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
