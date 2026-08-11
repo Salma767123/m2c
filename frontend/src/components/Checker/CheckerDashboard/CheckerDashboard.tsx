@@ -10,6 +10,7 @@ import { showErrorToast } from "@/lib/toast-utils"
 
 interface DashboardHomeProps {
   checkerID: string
+  checkerName?: string
   onSelectVendor: (vendor: string) => void
 }
 
@@ -55,7 +56,7 @@ function getVendorMainStatus(
 const getVendorStatusBadge = (status: string) =>
   `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${VENDOR_MAIN_STATUS_COLORS[status] || "bg-amber-50 text-amber-700 border-amber-200"}`
 
-export default function DashboardHome({ checkerID }: DashboardHomeProps) {
+export default function DashboardHome({ checkerID, checkerName }: DashboardHomeProps) {
   const router = useRouter()
   const [selectedInspection, setSelectedInspection] = useState<any | null>(null)
   const [showInspectionForm, setShowInspectionForm] = useState(false)
@@ -257,7 +258,7 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold text-slate-900 mb-2 tracking-tight">Dashboard</h1>
-            <p className="text-slate-500 text-lg">Welcome back, <span className="font-semibold text-brand-500">{checkerID}</span></p>
+            <p className="text-slate-500 text-lg">Welcome back, <span className="font-semibold text-brand-500">{checkerName || checkerID}</span></p>
           </div>
           <div className="flex items-center gap-2 text-slate-500 bg-white border border-slate-200 px-4 py-2.5 rounded-xl shadow-xs">
             <Calendar className="w-5 h-5 text-brand-500" />

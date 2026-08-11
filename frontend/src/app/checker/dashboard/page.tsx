@@ -4,9 +4,11 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Dashboard from "@/components/Checker/CheckerDashboard/CheckerDashboard"
 import { qcCheckerService } from "@/services/qcCheckerService"
+import { formatCheckerName } from "@/lib/checkerUtils"
 
 export default function DashboardPage() {
   const [checkerID, setCheckerID] = useState("")
+  const [checkerName, setCheckerName] = useState("")
   const router = useRouter()
 
   useEffect(() => {
@@ -17,17 +19,20 @@ export default function DashboardPage() {
       return
     }
 
+    // Checker's display name comes from the stored auth payload (same source the
+    // sidebar uses). formatCheckerName prepends the title → "Mr. Satish Kumar".
+    // The greeting shows the titled name; the id is the fallback.
+    const checkerData = qcCheckerService.getCheckerData()
+    const fullName = formatCheckerName(checkerData)
+    if (fullName) setCheckerName(fullName)
+
     const storedCheckerID = localStorage.getItem('checkerID')
     if (storedCheckerID) {
       setCheckerID(storedCheckerID)
+    } else if (checkerData?.checkerId) {
+      setCheckerID(checkerData.checkerId)
     } else {
-      // Try to get from checker data
-      const checkerData = qcCheckerService.getCheckerData()
-      if (checkerData?.checkerId) {
-        setCheckerID(checkerData.checkerId)
-      } else {
-        router.push('/checker')
-      }
+      router.push('/checker')
     }
   }, [router])
 
@@ -74,6 +79,7 @@ export default function DashboardPage() {
     <>
       <Dashboard
         checkerID={checkerID}
+        checkerName={checkerName}
         onSelectVendor={(vendor) => {
           console.log("Selected vendor:", vendor)
         }}
