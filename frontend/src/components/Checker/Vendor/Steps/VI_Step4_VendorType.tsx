@@ -32,30 +32,41 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
   const capFirst = (s: any) => (typeof s === 'string' && s.length > 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s)
   const vendorTypesDisplay = Array.isArray(v.vendorTypes) ? v.vendorTypes.map(capFirst) : v.vendorTypes
 
-  // Collect all category product photos
-  const categoryPhotos: Array<{ label: string; url: string; catKey: string; idx: number }> = []
+  // Collect category product photos, grouped by category so each category
+  // renders as a single card (like "Active Facilities") with its products
+  // laid out inside. A running global index keeps field keys stable.
+  type CatGroup = { key: string; name: string; photos: Array<{ label: string; url: string; fieldIdx: number }> }
+  const categoryGroups: CatGroup[] = []
+  let photoIdx = 0
+  const groupFor = (key: string, name: string) => {
+    let g = categoryGroups.find((x) => x.key === key)
+    if (!g) { g = { key, name, photos: [] }; categoryGroups.push(g) }
+    return g
+  }
   if (v.categoryProducts && typeof v.categoryProducts === 'object') {
     Object.entries(v.categoryProducts as Record<string, any[]>).forEach(([cat, products]) => {
-      const catName = categoryNameMap[cat] || ''
+      const catName = categoryNameMap[cat] || 'Category'
       ;(Array.isArray(products) ? products : []).forEach((p: any, pIdx: number) => {
         ;(Array.isArray(p?.photos) ? p.photos : []).forEach((ph: any) => {
           const url = ph?.url || ph?.preview
           const prodName = p?.name || `Product ${pIdx + 1}`
-          if (url) categoryPhotos.push({ label: catName ? `${catName} · ${prodName}` : prodName, url, catKey: cat, idx: categoryPhotos.length })
+          if (url) groupFor(cat, catName).photos.push({ label: prodName, url, fieldIdx: photoIdx++ })
         })
       })
     })
   }
   if (Array.isArray(v.additionalCategories)) {
     v.additionalCategories.forEach((cat: any) => {
+      const catName = cat?.name || 'Custom'
       ;(Array.isArray(cat?.products) ? cat.products : []).forEach((p: any, pIdx: number) => {
         ;(Array.isArray(p?.photos) ? p.photos : []).forEach((ph: any) => {
           const url = ph?.url || ph?.preview
-          if (url) categoryPhotos.push({ label: `${cat?.name || 'Custom'} · ${p?.name || `Product ${pIdx + 1}`}`, url, catKey: cat?.name, idx: categoryPhotos.length })
+          if (url) groupFor(`add_${catName}`, catName).photos.push({ label: p?.name || `Product ${pIdx + 1}`, url, fieldIdx: photoIdx++ })
         })
       })
     })
   }
+  const totalPhotos = photoIdx
 
   useEffect(() => {
     const keys: string[] = [
@@ -63,7 +74,7 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
       'vt_productCategories',
       ...(v.categoryRemarks ? ['vt_categoryRemarks'] : []),
       ...(v.primaryMarkets?.length > 0 ? ['vt_primaryMarkets'] : []),
-      ...categoryPhotos.map((_, idx) => `vt_catPhoto_${idx}`),
+      ...Array.from({ length: totalPhotos }, (_, idx) => `vt_catPhoto_${idx}`),
     ]
     onRegisterFields(keys)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,21 +107,34 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
         </SectionBlock>
       )}
 
-      {/* Category Product Photos */}
-      {categoryPhotos.length > 0 && (
+      {/* Category Product Photos — one card per category, products inside */}
+      {categoryGroups.length > 0 && (
         <SectionBlock title="Product Photos (by Category)" icon={<ImageIcon className="w-4 h-4" />}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {categoryPhotos.map((photo) => (
-              <VerifyField
-                key={photo.idx}
-                fieldKey={`vt_catPhoto_${photo.idx}`}
-                label={photo.label}
-                value={photo.url}
-                type="image"
-                verifications={verifications}
-                onChange={onChange}
-                documentUrl={photo.url || undefined}
-              />
+          <div className="space-y-6">
+            {categoryGroups.map((group) => (
+              <div key={group.key} className="bg-slate-50/60 border border-slate-200 rounded-xl p-5 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                  <span className="w-2 h-2 rounded-full bg-brand-500" />
+                  <p className="text-sm font-bold text-slate-800">{group.name}</p>
+                  <span className="ml-auto text-xs font-bold px-2 py-0.5 bg-brand-50 text-brand-700 border border-brand-200 rounded-full">
+                    {group.photos.length} {group.photos.length === 1 ? 'Photo' : 'Photos'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {group.photos.map((photo) => (
+                    <VerifyField
+                      key={photo.fieldIdx}
+                      fieldKey={`vt_catPhoto_${photo.fieldIdx}`}
+                      label={photo.label}
+                      value={photo.url}
+                      type="image"
+                      verifications={verifications}
+                      onChange={onChange}
+                      documentUrl={photo.url || undefined}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </SectionBlock>
