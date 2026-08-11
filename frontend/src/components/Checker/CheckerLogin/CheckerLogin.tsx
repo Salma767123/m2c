@@ -53,9 +53,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       setCheckerIDError("");
       return true;
     }
-    const checkerIDRegex = /^QC-\d{3}$/;
+    // Accept the current QC-<year>-<serial> format (e.g. QC-2026-001) and the
+    // legacy QC-<serial> format (e.g. QC-001) still held by older checkers.
+    const checkerIDRegex = /^QC-(\d{4}-)?\d{3,}$/;
     if (!checkerIDRegex.test(value.toUpperCase())) {
-      setCheckerIDError("Invalid format. Use QC-XXX format (e.g., QC-001)");
+      setCheckerIDError("Invalid format. Use QC-YYYY-XXX format (e.g., QC-2026-001)");
       return false;
     }
     setCheckerIDError("");
@@ -240,7 +242,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                         ? "border-red-500 focus:ring-red-200"
                         : "border-gray-300 focus:ring-[#455a64]"
                       }`}
-                    placeholder="Enter your Checker ID (e.g., QC-001)"
+                    placeholder="Enter your Checker ID (e.g., QC-2026-001)"
                     autoFocus
                     disabled={isLoading}
                   />

@@ -6,11 +6,13 @@ import {
   ArrowLeft, User, Mail, Phone, MapPin, Shield, FileText, ExternalLink,
   RefreshCw, Calendar, BadgeCheck,
 } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
 import { qcCheckerService, QCCheckerData } from "@/services/qcCheckerService";
 import { showErrorToast } from "@/lib/toast-utils";
 import { formatCheckerName } from "@/lib/checkerUtils";
 import { openDoc } from "@/lib/docViewerBus";
+import CheckerAssignmentsTab from "./CheckerAssignmentsTab";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -59,6 +61,7 @@ export default function QCCheckerDetail() {
 
   const [checker, setChecker] = useState<QCCheckerData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"overview" | "assignments">("overview");
 
   useEffect(() => {
     const load = async () => {
@@ -141,6 +144,26 @@ export default function QCCheckerDetail() {
             </CardContent>
           </Card>
 
+          {/* Tabs */}
+          <div className="flex items-center gap-1 border-b border-slate-200">
+            {([
+              { key: "overview", label: "Overview", Icon: User },
+              { key: "assignments", label: "Assignments", Icon: ClipboardList },
+            ] as const).map(({ key, label, Icon }) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === key ? "border-brand-500 text-brand-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+              >
+                <Icon className="w-4 h-4" /> {label}
+              </button>
+            ))}
+          </div>
+
+          {tab === "assignments" && <CheckerAssignmentsTab checkerId={checker.id} />}
+
+          {tab === "overview" && (
+          <div className="space-y-6">
           {/* Contact */}
           <SectionCard icon={Mail} title="Contact Information">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -198,6 +221,8 @@ export default function QCCheckerDetail() {
               )}
             </div>
           </SectionCard>
+          </div>
+          )}
         </div>
       )}
     </div>

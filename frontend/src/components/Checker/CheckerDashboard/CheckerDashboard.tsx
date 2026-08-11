@@ -7,6 +7,7 @@ import StatCard from "@/components/Checker/CheckerDashboard/StatCard"
 import InspectionForm from "@/components/Checker/Vendor/InspectionForm"
 import { qcCheckerService } from "@/services/qcCheckerService"
 import { showErrorToast } from "@/lib/toast-utils"
+import { vendorInspectionStatusOf } from "@/lib/checkerVendorStatus"
 
 interface DashboardHomeProps {
   checkerID: string
@@ -51,6 +52,28 @@ function getVendorMainStatus(
   }
   if (status === 'PENDING') return 'New Assignment'
   return status.replace(/_/g, " ").toLowerCase()
+}
+
+// Sortable timestamp for a vendor's inspection window: the latest inspection's
+// scheduledDate (YYYY-MM-DD) + scheduledTime (e.g. "08:16 AM"). Falls back to the
+// assignment/submission time when no inspection is scheduled yet.
+function scheduledMs(vendor: any): number {
+  const insp = vendor?.inspections?.[0]
+  if (insp?.scheduledDate) {
+    const t = new Date(`${insp.scheduledDate} ${insp.scheduledTime || '00:00'}`).getTime()
+    if (!isNaN(t)) return t
+    const d = new Date(insp.scheduledDate).getTime()
+    if (!isNaN(d)) return d
+  }
+  return new Date(vendor?.assignedQcAt || vendor?.submittedAt || 0).getTime()
+}
+
+// "2026-09-15" → "15 Sep 2026" (parsed as local midnight to avoid TZ date shifts).
+function formatSchedDate(ymd?: string): string {
+  if (!ymd) return ''
+  const d = new Date(`${ymd}T00:00:00`)
+  if (isNaN(d.getTime())) return ymd
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 const getVendorStatusBadge = (status: string) =>
@@ -109,10 +132,13 @@ export default function DashboardHome({ checkerID, checkerName }: DashboardHomeP
   const passedProducts = assignedProducts.filter(p => p.approvalStatus === 'QC_APPROVED' || p.approvalStatus === 'APPROVED').length
   const failedProducts = assignedProducts.filter(p => p.approvalStatus === 'REJECTED').length
 
-  // Vendor inspection counts
-  const pendingVendors = assignedVendors.filter(v => v.status === 'UNDER_REVIEW' || v.status === 'PENDING' || v.status === 'REINSPECTION').length
-  const passedVendors = completedInspections.filter(i => i.result === 'PASSED').length
-  const failedVendors = completedInspections.filter(i => i.result === 'FAILED').length
+  // Vendor inspection counts — derived from the SAME assigned-vendor list, using the
+  // SAME status logic the Vendors page filters on (lib/checkerVendorStatus). So each
+  // card's number equals exactly the rows its filter shows, and the three are mutually
+  // exclusive (they no longer come from a separate "completed inspections" fetch).
+  const pendingVendors = assignedVendors.filter(v => vendorInspectionStatusOf(v) === 'Pending').length
+  const passedVendors = assignedVendors.filter(v => vendorInspectionStatusOf(v) === 'Completed').length
+  const failedVendors = assignedVendors.filter(v => vendorInspectionStatusOf(v) === 'Rejected').length
 
   const pl = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 
@@ -131,7 +157,7 @@ export default function DashboardHome({ checkerID, checkerName }: DashboardHomeP
       icon: Clock,
       trend: activeTab === 'vendor' ? `${pl(pendingVendors, "Vendor")}` : `${pl(pendingProducts, "Product")}`,
       color: "amber" as const,
-      onClick: () => router.push(activeTab === 'vendor' ? '/checker/dashboard/vendors?status=&inspectionStatus=Pending' : '/checker/dashboard/products?status=PENDING'),
+      onClick: () => router.push(activeTab === 'vendor' ? '/checker/dashboard/vendors?status=&inspectionStatus=Pending' : '/checker/dashboard/products?status=PENDING,REINSPECTION'),
     },
     {
       label: "Completed",
@@ -139,7 +165,7 @@ export default function DashboardHome({ checkerID, checkerName }: DashboardHomeP
       icon: CheckCircle2,
       trend: activeTab === 'vendor' ? `${pl(passedVendors, "Vendor")}` : `${pl(passedProducts, "Product")}`,
       color: "emerald" as const,
-      onClick: () => router.push(activeTab === 'vendor' ? '/checker/dashboard/vendors?status=&inspectionStatus=Completed' : '/checker/dashboard/products?status=QC_APPROVED'),
+      onClick: () => router.push(activeTab === 'vendor' ? '/checker/dashboard/vendors?status=&inspectionStatus=Completed' : '/checker/dashboard/products?status=QC_APPROVED,APPROVED'),
     },
     {
       label: "Rejected",
@@ -147,7 +173,7 @@ export default function DashboardHome({ checkerID, checkerName }: DashboardHomeP
       icon: AlertCircle,
       trend: activeTab === 'vendor' ? `${pl(failedVendors, "Vendor")}` : `${pl(failedProducts, "Product")}`,
       color: "red" as const,
-      onClick: () => router.push(activeTab === 'vendor' ? '/checker/dashboard/vendors?status=Rejected' : '/checker/dashboard/products?status=REJECTED'),
+      onClick: () => router.push(activeTab === 'vendor' ? '/checker/dashboard/vendors?status=&inspectionStatus=Rejected' : '/checker/dashboard/products?status=REJECTED'),
     },
   ]
 
@@ -338,6 +364,7 @@ export default function DashboardHome({ checkerID, checkerName }: DashboardHomeP
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {[...assignedProducts]
                   .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                  .slice(0, 8)
                   .map((product) => (
                     <div
                       key={product.id}
@@ -389,10 +416,16 @@ export default function DashboardHome({ checkerID, checkerName }: DashboardHomeP
               /* ── Vendor grid ──────────────────────────────────────────────── */
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {[...assignedVendors]
-                  .sort((a, b) => new Date(b.createdAt || b.submittedAt || 0).getTime() - new Date(a.createdAt || a.submittedAt || 0).getTime())
+                  // Order by the inspection's scheduled date/time (soonest/most recent
+                  // first), then show at most 8. This is the booked inspection window
+                  // (scheduledDate + scheduledTime), not the vendor's join date.
+                  .sort((a, b) => scheduledMs(b) - scheduledMs(a))
+                  .slice(0, 8)
                   .map((vendor) => {
                     const vendorStatus = getVendorMainStatus(vendor.status, vendor.inspections?.[0] ?? null)
-                    const assignedDate = vendor.createdAt || vendor.submittedAt
+                    const latestInsp = vendor.inspections?.[0]
+                    const schedDate = latestInsp?.scheduledDate as string | undefined
+                    const schedTime = latestInsp?.scheduledTime as string | undefined
                     return (
                       <div
                         key={vendor.id}
@@ -420,11 +453,16 @@ export default function DashboardHome({ checkerID, checkerName }: DashboardHomeP
                           {vendorStatus}
                         </span>
 
-                        {/* Date */}
-                        {assignedDate && (
+                        {/* Inspection scheduled date + time (the booked window) */}
+                        {schedDate ? (
                           <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
                             <CalendarDays className="w-3 h-3 shrink-0" />
-                            {new Date(assignedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            <span>Scheduled {formatSchedDate(schedDate)}{schedTime ? ` · ${schedTime}` : ''}</span>
+                          </p>
+                        ) : (
+                          <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
+                            <CalendarDays className="w-3 h-3 shrink-0" />
+                            <span>Not scheduled yet</span>
                           </p>
                         )}
 

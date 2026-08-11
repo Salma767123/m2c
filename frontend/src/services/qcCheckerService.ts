@@ -29,9 +29,43 @@ export interface QCCheckerData {
     isActive: boolean;
     lastLoginAt?: string;
     assignedVendors: number;
+    assignedProducts: number;
     completedInspections: number;
     createdAt: string;
     updatedAt: string;
+}
+
+// A checker's assignments (Assignments tab on the detail page).
+export interface CheckerVendorInspection {
+    id: string;
+    poNumber?: string;
+    clientName?: string;
+    scheduledDate?: string;
+    scheduledTime?: string;
+    inspectionType?: 'PHYSICAL' | 'VIRTUAL';
+    status: string;
+    result?: 'PASSED' | 'FAILED' | null;
+    submittedAt?: string | null;
+    completedAt?: string | null;
+    createdAt?: string;
+    vendor?: { id: string; companyName?: string; ownerName?: string; factoryCity?: string; factoryState?: string } | null;
+}
+
+export interface CheckerProductAssignment {
+    id: string;
+    name: string;
+    baseSku?: string;
+    category?: string;
+    approvalStatus: string;
+    qcAssignment?: { clientName?: string; scheduledDate?: string; scheduledTime?: string; estimatedDuration?: string } | null;
+    createdAt?: string;
+    updatedAt?: string;
+    vendor?: { id: string; companyName?: string; ownerName?: string } | null;
+}
+
+export interface CheckerAssignments {
+    vendorInspections: CheckerVendorInspection[];
+    productAssignments: CheckerProductAssignment[];
 }
 
 export interface CreateQCCheckerData {
@@ -114,6 +148,16 @@ class QCCheckerService {
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to fetch QC checker');
+        }
+    }
+
+    // Get a checker's assignments — vendor inspections + product QC (Admin)
+    async getCheckerAssignments(id: string): Promise<CheckerAssignments> {
+        try {
+            const response = await axios.get(`/qc-checkers/${id}/assignments`);
+            return response.data?.data ?? { vendorInspections: [], productAssignments: [] };
+        } catch (error: any) {
+            throw new Error(error.message || 'Failed to fetch assignments');
         }
     }
 

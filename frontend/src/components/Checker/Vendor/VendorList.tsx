@@ -19,6 +19,7 @@ import DateRangeCalendar from "@/components/Shared/DateRangeCalendar"
 import VendorInspectionForm from "@/components/Checker/Vendor/VendorInspectionForm"
 import VendorDetail from "@/components/Checker/Vendor/VendorDetail"
 import Dropdown from "@/components/UI/Dropdown"
+import { getVendorMainStatus, getVendorInspectionStatus } from "@/lib/checkerVendorStatus"
 import { State } from "country-state-city"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/UI/Table"
 import { Vendor } from "@/types/inspection"
@@ -87,76 +88,10 @@ const getBackendStatus = (tabValue: string): string => {
   }
 }
 
-function getNewMainStatus(dbStatus: string, latestInspection?: { status?: string | null; result?: string | null; cycleNumber?: number | null } | null): string {
-  const status = dbStatus?.toUpperCase() || 'PENDING'
-  if (status === 'APPROVED') {
-    return 'Approved'
-  }
-  if (status === 'REJECTED') {
-    return 'Rejected'
-  }
-  if (status === 'REINSPECTION') {
-    return 'Re-Inspection'
-  }
-  if (status === 'UNDER_REVIEW') {
-    if (latestInspection) {
-      const inspStatus = latestInspection.status?.toUpperCase()
-      const cycle = latestInspection.cycleNumber ?? 1
-      if (inspStatus === 'SCHEDULED' || inspStatus === 'IN_PROGRESS') {
-        if (cycle > 1) {
-          return 'Re-Inspection'
-        }
-        return 'New Assignment'
-      }
-      if (inspStatus === 'SUBMITTED' || inspStatus === 'UNDER_ADMIN_REVIEW') {
-        if (cycle > 1) {
-          return 'Re-Inspection Under Review by Admin'
-        }
-        return 'Under Review by Admin'
-      }
-    }
-    return 'Under Review by Admin'
-  }
-  if (status === 'PENDING') {
-    return 'New Assignment'
-  }
-  return status.replace(/_/g, " ").toLowerCase()
-}
-
-function getNewInspectionStatus(dbStatus: string, latestInspection?: { status?: string | null; result?: string | null } | null): string {
-  const status = dbStatus?.toUpperCase() || 'PENDING'
-  if (status === 'APPROVED') {
-    return 'Completed'
-  }
-  if (status === 'REJECTED') {
-    if (latestInspection && latestInspection.result?.toUpperCase() === 'FAILED') {
-      return 'Rejected'
-    }
-    return 'Completed'
-  }
-  if (status === 'REINSPECTION') {
-    return 'Pending'
-  }
-  if (status === 'UNDER_REVIEW') {
-    if (latestInspection) {
-      const inspStatus = latestInspection.status?.toUpperCase()
-      if (inspStatus === 'SCHEDULED' || inspStatus === 'IN_PROGRESS') {
-        return 'Pending'
-      }
-      if (inspStatus === 'SUBMITTED' || inspStatus === 'UNDER_ADMIN_REVIEW') {
-        if (latestInspection.result?.toUpperCase() === 'FAILED') {
-          return 'Rejected'
-        }
-        return 'Submitted'
-      }
-    }
-    return 'Pending'
-  }
-  if (status === 'PENDING') {
-    return 'Pending'
-  }
-  return 'Pending'
-}
+// Status derivation lives in a shared util so the dashboard metric counts and this
+// list's filters agree exactly (a card's count == the rows its filter shows).
+const getNewMainStatus = getVendorMainStatus
+const getNewInspectionStatus = getVendorInspectionStatus
 
 function formatVendorLocation(city?: string | null, state?: string | null): string {
   const parts = [city, state].map((p) => (p ?? "").trim()).filter(Boolean)
@@ -175,28 +110,23 @@ interface RawVendor {
   createdAt?: string | null
   assignedQcAt?: string | null
   status: string
-  inspections?: Array<{ status?: string | null; result?: string | null; cycleNumber?: number | null }>
+  inspections?: Array<{ status?: string | null; result?: string | null; cycleNumber?: number | null; scheduledDate?: string | null; scheduledTime?: string | null }>
 }
 
 function transformVendor(v: RawVendor): Vendor {
-  // Use assignedQcAt as the "Assigned Date"; fall back to createdAt for older records
-  const assignedDateObj = v.assignedQcAt
-    ? new Date(v.assignedQcAt)
-    : v.createdAt
-    ? new Date(v.createdAt)
-    : null
-  const assignedDate = assignedDateObj
-    ? assignedDateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+  const latestInspection = v.inspections && v.inspections.length > 0 ? v.inspections[0] : null
+
+  // "Assigned Date" now shows the inspection's booked window — scheduledDate
+  // (YYYY-MM-DD) + scheduledTime (e.g. "08:16 AM"), the same values the admin set.
+  const schedYmd = latestInspection?.scheduledDate || undefined
+  const schedTime = latestInspection?.scheduledTime || undefined
+  const schedDateObj = schedYmd ? new Date(`${schedYmd}T00:00:00`) : null
+  const assignedDate = schedDateObj && !isNaN(schedDateObj.getTime())
+    ? `${schedDateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}${schedTime ? ` · ${schedTime}` : ""}`
     : undefined
 
-  // YYYY-MM-DD for date filter matching (still based on assignedQcAt / createdAt)
-  const dateObj = assignedDateObj
-  const year = dateObj ? dateObj.getFullYear() : ""
-  const month = dateObj ? String(dateObj.getMonth() + 1).padStart(2, '0') : ""
-  const day = dateObj ? String(dateObj.getDate()).padStart(2, '0') : ""
-  const createdAtRaw = dateObj ? `${year}-${month}-${day}` : undefined
-
-  const latestInspection = v.inspections && v.inspections.length > 0 ? v.inspections[0] : null
+  // YYYY-MM-DD for the date filter — now matched on the scheduled inspection date.
+  const createdAtRaw = schedYmd || undefined
 
   return {
     id: v.id,
@@ -631,7 +561,7 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Contact Info</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Location</TableHead>
-                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Assigned Date</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Scheduled</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Inspection Status</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Status</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-5 text-[10px] uppercase tracking-wider text-right">Actions</TableHead>
@@ -698,7 +628,7 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Contact Info</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Location</TableHead>
-                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Assigned Date</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Scheduled</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Inspection Status</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Status</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-5 text-[10px] uppercase tracking-wider text-right">Actions</TableHead>

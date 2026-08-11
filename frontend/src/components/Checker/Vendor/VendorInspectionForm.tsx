@@ -41,11 +41,25 @@ const STEPS = [
   { id: 9, label: 'Documentation',   short: '9' },
 ]
 
+// Format a booked inspection slot for display: "12 Aug 2026 · 08:16 AM".
+// scheduledDate is YYYY-MM-DD, scheduledTime a pre-formatted string like "08:16 AM".
+function formatScheduledWindow(date?: string | null, time?: string | null): string {
+  let out = ''
+  if (date) {
+    const d = new Date(`${date}T00:00:00`)
+    out = isNaN(d.getTime())
+      ? date
+      : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+  }
+  if (time) out = out ? `${out} · ${time}` : time
+  return out || 'the scheduled time'
+}
+
 
 export default function VendorInspectionForm({ vendorId, vendorName, onComplete }: Props) {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<{ type: 'not_assigned' | 'submitted' | 'unknown' | 'expired'; message: string } | null>(null)
+  const [loadError, setLoadError] = useState<{ type: 'not_assigned' | 'submitted' | 'unknown' | 'expired'; message: string; scheduledDate?: string | null; scheduledTime?: string | null } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [checkerCoords, setCheckerCoords] = useState<CheckerCoords | null>(null)
   // Physical vs virtual. Chosen in the mandatory dialog on first start, or read back
@@ -173,6 +187,10 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
     let cancelled = false
 
     async function load() {
+      // The booked window for this vendor's inspection, captured from whatever we can
+      // read (vendor's latest inspection, then the active inspection). Shown on the
+      // "expired" screen so the checker sees exactly which slot was missed.
+      let scheduledWindow: { date?: string | null; time?: string | null } | null = null
       try {
         const cached = qcCheckerService.getCheckerData?.()
         if (cached?.name && !cancelled) {
@@ -192,9 +210,12 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
           if (liveQc) {
             setMeta(prev => ({ ...prev, inspectorName: formatCheckerName(liveQc) }))
           }
+          const latestInsp = vendorRes.data.vendor?.inspections?.[0]
+          if (latestInsp?.scheduledDate) scheduledWindow = { date: latestInsp.scheduledDate, time: latestInsp.scheduledTime }
         }
 
         let insp = inspRes?.inspection
+        if (insp?.scheduledDate) scheduledWindow = { date: insp.scheduledDate, time: insp.scheduledTime }
 
         if (!insp) {
           try {
@@ -207,7 +228,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
             const code = beginErr?.data?.code
             const msg: string = beginErr?.data?.message || beginErr?.message || 'Could not begin inspection.'
             if (code === 'INSPECTION_EXPIRED' || (status === 409 && /window has passed|expired/i.test(msg))) {
-              setLoadError({ type: 'expired', message: msg })
+              setLoadError({ type: 'expired', message: msg, scheduledDate: scheduledWindow?.date, scheduledTime: scheduledWindow?.time })
             } else if (status === 403) {
               setLoadError({ type: 'not_assigned', message: msg })
             } else if (status === 409) {
@@ -239,8 +260,14 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
       } catch (err: any) {
         if (cancelled) return
         const status = err?.status
-        const msg: string = err?.message || 'Failed to load inspection data.'
-        if (status === 403) {
+        const code = err?.code || err?.data?.code
+        const msg: string = err?.data?.message || err?.message || 'Failed to load inspection data.'
+        // A window-passed/expired error can surface here too (e.g. from the initial
+        // fetch) — classify it the same as the begin path so the checker gets the
+        // clear "Inspection Window Expired" screen, not a generic "unable to start".
+        if (code === 'INSPECTION_EXPIRED' || /window has passed|expired/i.test(msg)) {
+          setLoadError({ type: 'expired', message: msg, scheduledDate: scheduledWindow?.date, scheduledTime: scheduledWindow?.time })
+        } else if (status === 403) {
           setLoadError({ type: 'not_assigned', message: msg })
         } else {
           setLoadError({ type: 'unknown', message: msg })
@@ -280,7 +307,12 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
       // Booked window elapsed before the checker started — block the form with a
       // full-page warning; the assignment is now EXPIRED and needs a reassign.
       if (err?.code === 'INSPECTION_EXPIRED' || (err?.status === 409 && /window has passed|expired/i.test(msg))) {
-        setLoadError({ type: 'expired', message: msg || 'This inspection can no longer be started — its scheduled time window has passed. Please ask the admin to schedule a new assignment.' })
+        setLoadError({
+          type: 'expired',
+          message: msg || 'This inspection can no longer be started — its scheduled time window has passed. Please ask the admin to schedule a new assignment.',
+          scheduledDate: inspection?.scheduledDate,
+          scheduledTime: inspection?.scheduledTime,
+        })
         return
       }
       if (err?.status === 400 && /already/i.test(msg)) return
@@ -583,10 +615,25 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
             <h2 className="text-xl font-bold text-slate-900 mb-1">
               {isSubmitted ? 'Inspection Submitted' : isNotAssigned ? 'Access Denied' : isExpired ? 'Inspection Window Expired' : 'Unable to Start Inspection'}
             </h2>
-            <p className="text-slate-600 text-sm leading-relaxed">{loadError.message}</p>
+            <p className="text-slate-600 text-sm leading-relaxed">
+              {isExpired
+                ? 'This inspection can no longer be started because its scheduled date and time have already passed.'
+                : loadError.message}
+            </p>
+            {isExpired && (loadError.scheduledDate || loadError.scheduledTime) && (
+              <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-medium text-amber-800">
+                <AlarmClockOff className="w-4 h-4 shrink-0" />
+                <span>
+                  Missed window:{' '}
+                  <span className="font-semibold">
+                    {formatScheduledWindow(loadError.scheduledDate, loadError.scheduledTime)}
+                  </span>
+                </span>
+              </div>
+            )}
             {isExpired && (
-              <p className="text-slate-500 text-xs leading-relaxed mt-2">
-                The admin has been notified and can assign a new inspection for this vendor.
+              <p className="text-slate-500 text-xs leading-relaxed mt-3">
+                The admin has been notified and can assign a new inspection for this vendor. Please ask them to reschedule so you can inspect it.
               </p>
             )}
           </div>

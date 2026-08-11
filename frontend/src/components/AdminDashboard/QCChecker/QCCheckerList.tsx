@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Eye, Edit, Trash2, UserPlus, Mail, Phone, Calendar, RefreshCw, Send, ChevronLeft, ChevronRight, Users, UserCheck, UserX, ClipboardList } from "lucide-react";
+import { Search, Eye, Edit, Trash2, UserPlus, Mail, Phone, Calendar, RefreshCw, Send, ChevronLeft, ChevronRight, Users, UserCheck, UserX, ClipboardList, User } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
@@ -272,6 +272,7 @@ export default function QCCheckerList() {
                 <TableHead>Contact</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Assigned Vendors</TableHead>
+                <TableHead>Assigned Products</TableHead>
                 <TableHead>Inspections</TableHead>
                 <TableHead>Joined Date</TableHead>
                 <TableHead>Last Active</TableHead>
@@ -283,9 +284,23 @@ export default function QCCheckerList() {
                 paginatedCheckers.map((checker) => (
                   <TableRow key={checker.id} className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0">
                     <TableCell>
-                      <div>
-                        <div className="font-medium text-slate-900">{formatCheckerName(checker)}</div>
-                        <div className="text-sm text-blue-600 font-mono">{checker.checkerId}</div>
+                      <div className="flex items-center gap-3">
+                        {checker.profilePhoto ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={checker.profilePhoto}
+                            alt={formatCheckerName(checker)}
+                            className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-brand-50 text-brand-500 flex items-center justify-center ring-1 ring-slate-200 shrink-0">
+                            <User className="w-4 h-4" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="font-medium text-slate-900">{formatCheckerName(checker)}</div>
+                          <div className="text-sm text-blue-600 font-mono">{checker.checkerId}</div>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -303,6 +318,9 @@ export default function QCCheckerList() {
                     <TableCell>{getStatusBadge(checker.status)}</TableCell>
                     <TableCell>
                       <div className="text-sm font-medium text-slate-900">{checker.assignedVendors || 0}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm font-medium text-slate-900">{checker.assignedProducts || 0}</div>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm font-medium text-blue-600">{checker.completedInspections || 0}</div>
@@ -366,7 +384,7 @@ export default function QCCheckerList() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8}>
+                  <TableCell colSpan={9}>
                     <div className="p-12 text-center">
                       <p className="text-slate-500">No QC checkers found</p>
                       {hasPermission('qc_checker_management:create') && (
