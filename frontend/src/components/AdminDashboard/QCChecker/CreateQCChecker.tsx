@@ -266,50 +266,33 @@ export default function CreateQCChecker() {
               <h2 className="text-lg font-semibold text-slate-900">Personal Information</h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Title + First Name row */}
-              <div className="flex gap-3">
-                <div className="w-28 shrink-0">
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Title</label>
-                  <select
-                    name="title"
-                    value={formData.title}
-                    onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                    className={INPUT_CLASS}
-                  >
-                    <option value="">—</option>
-                    {TITLE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    First Name <span className="text-brand-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="firstName"
-                    value={formData.firstName}
-                    onChange={handleInputChange}
-                    placeholder="First name"
-                    className={INPUT_CLASS}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name</label>
-                <input
-                  type="text"
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleInputChange}
-                  placeholder="Last name"
-                  className={INPUT_CLASS}
+            {/* All personal fields in one row: Title · First Name · Middle Name · Last Name · DOB */}
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="md:w-28 md:shrink-0">
+                <Dropdown
+                  label="Title"
+                  value={formData.title}
+                  onChange={(v) => setFormData(prev => ({ ...prev, title: v as string }))}
+                  options={[{ value: '', label: '—' }, ...TITLE_OPTIONS.map(t => ({ value: t, label: t }))]}
                 />
               </div>
 
-              <div>
+              <div className="flex-1">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  First Name <span className="text-brand-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleInputChange}
+                  placeholder="First name"
+                  className={INPUT_CLASS}
+                  required
+                />
+              </div>
+
+              <div className="flex-1">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Middle Name <span className="font-normal text-slate-400">(optional)</span></label>
                 <input
                   type="text"
@@ -321,7 +304,19 @@ export default function CreateQCChecker() {
                 />
               </div>
 
-              <div>
+              <div className="flex-1">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name</label>
+                <input
+                  type="text"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleInputChange}
+                  placeholder="Last name"
+                  className={INPUT_CLASS}
+                />
+              </div>
+
+              <div className="flex-1">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Date of Birth
                 </label>

@@ -15,22 +15,28 @@ const generateRandomPassword = (length = 10) => {
     return password;
 };
 
-// Generate a unique Checker ID
+// Generate a unique Checker ID in the form QC-<year>-<serial>, e.g. QC-2026-001.
+// The serial is scoped to the current year, so it restarts at 001 each year.
 const generateCheckerId = async () => {
+    const year = new Date().getFullYear();
+    const prefix = `QC-${year}-`;
+
+    // Latest checker created this year → its serial is the current max for the year.
     const lastChecker = await prisma.qCChecker.findFirst({
+        where: { checkerId: { startsWith: prefix } },
         orderBy: { createdAt: 'desc' },
         select: { checkerId: true }
     });
 
     let nextNumber = 1;
     if (lastChecker && lastChecker.checkerId) {
-        const match = lastChecker.checkerId.match(/QC-(\d+)/);
+        const match = lastChecker.checkerId.match(/QC-\d{4}-(\d+)/);
         if (match) {
-            nextNumber = parseInt(match[1]) + 1;
+            nextNumber = parseInt(match[1], 10) + 1;
         }
     }
 
-    return `QC-${nextNumber.toString().padStart(3, '0')}`;
+    return `${prefix}${nextNumber.toString().padStart(3, '0')}`;
 };
 
 // Generate JWT Token for QC Checker
@@ -95,6 +101,11 @@ const createQCChecker = async (req, res) => {
         const plainPassword = generateRandomPassword();
         const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
+        // Upload the profile photo + ID proof to Cloudinary so only the secure URL is
+        // stored — never a base64 blob in the DB. Existing URLs pass through unchanged.
+        const resolvedProfilePhoto = profilePhoto ? await resolveBase64InValue(profilePhoto, { folder: 'qc-checkers/photos' }) : null;
+        const resolvedIdProof = idProof ? await resolveBase64InValue(idProof, { folder: 'qc-checkers/id-proofs' }) : null;
+
         // Create the QC Checker
         const qcChecker = await prisma.qCChecker.create({
             data: {
@@ -112,8 +123,8 @@ const createQCChecker = async (req, res) => {
                 dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
                 alternatePhone: alternatePhone || null,
                 alternateEmail: alternateEmail || null,
-                profilePhoto: profilePhoto || null,
-                idProof: idProof || null,
+                profilePhoto: resolvedProfilePhoto,
+                idProof: resolvedIdProof,
                 joiningDate: joiningDate ? new Date(joiningDate) : new Date(),
                 specialization: specialization || null,
                 experience: experience ? parseInt(experience) : 0,
@@ -187,6 +198,8 @@ const getAllQCCheckers = async (req, res) => {
                     name: true,
                     title: true,
                     phone: true,
+                    // Small Cloudinary URL — shown as the avatar in the management list.
+                    profilePhoto: true,
                     address: true,
                     city: true,
                     state: true,
@@ -213,6 +226,8 @@ const getAllQCCheckers = async (req, res) => {
                     _count: {
                         select: {
                             vendorsList: true,
+                            // Products assigned to this checker for QC.
+                            productsList: true,
                             // "Performed" inspections — anything the checker has
                             // actually worked past scheduling (submitted, under
                             // review, rejected, re-inspection, completed).
@@ -237,6 +252,7 @@ const getAllQCCheckers = async (req, res) => {
             data: checkers.map(({ _count, ...checker }) => ({
                 ...checker,
                 assignedVendors: _count.vendorsList,
+                assignedProducts: _count.productsList,
                 completedInspections: _count.inspections,
             })),
             pagination: {
@@ -317,6 +333,65 @@ const getQCCheckerById = async (req, res) => {
 };
 
 // ============================
+// Admin: Get a checker's assignments — factory (vendor) inspections + product QC
+// assignments, each with its status, for the Assignments tab on the detail page.
+// ============================
+const getCheckerAssignments = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const checker = await prisma.qCChecker.findUnique({ where: { id }, select: { id: true } });
+        if (!checker) {
+            return res.status(404).json({ success: false, error: 'QC checker not found' });
+        }
+
+        const [vendorInspections, productAssignments] = await Promise.all([
+            // Factory / vendor inspections this checker was assigned.
+            prisma.inspection.findMany({
+                where: { checkerId: id },
+                select: {
+                    id: true,
+                    poNumber: true,
+                    clientName: true,
+                    scheduledDate: true,
+                    scheduledTime: true,
+                    inspectionType: true,
+                    status: true,
+                    result: true,
+                    submittedAt: true,
+                    completedAt: true,
+                    createdAt: true,
+                    vendor: { select: { id: true, companyName: true, ownerName: true, factoryCity: true, factoryState: true } },
+                },
+                orderBy: { createdAt: 'desc' },
+            }),
+            // Products assigned to this checker for QC. Their "status" is the product's
+            // approvalStatus; the booked schedule (if any) lives in qcAssignment.
+            prisma.product.findMany({
+                where: { assignedQcId: id },
+                select: {
+                    id: true,
+                    name: true,
+                    baseSku: true,
+                    category: true,
+                    approvalStatus: true,
+                    qcAssignment: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    vendor: { select: { id: true, companyName: true, ownerName: true } },
+                },
+                orderBy: { createdAt: 'desc' },
+            }),
+        ]);
+
+        res.json({ success: true, data: { vendorInspections, productAssignments } });
+    } catch (error) {
+        console.error('Get checker assignments error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch assignments' });
+    }
+};
+
+// ============================
 // Admin: Update QC Checker
 // ============================
 const updateQCChecker = async (req, res) => {
@@ -364,8 +439,9 @@ const updateQCChecker = async (req, res) => {
         if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
         if (alternatePhone !== undefined) updateData.alternatePhone = alternatePhone || null;
         if (alternateEmail !== undefined) updateData.alternateEmail = alternateEmail || null;
-        if (profilePhoto !== undefined) updateData.profilePhoto = profilePhoto || null;
-        if (idProof !== undefined) updateData.idProof = idProof || null;
+        // Upload any newly-picked photo/ID (base64) to Cloudinary; existing URLs pass through.
+        if (profilePhoto !== undefined) updateData.profilePhoto = profilePhoto ? await resolveBase64InValue(profilePhoto, { folder: 'qc-checkers/photos' }) : null;
+        if (idProof !== undefined) updateData.idProof = idProof ? await resolveBase64InValue(idProof, { folder: 'qc-checkers/id-proofs' }) : null;
         if (joiningDate !== undefined) updateData.joiningDate = joiningDate ? new Date(joiningDate) : existing.joiningDate;
         if (status) {
             updateData.status = status.toUpperCase();
@@ -739,8 +815,9 @@ const updateCheckerProfile = async (req, res) => {
         if (country !== undefined) updateData.country = country || 'India';
         if (alternatePhone !== undefined) updateData.alternatePhone = alternatePhone || null;
         if (alternateEmail !== undefined) updateData.alternateEmail = alternateEmail || null;
-        if (profilePhoto !== undefined) updateData.profilePhoto = profilePhoto || null;
-        if (idProof !== undefined) updateData.idProof = idProof || null;
+        // Upload any newly-picked photo/ID (base64) to Cloudinary; existing URLs pass through.
+        if (profilePhoto !== undefined) updateData.profilePhoto = profilePhoto ? await resolveBase64InValue(profilePhoto, { folder: 'qc-checkers/photos' }) : null;
+        if (idProof !== undefined) updateData.idProof = idProof ? await resolveBase64InValue(idProof, { folder: 'qc-checkers/id-proofs' }) : null;
 
         if (password) {
             updateData.password = await bcrypt.hash(password, 10);
@@ -849,7 +926,7 @@ const getAssignedVendors = async (req, res) => {
                     factoryCity: true,
                     factoryState: true,
                     inspections: {
-                        select: { status: true, result: true, cycleNumber: true },
+                        select: { status: true, result: true, cycleNumber: true, scheduledDate: true, scheduledTime: true, createdAt: true },
                         orderBy: { createdAt: 'desc' },
                         take: 5,
                     },
@@ -1516,13 +1593,19 @@ const getAssignedProducts = async (req, res) => {
         const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 12, 1), 50);
         // Cap search to bound DB scan cost — same pattern as getAssignedVendors.
         const search = (req.query.search || '').toString().trim().slice(0, 100);
-        const status = req.query.status ? req.query.status.toString().toUpperCase() : null;
+        // `status` may be a single value or a comma-separated list (e.g. the dashboard's
+        // "Pending Action" card links here with PENDING,REINSPECTION so the list shows
+        // exactly the products that card counted).
+        const statusList = req.query.status
+            ? req.query.status.toString().toUpperCase().split(',').map(s => s.trim()).filter(Boolean)
+            : [];
         const sortBy = ALLOWED_PRODUCT_SORT_FIELDS.includes(req.query.sortBy)
             ? req.query.sortBy
             : 'createdAt';
         const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
 
-        if (status && !ALLOWED_PRODUCT_APPROVAL_STATUSES.includes(status)) {
+        const invalidStatus = statusList.find(s => !ALLOWED_PRODUCT_APPROVAL_STATUSES.includes(s));
+        if (invalidStatus) {
             return res.status(400).json({
                 success: false,
                 error: `Invalid status. Must be one of: ${ALLOWED_PRODUCT_APPROVAL_STATUSES.join(', ')}`,
@@ -1530,7 +1613,8 @@ const getAssignedProducts = async (req, res) => {
         }
 
         const where = { assignedQcId: qcCheckerId };
-        if (status) where.approvalStatus = status;
+        if (statusList.length === 1) where.approvalStatus = statusList[0];
+        else if (statusList.length > 1) where.approvalStatus = { in: statusList };
         if (search) {
             where.OR = [
                 { name: { contains: search, mode: 'insensitive' } },
@@ -2186,6 +2270,7 @@ module.exports = {
     createQCChecker,
     getAllQCCheckers,
     getQCCheckerById,
+    getCheckerAssignments,
     updateQCChecker,
     deleteQCChecker,
     resendCredentials,

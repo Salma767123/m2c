@@ -3,6 +3,7 @@ const {
     createQCChecker,
     getAllQCCheckers,
     getQCCheckerById,
+    getCheckerAssignments,
     updateQCChecker,
     deleteQCChecker,
     resendCredentials,
@@ -65,6 +66,7 @@ router.post('/products/:productId/reject', authenticateToken, rejectProductByQc)
 router.post('/', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:create'), createQCChecker);
 router.get('/', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:view'), getAllQCCheckers);
 router.get('/:id', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:view'), getQCCheckerById);
+router.get('/:id/assignments', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:view'), getCheckerAssignments);
 router.put('/:id', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:edit'), updateQCChecker);
 router.delete('/:id', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:delete'), deleteQCChecker);
 router.post('/:id/resend-credentials', authenticateToken, requireAdminRole, requirePermission('qc_checker_management:resend_credentials'), resendCredentials);

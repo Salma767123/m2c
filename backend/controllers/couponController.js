@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
 const { evaluateCoupon } = require('../utils/couponPricing');
+const { resolveBase64InValue } = require('../config/cloudinary');
 
 // Create a new coupon (Admin only)
 const createCoupon = async (req, res) => {
@@ -37,6 +38,10 @@ const createCoupon = async (req, res) => {
             });
         }
 
+        // Upload the popup image to Cloudinary so only the URL is stored, never a
+        // base64 blob in the DB. Existing URLs pass through unchanged.
+        const resolvedPopupImage = popupImage ? await resolveBase64InValue(popupImage, { folder: 'coupons' }) : undefined;
+
         const coupon = await prisma.coupon.create({
             data: {
                 code,
@@ -53,7 +58,7 @@ const createCoupon = async (req, res) => {
                 freeShipping: freeShipping || false,
                 freeShippingOrderNumbers: freeShippingOrderNumbers || [],
                 showAsPopup: showAsPopup || false,
-                popupImage: popupImage || undefined,
+                popupImage: resolvedPopupImage,
                 popupTitle: popupTitle || undefined,
                 popupMessage: popupMessage || undefined,
                 applicableCategories: applicableCategories || [],
@@ -166,6 +171,9 @@ const updateCoupon = async (req, res) => {
 
         if (updateData.startDate) updateData.startDate = new Date(updateData.startDate);
         if (updateData.expiryDate) updateData.expiryDate = new Date(updateData.expiryDate);
+        // A newly-picked popup image arrives as base64 — upload it to Cloudinary and
+        // store only the URL (existing URLs pass through unchanged).
+        if (updateData.popupImage) updateData.popupImage = await resolveBase64InValue(updateData.popupImage, { folder: 'coupons' });
 
         const coupon = await prisma.coupon.update({
             where: { id },
