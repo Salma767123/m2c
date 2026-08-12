@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
-import { CheckCircle2, XCircle, Minus, Pencil, ChevronDown, Check, ClipboardList, Package, Box, AlertTriangle, FlaskConical, UserCheck } from 'lucide-react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { CheckCircle2, XCircle, Minus, Pencil, ClipboardList, Package, Box, AlertTriangle, FlaskConical, UserCheck } from 'lucide-react-native';
 import type { PackagingItem, TestGroup } from '../PI_data';
 import { ADDITIONAL_EVIDENCE_DEFS, CODE_LABELS, INSPECTION_STATUS_OPTIONS } from '../PI_data';
 import { getBusinessTypeLabel } from '@/components/Vendor/Steps/fieldHelpers';
-import { RemarkInput } from './piShared';
+import { RemarkInput, formatDateDMY, Dropdown } from './piShared';
+import type { DropdownOption } from './piShared';
+import { InvalidAnchor } from './piValidation';
+import type { ScrollNavHandlers } from '@/components/General/ScrollNav';
 
 function badgeCls(code: number) {
   if (code <= 5) return 'bg-red-100 border-red-200';
@@ -23,6 +26,14 @@ const STATUS_STYLES: Record<string, { border: string; bg: string; text: string }
   'On Hold': { border: 'border-yellow-500', bg: 'bg-yellow-50', text: 'text-yellow-600' },
   'Re-Inspection': { border: 'border-orange-500', bg: 'bg-orange-50', text: 'text-orange-600' },
 };
+
+// Carry each status' own colour into the option rows so the open panel reads
+// the same as the closed field.
+const STATUS_DROPDOWN_OPTIONS: DropdownOption[] = INSPECTION_STATUS_OPTIONS.map((status) => ({
+  value: status,
+  selectedBg: STATUS_STYLES[status]?.bg,
+  selectedText: STATUS_STYLES[status]?.text,
+}));
 
 interface Props {
   formData: {
@@ -54,6 +65,7 @@ interface Props {
   setFormData: (d: any) => void;
   onEditStep: (stepId: string) => void;
   errors?: Record<string, string>;
+  scrollNav?: ScrollNavHandlers;
 }
 
 function SectionHeader({ title, stepLabel, onEdit, icon }: { title: string; stepLabel: string; onEdit: () => void; icon?: React.ReactNode }) {
@@ -105,8 +117,7 @@ function VerBadge({ ok }: { ok: boolean | null }) {
   );
 }
 
-export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, errors = {} }: Props) {
-  const [showStatus, setShowStatus] = useState(false);
+export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, errors = {}, scrollNav }: Props) {
   const v = d.vendorData || {};
   const p = d.productData || {};
   const inspectorName = d.inspectorSignature || '';
@@ -125,7 +136,7 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
   const statusStyle = d.inspectionStatus ? STATUS_STYLES[d.inspectionStatus] : null;
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView showsVerticalScrollIndicator={false} {...scrollNav}>
       <View className="border-b border-slate-200 pb-4 mb-4">
         <Text className="text-xl font-bold text-slate-900 mb-1">Inspection Review</Text>
         <Text className="text-sm text-slate-500">
@@ -159,7 +170,7 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
         <Row label="Company" value={v.companyName} />
         <Row label="Business Type" value={getBusinessTypeLabel(v.businessType)} />
         <Row label="Product" value={p.name} />
-        <Row label="Inspection Date" value={d.serviceStartDate} />
+        <Row label="Inspection Date" value={formatDateDMY(d.serviceStartDate)} />
         <Row label="Service Type" value={d.serviceType} />
       </View>
 
@@ -322,80 +333,53 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
 
           <Text className="text-[11px] font-semibold text-slate-500 uppercase mb-1.5">Inspection Date</Text>
           <View className="px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 mb-4">
-            <Text className="text-sm text-slate-700">{d.serviceStartDate || new Date().toISOString().split('T')[0]}</Text>
+            <Text className="text-sm text-slate-700">{formatDateDMY(d.serviceStartDate || new Date().toISOString().split('T')[0])}</Text>
           </View>
 
-          <Text className="text-[11px] font-semibold text-slate-500 uppercase mb-1.5">
-            Inspection Status <Text className="text-red-500">*</Text>
-          </Text>
-          <TouchableOpacity
-            onPress={() => setShowStatus(true)}
-            activeOpacity={0.8}
-            className={`px-4 py-3 border rounded-xl flex-row items-center justify-between ${
-              errors.inspectionStatus
-                ? 'border-red-500 bg-red-50'
-                : statusStyle
-                ? `${statusStyle.border} ${statusStyle.bg}`
-                : 'border-slate-300 bg-white'
-            }`}
-          >
-            <Text className={`text-sm font-semibold ${statusStyle ? statusStyle.text : 'text-slate-400'}`}>
-              {d.inspectionStatus || 'Select status…'}
+          <InvalidAnchor errorKey="inspectionStatus" invalid={!!errors.inspectionStatus}>
+            <Text className="text-[11px] font-semibold text-slate-500 uppercase mb-1.5">
+              Inspection Status <Text className="text-red-500">*</Text>
             </Text>
-            <ChevronDown size={16} color="#64748b" />
-          </TouchableOpacity>
-          {!!errors.inspectionStatus && <Text className="text-xs text-red-600 mt-1.5">{errors.inspectionStatus}</Text>}
+            <Dropdown
+              value={d.inspectionStatus}
+              placeholder="Select status…"
+              options={STATUS_DROPDOWN_OPTIONS}
+              onSelect={(inspectionStatus) => setFormData({ ...d, inspectionStatus })}
+              accessibilityLabel="Inspection Status"
+              triggerClassName={`px-4 py-3 border rounded-xl flex-row items-center justify-between ${
+                errors.inspectionStatus
+                  ? 'border-red-500 bg-red-50'
+                  : statusStyle
+                  ? `${statusStyle.border} ${statusStyle.bg}`
+                  : 'border-slate-300 bg-white'
+              }`}
+              valueClassName={`text-sm font-semibold ${statusStyle ? statusStyle.text : 'text-slate-400'}`}
+            />
+            {!!errors.inspectionStatus && <Text className="text-xs text-red-600 mt-1.5">{errors.inspectionStatus}</Text>}
+          </InvalidAnchor>
 
           {/* Reviewer remarks — required when the decision is a rejection so the
               reject endpoint always receives a real reason (F-08). */}
-          <Text className="text-[11px] font-semibold text-slate-500 uppercase mb-1.5 mt-4">
-            Reviewer Remarks {d.inspectionStatus === 'Rejected' && <Text className="text-red-500">*</Text>}
-          </Text>
-          <RemarkInput
-            value={d.reviewerRemarks || ''}
-            onChangeText={(t) => setFormData({ ...d, reviewerRemarks: t })}
-            placeholder={
-              d.inspectionStatus === 'Rejected'
-                ? 'Reason for rejection (required)…'
-                : 'Optional notes explaining this decision…'
-            }
-            error={!!errors.reviewerRemarks}
-          />
-          {!!errors.reviewerRemarks && <Text className="text-xs text-red-600 mt-1.5">{errors.reviewerRemarks}</Text>}
+          <InvalidAnchor errorKey="reviewerRemarks" invalid={!!errors.reviewerRemarks} style={{ marginTop: 16 }}>
+            <Text className="text-[11px] font-semibold text-slate-500 uppercase mb-1.5">
+              Reviewer Remarks {d.inspectionStatus === 'Rejected' && <Text className="text-red-500">*</Text>}
+            </Text>
+            <RemarkInput
+              value={d.reviewerRemarks || ''}
+              onChangeText={(t) => setFormData({ ...d, reviewerRemarks: t })}
+              placeholder={
+                d.inspectionStatus === 'Rejected'
+                  ? 'Reason for rejection (required)…'
+                  : 'Optional notes explaining this decision…'
+              }
+              error={!!errors.reviewerRemarks}
+            />
+            {!!errors.reviewerRemarks && <Text className="text-xs text-red-600 mt-1.5">{errors.reviewerRemarks}</Text>}
+          </InvalidAnchor>
         </View>
       </View>
 
       <View className="h-6" />
-
-      {/* Status modal */}
-      <Modal visible={showStatus} transparent animationType="fade" onRequestClose={() => setShowStatus(false)}>
-        <Pressable className="flex-1 bg-black/40 justify-center px-6" onPress={() => setShowStatus(false)}>
-          <Pressable className="bg-white rounded-2xl overflow-hidden" onPress={(e) => e.stopPropagation()}>
-            <View className="px-5 py-3 border-b border-slate-100">
-              <Text className="text-sm font-bold text-slate-800">Select Inspection Status</Text>
-            </View>
-            {INSPECTION_STATUS_OPTIONS.map((status) => {
-              const selected = d.inspectionStatus === status;
-              const st = STATUS_STYLES[status];
-              return (
-                <TouchableOpacity
-                  key={status}
-                  onPress={() => {
-                    setFormData({ ...d, inspectionStatus: status });
-                    setShowStatus(false);
-                  }}
-                  className={`px-5 py-3.5 flex-row items-center justify-between border-b border-slate-50 ${
-                    selected ? st.bg : 'bg-white'
-                  }`}
-                >
-                  <Text className={`text-sm ${selected ? `${st.text} font-semibold` : 'text-slate-700'}`}>{status}</Text>
-                  {selected && <Check size={16} color="#e01a1b" />}
-                </TouchableOpacity>
-              );
-            })}
-          </Pressable>
-        </Pressable>
-      </Modal>
     </ScrollView>
   );
 }

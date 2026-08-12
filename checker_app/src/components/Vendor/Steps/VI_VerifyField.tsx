@@ -378,12 +378,12 @@ export default function VerifyField({
 
   // Compact cells sit two-per-row, so the Yes/No pair shrinks a little and the
   // padding tightens — everything else behaves identically.
-  const pad = compact ? 'p-2.5' : 'p-4';
-  const footPad = compact ? 'px-2.5 py-2' : 'px-4 py-3';
-  const btnPad = compact ? 'py-2' : 'py-3';
-  const btnText = compact ? 'text-sm' : 'text-base';
-  const dot = compact ? 'w-5 h-5' : 'w-6 h-6';
-  const dotIcon = compact ? 13 : 15;
+  const pad = compact ? 'p-2.5' : 'p-3';
+  const footPad = compact ? 'px-2.5 py-2' : 'px-3 py-2';
+  const btnPad = 'py-2';
+  const btnText = 'text-sm';
+  const dot = 'w-5 h-5';
+  const dotIcon = 13;
 
   return (
     <View className={`rounded-xl border ${borderCls}`}>
@@ -417,10 +417,10 @@ export default function VerifyField({
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityState={{ selected: v.ok === true }}
-            className={`flex-1 flex-row items-center justify-center rounded-xl border-2 ${btnPad} ${
+            className={`flex-1 flex-row items-center justify-center rounded-lg border-2 ${btnPad} ${
               v.ok === true ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300 bg-white'
             }`}
-            style={{ columnGap: compact ? 5 : 8 }}
+            style={{ columnGap: 6 }}
           >
             <View
               className={`${dot} rounded-full items-center justify-center ${
@@ -436,10 +436,10 @@ export default function VerifyField({
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityState={{ selected: v.ok === false }}
-            className={`flex-1 flex-row items-center justify-center rounded-xl border-2 ${btnPad} ${
+            className={`flex-1 flex-row items-center justify-center rounded-lg border-2 ${btnPad} ${
               v.ok === false ? 'border-red-600 bg-red-600' : 'border-slate-300 bg-white'
             }`}
-            style={{ columnGap: compact ? 5 : 8 }}
+            style={{ columnGap: 6 }}
           >
             <View
               className={`${dot} rounded-full items-center justify-center ${

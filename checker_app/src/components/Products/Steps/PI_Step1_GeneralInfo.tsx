@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, ScrollView, Pressable, Image } from 'react-native';
-import { ChevronDown, Check, User, Eye, Building2, Factory, Warehouse, UserCircle, ClipboardList, Package } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { User, Eye, Building2, Factory, Warehouse, UserCircle, ClipboardList, Package } from 'lucide-react-native';
 import { SERVICE_TYPES } from '../PI_data';
 import { getBusinessTypeLabel } from '@/components/Vendor/Steps/fieldHelpers';
-import { StepHeader, Card, InfoBlock, PhotoLightbox } from './piShared';
+import { StepHeader, Card, InfoBlock, PhotoLightbox, formatDateDMY, Dropdown } from './piShared';
+import { InvalidAnchor } from './piValidation';
+import type { ScrollNavHandlers } from '@/components/General/ScrollNav';
 
 interface Props {
   formData: {
@@ -14,12 +16,12 @@ interface Props {
   };
   setFormData: (d: any) => void;
   errors?: Record<string, string>;
+  scrollNav?: ScrollNavHandlers;
 }
 
-export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {} }: Props) {
+export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {}, scrollNav }: Props) {
   const v = formData.vendorData || {};
   const p = formData.productData || {};
-  const [showDropdown, setShowDropdown] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; label?: string } | null>(null);
 
   const mc = v.mainContact && typeof v.mainContact === 'object' ? v.mainContact : null;
@@ -37,7 +39,7 @@ export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {
     .join(', ');
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView showsVerticalScrollIndicator={false} {...scrollNav}>
       <StepHeader
         title="General Information"
         subtitle="Vendor registration data and inspection context for this product audit."
@@ -111,25 +113,27 @@ export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {
         {/* Inspection Date — read-only */}
         <Text className="text-sm font-semibold text-slate-700 mb-1">Inspection Date</Text>
         <View className="px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 mb-1">
-          <Text className="text-sm text-slate-700">{formData.serviceStartDate}</Text>
+          <Text className="text-sm text-slate-700">{formatDateDMY(formData.serviceStartDate)}</Text>
         </View>
         <Text className="text-[11px] text-slate-400 mb-4">Auto-populated from today&apos;s date.</Text>
 
         {/* Service Type — editable dropdown */}
-        <Text className="text-sm font-semibold text-slate-700 mb-1">
-          Service Type <Text className="text-red-500">*</Text>
-        </Text>
-        <TouchableOpacity
-          onPress={() => setShowDropdown(true)}
-          activeOpacity={0.8}
-          className={`px-4 py-3 border rounded-xl bg-white flex-row items-center justify-between ${
-            errors.serviceType ? 'border-red-500 bg-red-50' : 'border-slate-300'
-          }`}
-        >
-          <Text className="text-sm text-slate-900">{formData.serviceType}</Text>
-          <ChevronDown size={16} color="#64748b" />
-        </TouchableOpacity>
-        {!!errors.serviceType && <Text className="text-xs text-red-600 mt-1.5">{errors.serviceType}</Text>}
+        <InvalidAnchor errorKey="serviceType" invalid={!!errors.serviceType}>
+          <Text className="text-sm font-semibold text-slate-700 mb-1">
+            Service Type <Text className="text-red-500">*</Text>
+          </Text>
+          <Dropdown
+            value={formData.serviceType}
+            options={SERVICE_TYPES}
+            onSelect={(serviceType) => setFormData({ ...formData, serviceType })}
+            accessibilityLabel="Service Type"
+            triggerClassName={`px-4 py-3 border rounded-xl flex-row items-center justify-between ${
+              errors.serviceType ? 'border-red-500 bg-red-50' : 'border-slate-300 bg-white'
+            }`}
+            valueClassName="text-sm text-slate-900"
+          />
+          {!!errors.serviceType && <Text className="text-xs text-red-600 mt-1.5">{errors.serviceType}</Text>}
+        </InvalidAnchor>
       </Card>
 
       {/* Product Being Inspected */}
@@ -143,39 +147,6 @@ export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {
       <View className="h-6" />
 
       <PhotoLightbox image={lightbox} onClose={() => setLightbox(null)} />
-
-      {/* Service type modal */}
-      <Modal visible={showDropdown} transparent animationType="fade" onRequestClose={() => setShowDropdown(false)}>
-        <Pressable className="flex-1 bg-black/40 justify-center px-6" onPress={() => setShowDropdown(false)}>
-          <Pressable className="bg-white rounded-2xl overflow-hidden" onPress={(e) => e.stopPropagation()}>
-            <View className="px-5 py-3 border-b border-slate-100">
-              <Text className="text-sm font-bold text-slate-800">Select Service Type</Text>
-            </View>
-            <ScrollView style={{ maxHeight: 320 }}>
-              {SERVICE_TYPES.map((type) => {
-                const selected = formData.serviceType === type;
-                return (
-                  <TouchableOpacity
-                    key={type}
-                    onPress={() => {
-                      setFormData({ ...formData, serviceType: type });
-                      setShowDropdown(false);
-                    }}
-                    className={`px-5 py-3.5 flex-row items-center justify-between border-b border-slate-50 ${
-                      selected ? 'bg-brand-50' : 'bg-white'
-                    }`}
-                  >
-                    <Text className={`text-sm ${selected ? 'text-brand-600 font-semibold' : 'text-slate-700'}`}>
-                      {type}
-                    </Text>
-                    {selected && <Check size={16} color="#e01a1b" />}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </ScrollView>
   );
 }

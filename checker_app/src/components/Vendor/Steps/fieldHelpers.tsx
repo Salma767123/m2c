@@ -292,6 +292,8 @@
 //   - frontend/src/lib/checkerUtils.ts     -> formatCheckerName
 // Kept 1:1 with the source so display values match the web portal exactly.
 
+import { API_BASE_URL } from '@/lib/apiBase';
+
 // ── Name builder ──────────────────────────────────────────────────────────
 export function buildFullName(
   title?: string | null,
@@ -660,7 +662,7 @@ export function isImageUrl(url?: string, name?: string): boolean {
 export function getProxyUrl(url: string): string {
   try {
     if (/^res\.cloudinary\.com$/i.test(new URL(url).hostname)) {
-      const base = (process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:5000/api').replace(/\/+$/, '');
+      const base = API_BASE_URL || 'http://10.0.2.2:5000/api';
       return `${base}/document-proxy?url=${encodeURIComponent(url)}`;
     }
   } catch {
