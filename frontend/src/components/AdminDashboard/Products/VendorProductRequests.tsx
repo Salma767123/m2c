@@ -10,9 +10,10 @@ import DateRangeCalendar from '@/components/Shared/DateRangeCalendar'
 import ApproveProductModal, { type ApprovableProduct } from './ApproveProductModal'
 import ProductRejectionModal from './ProductRejectionModal'
 import PriceNegotiationModal from './PriceNegotiationModal'
+import Pagination from '@/components/UI/Pagination'
 import {
   Eye, Check, X, Search, Package, UserPlus, UserCog, CheckCircle,
-  ChevronLeft, ChevronRight, Clock, ShoppingBag, AlertTriangle, XCircle, Handshake,
+  Clock, ShoppingBag, AlertTriangle, XCircle, Handshake,
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { adminProductService } from '@/services/adminProductService'
@@ -74,18 +75,6 @@ interface StatusCounts {
   approved: number
   rejected: number
   reinspection: number
-}
-
-function getPageRange(current: number, total: number): Array<number | '…'> {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-  const pages: Array<number | '…'> = [1]
-  if (current > 4) pages.push('…')
-  const start = Math.max(2, current - 1)
-  const end = Math.min(total - 1, current + 1)
-  for (let p = start; p <= end; p++) pages.push(p)
-  if (current < total - 3) pages.push('…')
-  pages.push(total)
-  return pages
 }
 
 const getApprovalStatusBadge = (status: string) => {
@@ -256,8 +245,6 @@ export default function VendorProductRequests() {
   ]
 
   const hasActiveFilters = statusFilter !== 'all' || searchTerm || dateFrom || dateTo
-  const rangeStart = pagination.totalCount === 0 ? 0 : (pagination.currentPage - 1) * pagination.limit + 1
-  const rangeEnd = Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -523,45 +510,11 @@ export default function VendorProductRequests() {
               </Table>
 
               {/* Pagination */}
-              {pagination.totalPages > 1 && (
-                <div className="flex items-center justify-between gap-4 px-5 py-3.5 border-t border-slate-100">
-                  <span className="text-xs text-slate-400 hidden sm:block">
-                    {pagination.totalCount === 0 ? '0 products' : `Showing ${rangeStart}–${rangeEnd} of ${pagination.totalCount} product${pagination.totalCount === 1 ? '' : 's'}`}
-                  </span>
-                  <div className="flex items-center gap-1 ml-auto">
-                    <button
-                      onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))}
-                      disabled={pagination.currentPage <= 1}
-                      className="p-2 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                      aria-label="Previous page"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    {getPageRange(pagination.currentPage, pagination.totalPages).map((p, i) =>
-                      p === '…' ? (
-                        <span key={`e-${i}`} className="px-2 text-slate-400 text-sm">…</span>
-                      ) : (
-                        <button
-                          key={`p-${p}`}
-                          onClick={() => setPagination(prev => ({ ...prev, currentPage: p as number }))}
-                          aria-current={p === pagination.currentPage ? 'page' : undefined}
-                          className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === pagination.currentPage ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/20' : 'text-slate-700 hover:bg-slate-100'}`}
-                        >
-                          {p}
-                        </button>
-                      )
-                    )}
-                    <button
-                      onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))}
-                      disabled={pagination.currentPage >= pagination.totalPages}
-                      className="p-2 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                      aria-label="Next page"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
+              <Pagination
+                page={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                onChange={(p) => setPagination(prev => ({ ...prev, currentPage: p }))}
+              />
             </>
           )}
         </div>

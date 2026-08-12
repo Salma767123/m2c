@@ -12,6 +12,7 @@ import type { InspectorMeta } from "@/components/Checker/Vendor/Steps/VI_Step8_F
 import type { FactoryEvidenceState } from "@/components/Checker/Vendor/Steps/VI_Step2_WarehouseFactory"
 import { notifyUploadSuccess } from "@/lib/toast-utils"
 import { GEOFENCE_DISABLED, getCurrentCoords } from "@/lib/checkerLocation"
+import { computeInspectionDurations } from "@/lib/inspectionDuration"
 
 const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<string> =>
   new Promise((resolve) => {
@@ -83,9 +84,11 @@ interface Props {
   factoryEvidence?: FactoryEvidenceState | null
   inspectionStartedAt?: string | null
   inspectionType?: string
+  /** Full inspection row — drives the report's active/paused/total duration. */
+  inspection?: any
 }
 
-export default function VendorDocumentation({ vendor, verifications, meta, docData, onDocDataChange, errors = {}, factoryEvidence, inspectionStartedAt, inspectionType }: Props) {
+export default function VendorDocumentation({ vendor, verifications, meta, docData, onDocDataChange, errors = {}, factoryEvidence, inspectionStartedAt, inspectionType, inspection }: Props) {
   const signedDocInputRef = useRef<HTMLInputElement | null>(null)
   const sigPadRef = useRef<SignatureCanvasType | null>(null)
   const sigCanvasContainerRef = useRef<HTMLDivElement | null>(null)
@@ -126,17 +129,30 @@ export default function VendorDocumentation({ vendor, verifications, meta, docDa
   const cachedChecker = qcCheckerService.getCheckerData?.() || null
   const checker = liveQc || cachedChecker
 
-  const buildMeta = () => ({
-    inspectorName: meta.inspectorName || formatCheckerName(checker) || "",
-    inspectionDate: meta.inspectionDate,
-    inspectionStartedAt: inspectionStartedAt ?? undefined,
-    overallResult: meta.overallResult,
-    inspectorRemarks: meta.inspectorRemarks,
-    checker: checker ? { name: formatCheckerName(checker), checkerId: checker.checkerId, email: checker.email, phone: checker.phone || (checker as any).mobile } : null,
-    inspectionType,
-    location: coords,
-    generatedAt: new Date(),
-  })
+  const buildMeta = () => {
+    // Live report: the inspection isn't submitted yet, so "now" is the end anchor.
+    const now = new Date()
+    const d = inspection ? computeInspectionDurations(inspection, now) : null
+    return {
+      inspectorName: meta.inspectorName || formatCheckerName(checker) || "",
+      inspectionDate: meta.inspectionDate,
+      inspectionStartedAt: inspectionStartedAt ?? undefined,
+      inspectionCompletedAt: now.toISOString(),
+      overallResult: meta.overallResult,
+      inspectorRemarks: meta.inspectorRemarks,
+      checker: checker ? { name: formatCheckerName(checker), checkerId: checker.checkerId, email: checker.email, phone: checker.phone || (checker as any).mobile } : null,
+      inspectionType,
+      location: coords,
+      generatedAt: now,
+      ...(d && d.totalMs > 0 ? {
+        activeDurationMs: d.activeMs,
+        pausedDurationMs: d.pausedMs,
+        totalDurationMs: d.totalMs,
+        scheduledDurationMs: d.scheduledMs,
+        exceededSchedule: d.exceeded,
+      } : {}),
+    }
+  }
 
   const gatherFactoryImages = async () => {
     const vendorDocs: any[] = Array.isArray(vendor?.documents) ? vendor.documents : []
@@ -261,6 +277,10 @@ export default function VendorDocumentation({ vendor, verifications, meta, docDa
   const signedReport = docData.signedReport || []
   const hasSignedDoc = signedDocs.length > 0
   const hasSignedReport = signedReport.length > 0
+  // Virtual inspections are done remotely, so an on-screen client signature can't
+  // be captured — the digital signed-report path is disabled and only the manual
+  // upload (scanned, signed copy) is allowed.
+  const isVirtual = String(inspectionType).toUpperCase() === "VIRTUAL"
 
   const closeDocModal = () => {
     setShowDocModal(false)
@@ -348,7 +368,7 @@ export default function VendorDocumentation({ vendor, verifications, meta, docDa
         </div>
 
         {/* ── Digital Signed Report ── */}
-        <div className={`rounded-2xl border bg-white p-6 flex flex-col gap-4 transition-opacity ${hasSignedDoc ? "opacity-40 pointer-events-none select-none" : "border-slate-200"}`}>
+        <div className={`rounded-2xl border bg-white p-6 flex flex-col gap-4 transition-opacity ${hasSignedDoc || isVirtual ? "opacity-40 pointer-events-none select-none border-slate-200" : "border-slate-200"}`}>
           <div className="flex items-start gap-3">
             <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center flex-shrink-0">
               <PenLine className="w-5 h-5" />
@@ -359,7 +379,11 @@ export default function VendorDocumentation({ vendor, verifications, meta, docDa
             </div>
           </div>
 
-          {hasSignedReport ? (
+          {isVirtual ? (
+            <div className="mt-auto rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 font-medium">
+              Not available for virtual inspections — use the Manual Document path to upload a signed copy.
+            </div>
+          ) : hasSignedReport ? (
             <div className="space-y-3 mt-auto">
               <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600">
                 <CheckCircle2 className="w-4 h-4" /> Signed report generated
@@ -427,7 +451,9 @@ export default function VendorDocumentation({ vendor, verifications, meta, docDa
       }`}>
         {hasSignedDoc || hasSignedReport
           ? "A signed document is attached. You can submit the inspection."
-          : errors.signedDocuments || "At least one signed document is required — upload a signed copy or generate the digitally-signed report."}
+          : errors.signedDocuments || (isVirtual
+              ? "A signed document is required — upload a signed copy via the Manual Document path."
+              : "At least one signed document is required — upload a signed copy or generate the digitally-signed report.")}
       </div>
 
       {/* ── Document Center modal ── */}

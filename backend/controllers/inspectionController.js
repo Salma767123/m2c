@@ -206,12 +206,14 @@ const startInspection = async (req, res) => {
             return res.status(403).json({ error: 'Unauthorized to start this inspection' });
         }
 
-        // Inspection type is chosen when the checker first starts. On a restart of an
-        // already-started inspection, the original choice stands — it can't change
-        // mid-inspection, so the stored value wins over anything the client re-sends.
+        // Inspection type is chosen when the checker first starts. On resume it stays
+        // fixed UNLESS the checker explicitly discards the saved draft to start over
+        // (discardDraft) — then the newly chosen type wins and the form resets.
+        const requestedType = String(req.body.inspectionType).toUpperCase() === 'VIRTUAL' ? 'VIRTUAL' : 'PHYSICAL';
+        const discardDraft = req.body.discardDraft === true || req.body.discardDraft === 'true';
         const inspectionType = inspection.status === 'SCHEDULED'
-            ? (String(req.body.inspectionType).toUpperCase() === 'VIRTUAL' ? 'VIRTUAL' : 'PHYSICAL')
-            : inspection.inspectionType;
+            ? requestedType
+            : (discardDraft ? requestedType : inspection.inspectionType);
 
         // Both SCHEDULED (first start) and IN_PROGRESS (retry) re-verify
         // against the CURRENT vendor coordinates — so if admin updates the
@@ -230,8 +232,12 @@ const startInspection = async (req, res) => {
         // form auto-flips SCHEDULED → IN_PROGRESS on first load, so this state
         // does NOT mean active work). Mark it EXPIRED (frees the vendor for
         // reassignment) and alert admin + the checker.
+        // A genuinely-started inspection (IN_PROGRESS with a real startedAt) can be
+        // RESUMED past its booked window — overtime is highlighted on the report/lists,
+        // never blocked. Only a never-genuinely-started assignment expires here.
         const { getInspectionDeadline, isInspectionWindowElapsed } = require('../utils/inspectionSchedule');
-        if ((inspection.status === 'SCHEDULED' || inspection.status === 'IN_PROGRESS') && isInspectionWindowElapsed(inspection)) {
+        const genuinelyStarted = inspection.status === 'IN_PROGRESS' && !!inspection.startedAt;
+        if (!genuinelyStarted && (inspection.status === 'SCHEDULED' || inspection.status === 'IN_PROGRESS') && isInspectionWindowElapsed(inspection)) {
             const deadline = getInspectionDeadline(inspection);
             await prisma.inspection.update({
                 where: { id },
@@ -292,6 +298,21 @@ const startInspection = async (req, res) => {
         const wasScheduled = inspection.status === 'SCHEDULED';
         const hasCheckerCoords = checkerLatitude != null && checkerLongitude != null;
 
+        // ── Draft / pause-resume timing ────────────────────────────────
+        // First start stamps startedAt. A resume either discards the draft (type
+        // changed) and restarts the clock fresh, or continues the same draft —
+        // folding the elapsed pause gap into totalPausedMs so the report's
+        // active/paused/total duration stays accurate.
+        let resumeFields = {};
+        if (wasScheduled) {
+            resumeFields = { status: 'IN_PROGRESS', startedAt: new Date() };
+        } else if (discardDraft) {
+            resumeFields = { draftData: null, pausedAt: null, totalPausedMs: 0, startedAt: new Date() };
+        } else if (inspection.pausedAt) {
+            const pausedMs = Math.max(0, Date.now() - new Date(inspection.pausedAt).getTime());
+            resumeFields = { pausedAt: null, totalPausedMs: (inspection.totalPausedMs || 0) + pausedMs };
+        }
+
         // ── All checks passed — start (or refresh) the inspection ───────
         const updatedInspection = await prisma.inspection.update({
             where: { id },
@@ -307,8 +328,7 @@ const startInspection = async (req, res) => {
                 ...(geo.vendorLat != null ? { vendorLatitude: geo.vendorLat, vendorLongitude: geo.vendorLng } : {}),
                 locationVerified: geo.verified === true,
                 ...(geo.distanceM != null ? { locationDistanceM: Math.round(geo.distanceM) } : {}),
-                // Flip status + stamp startedAt only on the very first start.
-                ...(wasScheduled ? { status: 'IN_PROGRESS', startedAt: new Date() } : {}),
+                ...resumeFields,
             },
             include: {
                 vendor: true
@@ -334,6 +354,44 @@ const startInspection = async (req, res) => {
         });
     } catch (error) {
         console.error('Error starting inspection:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+
+// Save a draft (pause) of an in-progress inspection. Persists the checker's
+// half-filled form so they can exit and resume later. Marks the pause start; the
+// elapsed pause time is folded into totalPausedMs on the next start (resume).
+const saveInspectionDraft = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const checkerId = req.user.id;
+        const { draftData } = req.body;
+
+        const inspection = await prisma.inspection.findUnique({ where: { id } });
+        if (!inspection) {
+            return res.status(404).json({ error: 'Inspection not found' });
+        }
+        if (inspection.checkerId !== checkerId) {
+            return res.status(403).json({ error: 'Unauthorized to draft this inspection' });
+        }
+        if (inspection.status !== 'IN_PROGRESS') {
+            return res.status(400).json({ error: `Cannot draft an inspection that is currently ${inspection.status}` });
+        }
+
+        const updated = await prisma.inspection.update({
+            where: { id },
+            data: {
+                draftData: draftData ?? {},
+                // Mark the pause start once per pause cycle. Resume clears pausedAt, so
+                // keeping the earliest here means no paused time is ever double-counted.
+                ...(inspection.pausedAt ? {} : { pausedAt: new Date() }),
+            },
+        });
+
+        res.json({ success: true, message: 'Draft saved', inspection: updated });
+    } catch (error) {
+        console.error('Error saving inspection draft:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
@@ -380,6 +438,14 @@ const updateInspection = async (req, res) => {
             }
         }
 
+        // A missed (EXPIRED) assignment being given a fresh window is a REASSIGNMENT —
+        // revive it back to SCHEDULED and clear the expiry stamps, otherwise it stays
+        // "Expired · Missed" forever (admin badge never clears, and the checker's
+        // begin-inspection guard keeps returning INSPECTION_EXPIRED). Only EXPIRED is
+        // revived; live states (SCHEDULED/IN_PROGRESS/…) keep their status on edit.
+        const existing = await prisma.inspection.findUnique({ where: { id }, select: { status: true, vendorId: true } });
+        const reviving = existing?.status === 'EXPIRED' && !!scheduledDate;
+
         const updatedInspection = await prisma.inspection.update({
             where: { id },
             data: {
@@ -390,15 +456,30 @@ const updateInspection = async (req, res) => {
                 scheduledTime,
                 priority,
                 estimatedDuration,
-                itemsToInspect: await resolveBase64InValue(itemsToInspect, { folder: 'inspections' })
+                itemsToInspect: await resolveBase64InValue(itemsToInspect, { folder: 'inspections' }),
+                ...(reviving ? { status: 'SCHEDULED', expiredAt: null, reminderSentAt: null } : {}),
             }
         });
 
         if (checkerId) {
             await prisma.vendor.update({
                 where: { id: updatedInspection.vendorId },
-                data: { assignedQcId: checkerId }
+                data: { assignedQcId: checkerId, status: 'UNDER_REVIEW' }
             });
+        }
+
+        // Tell the (re)assigned checker they have a fresh window to inspect.
+        if (reviving && checkerId) {
+            try {
+                const vendorRecord = await prisma.vendor.findUnique({ where: { id: updatedInspection.vendorId }, select: { companyName: true } });
+                const { createNotification } = require('./notificationController');
+                createNotification({
+                    userId: checkerId, role: 'QC_CHECKER', type: 'INSPECTION_SCHEDULED',
+                    title: 'Inspection Rescheduled',
+                    message: `The inspection for "${vendorRecord?.companyName || 'a vendor'}" has been rescheduled to ${scheduledDate}${scheduledTime ? ` at ${scheduledTime}` : ''}. Please complete it within the new window.`,
+                    data: { screen: 'vendors', vendorId: updatedInspection.vendorId },
+                }).catch(() => {});
+            } catch (e) { console.error('Reassign notify failed:', e); }
         }
 
         res.json({ success: true, message: 'Inspection updated successfully', inspection: updatedInspection });
@@ -534,6 +615,14 @@ const completeInspection = async (req, res) => {
                 status: 'SUBMITTED',
                 startedAt: inspection.startedAt || new Date(),
                 submittedAt: new Date(),
+                completedAt: new Date(),
+                // If the inspection was mid-pause when completed, fold the open pause
+                // gap into totalPausedMs, then clear the draft/pause state.
+                ...(inspection.pausedAt
+                    ? { totalPausedMs: (inspection.totalPausedMs || 0) + Math.max(0, Date.now() - new Date(inspection.pausedAt).getTime()) }
+                    : {}),
+                draftData: null,
+                pausedAt: null,
                 ...locationFields,
                 result: resultStatus,
                 notes: formData.inspectorRemarks || '',
@@ -690,6 +779,7 @@ module.exports = {
     createInspection,
     getInspectionsByChecker,
     startInspection,
+    saveInspectionDraft,
     getInspectionByVendorId,
     getInspectionById,
     getMyInspectionById,

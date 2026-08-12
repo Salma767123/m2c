@@ -8,6 +8,7 @@ import { adminProductService, type AdminProduct } from '@/services/adminProductS
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import type { OfferType, OfferScope, OfferRegion } from '@/lib/offers'
 import Dropdown from '@/components/UI/Dropdown'
+import Pagination from '@/components/UI/Pagination'
 
 const TYPE_LABELS: Record<OfferType, string> = {
   PERCENTAGE: 'Percentage off',
@@ -95,6 +96,16 @@ export default function OfferManagement() {
   const displayedOffers = useMemo(
     () => (statusFilter === 'ALL' ? offers : offers.filter((o) => (o.status || 'PAUSED') === statusFilter)),
     [offers, statusFilter],
+  )
+
+  // Pagination — 10 rows/page, reset to page 1 whenever the filter changes.
+  const OFFERS_PER_PAGE = 10
+  const [page, setPage] = useState(1)
+  useEffect(() => { setPage(1) }, [statusFilter])
+  const totalPages = Math.max(1, Math.ceil(displayedOffers.length / OFFERS_PER_PAGE))
+  const pagedOffers = useMemo(
+    () => displayedOffers.slice((page - 1) * OFFERS_PER_PAGE, page * OFFERS_PER_PAGE),
+    [displayedOffers, page],
   )
 
   // Metric cards — click to filter the table by that status (click the active one to clear).
@@ -196,7 +207,7 @@ export default function OfferManagement() {
                 </tr>
               </thead>
               <tbody>
-                {displayedOffers.map((o) => (
+                {pagedOffers.map((o) => (
                   <tr key={o.id} className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0">
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">{o.title}</div>
@@ -235,6 +246,7 @@ export default function OfferManagement() {
                 ))}
               </tbody>
             </table>
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
           </div>
         )}
       </div>

@@ -49,6 +49,11 @@ export default function VendorPanel() {
   const [formData, setFormData] = useState<FormData>({});
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [isEditingFromReview, setIsEditingFromReview] = useState(false);
+  // Synchronous mirror of formData. A step commits its data via onUpdateData and
+  // then immediately calls onNext in the same handler; the setState from
+  // onUpdateData hasn't flushed yet, so nextStep must read the fresh values from
+  // this ref (not the stale `formData` closure) to decide step-skipping.
+  const formDataRef = useRef<FormData>({});
   // When the user edits a section from Review & Submit and saves, we return to
   // Review and scroll back to THAT section instead of the top. Holds the
   // section id to scroll to on the next render of the Review step.
@@ -94,8 +99,8 @@ export default function VendorPanel() {
     return () => cancelAnimationFrame(raf1);
   }, [currentStep]);
 
-  const isManufacturer = () => {
-    const vendorTypes = formData.vendorType || [];
+  const isManufacturer = (fd: FormData = formData) => {
+    const vendorTypes = fd.vendorType || [];
     return Array.isArray(vendorTypes)
       ? vendorTypes.includes("manufacturer")
       : vendorTypes === "manufacturer";
@@ -105,20 +110,33 @@ export default function VendorPanel() {
   // to a type on Step 4. Before then we keep the step "live" so the sidebar
   // shows a stable 8-step flow. After Step 4 is saved, non-manufacturers see
   // it marked N/A and nav skips over it.
-  const isStepSkipped = (index: number) =>
+  //
+  // `fd`/`completed` are passed explicitly by nextStep so navigation uses the
+  // freshly-committed values (the state versions are used by render).
+  const isStepSkippedWith = (index: number, fd: FormData, completed: number[]) =>
     index === MANUFACTURING_STEP_INDEX &&
-    completedSteps.includes(3) &&
-    !isManufacturer();
+    completed.includes(3) &&
+    !isManufacturer(fd);
 
-  const findAdjacent = (from: number, dir: 1 | -1) => {
+  const isStepSkipped = (index: number) =>
+    isStepSkippedWith(index, formData, completedSteps);
+
+  const findAdjacent = (
+    from: number,
+    dir: 1 | -1,
+    fd: FormData = formData,
+    completed: number[] = completedSteps,
+  ) => {
     let next = from + dir;
-    while (next >= 0 && next < steps.length && isStepSkipped(next)) {
+    while (next >= 0 && next < steps.length && isStepSkippedWith(next, fd, completed)) {
       next += dir;
     }
     return next;
   };
 
   const updateFormData = (stepData: Partial<FormData>) => {
+    // Keep the synchronous mirror in lock-step so nextStep sees the latest data.
+    formDataRef.current = { ...formDataRef.current, ...stepData };
     setFormData((prev) => ({ ...prev, ...stepData }));
   };
 
@@ -139,8 +157,15 @@ export default function VendorPanel() {
     }
 
     if (currentStep < steps.length - 1) {
+      // Compute the next step from freshly-committed values: the step just
+      // finished (so it counts as completed) and formDataRef holds the vendor
+      // type the user just saved. Using stale state here would let a
+      // non-manufacturer land on the Manufacturing step before the skip applied.
+      const completedNow = completedSteps.includes(currentStep)
+        ? completedSteps
+        : [...completedSteps, currentStep];
       markStepAsCompleted(currentStep);
-      setCurrentStep(findAdjacent(currentStep, 1));
+      setCurrentStep(findAdjacent(currentStep, 1, formDataRef.current, completedNow));
     }
   };
 
@@ -153,7 +178,7 @@ export default function VendorPanel() {
     }
 
     if (currentStep > 0) {
-      setCurrentStep(findAdjacent(currentStep, -1));
+      setCurrentStep(findAdjacent(currentStep, -1, formDataRef.current, completedSteps));
     }
   };
 
@@ -279,7 +304,7 @@ export default function VendorPanel() {
                 const isAccessible = !skipped;
 
                 return (
-                  <li key={index} className="relative flex items-start gap-4 pb-6 last:pb-0">
+                  <li key={index} className="group/step relative flex items-start gap-4 pb-6 last:pb-0">
                     {/* Vertical Connector Line */}
                     {index < steps.length - 1 && (
                       <div
@@ -296,7 +321,8 @@ export default function VendorPanel() {
                       disabled={!isAccessible}
                       onClick={() => isAccessible && goToStep(index)}
                       aria-current={isCurrent ? "step" : undefined}
-                      aria-label={`Step ${index + 1}: ${step}${skipped ? ", not applicable" : isCompleted ? ", completed" : isCurrent ? ", current" : ""}`}
+                      title={skipped ? "Only applies to Manufacturers. Select “Manufacturer” under Vendor Type (Step 4) to enable this step." : undefined}
+                      aria-label={`Step ${index + 1}: ${step}${skipped ? ", not applicable — only for manufacturers" : isCompleted ? ", completed" : isCurrent ? ", current" : ""}`}
                       className={`flex items-start gap-3.5 p-2 rounded-xl w-full text-left transition-all duration-200 group relative
                         ${
                           skipped
@@ -385,6 +411,15 @@ export default function VendorPanel() {
                         )}
                       </div>
                     </button>
+
+                    {/* Reason tooltip for a disabled (non-manufacturer) step */}
+                    {skipped && (
+                      <div className="pointer-events-none absolute left-14 top-1 z-30 hidden group-hover/step:block">
+                        <div className="w-52 rounded-lg bg-gray-900 px-3 py-2 text-[11px] font-medium leading-snug text-white shadow-lg">
+                          Only applies to Manufacturers. Select “Manufacturer” under Vendor Type (Step 4) to enable this step.
+                        </div>
+                      </div>
+                    )}
                   </li>
                 );
               })}
