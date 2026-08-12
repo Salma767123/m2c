@@ -248,40 +248,58 @@ async function verifyCheckerAtVendor({
     };
   }
 
-  let vendorLat = vendor?.factoryLatitude;
-  let vendorLng = vendor?.factoryLongitude;
+  // Build the set of vendor locations the checker may legitimately stand at:
+  // the LEGAL ADDRESS / FACTORY SITE and the WAREHOUSE. The checker passes when
+  // they are within the threshold of ANY one of these (an "OR" of all addresses).
+  let factoryLat = vendor?.factoryLatitude;
+  let factoryLng = vendor?.factoryLongitude;
 
-  // Fall back to mapLink on the fly when the columns aren't populated yet,
+  // Fall back to mapLink on the fly when the factory columns aren't populated yet,
   // and backfill them async so future calls are cheaper.
-  if ((vendorLat == null || vendorLng == null) && vendor?.mapLink) {
+  if ((factoryLat == null || factoryLng == null) && vendor?.mapLink) {
     const coords = parseMapLinkCoordinates(vendor.mapLink);
     if (coords) {
-      vendorLat = coords.latitude;
-      vendorLng = coords.longitude;
+      factoryLat = coords.latitude;
+      factoryLng = coords.longitude;
       if (prisma && vendor?.id) {
         prisma.vendor
           .update({
             where: { id: vendor.id },
-            data: { factoryLatitude: vendorLat, factoryLongitude: vendorLng },
+            data: { factoryLatitude: factoryLat, factoryLongitude: factoryLng },
           })
           .catch((e) => console.error("Failed to backfill vendor coords:", e));
       }
     }
   }
 
-  // Vendor has no coordinates on file — there is nothing to measure against, so the
-  // inspection is ALLOWED and recorded as location-unverified rather than blocked.
-  //
-  // Blocking here would strand every vendor registered before coordinates became a
-  // form field, and the checker cannot fix the vendor's record themselves. The
-  // checker's own GPS is still captured and stored, so the report stays auditable and
-  // an admin can verify it after the fact.
-  if (vendorLat == null || vendorLng == null) {
-    const vendorTag = vendor?.companyName
-      ? `${vendor.companyName} (${vendor.id || "?"})`
-      : `vendor ${vendor?.id || "?"}`;
+  const candidates = [];
+  if (factoryLat != null && factoryLng != null) {
+    candidates.push({ label: "legal/factory", lat: factoryLat, lng: factoryLng });
+  }
+  if (vendor?.warehouseLatitude != null && vendor?.warehouseLongitude != null) {
+    candidates.push({ label: "warehouse", lat: vendor.warehouseLatitude, lng: vendor.warehouseLongitude });
+  }
+
+  // Dedupe identical pairs so "legal same as warehouse" measures a single point
+  // instead of the same distance twice.
+  const coordsEqual = (a, b, c, d) => Math.abs(a - c) < 1e-6 && Math.abs(b - d) < 1e-6;
+  const locations = [];
+  for (const c of candidates) {
+    if (!locations.some((u) => coordsEqual(u.lat, u.lng, c.lat, c.lng))) locations.push(c);
+  }
+
+  const vendorTag = vendor?.companyName
+    ? `${vendor.companyName} (${vendor.id || "?"})`
+    : `vendor ${vendor?.id || "?"}`;
+
+  // Vendor has no coordinates on file (neither address, nor a parseable mapLink) —
+  // there is nothing to measure against, so the inspection is ALLOWED and recorded as
+  // location-unverified rather than blocked. Blocking here would strand vendors
+  // registered before coordinates became a form field, and the checker cannot fix the
+  // vendor's record themselves. The checker's own GPS is still captured for audit.
+  if (locations.length === 0) {
     console.log(
-      `[Geofence] ${prefix}UNVERIFIED — ${vendorTag} has no factory coordinates ` +
+      `[Geofence] ${prefix}UNVERIFIED — ${vendorTag} has no factory/warehouse coordinates ` +
         `and no parseable mapLink. Allowing, and recording the checker's GPS only.`,
     );
     return {
@@ -294,44 +312,56 @@ async function verifyCheckerAtVendor({
     };
   }
 
-  const distanceM = haversineDistanceMeters(
-    checkerLatitude,
-    checkerLongitude,
-    vendorLat,
-    vendorLng,
-  );
+  // Distance to every registered location; the nearest one decides pass/fail.
+  let nearest = null;
+  for (const loc of locations) {
+    const d = haversineDistanceMeters(checkerLatitude, checkerLongitude, loc.lat, loc.lng);
+    if (nearest == null || d < nearest.distanceM) nearest = { ...loc, distanceM: d };
+  }
 
-  // Diagnostic — show both sides of the comparison so you can see at a
-  // glance which vendor coords the geofence is using vs the checker's GPS.
-  const pass = distanceM <= LOCATION_THRESHOLD_METERS;
-  const tag = vendor?.companyName
-    ? `${vendor.companyName} (${vendor.id || "?"})`
-    : `vendor ${vendor?.id || "?"}`;
-  const vendorSrc =
-    vendor?.factoryLatitude == null || vendor?.factoryLongitude == null
-      ? " (from mapLink)"
-      : " (factoryLatitude/Longitude)";
+  const pass = nearest.distanceM <= LOCATION_THRESHOLD_METERS;
   console.log(
-    `[Geofence] ${prefix}${tag}\n` +
-      `  vendor:  ${vendorLat}, ${vendorLng}${vendorSrc}\n` +
-      `  checker: ${checkerLatitude}, ${checkerLongitude}\n` +
-      `  distance: ${Math.round(distanceM)}m / ${LOCATION_THRESHOLD_METERS}m → ${pass ? "✓ PASS" : "✗ MISMATCH"}`,
+    `[Geofence] ${prefix}${tag(vendor)}\n` +
+      locations
+        .map(
+          (loc) =>
+            `  ${loc.label}: ${loc.lat}, ${loc.lng} → ${Math.round(
+              haversineDistanceMeters(checkerLatitude, checkerLongitude, loc.lat, loc.lng),
+            )}m`,
+        )
+        .join("\n") +
+      `\n  checker: ${checkerLatitude}, ${checkerLongitude}\n` +
+      `  nearest: ${nearest.label} @ ${Math.round(nearest.distanceM)}m / ${LOCATION_THRESHOLD_METERS}m → ${pass ? "✓ PASS" : "✗ MISMATCH"}`,
   );
 
-  if (distanceM > LOCATION_THRESHOLD_METERS) {
+  if (!pass) {
     return {
       ok: false,
       status: 403,
       body: {
         error: "Location mismatch",
-        message: `You are approximately ${Math.round(distanceM)}m (straight-line) from the vendor's factory. You must be within ${LOCATION_THRESHOLD_METERS}m to submit this inspection. Note: Google Maps may show a longer distance as it measures road/walking routes. Please travel closer to the factory location and try again.`,
-        distanceMeters: Math.round(distanceM),
+        message: `You are approximately ${Math.round(nearest.distanceM)}m (straight-line) from the nearest of the vendor's registered locations (legal/factory or warehouse). You must be within ${LOCATION_THRESHOLD_METERS}m of one of them to run this inspection. Note: Google Maps may show a longer distance as it measures road/walking routes. Please travel closer and try again.`,
+        distanceMeters: Math.round(nearest.distanceM),
         thresholdMeters: LOCATION_THRESHOLD_METERS,
       },
     };
   }
 
-  return { ok: true, vendorLat, vendorLng, distanceM, verified: true };
+  return {
+    ok: true,
+    vendorLat: nearest.lat,
+    vendorLng: nearest.lng,
+    distanceM: nearest.distanceM,
+    verified: true,
+    matchedAddress: nearest.label,
+  };
+}
+
+// Short vendor tag for diagnostics.
+function tag(vendor) {
+  return vendor?.companyName
+    ? `${vendor.companyName} (${vendor.id || "?"})`
+    : `vendor ${vendor?.id || "?"}`;
 }
 
 /**

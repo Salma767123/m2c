@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useSearchParams } from "next/navigation"
+import { formatInspectionDate } from "@/lib/checkerUtils"
 import type { LucideIcon } from "lucide-react"
 import {
   ArrowLeft, CheckCircle, XCircle,
@@ -338,7 +339,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
           <InfoRow label="Vendor" value={fd.vendor} />
           <InfoRow label="Factory" value={fd.factory} />
           <InfoRow label="Service Location" value={fd.serviceLocation} />
-          <InfoRow label="Service Start Date" value={fd.serviceStartDate} />
+          <InfoRow label="Service Start Date" value={formatInspectionDate(fd.serviceStartDate)} />
           <InfoRow label="Service Type" value={fd.serviceType} />
         </div>
       </Section>

@@ -4,6 +4,7 @@ import { ClipboardList, User, Calendar, MessageSquare, ChevronDown, Pencil } fro
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Verifications } from './VI_VerifyField'
+import { formatInspectionDate } from '@/lib/checkerUtils'
 
 // ── Inspector Metadata ────────────────────────────────────────────────────────
 export interface InspectorMeta {
@@ -151,7 +152,7 @@ export default function VI_Step8_FinalReview({ vendor: v, inspection, verificati
                 <Calendar className="w-3 h-3" /> Inspection Date
               </p>
               <div className="px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-700 min-h-[42px] flex items-center">
-                {meta.inspectionDate || <span className="text-slate-400 italic">Auto-filled</span>}
+                {formatInspectionDate(meta.inspectionDate) || <span className="text-slate-400 italic">Auto-filled</span>}
               </div>
             </div>
 
