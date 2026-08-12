@@ -2906,7 +2906,10 @@ export default function VendorDetailScreen() {
             {hasVal(fv.factoryOwnershipType) ? (
               <InfoRow label="Ownership Type" value={getOwnershipTypeLabel(fv.factoryOwnershipType)} />
             ) : null}
-            <InfoRow label="Warehousing Capacity" value={fv.factorySize} />
+            {/* Sizes are usually stored with the unit baked in ("3000 sq ft"),
+                but legacy rows hold a bare number — withUnit only appends when
+                there is no unit already, so it can never double up. */}
+            <InfoRow label="Warehousing Capacity" value={withUnit(fv.factorySize, 'sq ft')} />
             <InfoRow label="Address Line 1" value={fv.factoryAddress} />
             <InfoRow label="Address Line 2" value={fv.addressLine2} />
             <InfoRow label="Address Line 3" value={fv.addressLine3} />
@@ -2958,7 +2961,7 @@ export default function VendorDetailScreen() {
                 ) : (
                   <>
                     <InfoRow label="Ownership Type" value={getOwnershipTypeLabel(fv.ownershipType) || '—'} />
-                    <InfoRow label="Warehousing Capacity" value={fv.warehouseSize || '—'} />
+                    <InfoRow label="Warehousing Capacity" value={withUnit(fv.warehouseSize, 'sq ft') || '—'} />
                     <InfoRow label="Address Line 1" value={fv.warehouseAddress} />
                     <InfoRow label="Address Line 2" value={fv.warehouseAddressLine2} />
                     <InfoRow label="Address Line 3" value={fv.warehouseAddressLine3} />

@@ -4,6 +4,7 @@
 
 import React, { useEffect, useState } from 'react';
 import {
+  useWindowDimensions,
   View,
   Text,
   TouchableOpacity,
@@ -256,6 +257,26 @@ const eq = (a: any, b: any) => (a || '').trim() === (b || '').trim();
 // The Warehouse Address counts as "same as" the Legal Address & Factory Site
 // when the vendor didn't enter a separate warehouse address, or entered one
 // that matches the legal/factory address field-for-field.
+/**
+ * Invisible fillers for the last row of a `space-between` wrap grid.
+ *
+ * Without them a final row holding fewer items than there are columns gets its
+ * items pushed to the outer edges — e.g. 2 photos in a 3-up grid sit hard left
+ * and hard right with a hole between. Only matters once the column count can
+ * exceed two, which is why it arrived with the responsive grid.
+ */
+function GridSpacers({ count, cols, width }: { count: number; cols: number; width: `${number}%` }) {
+  const missing = (cols - (count % cols)) % cols;
+  if (missing === 0) return null;
+  return (
+    <>
+      {Array.from({ length: missing }).map((_, i) => (
+        <View key={`spacer-${i}`} style={{ width }} />
+      ))}
+    </>
+  );
+}
+
 export function detectSameAsWarehouse(v: any): boolean {
   if (!v.warehouseAddress && !v.warehouseCity) return true;
   return (
@@ -318,6 +339,15 @@ export default function VI_Step2_WarehouseFactory({
     .sort((a: any, b: any) => (WAREHOUSE_PHOTO_ORDER[a.label] ?? 99) - (WAREHOUSE_PHOTO_ORDER[b.label] ?? 99));
 
   const isSameAsWarehouse = detectSameAsWarehouse(v);
+
+  // Image grid density, mirroring the web portal's 1/2/3/4-up responsive grid.
+  // Web's breakpoints are desktop-sized, so they are re-pitched for handsets:
+  // a phone keeps 2-up, and the extra columns only appear on tablets, where a
+  // 2-up grid otherwise stretches each thumbnail across half a large screen.
+  const { width: screenW } = useWindowDimensions();
+  const imageCols = screenW >= 1024 ? 4 : screenW >= 768 ? 3 : 2;
+  // Percentage width leaving a consistent 4% gutter between columns.
+  const imageColWidth: `${number}%` = `${(100 - (imageCols - 1) * 4) / imageCols}%`;
 
   useEffect(() => {
     const keys: string[] = [
@@ -386,7 +416,7 @@ export default function VI_Step2_WarehouseFactory({
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 }}>
               {legalImages.map((img: any, idx: number) => (
-                <View key={idx} style={{ width: '48%' }}>
+                <View key={idx} style={{ width: imageColWidth }}>
                   <VerifyField
                     fieldKey={`w_legalImg_${idx}`}
                     label={img.label}
@@ -399,6 +429,7 @@ export default function VI_Step2_WarehouseFactory({
                   />
                 </View>
               ))}
+              <GridSpacers count={legalImages.length} cols={imageCols} width={imageColWidth} />
             </View>
           </View>
         )}
@@ -436,7 +467,7 @@ export default function VI_Step2_WarehouseFactory({
             {v.warehouseCountry && vf('w_whCountry', 'Country', v.warehouseCountry)}
           </View>
         )}
-        {/* Warehouse Images — only the Warehouse Address photos, two per row */}
+        {/* Warehouse Images — only the Warehouse Address photos */}
         {warehouseImages.length > 0 && (
           <View style={{ rowGap: 12 }} className="mt-2">
             <View className="flex-row items-center" style={{ columnGap: 6 }}>
@@ -445,7 +476,7 @@ export default function VI_Step2_WarehouseFactory({
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 }}>
               {warehouseImages.map((img: any, idx: number) => (
-                <View key={idx} style={{ width: '48%' }}>
+                <View key={idx} style={{ width: imageColWidth }}>
                   <VerifyField
                     fieldKey={`w_whImg_${idx}`}
                     label={img.label}
@@ -458,6 +489,7 @@ export default function VI_Step2_WarehouseFactory({
                   />
                 </View>
               ))}
+              <GridSpacers count={warehouseImages.length} cols={imageCols} width={imageColWidth} />
             </View>
           </View>
         )}

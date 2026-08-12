@@ -69,7 +69,7 @@ function UrlValue({ value }: { value: string }) {
 // Email value with a mailto: link plus a "Test" button that sends a real test
 // email through the backend so the checker can confirm the address is
 // reachable before marking it verified. Mirrors web VI_VerifyField EmailValue.
-function EmailValue({ value }: { value: string }) {
+function EmailValue({ value, onTestSent }: { value: string; onTestSent?: () => void }) {
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
 
   const sendTest = async () => {
@@ -78,6 +78,7 @@ function EmailValue({ value }: { value: string }) {
     try {
       await qcCheckerService.sendTestEmail(value);
       setStatus('sent');
+      onTestSent?.(); // unlocks this field's Yes/No once the test mail is out
     } catch {
       setStatus('failed');
     }
@@ -365,7 +366,28 @@ export default function VerifyField({
     value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0);
   const needsHighlight = highlightedKeys.has(fieldKey) && v.ok === null;
 
-  const setOk = (ok: boolean) => onChange(fieldKey, ok, v.remarks);
+  // Is this an email field? Explicit type, or auto-detected from label + value —
+  // the same detection RenderValue uses, so every email in the form is gated and
+  // not just the ones a step remembered to tag.
+  const isEmailField =
+    !isEmpty &&
+    typeof value === 'string' &&
+    (type === 'email' ||
+      (!type && !!label && EMAIL_LABEL_RE.test(label) && EMAIL_VALUE_RE.test(value.trim())));
+
+  // Verification gate: an email's Yes/No stays LOCKED until the checker has
+  // actually sent a test mail, so an unreachable address can't be rubber-stamped.
+  const [emailTested, setEmailTested] = useState(false);
+  const gated = isEmailField && !emailTested;
+  const [showGateHint, setShowGateHint] = useState(false);
+
+  const setOk = (ok: boolean) => {
+    if (gated) {
+      setShowGateHint(true);
+      return;
+    }
+    onChange(fieldKey, ok, v.remarks);
+  };
   const setRemarks = (remarks: string) => onChange(fieldKey, v.ok, remarks);
 
   const borderCls = needsHighlight
@@ -395,6 +417,13 @@ export default function VerifyField({
         <View style={{ minHeight: 24 }}>
           {isEmpty ? (
             <Text className="text-slate-400 italic text-sm">Not provided</Text>
+          ) : isEmailField ? (
+            // Rendered here rather than via RenderValue so the "Test" button can
+            // report back and unlock this card's Yes/No.
+            <EmailValue
+              value={String(value).trim()}
+              onTestSent={() => { setEmailTested(true); setShowGateHint(false); }}
+            />
           ) : (
             <RenderValue
               value={value}
@@ -408,10 +437,17 @@ export default function VerifyField({
       </View>
 
       <View className={`border-t border-slate-100 ${footPad}`} style={{ rowGap: 8 }}>
-        {!compact && <Text className="text-xs font-semibold text-slate-600">Verification</Text>}
+        {!compact && (
+          <Text className="text-xs font-semibold text-slate-600">
+            Verification
+            {gated ? <Text className="font-normal text-amber-600"> · send a test email to unlock</Text> : null}
+          </Text>
+        )}
         {/* Large segmented Yes/No — the primary action on every card, so it
             fills the row and the picked side stays solid-filled. */}
-        <View className="flex-row" style={{ columnGap: compact ? 8 : 12 }}>
+        {/* Dimmed rather than disabled while gated — a tap still lands so it can
+            explain why, instead of feeling broken. */}
+        <View className="flex-row" style={{ columnGap: compact ? 8 : 12, opacity: gated ? 0.55 : 1 }}>
           <TouchableOpacity
             onPress={() => setOk(true)}
             activeOpacity={0.8}
@@ -451,6 +487,14 @@ export default function VerifyField({
             <Text className={`${btnText} font-bold ${v.ok === false ? 'text-white' : 'text-slate-600'}`}>No</Text>
           </TouchableOpacity>
         </View>
+        {showGateHint && gated && (
+          <View className="flex-row items-center bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5" style={{ columnGap: 6 }}>
+            <Send size={12} color="#b45309" />
+            <Text className="text-xs text-amber-700 font-medium flex-1">
+              Please send a test email first, then mark Yes or No.
+            </Text>
+          </View>
+        )}
         {needsHighlight && (
           <Text className="text-xs text-red-600 font-medium">Please complete this verification before continuing.</Text>
         )}
