@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import CompanyLogo from "@/components/Shared/CompanyLogo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card";
 import { Button } from "@/components/UI/Button";
@@ -134,7 +135,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   return (
     <div className="min-h-screen flex bg-white font-sans">
       {/* Left Side - QC Branding */}
-      <div className="hidden lg:flex lg:flex-1 relative bg-[#000000]">
+      <div className="hidden lg:flex lg:flex-1 relative bg-gradient-to-br from-brand-600 to-brand-700">
         <div className="flex items-center justify-center w-full p-12">
           <div className="max-w-lg text-center text-white">
             {/* Logo Section */}
@@ -151,7 +152,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <h1 className="text-4xl font-bold mb-3">
                 QC Portal
               </h1>
-              <p className="text-xl text-gray-100 font-medium">
+              <p className="text-xl text-white/90 font-medium">
                 Pre-Shipment Inspection System
               </p>
             </div>
@@ -238,9 +239,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     value={checkerID}
                     onChange={handleCheckerIDChange}
                     onBlur={() => validateCheckerID(checkerID)}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${checkerIDError
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:border-brand-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${checkerIDError
                         ? "border-red-500 focus:ring-red-200"
-                        : "border-gray-300 focus:ring-[#455a64]"
+                        : "border-gray-300 focus:ring-brand-500/40"
                       }`}
                     placeholder="Enter your Checker ID (e.g., QC-2026-001)"
                     autoFocus
@@ -269,9 +270,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                       value={password}
                       onChange={handlePasswordChange}
                       onBlur={() => validatePassword(password)}
-                      className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${passwordError
+                      className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:border-brand-500 transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${passwordError
                           ? "border-red-500 focus:ring-red-200"
-                          : "border-gray-300 focus:ring-[#455a64]"
+                          : "border-gray-300 focus:ring-brand-500/40"
                         }`}
                       placeholder="Enter your password"
                       disabled={isLoading}
@@ -310,24 +311,30 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   </div>
                 )}
 
-                {/* Remember */}
+                {/* Remember + Forgot password */}
                 <div className="flex items-center justify-between">
                   <label className="flex items-center cursor-pointer">
                     <input
                       type="checkbox"
-                      className="w-4 h-4 text-gray-700 border-gray-300 rounded focus:ring-[#455a64]"
+                      className="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500/40"
                     />
                     <span className="ml-2 text-sm text-gray-700">
                       Remember me
                     </span>
                   </label>
+                  <Link
+                    href="/checker/forgot-password"
+                    className="text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors"
+                  >
+                    Forgot password?
+                  </Link>
                 </div>
 
                 {/* Sign In Button */}
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-gray-900 hover:bg-gray-700 disabled:bg-gray-400 text-white py-3 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"
+                  className="w-full bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white py-3 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"
                 >
                   {isLoading ? (
                     <>

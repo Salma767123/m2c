@@ -67,7 +67,7 @@ function PhoneValue({ value }: { value: string }) {
 // Email address with a mailto: link plus a "Test" button that sends a real
 // test email through the backend so the checker can confirm the address is
 // reachable before marking it verified.
-function EmailValue({ value }: { value: string }) {
+function EmailValue({ value, onTestSent }: { value: string; onTestSent?: () => void }) {
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
 
   const sendTest = async () => {
@@ -76,6 +76,7 @@ function EmailValue({ value }: { value: string }) {
     try {
       await qcCheckerService.sendTestEmail(value)
       setStatus('sent')
+      onTestSent?.() // unlock the Yes/No verification once the test mail is out
     } catch {
       setStatus('failed')
     }
@@ -225,12 +226,22 @@ export default function VerifyField({ fieldKey, label, value, verifications, onC
   const missingRemarks = v.ok === false && !v.remarks.trim()
   const needsHighlight = highlightedKeys.has(fieldKey) && (v.ok === null || missingRemarks)
 
-  // Document gate: a field carrying a document must be OPENED & VIEWED before its
-  // Yes/No verification unlocks. Touching the locked option reveals a hint.
+  // Is this field an email address? (explicit type, or auto-detected from the label +
+  // value — mirrors renderValue's detection so every email in the form is gated.)
+  const isEmailField = typeof value === 'string' && (
+    type === 'email' ||
+    (!type && EMAIL_LABEL_RE.test(label) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()))
+  )
+
+  // Verification gates: Yes/No stays LOCKED until the checker has done the required
+  // action. Documents must be OPENED & VIEWED; emails must have a test mail SENT.
   const [docViewerOpen, setDocViewerOpen] = useState(false)
   const [docViewed, setDocViewed] = useState(false)
+  const [emailTested, setEmailTested] = useState(false)
   const [showViewHint, setShowViewHint] = useState(false)
-  const gated = !!documentUrl && !docViewed
+  const documentGated = !!documentUrl && !docViewed
+  const emailGated = isEmailField && !emailTested
+  const gated = documentGated || emailGated
   const openDoc = () => { setDocViewerOpen(true); setDocViewed(true); setShowViewHint(false) }
 
   const setOk = (ok: boolean) => {
@@ -274,7 +285,11 @@ export default function VerifyField({ fieldKey, label, value, verifications, onC
         <div className="min-h-[1.5rem]">
           {isEmpty
             ? <span className="text-slate-400 italic text-sm">Not provided</span>
-            : renderValue(value, type, label)
+            : isEmailField
+              // Email rendered here (not via renderValue) so the "Test" button can
+              // unlock this field's Yes/No once the test mail is sent.
+              ? <EmailValue value={String(value).trim()} onTestSent={() => { setEmailTested(true); setShowViewHint(false); }} />
+              : renderValue(value, type, label)
           }
         </div>
       </div>
@@ -282,7 +297,7 @@ export default function VerifyField({ fieldKey, label, value, verifications, onC
       <div className="border-t border-slate-100 px-4 py-3 flex flex-col gap-2">
         <p className="text-xs font-semibold text-slate-600">
           Verification
-          {gated && <span className="ml-1 font-normal text-amber-600">· view the document to unlock</span>}
+          {gated && <span className="ml-1 font-normal text-amber-600">· {emailGated ? 'send a test email to unlock' : 'view the document to unlock'}</span>}
         </p>
         <div className="flex gap-6">
           <label
@@ -316,7 +331,11 @@ export default function VerifyField({ fieldKey, label, value, verifications, onC
         </div>
         {gated && showViewHint && (
           <p className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 font-medium">
-            <Eye className="w-3.5 h-3.5 shrink-0" /> Please open and view the document first, then mark Yes or No.
+            {emailGated ? (
+              <><Send className="w-3.5 h-3.5 shrink-0" /> Please send a test email first, then mark Yes or No.</>
+            ) : (
+              <><Eye className="w-3.5 h-3.5 shrink-0" /> Please open and view the document first, then mark Yes or No.</>
+            )}
           </p>
         )}
         {needsHighlight && (

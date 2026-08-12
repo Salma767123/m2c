@@ -2421,13 +2421,17 @@ const approveVendor = async (req, res) => {
       }
 
       try {
+        // Credentials go to the vendor's Contact & Communication → Primary Email
+        // (businessEmail). It is the same value used as the login id; fall back to
+        // the account email only if businessEmail is somehow missing on old rows.
+        const credentialsEmail = vendor.businessEmail || vendor.email;
         await sendVendorApprovalEmail({
           companyName: vendor.companyName,
           ownerName: vendor.ownerName,
-          email: vendor.email,
+          email: credentialsEmail,
           password: temporaryPassword
         });
-        console.log(`✅ Approval email sent to ${vendor.email}`);
+        console.log(`✅ Approval email sent to ${credentialsEmail}`);
       } catch (emailError) {
         console.error('❌ Failed to send approval email:', emailError);
       }
@@ -2524,13 +2528,16 @@ const confirmApproval = async (req, res) => {
     }
 
     try {
+      // Credentials go to the vendor's Contact & Communication → Primary Email
+      // (businessEmail); fall back to the account email only for old rows.
+      const credentialsEmail = vendor.businessEmail || vendor.email;
       await sendVendorApprovalEmail({
         companyName: vendor.companyName,
         ownerName: vendor.ownerName,
-        email: vendor.email,
+        email: credentialsEmail,
         password: temporaryPassword
       });
-      console.log(`✅ Approval email sent to ${vendor.email}`);
+      console.log(`✅ Approval email sent to ${credentialsEmail}`);
     } catch (emailError) {
       console.error('❌ Failed to send approval email:', emailError);
     }

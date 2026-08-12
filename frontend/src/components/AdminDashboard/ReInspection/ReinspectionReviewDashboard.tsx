@@ -21,10 +21,9 @@ import {
   IconSearch,
   IconLoader2,
   IconEye,
-  IconChevronLeft,
-  IconChevronRight,
 } from '@tabler/icons-react';
 import { formatCheckerName } from '@/lib/checkerUtils';
+import Pagination from '@/components/UI/Pagination';
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   SUBMITTED: { label: 'Submitted', className: 'bg-brand-50 text-brand-700 border border-brand-200' },
@@ -277,21 +276,12 @@ export default function ReinspectionReviewDashboard() {
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
-                <span className="text-sm text-slate-500">
-                  Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
-                </span>
-                <div className="flex gap-1">
-                  <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page <= 1}>
-                    <IconChevronLeft size={14} />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages}>
-                    <IconChevronRight size={14} />
-                  </Button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onChange={setPage}
+              disabled={loading}
+            />
         </div>
       </div>
     </div>

@@ -1918,6 +1918,10 @@ model QCChecker {
   isActive    Boolean         @default(true)
   lastLoginAt DateTime?
 
+  // Password reset (forgot-password flow), mirrors User/Admin/Vendor.
+  resetToken       String?
+  resetTokenExpiry DateTime?
+
   // Stats
   assignedVendors      Int @default(0)
   completedInspections Int @default(0)
@@ -2038,6 +2042,15 @@ model Inspection {
   status      InspectionStatus @default(SCHEDULED)
   startedAt   DateTime?
   completedAt DateTime?
+
+  // Draft / pause / resume. When a checker saves a draft and exits mid-inspection,
+  // draftData holds the full in-progress form snapshot and pausedAt marks when the
+  // pause began. On resume the elapsed pause gap is added to totalPausedMs and
+  // pausedAt is cleared. Together with startedAt/submittedAt these drive the report's
+  // active/paused/total duration breakdown. All cleared on completion.
+  draftData     Json?
+  pausedAt      DateTime?
+  totalPausedMs Int       @default(0)
 
   // Inspection Items (JSON array of category/subcategory objects assigned)
   itemsToInspect Json

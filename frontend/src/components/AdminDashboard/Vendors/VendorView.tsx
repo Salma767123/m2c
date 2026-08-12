@@ -56,6 +56,7 @@ import DocViewerModal from '@/components/UI/DocViewerModal'
 import { FACILITY_META, withUnit } from '@/components/Checker/Vendor/Steps/VI_Step5_Manufacturing'
 import { Country } from 'country-state-city'
 import { formatOrderAmount } from "@/lib/currency";
+import { formatSqFt } from "@/lib/units";
 
 // Map country name → ISO code so we can render flag *images* (via flagcdn).
 // Flag emoji don't render on Windows, which shows the bare ISO letters instead.
@@ -1301,7 +1302,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
               {(vendor as any).factorySize && (
                 <div>
                   <p className="text-sm text-slate-500">Warehousing Capacity</p>
-                  <p className="font-medium">{(vendor as any).factorySize} sq ft</p>
+                  <p className="font-medium">{formatSqFt((vendor as any).factorySize)}</p>
                 </div>
               )}
               {imageGallery(factorySiteImgs, 'Factory Site ')}
@@ -1373,7 +1374,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
               {vendor.warehouseSize && (
                 <div className="mt-3">
                   <p className="text-sm text-slate-500">Warehousing Capacity</p>
-                  <p className="font-medium">{vendor.warehouseSize} sq ft</p>
+                  <p className="font-medium">{formatSqFt(vendor.warehouseSize)}</p>
                 </div>
               )}
               {v.mapLink && (

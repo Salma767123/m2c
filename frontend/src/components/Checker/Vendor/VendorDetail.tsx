@@ -29,16 +29,18 @@ import {
   ShieldCheck,
   Image as ImageIcon,
   Eye,
-  Download,
+  AlarmClockOff,
 } from "lucide-react"
+import { computeInspectionDurations, isInspectionOvertimeLive } from "@/lib/inspectionDuration"
 import { Vendor } from "@/types/inspection"
 import qcCheckerService from "@/services/qcCheckerService"
 import { formatLocalLandline, formatIntlLandline } from "@/components/VendorHub/FormUI"
 import { buildFullName, toExternalUrl, resolveOwnerDesignation, formatTime12 } from "@/lib/utils"
-import { isDocImageUrl, downloadDoc } from "@/lib/docDownload"
+import { isDocImageUrl } from "@/lib/docDownload"
 import DocViewerModal from "@/components/UI/DocViewerModal"
 import { FACILITY_META, withUnit } from "./Steps/VI_Step5_Manufacturing"
 import { Country } from "country-state-city"
+import { formatSqFt } from "@/lib/units"
 
 // Present an estimatedDuration for reading. The field is a free string: sometimes it
 // already carries a unit ("6 hours", "1 Hour"), sometimes it's a bare number ("6").
@@ -399,7 +401,7 @@ export default function VendorDetail({
         icon: <Warehouse className="w-5 h-5 text-brand-600" />,
         fields: [
           { key: "factoryOwnershipType", label: "Ownership Type", transform: (val: string) => getOwnershipTypeLabel(val) },
-          { key: "factorySize", label: "Warehousing Capacity" },
+          { key: "factorySize", label: "Warehousing Capacity", transform: (val: string) => formatSqFt(val) },
           { key: "factoryAddress", label: "Address Line 1", condition: fullVendor.factoryAddress },
           { key: "addressLine2", label: "Address Line 2", condition: fullVendor.addressLine2 },
           { key: "addressLine3", label: "Address Line 3", condition: fullVendor.addressLine3 },
@@ -529,33 +531,15 @@ export default function VendorDetail({
               <div key={doc.id || idx} className="flex items-center gap-3 p-2.5 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 transition-colors">
                 {isImg ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={doc.documentUrl} alt={doc.name} className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0" loading="lazy" />
+                  <img src={doc.documentUrl} alt={doc.name} className="w-7 h-7 rounded-md object-cover border border-slate-200 shrink-0" loading="lazy" />
                 ) : (
-                  <div className="w-10 h-10 rounded-lg bg-brand-50 text-brand-500 flex items-center justify-center shrink-0">
-                    <FileText className="w-5 h-5" />
+                  <div className="w-7 h-7 rounded-md bg-brand-50 text-brand-500 flex items-center justify-center shrink-0">
+                    <FileText className="w-3.5 h-3.5" />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-900 truncate" title={doc.name}>{doc.name}</p>
                 </div>
-                {doc.documentUrl && (
-                  <div className="flex gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setViewerDoc({ url: doc.documentUrl, name: doc.name || 'Document' })}
-                      className="inline-flex items-center gap-1 h-7 px-2 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                      <Eye className="w-3 h-3" /> View
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => downloadDoc(doc.documentUrl, doc.name || 'Document')}
-                      className="inline-flex items-center gap-1 h-7 px-2 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                      <Download className="w-3 h-3" /> Download
-                    </button>
-                  </div>
-                )}
               </div>
             )
           })}
@@ -676,7 +660,7 @@ export default function VendorDetail({
                         </div>
                         <div>
                           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Warehousing Capacity</label>
-                          <p className="text-sm font-semibold text-slate-800">{vd.warehouseSize || '—'}</p>
+                          <p className="text-sm font-semibold text-slate-800">{formatSqFt(vd.warehouseSize) || '—'}</p>
                         </div>
                         {vd.warehouseAddress && (
                           <div>
@@ -1364,14 +1348,26 @@ export default function VendorDetail({
                     </span>
                     <span className="font-medium text-slate-900">{insp.clientName}</span>
                   </div>
-                  {(() => {
-                    const badge = getInspectionRowBadge(insp)
-                    return (
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${badge.color}`}>
-                        {badge.label}
-                      </span>
-                    )
-                  })()}
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const over = insp.status === 'IN_PROGRESS'
+                        ? isInspectionOvertimeLive(insp)
+                        : computeInspectionDurations(insp).exceeded
+                      return over ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap bg-red-50 text-red-700 border-red-200">
+                          <AlarmClockOff className="w-3 h-3" /> Exceeded schedule
+                        </span>
+                      ) : null
+                    })()}
+                    {(() => {
+                      const badge = getInspectionRowBadge(insp)
+                      return (
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${badge.color}`}>
+                          {badge.label}
+                        </span>
+                      )
+                    })()}
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-slate-600">
                   <span className="inline-flex items-center gap-1 font-medium text-slate-700">
