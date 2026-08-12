@@ -532,6 +532,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, Pressable, ActivityIndicator, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import {
   FileText,
@@ -1039,52 +1040,58 @@ export default function VI_Step9_Documentation({
         </Pressable>
       </Modal>
 
-      {/* ── Signature Center modal ── */}
-      <Modal visible={showSignModal} transparent animationType="fade" onRequestClose={() => setShowSignModal(false)}>
-        <Pressable className="flex-1 bg-black/50 justify-center px-5" onPress={() => setShowSignModal(false)}>
-          <Pressable className="bg-white rounded-2xl overflow-hidden" onPress={(e) => e.stopPropagation()}>
-            <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-100">
-              <View className="flex-1 mr-3">
-                <Text className="font-bold text-slate-900">Signature Center</Text>
-                <Text className="text-xs text-slate-500 mt-0.5">Draw signature using finger or stylus</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowSignModal(false)} hitSlop={10} accessibilityLabel="Close">
-                <X size={18} color="#64748b" />
-              </TouchableOpacity>
+      {/* ── Signature Center sheet ──
+          Full-screen rather than a centred dialog: the pad is portrait now and
+          needs the whole sheet, and a full-screen surface also removes the
+          tap-outside-to-dismiss that could throw away a signature mid-stroke. */}
+      <Modal
+        visible={showSignModal}
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setShowSignModal(false)}
+      >
+        <SafeAreaView className="flex-1 bg-white" edges={['top', 'bottom']}>
+          <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-100">
+            <View className="flex-1 mr-3">
+              <Text className="font-bold text-slate-900">Signature Center</Text>
+              <Text className="text-xs text-slate-500 mt-0.5">Draw signature using finger or stylus</Text>
             </View>
-            <View className="p-5">
-              <SignaturePad value={drawnSignature} onChange={setDrawnSignature} height={200} label="Sign below" />
-            </View>
-            {/* Weighted split: the primary action needs roughly twice the width
-                of "Cancel" to keep its label on one line. Both share a min
-                height so a spinner-only state can't shrink one of them. */}
-            <View className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex-row" style={{ columnGap: 10 }}>
-              <TouchableOpacity
-                onPress={() => setShowSignModal(false)}
-                className="rounded-xl border border-slate-200 bg-white items-center justify-center"
-                style={{ flex: 1, minHeight: FOOTER_BTN_HEIGHT }}
-              >
-                <Text className="text-slate-700 font-semibold text-sm">Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleConfirmSignature}
-                disabled={generating || !drawnSignature}
-                className="flex-row items-center justify-center rounded-xl bg-brand-500 px-3"
-                style={{
-                  flex: 2,
-                  minHeight: FOOTER_BTN_HEIGHT,
-                  columnGap: 6,
-                  opacity: generating || !drawnSignature ? 0.6 : 1,
-                }}
-              >
-                {generating ? <ActivityIndicator size="small" color="#fff" /> : <CheckCircle2 size={16} color="#fff" />}
-                <Text className="text-white font-semibold text-sm" numberOfLines={1}>
-                  {generating ? 'Generating…' : 'Confirm & Generate'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
+            <TouchableOpacity onPress={() => setShowSignModal(false)} hitSlop={10} accessibilityLabel="Close">
+              <X size={18} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+          <View className="flex-1 p-5">
+            <SignaturePad value={drawnSignature} onChange={setDrawnSignature} fill label="Sign below" />
+          </View>
+          {/* Weighted split: the primary action needs roughly twice the width
+              of "Cancel" to keep its label on one line. Both share a min
+              height so a spinner-only state can't shrink one of them. */}
+          <View className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex-row" style={{ columnGap: 10 }}>
+            <TouchableOpacity
+              onPress={() => setShowSignModal(false)}
+              className="rounded-xl border border-slate-200 bg-white items-center justify-center"
+              style={{ flex: 1, minHeight: FOOTER_BTN_HEIGHT }}
+            >
+              <Text className="text-slate-700 font-semibold text-sm">Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleConfirmSignature}
+              disabled={generating || !drawnSignature}
+              className="flex-row items-center justify-center rounded-xl bg-brand-500 px-3"
+              style={{
+                flex: 2,
+                minHeight: FOOTER_BTN_HEIGHT,
+                columnGap: 6,
+                opacity: generating || !drawnSignature ? 0.6 : 1,
+              }}
+            >
+              {generating ? <ActivityIndicator size="small" color="#fff" /> : <CheckCircle2 size={16} color="#fff" />}
+              <Text className="text-white font-semibold text-sm" numberOfLines={1}>
+                {generating ? 'Generating…' : 'Confirm & Generate'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
       </Modal>
     </View>
   );

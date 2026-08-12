@@ -8,9 +8,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Modal,
-  LayoutAnimation,
   Platform,
-  UIManager,
 } from 'react-native';
 import {
   Search,
@@ -19,12 +17,11 @@ import {
   CalendarDays,
   ArrowRight,
   Eye,
-  CheckCircle,
   AlertCircle,
   RefreshCw,
   X,
-  ChevronDown,
-  ChevronUp,
+  SlidersHorizontal,
+  Check,
   ChevronLeft,
   ChevronRight,
   User,
@@ -37,11 +34,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import DateRangeCalendar, { fmtDate } from '../../components/General/DateRangeCalendar';
 import { AppText, Button } from '@/components/UI';
 import { brand, colors, elevation } from '@/constants/design';
-
-// Enable LayoutAnimation on Android so the filter section collapses smoothly.
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const PAGE_SIZE = 12;
 const DEFAULT_SORT = 'assignedQcAt:desc';
@@ -246,10 +238,56 @@ export default function VendorsTab() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [showInspectionModal, setShowInspectionModal] = useState(false);
-  const [showStateModal, setShowStateModal] = useState(false);
-  const [showSortModal, setShowSortModal] = useState(false);
+
+  // Bottom sheet filter modal — every filter is edited as a draft and only
+  // committed on Apply, so half-set criteria never refetch the list.
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [draftStatus, setDraftStatus] = useState(status);
+  const [draftInspectionStatus, setDraftInspectionStatus] = useState(inspectionStatus);
+  const [draftState, setDraftState] = useState(selectedState);
+  const [draftSort, setDraftSort] = useState(sort);
+  const [draftDateFrom, setDraftDateFrom] = useState(dateFrom);
+  const [draftDateTo, setDraftDateTo] = useState(dateTo);
+
+  const openFilterSheet = () => {
+    setDraftStatus(status);
+    setDraftInspectionStatus(inspectionStatus);
+    setDraftState(selectedState);
+    setDraftSort(sort);
+    setDraftDateFrom(dateFrom);
+    setDraftDateTo(dateTo);
+    setShowFilterSheet(true);
+  };
+
+  const draftActiveCount = useMemo(() => {
+    let n = 0;
+    if (draftStatus) n += 1;
+    if (draftInspectionStatus) n += 1;
+    if (draftState) n += 1;
+    if (draftSort !== DEFAULT_SORT) n += 1;
+    if (draftDateFrom) n += 1;
+    return n;
+  }, [draftStatus, draftInspectionStatus, draftState, draftSort, draftDateFrom]);
+
+  const resetDraft = () => {
+    setDraftStatus('');
+    setDraftInspectionStatus('');
+    setDraftState('');
+    setDraftSort(DEFAULT_SORT);
+    setDraftDateFrom('');
+    setDraftDateTo('');
+  };
+
+  const applyFilters = () => {
+    setStatus(draftStatus);
+    setInspectionStatus(draftInspectionStatus);
+    setSelectedState(draftState);
+    setSort(draftSort);
+    setDateFrom(draftDateFrom);
+    setDateTo(draftDateTo);
+    setPage(1);
+    setShowFilterSheet(false);
+  };
 
   // Apply incoming params once when they change (deep-link from dashboard).
   useEffect(() => {
@@ -363,6 +401,17 @@ export default function VendorsTab() {
   const hasActiveFilters = Boolean(
     debouncedSearch || status || inspectionStatus || selectedState || dateFrom || dateTo || sort !== DEFAULT_SORT || page !== 1,
   );
+  // Badge count covers only the sheet's own criteria — search has its own
+  // visible field and clear button, so counting it would double-report.
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (status) n += 1;
+    if (inspectionStatus) n += 1;
+    if (selectedState) n += 1;
+    if (sort !== DEFAULT_SORT) n += 1;
+    if (dateFrom) n += 1;
+    return n;
+  }, [status, inspectionStatus, selectedState, sort, dateFrom]);
 
   const clearFilters = () => {
     setSearchInput('');
@@ -383,22 +432,9 @@ export default function VendorsTab() {
     router.push({ pathname: '/vendors/[id]/inspection' as any, params: { id: v.id, name: v.name } });
   };
 
-  const statusLabel = STATUS_OPTIONS.find((o) => o.value === status)?.label || 'All Statuses';
-  const inspectionLabel =
-    INSPECTION_STATUS_OPTIONS.find((o) => o.value === inspectionStatus)?.label || 'All Inspection Statuses';
-  const stateLabel = stateOptions.find((o) => o.value === selectedState)?.label || 'All States';
-  const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label || 'Newest assignment';
-
-  // Collapsible filter section — toggled by the arrow button next to the title.
-  const [showFilters, setShowFilters] = useState(false);
-  const toggleFilters = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setShowFilters((v) => !v);
-  };
-
   return (
     <View className="flex-1 bg-gray-50">
-      {/* Sticky title + filter toggle arrow */}
+      {/* Title */}
       <View className="px-4 pt-4 pb-2 bg-gray-50 flex-row items-start justify-between">
         <View className="flex-1">
           <AppText variant="headlineLg" color={colors.text}>Vendor Management</AppText>
@@ -406,97 +442,46 @@ export default function VendorsTab() {
             Select a vendor to start quality inspection
           </AppText>
         </View>
+      </View>
+
+      {/* Search + Filter trigger */}
+      <View className="px-4 pb-3 bg-gray-50 flex-row items-center" style={{ columnGap: 8 }}>
+        <View className="flex-1 flex-row items-center bg-white border border-slate-200 rounded-xl px-4 py-3">
+          <Search size={18} color="#94a3b8" />
+          <TextInput
+            placeholder="Search by name, city, or state..."
+            value={searchInput}
+            onChangeText={setSearchInput}
+            className="flex-1 ml-3 text-sm text-slate-900"
+            placeholderTextColor="#94a3b8"
+          />
+          {searchInput ? (
+            <TouchableOpacity onPress={() => setSearchInput('')} hitSlop={8}>
+              <X size={16} color="#94a3b8" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
         <TouchableOpacity
-          onPress={toggleFilters}
+          onPress={openFilterSheet}
           accessibilityRole="button"
-          accessibilityLabel={showFilters ? 'Hide filters' : 'Show filters'}
-          className="w-9 h-9 rounded-full bg-white border border-slate-200 items-center justify-center mt-1"
+          accessibilityLabel="Open filters"
+          className="w-12 h-12 rounded-xl bg-slate-900 items-center justify-center"
           style={elevation.card}
         >
-          {showFilters ? (
-            <ChevronUp size={18} color={colors.textSecondary} />
-          ) : (
-            <ChevronDown size={18} color={colors.textSecondary} />
-          )}
+          <SlidersHorizontal size={18} color="#ffffff" />
+          {activeFilterCount > 0 ? (
+            <View className="absolute -top-1 -right-1 min-w-[18px] min-h-[18px] px-1 rounded-full bg-red-500 items-center justify-center">
+              <Text className="text-[10px] font-bold text-white">{activeFilterCount}</Text>
+            </View>
+          ) : null}
         </TouchableOpacity>
       </View>
 
-      {/* Search + filters — collapsible via the arrow */}
-      {showFilters ? (
-        <View className="px-4 pt-1 pb-3 bg-gray-50 border-b border-slate-200">
-          {/* Search */}
-          <View className="mb-3 flex-row items-center bg-white border border-slate-300 rounded-xl px-4 py-2.5">
-            <Search size={18} color="#94a3b8" />
-            <TextInput
-              placeholder="Search by name, city, or state..."
-              value={searchInput}
-              onChangeText={setSearchInput}
-              className="flex-1 ml-3 text-sm text-slate-900"
-              placeholderTextColor="#94a3b8"
-            />
-            {searchInput ? (
-              <TouchableOpacity onPress={() => setSearchInput('')} hitSlop={8}>
-                <X size={16} color="#94a3b8" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          {/* Status + Inspection Status */}
-          <View className="flex-row mb-3" style={{ columnGap: 8 }}>
-            <TouchableOpacity
-              onPress={() => setShowStatusModal(true)}
-              className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
-            >
-              <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{statusLabel}</AppText>
-              <ChevronDown size={16} color="#64748b" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setShowInspectionModal(true)}
-              className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
-            >
-              <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{inspectionLabel}</AppText>
-              <ChevronDown size={16} color="#64748b" />
-            </TouchableOpacity>
-          </View>
-
-          {/* State + Sort */}
-          <View className="flex-row mb-3" style={{ columnGap: 8 }}>
-            <TouchableOpacity
-              onPress={() => setShowStateModal(true)}
-              className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
-            >
-              <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{stateLabel}</AppText>
-              <ChevronDown size={16} color="#64748b" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setShowSortModal(true)}
-              className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
-            >
-              <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{sortLabel}</AppText>
-              <ChevronDown size={16} color="#64748b" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Date range */}
-          <View className="mb-3">
-            <DateRangeCalendar
-              from={dateFrom}
-              to={dateTo}
-              onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
-              placeholder="Filter by date"
-            />
-          </View>
-
-          {/* Clear */}
-          {hasActiveFilters ? (
-            <View className="flex-row items-center justify-end">
-              <TouchableOpacity onPress={clearFilters}>
-                <AppText variant="labelLg" color={brand[600]} style={{ textDecorationLine: 'underline' }}>
-                  Clear filters
-                </AppText>
-              </TouchableOpacity>
-            </View>
-          ) : null}
+      {hasActiveFilters ? (
+        <View className="px-4 pb-2 -mt-1 flex-row justify-end">
+          <TouchableOpacity onPress={clearFilters}>
+            <Text className="text-xs font-semibold text-brand-600 underline">Clear filters</Text>
+          </TouchableOpacity>
         </View>
       ) : null}
 
@@ -688,91 +673,138 @@ export default function VendorsTab() {
         ) : null}
       </ScrollView>
 
-      {/* Status modal */}
-      <OptionModal
-        visible={showStatusModal}
-        title="Filter by status"
-        options={STATUS_OPTIONS}
-        value={status}
-        onSelect={(v) => { setStatus(v); setShowStatusModal(false); }}
-        onClose={() => setShowStatusModal(false)}
-      />
+      {/* Bottom sheet filter modal */}
+      <Modal visible={showFilterSheet} transparent animationType="slide" onRequestClose={() => setShowFilterSheet(false)}>
+        <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setShowFilterSheet(false)}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          />
+          <View className="bg-white rounded-t-3xl" style={{ maxHeight: '85%' }}>
+            {/* Drag handle */}
+            <View className="items-center pt-3 pb-1">
+              <View className="w-10 h-1.5 rounded-full bg-slate-200" />
+            </View>
 
-      {/* Inspection status modal */}
-      <OptionModal
-        visible={showInspectionModal}
-        title="Inspection status"
-        options={INSPECTION_STATUS_OPTIONS}
-        value={inspectionStatus}
-        onSelect={(v) => { setInspectionStatus(v); setShowInspectionModal(false); }}
-        onClose={() => setShowInspectionModal(false)}
-      />
+            {/* Header: Reset / Filters / Close */}
+            <View className="flex-row items-center justify-between px-5 pt-2 pb-4">
+              <TouchableOpacity onPress={resetDraft} hitSlop={8}>
+                <Text className="text-sm font-bold text-red-500">Reset</Text>
+              </TouchableOpacity>
+              <Text className="text-base font-extrabold text-slate-900">Filters</Text>
+              <TouchableOpacity onPress={() => setShowFilterSheet(false)} hitSlop={8}>
+                <X size={18} color="#64748b" />
+              </TouchableOpacity>
+            </View>
 
-      {/* State modal */}
-      <OptionModal
-        visible={showStateModal}
-        title="Filter by state"
-        options={stateOptions}
-        value={selectedState}
-        onSelect={(v) => { setSelectedState(v); setShowStateModal(false); }}
-        onClose={() => setShowStateModal(false)}
-      />
+            <ScrollView
+              style={{ maxHeight: 420 }}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 8 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Date range */}
+              <Text className="text-sm font-bold text-slate-900 mb-2">Date range</Text>
+              <View className="mb-5">
+                <DateRangeCalendar
+                  from={draftDateFrom}
+                  to={draftDateTo}
+                  onChange={(f, t) => { setDraftDateFrom(f); setDraftDateTo(t); }}
+                  placeholder="Filter by date"
+                />
+              </View>
 
-      {/* Sort modal */}
-      <OptionModal
-        visible={showSortModal}
-        title="Sort by"
-        options={SORT_OPTIONS}
-        value={sort}
-        onSelect={(v) => { setSort(v); setShowSortModal(false); }}
-        onClose={() => setShowSortModal(false)}
-      />
+              {/* Vendor status */}
+              <Text className="text-sm font-bold text-slate-900 mb-2">Vendor status</Text>
+              <FilterChips options={STATUS_OPTIONS} value={draftStatus} onSelect={setDraftStatus} />
+
+              {/* Inspection status */}
+              <Text className="text-sm font-bold text-slate-900 mb-2">Inspection status</Text>
+              <FilterChips
+                options={INSPECTION_STATUS_OPTIONS}
+                value={draftInspectionStatus}
+                onSelect={setDraftInspectionStatus}
+              />
+
+              {/* State — derived from the assigned vendors, so it is only worth
+                  showing once more than the "All States" placeholder exists. */}
+              {stateOptions.length > 1 ? (
+                <>
+                  <Text className="text-sm font-bold text-slate-900 mb-2">State</Text>
+                  <FilterChips options={stateOptions} value={draftState} onSelect={setDraftState} />
+                </>
+              ) : null}
+
+              {/* Sort by */}
+              <Text className="text-sm font-bold text-slate-900 mb-2">Sort by</Text>
+              <FilterChips options={SORT_OPTIONS} value={draftSort} onSelect={setDraftSort} last />
+            </ScrollView>
+
+            {/* Fixed bottom actions */}
+            <View className="px-5 pt-3" style={{ paddingBottom: Platform.OS === 'ios' ? 28 : 18 }}>
+              <TouchableOpacity
+                onPress={resetDraft}
+                activeOpacity={0.85}
+                className="w-full items-center justify-center bg-white border border-slate-200 rounded-xl py-3.5 mb-2.5"
+              >
+                <Text className="text-sm font-bold text-slate-700">Clear all</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={applyFilters}
+                activeOpacity={0.9}
+                className="w-full items-center justify-center bg-slate-900 rounded-xl py-3.5"
+              >
+                <Text className="text-sm font-extrabold text-white">
+                  Apply{draftActiveCount > 0 ? ` (${draftActiveCount})` : ''}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
-function OptionModal({
-  visible, title, options, value, onSelect, onClose,
+/**
+ * Wrapping row of selectable pills. Vendors has four filter dimensions to the
+ * products page's two, so the chip markup is factored out rather than repeated.
+ */
+function FilterChips({
+  options,
+  value,
+  onSelect,
+  last = false,
 }: {
-  visible: boolean;
-  title: string;
   options: { value: string; label: string }[];
   value: string;
   onSelect: (v: string) => void;
-  onClose: () => void;
+  /** Tighter bottom margin for the final group in the sheet. */
+  last?: boolean;
 }) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={onClose}
-        className="flex-1 justify-center items-center"
-        style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
-      >
-        <View className="bg-white rounded-2xl w-11/12 max-w-sm overflow-hidden">
-          <View className="px-5 py-4 border-b border-slate-100">
-            <AppText variant="titleLg" color={colors.text}>{title}</AppText>
-          </View>
-          {options.map((opt) => {
-            const active = opt.value === value;
-            return (
-              <TouchableOpacity
-                key={opt.value}
-                onPress={() => onSelect(opt.value)}
-                className={`px-5 py-3.5 flex-row items-center justify-between border-b border-slate-100 ${
-                  active ? 'bg-brand-50' : ''
-                }`}
-              >
-                <AppText variant="bodyMd" color={active ? brand[700] : colors.textSecondary}>
-                  {opt.label}
-                </AppText>
-                {active ? <CheckCircle size={16} color={brand[500]} /> : null}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </TouchableOpacity>
-    </Modal>
+    <View className={`flex-row flex-wrap ${last ? 'mb-2' : 'mb-5'}`} style={{ columnGap: 8, rowGap: 8 }}>
+      {options.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <TouchableOpacity
+            key={opt.value || 'all'}
+            onPress={() => onSelect(opt.value)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            className={`flex-row items-center px-4 py-2.5 rounded-full border ${
+              active ? 'bg-slate-900 border-slate-900' : 'bg-white border-slate-200'
+            }`}
+          >
+            {active ? <Check size={13} color="#ffffff" style={{ marginRight: 6 }} /> : null}
+            <Text className={`text-xs font-semibold ${active ? 'text-white' : 'text-slate-500'}`}>
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
   );
 }
 

@@ -1,4 +1,4 @@
-import { Alert, Platform } from 'react-native';
+import { Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 export interface ImagePickerResult {
@@ -30,7 +30,7 @@ export const requestMediaLibraryPermission = async (): Promise<boolean> => {
   if (status !== 'granted') {
     Alert.alert(
       'Permission Required',
-      'Media library permission is required to select photos.',
+      'Photo library permission is required to upload photos.',
       [{ text: 'OK' }]
     );
     return false;
@@ -38,67 +38,18 @@ export const requestMediaLibraryPermission = async (): Promise<boolean> => {
   return true;
 };
 
-export const showImagePickerOptions = (
-  onImageSelected: (images: ImagePickerResult[]) => void,
-  allowMultiple: boolean = true
-) => {
-  // Defer the native picker launch until AFTER the Alert's dismiss animation.
-  // Launching immediately inside onPress silently fails on both iOS + Android
-  // because two native modals can't open on the same frame.
-  const defer = (fn: () => void) => setTimeout(fn, 350);
-  Alert.alert(
-    'Select Photo',
-    'Choose an option',
-    [
-      {
-        text: 'Take Photo',
-        onPress: () => defer(() => takePhoto(onImageSelected)),
-      },
-      {
-        text: 'Choose from Gallery',
-        onPress: () => defer(() => pickFromGallery(onImageSelected, allowMultiple)),
-      },
-      {
-        text: 'Cancel',
-        style: 'cancel',
-      },
-    ],
-    { cancelable: true }
-  );
-};
-
-export const takePhoto = async (
-  onImageSelected: (images: ImagePickerResult[]) => void
-) => {
-  const hasPermission = await requestCameraPermission();
-  if (!hasPermission) return;
-
-  try {
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true, // enables the crop/edit step after capture
-      quality: 0.6,
-      base64: true,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const images: ImagePickerResult[] = result.assets.map((asset, index) => ({
-        uri: asset.uri,
-        name: `photo_${Date.now()}_${index}.jpg`,
-        type: 'image/jpeg',
-        data: toDataUrl(asset.base64, 'image/jpeg'),
-      }));
-      onImageSelected(images);
-    }
-  } catch (error: any) {
-    console.error('Error taking photo:', error);
-    Alert.alert('Camera Error', error?.message || 'Failed to open camera.');
-  }
-};
+const toResult = (assets: ImagePicker.ImagePickerAsset[]): ImagePickerResult[] =>
+  assets.map((asset, index) => ({
+    uri: asset.uri,
+    name: `photo_${Date.now()}_${index}.jpg`,
+    type: 'image/jpeg',
+    data: toDataUrl(asset.base64, 'image/jpeg'),
+  }));
 
 export const pickFromGallery = async (
   onImageSelected: (images: ImagePickerResult[]) => void,
-  allowMultiple: boolean = true
+  allowsEditing: boolean = true,
+  allowMultiple: boolean = false
 ) => {
   const hasPermission = await requestMediaLibraryPermission();
   if (!hasPermission) return;
@@ -106,29 +57,68 @@ export const pickFromGallery = async (
   try {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
+      allowsEditing, // when false the checker decides on the crop screen
       allowsMultipleSelection: allowMultiple,
-      // Crop/edit is only supported for single selection — expo-image-picker
-      // ignores allowsEditing when multiple selection is on.
-      allowsEditing: !allowMultiple,
       quality: 0.6,
       base64: true,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      const images: ImagePickerResult[] = result.assets.map((asset, index) => {
-        const fileName = asset.uri.split('/').pop() || `image_${Date.now()}_${index}.jpg`;
-        const mime = asset.type === 'video' ? 'video/mp4' : 'image/jpeg';
-        return {
-          uri: asset.uri,
-          name: fileName,
-          type: mime,
-          data: toDataUrl(asset.base64, mime),
-        };
-      });
-      onImageSelected(images);
+      onImageSelected(toResult(result.assets));
     }
   } catch (error: any) {
-    console.error('Error picking image:', error);
+    console.error('Error picking photo:', error);
     Alert.alert('Gallery Error', error?.message || 'Failed to open gallery.');
+  }
+};
+
+export const showImagePickerOptions = (
+  onImageSelected: (images: ImagePickerResult[]) => void,
+  allowMultiple: boolean = true,
+  options?: { allowsEditing?: boolean; allowGallery?: boolean }
+) => {
+  const allowsEditing = options?.allowsEditing ?? true;
+  const choose = (fromGallery: boolean) =>
+    fromGallery
+      ? pickFromGallery(onImageSelected, allowsEditing, allowMultiple)
+      : takePhoto(onImageSelected, allowsEditing);
+
+  // Virtual inspections may upload photos from the gallery as well as take
+  // them live; physical inspections are camera-only so photos can't be sourced
+  // from an old or third-party image. `allowMultiple` is only honoured by the
+  // gallery — the camera produces a single shot at a time.
+  if (options?.allowGallery) {
+    Alert.alert('Add Photo', 'Choose a source for the photo', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Take Photo', onPress: () => choose(false) },
+      { text: 'Upload from Gallery', onPress: () => choose(true) },
+    ]);
+    return;
+  }
+
+  takePhoto(onImageSelected, allowsEditing);
+};
+
+export const takePhoto = async (
+  onImageSelected: (images: ImagePickerResult[]) => void,
+  allowsEditing: boolean = true
+) => {
+  const hasPermission = await requestCameraPermission();
+  if (!hasPermission) return;
+
+  try {
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing, // when false the checker decides on the crop screen
+      quality: 0.6,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      onImageSelected(toResult(result.assets));
+    }
+  } catch (error: any) {
+    console.error('Error taking photo:', error);
+    Alert.alert('Camera Error', error?.message || 'Failed to open camera.');
   }
 };

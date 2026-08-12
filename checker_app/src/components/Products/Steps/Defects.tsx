@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { ChevronDown, ChevronUp, CheckCircle, AlertTriangle, SlidersHorizontal, ClipboardCheck } from 'lucide-react-native';
 import { StepHeader, Card, PhotoGrid, RemarkInput, Photo } from './piShared';
+import { InvalidAnchor } from './piValidation';
+import type { ScrollNavHandlers } from '@/components/General/ScrollNav';
 
 interface Props {
   formData: {
@@ -23,6 +25,9 @@ interface Props {
   };
   setFormData: (d: any) => void;
   errors?: Record<string, string>;
+  scrollNav?: ScrollNavHandlers;
+  /** 'VIRTUAL' allows gallery uploads; 'PHYSICAL' is camera-only. */
+  inspectionType?: 'PHYSICAL' | 'VIRTUAL' | null;
 }
 
 const LEVELS = ['L-I', 'L-II', 'L-III'];
@@ -98,7 +103,7 @@ function Counter({
   );
 }
 
-export default function Defects({ formData, setFormData, errors = {} }: Props) {
+export default function Defects({ formData, setFormData, errors = {}, scrollNav, inspectionType }: Props) {
   const set = (patch: Partial<Props['formData']>) => setFormData({ ...formData, ...patch });
 
   const pass =
@@ -115,7 +120,7 @@ export default function Defects({ formData, setFormData, errors = {} }: Props) {
   };
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView showsVerticalScrollIndicator={false} {...scrollNav}>
       <StepHeader
         title="AQL Summary (Workmanship, Appearance and Basic Function)"
         subtitle={`Visual AQL check on ${formData.sampleSize} randomly selected units for critical, major and minor defects`}
@@ -142,7 +147,16 @@ export default function Defects({ formData, setFormData, errors = {} }: Props) {
         </View>
 
         <View className="flex-row flex-wrap" style={{ columnGap: 12 }}>
-          <NumField label="Sample Size" value={formData.sampleSize} onChange={(n) => set({ sampleSize: n })} error={errors.sampleSize} />
+          {/* The anchor takes NumField's slot in the 2-up grid — NumField's own
+              flex-1/min-w rules apply inside it, so the columns stay even. */}
+          <InvalidAnchor
+            errorKey="sampleSize"
+            invalid={!!errors.sampleSize}
+            radius={10}
+            style={{ flex: 1, minWidth: '45%' }}
+          >
+            <NumField label="Sample Size" value={formData.sampleSize} onChange={(n) => set({ sampleSize: n })} error={errors.sampleSize} />
+          </InvalidAnchor>
           <NumField label="AQL Level - Critical" value={formData.aqlCritical} onChange={(n) => set({ aqlCritical: n })} step={0.1} />
           <NumField label="AQL Level - Major" value={formData.aqlMajor} onChange={(n) => set({ aqlMajor: n })} step={0.1} />
           <NumField label="AQL Level - Minor" value={formData.aqlMinor} onChange={(n) => set({ aqlMinor: n })} step={0.1} />
@@ -202,7 +216,7 @@ export default function Defects({ formData, setFormData, errors = {} }: Props) {
       </Card>
 
       {/* Photo evidence */}
-      <View className="mb-2">
+      <InvalidAnchor errorKey="defectPhotos" invalid={!!errors.defectPhotos} style={{ marginBottom: 8 }}>
         <Text className="text-sm font-semibold text-slate-700 mb-1">Photo Evidence:</Text>
         <Text className="text-xs text-slate-500 mb-3">Major/minor defects, sealed samples with AQF tape</Text>
         {!!errors.defectPhotos && <Text className="text-xs text-red-600 mb-2">{errors.defectPhotos}</Text>}
@@ -213,8 +227,9 @@ export default function Defects({ formData, setFormData, errors = {} }: Props) {
           addLabel="Upload defect photo"
           allowMultiple
           hasError={!!errors.defectPhotos}
+          inspectionType={inspectionType}
         />
-      </View>
+      </InvalidAnchor>
 
       <View className="h-6" />
     </ScrollView>

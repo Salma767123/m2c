@@ -1,5 +1,6 @@
 import axios from '../lib/axios';
 import axiosLib from 'axios';
+import { API_BASE_URL } from '../lib/apiBase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface QCCheckerData {
@@ -152,7 +153,7 @@ class QCCheckerService {
   async login(data: QCCheckerLoginData): Promise<QCCheckerLoginResponse> {
     try {
       // Using a basic fallback if env is not defined in rn
-      const baseURL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:5000/api';
+      const baseURL = API_BASE_URL || 'http://10.0.2.2:5000/api';
       const response = await axiosLib.post(`${baseURL}/qc-checkers/login`, data, {
         headers: { 'Content-Type': 'application/json' }
       });
@@ -449,6 +450,7 @@ class QCCheckerService {
     productId: string,
     formData?: any,
     location?: { latitude: number | null; longitude: number | null } | null,
+    inspectionType?: 'PHYSICAL' | 'VIRTUAL',
   ): Promise<{ success: boolean; message: string; data: any }> {
     try {
       const token = await this.getCheckerToken();
@@ -456,6 +458,7 @@ class QCCheckerService {
         `/qc-checkers/products/${productId}/approve`,
         {
           formData,
+          inspectionType,
           checkerLatitude: location?.latitude ?? null,
           checkerLongitude: location?.longitude ?? null,
         },
@@ -479,6 +482,7 @@ class QCCheckerService {
     rejectionReason: string,
     formData?: any,
     location?: { latitude: number | null; longitude: number | null } | null,
+    inspectionType?: 'PHYSICAL' | 'VIRTUAL',
   ): Promise<{ success: boolean; message: string; data: any }> {
     try {
       const token = await this.getCheckerToken();
@@ -487,6 +491,7 @@ class QCCheckerService {
         {
           reason: rejectionReason,
           formData,
+          inspectionType,
           checkerLatitude: location?.latitude ?? null,
           checkerLongitude: location?.longitude ?? null,
         },

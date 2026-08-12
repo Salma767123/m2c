@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import Svg, { Path, Circle, Rect, Line, Text as SvgText, G } from 'react-native-svg';
-import { Package, Image as ImageIcon, Ruler, Layers, Box, Tag, Truck, Camera } from 'lucide-react-native';
+import { Package, Image as ImageIcon, Ruler, Layers, Box, Tag, Truck, Camera, Check, X } from 'lucide-react-native';
 import { getExpectedProductVerificationKeys } from '../validation';
 import {
   StepHeader,
@@ -13,6 +13,8 @@ import {
   RemarkInput,
   Photo,
 } from './piShared';
+import { InvalidAnchor } from './piValidation';
+import type { ScrollNavHandlers } from '@/components/General/ScrollNav';
 
 // ── Verifications type ────────────────────────────────────────────────────────
 type Verification = { ok: boolean | null; remarks: string };
@@ -158,7 +160,8 @@ function CareInstructionsVerifyBlock({
     : 'border-slate-200 bg-white';
 
   return (
-    <View className={`rounded-xl border mb-3 ${borderCls}`}>
+    <InvalidAnchor errorKey="productVerifications" invalid={highlight} style={{ marginBottom: 12 }}>
+    <View className={`rounded-xl border ${borderCls}`}>
       <View className="p-3">
         <Text className="text-[11px] font-semibold text-slate-500 uppercase mb-2">Care Instructions</Text>
         <View className="flex-row flex-wrap" style={{ gap: 12 }}>
@@ -174,28 +177,57 @@ function CareInstructionsVerifyBlock({
           })}
         </View>
       </View>
-      <View className="border-t border-slate-100 px-3 py-2.5">
-        <View className="flex-row" style={{ columnGap: 24 }}>
-          <Text
+      <View className="border-t border-slate-100 px-3 py-2.5" style={{ rowGap: 8 }}>
+        <Text className="text-xs font-semibold text-slate-600">Verification</Text>
+        {/* Large segmented Yes/No — matches VI_VerifyField's primary-action
+            buttons: flex-1, solid-filled when picked, slightly more compact. */}
+        <View className="flex-row" style={{ columnGap: 8 }}>
+          <TouchableOpacity
             onPress={() => onVerify(fieldKey, true, v.remarks)}
-            className={`text-sm font-semibold ${v.ok === true ? 'text-emerald-700' : 'text-slate-500'}`}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: v.ok === true }}
+            className={`flex-1 flex-row items-center justify-center rounded-lg border-2 py-2 ${
+              v.ok === true ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300 bg-white'
+            }`}
+            style={{ columnGap: 6 }}
           >
-            Yes
-          </Text>
-          <Text
+            <View
+              className={`w-5 h-5 rounded-full items-center justify-center ${
+                v.ok === true ? 'bg-white' : 'border-2 border-slate-300'
+              }`}
+            >
+              {v.ok === true && <Check size={13} color="#059669" strokeWidth={3.5} />}
+            </View>
+            <Text className={`text-sm font-bold ${v.ok === true ? 'text-white' : 'text-slate-600'}`}>Yes</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={() => onVerify(fieldKey, false, v.remarks)}
-            className={`text-sm font-semibold ${v.ok === false ? 'text-red-700' : 'text-slate-500'}`}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: v.ok === false }}
+            className={`flex-1 flex-row items-center justify-center rounded-lg border-2 py-2 ${
+              v.ok === false ? 'border-red-600 bg-red-600' : 'border-slate-300 bg-white'
+            }`}
+            style={{ columnGap: 6 }}
           >
-            No
-          </Text>
+            <View
+              className={`w-5 h-5 rounded-full items-center justify-center ${
+                v.ok === false ? 'bg-white' : 'border-2 border-slate-300'
+              }`}
+            >
+              {v.ok === false && <X size={13} color="#dc2626" strokeWidth={3.5} />}
+            </View>
+            <Text className={`text-sm font-bold ${v.ok === false ? 'text-white' : 'text-slate-600'}`}>No</Text>
+          </TouchableOpacity>
         </View>
         {highlight && (
-          <Text className="text-xs text-red-600 font-medium mt-1.5">
+          <Text className="text-xs text-red-600 font-medium">
             Please complete this verification before continuing.
           </Text>
         )}
         {v.ok === false && (
-          <View className="mt-2">
+          <View className="mt-1">
             <RemarkInput
               value={v.remarks}
               onChangeText={(t) => onVerify(fieldKey, v.ok, t)}
@@ -206,6 +238,7 @@ function CareInstructionsVerifyBlock({
         )}
       </View>
     </View>
+    </InvalidAnchor>
   );
 }
 
@@ -217,9 +250,12 @@ interface Props {
   };
   setFormData: (d: any) => void;
   errors?: Record<string, string>;
+  scrollNav?: ScrollNavHandlers;
+  /** 'VIRTUAL' allows gallery uploads; 'PHYSICAL' is camera-only. */
+  inspectionType?: 'PHYSICAL' | 'VIRTUAL' | null;
 }
 
-export default function PI_Step2_ProductVerification({ formData, setFormData, errors = {} }: Props) {
+export default function PI_Step2_ProductVerification({ formData, setFormData, errors = {}, scrollNav, inspectionType }: Props) {
   const p = formData.productData || {};
   const verifications = formData.productVerifications || {};
   const [lightbox, setLightbox] = useState<{ url: string; label?: string } | null>(null);
@@ -257,7 +293,7 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
   const variants: any[] = Array.isArray(p.variants) ? p.variants : [];
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView showsVerticalScrollIndicator={false} {...scrollNav}>
       <StepHeader
         title="Product Information Verification"
         subtitle="Verify each field against the physical product. Select Yes / No and add remarks when needed."
@@ -514,16 +550,19 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
       )}
 
       {/* Photo Evidence */}
-      <Card title="Photo Evidence" icon={<Camera size={16} color="#e01a1b" />}>
-        <PhotoGrid
-          photos={formData.productEvidencePhotos || []}
-          onAdd={addEvidence}
-          onRemove={removeEvidence}
-          addLabel="Upload product evidence photo"
-          allowMultiple
-          hasError={!!errors.productEvidencePhotos}
-        />
-      </Card>
+      <InvalidAnchor errorKey="productEvidencePhotos" invalid={!!errors.productEvidencePhotos}>
+        <Card title="Photo Evidence" icon={<Camera size={16} color="#e01a1b" />}>
+          <PhotoGrid
+            photos={formData.productEvidencePhotos || []}
+            onAdd={addEvidence}
+            onRemove={removeEvidence}
+            addLabel="Upload product evidence photo"
+            allowMultiple
+            hasError={!!errors.productEvidencePhotos}
+            inspectionType={inspectionType}
+          />
+        </Card>
+      </InvalidAnchor>
 
       <View className="h-6" />
 

@@ -1,35 +1,21 @@
 {
   "cli": {
-    "version": ">= 3.0.0",
+    "version": ">= 21.7.1",
     "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
+      "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      },
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://backend-sigma-nine-jx4v8tvnai.vercel.app/api"
-      }
+      "distribution": "internal"
     },
     "production": {
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://backend-sigma-nine-jx4v8tvnai.vercel.app/api"
-      }
-    },
-    "production-apk": {
-      "extends": "production",
-      "android": {
-        "buildType": "apk"
-      }
+      "autoIncrement": true
     }
+  },
+  "submit": {
+    "production": {}
   }
 }

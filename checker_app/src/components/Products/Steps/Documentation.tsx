@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   FileText,
   PenLine,
@@ -15,14 +16,19 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { StepHeader } from './piShared';
 import { pickPhotos, Photo } from './piShared';
+import { InvalidAnchor } from './piValidation';
 import SignaturePad from '@/components/General/SignaturePad';
 import { generateReportPdfDataUri, reportFileName, ReportMeta } from './piReportHtml';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import type { ScrollNavHandlers } from '@/components/General/ScrollNav';
 
 interface Props {
   formData: any;
   setFormData: (data: any) => void;
   errors?: Record<string, string>;
+  scrollNav?: ScrollNavHandlers;
+  /** 'VIRTUAL' allows gallery uploads; 'PHYSICAL' is camera-only. */
+  inspectionType?: 'PHYSICAL' | 'VIRTUAL' | null;
 }
 
 // Share a PDF data URI via the OS share sheet (open / print / save).
@@ -39,7 +45,7 @@ async function shareDataUri(dataUri: string, fileName: string) {
   }
 }
 
-export default function Documentation({ formData, setFormData, errors = {} }: Props) {
+export default function Documentation({ formData, setFormData, errors = {}, scrollNav, inspectionType }: Props) {
   const [showDocModal, setShowDocModal] = useState(false);
   const [showSignModal, setShowSignModal] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -86,7 +92,7 @@ export default function Documentation({ formData, setFormData, errors = {} }: Pr
       setShowDocModal(false);
       setHasDownloaded(false);
       showSuccessToast('Uploaded', 'Signed document uploaded successfully.');
-    }, false);
+    }, false, { allowGallery: inspectionType === 'VIRTUAL' });
   };
 
   const viewManualDoc = async () => {
@@ -141,7 +147,7 @@ export default function Documentation({ formData, setFormData, errors = {} }: Pr
   };
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView showsVerticalScrollIndicator={false} {...scrollNav}>
       <StepHeader
         title="Final Documentation & Sign-off"
         subtitle="Generate the inspection report, capture the client's signature, and submit."
@@ -248,26 +254,31 @@ export default function Documentation({ formData, setFormData, errors = {} }: Pr
       </View>
 
       {/* Status hint */}
-      <View
-        className={`rounded-xl px-4 py-3 border ${
-          hasSignedDoc || hasSignedReport
-            ? 'bg-emerald-50 border-emerald-200'
-            : errors.signedDocuments
-            ? 'bg-red-50 border-red-300'
-            : 'bg-amber-50 border-amber-200'
-        }`}
+      <InvalidAnchor
+        errorKey="signedDocuments"
+        invalid={!hasSignedDoc && !hasSignedReport && !!errors.signedDocuments}
       >
-        <Text
-          className={`text-sm ${
-            hasSignedDoc || hasSignedReport ? 'text-emerald-700' : errors.signedDocuments ? 'text-red-700' : 'text-amber-700'
+        <View
+          className={`rounded-xl px-4 py-3 border ${
+            hasSignedDoc || hasSignedReport
+              ? 'bg-emerald-50 border-emerald-200'
+              : errors.signedDocuments
+              ? 'bg-red-50 border-red-300'
+              : 'bg-amber-50 border-amber-200'
           }`}
         >
-          {hasSignedDoc || hasSignedReport
-            ? 'A signed document is attached. You can submit the inspection.'
-            : errors.signedDocuments ||
-              'At least one signed document is required — upload a signed copy or generate the digitally-signed report.'}
-        </Text>
-      </View>
+          <Text
+            className={`text-sm ${
+              hasSignedDoc || hasSignedReport ? 'text-emerald-700' : errors.signedDocuments ? 'text-red-700' : 'text-amber-700'
+            }`}
+          >
+            {hasSignedDoc || hasSignedReport
+              ? 'A signed document is attached. You can submit the inspection.'
+              : errors.signedDocuments ||
+                'At least one signed document is required — upload a signed copy or generate the digitally-signed report.'}
+          </Text>
+        </View>
+      </InvalidAnchor>
 
       <View className="h-6" />
 
@@ -346,47 +357,53 @@ export default function Documentation({ formData, setFormData, errors = {} }: Pr
         </Pressable>
       </Modal>
 
-      {/* ── Signature Center modal ── */}
-      <Modal visible={showSignModal} transparent animationType="fade" onRequestClose={() => setShowSignModal(false)}>
-        <Pressable className="flex-1 bg-black/50 justify-center px-5" onPress={() => setShowSignModal(false)}>
-          <Pressable className="bg-white rounded-2xl overflow-hidden" onPress={(e) => e.stopPropagation()}>
-            <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-100">
-              <View>
-                <Text className="font-bold text-slate-900">Signature Center</Text>
-                <Text className="text-xs text-slate-500 mt-0.5">Draw signature using finger or stylus</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowSignModal(false)}>
-                <X size={18} color="#64748b" />
-              </TouchableOpacity>
+      {/* ── Signature Center sheet ──
+          Full-screen rather than a centred dialog: the pad is portrait now and
+          needs the whole sheet, and a full-screen surface also removes the
+          tap-outside-to-dismiss that could throw away a signature mid-stroke. */}
+      <Modal
+        visible={showSignModal}
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setShowSignModal(false)}
+      >
+        <SafeAreaView className="flex-1 bg-white" edges={['top', 'bottom']}>
+          <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-100">
+            <View>
+              <Text className="font-bold text-slate-900">Signature Center</Text>
+              <Text className="text-xs text-slate-500 mt-0.5">Draw signature using finger or stylus</Text>
             </View>
-            <View className="p-5">
-              <SignaturePad value={drawnSignature} onChange={setDrawnSignature} height={200} label="Sign below" />
-            </View>
-            <View className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex-row" style={{ columnGap: 8 }}>
-              <TouchableOpacity
-                onPress={() => setShowSignModal(false)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white items-center"
-              >
-                <Text className="text-slate-700 font-semibold text-sm">Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleConfirmSignature}
-                disabled={generating || !drawnSignature}
-                className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl bg-brand-500"
-                style={{ opacity: generating || !drawnSignature ? 0.6 : 1 }}
-              >
-                {generating ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <CheckCircle2 size={16} color="#fff" />
-                    <Text className="text-white font-semibold text-sm ml-1.5">Confirm & Generate</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
+            <TouchableOpacity onPress={() => setShowSignModal(false)} hitSlop={10} accessibilityLabel="Close">
+              <X size={18} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+          <View className="flex-1 p-5">
+            <SignaturePad value={drawnSignature} onChange={setDrawnSignature} fill label="Sign below" />
+          </View>
+          <View className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex-row" style={{ columnGap: 8 }}>
+            <TouchableOpacity
+              onPress={() => setShowSignModal(false)}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white items-center"
+            >
+              <Text className="text-slate-700 font-semibold text-sm">Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleConfirmSignature}
+              disabled={generating || !drawnSignature}
+              className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl bg-brand-500"
+              style={{ opacity: generating || !drawnSignature ? 0.6 : 1 }}
+            >
+              {generating ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <CheckCircle2 size={16} color="#fff" />
+                  <Text className="text-white font-semibold text-sm ml-1.5">Confirm & Generate</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
       </Modal>
     </ScrollView>
   );
