@@ -36,6 +36,7 @@ import ResultModal from "@/components/UI/ResultModal";
 import { PhoneInput, LocalLandlineInput, getLandlineDisplay } from "@/components/VendorHub/FormUI";
 import { downloadDoc, isDocImageUrl } from "@/lib/docDownload";
 import { openDoc } from "@/lib/docViewerBus";
+import { formatSqFt } from "@/lib/units";
 
 // A certificate may only be edited/replaced when it is expired or within this
 // many days of expiring. Valid certs (and certs with no expiry) stay locked.
@@ -1034,7 +1035,7 @@ export default function VendorSettings() {
   // ===================================================================
   const warehouseOwnership = compact([
     mk("Ownership Type", v.ownershipType, { transform: getOwnershipTypeLabel }),
-    mk("Warehousing Capacity", v.warehouseSize || v.storageCapacity),
+    mk("Warehousing Capacity", formatSqFt(v.warehouseSize || v.storageCapacity)),
   ]);
   const warehouseAddress = compact([
     mk(
@@ -1296,7 +1297,7 @@ export default function VendorSettings() {
               <div className="space-y-4">
                 <FieldsGrid items={compact([
                   mk("Ownership Type", v.factoryOwnershipType, { transform: getOwnershipTypeLabel }),
-                  mk("Warehousing Capacity", v.factorySize),
+                  mk("Warehousing Capacity", formatSqFt(v.factorySize)),
                 ])} />
                 <AddressCard
                   line1={v.businessAddress}

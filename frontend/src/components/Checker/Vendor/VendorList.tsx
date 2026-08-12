@@ -10,8 +10,6 @@ import {
   Eye,
   CheckCircle,
   RotateCw,
-  ChevronLeft,
-  ChevronRight,
   X,
   Clock,
 } from "lucide-react"
@@ -19,6 +17,7 @@ import DateRangeCalendar from "@/components/Shared/DateRangeCalendar"
 import VendorInspectionForm from "@/components/Checker/Vendor/VendorInspectionForm"
 import VendorDetail from "@/components/Checker/Vendor/VendorDetail"
 import Dropdown from "@/components/UI/Dropdown"
+import Pagination from "@/components/UI/Pagination"
 import { getVendorMainStatus, getVendorInspectionStatus } from "@/lib/checkerVendorStatus"
 import { State } from "country-state-city"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/UI/Table"
@@ -790,72 +789,3 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
   )
 }
 
-function Pagination({
-  page,
-  totalPages,
-  onChange,
-  disabled,
-}: {
-  page: number
-  totalPages: number
-  onChange: (p: number) => void
-  disabled?: boolean
-}) {
-  const pages = getPageRange(page, totalPages)
-  return (
-    <nav aria-label="Pagination" className="mt-8 flex items-center justify-center gap-1 flex-wrap">
-      <button
-        type="button"
-        onClick={() => onChange(page - 1)}
-        disabled={disabled || page <= 1}
-        aria-label="Previous page"
-        className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        <ChevronLeft className="w-4 h-4" /> Prev
-      </button>
-      {pages.map((p, i) =>
-        p === "…" ? (
-          <span key={`ellipsis-${i}`} className="px-2 text-slate-400" aria-hidden="true">…</span>
-        ) : (
-          <button
-            key={p}
-            type="button"
-            onClick={() => onChange(p)}
-            disabled={disabled}
-            aria-current={p === page ? "page" : undefined}
-            aria-label={`Go to page ${p}`}
-            className={`min-w-9 px-3 py-2 rounded-lg border font-semibold ${
-              p === page
-                ? "bg-brand-500 text-white border-brand-500"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-900"
-            } disabled:opacity-40 disabled:cursor-not-allowed`}
-          >
-            {p}
-          </button>
-        )
-      )}
-      <button
-        type="button"
-        onClick={() => onChange(page + 1)}
-        disabled={disabled || page >= totalPages}
-        aria-label="Next page"
-        className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        Next <ChevronRight className="w-4 h-4" />
-      </button>
-    </nav>
-  )
-}
-
-// Returns an array of page numbers and ellipsis markers for a compact pagination bar.
-function getPageRange(current: number, total: number): Array<number | "…"> {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-  const pages: Array<number | "…"> = [1]
-  if (current > 3) pages.push("…")
-  const start = Math.max(2, current - 1)
-  const end = Math.min(total - 1, current + 1)
-  for (let p = start; p <= end; p++) pages.push(p)
-  if (current < total - 2) pages.push("…")
-  pages.push(total)
-  return pages
-}

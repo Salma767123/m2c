@@ -4,6 +4,7 @@ const {
     createInspection,
     getInspectionsByChecker,
     startInspection,
+    saveInspectionDraft,
     getInspectionByVendorId,
     getInspectionById,
     getMyInspectionById,
@@ -22,6 +23,9 @@ router.get('/', authenticateToken, getInspectionsByChecker);
 
 // 3. QC Checker starts an inspection
 router.post('/:id/start', authenticateToken, startInspection);
+
+// 3a2. QC Checker saves a draft (pauses) an in-progress inspection
+router.post('/:id/draft', authenticateToken, saveInspectionDraft);
 
 // 3b. QC Checker completes an inspection
 router.post('/:id/complete', authenticateToken, completeInspection);

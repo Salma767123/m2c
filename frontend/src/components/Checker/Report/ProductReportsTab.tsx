@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
   Package, CheckCircle, XCircle,
-  Search, X, ChevronLeft, ChevronRight, RotateCw,
+  Search, X, RotateCw,
 } from "lucide-react"
 import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalendar"
+import Pagination from "@/components/UI/Pagination"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -30,18 +31,6 @@ const STATUS_OPTIONS = [
   { value: "APPROVED", label: "Approved" },
   { value: "REJECTED", label: "Rejected" },
 ]
-
-function getPageRange(current: number, total: number): Array<number | "…"> {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-  const pages: Array<number | "…"> = [1]
-  if (current > 4) pages.push("…")
-  const start = Math.max(2, current - 1)
-  const end = Math.min(total - 1, current + 1)
-  for (let p = start; p <= end; p++) pages.push(p)
-  if (current < total - 3) pages.push("…")
-  pages.push(total)
-  return pages
-}
 
 interface ProductReportSummary {
   id: string
@@ -373,48 +362,12 @@ export default function ProductReportsTab() {
       </div>
 
       {/* Pagination */}
-      {pagination.totalPages > 1 && (
-        <nav aria-label="Product report pagination" className="mt-2 flex items-center justify-center gap-1 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setPage(page - 1)}
-            disabled={loading || page <= 1}
-            aria-label="Previous page"
-            className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <ChevronLeft className="w-4 h-4" /> Prev
-          </button>
-          {getPageRange(page, pagination.totalPages).map((p, i) =>
-            p === "…" ? (
-              <span key={`ellipsis-${i}`} className="px-2 text-slate-400" aria-hidden="true">…</span>
-            ) : (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPage(p)}
-                disabled={loading}
-                aria-current={p === page ? "page" : undefined}
-                className={`min-w-9 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                  p === page
-                    ? "bg-brand-500 text-white border-brand-500"
-                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                } disabled:opacity-40 disabled:cursor-not-allowed`}
-              >
-                {p}
-              </button>
-            )
-          )}
-          <button
-            type="button"
-            onClick={() => setPage(page + 1)}
-            disabled={loading || page >= pagination.totalPages}
-            aria-label="Next page"
-            className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Next <ChevronRight className="w-4 h-4" />
-          </button>
-        </nav>
-      )}
+      <Pagination
+        page={page}
+        totalPages={pagination.totalPages}
+        onChange={setPage}
+        disabled={loading}
+      />
     </div>
   )
 }

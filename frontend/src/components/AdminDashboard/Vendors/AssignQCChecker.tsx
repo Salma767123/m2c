@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Search, UserCheck, Building2, Mail, Phone, CheckCircle,
-  Plus, FileText, ChevronLeft, ChevronRight,
+  Plus, FileText,
   AlertTriangle, Clock, Users, X, RotateCw,
 } from "lucide-react";
 import { Badge } from "@/components/UI/Badge";
+import Pagination from "@/components/UI/Pagination";
 import { LoadingSpinner } from "@/components/UI/LoadingSpinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/UI/Table";
 import Dropdown from "@/components/UI/Dropdown";
@@ -70,18 +71,6 @@ function isPastInspectionWindow(
   const durNum = parseFloat(durStr) || 1;
   const durMs = durStr.includes("min") ? durNum * 60000 : durStr.includes("day") ? durNum * 86400000 : durNum * 3600000;
   return Date.now() > start.getTime() + durMs;
-}
-
-function getPageRange(current: number, total: number): Array<number | "…"> {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const pages: Array<number | "…"> = [1];
-  if (current > 4) pages.push("…");
-  const start = Math.max(2, current - 1);
-  const end = Math.min(total - 1, current + 1);
-  for (let p = start; p <= end; p++) pages.push(p);
-  if (current < total - 3) pages.push("…");
-  pages.push(total);
-  return pages;
 }
 
 const getStatusBadge = (status: string) => {
@@ -248,9 +237,6 @@ export default function AssignQCChecker() {
   const totalAssignable = vendors.filter(
     (v) => !v.assignedChecker && !["REJECTED", "SUSPENDED"].includes(v.status)
   ).length;
-
-  const rangeStart = filteredVendors.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1;
-  const rangeEnd = Math.min(currentPage * ITEMS_PER_PAGE, pagination.total);
 
   // ── Metric cards ─────────────────────────────────────────────────────────
   const metricCards = [
@@ -596,51 +582,12 @@ export default function AssignQCChecker() {
               </Table>
 
               {/* Pagination */}
-              {pagination.pages > 1 && (
-                <div className="flex items-center justify-between gap-4 px-5 py-3.5 border-t border-slate-100">
-                  <span className="text-xs text-slate-400 hidden sm:block">
-                    {pagination.total === 0
-                      ? "0 vendors"
-                      : `Showing ${rangeStart}–${rangeEnd} of ${pagination.total} vendor${pagination.total === 1 ? "" : "s"}`}
-                  </span>
-                  <div className="flex items-center gap-1 ml-auto">
-                    <button
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage <= 1}
-                      className="p-2 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                      aria-label="Previous page"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    {getPageRange(currentPage, pagination.pages).map((p, i) =>
-                      p === "…" ? (
-                        <span key={`e-${i}`} className="px-2 text-slate-400 text-sm">…</span>
-                      ) : (
-                        <button
-                          key={`p-${p}`}
-                          onClick={() => setCurrentPage(p as number)}
-                          aria-current={p === currentPage ? "page" : undefined}
-                          className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${
-                            p === currentPage
-                              ? "bg-brand-500 text-white shadow-xs shadow-brand-500/20"
-                              : "text-slate-700 hover:bg-slate-100"
-                          }`}
-                        >
-                          {p}
-                        </button>
-                      )
-                    )}
-                    <button
-                      onClick={() => setCurrentPage((p) => Math.min(pagination.pages, p + 1))}
-                      disabled={currentPage >= pagination.pages}
-                      className="p-2 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                      aria-label="Next page"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
+              <Pagination
+                page={currentPage}
+                totalPages={pagination.pages}
+                onChange={setCurrentPage}
+                disabled={loading}
+              />
             </>
           )}
         </div>

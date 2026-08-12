@@ -1019,9 +1019,11 @@ const getVendorDetails = async (req, res) => {
                     clientName: true,
                     scheduledDate: true,
                     scheduledTime: true,
+                    estimatedDuration: true, // for the "exceeded schedule" overtime badge
                     startedAt: true,
                     completedAt: true,
                     submittedAt: true,
+                    totalPausedMs: true,     // active/paused duration math
                     result: true,
                     status: true,
                     inspectionType: true,
@@ -1127,6 +1129,11 @@ const getActiveInspectionForVendor = async (req, res) => {
             cycleNumber: true,
             parentInspectionId: true,
             rejectionReason: true,
+            // Draft / pause-resume state so the checker can resume a half-filled form
+            startedAt: true,
+            draftData: true,
+            pausedAt: true,
+            totalPausedMs: true,
             checker: { select: { name: true, title: true, checkerId: true, email: true, phone: true } },
             vendor: {
                 select: {

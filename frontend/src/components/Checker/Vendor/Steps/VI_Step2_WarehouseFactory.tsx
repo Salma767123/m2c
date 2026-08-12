@@ -5,6 +5,7 @@ import { Warehouse, MapPin, Image as ImageIcon, Camera, X } from 'lucide-react'
 import VerifyField, { SectionBlock, Verifications } from './VI_VerifyField'
 import ImageCropModal from '@/components/UI/ImageCropModal'
 import { notifyUploadSuccess } from '@/lib/toast-utils'
+import { formatSqFt } from '@/lib/units'
 
 function getOwnershipTypeLabel(val: string) {
   const map: Record<string, string> = { owned: 'Owned', rented: 'Rented', lease: 'Lease' }
@@ -232,7 +233,7 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
       <SectionBlock title="Legal Address & Factory Site" icon={<Warehouse className="w-4 h-4" />}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {vf('w_legalOwnershipType', 'Ownership Type', getOwnershipTypeLabel(v.factoryOwnershipType))}
-          {vf('w_legalCapacity', 'Warehousing Capacity', v.factorySize)}
+          {vf('w_legalCapacity', 'Warehousing Capacity', formatSqFt(v.factorySize))}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           {v.factoryAddress && vf('w_legalAddress', 'Address Line 1', v.factoryAddress)}
@@ -251,7 +252,7 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
             <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
               <ImageIcon className="w-3.5 h-3.5" /> Factory Images
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {legalImages.map((img: any, idx: number) => (
                 <VerifyField
                   key={idx}
@@ -268,8 +269,11 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
           </div>
         )}
 
-        {/* Inspector Evidence Photos — Legal Address & Factory Site (sits right under
-            the Factory Images so evidence lines up with what it verifies). */}
+        {/* Inspector Evidence Photos — Legal Address & Factory Site. Shown here (under
+            the Factory Images) ONLY when the warehouse address differs. When the
+            warehouse is the same as the legal address, this group moves below, after the
+            Warehouse Images (see Section 2). */}
+        {!isSameAsWarehouse && (
         <div id="inspector-evidence-photos" className="mt-6 pt-5 border-t border-slate-100">
           <p className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
             <Camera className="w-4 h-4 text-brand-500" /> Inspector Evidence Photos — Legal Address &amp; Factory Site
@@ -300,6 +304,7 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
             </div>
           </div>
         </div>
+        )}
       </SectionBlock>
 
       {/* Section 2: Warehouse Address */}
@@ -324,7 +329,7 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {vf('w_whOwnershipType', 'Ownership Type', getOwnershipTypeLabel(v.ownershipType))}
-              {vf('w_whCapacity', 'Warehousing Capacity', v.warehouseSize)}
+              {vf('w_whCapacity', 'Warehousing Capacity', formatSqFt(v.warehouseSize))}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               {v.warehouseAddress && vf('w_whAddress', 'Address Line 1', v.warehouseAddress)}
@@ -344,7 +349,7 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
             <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
               <ImageIcon className="w-3.5 h-3.5" /> Warehouse Images
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {warehouseImages.map((img: any, idx: number) => (
                 <VerifyField
                   key={idx}
@@ -361,41 +366,76 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
           </div>
         )}
 
-        {/* Inspector Evidence Photos — Warehouse (sits right under the Warehouse Images).
-            Only when the warehouse address differs from the Legal Address & Factory Site;
-            when they're the same, the factory-site evidence above already covers it. */}
-        {!isSameAsWarehouse && (
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <p className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-              <Camera className="w-4 h-4 text-brand-500" /> Inspector Evidence Photos — Warehouse
-            </p>
-            <p className="text-xs text-slate-500 mb-3">Upload photos taken during the visit. All three are required.</p>
-            {evidenceError && (
-              <p className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
-                All three Warehouse evidence photos are required before continuing.
+        {/* Inspector Evidence Photos — sits after the Warehouse Images.
+            • Warehouse address SAME as legal → the single Legal Address & Factory Site
+              evidence group renders here (moved down from Section 1).
+            • Warehouse address DIFFERS → the Warehouse evidence group renders here
+              (the factory-site group stays under the Factory Images in Section 1). */}
+        <div className="mt-6 pt-5 border-t border-slate-100">
+          {isSameAsWarehouse ? (
+            <div id="inspector-evidence-photos">
+              <p className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Camera className="w-4 h-4 text-brand-500" /> Inspector Evidence Photos — Legal Address &amp; Factory Site
               </p>
-            )}
-            <div className={evidenceError ? 'ring-2 ring-red-300 ring-offset-2 rounded-xl p-2' : ''}>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <EvidenceUpload
-                  label="Warehouse Name Board"
-                  value={factoryEvidence.warehouseNameBoard}
-                  onChange={(photo) => onEvidenceChange('warehouseNameBoard', photo)}
-                />
-                <EvidenceUpload
-                  label="Warehouse Front View"
-                  value={factoryEvidence.warehouseFrontView}
-                  onChange={(photo) => onEvidenceChange('warehouseFrontView', photo)}
-                />
-                <EvidenceUpload
-                  label="Warehouse Route Map"
-                  value={factoryEvidence.warehouseRouteMap}
-                  onChange={(photo) => onEvidenceChange('warehouseRouteMap', photo)}
-                />
+              <p className="text-xs text-slate-500 mb-3">Upload photos taken during the visit. All three are required.</p>
+              {evidenceError && (
+                <p className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
+                  All three Legal Address &amp; Factory Site evidence photos are required before continuing.
+                </p>
+              )}
+              <div className={evidenceError ? 'ring-2 ring-red-300 ring-offset-2 rounded-xl p-2' : ''}>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <EvidenceUpload
+                    label="Factory Site Name Board"
+                    value={factoryEvidence.nameBoard}
+                    onChange={(photo) => onEvidenceChange('nameBoard', photo)}
+                  />
+                  <EvidenceUpload
+                    label="Factory Site Front View"
+                    value={factoryEvidence.frontView}
+                    onChange={(photo) => onEvidenceChange('frontView', photo)}
+                  />
+                  <EvidenceUpload
+                    label="Factory Site Route Map"
+                    value={factoryEvidence.routeMap}
+                    onChange={(photo) => onEvidenceChange('routeMap', photo)}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div>
+              <p className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Camera className="w-4 h-4 text-brand-500" /> Inspector Evidence Photos — Warehouse
+              </p>
+              <p className="text-xs text-slate-500 mb-3">Upload photos taken during the visit. All three are required.</p>
+              {evidenceError && (
+                <p className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
+                  All three Warehouse evidence photos are required before continuing.
+                </p>
+              )}
+              <div className={evidenceError ? 'ring-2 ring-red-300 ring-offset-2 rounded-xl p-2' : ''}>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <EvidenceUpload
+                    label="Warehouse Name Board"
+                    value={factoryEvidence.warehouseNameBoard}
+                    onChange={(photo) => onEvidenceChange('warehouseNameBoard', photo)}
+                  />
+                  <EvidenceUpload
+                    label="Warehouse Front View"
+                    value={factoryEvidence.warehouseFrontView}
+                    onChange={(photo) => onEvidenceChange('warehouseFrontView', photo)}
+                  />
+                  <EvidenceUpload
+                    label="Warehouse Route Map"
+                    value={factoryEvidence.warehouseRouteMap}
+                    onChange={(photo) => onEvidenceChange('warehouseRouteMap', photo)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </SectionBlock>
     </div>
   </>)

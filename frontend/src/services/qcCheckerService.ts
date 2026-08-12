@@ -564,7 +564,7 @@ class QCCheckerService {
     // then records the run as location-unverified instead of blocking it.
     async startInspection(
         inspectionId: string,
-        coords?: { checkerLatitude: number | null; checkerLongitude: number | null; inspectionType?: 'PHYSICAL' | 'VIRTUAL' }
+        coords?: { checkerLatitude: number | null; checkerLongitude: number | null; inspectionType?: 'PHYSICAL' | 'VIRTUAL'; discardDraft?: boolean }
     ): Promise<{ success: boolean; message: string; inspection: any }> {
         try {
             const response = await axios.post(`/inspections/${inspectionId}/start`, coords || {}, {
@@ -578,6 +578,26 @@ class QCCheckerService {
             // Prefer the human-readable `message` (e.g. the expired-window text)
             // and carry `code` so callers can special-case INSPECTION_EXPIRED.
             const err = new Error(data.message || data.error || error?.message || 'Failed to start inspection') as Error & { status?: number; code?: string };
+            err.status = error?.response?.status;
+            err.code = data.code;
+            throw err;
+        }
+    }
+
+    // Save a draft (pause) of an in-progress inspection so the checker can exit and
+    // resume the half-filled form later. draftData is the serialized form snapshot.
+    async saveInspectionDraft(inspectionId: string, draftData: any): Promise<{ success: boolean; message: string; inspection: any }> {
+        try {
+            const response = await axios.post(`/inspections/${inspectionId}/draft`, { draftData }, {
+                headers: {
+                    'Authorization': `Bearer ${this.getCheckerToken()}`
+                },
+                timeout: 120000, // draft can include base64 evidence images
+            });
+            return response.data;
+        } catch (error: any) {
+            const data = error?.response?.data || {};
+            const err = new Error(data.message || data.error || error?.message || 'Failed to save draft') as Error & { status?: number; code?: string };
             err.status = error?.response?.status;
             err.code = data.code;
             throw err;

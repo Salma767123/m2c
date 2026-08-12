@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Building2, User, Mail, Phone, MapPin, Calendar, CheckCircle, XCircle, FileText, ClipboardCheck, Clock, Factory, Shield, Wrench, Camera, AlertTriangle, Eye, Download, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Building2, User, Mail, Phone, MapPin, Calendar, CheckCircle, XCircle, FileText, ClipboardCheck, Clock, Factory, Shield, Wrench, Camera, AlertTriangle, Eye, Download, Loader2, RefreshCw, AlarmClockOff } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import { Badge } from "../../UI/Badge";
@@ -14,6 +14,7 @@ import RejectionModal from "./RejectionModal";
 import AdminReviewModal from "../ReInspection/AdminReviewModal";
 import axiosInstance from "@/lib/axios";
 import { generateFactoryInspectionPdf, pdfFileName } from "@/lib/factoryInspectionReportPdf";
+import { computeInspectionDurations } from "@/lib/inspectionDuration";
 import { fieldLabelForKey as humanizeFieldKey } from "@/lib/inspectionFieldLabel";
 import VendorInspectionData from "./VendorInspectionData";
 import InspectionChecklist from "./InspectionChecklist";
@@ -279,6 +280,14 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
         : inspection?.completedAt
           ? new Date(inspection.completedAt)
           : new Date(),
+      inspectionCompletedAt: inspection?.submittedAt || inspection?.completedAt || undefined,
+      // Active / paused / total duration breakdown for the report.
+      ...(() => {
+        const d = computeInspectionDurations(inspection);
+        return d.totalMs > 0
+          ? { activeDurationMs: d.activeMs, pausedDurationMs: d.pausedMs, totalDurationMs: d.totalMs, scheduledDurationMs: d.scheduledMs, exceededSchedule: d.exceeded }
+          : {};
+      })(),
     };
 
     // Inspector evidence photos captured during the visit — persisted on the
@@ -484,6 +493,11 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
           <CardContent className="p-4">
             <div className="text-sm text-slate-500">Inspection Status</div>
             <div className="mt-1">{getInspectionStatusBadge(inspection)}</div>
+            {computeInspectionDurations(inspection).exceeded && (
+              <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border bg-red-50 text-red-700 border-red-200">
+                <AlarmClockOff className="w-3 h-3" /> Exceeded schedule
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card className="border border-slate-200/80 rounded-2xl shadow-xs">

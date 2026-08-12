@@ -11,6 +11,7 @@ import { getLandlineDisplay } from "@/components/VendorHub/FormUI";
 import { openDoc } from "@/lib/docViewerBus";
 import { downloadDoc } from "@/lib/docDownload";
 import { Country } from "country-state-city";
+import { formatSqFt } from "@/lib/units";
 
 // name → ISO code for flag images (flag emoji don't render on Windows).
 const COUNTRY_ISO: Record<string, string> = {};
@@ -417,7 +418,7 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
       <Section title="Legal Address & Factory Site" icon={<Factory className="h-5 w-5" />}>
         <FieldGrid>
           <Field label="Ownership Type" value={titleCase(v.factoryOwnershipType || v.ownershipType)} />
-          <Field label="Warehousing Capacity" value={v.factorySize} />
+          <Field label="Warehousing Capacity" value={formatSqFt(v.factorySize)} />
           <Field label="Address Line 1" value={v.factoryAddress} wide />
           <Field label="Address Line 2" value={v.addressLine2} />
           <Field label="Address Line 3" value={v.addressLine3} />
@@ -456,7 +457,7 @@ export default function VendorInspectionData({ vendor: v }: { vendor: any }) {
           <>
             <FieldGrid>
               <Field label="Ownership Type" value={titleCase(v.ownershipType)} />
-              <Field label="Warehousing Capacity" value={v.warehouseSize} />
+              <Field label="Warehousing Capacity" value={formatSqFt(v.warehouseSize)} />
               <Field label="Address Line 1" value={v.warehouseAddress} wide />
               <Field label="Address Line 2" value={v.warehouseAddressLine2} />
               <Field label="Address Line 3" value={v.warehouseAddressLine3} />

@@ -19,6 +19,7 @@ import jsPDF from "jspdf"
 import { formatCheckerName } from "@/lib/checkerUtils"
 import { resolveOwnerDesignation } from "@/lib/utils"
 import { fieldLabelForKey } from "@/lib/inspectionFieldLabel"
+import { formatDuration } from "@/lib/inspectionDuration"
 import autoTable from "jspdf-autotable"
 import type { Verifications } from "@/components/Checker/Vendor/Steps/VI_VerifyField"
 export interface FactoryReportChecker {
@@ -32,6 +33,8 @@ export interface FactoryReportMeta {
   inspectorName?: string
   inspectionDate?: string
   inspectionStartedAt?: string
+  /** ISO string for when the inspection was completed/submitted. */
+  inspectionCompletedAt?: string
   overallResult?: string
   inspectorRemarks?: string
   checker?: FactoryReportChecker | null
@@ -39,6 +42,13 @@ export interface FactoryReportMeta {
   inspectionType?: string | null
   location?: { latitude: number; longitude: number } | null
   generatedAt?: Date
+  // Duration breakdown (see lib/inspectionDuration.ts). When present, the report
+  // prints Active / Paused / Total rows; exceededSchedule highlights the total.
+  activeDurationMs?: number
+  pausedDurationMs?: number
+  totalDurationMs?: number
+  scheduledDurationMs?: number
+  exceededSchedule?: boolean
 }
 
 export interface FactoryImageEntry {
@@ -667,7 +677,15 @@ export function generateFactoryInspectionPdf(
       ["Inspection Type",          isVirtual ? "Virtual Inspection" : "Physical Inspection"],
       ["Inspection Date",          fmtDate(meta.inspectionDate)],
       ["Inspection Start Time",    meta.inspectionStartedAt ? new Date(meta.inspectionStartedAt).toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "—"],
-      ["Inspection Complete Time", generatedAt.toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })],
+      ["Inspection Complete Time", (meta.inspectionCompletedAt ? new Date(meta.inspectionCompletedAt) : generatedAt).toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })],
+      // Duration breakdown across pauses (only when time tracking is available).
+      ...(meta.totalDurationMs != null && meta.totalDurationMs > 0
+        ? [
+            ["Active Duration", formatDuration(meta.activeDurationMs || 0)],
+            ["Paused Duration", formatDuration(meta.pausedDurationMs || 0)],
+            ["Total Duration",  `${formatDuration(meta.totalDurationMs || 0)}${meta.exceededSchedule ? "  (exceeded scheduled duration)" : ""}`],
+          ]
+        : []),
       ["Overall Result",           val(meta.overallResult)],
       // Virtual inspections have no location — show the type in place of coordinates.
       ...(isVirtual
@@ -676,6 +694,21 @@ export function generateFactoryInspectionPdf(
       ["Inspector Remarks",        val(meta.inspectorRemarks)],
     ]
   )
+
+  // Highlight when the inspection ran past its scheduled duration.
+  if (meta.exceededSchedule) {
+    ensureSpace(20)
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(8.5)
+    doc.setTextColor(200, 30, 30)
+    doc.text(
+      `⚠  Exceeded scheduled duration${meta.scheduledDurationMs ? ` (scheduled ${formatDuration(meta.scheduledDurationMs)})` : ""} — active work took ${formatDuration(meta.activeDurationMs || 0)}.`,
+      margin, y
+    )
+    doc.setFont("helvetica", "normal")
+    doc.setTextColor(...SLATE)
+    y += 16
+  }
 
   // ── L. Inspector Evidence Photos ─────────────────────────────────────────────
   // Vendor factory/warehouse photos now render under section B (their address
@@ -696,7 +729,7 @@ export function generateFactoryInspectionPdf(
   doc.line(margin, y, margin + contentW, y)
   y += 16
 
-  const inspectionTime = generatedAt.toLocaleString("en-US", {
+  const inspectionTime = (meta.inspectionCompletedAt ? new Date(meta.inspectionCompletedAt) : generatedAt).toLocaleString("en-US", {
     hour: "2-digit", minute: "2-digit", hour12: true,
   })
 
@@ -710,6 +743,13 @@ export function generateFactoryInspectionPdf(
     { label: "Inspection Date:", value: fmtDate(meta.inspectionDate) },
     { label: "Inspection Start Time:", value: startTime },
     { label: "Inspection Complete Time:", value: inspectionTime },
+    ...(meta.totalDurationMs != null && meta.totalDurationMs > 0
+      ? [
+          { label: "Active Duration:", value: formatDuration(meta.activeDurationMs || 0) },
+          { label: "Paused Duration:", value: formatDuration(meta.pausedDurationMs || 0) },
+          { label: "Total Duration:", value: `${formatDuration(meta.totalDurationMs || 0)}${meta.exceededSchedule ? "  (over schedule)" : ""}` },
+        ]
+      : []),
   ]
   let lineY = y
   const valueColX = margin + 135

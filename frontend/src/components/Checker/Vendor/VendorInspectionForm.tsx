@@ -65,9 +65,17 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
   // Physical vs virtual. Chosen in the mandatory dialog on first start, or read back
   // from the inspection when continuing an already-started one.
   const [inspectionType, setInspectionType] = useState<InspectionType | null>(null)
-  // Inspection id awaiting a type choice → drives the mandatory dialog. Non-null only
-  // for a SCHEDULED (never-started) inspection.
+  // Inspection id awaiting a type choice → drives the mandatory dialog. Set both for
+  // a SCHEDULED (never-started) inspection AND when resuming an IN_PROGRESS one.
   const [typeDialogFor, setTypeDialogFor] = useState<string | null>(null)
+  // Resume/draft state. When re-entering an already-started inspection we re-ask the
+  // type: a matching type resumes the saved draft, a different type discards it and
+  // restarts with the current time.
+  const [isResume, setIsResume] = useState(false)
+  const [draftInspectionType, setDraftInspectionType] = useState<InspectionType | null>(null)
+  const draftDataRef = useRef<any>(null)
+  const [discardConfirm, setDiscardConfirm] = useState<{ inspId: string; type: InspectionType } | null>(null)
+  const [savingDraft, setSavingDraft] = useState(false)
   const [vendor, setVendor] = useState<any>(null)
   const [inspection, setInspection] = useState<any>(null)
   const [cycleNumber, setCycleNumber] = useState(1)
@@ -140,6 +148,27 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
   const cancelExit = () => {
     setShowExitConfirm(false)
     pendingNavRef.current = null
+  }
+
+  // Save the half-filled form as a server-side draft, then leave. The inspection
+  // stays IN_PROGRESS and can be resumed later (see the type re-prompt on load).
+  const saveDraftAndExit = async () => {
+    if (!inspection?.id) { confirmExit(); return }
+    setSavingDraft(true)
+    try {
+      await qcCheckerService.saveInspectionDraft(inspection.id, snapshotDraft())
+      showSuccessToast('Draft saved', 'Your progress has been saved — you can resume this inspection later.')
+    } catch (e: any) {
+      showErrorToast('Could not save draft', e?.message || 'Please try again.')
+      setSavingDraft(false)
+      return
+    }
+    setSavingDraft(false)
+    setShowExitConfirm(false)
+    allowLeaveRef.current = true
+    const action = pendingNavRef.current
+    pendingNavRef.current = null
+    action?.()
   }
 
   useEffect(() => {
@@ -248,11 +277,19 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
 
           if (insp.status === 'SCHEDULED') {
             // Never started — ask the checker how before capturing anything. The dialog
-            // then calls handleStartWithType, which starts the inspection.
+            // then calls handleTypeChosen, which starts the inspection.
+            setIsResume(false)
             setTypeDialogFor(insp.id)
           } else {
-            // Continuing an already-started inspection — its type is fixed, reuse it.
+            // Resuming an already-started inspection — re-ask the type. A saved draft is
+            // restored only when the same type is chosen; a different type discards it.
             setInspectionType((insp.inspectionType as InspectionType) || 'PHYSICAL')
+            if (insp.status === 'IN_PROGRESS') {
+              draftDataRef.current = insp.draftData || null
+              setDraftInspectionType((insp.inspectionType as InspectionType) || 'PHYSICAL')
+              setIsResume(true)
+              setTypeDialogFor(insp.id)
+            }
           }
         }
 
@@ -285,12 +322,66 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
   // ── Start the inspection with the chosen type ──────────────────────────────
   // Invoked from the mandatory type dialog. Physical captures + verifies GPS;
   // virtual sends none. Mirrors the backend guard: the type decides everything.
-  const handleStartWithType = async (inspId: string, type: InspectionType) => {
+  // Serialize the in-progress form for a server-side draft so it can be resumed.
+  const snapshotDraft = () => ({ verifications, meta, factoryEvidence, docData, step })
+
+  // Restore form state from a previously saved draft.
+  const hydrateFromDraft = (draft: any) => {
+    if (!draft) return
+    if (draft.verifications) setVerifications(draft.verifications)
+    if (draft.meta) setMeta(prev => ({ ...prev, ...draft.meta }))
+    if (draft.factoryEvidence) setFactoryEvidence(draft.factoryEvidence)
+    if (draft.docData) setDocData(draft.docData)
+    if (typeof draft.step === 'number') setStep(draft.step)
+  }
+
+  // Wipe the form back to a blank inspection (used when a different type is chosen
+  // on resume — the saved draft is discarded and we start fresh).
+  const resetForm = () => {
+    setVerifications({})
+    setMeta(prev => ({ ...prev, overallResult: '', inspectorRemarks: '' }))
+    setFactoryEvidence({ frontView: null, nameBoard: null, routeMap: null, warehouseFrontView: null, warehouseNameBoard: null, warehouseRouteMap: null })
+    setDocData({ signedDocuments: [], signedReport: [], clientSignature: '' })
+    setStep(1)
+    draftDataRef.current = null
+  }
+
+  // Entry point from the type dialog. Fresh inspections start immediately; a resume
+  // continues the draft on a matching type, or asks to discard on a different type.
+  const handleTypeChosen = (inspId: string, type: InspectionType) => {
+    if (isResume) {
+      const draftType = draftInspectionType || inspectionType
+      if (type === draftType) {
+        setTypeDialogFor(null)
+        hydrateFromDraft(draftDataRef.current)
+        setIsResume(false)
+        handleStartWithType(inspId, type, false)
+      } else {
+        // Different type — confirm discarding the saved draft first.
+        setDiscardConfirm({ inspId, type })
+      }
+    } else {
+      setTypeDialogFor(null)
+      handleStartWithType(inspId, type, false)
+    }
+  }
+
+  const confirmDiscardDraft = () => {
+    if (!discardConfirm) return
+    const { inspId, type } = discardConfirm
+    setDiscardConfirm(null)
+    setTypeDialogFor(null)
+    resetForm()
+    setIsResume(false)
+    handleStartWithType(inspId, type, true)
+  }
+
+  const handleStartWithType = async (inspId: string, type: InspectionType, discardDraft = false) => {
     setInspectionType(type)
     setTypeDialogFor(null)
     try {
       if (type === 'VIRTUAL' || GEOFENCE_DISABLED) {
-        const res = await qcCheckerService.startInspection(inspId, { checkerLatitude: null, checkerLongitude: null, inspectionType: type } as any)
+        const res = await qcCheckerService.startInspection(inspId, { checkerLatitude: null, checkerLongitude: null, inspectionType: type, discardDraft } as any)
         if (res?.inspection) setInspection(res.inspection)
         return
       }
@@ -300,6 +391,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
         checkerLatitude: coords.latitude,
         checkerLongitude: coords.longitude,
         inspectionType: type,
+        discardDraft,
       })
       if (res?.inspection) setInspection(res.inspection)
     } catch (err: any) {
@@ -575,6 +667,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
           docData={docData}
           onDocDataChange={(patch) => setDocData(prev => ({ ...prev, ...patch }))}
           factoryEvidence={factoryEvidence}
+          inspection={inspection}
           inspectionStartedAt={inspection?.startedAt ?? formOpenedAtRef.current}
           inspectionType={inspectionType ?? (inspection?.inspectionType as InspectionType) ?? 'PHYSICAL'}
         />
@@ -652,12 +745,55 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
     <div ref={rootRef} className="min-h-screen font-sans bg-[#f7f7f5]">
       {/* Mandatory type selection — blocks the form until the checker chooses how the
           inspection is being carried out. Cancelling backs out of the inspection. */}
-      {typeDialogFor && (
+      {typeDialogFor && !discardConfirm && (
         <InspectionTypeDialog
           subjectName={vendor?.companyName || vendorName}
-          onSelect={(type) => handleStartWithType(typeDialogFor, type)}
+          onSelect={(type) => handleTypeChosen(typeDialogFor, type)}
           onCancel={() => { setTypeDialogFor(null); onComplete() }}
         />
+      )}
+
+      {/* Discard-draft confirmation — shown when the checker resumes with a DIFFERENT
+          inspection type than the saved draft, which cannot be carried over. */}
+      {discardConfirm && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setDiscardConfirm(null)}
+        >
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-amber-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-slate-900">Discard saved draft?</h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    You saved this inspection as a <span className="font-semibold">{(draftInspectionType || '').toLowerCase()}</span> inspection.
+                    Switching to <span className="font-semibold">{discardConfirm.type.toLowerCase()}</span> will
+                    <span className="font-semibold text-amber-700"> discard the saved draft</span> and start a fresh inspection at the current time.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
+              <button
+                onClick={() => setDiscardConfirm(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                Go back
+              </button>
+              <button
+                onClick={confirmDiscardDraft}
+                className="flex-1 px-4 py-2.5 rounded-xl font-semibold bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white transition-colors shadow-sm shadow-amber-500/10"
+              >
+                Discard &amp; start fresh
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       <div className="p-8 max-w-5xl mx-auto">
         {/* Header */}
@@ -810,24 +946,40 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
                 <div className="flex-1">
                   <h3 id="exit-confirm-title" className="text-lg font-bold text-slate-900">Exit inspection?</h3>
                   <p className="mt-1 text-sm text-slate-600">
-                    Are you sure you want to exit? Your verification progress on this form will be lost and won&apos;t be saved.
+                    {inspection?.status === 'IN_PROGRESS'
+                      ? 'You can save your progress as a draft and resume this inspection later, or exit without saving.'
+                      : 'Are you sure you want to exit? Your verification progress on this form will be lost and won’t be saved.'}
                   </p>
                 </div>
               </div>
             </div>
-            <div className="flex gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
-              <button
-                onClick={cancelExit}
-                className="flex-1 px-4 py-2.5 rounded-xl font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 transition-colors"
-              >
-                Keep editing
-              </button>
-              <button
-                onClick={confirmExit}
-                className="flex-1 px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white transition-colors shadow-sm shadow-brand-500/10"
-              >
-                Yes, exit
-              </button>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 space-y-3">
+              {inspection?.status === 'IN_PROGRESS' && (
+                <button
+                  onClick={saveDraftAndExit}
+                  disabled={savingDraft}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white transition-colors shadow-sm shadow-brand-500/10 disabled:opacity-70"
+                >
+                  <Save className="w-4 h-4" />
+                  {savingDraft ? 'Saving draft…' : 'Save draft & exit'}
+                </button>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={cancelExit}
+                  disabled={savingDraft}
+                  className="flex-1 px-4 py-2.5 rounded-xl font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-70"
+                >
+                  Keep editing
+                </button>
+                <button
+                  onClick={confirmExit}
+                  disabled={savingDraft}
+                  className="flex-1 px-4 py-2.5 rounded-xl font-semibold border border-red-200 bg-white text-red-600 hover:bg-red-50 transition-colors disabled:opacity-70"
+                >
+                  Exit without saving
+                </button>
+              </div>
             </div>
           </div>
         </div>

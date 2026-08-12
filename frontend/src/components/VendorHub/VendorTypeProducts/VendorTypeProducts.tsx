@@ -112,6 +112,12 @@ export default function VendorTypeProducts({
   const isImportExportDisabled = data.hasImportExport === 'no';
   const IE_TYPES = ['importer', 'exporter'];
 
+  // When the vendor declared import/export activity in Step 1, default the
+  // Exporter vendor type + International market focus on. `ieDefaultsApplied`
+  // (persisted) makes this a ONE-TIME default so the vendor can still deselect
+  // them afterwards without them snapping back when they return to this step.
+  const applyIeDefaults = data.hasImportExport === 'yes' && !data.ieDefaultsApplied;
+
   const [formData, setFormData] = useState({
     // allow multiple selections; accept legacy single-value strings
     vendorType: (() => {
@@ -120,13 +126,17 @@ export default function VendorTypeProducts({
         : data.vendorType
           ? [data.vendorType]
           : [];
-      return isImportExportDisabled ? raw.filter((t: string) => !IE_TYPES.includes(t)) : raw;
+      const cleaned = isImportExportDisabled ? raw.filter((t: string) => !IE_TYPES.includes(t)) : raw;
+      return applyIeDefaults && !cleaned.includes('exporter') ? [...cleaned, 'exporter'] : cleaned;
     })(),
-    marketType: Array.isArray(data.marketType)
-      ? data.marketType
-      : data.marketType
-        ? [data.marketType]
-        : [],
+    marketType: (() => {
+      const raw = Array.isArray(data.marketType)
+        ? data.marketType
+        : data.marketType
+          ? [data.marketType]
+          : [];
+      return applyIeDefaults && !raw.includes('international') ? [...raw, 'international'] : raw;
+    })(),
     selectedCategories: data.selectedCategories || {},
     expandedCategories: data.expandedCategories || {},
     categoryRemarks: data.categoryRemarks || "",
@@ -259,6 +269,19 @@ export default function VendorTypeProducts({
   const onUpdateDataRef = useRef(onUpdateData);
   onUpdateDataRef.current = onUpdateData;
   useEffect(() => () => onUpdateDataRef.current(persistRef.current), []);
+
+  // Persist the one-time import/export defaults (Exporter + International) and the
+  // flag, so navigating away and back doesn't re-add them after the user adjusts.
+  useEffect(() => {
+    if (applyIeDefaults) {
+      onUpdateDataRef.current({
+        ieDefaultsApplied: true,
+        vendorType: persistRef.current.vendorType,
+        marketType: persistRef.current.marketType,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const addAdditionalCategory = () => {
     setAdditionalCategories((prev) => [

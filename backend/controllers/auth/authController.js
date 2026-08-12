@@ -768,6 +768,13 @@ const forgotPassword = async (req, res) => {
       });
       userType = "admin";
       console.log("🔍 Checking admin collection first (admin-specific request)");
+    } else if (requestedUserType === "checker") {
+      // QC checker-specific request - check the qc_checkers collection.
+      user = await prisma.qCChecker.findUnique({
+        where: { email },
+      });
+      userType = "checker";
+      console.log("🔍 Checking QC checker collection (checker-specific request)");
     } else {
       // Regular user or auto-detect - check in order: user → admin → vendor
       user = await prisma.user.findUnique({
@@ -826,6 +833,15 @@ const forgotPassword = async (req, res) => {
         },
       });
       console.log("✅ Vendor reset token saved");
+    } else if (userType === "checker") {
+      await prisma.qCChecker.update({
+        where: { id: user.id },
+        data: {
+          resetToken,
+          resetTokenExpiry,
+        },
+      });
+      console.log("✅ QC checker reset token saved");
     } else {
       await prisma.user.update({
         where: { id: user.id },
@@ -852,6 +868,11 @@ const forgotPassword = async (req, res) => {
       resetUrl = `${process.env.FRONTEND_URL}/admin/reset-password?token=${resetToken}`;
       userName = user.name;
       accountType = "Admin Account";
+    } else if (userType === "checker") {
+      resetUrl = `${process.env.FRONTEND_URL}/checker/reset-password?token=${resetToken}`;
+      userName = user.name;
+      accountType = "QC Checker Account";
+      console.log("🔗 QC checker reset URL:", resetUrl);
     } else {
       resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
       userName = user.name;
@@ -943,6 +964,18 @@ const resetPassword = async (req, res) => {
     }
 
     if (!user) {
+      user = await prisma.qCChecker.findFirst({
+        where: {
+          resetToken: token,
+          resetTokenExpiry: {
+            gt: new Date(),
+          },
+        },
+      });
+      userType = "checker";
+    }
+
+    if (!user) {
       console.log("❌ No user found with valid reset token");
       // Check if token exists but is expired
       const expiredUser = await prisma.vendor.findFirst({
@@ -991,6 +1024,16 @@ const resetPassword = async (req, res) => {
       console.log("✅ Vendor password updated successfully");
       console.log("📧 Vendor email:", updatedVendor.email);
       console.log("🏢 Company:", updatedVendor.companyName);
+    } else if (userType === "checker") {
+      await prisma.qCChecker.update({
+        where: { id: user.id },
+        data: {
+          password: hashedPassword,
+          resetToken: null,
+          resetTokenExpiry: null,
+        },
+      });
+      console.log("✅ QC checker password updated successfully");
     } else {
       await prisma.user.update({
         where: { id: user.id },

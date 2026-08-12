@@ -11,9 +11,10 @@ import Dropdown from '@/components/UI/Dropdown'
 import DateRangeCalendar from '@/components/Shared/DateRangeCalendar'
 import {
   Edit, Eye, CheckCircle, XCircle, Search, Plus,
-  ChevronLeft, ChevronRight, RotateCcw,
+  RotateCcw,
   Building2, Clock, AlertTriangle, Bell,
 } from 'lucide-react'
+import Pagination from '@/components/UI/Pagination'
 import VendorService, { VendorProfile, VendorFilters } from '@/services/vendorService'
 import { formatDate } from '@/lib/utils'
 import RejectionModal from './RejectionModal'
@@ -21,18 +22,6 @@ import SuspensionModal from './SuspensionModal'
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 import { toast } from '@/hooks/use-toast'
 import { hasPermission } from '@/lib/auth'
-
-function getPageRange(current: number, total: number): Array<number | '…'> {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-  const pages: Array<number | '…'> = [1]
-  if (current > 4) pages.push('…')
-  const start = Math.max(2, current - 1)
-  const end = Math.min(total - 1, current + 1)
-  for (let p = start; p <= end; p++) pages.push(p)
-  if (current < total - 3) pages.push('…')
-  pages.push(total)
-  return pages
-}
 
 const getStatusBadge = (status: string) => {
   switch (status.toUpperCase()) {
@@ -807,49 +796,12 @@ export default function VendorsTable() {
             </div>
 
             {/* Pagination */}
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between gap-4 px-5 py-3.5 border-t border-slate-100">
-                <span className="text-xs text-slate-400 hidden sm:block">
-                  Page {pagination.page} of {pagination.pages}
-                </span>
-                <div className="flex items-center gap-1 ml-auto">
-                  <button
-                    onClick={() => handlePageChange(pagination.page - 1)}
-                    disabled={pagination.page <= 1}
-                    className="p-2 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    aria-label="Previous page"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  {getPageRange(pagination.page, pagination.pages).map((p, i) =>
-                    p === '…' ? (
-                      <span key={`e-${i}`} className="px-2 text-slate-400 text-sm">…</span>
-                    ) : (
-                      <button
-                        key={`p-${p}`}
-                        onClick={() => handlePageChange(p as number)}
-                        aria-current={p === pagination.page ? 'page' : undefined}
-                        className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${
-                          p === pagination.page
-                            ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/20'
-                            : 'text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    )
-                  )}
-                  <button
-                    onClick={() => handlePageChange(pagination.page + 1)}
-                    disabled={pagination.page >= pagination.pages}
-                    className="p-2 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    aria-label="Next page"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              page={pagination.page}
+              totalPages={pagination.pages}
+              onChange={handlePageChange}
+              disabled={loading}
+            />
           </>
         )}
       </div>

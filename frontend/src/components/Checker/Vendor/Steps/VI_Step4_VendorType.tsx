@@ -83,7 +83,7 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
   return (
     <div className="space-y-10">
       <div className="border-b border-slate-200 pb-6">
-        <h2 className="text-2xl font-bold text-slate-900 mb-1">Vendor Type & Products</h2>
+        <h2 className="text-2xl font-bold text-slate-900 mb-1">Vendor & Products</h2>
         <p className="text-slate-500 text-sm">Verify vendor type, product categories, and market focus.</p>
       </div>
 
@@ -107,12 +107,16 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
         </SectionBlock>
       )}
 
-      {/* Category Product Photos — one card per category, products inside */}
+      {/* Category Product Photos — one card per category, products inside.
+          Categories with multiple products span the full row; single-product
+          categories pack two per row. */}
       {categoryGroups.length > 0 && (
-        <SectionBlock title="Product Photos (by Category)" icon={<ImageIcon className="w-4 h-4" />}>
-          <div className="space-y-6">
-            {categoryGroups.map((group) => (
-              <div key={group.key} className="bg-slate-50/60 border border-slate-200 rounded-xl p-5 space-y-4">
+        <SectionBlock title="Products (By Category)" icon={<ImageIcon className="w-4 h-4" />}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {categoryGroups.map((group) => {
+              const isWide = group.photos.length > 1
+              return (
+              <div key={group.key} className={`bg-slate-50/60 border border-slate-200 rounded-xl p-5 space-y-4 ${isWide ? 'lg:col-span-2' : ''}`}>
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
                   <span className="w-2 h-2 rounded-full bg-brand-500" />
                   <p className="text-sm font-bold text-slate-800">{group.name}</p>
@@ -120,7 +124,7 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
                     {group.photos.length} {group.photos.length === 1 ? 'Photo' : 'Photos'}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={`grid gap-4 ${isWide ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
                   {group.photos.map((photo) => (
                     <VerifyField
                       key={photo.fieldIdx}
@@ -135,7 +139,8 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
                   ))}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </SectionBlock>
       )}

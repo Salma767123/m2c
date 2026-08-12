@@ -4,79 +4,36 @@ import { useState, useRef, useEffect } from 'react'
 import CompanyLogo from '@/components/Shared/CompanyLogo'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
-import { 
-  Mail, 
-  ArrowLeft, 
-  AlertCircle,
-  CheckCircle,
-  Send,
-  Package
-} from 'lucide-react'
+import { Mail, ArrowLeft, AlertCircle, CheckCircle, Send, ShieldCheck } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Link from 'next/link'
 import axios from '@/lib/axios'
 
-interface ForgotPasswordData {
-  email: string
-}
-
-export default function VendorForgotPassword() {
+export default function CheckerForgotPassword() {
   const [isLoading, setIsLoading] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
-  const [emailError, setEmailError] = useState("")
-  const [formData, setFormData] = useState<ForgotPasswordData>({
-    email: ''
-  })
+  const [emailError, setEmailError] = useState('')
+  const [email, setEmail] = useState('')
   const emailInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (emailInputRef.current) {
-      emailInputRef.current.focus()
-    }
+    emailInputRef.current?.focus()
   }, [])
 
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(email)
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-    
-    if (name === 'email' && emailError) {
-      setEmailError("")
-    }
-  }
+  const validateEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!formData.email.trim()) {
-      setEmailError("Email is required")
-      return
-    }
-
-    if (!validateEmail(formData.email)) {
-      setEmailError("Please enter a valid email address")
-      return
-    }
+    if (!email.trim()) return setEmailError('Email is required')
+    if (!validateEmail(email)) return setEmailError('Please enter a valid email address')
 
     setIsLoading(true)
-    setEmailError("")
-
+    setEmailError('')
     try {
-      console.log('Making request using axios instance...')
-      console.log('Axios baseURL:', axios.defaults.baseURL)
-      
-      const response = await axios.post('/auth/forgot-password', { 
-        email: formData.email,
-        userType: 'vendor' // Specify this is a vendor request
+      const response = await axios.post('/auth/forgot-password', {
+        email,
+        userType: 'checker', // QC checker request
       })
-
       if (response.data.success) {
         setEmailSent(true)
         showSuccessToast('Password Reset Email Sent', 'Check your email for reset instructions')
@@ -84,15 +41,7 @@ export default function VendorForgotPassword() {
         throw new Error(response.data.error || 'Failed to send reset email')
       }
     } catch (error: any) {
-      console.error('Forgot password error:', error)
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        config: error.config
-      })
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to send reset email'
-      showErrorToast('Reset Failed', errorMessage)
+      showErrorToast('Reset Failed', error.response?.data?.error || error.message || 'Failed to send reset email')
     } finally {
       setIsLoading(false)
     }
@@ -100,40 +49,23 @@ export default function VendorForgotPassword() {
 
   const handleResendEmail = () => {
     setEmailSent(false)
-    setFormData({ email: '' })
-    setTimeout(() => {
-      if (emailInputRef.current) {
-        emailInputRef.current.focus()
-      }
-    }, 100)
+    setEmail('')
+    setTimeout(() => emailInputRef.current?.focus(), 100)
   }
 
   if (emailSent) {
     return (
       <div className="min-h-screen flex bg-white font-sans">
-        {/* Left Side - Professional Branding */}
         <div className="hidden lg:flex lg:flex-1 relative bg-gradient-to-br from-brand-600 to-brand-700">
           <div className="flex items-center justify-center w-full p-12">
             <div className="max-w-lg text-center text-white">
-              {/* Logo Section */}
               <div className="mb-8">
                 <div className="inline-flex items-center justify-center w-44 h-36 mb-6">
-                  <CompanyLogo
-                    className="w-[190px] h-[150px] object-contain"
-                    skeletonClassName="h-[150px] aspect-square bg-white/10"
-                    fallbackWidth={190}
-                    fallbackHeight={150}
-                  />
+                  <CompanyLogo className="w-[190px] h-[150px] object-contain" skeletonClassName="h-[150px] aspect-square bg-white/10" fallbackWidth={190} fallbackHeight={150} />
                 </div>
-                <h1 className="text-4xl font-bold mb-3">
-                  Vendor Portal
-                </h1>
-                <p className="text-xl text-white/90 font-medium">
-                  Password Reset Assistance
-                </p>
+                <h1 className="text-4xl font-bold mb-3">QC Checker Portal</h1>
+                <p className="text-xl text-white/90 font-medium">Password Reset Assistance</p>
               </div>
-
-              {/* Success Message */}
               <div className="bg-white/20 backdrop-blur-md rounded-xl p-6">
                 <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-white mb-2">Email Sent Successfully</h3>
@@ -143,7 +75,6 @@ export default function VendorForgotPassword() {
           </div>
         </div>
 
-        {/* Right Side - Success Message */}
         <div className="flex-1 flex items-center justify-center px-6 py-12 bg-gray-50">
           <div className="max-w-md w-full">
             <Card className="shadow-2xl border-0 bg-white">
@@ -151,20 +82,13 @@ export default function VendorForgotPassword() {
                 <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                   <CheckCircle className="w-8 h-8 text-green-600" />
                 </div>
-                <CardTitle className="text-2xl font-bold text-gray-900">
-                  Check Your Email
-                </CardTitle>
+                <CardTitle className="text-2xl font-bold text-gray-900">Check Your Email</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="text-center">
-                  <p className="text-gray-600 mb-4">
-                    We've sent a password reset link to:
-                  </p>
-                  <p className="font-semibold text-gray-900 bg-gray-50 p-3 rounded-lg">
-                    {formData.email}
-                  </p>
+                  <p className="text-gray-600 mb-4">We&apos;ve sent a password reset link to:</p>
+                  <p className="font-semibold text-gray-900 bg-gray-50 p-3 rounded-lg">{email}</p>
                 </div>
-                
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-start space-x-3">
                     <Mail className="w-5 h-5 text-blue-600 mt-0.5" />
@@ -178,21 +102,13 @@ export default function VendorForgotPassword() {
                     </div>
                   </div>
                 </div>
-
                 <div className="space-y-3">
-                  <Button
-                    onClick={handleResendEmail}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    Send Another Email
+                  <Button onClick={handleResendEmail} variant="outline" className="w-full">
+                    <Send className="w-4 h-4 mr-2" /> Send Another Email
                   </Button>
-                  
-                  <Link href="/vendor">
+                  <Link href="/checker">
                     <Button variant="ghost" className="w-full">
-                      <ArrowLeft className="w-4 w-4 mr-2" />
-                      Back to Vendor Login
+                      <ArrowLeft className="w-4 h-4 mr-2" /> Back to Checker Login
                     </Button>
                   </Link>
                 </div>
@@ -206,37 +122,22 @@ export default function VendorForgotPassword() {
 
   return (
     <div className="min-h-screen flex bg-white font-sans">
-      {/* Left Side - Professional Branding */}
       <div className="hidden lg:flex lg:flex-1 relative bg-gradient-to-br from-brand-600 to-brand-700">
         <div className="flex items-center justify-center w-full p-12">
           <div className="max-w-lg text-center text-white">
-            {/* Logo Section */}
             <div className="mb-8">
               <div className="inline-flex items-center justify-center w-44 h-36 mb-6">
-                <CompanyLogo
-                  className="w-[190px] h-[150px] object-contain"
-                  skeletonClassName="h-[150px] aspect-square bg-white/10"
-                  fallbackWidth={190}
-                  fallbackHeight={150}
-                />
+                <CompanyLogo className="w-[190px] h-[150px] object-contain" skeletonClassName="h-[150px] aspect-square bg-white/10" fallbackWidth={190} fallbackHeight={150} />
               </div>
-              <h1 className="text-4xl font-bold mb-3">
-                Vendor Portal
-              </h1>
-              <p className="text-xl text-white/90 font-medium">
-                Reset Your Password
-              </p>
+              <h1 className="text-4xl font-bold mb-3">QC Checker Portal</h1>
+              <p className="text-xl text-white/90 font-medium">Reset Your Password</p>
             </div>
-
-            {/* Help Information */}
             <div className="bg-white/20 backdrop-blur-md rounded-xl p-6">
-              <Package className="w-12 h-12 text-white mx-auto mb-4" />
+              <ShieldCheck className="w-12 h-12 text-white mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-white mb-2">Need Help?</h3>
-              <p className="text-white/80 mb-4">
-                Enter your vendor account email address and we'll send you a secure link to reset your password.
-              </p>
+              <p className="text-white/80 mb-4">Enter your QC checker account email address and we&apos;ll send you a secure link to reset your password.</p>
               <div className="text-sm text-white/70">
-                <p>• Check your spam folder if you don't see the email</p>
+                <p>• Check your spam folder if you don&apos;t see the email</p>
                 <p>• The reset link expires in 1 hour</p>
                 <p>• Contact support if you need assistance</p>
               </div>
@@ -245,7 +146,6 @@ export default function VendorForgotPassword() {
         </div>
       </div>
 
-      {/* Right Side - Forgot Password Form */}
       <div className="flex-1 flex items-center justify-center px-6 py-12 bg-gray-50">
         <div className="max-w-md w-full">
           <Card className="shadow-2xl border-0 bg-white">
@@ -253,51 +153,35 @@ export default function VendorForgotPassword() {
               <div className="mx-auto w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mb-4">
                 <Mail className="w-8 h-8 text-brand-500" />
               </div>
-              <CardTitle className="text-2xl font-bold text-gray-900">
-                Forgot Password?
-              </CardTitle>
-              <p className="text-gray-600 mt-2">
-                Enter your vendor account email address and we'll send you a link to reset your password.
-              </p>
+              <CardTitle className="text-2xl font-bold text-gray-900">Forgot Password?</CardTitle>
+              <p className="text-gray-600 mt-2">Enter your QC checker account email address and we&apos;ll send you a link to reset your password.</p>
             </CardHeader>
-            
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                    Email Address
-                  </label>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email Address</label>
                   <div className="relative">
                     <input
                       ref={emailInputRef}
                       type="email"
                       id="email"
                       name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-3 pl-11 border rounded-lg focus:ring-2 focus:border-transparent transition-colors ${
-                        emailError 
-                          ? 'border-red-300 bg-red-50 focus:ring-red-200' 
-                          : 'border-gray-300 focus:ring-brand-500/40 focus:border-brand-500'
-                      }`}
-                      placeholder="Enter your vendor email address"
+                      value={email}
+                      onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError('') }}
+                      className={`w-full px-4 py-3 pl-11 border rounded-lg focus:ring-2 focus:border-transparent transition-colors ${emailError ? 'border-red-300 bg-red-50 focus:ring-red-200' : 'border-gray-300 focus:ring-brand-500/40 focus:border-brand-500'}`}
+                      placeholder="Enter your checker email address"
                       disabled={isLoading}
                     />
                     <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   </div>
                   {emailError && (
                     <div className="flex items-center space-x-2 text-red-600 text-sm">
-                      <AlertCircle className="w-4 h-4" />
-                      <span>{emailError}</span>
+                      <AlertCircle className="w-4 h-4" /> <span>{emailError}</span>
                     </div>
                   )}
                 </div>
 
-                <Button
-                  type="submit"
-                  className="w-full bg-brand-500 hover:bg-brand-600 text-white py-3"
-                  disabled={isLoading}
-                >
+                <Button type="submit" className="w-full bg-brand-500 hover:bg-brand-600 text-white py-3" disabled={isLoading}>
                   {isLoading ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -305,19 +189,14 @@ export default function VendorForgotPassword() {
                     </>
                   ) : (
                     <>
-                      <Send className="w-4 h-4 mr-2" />
-                      Send Reset Link
+                      <Send className="w-4 h-4 mr-2" /> Send Reset Link
                     </>
                   )}
                 </Button>
 
                 <div className="text-center">
-                  <Link 
-                    href="/vendor"
-                    className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 transition-colors"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-1" />
-                    Back to Vendor Login
+                  <Link href="/checker" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                    <ArrowLeft className="w-4 h-4 mr-1" /> Back to Checker Login
                   </Link>
                 </div>
               </form>

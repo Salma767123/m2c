@@ -11,10 +11,9 @@ import {
     Search,
     RotateCw,
     X,
-    ChevronLeft,
-    ChevronRight,
 } from 'lucide-react'
 import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar'
+import Pagination from '@/components/UI/Pagination'
 import { showErrorToast } from '@/lib/toast-utils'
 import { qcCheckerService } from '@/services/qcCheckerService'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -573,82 +572,12 @@ export default function Products() {
                 </div>
             )}
 
-            {pagination.totalPages > 1 && (
-                <Pagination
-                    page={pagination.page}
-                    totalPages={pagination.totalPages}
-                    onChange={setPage}
-                    disabled={loading}
-                />
-            )}
+            <Pagination
+                page={pagination.page}
+                totalPages={pagination.totalPages}
+                onChange={setPage}
+                disabled={loading}
+            />
         </div>
     )
-}
-
-function Pagination({
-    page,
-    totalPages,
-    onChange,
-    disabled,
-}: {
-    page: number
-    totalPages: number
-    onChange: (p: number) => void
-    disabled?: boolean
-}) {
-    const pages = getPageRange(page, totalPages)
-    return (
-        <nav aria-label="Pagination" className="mt-2 flex items-center justify-center gap-1 flex-wrap">
-            <button
-                type="button"
-                onClick={() => onChange(page - 1)}
-                disabled={disabled || page <= 1}
-                aria-label="Previous page"
-                className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-                <ChevronLeft className="w-4 h-4" /> Prev
-            </button>
-            {pages.map((p, i) =>
-                p === '…' ? (
-                    <span key={`ellipsis-${i}`} className="px-2 text-slate-400" aria-hidden="true">…</span>
-                ) : (
-                    <button
-                        key={p}
-                        type="button"
-                        onClick={() => onChange(p)}
-                        disabled={disabled}
-                        aria-current={p === page ? 'page' : undefined}
-                        aria-label={`Go to page ${p}`}
-                        className={`min-w-9 px-3 py-2 rounded-lg border font-medium ${p === page
-                            ? 'bg-brand-500 text-white border-brand-500'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                            } disabled:opacity-40 disabled:cursor-not-allowed`}
-                    >
-                        {p}
-                    </button>
-                )
-            )}
-            <button
-                type="button"
-                onClick={() => onChange(page + 1)}
-                disabled={disabled || page >= totalPages}
-                aria-label="Next page"
-                className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-                Next <ChevronRight className="w-4 h-4" />
-            </button>
-        </nav>
-    )
-}
-
-function getPageRange(current: number, total: number): Array<number | '…'> {
-    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-    const pages: Array<number | '…'> = [1]
-    if (current > 4) pages.push('…')
-    const start = Math.max(2, current - 1)
-    const end = Math.min(total - 1, current + 1)
-    for (let p = start; p <= end; p++) pages.push(p)
-    if (current < total - 3) pages.push('…')
-    pages.push(total)
-    return pages
 }
