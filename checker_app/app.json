@@ -70,7 +70,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "35802f1f-f8cf-46ff-93a7-a3077e3cd19e"
+        "projectId": "9ce0af85-d923-4571-8ba0-7aef197562f6"
       }
     },
     "runtimeVersion": {
@@ -79,6 +79,6 @@
     "updates": {
       "url": "https://u.expo.dev/a0631327-c1cb-48c8-8e54-374e9b4cf0ed"
     },
-    "owner": "kansha2312"
+    "owner": "karneyar"
   }
 }

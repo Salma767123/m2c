@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { CheckCircle2, XCircle, Camera } from 'lucide-react-native';
+import { Check, X, Camera } from 'lucide-react-native';
 import type { PackagingItem } from '../PI_data';
 import { CODE_LABELS } from '../PI_data';
 import { StepHeader, Card, ErrorBanner, PhotoGrid, RemarkInput, Photo } from './piShared';
+import { InvalidAnchor } from './piValidation';
+import type { ScrollNavHandlers } from '@/components/General/ScrollNav';
 
 // ── Remark-code colouring — mirrors web codeClass / codeBadge ────────────────
 // 1-5 → REJECTED (red)   6-7 → RE-INSPECTION (amber)   8-10 → PASS (emerald)
@@ -36,20 +38,31 @@ interface Props {
   };
   setFormData: (d: any) => void;
   errors?: Record<string, string>;
+  scrollNav?: ScrollNavHandlers;
+  /** 'VIRTUAL' allows gallery uploads; 'PHYSICAL' is camera-only. */
+  inspectionType?: 'PHYSICAL' | 'VIRTUAL' | null;
 }
 
 function PackagingRow({
   item,
+  invalid = false,
   onChange,
 }: {
   item: PackagingItem;
+  /** This is the item blocking Next — highlight it and be the scroll target. */
+  invalid?: boolean;
   onChange: (patch: Partial<PackagingItem>) => void;
 }) {
   const needsRemarks = item.remarkCode !== null && item.remarkCode <= 7;
-  const borderCls = item.verified === true ? 'border-emerald-200' : 'border-slate-200';
+  const borderCls = invalid
+    ? 'border-red-500'
+    : item.verified === true
+    ? 'border-emerald-200'
+    : 'border-slate-200';
 
   return (
-    <View className={`border rounded-2xl overflow-hidden mb-4 bg-white ${borderCls}`}>
+    <InvalidAnchor errorKey="packagingItems" invalid={invalid} style={{ marginBottom: 16 }}>
+    <View className={`border rounded-2xl overflow-hidden bg-white ${borderCls}`}>
       {/* Header */}
       <View className="px-4 py-3 border-b border-slate-100">
         <Text className="text-sm font-bold text-slate-900">{item.label}</Text>
@@ -57,28 +70,48 @@ function PackagingRow({
       </View>
 
       {/* Yes / No */}
-      <View className="px-4 py-3 border-b border-slate-100 flex-row items-center" style={{ columnGap: 24 }}>
-        <Text className="text-[11px] font-semibold text-slate-600 uppercase mr-1">Inspected?</Text>
-        <TouchableOpacity
-          className="flex-row items-center"
-          activeOpacity={0.7}
-          onPress={() => onChange({ verified: true, remarkCode: item.remarkCode ?? null })}
-        >
-          <CheckCircle2 size={16} color={item.verified === true ? '#059669' : '#94a3b8'} />
-          <Text className={`ml-1.5 text-sm font-semibold ${item.verified === true ? 'text-emerald-700' : 'text-slate-500'}`}>
-            Yes
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          className="flex-row items-center"
-          activeOpacity={0.7}
-          onPress={() => onChange({ verified: false, remarkCode: null, remarks: '' })}
-        >
-          <XCircle size={16} color={item.verified === false ? '#475569' : '#94a3b8'} />
-          <Text className={`ml-1.5 text-sm font-semibold ${item.verified === false ? 'text-slate-700' : 'text-slate-500'}`}>
-            No
-          </Text>
-        </TouchableOpacity>
+      <View className="px-3 py-2.5 border-b border-slate-100">
+        <Text className="text-[11px] font-semibold text-slate-600 uppercase mb-2">Inspected?</Text>
+        <View className="flex-row" style={{ columnGap: 8 }}>
+          <TouchableOpacity
+            onPress={() => onChange({ verified: true, remarkCode: item.remarkCode ?? null })}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: item.verified === true }}
+            className={`flex-1 flex-row items-center justify-center rounded-lg border-2 py-2 ${
+              item.verified === true ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300 bg-white'
+            }`}
+            style={{ columnGap: 6 }}
+          >
+            <View
+              className={`w-5 h-5 rounded-full items-center justify-center ${
+                item.verified === true ? 'bg-white' : 'border-2 border-slate-300'
+              }`}
+            >
+              {item.verified === true && <Check size={13} color="#059669" strokeWidth={3.5} />}
+            </View>
+            <Text className={`text-sm font-bold ${item.verified === true ? 'text-white' : 'text-slate-600'}`}>Yes</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => onChange({ verified: false, remarkCode: null, remarks: '' })}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: item.verified === false }}
+            className={`flex-1 flex-row items-center justify-center rounded-lg border-2 py-2 ${
+              item.verified === false ? 'border-red-600 bg-red-600' : 'border-slate-300 bg-white'
+            }`}
+            style={{ columnGap: 6 }}
+          >
+            <View
+              className={`w-5 h-5 rounded-full items-center justify-center ${
+                item.verified === false ? 'bg-white' : 'border-2 border-slate-300'
+              }`}
+            >
+              {item.verified === false && <X size={13} color="#dc2626" strokeWidth={3.5} />}
+            </View>
+            <Text className={`text-sm font-bold ${item.verified === false ? 'text-white' : 'text-slate-600'}`}>No</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Remark code picker — only when Yes */}
@@ -136,11 +169,27 @@ function PackagingRow({
         </View>
       )}
     </View>
+    </InvalidAnchor>
   );
 }
 
-export default function PI_Step3_PackagingInspection({ formData, setFormData, errors = {} }: Props) {
+export default function PI_Step3_PackagingInspection({ formData, setFormData, errors = {}, scrollNav, inspectionType }: Props) {
   const items: PackagingItem[] = formData.packagingItems || [];
+
+  // Mirror the Next-gate validation so, when the step is blocked, we can point
+  // at and highlight the exact offending item — the same order validateStep
+  // uses, so the highlighted row is always the one the message names.
+  const firstInvalidItemId: string | null = (() => {
+    if (!errors.packagingItems) return null;
+    const unanswered = items.find((it) => it.verified === null || it.verified === undefined);
+    if (unanswered) return unanswered.id;
+    for (const it of items) {
+      if (it.verified !== true) continue;
+      if (it.remarkCode === null) return it.id;
+      if (it.remarkCode <= 7 && !String(it.remarks || '').trim()) return it.id;
+    }
+    return null;
+  })();
 
   const updateItem = (id: string, patch: Partial<PackagingItem>) => {
     setFormData({
@@ -159,7 +208,7 @@ export default function PI_Step3_PackagingInspection({ formData, setFormData, er
   };
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView showsVerticalScrollIndicator={false} {...scrollNav}>
       <StepHeader
         title="Packaging Inspection"
         subtitle="For each packaging item, mark whether it was inspected. If yes, select a remark code — codes 1–7 require remarks describing the findings."
@@ -184,22 +233,30 @@ export default function PI_Step3_PackagingInspection({ formData, setFormData, er
       </View>
 
       {items.map((item) => (
-        <PackagingRow key={item.id} item={item} onChange={(patch) => updateItem(item.id, patch)} />
+        <PackagingRow
+          key={item.id}
+          item={item}
+          invalid={item.id === firstInvalidItemId}
+          onChange={(patch) => updateItem(item.id, patch)}
+        />
       ))}
 
       {/* Photo upload */}
-      <Card title="Packaging Photos" icon={<Camera size={16} color="#e01a1b" />} right={
-        errors.packagingPhotos ? <Text className="text-xs text-red-600 font-medium">{errors.packagingPhotos}</Text> : undefined
-      }>
-        <PhotoGrid
-          photos={formData.packagingPhotos || []}
-          onAdd={addPhotos}
-          onRemove={removePhoto}
-          addLabel="Upload packaging photo"
-          allowMultiple
-          hasError={!!errors.packagingPhotos}
-        />
-      </Card>
+      <InvalidAnchor errorKey="packagingPhotos" invalid={!!errors.packagingPhotos}>
+        <Card title="Packaging Photos" icon={<Camera size={16} color="#e01a1b" />} right={
+          errors.packagingPhotos ? <Text className="text-xs text-red-600 font-medium">{errors.packagingPhotos}</Text> : undefined
+        }>
+          <PhotoGrid
+            photos={formData.packagingPhotos || []}
+            onAdd={addPhotos}
+            onRemove={removePhoto}
+            addLabel="Upload packaging photo"
+            allowMultiple
+            hasError={!!errors.packagingPhotos}
+            inspectionType={inspectionType}
+          />
+        </Card>
+      </InvalidAnchor>
 
       <View className="h-6" />
     </ScrollView>

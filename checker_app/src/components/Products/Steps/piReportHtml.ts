@@ -19,6 +19,12 @@ const esc = (s?: unknown): string => {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 };
 
+// YYYY-MM-DD → DD-MM-YYYY for the printed report (matches the form's display).
+const fmtDMY = (value?: string | null): string => {
+  const m = String(value ?? '').trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : String(value ?? '');
+};
+
 export interface ReportMeta {
   productName: string;
   vendorName: string;
@@ -92,7 +98,7 @@ function buildHtml(formData: any, meta: ReportMeta, clientSignatureDataUrl?: str
     <div class="meta">Vendor: <b>${esc(meta.vendorName)}</b></div>
     <div class="meta">Inspector: ${esc(meta.inspectorName)}</div>
     <div class="meta">Service Type: ${esc(d.serviceType)}</div>
-    <div class="meta">Inspection Date: ${esc(d.serviceStartDate)}</div>
+    <div class="meta">Inspection Date: ${esc(fmtDMY(d.serviceStartDate))}</div>
     <div class="meta">Status: ${esc(d.inspectionStatus)}</div>
     <div class="meta">Generated: ${esc(meta.generatedAt.toLocaleString())}</div>
     ${meta.location ? `<div class="meta">Location: ${meta.location.latitude.toFixed(5)}, ${meta.location.longitude.toFixed(5)}</div>` : ''}

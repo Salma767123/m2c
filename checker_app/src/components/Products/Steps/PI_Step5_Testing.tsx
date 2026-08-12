@@ -9,10 +9,24 @@ import {
   Trash2,
   Images,
   Camera,
+  Package,
+  Box,
+  Ruler,
+  Zap,
 } from 'lucide-react-native';
 import type { TestGroup, TestItem } from '../PI_data';
 import { ADDITIONAL_EVIDENCE_DEFS } from '../PI_data';
 import { StepHeader, Card, ErrorBanner, PhotoGrid, RemarkInput, Photo } from './piShared';
+import { InvalidAnchor } from './piValidation';
+import type { ScrollNavHandlers } from '@/components/General/ScrollNav';
+
+// ── Group icon map (matches web) ─────────────────────────────────────────────
+const GROUP_ICONS: Record<string, React.ReactNode> = {
+  packagingVerification: <Package size={16} color="#e01a1b" />,
+  productVerification: <Box size={16} color="#e01a1b" />,
+  measurementInspection: <Ruler size={16} color="#e01a1b" />,
+  functionalTests: <Zap size={16} color="#e01a1b" />,
+};
 
 interface Props {
   formData: {
@@ -21,23 +35,37 @@ interface Props {
   };
   setFormData: (d: any) => void;
   errors?: Record<string, string>;
+  scrollNav?: ScrollNavHandlers;
+  /** 'VIRTUAL' allows gallery uploads; 'PHYSICAL' is camera-only. */
+  inspectionType?: 'PHYSICAL' | 'VIRTUAL' | null;
 }
 
 // ── Single test row ──────────────────────────────────────────────────────────
 function TestRow({
   test,
   onChange,
+  inspectionType,
+  invalid = false,
 }: {
   test: TestItem;
   onChange: (patch: Partial<TestItem>) => void;
+  inspectionType?: 'PHYSICAL' | 'VIRTUAL' | null;
+  invalid?: boolean;
 }) {
   const togglePass = () => (test.pass ? onChange({ pass: null }) : onChange({ pass: true, fail: null }));
   const toggleFail = () => (test.fail ? onChange({ fail: null }) : onChange({ fail: true, pass: null }));
 
-  const borderCls = test.pass ? 'border-emerald-200 bg-emerald-50' : test.fail ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white';
+  const borderCls = invalid
+    ? 'border-red-500 bg-red-50'
+    : test.pass
+    ? 'border-emerald-200 bg-emerald-50'
+    : test.fail
+    ? 'border-red-200 bg-red-50'
+    : 'border-slate-200 bg-white';
 
   return (
-    <View className={`border rounded-xl overflow-hidden mb-3 ${borderCls}`}>
+    <InvalidAnchor errorKey="testGroups" invalid={invalid} style={{ marginBottom: 12 }} radius={12}>
+    <View className={`border rounded-xl overflow-hidden ${borderCls}`}>
       <View className="px-3 py-3 flex-row items-center">
         <Text className="text-sm font-medium text-slate-800 flex-1 pr-2">{test.label}</Text>
         <View className="flex-row" style={{ columnGap: 8 }}>
@@ -69,15 +97,11 @@ function TestRow({
               <Text className="text-xs font-semibold text-emerald-700 mb-1">Correct / Right Photo</Text>
               <PhotoGrid
                 photos={test.rightPhotos}
-                onAdd={(ph) => onChange({ rightPhotos: [...test.rightPhotos, ...ph] })}
-                onRemove={(i) => {
-                  const next = [...test.rightPhotos];
-                  next.splice(i, 1);
-                  onChange({ rightPhotos: next });
-                }}
+                onAdd={(ph) => onChange({ rightPhotos: ph.slice(0, 1) })}
+                onRemove={() => onChange({ rightPhotos: [] })}
                 addLabel="Add right photo"
-                allowMultiple
                 thumb={56}
+                inspectionType={inspectionType}
               />
             </View>
           )}
@@ -87,15 +111,11 @@ function TestRow({
                 <Text className="text-xs font-semibold text-red-700 mb-1">Wrong / Incorrect Photo</Text>
                 <PhotoGrid
                   photos={test.wrongPhotos}
-                  onAdd={(ph) => onChange({ wrongPhotos: [...test.wrongPhotos, ...ph] })}
-                  onRemove={(i) => {
-                    const next = [...test.wrongPhotos];
-                    next.splice(i, 1);
-                    onChange({ wrongPhotos: next });
-                  }}
+                  onAdd={(ph) => onChange({ wrongPhotos: ph.slice(0, 1) })}
+                  onRemove={() => onChange({ wrongPhotos: [] })}
                   addLabel="Add wrong photo"
-                  allowMultiple
                   thumb={56}
+                  inspectionType={inspectionType}
                 />
               </View>
               <Text className="text-xs font-semibold text-slate-600 mb-1">Remarks</Text>
@@ -105,6 +125,7 @@ function TestRow({
         </View>
       )}
     </View>
+    </InvalidAnchor>
   );
 }
 
@@ -113,17 +134,28 @@ function OtherTestRow({
   test,
   onChange,
   onRemove,
+  inspectionType,
+  invalid = false,
 }: {
   test: TestItem;
   onChange: (patch: Partial<TestItem>) => void;
   onRemove: () => void;
+  inspectionType?: 'PHYSICAL' | 'VIRTUAL' | null;
+  invalid?: boolean;
 }) {
   const togglePass = () => onChange({ pass: test.pass ? null : true, fail: null });
   const toggleFail = () => onChange({ fail: test.fail ? null : true, pass: null });
-  const borderCls = test.pass ? 'border-emerald-200 bg-emerald-50' : test.fail ? 'border-red-200 bg-red-50' : 'border-brand-200 bg-brand-50';
+  const borderCls = invalid
+    ? 'border-red-500 bg-red-50'
+    : test.pass
+    ? 'border-emerald-200 bg-emerald-50'
+    : test.fail
+    ? 'border-red-200 bg-red-50'
+    : 'border-brand-200 bg-brand-50';
 
   return (
-    <View className={`border rounded-xl overflow-hidden mb-3 ${borderCls}`}>
+    <InvalidAnchor errorKey="testGroups" invalid={invalid} style={{ marginBottom: 12 }} radius={12}>
+    <View className={`border rounded-xl overflow-hidden ${borderCls}`}>
       <View className="px-3 py-3">
         <View className="flex-row items-center justify-between mb-3">
           <Text className="text-xs font-bold text-brand-600 uppercase">Custom Test</Text>
@@ -181,15 +213,11 @@ function OtherTestRow({
               <Text className="text-xs font-semibold text-emerald-700 mb-1">Correct / Right Photo</Text>
               <PhotoGrid
                 photos={test.rightPhotos}
-                onAdd={(ph) => onChange({ rightPhotos: [...test.rightPhotos, ...ph] })}
-                onRemove={(i) => {
-                  const next = [...test.rightPhotos];
-                  next.splice(i, 1);
-                  onChange({ rightPhotos: next });
-                }}
+                onAdd={(ph) => onChange({ rightPhotos: ph.slice(0, 1) })}
+                onRemove={() => onChange({ rightPhotos: [] })}
                 addLabel="Add right photo"
-                allowMultiple
                 thumb={56}
+                inspectionType={inspectionType}
               />
             </View>
           )}
@@ -199,15 +227,11 @@ function OtherTestRow({
                 <Text className="text-xs font-semibold text-red-700 mb-1">Wrong / Incorrect Photo</Text>
                 <PhotoGrid
                   photos={test.wrongPhotos}
-                  onAdd={(ph) => onChange({ wrongPhotos: [...test.wrongPhotos, ...ph] })}
-                  onRemove={(i) => {
-                    const next = [...test.wrongPhotos];
-                    next.splice(i, 1);
-                    onChange({ wrongPhotos: next });
-                  }}
+                  onAdd={(ph) => onChange({ wrongPhotos: ph.slice(0, 1) })}
+                  onRemove={() => onChange({ wrongPhotos: [] })}
                   addLabel="Add wrong photo"
-                  allowMultiple
                   thumb={56}
+                  inspectionType={inspectionType}
                 />
               </View>
               <Text className="text-xs font-semibold text-slate-600 mb-1">Remarks</Text>
@@ -217,22 +241,27 @@ function OtherTestRow({
         </View>
       )}
     </View>
+    </InvalidAnchor>
   );
 }
 
 // ── Collapsible group ────────────────────────────────────────────────────────
 function TestGroupCard({
   group,
+  invalidTestId = null,
   onToggleCollapse,
   onTestChange,
   onAddOther,
   onRemoveOther,
+  inspectionType,
 }: {
   group: TestGroup;
+  invalidTestId?: string | null;
   onToggleCollapse: () => void;
   onTestChange: (testId: string, patch: Partial<TestItem>) => void;
   onAddOther: () => void;
   onRemoveOther: (testId: string) => void;
+  inspectionType?: 'PHYSICAL' | 'VIRTUAL' | null;
 }) {
   const regularTests = group.tests.filter((t) => !t.isOther);
   const otherTests = group.tests.filter((t) => t.isOther);
@@ -240,6 +269,10 @@ function TestGroupCard({
   const failed = group.tests.filter((t) => t.fail).length;
   const total = group.tests.length;
   const done = passed + failed;
+  // Force this group open when it holds the failing test, so the highlighted
+  // row is actually in the DOM for the scroll-to-error to land on.
+  const holdsInvalid = !!invalidTestId && group.tests.some((t) => t.id === invalidTestId);
+  const showTests = !group.collapsed || holdsInvalid;
 
   return (
     <View className="border border-slate-200 rounded-2xl overflow-hidden mb-4">
@@ -248,6 +281,7 @@ function TestGroupCard({
         className="px-4 py-3.5 flex-row items-center bg-slate-50"
         activeOpacity={0.8}
       >
+        <View className="mr-2">{GROUP_ICONS[group.id]}</View>
         <Text className="text-sm font-bold text-slate-800 flex-1">{group.label}</Text>
         {done > 0 && (
           <View className="flex-row items-center mr-2" style={{ columnGap: 6 }}>
@@ -269,17 +303,19 @@ function TestGroupCard({
         {group.collapsed ? <ChevronRight size={16} color="#64748b" /> : <ChevronDown size={16} color="#64748b" />}
       </TouchableOpacity>
 
-      {!group.collapsed && (
+      {showTests && (
         <View className="p-3">
           {regularTests.map((test) => (
-            <TestRow key={test.id} test={test} onChange={(patch) => onTestChange(test.id, patch)} />
+            <TestRow key={test.id} test={test} invalid={test.id === invalidTestId} onChange={(patch) => onTestChange(test.id, patch)} inspectionType={inspectionType} />
           ))}
           {otherTests.map((test) => (
             <OtherTestRow
               key={test.id}
               test={test}
+              invalid={test.id === invalidTestId}
               onChange={(patch) => onTestChange(test.id, patch)}
               onRemove={() => onRemoveOther(test.id)}
+              inspectionType={inspectionType}
             />
           ))}
           <TouchableOpacity
@@ -295,7 +331,7 @@ function TestGroupCard({
   );
 }
 
-export default function PI_Step5_Testing({ formData, setFormData, errors = {} }: Props) {
+export default function PI_Step5_Testing({ formData, setFormData, errors = {}, scrollNav, inspectionType }: Props) {
   const groups: TestGroup[] = formData.testGroups || [];
   const evidence: Record<string, Photo[]> = formData.additionalEvidence || {};
 
@@ -342,16 +378,15 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
     });
   };
 
+  // Only ONE photo allowed per evidence slot — any new pick replaces the old one.
   const addEvidencePhoto = (id: string, photos: Photo[]) => {
     setFormData({
       ...formData,
-      additionalEvidence: { ...evidence, [id]: [...(evidence[id] || []), ...photos] },
+      additionalEvidence: { ...evidence, [id]: photos.slice(0, 1) },
     });
   };
-  const removeEvidence = (id: string, i: number) => {
-    const next = [...(evidence[id] || [])];
-    next.splice(i, 1);
-    setFormData({ ...formData, additionalEvidence: { ...evidence, [id]: next } });
+  const removeEvidence = (id: string) => {
+    setFormData({ ...formData, additionalEvidence: { ...evidence, [id]: [] } });
   };
 
   const allTests = groups.flatMap((g) => g.tests);
@@ -359,8 +394,24 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
   const totalFail = allTests.filter((t) => t.fail).length;
   const totalDone = totalPass + totalFail;
 
+  // Mirror the Next-gate validation so, when blocked, we can point at (and
+  // highlight) the exact failing test.
+  const firstInvalidTestId: string | null = (() => {
+    if (!errors.testGroups) return null;
+    const blank = (s: any) => !s || !String(s).trim();
+    for (const g of groups) {
+      for (const t of g.tests || []) {
+        if (t.isOther && (blank(t.subject) || blank(t.label))) return t.id;
+        if (t.pass !== true && t.fail !== true) return t.id;
+        if (t.pass === true && (!Array.isArray(t.rightPhotos) || t.rightPhotos.length === 0)) return t.id;
+        if (t.fail === true && (!Array.isArray(t.wrongPhotos) || t.wrongPhotos.length === 0)) return t.id;
+      }
+    }
+    return null;
+  })();
+
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView showsVerticalScrollIndicator={false} {...scrollNav}>
       <StepHeader
         title="Testing"
         subtitle="Record Pass / Fail for each test. On Fail: add a wrong photo and remarks. On Pass: add a correct photo."
@@ -386,10 +437,12 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
         <TestGroupCard
           key={group.id}
           group={group}
+          invalidTestId={firstInvalidTestId}
           onToggleCollapse={() => toggleCollapse(group.id)}
           onTestChange={(testId, patch) => updateTest(group.id, testId, patch)}
           onAddOther={() => addOtherTest(group.id)}
           onRemoveOther={(testId) => removeOtherTest(group.id, testId)}
+          inspectionType={inspectionType}
         />
       ))}
 
@@ -403,14 +456,15 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
           key={def.id}
           title={def.label}
           icon={<Camera size={16} color="#e01a1b" />}
-          right={<Text className="text-xs text-slate-500">{(evidence[def.id] || []).length} photo{(evidence[def.id] || []).length !== 1 ? 's' : ''}</Text>}
+          right={<Text className="text-xs text-slate-500">{(evidence[def.id] || []).length} photo</Text>}
         >
           <PhotoGrid
             photos={evidence[def.id] || []}
             onAdd={(ph) => addEvidencePhoto(def.id, ph)}
-            onRemove={(i) => removeEvidence(def.id, i)}
+            onRemove={() => removeEvidence(def.id)}
             addLabel="Add"
-            allowMultiple
+            thumb={56}
+            inspectionType={inspectionType}
           />
         </Card>
       ))}

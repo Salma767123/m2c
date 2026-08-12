@@ -2038,6 +2038,7 @@ import {
   ChevronUp,
 } from 'lucide-react-native';
 import qcCheckerService from '../../services/qcCheckerService';
+import { API_BASE_URL } from '../../lib/apiBase';
 import {
   buildFullName,
   formatLocalLandline,
@@ -2080,8 +2081,7 @@ const proxiedDocUrl = (url: string): string => {
   try {
     const host = new URL(url).hostname;
     if (/^res\.cloudinary\.com$/i.test(host)) {
-      const base = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/+$/, '');
-      return `${base}/document-proxy?url=${encodeURIComponent(url)}`;
+      return `${API_BASE_URL}/document-proxy?url=${encodeURIComponent(url)}`;
     }
   } catch {
     /* non-URL string: return as-is */

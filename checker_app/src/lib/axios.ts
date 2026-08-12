@@ -5,8 +5,10 @@ import axios, {
 } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { API_BASE_URL } from "./apiBase";
+
 const axiosInstance: AxiosInstance = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL,
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -39,7 +41,13 @@ axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error) => {
     const method = error.config?.method?.toUpperCase() || "REQUEST";
-    const url = `${error.config?.baseURL ?? ""}${error.config?.url ?? ""}`;
+    // Join the way axios does. Plain concatenation reports a phantom "//" that
+    // was never in the real request and sends you hunting for the wrong bug.
+    const base = (error.config?.baseURL ?? "").replace(/\/+$/, "");
+    const path = error.config?.url ?? "";
+    const url = /^https?:\/\//i.test(path)
+      ? path
+      : `${base}/${path.replace(/^\/+/, "")}`;
     const reqInfo = `${method} ${url}`;
 
     if (error.response) {

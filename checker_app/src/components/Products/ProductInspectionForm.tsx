@@ -27,6 +27,9 @@ import Defects from './Steps/Defects';
 import PI_Step5_Testing from './Steps/PI_Step5_Testing';
 import PI_Step6_Review from './Steps/PI_Step6_Review';
 import Documentation from './Steps/Documentation';
+import InspectionTypeDialog, { type InspectionType } from './InspectionTypeDialog';
+import { useScrollNav, ScrollNavButton } from '@/components/General/ScrollNav';
+import { PIValidationProvider, useInvalidFieldRegistry } from './Steps/piValidation';
 
 interface Props {
   productId: string;
@@ -55,9 +58,14 @@ export default function ProductInspectionForm({
 }: Props) {
   const insets = useSafeAreaInsets();
   const [currentStep, setCurrentStep] = useState<Step>('generalInformation');
+  const scrollNav = useScrollNav();
+  const invalidFields = useInvalidFieldRegistry();
   const [reviewMode, setReviewMode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<AllErrors>({});
+  // Physical vs virtual — chosen in the mandatory dialog before the form is usable.
+  // Virtual inspections may upload photos from the gallery; physical are camera-only.
+  const [inspectionType, setInspectionType] = useState<InspectionType | null>(null);
 
   // ── Exit-confirmation guard ─────────────────────────────
   const [showExitConfirm, setShowExitConfirm] = useState(false);
@@ -223,8 +231,49 @@ export default function ProductInspectionForm({
     };
   }, [productId, vendorName]);
 
+  // Reset the scroll-nav position whenever the active step changes, since each
+  // step mounts its own ScrollView starting at the top.
+  useEffect(() => {
+    scrollNav.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
+
   const currentStepIndex = STEPS.findIndex((s) => s.id === currentStep);
   const isLastStep = currentStepIndex === STEPS.length - 1;
+
+  // ── Scroll to the field that failed ───────────────────────────────────────
+  // Mirrors the web form: jump to the exact field that blocked Next and pulse a
+  // red ring, instead of leaving the checker to hunt for it. The node is polled
+  // rather than read once — the step still has to render (and Testing has to
+  // expand the collapsed group holding the failing test) before it registers.
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scrollToFirstError = (stepErrors: Record<string, string>) => {
+    const key = Object.keys(stepErrors)[0];
+    if (!key) return;
+    if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    invalidFields.flash(key);
+
+    let attempts = 0;
+    const tryScroll = async () => {
+      const node = invalidFields.getNode(key);
+      if (node && (await scrollNav.scrollToNode(node))) return;
+      if (attempts++ < 8) {
+        scrollTimer.current = setTimeout(tryScroll, 80);
+        return;
+      }
+      // The step never marked a specific field — the error banner is at the top.
+      scrollNav.scrollToTop();
+    };
+    scrollTimer.current = setTimeout(tryScroll, 60);
+  };
+
+  useEffect(
+    () => () => {
+      if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    },
+    [],
+  );
 
   // ── Navigation ────────────────────────────────────────────────────────────
   const nextStep = () => {
@@ -232,6 +281,7 @@ export default function ProductInspectionForm({
     setErrors((prev) => ({ ...prev, [currentStep]: stepErrors }));
     if (hasErrors(stepErrors)) {
       showErrorToast('Please complete this step', firstErrorMessage(stepErrors) || 'Some required fields are missing.');
+      scrollToFirstError(stepErrors);
       return;
     }
 
@@ -286,6 +336,9 @@ export default function ProductInspectionForm({
       if (firstInvalid) {
         setReviewMode(false);
         setCurrentStep(firstInvalid);
+        // The step is about to swap, so its fields have not registered yet —
+        // scrollToFirstError polls, which covers the remount.
+        scrollToFirstError(all[firstInvalid]!);
       }
       showErrorToast('Cannot submit yet', 'Some required fields are missing. Review the highlighted steps.');
       return;
@@ -320,11 +373,12 @@ export default function ProductInspectionForm({
       // (inspectionStatus). Only an explicit "Rejected" hits the reject
       // endpoint; everything else goes through approve, which derives the
       // final approvalStatus from inspectionStatus on the backend.
+      const type = inspectionType ?? 'PHYSICAL';
       if (formData.inspectionStatus === 'Rejected') {
         const reason = (formData.reviewerRemarks || '').trim() || 'Rejected during QC product inspection';
-        await qcCheckerService.rejectProduct(productId, reason, cleanedData);
+        await qcCheckerService.rejectProduct(productId, reason, cleanedData, null, type);
       } else {
-        await qcCheckerService.approveProduct(productId, cleanedData);
+        await qcCheckerService.approveProduct(productId, cleanedData, null, type);
       }
 
       allowLeaveRef.current = true;
@@ -339,21 +393,22 @@ export default function ProductInspectionForm({
 
   // ── Step content ──────────────────────────────────────────────────────────
   const renderStepContent = () => {
+    const props = { formData, setFormData, scrollNav: scrollNav.handlers, inspectionType };
     switch (currentStep) {
       case 'generalInformation':
-        return <PI_Step1_GeneralInfo formData={formData} setFormData={setFormData} errors={errors.generalInformation || {}} />;
+        return <PI_Step1_GeneralInfo {...props} errors={errors.generalInformation || {}} />;
       case 'productVerification':
-        return <PI_Step2_ProductVerification formData={formData} setFormData={setFormData} errors={errors.productVerification || {}} />;
+        return <PI_Step2_ProductVerification {...props} errors={errors.productVerification || {}} />;
       case 'packagingInspection':
-        return <PI_Step3_PackagingInspection formData={formData} setFormData={setFormData} errors={errors.packagingInspection || {}} />;
+        return <PI_Step3_PackagingInspection {...props} errors={errors.packagingInspection || {}} />;
       case 'defects':
-        return <Defects formData={formData} setFormData={setFormData} errors={errors.defects || {}} />;
+        return <Defects {...props} errors={errors.defects || {}} />;
       case 'testing':
-        return <PI_Step5_Testing formData={formData} setFormData={setFormData} errors={errors.testing || {}} />;
+        return <PI_Step5_Testing {...props} errors={errors.testing || {}} />;
       case 'review':
-        return <PI_Step6_Review formData={formData} setFormData={setFormData} onEditStep={handleEditStep} errors={errors.review || {}} />;
+        return <PI_Step6_Review {...props} onEditStep={handleEditStep} errors={errors.review || {}} />;
       case 'documentation':
-        return <Documentation formData={formData} setFormData={setFormData} errors={errors.documentation || {}} />;
+        return <Documentation {...props} errors={errors.documentation || {}} />;
       default:
         return null;
     }
@@ -361,6 +416,16 @@ export default function ProductInspectionForm({
 
   return (
     <View className="flex-1 bg-white">
+      {/* Mandatory type selection — shown until the checker chooses. Cancelling
+          backs out of the inspection. */}
+      {!inspectionType && (
+        <InspectionTypeDialog
+          subjectName={productName}
+          onSelect={setInspectionType}
+          onCancel={onCancel}
+        />
+      )}
+
       {/* Header */}
       <View className="px-4 pt-2 pb-2 flex-row items-center">
         <TouchableOpacity onPress={() => requestExit(onCancel)} className="mr-3 p-1">
@@ -438,7 +503,12 @@ export default function ProductInspectionForm({
       </View>
 
       {/* Form Content */}
-      <View className="flex-1 px-4">{renderStepContent()}</View>
+      <View className="flex-1 px-4">
+        <PIValidationProvider register={invalidFields.register} flashKey={invalidFields.flashKey}>
+          {renderStepContent()}
+        </PIValidationProvider>
+        <ScrollNavButton nav={scrollNav} />
+      </View>
 
       {/* Bottom Navigation */}
       <View
