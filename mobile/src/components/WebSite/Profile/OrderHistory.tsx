@@ -81,7 +81,7 @@ const STATUS_CONFIG: Record<string, {
     label: 'Processing', icon: Clock,
   },
   cancelled: {
-    iconBg: '#ef4444', textColor: '#991b1b', bgColor: '#fef2f2',
+    iconBg: '#E01A1B', textColor: '#991b1b', bgColor: '#E01A1B',
     label: 'Cancelled', icon: XCircle,
   },
 };
@@ -400,8 +400,8 @@ export default function OrderHistory() {
   if (error) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: '#f8f9fa' }}>
-        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#fef2f2', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-          <AlertCircle size={36} color="#ef4444" />
+        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#E01A1B', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+          <AlertCircle size={36} color="#E01A1B" />
         </View>
         <Text style={{ fontSize: 18, fontWeight: '800', color: '#991b1b', marginBottom: 8 }}>Something went wrong</Text>
         <Text style={{ fontSize: 13, color: '#6b7280', textAlign: 'center', marginBottom: 24 }}>{error}</Text>

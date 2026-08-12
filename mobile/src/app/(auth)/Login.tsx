@@ -232,10 +232,13 @@ export default function LoginScreen() {
         <View className="px-6 py-8">
           {/* Logo Section */}
           <View className="items-center mb-8 mt-4">
-            <View className="mb-4">
+            {/* White plate behind the mark — logo4.png is black line art on a
+                transparent background and is invisible on this black canvas
+                without it. Matches AuthKit and the splash screen. */}
+            <View className="mb-4 bg-white rounded-3xl px-5 py-3">
               <Image
                 source={companyLogo ? { uri: companyLogo } : STATIC_LOGO}
-                className="w-48 h-36"
+                className="w-44 h-28"
                 resizeMode="contain"
               />
             </View>
@@ -250,7 +253,7 @@ export default function LoginScreen() {
           {/* Login Card */}
           <View className="bg-white rounded-2xl p-5 shadow-2xl">
             <View className="flex-row items-center mb-5">
-              <View className="bg-black rounded-full p-2 mr-3">
+              <View className="bg-brand-500 rounded-full p-2 mr-3">
                 <ShoppingBag size={20} color="#FFFFFF" />
               </View>
               <View>
@@ -340,12 +343,25 @@ export default function LoginScreen() {
               )}
             </View>
 
+            {/* Forgot password */}
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/ForgotPassword")}
+              className="self-end -mt-3 mb-4"
+              activeOpacity={0.7}
+              accessibilityRole="link"
+              accessibilityLabel="Forgot your password"
+            >
+              <Text className="text-xs font-semibold text-brand-500">
+                Forgot password?
+              </Text>
+            </TouchableOpacity>
+
             {/* Sign In Button */}
             <TouchableOpacity
               disabled={submitting}
               onPress={handleSubmit}
               className={`rounded-xl py-3.5 items-center justify-center flex-row shadow-lg ${
-                submitting ? "bg-gray-400" : "bg-black"
+                submitting ? "bg-gray-400" : "bg-brand-500"
               }`}
             >
               <LogIn size={18} color="#FFFFFF" strokeWidth={2.5} />
@@ -389,6 +405,21 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               </>
             ) : null}
+          </View>
+
+          {/* Create account */}
+          <View className="mt-5 flex-row items-center justify-center">
+            <Text className="text-xs text-gray-400">
+              Don&apos;t have an account?{" "}
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/Register")}
+              activeOpacity={0.7}
+              accessibilityRole="link"
+              accessibilityLabel="Create an account"
+            >
+              <Text className="text-xs font-bold text-brand-400">Sign Up</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Footer */}

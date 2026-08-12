@@ -83,6 +83,23 @@ class WishlistService {
     }
   }
 
+  /**
+   * Mint a public share token for the signed-in user's wishlist.
+   *
+   * The token resolves to a WEB page (`/wishlist/shared/:token`) — there is no
+   * mobile screen for someone else's wishlist, and a recipient without the app
+   * installed needs a link that just opens. Requires auth: a guest wishlist
+   * lives only in AsyncStorage and has nothing to share.
+   */
+  async getShareToken(): Promise<string> {
+    try {
+      const response = await axios.post('/wishlist/share');
+      return response.data.shareToken;
+    } catch (error: any) {
+      throw new Error(error?.message || 'Failed to generate share link');
+    }
+  }
+
   // ── AsyncStorage methods for guest users ────────────────────────────────
 
   async getLocalWishlist(): Promise<string[]> {

@@ -25,6 +25,7 @@ import {
   Package,
   ChevronRight,
   HelpCircle,
+  LifeBuoy,
 } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
@@ -37,6 +38,7 @@ import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { ProfileSkeleton } from '@/components/ui/Skeleton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Palette } from '@/constants/theme';
 
 // Firebase push notifications — fails gracefully in Expo Go
 let unregisterPushNotifications: (() => Promise<void>) | null = null;
@@ -246,7 +248,7 @@ export default function Profile() {
             Sign in to view and manage your profile.
           </Text>
           <Pressable onPress={() => router.push('/(auth)/Login' as any)} accessibilityRole="button">
-            <View style={{ backgroundColor: '#111827', paddingHorizontal: 28, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ backgroundColor: Palette.primary, paddingHorizontal: 28, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Login to Continue</Text>
             </View>
           </Pressable>
@@ -298,7 +300,7 @@ export default function Profile() {
                 width: 60,
                 height: 60,
                 borderRadius: 18,
-                backgroundColor: '#111827',
+                backgroundColor: Palette.primary,
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: 16,
@@ -331,7 +333,8 @@ export default function Profile() {
           <MenuItem icon={<MapPin size={18} color="#111827" />} label="Saved Addresses" onPress={() => router.push('/(any)/saved-addresses' as any)} />
           <MenuItem icon={<Heart size={18} color="#111827" />} label="My Wishlist" onPress={() => router.push('/(tabs)/wishlist' as any)} />
           <MenuItem icon={<ShoppingCart size={18} color="#111827" />} label="My Cart" onPress={() => router.push('/(tabs)/cart' as any)} />
-          <MenuItem icon={<HelpCircle size={18} color="#111827" />} label="Help & Support" onPress={() => router.push('/(any)/contact' as any)} last />
+          <MenuItem icon={<LifeBuoy size={18} color="#111827" />} label="My Support Tickets" onPress={() => router.push('/(any)/support' as any)} />
+          <MenuItem icon={<HelpCircle size={18} color="#111827" />} label="Contact Us" onPress={() => router.push('/(any)/contact' as any)} last />
         </View>
 
         {/* Profile form */}
@@ -358,13 +361,13 @@ export default function Profile() {
                 backgroundColor: '#fff',
                 borderRadius: 14,
                 borderWidth: 1,
-                borderColor: '#fecaca',
+                borderColor: '#E01A1B',
                 height: 52,
                 gap: 8,
               }}
             >
-              <LogOut size={18} color="#dc2626" />
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#dc2626' }}>Sign Out</Text>
+              <LogOut size={18} color="#E01A1B" />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#E01A1B' }}>Sign Out</Text>
             </View>
           </Pressable>
         </View>
@@ -408,7 +411,7 @@ function ScreenHeader({
       {isEditing ? (
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable onPress={onSave} disabled={isSaving} accessibilityRole="button" accessibilityLabel="Save profile" accessibilityState={{ disabled: isSaving }}>
-            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center', opacity: isSaving ? 0.6 : 1 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: Palette.primary, alignItems: 'center', justifyContent: 'center', opacity: isSaving ? 0.6 : 1 }}>
               {isSaving ? <ActivityIndicator size={14} color="#fff" /> : <Save size={18} color="#fff" />}
             </View>
           </Pressable>

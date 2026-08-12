@@ -136,7 +136,7 @@ export function SearchResults({
                     onPress={() => setSortBy(option.value)}
                     className={`px-4 py-2 rounded-xl border ${
                       sortBy === option.value
-                        ? 'bg-gray-900 border-gray-900'
+                        ? 'bg-brand-500 border-brand-500'
                         : 'bg-white border-gray-300'
                     }`}
                   >
@@ -162,7 +162,7 @@ export function SearchResults({
                     onPress={() => setSelectedCategory(category)}
                     className={`px-4 py-2 rounded-xl border ${
                       selectedCategory === category
-                        ? 'bg-gray-900 border-gray-900'
+                        ? 'bg-brand-500 border-brand-500'
                         : 'bg-white border-gray-300'
                     }`}
                   >

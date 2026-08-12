@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, Dimensions } from 'react-native';
-import { Package, RefreshCw, ArrowRight } from 'lucide-react-native';
+import { Package, RefreshCw } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { categoryService, Category } from '@/services/categoryService';
+import SectionHeading from './SectionHeading';
 
 // 2×2 grid → show 4 categories
 const GRID_LIMIT = 4;
@@ -63,39 +64,12 @@ export default function CategoriesSection() {
         padding: CARD_PADDING,
       }}
     >
-      {/* Header — title + arrow pill */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 4,
-          marginBottom: 14,
-        }}
-      >
-        <Text style={{ flex: 1, color: '#ffffff', fontSize: 20, fontWeight: '800', letterSpacing: -0.3 }}>
-          Shop by Category
-        </Text>
-        <Pressable
-          onPress={() => router.push('/(tabs)/categories' as any)}
-          accessibilityRole="button"
-          accessibilityLabel="View all categories"
-          hitSlop={6}
-        >
-          <View
-            style={{
-              width: 56,
-              height: 38,
-              borderRadius: 19,
-              backgroundColor: '#ffffff',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <ArrowRight size={20} color="#111827" strokeWidth={2.5} />
-          </View>
-        </Pressable>
-      </View>
+      {/* `inverse` — this panel is ink-filled, so the type and CTA invert. */}
+      <SectionHeading
+        section="categories"
+        inverse
+        onPressCta={() => router.push('/(tabs)/categories' as any)}
+      />
 
       {/* Body */}
       {state === 'loading' ? (
@@ -210,13 +184,13 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
           width: 52,
           height: 52,
           borderRadius: 26,
-          backgroundColor: '#fef2f2',
+          backgroundColor: '#E01A1B',
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: 10,
         }}
       >
-        <Package size={22} color="#dc2626" strokeWidth={1.75} />
+        <Package size={22} color="#E01A1B" strokeWidth={1.75} />
       </View>
       <Text style={{ fontSize: 14, fontWeight: '700', color: '#ffffff', marginBottom: 2 }}>
         {"Couldn't load categories"}

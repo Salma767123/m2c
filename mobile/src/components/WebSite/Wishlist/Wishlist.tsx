@@ -8,6 +8,7 @@ import {
   RefreshControl,
   StyleSheet,
   StatusBar,
+  Share,
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
@@ -18,6 +19,8 @@ import {
   ArrowRight,
   Package,
   AlertCircle,
+  Share2,
+  Star,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
@@ -30,6 +33,8 @@ import { useCart } from '@/context/CartContext';
 import { WishlistSkeleton } from '@/components/ui/Skeleton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getRegionalPrice, getRegionalOriginalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
+import { sharedWishlistUrl, productUrl } from '@/lib/shareLinks';
+import { Palette, Radius } from '@/constants/theme';
 
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -52,6 +57,7 @@ export default function Wishlist() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [addingToCart, setAddingToCart] = useState<string | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
 
   const { refreshWishlist } = useWishlist();
   const { refreshCart, itemCount } = useCart();
@@ -161,6 +167,54 @@ export default function Wishlist() {
     }
   };
 
+  // ── Share ───────────────────────────────────────────────────────────────
+  // Mirrors the web's shareWishlist(): mint a token, build a public URL, and
+  // hand it to the OS share sheet. RN's Share is the native equivalent of
+  // navigator.share; there is no clipboard fallback branch because the sheet is
+  // always available on iOS and Android.
+  const shareWishlist = useCallback(async () => {
+    if (isSharing || wishlistItems.length === 0) return;
+    try {
+      setIsSharing(true);
+      const token = await wishlistService.getShareToken();
+      const url = sharedWishlistUrl(token);
+
+      const names = wishlistItems
+        .filter((item) => item.product)
+        .map((item) => item.product!.name)
+        .slice(0, 5);
+      const extra = wishlistItems.length > 5 ? ` and ${wishlistItems.length - 5} more` : '';
+      const message = names.length
+        ? `Check out my wishlist: ${names.join(', ')}${extra}\n${url}`
+        : `Check out my wishlist!\n${url}`;
+
+      await Share.share({ title: 'My Wishlist', message, url });
+    } catch (error: any) {
+      // A user dismissing the sheet is not a failure — only surface real errors.
+      if (error?.message) {
+        showErrorToast('Share Failed', 'Unable to share your wishlist. Please try again.');
+      }
+    } finally {
+      setIsSharing(false);
+    }
+  }, [isSharing, wishlistItems]);
+
+  // Share a single product out of the list. Mirrors the web's `shareProduct`;
+  // the URL targets the web storefront so it opens for a recipient without the
+  // app installed.
+  const shareProduct = useCallback(async (productId: string, name: string) => {
+    try {
+      await Share.share({
+        title: name,
+        message: `Check out this product: ${name}\n${productUrl(productId)}`,
+        url: productUrl(productId),
+      });
+    } catch (error: any) {
+      if (error?.message) {
+        showErrorToast('Share Failed', 'Unable to share this product.');
+      }
+    }
+  }, []);
 
   // ── States ──────────────────────────────────────────────────────────────
   if (isLoading && !refreshing) {
@@ -211,7 +265,12 @@ export default function Wishlist() {
   // ── Main ────────────────────────────────────────────────────────────────
   return (
     <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-      <ScreenHeader count={wishlistItems.length} itemCount={itemCount} />
+      <ScreenHeader
+        count={wishlistItems.length}
+        itemCount={itemCount}
+        onShare={shareWishlist}
+        isSharing={isSharing}
+      />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 10 }}
@@ -227,6 +286,41 @@ export default function Wishlist() {
             <Text style={ws.syncingText}>Checking availability...</Text>
           </View>
         ) : null}
+
+        {/* Top actions — the web pairs "Share Wishlist" with "Continue
+            Shopping". The share icon in the header stays as the quick affordance;
+            this row is the labelled version plus the route back to the catalogue,
+            which mobile had no path to from here at all. */}
+        <View style={ws.topActions}>
+          <Pressable
+            onPress={shareWishlist}
+            disabled={isSharing}
+            accessibilityRole="button"
+            accessibilityLabel="Share my wishlist"
+            style={[ws.topActionGhost, isSharing && ws.actionDisabled]}
+          >
+            {isSharing ? (
+              <ActivityIndicator size="small" color={Palette.text} />
+            ) : (
+              <Share2 size={14} color={Palette.text} strokeWidth={2.25} />
+            )}
+            <Text style={ws.topActionGhostText} numberOfLines={1}>
+              {isSharing ? 'Generating Link...' : 'Share Wishlist'}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push('/(any)/products' as any)}
+            accessibilityRole="button"
+            accessibilityLabel="Continue shopping"
+            style={ws.topActionPrimary}
+          >
+            <ShoppingCart size={14} color={Palette.onPrimary} strokeWidth={2.25} />
+            <Text style={ws.topActionPrimaryText} numberOfLines={1}>
+              Continue Shopping
+            </Text>
+          </Pressable>
+        </View>
 
         {wishlistItems.map((item) => {
           if (!item.product) return null;
@@ -253,7 +347,7 @@ export default function Wishlist() {
                 backgroundColor: '#ffffff',
                 borderRadius: 14,
                 borderWidth: 1,
-                borderColor: isOOS ? '#fecaca' : isLowStock ? '#fed7aa' : '#e5e7eb',
+                borderColor: isOOS ? '#E01A1B' : isLowStock ? '#fed7aa' : '#e5e7eb',
                 shadowColor: '#0f172a',
                 shadowOffset: { width: 0, height: 1 },
                 shadowOpacity: 0.04,
@@ -264,7 +358,7 @@ export default function Wishlist() {
               {/* Stock status banner */}
               {isOOS ? (
                 <View style={[ws.bannerRow, ws.bannerOos]} accessibilityRole="alert">
-                  <AlertCircle size={11} color="#dc2626" />
+                  <AlertCircle size={11} color="#E01A1B" />
                   <Text style={ws.bannerTextOos}>Out of Stock</Text>
                 </View>
               ) : isLowStock && live ? (
@@ -305,7 +399,7 @@ export default function Wishlist() {
                     )}
                     {displayDiscount != null && displayDiscount > 0 ? (
                       <View
-                        style={{ position: 'absolute', top: 4, left: 4, backgroundColor: '#111827', borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 }}
+                        style={{ position: 'absolute', top: 4, left: 4, backgroundColor: Palette.primary, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 }}
                       >
                         <Text style={{ color: '#fff', fontSize: 8, fontWeight: '800' }}>
                           {displayDiscount}%
@@ -317,20 +411,38 @@ export default function Wishlist() {
 
                 {/* Info + actions */}
                 <View style={{ flex: 1 }}>
-                  {/* Name + trash */}
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 2 }}>
-                    <Text
-                      style={{ flex: 1, fontSize: 13, fontWeight: '700', color: '#111827', lineHeight: 17, marginRight: 8 }}
-                      numberOfLines={2}
-                    >
-                      {displayName}
-                    </Text>
-                    <Pressable onPress={() => removeItem(item.productId, displayName)} accessibilityRole="button" accessibilityLabel="Remove" hitSlop={8}>
-                      <View style={{ padding: 4 }}>
-                        <Trash2 size={14} color="#9ca3af" />
-                      </View>
-                    </Pressable>
-                  </View>
+                  {/* Category pill — brand-tinted, matching the web card. */}
+                  {item.product.category ? (
+                    <View style={ws.categoryPill}>
+                      <Text style={ws.categoryText} numberOfLines={1}>
+                        {item.product.category}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <Text
+                    style={{ fontSize: 13, fontWeight: '700', color: '#111827', lineHeight: 17 }}
+                    numberOfLines={2}
+                  >
+                    {displayName}
+                  </Text>
+
+                  {/* Rating — only when the product actually has one. */}
+                  {item.product.rating != null && item.product.rating > 0 ? (
+                    <View style={ws.ratingRow}>
+                      {[0, 1, 2, 3, 4].map((i) => (
+                        <Star
+                          key={i}
+                          size={11}
+                          color={i < Math.floor(item.product!.rating || 0) ? '#facc15' : '#d1d5db'}
+                          fill={i < Math.floor(item.product!.rating || 0) ? '#facc15' : 'transparent'}
+                        />
+                      ))}
+                      <Text style={ws.ratingText}>
+                        {item.product.rating} ({item.product.reviews || 0})
+                      </Text>
+                    </View>
+                  ) : null}
 
                   {/* Price row + stock label + Add to Cart */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
@@ -340,7 +452,7 @@ export default function Wishlist() {
                           {fmt(displayPrice)}
                         </Text>
                         {displayOriginalPrice ? (
-                          <Text style={{ fontSize: 10, color: '#dc2626', textDecorationLine: 'line-through' }}>
+                          <Text style={{ fontSize: 10, color: '#E01A1B', textDecorationLine: 'line-through' }}>
                             {fmt(displayOriginalPrice)}
                           </Text>
                         ) : null}
@@ -352,7 +464,17 @@ export default function Wishlist() {
                       ) : null}
                     </View>
 
-                    {/* Add to Cart / Choose Options / OOS */}
+                  </View>
+
+                  {/* Added-on date, as on the web card. */}
+                  <Text style={ws.addedOn}>
+                    Added on {new Date(item.createdAt).toLocaleDateString()}
+                  </Text>
+
+                  {/* Actions — the web pairs a primary Add to Cart with Share and
+                      Remove. Previously mobile had a cramped "Add" chip and a bare
+                      trash icon, so Share had no home and Remove was unlabelled. */}
+                  <View style={ws.actionsRow}>
                     <Pressable
                       onPress={() => {
                         if (hasVariants) {
@@ -363,30 +485,39 @@ export default function Wishlist() {
                       }}
                       disabled={isOOS || isAdding}
                       accessibilityRole="button"
-                      accessibilityLabel={isOOS ? 'Out of stock' : hasVariants ? 'Choose variant options' : 'Add to cart'}
+                      accessibilityLabel={
+                        isOOS ? 'Out of stock' : hasVariants ? 'Choose variant options' : 'Add to cart'
+                      }
+                      style={[ws.actionPrimary, isOOS && ws.actionDisabled]}
                     >
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          backgroundColor: isOOS ? '#f3f4f6' : '#111827',
-                          paddingHorizontal: 10,
-                          height: 30,
-                          borderRadius: 8,
-                          gap: 4,
-                        }}
-                      >
-                        {isAdding ? (
-                          <ActivityIndicator size={12} color="#fff" />
-                        ) : (
-                          <>
-                            <ShoppingCart size={11} color={isOOS ? '#9ca3af' : '#fff'} strokeWidth={2.5} />
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: isOOS ? '#9ca3af' : '#fff' }}>
-                              {isOOS ? 'OOS' : hasVariants ? 'Options' : 'Add'}
-                            </Text>
-                          </>
-                        )}
-                      </View>
+                      {isAdding ? (
+                        <ActivityIndicator size={12} color="#fff" />
+                      ) : (
+                        <>
+                          <ShoppingCart size={12} color={isOOS ? '#9ca3af' : '#fff'} strokeWidth={2.5} />
+                          <Text style={[ws.actionPrimaryText, isOOS && ws.actionDisabledText]}>
+                            {isOOS ? 'Out of Stock' : hasVariants ? 'Choose Options' : 'Add to Cart'}
+                          </Text>
+                        </>
+                      )}
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => shareProduct(item.productId, displayName)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Share ${displayName}`}
+                      style={ws.actionNeutral}
+                    >
+                      <Share2 size={12} color={Palette.text} strokeWidth={2.25} />
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => removeItem(item.productId, displayName)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${displayName} from wishlist`}
+                      style={ws.actionDanger}
+                    >
+                      <Trash2 size={12} color={Palette.onBrand} strokeWidth={2.25} />
                     </Pressable>
                   </View>
                 </View>
@@ -394,13 +525,66 @@ export default function Wishlist() {
             </View>
           );
         })}
+
+        <WishlistTips />
       </ScrollView>
     </View>
   );
 }
 
+// ─── Wishlist Tips ────────────────────────────────────────────────────────────
+// Same three tips as the web section. Stacked rather than a 3-column grid —
+// each one is a sentence, and three columns on a phone would be unreadable.
+const TIPS = [
+  {
+    Icon: Heart,
+    title: 'Save for Later',
+    body: 'Tap the heart on any product to save it to your wishlist.',
+  },
+  {
+    Icon: Share2,
+    title: 'Share with Friends',
+    body: 'Share your wishlist with family and friends for gift ideas.',
+  },
+  {
+    Icon: ShoppingCart,
+    title: 'Quick Add to Cart',
+    body: 'Easily move items from your wishlist to your shopping cart.',
+  },
+];
+
+function WishlistTips() {
+  return (
+    <View style={ws.tipsCard}>
+      <Text style={ws.tipsTitle}>Wishlist Tips</Text>
+      {TIPS.map(({ Icon, title, body }) => (
+        <View key={title} style={ws.tipRow}>
+          <View style={ws.tipIcon}>
+            <Icon size={15} color={Palette.text} strokeWidth={2} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={ws.tipTitle}>{title}</Text>
+            <Text style={ws.tipBody}>{body}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 // ─── Header ───────────────────────────────────────────────────────────────────
-function ScreenHeader({ count, itemCount }: { count: number; itemCount: number }) {
+function ScreenHeader({
+  count,
+  itemCount,
+  onShare,
+  isSharing,
+}: {
+  count: number;
+  itemCount: number;
+  /** Omitted on the empty/logged-out states — there is nothing to share. */
+  onShare?: () => void;
+  isSharing?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   return (
     <View
@@ -424,6 +608,35 @@ function ScreenHeader({ count, itemCount }: { count: number; itemCount: number }
           {count > 0 ? `${count} saved ${count === 1 ? 'item' : 'items'}` : 'Your saved items'}
         </Text>
       </View>
+      {onShare ? (
+        <Pressable
+          onPress={onShare}
+          disabled={isSharing}
+          accessibilityRole="button"
+          accessibilityLabel="Share my wishlist"
+          accessibilityState={{ busy: !!isSharing, disabled: !!isSharing }}
+          hitSlop={6}
+          style={{ marginRight: 10 }}
+        >
+          <View
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              backgroundColor: Palette.onBrand,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: isSharing ? 0.6 : 1,
+            }}
+          >
+            {isSharing ? (
+              <ActivityIndicator size="small" color={Palette.primary} />
+            ) : (
+              <Share2 size={18} color={Palette.primary} />
+            )}
+          </View>
+        </Pressable>
+      ) : null}
       <Pressable
         onPress={() => router.push('/(tabs)/cart' as any)}
         accessibilityRole="button"
@@ -447,7 +660,7 @@ function ScreenHeader({ count, itemCount }: { count: number; itemCount: number }
                 position: 'absolute',
                 top: -2,
                 right: -4,
-                backgroundColor: '#dc2626',
+                backgroundColor: '#E01A1B',
                 minWidth: 16,
                 height: 16,
                 borderRadius: 8,
@@ -512,7 +725,7 @@ function ActionBtn({ label, icon, onPress }: { label: string; icon?: React.React
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: '#111827',
+          backgroundColor: Palette.primary,
           paddingHorizontal: 28,
           height: 50,
           borderRadius: 14,
@@ -528,6 +741,109 @@ function ActionBtn({ label, icon, onPress }: { label: string; icon?: React.React
 
 // ─── Hoisted styles for sync UI ──────────────────────────────────────────────
 const ws = StyleSheet.create({
+  // ── Item metadata (parity with the web card) ──
+  categoryPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: Palette.primaryContainer,
+    borderRadius: Radius.full,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginBottom: 4,
+  },
+  categoryText: { fontSize: 9, fontWeight: '700', color: Palette.onBrand },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 1.5, marginTop: 4 },
+  ratingText: { fontSize: 10, color: Palette.onBrand, marginLeft: 4 },
+  addedOn: { fontSize: 9.5, color: Palette.textSubtle, marginTop: 6 },
+
+  // ── Per-item actions ──
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: Palette.outlineSubtle,
+  },
+  actionPrimary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    height: 32,
+    borderRadius: Radius.full,
+    backgroundColor: Palette.primary,
+  },
+  actionPrimaryText: { fontSize: 11, fontWeight: '700', color: Palette.onPrimary },
+  actionDisabled: { backgroundColor: Palette.outlineSubtle },
+  actionDisabledText: { color: Palette.textSubtle },
+  actionNeutral: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.full,
+    backgroundColor: Palette.outlineSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionDanger: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.full,
+    backgroundColor: Palette.errorContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Top actions ──
+  topActions: { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  topActionGhost: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 42,
+    borderRadius: Radius.md,
+    backgroundColor: Palette.surface,
+    borderWidth: 1,
+    borderColor: Palette.outline,
+  },
+  topActionGhostText: { fontSize: 12.5, fontWeight: '700', color: Palette.text },
+  topActionPrimary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 42,
+    borderRadius: Radius.md,
+    backgroundColor: Palette.primary,
+  },
+  topActionPrimaryText: { fontSize: 12.5, fontWeight: '700', color: Palette.onPrimary },
+
+  // ── Tips ──
+  tipsCard: {
+    marginTop: 14,
+    backgroundColor: Palette.surface,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Palette.outline,
+    padding: 16,
+  },
+  tipsTitle: { fontSize: 15, fontWeight: '800', color: Palette.ink, marginBottom: 12 },
+  tipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
+  tipIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.full,
+    backgroundColor: Palette.outlineSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tipTitle: { fontSize: 12.5, fontWeight: '700', color: Palette.ink },
+  tipBody: { fontSize: 11.5, lineHeight: 16, color: Palette.onBrand, marginTop: 1 },
+
   // Syncing indicator
   syncingRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
@@ -541,12 +857,12 @@ const ws = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 6,
     borderTopLeftRadius: 14, borderTopRightRadius: 14,
   },
-  bannerOos: { backgroundColor: '#fef2f2' },
+  bannerOos: { backgroundColor: '#E01A1B' },
   bannerLow: { backgroundColor: '#fff7ed' },
-  bannerTextOos: { fontSize: 10, fontWeight: '700', color: '#dc2626' },
+  bannerTextOos: { fontSize: 10, fontWeight: '700', color: '#E01A1B' },
   bannerTextLow: { fontSize: 10, fontWeight: '700', color: '#9a3412' },
 
   // Price change labels
-  priceUp: { fontSize: 9, fontWeight: '600', color: '#dc2626', marginTop: 1 },
+  priceUp: { fontSize: 9, fontWeight: '600', color: '#E01A1B', marginTop: 1 },
   priceDown: { fontSize: 9, fontWeight: '600', color: '#16a34a', marginTop: 1 },
 });

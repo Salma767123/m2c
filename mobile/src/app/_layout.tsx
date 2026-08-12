@@ -127,6 +127,9 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="(any)" options={{ headerShown: false }} />
+            {/* Deep-link aliases — see src/app/reset-password.tsx */}
+            <Stack.Screen name="reset-password" options={{ headerShown: false }} />
+            <Stack.Screen name="verify-email" options={{ headerShown: false }} />
           </Stack>
           <NotificationBanner
             visible={notification.visible}

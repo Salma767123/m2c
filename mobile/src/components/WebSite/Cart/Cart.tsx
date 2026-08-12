@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { calculateLogistics, type LogisticsConfig } from '@/lib/logistics';
-import { getRegionalPrice, getRegionalOriginalPrice, getCurrency, formatPrice as fmtCurrency } from '@/lib/currency';
+import { getRegionalPrice, getRegionalOriginalPrice, getCurrency, getRegion, convertINRtoUSD, formatPrice as fmtCurrency } from '@/lib/currency';
 import {
   View,
   Text,
@@ -33,10 +33,14 @@ import {
   Info,
   ChevronDown,
   ChevronRight,
+  Truck,
+  Star,
+  Shield,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cartService } from '@/services/cartService';
+import { courierService } from '@/services/courierService';
 import { couponService } from '@/services/couponService';
 import { publicProductService } from '@/services/publicProductService';
 import { userAuthService } from '@/services/userAuthService';
@@ -47,6 +51,30 @@ import type { StockSyncResult } from '@/lib/stockSync';
 import { CartSkeleton } from '@/components/ui/Skeleton';
 import BagSelector from './BagSelector';
 import type { BagType } from '@/services/bagTypeService';
+import { Palette, Radius } from '@/constants/theme';
+import { extractCouponCode } from '@/lib/coupons';
+
+/*
+  NOTE ON ASSUMPTIONS (courier naming)
+  ─────────────────────────────────────
+  Web reads a courier's display name via `courierName(item.courier)` from
+  `frontend/src/lib/couriers.ts`. Mirrored here as an optional import that
+  no-ops (falls back to showing the raw courier id) if the module doesn't
+  exist yet in mobile/src/lib — create it mirroring the web file if missing.
+*/
+let courierNameFn: ((id: string) => string) | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  courierNameFn = require('@/lib/couriers').courierName;
+} catch {
+  courierNameFn = null;
+}
+const courierName = (id?: string | null) => (id ? (courierNameFn?.(id) ?? id) : '');
+
+// Brand color — matches DESIGN.md primary (#E01A1B), used the same way web uses
+// `text-[#E01A1B]` / `bg-[#E01A1B]` throughout the cart page.
+const BRAND = '#E01A1B';
+const BRAND_DARK = '#E01A1B';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CartItem {
@@ -55,13 +83,23 @@ interface CartItem {
   name: string;
   price: number;
   originalPrice?: number;
+  /** Automatic offer applied to this line + the pre-offer price to strike through
+      (web parity — was entirely absent from mobile before). */
+  activeOffer?: { badge: string; title?: string; description?: string; endsAt?: string } | null;
+  offerStrikePrice?: number;
   images: string[];
   category: string;
+  rating?: number;
+  reviews?: number;
+  material?: string;
   inStock: boolean;
   availableStock?: number;
   quantity: number;
   discount?: number;
   gstPercentage?: number;
+  /** Chosen shipping mode + courier for this line (web parity). */
+  transportType?: 'AIR' | 'SHIP' | null;
+  courier?: string | null;
   variantDetails?: { size: string; color: string; colorHex?: string; sku?: string };
   product?: any;
 }
@@ -100,7 +138,35 @@ export default function Cart() {
   const [appliedPromo, setAppliedPromo] = useState('');
   const [discountAmount, setDiscountAmount] = useState(0);
   const [couponMeta, setCouponMeta] = useState<{ discountType: string; discountValue: number; maxDiscountAmount?: number } | null>(null);
+  const [freeShippingApplied, setFreeShippingApplied] = useState(false);
+  const [freeShippingMessage, setFreeShippingMessage] = useState('');
   const [applyingCoupon, setApplyingCoupon] = useState(false);
+
+  const [availablePromos, setAvailablePromos] = useState<
+    { message: string; code?: string }[]
+  >([]);
+  const [promosLoading, setPromosLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    couponService
+      .getPromotionalCoupons(6)
+      .then((list) => {
+        if (!active) return;
+        setAvailablePromos(
+          list.map((c) => ({ message: c.message, code: extractCouponCode(c.message) })),
+        );
+      })
+      .catch(() => {
+        if (active) setAvailablePromos([]);
+      })
+      .finally(() => {
+        if (active) setPromosLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     fetchCart();
@@ -108,7 +174,13 @@ export default function Cart() {
     syncStock();
   }, []);
 
-  // When sync completes, merge live product data into local cartItems (uses ALL results, not just meaningful)
+  // Prime the courier registry so courierName(item.courier) resolves DB ids to
+  // display names instead of leaking the raw Mongo ObjectId into the shipping row.
+  useEffect(() => {
+    courierService.getActiveCouriers(getRegion()).catch(() => {});
+  }, []);
+
+  // When sync completes, merge live product data into local cartItems
   useEffect(() => {
     if (allSyncResults.length === 0) return;
 
@@ -146,6 +218,8 @@ export default function Cart() {
         const parsed = JSON.parse(saved);
         setAppliedPromo(parsed.code);
         setDiscountAmount(parsed.discountAmount);
+        setFreeShippingApplied(parsed.freeShipping || false);
+        setFreeShippingMessage(parsed.freeShippingMessage || '');
         if (parsed.discountType && parsed.discountValue != null) {
           setCouponMeta({
             discountType: parsed.discountType,
@@ -156,6 +230,20 @@ export default function Cart() {
       }
     } catch { /* ignore */ }
   };
+
+  const checkFreeShippingOffers = useCallback(async (cartSubtotal: number) => {
+    if (cartSubtotal <= 0) return;
+    try {
+      const userData = await userAuthService.getUserData();
+      if (!userData?.id) return;
+
+      const response = await couponService.applyFreeShippingOffer(userData.id, cartSubtotal);
+      if (response.success && (response.data as any)?.freeShipping) {
+        setFreeShippingApplied(true);
+        setFreeShippingMessage(response.message || 'Free shipping available!');
+      }
+    } catch { /* no offer available — expected */ }
+  }, []);
 
   const fetchCart = async () => {
     try {
@@ -170,7 +258,6 @@ export default function Cart() {
             res.data.items.map((item: any) => {
               const hasVariant = !!item.variant;
 
-              // Images: prefer variant images, fall back to product images
               const imgArray: string[] = [];
               const imgSource = (hasVariant && item.variant.images?.length > 0)
                 ? item.variant.images
@@ -182,17 +269,14 @@ export default function Cart() {
                 }
               }
 
-              // Price: use live product/variant price, not stale cart price
               const livePrice = hasVariant
                 ? getRegionalPrice(item.variant as any)
                 : getRegionalPrice(item.product as any);
 
-              // Stock: variant stock takes priority
               const liveStock = hasVariant
                 ? item.variant.stock
                 : (item.product?.availableStock ?? item.product?.totalStock);
 
-              // Original price & discount: variant overrides product
               const liveOriginalPrice = hasVariant
                 ? getRegionalOriginalPrice(item.variant as any) ?? getRegionalOriginalPrice(item.product as any)
                 : getRegionalOriginalPrice(item.product as any);
@@ -200,8 +284,13 @@ export default function Cart() {
                 ? (item.variant.discount ?? item.product?.discount)
                 : item.product?.discount;
 
-              // Build variant display info — use variant data if present,
-              // otherwise show product's singleUnit attributes (base variant)
+              // Offer-aware effective price — web parity (was entirely missing).
+              const activeOffer = item.product?.activeOffer ?? null;
+              const effectivePrice = activeOffer
+                ? applyOfferPrice(livePrice, activeOffer, item.quantity)
+                : livePrice;
+              const offerStrikePrice = activeOffer && effectivePrice < livePrice ? livePrice : undefined;
+
               let variantDetails: CartItem['variantDetails'];
               if (hasVariant) {
                 variantDetails = {
@@ -222,15 +311,22 @@ export default function Cart() {
                 id: item.id,
                 productId: item.productId,
                 name: item.product?.name || 'Product',
-                price: livePrice,
+                price: effectivePrice,
                 originalPrice: liveOriginalPrice ?? undefined,
+                activeOffer,
+                offerStrikePrice,
                 images: imgArray,
                 category: item.product?.category || '',
+                rating: item.product?.rating,
+                reviews: item.product?.reviews,
+                material: item.product?.material,
                 inStock: liveStock > 0 && (item.product?.inStock ?? true),
                 availableStock: liveStock,
                 quantity: item.quantity,
                 discount: liveDiscount,
                 gstPercentage: item.product?.gstPercentage,
+                transportType: item.transportType ?? null,
+                courier: item.courier ?? null,
                 variantDetails,
                 product: item.product || null,
               };
@@ -246,14 +342,22 @@ export default function Cart() {
             if (res.success && res.data) {
               const p = res.data;
               const url = p.images?.[0]?.url;
+              const activeOffer = (p as any).activeOffer ?? null;
+              const basePrice = getRegionalPrice(p as any);
+              const effectivePrice = activeOffer ? applyOfferPrice(basePrice, activeOffer, ci.quantity) : basePrice;
               items.push({
                 id: ci.id,
                 productId: ci.productId,
                 name: p.name,
-                price: getRegionalPrice(p as any),
+                price: effectivePrice,
                 originalPrice: getRegionalOriginalPrice(p as any) ?? undefined,
+                activeOffer,
+                offerStrikePrice: activeOffer && effectivePrice < basePrice ? basePrice : undefined,
                 images: url ? [url] : [],
                 category: p.category || '',
+                rating: (p as any).rating,
+                reviews: (p as any).reviews,
+                material: (p as any).material,
                 inStock: p.inStock,
                 availableStock: p.totalStock,
                 quantity: ci.quantity,
@@ -285,17 +389,15 @@ export default function Cart() {
   const updateQty = useCallback((id: string, qty: number) => {
     if (qty < 1) return;
 
-    // 1. Optimistic: update local state instantly
     setCartItems((prev) => prev.map((i) => (i.id === id ? { ...i, quantity: qty } : i)));
 
-    // 2. Debounce API call — if user taps rapidly, only the last value is sent
     if (pendingUpdates.current[id]) clearTimeout(pendingUpdates.current[id]);
     pendingUpdates.current[id] = setTimeout(async () => {
       delete pendingUpdates.current[id];
       try {
         if (isAuthenticated) await cartService.updateCartItem(id, qty);
         else await cartService.updateLocalCartItem(id, qty);
-        refreshCart(); // sync badge count
+        refreshCart();
       } catch {
         showErrorToast('Error', 'Failed to update quantity');
       }
@@ -309,7 +411,6 @@ export default function Cart() {
         text: 'Remove',
         style: 'destructive',
         onPress: async () => {
-          // Optimistic remove
           const prev = [...cartItems];
           setCartItems((items) => items.filter((i) => i.id !== id));
           try {
@@ -318,7 +419,6 @@ export default function Cart() {
             refreshCart();
             showSuccessToast('Removed', 'Item removed from cart');
           } catch {
-            // Rollback
             setCartItems(prev);
             showErrorToast('Error', 'Failed to remove item');
           }
@@ -339,7 +439,7 @@ export default function Cart() {
         setCouponMeta({
           discountType: res.data.discountType,
           discountValue: res.data.discountValue,
-          maxDiscountAmount: res.data.minPurchaseAmount, // backend returns maxDiscountAmount here
+          maxDiscountAmount: res.data.minPurchaseAmount,
         });
         setPromoCode('');
         await AsyncStorage.setItem('appliedCoupon', JSON.stringify({
@@ -369,20 +469,25 @@ export default function Cart() {
   const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
   const tax = cartItems.reduce((s, i) => s + i.price * i.quantity * ((i.gstPercentage ?? 0) / 100), 0);
 
-  // Calculate logistics-based shipping
+  useEffect(() => {
+    if (isAuthenticated) checkFreeShippingOffers(subtotal);
+  }, [isAuthenticated, subtotal, checkFreeShippingOffers]);
+
   const shippingCost = useMemo(() => {
-    let cost = 0;
+    if (freeShippingApplied) return 0;
+
+    let inr = 0;
     for (const item of cartItems) {
       const config = (item as any).product?.logisticsConfig;
-      if (config) {
-        const result = calculateLogistics(config as LogisticsConfig, item.quantity);
-        cost += result.totalShippingCost;
-      }
+      if (!config) continue;
+      const types = Array.isArray(config.transportTypes) ? config.transportTypes : [];
+      const mode = ((item as any).transportType || types[0]) as 'AIR' | 'SHIP' | undefined;
+      const result = calculateLogistics(config as LogisticsConfig, item.quantity, mode, getRegion());
+      inr += result.totalShippingCost;
     }
-    return cost;
-  }, [cartItems]);
+    return getCurrency() === 'USD' ? convertINRtoUSD(inr) : inr;
+  }, [cartItems, freeShippingApplied]);
 
-  // Recalculate discount from coupon metadata when subtotal changes
   const effectiveDiscount = (() => {
     if (!couponMeta || !appliedPromo) return discountAmount;
     let calc = 0;
@@ -401,6 +506,32 @@ export default function Cart() {
   const total = Math.max(0, subtotal + shippingCost + tax - effectiveDiscount + bagCost);
   const hasStockIssue = cartItems.some((i) => !i.inStock || (i.availableStock != null && i.quantity > i.availableStock));
 
+  // ── Shipping method gating — web parity ─────────────────────────────────
+  // A line "needs" a shipping decision when its product offers >1 transport
+  // mode (must pick AIR/SHIP) or when it has logistics at all (must pick a
+  // courier). Previously mobile had no concept of this — checkout could
+  // proceed with an incomplete/undefined shipping choice.
+  const transportOptionsFor = useCallback((item: CartItem): Array<'AIR' | 'SHIP'> => {
+    const types = (item as any).product?.logisticsConfig?.transportTypes;
+    return Array.isArray(types) ? types : [];
+  }, []);
+
+  const needsTransportChoice = useCallback((item: CartItem) => {
+    const opts = transportOptionsFor(item);
+    if (opts.length === 0) return false;
+    if (opts.length > 1 && !item.transportType) return true;
+    return !item.courier;
+  }, [transportOptionsFor]);
+
+  const hasShippingIssue = cartItems.some(needsTransportChoice);
+
+  const goSelectShipping = useCallback((item: CartItem) => {
+    router.push({
+      pathname: '/(any)/products/[id]' as any,
+      params: { id: item.productId, selectShipping: '1', cartItem: item.id },
+    } as any);
+  }, []);
+
   const handleCheckout = () => {
     if (!isAuthenticated) {
       Alert.alert('Login Required', 'Please login to checkout', [
@@ -411,6 +542,10 @@ export default function Cart() {
     }
     if (hasStockIssue) {
       showErrorToast('Stock Issue', 'Fix stock issues before checkout');
+      return;
+    }
+    if (hasShippingIssue) {
+      showErrorToast('Shipping Required', 'Choose a shipping method to proceed');
       return;
     }
     router.push('/(any)/checkout' as any);
@@ -433,30 +568,34 @@ export default function Cart() {
         <ScreenHeader count={0} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           <View
-            style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}
+            style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#E01A1B', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}
           >
-            <ShoppingCart size={40} color="#d1d5db" />
+            <ShoppingCart size={40} color="#ffffff" />
           </View>
-          <Text style={{ fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 6 }}>
+          <Text style={{ fontSize: 20, fontWeight: '800', color: '#1a1a1a', marginBottom: 6 }}>
             Your cart is empty
           </Text>
           <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
-            {"Looks like you haven't added anything yet."}
+            Add some items to get started
           </Text>
-          <Pressable onPress={() => router.push('/(tabs)')} accessibilityRole="button" accessibilityLabel="Start shopping, browse products">
+          <Pressable onPress={() => router.push('/(tabs)')} accessibilityRole="button" accessibilityLabel="Continue shopping, browse products">
             <View
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                backgroundColor: '#111827',
+                backgroundColor: BRAND,
                 paddingHorizontal: 28,
                 height: 50,
-                borderRadius: 14,
+                borderRadius: 999,
                 gap: 8,
+                shadowColor: BRAND,
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.3,
+                shadowRadius: 12,
+                elevation: 4,
               }}
             >
-              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Start Shopping</Text>
-              <ArrowRight size={16} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Continue Shopping</Text>
             </View>
           </Pressable>
         </View>
@@ -474,12 +613,11 @@ export default function Cart() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111827" />}
       >
-        {/* Sync notification banner */}
+        {/* Sync notification banner (mobile-only value-add — kept) */}
         {syncResult.length > 0 ? (
           <SyncBanner results={syncResult} onDismiss={clearSyncResult} isSyncing={isSyncing} />
         ) : null}
 
-        {/* Syncing indicator */}
         {isSyncing && syncResult.length === 0 ? (
           <View style={cs.syncingRow}>
             <RefreshCw size={14} color="#2563eb" />
@@ -487,14 +625,15 @@ export default function Cart() {
           </View>
         ) : null}
 
-        {/* Items — compact single-row cards */}
+        {/* Items */}
         {cartItems.map((item) => {
           const oos = !item.inStock;
           const overStock = !oos && item.availableStock != null && item.quantity > item.availableStock;
           const lowStock = !oos && !overStock && item.availableStock != null && item.availableStock > 0 && item.availableStock <= 5;
           const incOff = oos || (item.availableStock != null && item.quantity >= item.availableStock);
+          const shippingNeeded = needsTransportChoice(item);
+          const hasLogistics = transportOptionsFor(item).length >= 1 || !!(item as any).product?.logisticsConfig;
 
-          // Check if this item has a sync result with changes (match by itemId to avoid variant mix-up)
           const sr = syncResult.find((r) => r.itemId === item.id)
             ?? (syncResult.filter((r) => r.productId === item.productId).length === 1
               ? syncResult.find((r) => r.productId === item.productId)
@@ -515,7 +654,7 @@ export default function Cart() {
                 elevation: 1,
               }}
             >
-              {/* Stock warning — slim inline */}
+              {/* Stock warning */}
               {oos ? (
                 <View style={[cs.bannerRow, cs.bannerOos]} accessibilityRole="alert">
                   <AlertCircle size={11} color="#dc2626" />
@@ -533,7 +672,7 @@ export default function Cart() {
                 </View>
               ) : null}
 
-              {/* Price change notification — per item */}
+              {/* Price change notification */}
               {sr?.priceChanged ? (
                 <View
                   style={[cs.priceBannerRow, sr.newPrice > sr.oldPrice ? cs.priceBannerUp : cs.priceBannerDown]}
@@ -592,7 +731,33 @@ export default function Cart() {
                     </Pressable>
                   </View>
 
-                  {/* Variant / Product attributes + stock */}
+                  {/* Category + rating + material badges (web parity — new) */}
+                  <View style={cs.tagRow}>
+                    {item.category ? (
+                      <View style={cs.categoryChip}>
+                        <Text style={cs.categoryChipText}>{item.category}</Text>
+                      </View>
+                    ) : null}
+                    {item.rating != null ? (
+                      <View style={cs.ratingChip}>
+                        <Star size={10} color="#facc15" fill="#facc15" />
+                        <Text style={cs.ratingChipText}>{item.rating}</Text>
+                        <Text style={cs.ratingChipCount}>({item.reviews ?? 0})</Text>
+                      </View>
+                    ) : null}
+                    {item.material ? (
+                      <View style={cs.materialChip}>
+                        <Text style={cs.materialChipText}>{item.material}</Text>
+                      </View>
+                    ) : null}
+                    {item.discount != null && item.discount > 0 ? (
+                      <View style={cs.discountChip}>
+                        <Text style={cs.discountChipText}>Save {item.discount}%</Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  {/* Variant / stock */}
                   <View style={cs.metaRow}>
                     {item.variantDetails ? (
                       <View style={cs.variantChip}>
@@ -619,15 +784,17 @@ export default function Cart() {
                     ) : null}
                   </View>
 
-                  {/* Price */}
+                  {/* Price — offer-aware (web parity) */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                     <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>{fmt(item.price)}</Text>
-                    {item.originalPrice && item.originalPrice > item.price ? (
+                    {item.offerStrikePrice ? (
+                      <Text style={{ fontSize: 11, color: '#6b7280', textDecorationLine: 'line-through' }}>{fmt(item.offerStrikePrice)}</Text>
+                    ) : item.originalPrice && item.originalPrice > item.price ? (
                       <Text style={{ fontSize: 11, color: '#6b7280', textDecorationLine: 'line-through' }}>{fmt(item.originalPrice)}</Text>
                     ) : null}
-                    {item.discount && item.discount > 0 ? (
-                      <View style={{ backgroundColor: '#dcfce7', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#16a34a' }}>{item.discount}% off</Text>
+                    {item.activeOffer ? (
+                      <View style={cs.offerBadge}>
+                        <Text style={cs.offerBadgeText}>{item.activeOffer.badge}</Text>
                       </View>
                     ) : null}
                     {item.quantity > 1 ? (
@@ -639,7 +806,39 @@ export default function Cart() {
                 </View>
               </View>
 
-              {/* Stepper row — full width below card content */}
+              {/* Shipping method row — web parity (was completely missing) */}
+              {hasLogistics ? (
+                shippingNeeded ? (
+                  <Pressable
+                    onPress={() => goSelectShipping(item)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Select shipping method for ${item.name}`}
+                    style={{ marginHorizontal: 12, marginBottom: 12 }}
+                  >
+                    <View style={cs.shipSelectRow}>
+                      <Truck size={14} color="#92400e" />
+                      <Text style={cs.shipSelectText}>Select shipping method</Text>
+                      <Text style={cs.shipSelectRequired}>*</Text>
+                      <ArrowRight size={12} color="#92400e" style={{ marginLeft: 'auto' }} />
+                    </View>
+                  </Pressable>
+                ) : (
+                  <View style={{ marginHorizontal: 12, marginBottom: 12 }}>
+                    <View style={cs.shipInfoRow}>
+                      <Truck size={14} color="#6b7280" />
+                      <Text style={cs.shipInfoText}>
+                        Shipping: <Text style={cs.shipInfoBold}>{item.transportType === 'AIR' ? 'Air' : 'Sea'}</Text>
+                        {item.courier ? <Text style={cs.shipInfoBold}>{`  ·  ${courierName(item.courier)}`}</Text> : null}
+                      </Text>
+                      <Pressable onPress={() => goSelectShipping(item)} hitSlop={6}>
+                        <Text style={cs.shipChangeText}>Change</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )
+              ) : null}
+
+              {/* Stepper row */}
               <View
                 style={{
                   flexDirection: 'row',
@@ -711,7 +910,7 @@ export default function Cart() {
           );
         })}
 
-        {/* Bag add-on */}
+        {/* Bag add-on (mobile-only value-add — kept) */}
         <BagSelector
           selectedBagId={selectedBag?.id ?? null}
           onSelect={handleBagSelect}
@@ -760,7 +959,7 @@ export default function Cart() {
               <Pressable onPress={applyCoupon} disabled={applyingCoupon} accessibilityRole="button" accessibilityLabel="Apply promo code">
                 <View
                   style={{
-                    backgroundColor: applyingCoupon ? '#6b7280' : '#111827',
+                    backgroundColor: applyingCoupon ? '#6b7280' : BRAND,
                     height: 44,
                     paddingHorizontal: 20,
                     borderRadius: 10,
@@ -777,11 +976,75 @@ export default function Cart() {
               </Pressable>
             </View>
           )}
+
+          {freeShippingApplied && !appliedPromo ? (
+            <View style={cs.freeShipRow}>
+              <Truck size={15} color={Palette.secondary} />
+              <Text style={cs.freeShipText} numberOfLines={2}>
+                {freeShippingMessage || 'Free shipping applied!'}
+              </Text>
+            </View>
+          ) : null}
+
+          {!appliedPromo ? (
+            <View style={cs.offersBlock}>
+              {promosLoading ? (
+                <View style={cs.offersLoadingRow}>
+                  <ActivityIndicator size="small" color={Palette.textMuted} />
+                  <Text style={cs.offersEmptyText}>Checking for offers...</Text>
+                </View>
+              ) : availablePromos.length === 0 ? (
+                <View style={cs.offersEmptyRow}>
+                  <Info size={13} color={Palette.textSubtle} />
+                  <Text style={cs.offersEmptyText}>No promo codes available right now.</Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={cs.offersLabel}>Available offers</Text>
+                  {availablePromos.map((promo, i) => (
+                    <View key={`${promo.code ?? 'offer'}-${i}`} style={cs.offerRow}>
+                      <Tag size={13} color={BRAND} />
+                      <Text style={cs.offerText} numberOfLines={2}>
+                        {promo.message}
+                      </Text>
+                      {promo.code ? (
+                        <Pressable
+                          onPress={() => setPromoCode(promo.code!)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Use code ${promo.code}`}
+                          hitSlop={6}
+                          style={cs.offerCodeChip}
+                        >
+                          <Text style={cs.offerCodeText}>{promo.code}</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  ))}
+                </>
+              )}
+            </View>
+          ) : null}
+        </View>
+
+        {/* Trust badges — web parity (was completely missing) */}
+        <View style={cs.trustCard}>
+          <View style={cs.trustRow}>
+            <Shield size={18} color="#16a34a" />
+            <Text style={cs.trustText}>Secure checkout with SSL encryption</Text>
+          </View>
+          <View style={cs.trustRow}>
+            <Truck size={18} color={BRAND} />
+            <Text style={cs.trustText}>Free shipping on orders over $100</Text>
+          </View>
+          <View style={cs.trustRow}>
+            <Package size={18} color="#7c3aed" />
+            <Text style={cs.trustText}>30-day return policy</Text>
+          </View>
         </View>
 
       </ScrollView>
 
-      {/* Sticky bottom — summary + checkout, always visible */}
+      {/* Sticky bottom — summary + checkout */}
       <StickyCheckout
         subtotal={subtotal}
         shipping={shippingCost}
@@ -791,10 +1054,33 @@ export default function Cart() {
         bagName={selectedBag?.name}
         total={total}
         hasStockIssue={hasStockIssue}
+        hasShippingIssue={hasShippingIssue}
         onCheckout={handleCheckout}
       />
     </View>
   );
+}
+
+/**
+ * Minimal offer-to-price resolver mirroring web's `applyOfferToPrice` from
+ * `frontend/src/lib/offers.ts` for the common PERCENTAGE/FIXED shapes. If
+ * mobile already has (or gets) its own `lib/offers.ts`, swap this for that
+ * import — kept local + defensive so this file doesn't hard-fail if that
+ * module isn't ported yet.
+ */
+function applyOfferPrice(price: number, offer: any, quantity: number): number {
+  try {
+    if (!offer) return price;
+    if (offer.discountType === 'PERCENTAGE' && offer.discountValue) {
+      return Math.max(0, price - (price * offer.discountValue) / 100);
+    }
+    if (offer.discountType === 'FIXED' && offer.discountValue) {
+      return Math.max(0, price - offer.discountValue);
+    }
+    return price;
+  } catch {
+    return price;
+  }
 }
 
 // ─── Header ───────────────────────────────────────────────────────────────────
@@ -812,10 +1098,24 @@ function ScreenHeader({ count }: { count: number }) {
       }}
     >
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <Text style={{ fontSize: 24, fontWeight: '800', color: '#111827' }}>My Cart</Text>
-      <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>
-        {count > 0 ? `${count} ${count === 1 ? 'item' : 'items'}` : 'Your shopping cart'}
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+          {/* Brand-red cart icon — matches web's text-[#E01A1B] header icon */}
+          {/* <ShoppingCart size={26} color={BRAND} /> */}
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: '#1a1a1a' }}>Shopping Cart</Text>
+            <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>
+              Review your items and proceed to checkout
+            </Text>
+          </View>
+        </View>
+        {count > 0 ? (
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: '#1a1a1a' }}>{count}</Text>
+            <Text style={{ fontSize: 11, color: '#6b7280' }}>{count === 1 ? 'Item' : 'Items'}</Text>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -839,6 +1139,7 @@ function StickyCheckout({
   bagName,
   total,
   hasStockIssue,
+  hasShippingIssue,
   onCheckout,
 }: {
   subtotal: number;
@@ -849,10 +1150,12 @@ function StickyCheckout({
   bagName?: string;
   total: number;
   hasStockIssue: boolean;
+  hasShippingIssue: boolean;
   onCheckout: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const bottomInsets = useSafeAreaInsets();
+  const blocked = hasStockIssue || hasShippingIssue;
 
   return (
     <View
@@ -870,7 +1173,6 @@ function StickyCheckout({
         elevation: 10,
       }}
     >
-      {/* Expandable summary breakdown */}
       {expanded ? (
         <View style={{ marginBottom: 10, gap: 6 }}>
           <SummaryRow label="Subtotal" value={fmt(subtotal)} />
@@ -882,7 +1184,6 @@ function StickyCheckout({
         </View>
       ) : null}
 
-      {/* Total row + expand toggle */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <Pressable
           onPress={() => setExpanded((e) => !e)}
@@ -893,8 +1194,8 @@ function StickyCheckout({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Text style={{ fontSize: 13, color: '#6b7280' }}>Total</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-              {expanded ? <ChevronDown size={14} color="#2563eb" strokeWidth={2.5} /> : <ChevronRight size={14} color="#2563eb" strokeWidth={2.5} />}
-              <Text style={{ fontSize: 12, color: '#2563eb', fontWeight: '600' }}>
+              {expanded ? <ChevronDown size={14} color={BRAND} strokeWidth={2.5} /> : <ChevronRight size={14} color={BRAND} strokeWidth={2.5} />}
+              <Text style={{ fontSize: 12, color: BRAND, fontWeight: '600' }}>
                 {expanded ? 'Hide' : 'Details'}
               </Text>
             </View>
@@ -903,27 +1204,46 @@ function StickyCheckout({
         <Text style={{ fontSize: 20, fontWeight: '800', color: '#111827' }}>{fmt(total)}</Text>
       </View>
 
-      {/* Checkout button */}
+      {/* Checkout button — 3 states, web parity (mobile only had 2 before) */}
       <Pressable
         onPress={onCheckout}
-        disabled={hasStockIssue}
+        disabled={blocked}
         accessibilityRole="button"
-        accessibilityLabel={hasStockIssue ? 'Fix stock issues to checkout' : 'Proceed to checkout'}
+        accessibilityLabel={
+          hasShippingIssue
+            ? 'Choose a shipping method to proceed'
+            : hasStockIssue
+              ? 'Fix stock issues to checkout'
+              : 'Proceed to checkout'
+        }
       >
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: hasStockIssue ? '#d1d5db' : '#111827',
+            backgroundColor: blocked ? '#d1d5db' : BRAND,
             height: 52,
-            borderRadius: 14,
+            borderRadius: 999,
             gap: 8,
+            shadowColor: blocked ? 'transparent' : BRAND,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: blocked ? 0 : 0.3,
+            shadowRadius: 12,
+            elevation: blocked ? 0 : 4,
           }}
         >
-          <CreditCard size={18} color={hasStockIssue ? '#9ca3af' : '#fff'} />
-          <Text style={{ color: hasStockIssue ? '#9ca3af' : '#fff', fontSize: 16, fontWeight: '700' }}>
-            {hasStockIssue ? 'Fix Stock Issues' : 'Proceed to Checkout'}
+          {hasShippingIssue ? (
+            <Truck size={18} color={blocked ? '#9ca3af' : '#fff'} />
+          ) : (
+            <CreditCard size={18} color={blocked ? '#9ca3af' : '#fff'} />
+          )}
+          <Text style={{ color: blocked ? '#9ca3af' : '#fff', fontSize: 16, fontWeight: '700' }}>
+            {hasShippingIssue
+              ? 'Choose a shipping method to proceed'
+              : hasStockIssue
+                ? 'Fix Stock Issues'
+                : 'Proceed to Checkout'}
           </Text>
         </View>
       </Pressable>
@@ -991,16 +1311,60 @@ function SyncBanner({
   );
 }
 
-// ─── Hoisted styles for sync UI ──────────────────────────────────────────────
+// ─── Hoisted styles ───────────────────────────────────────────────────────────
 const cs = StyleSheet.create({
-  // Syncing indicator
+  offersBlock: { marginTop: 12 },
+  offersLabel: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: Palette.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  offersLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  offersEmptyRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  offersEmptyText: { flex: 1, fontSize: 12, color: Palette.textSubtle },
+  offerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: Palette.outlineSubtle,
+  },
+  offerText: { flex: 1, fontSize: 12, color: Palette.text, lineHeight: 16 },
+  offerCodeChip: {
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: Palette.brandBorder,
+    backgroundColor: Palette.onBrand,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  offerCodeText: { fontSize: 11, fontWeight: '800', color: '#E01A1B', letterSpacing: 0.5 },
+
+  freeShipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: Radius.md,
+    backgroundColor: Palette.secondaryContainer,
+    borderWidth: 1,
+    borderColor: 'rgba(22,163,74,0.25)',
+  },
+  freeShipText: { flex: 1, fontSize: 12.5, fontWeight: '700', color: Palette.secondary },
+
   syncingRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingVertical: 10, backgroundColor: '#eff6ff', borderRadius: 12,
   },
   syncingText: { fontSize: 12, fontWeight: '600', color: '#2563eb' },
 
-  // Stock warning banners (per-item)
   bannerRow: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 6,
@@ -1013,7 +1377,6 @@ const cs = StyleSheet.create({
   bannerTextOver: { fontSize: 11, fontWeight: '700', color: '#92400e' },
   bannerTextLow: { fontSize: 11, fontWeight: '700', color: '#9a3412' },
 
-  // Price change banner (per-item)
   priceBannerRow: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 5,
@@ -1023,7 +1386,6 @@ const cs = StyleSheet.create({
   priceTextUp: { fontSize: 11, fontWeight: '700', color: '#dc2626' },
   priceTextDown: { fontSize: 11, fontWeight: '700', color: '#16a34a' },
 
-  // SyncBanner component
   syncBanner: { borderRadius: 12, borderWidth: 1, padding: 12 },
   syncBannerInner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   syncBannerIcon: { marginTop: 1 },
@@ -1031,6 +1393,39 @@ const cs = StyleSheet.create({
   syncBannerTitle: { fontSize: 13, fontWeight: '700', color: '#111827', marginBottom: 4 },
   syncBannerLine: { fontSize: 11, color: '#374151', lineHeight: 17 },
   syncBannerDismiss: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+
+  // Tag row (category / rating / material / discount) — web parity, new
+  tagRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' },
+  categoryChip: { backgroundColor: Palette.onBrand, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  categoryChipText: { fontSize: 10, fontWeight: '700', color: '#E01A1B' },
+  ratingChip: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  ratingChipText: { fontSize: 10.5, fontWeight: '700', color: '#374151' },
+  ratingChipCount: { fontSize: 10, color: '#9ca3af' },
+  materialChip: { backgroundColor: '#f0fdf4', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  materialChipText: { fontSize: 10, fontWeight: '700', color: '#16a34a' },
+  discountChip: { backgroundColor: '#f3f4f6', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  discountChipText: { fontSize: 10, fontWeight: '700', color: '#374151' },
+
+  // Offer badge on price row — web parity, new
+  offerBadge: { backgroundColor: '#E01A1B', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1.5 },
+  offerBadgeText: { fontSize: 9, fontWeight: '800', color: '#fff' },
+
+  // Shipping method rows — web parity, new
+  shipSelectRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a',
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+  },
+  shipSelectText: { fontSize: 12, fontWeight: '700', color: '#92400e' },
+  shipSelectRequired: { fontSize: 12, fontWeight: '700', color: '#E01A1B' },
+  shipInfoRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb',
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+  },
+  shipInfoText: { fontSize: 12, color: '#374151', flex: 1 },
+  shipInfoBold: { fontWeight: '700', color: '#111827' },
+  shipChangeText: { fontSize: 12, fontWeight: '700', color: '#E01A1B' },
 
   // Meta row (variant + stock)
   metaRow: {
@@ -1045,7 +1440,6 @@ const cs = StyleSheet.create({
   },
   variantText: { fontSize: 11, fontWeight: '600', color: '#374151' },
 
-  // Stock chips
   stockChip: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   stockChipOk: { backgroundColor: '#f0fdf4' },
   stockChipLow: { backgroundColor: '#fff7ed' },
@@ -1054,4 +1448,12 @@ const cs = StyleSheet.create({
   stockTextOk: { color: '#16a34a' },
   stockTextLow: { color: '#ea580c' },
   stockTextOos: { color: '#dc2626' },
+
+  // Trust badges card — web parity, new
+  trustCard: {
+    backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#e5e7eb',
+    padding: 16, gap: 12,
+  },
+  trustRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  trustText: { fontSize: 12.5, color: '#4b5563', flex: 1 },
 });
