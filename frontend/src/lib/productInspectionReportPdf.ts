@@ -19,6 +19,7 @@
 import jsPDF from "jspdf"
 import { formatCheckerName } from "@/lib/checkerUtils"
 import { resolveOwnerDesignation } from "@/lib/utils"
+import { formatDuration } from "@/lib/inspectionDuration"
 import autoTable from "jspdf-autotable"
 
 export interface ReportChecker {
@@ -36,7 +37,16 @@ export interface ReportMeta {
     inspectionType?: string | null
     location?: { latitude: number; longitude: number } | null
     inspectionStartedAt?: string
+    /** ISO string for when the inspection was completed/submitted. */
+    inspectionCompletedAt?: string
     generatedAt?: Date
+    // Duration breakdown (see lib/inspectionDuration.ts). When present, the report
+    // prints Active / Paused / Total rows; exceededSchedule highlights the total.
+    activeDurationMs?: number
+    pausedDurationMs?: number
+    totalDurationMs?: number
+    scheduledDurationMs?: number
+    exceededSchedule?: boolean
 }
 
 export interface ReportOptions {
@@ -115,10 +125,10 @@ export function generateProductInspectionPdf(
     const margin = 40
     const contentW = pageW - margin * 2
     const generatedAt = meta.generatedAt || new Date()
-    // Inspection start time comes from when the inspection was opened; the
-    // complete time is the report-generation timestamp — same as the factory report.
+    // Inspection start time comes from when the inspection was opened; the complete
+    // time uses the real completion stamp when available, else the report-gen time.
     const startTimeStr = meta.inspectionStartedAt ? fmtTime(new Date(meta.inspectionStartedAt)) : "—"
-    const completeTimeStr = fmtTime(generatedAt)
+    const completeTimeStr = fmtTime(meta.inspectionCompletedAt ? new Date(meta.inspectionCompletedAt) : generatedAt)
     const checker = meta.checker || {}
 
     let y = margin
@@ -402,6 +412,14 @@ export function generateProductInspectionPdf(
             ["Inspection Date", val(formData.serviceStartDate)],
             ["Inspection Start Time", startTimeStr],
             ["Inspection Complete Time", completeTimeStr],
+            // Duration breakdown across pauses (only when time tracking is available).
+            ...(meta.totalDurationMs != null && meta.totalDurationMs > 0
+                ? [
+                    ["Active Duration", formatDuration(meta.activeDurationMs || 0)],
+                    ["Paused Duration", formatDuration(meta.pausedDurationMs || 0)],
+                    ["Total Duration", `${formatDuration(meta.totalDurationMs || 0)}${meta.exceededSchedule ? "  (exceeded scheduled duration)" : ""}`],
+                  ]
+                : []),
             ["Inspection Status", val(formData.inspectionStatus)],
             // Virtual inspections have no location — show the type in place of coordinates.
             ...(isVirtual
@@ -410,6 +428,21 @@ export function generateProductInspectionPdf(
             ["Report Generated", fmtDateTime(generatedAt)],
         ]
     )
+
+    // Highlight when the inspection ran past its scheduled duration.
+    if (meta.exceededSchedule) {
+        ensureSpace(20)
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(8.5)
+        doc.setTextColor(200, 30, 30)
+        doc.text(
+            `⚠  Exceeded scheduled duration${meta.scheduledDurationMs ? ` (scheduled ${formatDuration(meta.scheduledDurationMs)})` : ""} — active work took ${formatDuration(meta.activeDurationMs || 0)}.`,
+            margin, y
+        )
+        doc.setFont("helvetica", "normal")
+        doc.setTextColor(...SLATE)
+        y += 16
+    }
 
     // ── Attached documents (thumbnails) ───────────────────────────────────────
     const docImages: any[] = [

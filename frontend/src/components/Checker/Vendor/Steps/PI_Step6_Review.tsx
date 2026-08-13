@@ -6,7 +6,7 @@ import { CheckCircle2, XCircle, Minus, Pencil, Package, Box, Ruler, Zap, Clipboa
 import type { PackagingItem, TestGroup } from './PI_data'
 import { ADDITIONAL_EVIDENCE_DEFS } from './PI_data'
 import { qcCheckerService } from '@/services/qcCheckerService'
-import { formatCheckerName } from '@/lib/checkerUtils'
+import { formatCheckerName, formatInspectionDate } from '@/lib/checkerUtils'
 import { getBusinessTypeLabel } from './PI_Step1_GeneralInfo'
 
 // ── Code badge helper ────────────────────────────────────────────────────────
@@ -210,7 +210,7 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
           <ReviewRow label="Company" value={v.companyName} />
           <ReviewRow label="Business Type" value={getBusinessTypeLabel(v.businessType)} />
           <ReviewRow label="Product" value={p.name} />
-          <ReviewRow label="Inspection Date" value={d.serviceStartDate} />
+          <ReviewRow label="Inspection Date" value={formatInspectionDate(d.serviceStartDate)} />
           <ReviewRow label="Service Type" value={d.serviceType} />
         </div>
       </div>
@@ -413,7 +413,7 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Inspection Date</p>
               <div className="px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-700 text-sm">
-                {d.serviceStartDate || new Date().toLocaleDateString('en-CA')}
+                {formatInspectionDate(d.serviceStartDate) || formatInspectionDate(new Date().toISOString().slice(0, 10))}
               </div>
             </div>
             <div>

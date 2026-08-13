@@ -122,7 +122,11 @@ axiosInstance.interceptors.response.use(
           }
           break;
         case 403:
-          showErrorToast('Access Denied', data?.error || 'You do not have permission to perform this action');
+          // Geofence blocks ("Location mismatch") are handled by the inspection UI's
+          // own warning card — don't double-toast them here as "Access Denied".
+          if (data?.error !== 'Location mismatch' && data?.error !== 'Location required') {
+            showErrorToast('Access Denied', data?.error || 'You do not have permission to perform this action');
+          }
           break;
         case 404:
           // Not found — let the caller decide whether to surface

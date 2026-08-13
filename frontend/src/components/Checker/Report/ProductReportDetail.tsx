@@ -3,15 +3,17 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useSearchParams } from "next/navigation"
+import { formatInspectionDate } from "@/lib/checkerUtils"
 import type { LucideIcon } from "lucide-react"
 import {
   ArrowLeft, CheckCircle, XCircle,
   AlertTriangle, ClipboardList,
-  Box, Bug, FlaskConical, Camera, Star, Download, Clock, FileText
+  Box, Bug, FlaskConical, Camera, Star, Download, Clock, FileText, AlarmClockOff
 } from "lucide-react"
 import { Badge } from "@/components/UI/Badge"
 import qcCheckerService from "@/services/qcCheckerService"
 import { generateProductInspectionPdf } from "@/lib/productInspectionReportPdf"
+import { computeInspectionDurations } from "@/lib/inspectionDuration"
 import ManufacturerInfoCard from "@/components/Shared/ManufacturerInfoCard"
 import { hasManufacturerInfo } from "@/lib/manufacturerInfo"
 
@@ -163,6 +165,12 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
     autoDownloadTriggered.current = true
     const fd = (product.qcInspectionData || {}) as Record<string, any>
     const assignedQc = (product as any).assignedQc
+    const d = computeInspectionDurations({
+      startedAt: fd.inspectionStartedAt,
+      submittedAt: fd.inspectionCompletedAt,
+      totalPausedMs: fd.totalPausedMs || 0,
+      estimatedDuration: (product as any).qcAssignment?.estimatedDuration,
+    })
     const meta = {
       productName: product.name,
       vendorName: product.vendor?.companyName || fd.vendor,
@@ -173,7 +181,16 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
       location: fd.checkerLocation?.checkerLatitude != null
           ? { latitude: fd.checkerLocation.checkerLatitude, longitude: fd.checkerLocation.checkerLongitude }
           : undefined,
+      inspectionStartedAt: fd.inspectionStartedAt,
+      inspectionCompletedAt: fd.inspectionCompletedAt,
       generatedAt: new Date(),
+      ...(d.totalMs > 0 ? {
+        activeDurationMs: d.activeMs,
+        pausedDurationMs: d.pausedMs,
+        totalDurationMs: d.totalMs,
+        scheduledDurationMs: d.scheduledMs,
+        exceededSchedule: d.exceeded,
+      } : {}),
     }
     try {
       const pdf = generateProductInspectionPdf(fd, meta, {})
@@ -224,6 +241,17 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fd = (product.qcInspectionData || {}) as Record<string, any>
   const status = product.approvalStatus || "PENDING"
+  const overtime = computeInspectionDurations({
+    startedAt: fd.inspectionStartedAt,
+    submittedAt: fd.inspectionCompletedAt,
+    totalPausedMs: fd.totalPausedMs || 0,
+    estimatedDuration: (product as any).qcAssignment?.estimatedDuration,
+  }).exceeded
+  const overtimeBadge = overtime ? (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border bg-red-50 text-red-700 border-red-200">
+      <AlarmClockOff className="w-3.5 h-3.5" /> Exceeded schedule
+    </span>
+  ) : null
 
   // ── New-schema inspection data (matches the 7-step form + PDF generator) ────
   const productVerifications: [string, any][] = Object.entries(fd.productVerifications || {})
@@ -247,6 +275,12 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
     try {
       const fd = (product.qcInspectionData || {}) as Record<string, any>
       const assignedQc = (product as any).assignedQc
+      const d = computeInspectionDurations({
+        startedAt: fd.inspectionStartedAt,
+        submittedAt: fd.inspectionCompletedAt,
+        totalPausedMs: fd.totalPausedMs || 0,
+        estimatedDuration: (product as any).qcAssignment?.estimatedDuration,
+      })
       const meta = {
         productName: product.name,
         vendorName: product.vendor?.companyName || fd.vendor,
@@ -258,7 +292,15 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
             ? { latitude: fd.checkerLocation.checkerLatitude, longitude: fd.checkerLocation.checkerLongitude }
             : undefined,
         inspectionStartedAt: fd.inspectionStartedAt,
+        inspectionCompletedAt: fd.inspectionCompletedAt,
         generatedAt: new Date(),
+        ...(d.totalMs > 0 ? {
+          activeDurationMs: d.activeMs,
+          pausedDurationMs: d.pausedMs,
+          totalDurationMs: d.totalMs,
+          scheduledDurationMs: d.scheduledMs,
+          exceededSchedule: d.exceeded,
+        } : {}),
       }
       const pdf = generateProductInspectionPdf(fd, meta, {})
       pdf.save(`Product_Report_${product.name.replace(/\s+/g, "_")}_${product.baseSku || productId}.pdf`)
@@ -292,6 +334,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
           <Download className="w-4 h-4" />
           {downloading ? "Generating..." : "Download PDF"}
         </button>
+        {overtimeBadge}
         <Badge className={`${statusColors[status] || "bg-gray-100 text-gray-700"} text-sm px-4 py-1.5`}>
           {status === "QC_APPROVED" || status === "APPROVED" ? <CheckCircle className="w-4 h-4 mr-1.5" /> : null}
           {status === "REJECTED" ? <XCircle className="w-4 h-4 mr-1.5" /> : null}
@@ -338,7 +381,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
           <InfoRow label="Vendor" value={fd.vendor} />
           <InfoRow label="Factory" value={fd.factory} />
           <InfoRow label="Service Location" value={fd.serviceLocation} />
-          <InfoRow label="Service Start Date" value={fd.serviceStartDate} />
+          <InfoRow label="Service Start Date" value={formatInspectionDate(fd.serviceStartDate)} />
           <InfoRow label="Service Type" value={fd.serviceType} />
         </div>
       </Section>

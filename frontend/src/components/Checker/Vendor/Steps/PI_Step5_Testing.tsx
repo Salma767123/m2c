@@ -17,7 +17,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import type { TestGroup, TestItem } from './PI_data'
-import { ADDITIONAL_EVIDENCE_DEFS } from './PI_data'
+import { ADDITIONAL_EVIDENCE_DEFS, PACKAGING_TOGGLE_GROUPS, relabelForPackaging } from './PI_data'
 import ImageCropModal from '@/components/UI/ImageCropModal'
 import { notifyUploadSuccess } from '@/lib/toast-utils'
 
@@ -408,6 +408,7 @@ function TestGroupCard({
   onTestChange,
   onAddOther,
   onRemoveOther,
+  onPackagingTypeChange,
 }: {
   group: TestGroup
   invalidTestId?: string | null
@@ -415,7 +416,11 @@ function TestGroupCard({
   onTestChange: (testId: string, patch: Partial<TestItem>) => void
   onAddOther: () => void
   onRemoveOther: (testId: string) => void
+  onPackagingTypeChange: (type: 'Carton' | 'Bale') => void
 }) {
+  // Only the measurement & functional groups carry the Carton/Bale packaging toggle.
+  const showPackagingToggle = (PACKAGING_TOGGLE_GROUPS as readonly string[]).includes(group.id)
+  const packagingType = group.packagingType || 'Carton'
   const regularTests = group.tests.filter((t) => !t.isOther)
   const otherTests = group.tests.filter((t) => t.isOther)
   const passed = group.tests.filter((t) => t.pass).length
@@ -463,6 +468,28 @@ function TestGroupCard({
       {/* Tests */}
       {showTests && (
         <div className="p-4 space-y-3">
+          {showPackagingToggle && (
+            <div className="flex items-center gap-3 pb-1">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Packaging Type</span>
+              <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+                {(['Carton', 'Bale'] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => { if (type !== packagingType) onPackagingTypeChange(type) }}
+                    aria-pressed={type === packagingType}
+                    className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${
+                      type === packagingType
+                        ? 'bg-brand-500 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {regularTests.map((test) => (
             <TestRow
               key={test.id}
@@ -619,6 +646,24 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
     }))
   }
 
+  // Carton/Bale toggle for the measurement & functional groups: store the choice and
+  // relabel that group's predefined test names accordingly (custom "Other" rows keep
+  // whatever the checker typed).
+  const setPackagingType = (groupId: string, type: 'Carton' | 'Bale') => {
+    setFormData((prev: any) => ({
+      ...prev,
+      testGroups: groups.map((g) =>
+        g.id === groupId
+          ? {
+              ...g,
+              packagingType: type,
+              tests: g.tests.map((t) => (t.isOther ? t : { ...t, label: relabelForPackaging(t.label, type) })),
+            }
+          : g
+      ),
+    }))
+  }
+
   const updateTest = (groupId: string, testId: string, patch: Partial<TestItem>) => {
     setFormData((prev: any) => ({
       ...prev,
@@ -742,6 +787,7 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
             onTestChange={(testId, patch) => updateTest(group.id, testId, patch)}
             onAddOther={() => addOtherTest(group.id)}
             onRemoveOther={(testId) => removeOtherTest(group.id, testId)}
+            onPackagingTypeChange={(type) => setPackagingType(group.id, type)}
           />
         ))}
       </div>

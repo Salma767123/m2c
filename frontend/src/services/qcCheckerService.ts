@@ -574,12 +574,18 @@ class QCCheckerService {
             });
             return response.data;
         } catch (error: any) {
-            const data = error?.response?.data || {};
-            // Prefer the human-readable `message` (e.g. the expired-window text)
-            // and carry `code` so callers can special-case INSPECTION_EXPIRED.
-            const err = new Error(data.message || data.error || error?.message || 'Failed to start inspection') as Error & { status?: number; code?: string };
-            err.status = error?.response?.status;
+            // The shared axios interceptor rejects with a FLAT shape ({ message, status,
+            // data }) — no `.response`. Read that first, then fall back to a raw axios
+            // error, so status/code/geofence details survive for the caller.
+            const data = error?.data || error?.response?.data || {};
+            // Prefer the human-readable `message` (e.g. the expired-window / location
+            // text) and carry `code` so callers can special-case INSPECTION_EXPIRED.
+            const err = new Error(data.message || data.error || error?.message || 'Failed to start inspection') as Error & { status?: number; code?: string; distanceMeters?: number; thresholdMeters?: number };
+            err.status = error?.status ?? error?.response?.status;
             err.code = data.code;
+            // Geofence details (403 Location mismatch) so the UI can show the exact gap.
+            err.distanceMeters = data.distanceMeters;
+            err.thresholdMeters = data.thresholdMeters;
             throw err;
         }
     }
