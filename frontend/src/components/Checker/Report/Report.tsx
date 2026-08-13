@@ -161,6 +161,8 @@ export default function ReportsPage() {
       case "PASSED":
       case "APPROVED":
         return <Badge className="bg-green-50 text-green-700 border border-green-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Approved</Badge>
+      case "QC_SUBMITTED":
+        return <Badge className="bg-blue-50 text-blue-700 border border-blue-200">Submitted</Badge>
       case "QC_APPROVED":
         return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" />QC Approved</Badge>
       case "REINSPECTION":

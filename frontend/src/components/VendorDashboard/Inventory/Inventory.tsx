@@ -49,6 +49,7 @@ const getApprovalBadge = (item: APIInventoryItem) => {
   switch (item.productApprovalStatus) {
     case 'APPROVED': return <span className={`${pill} bg-green-50 text-green-700 border-green-200`}>Approved</span>
     case 'PENDING': return <span className={`${pill} bg-yellow-50 text-yellow-700 border-yellow-200`}>Pending Approval</span>
+    case 'QC_SUBMITTED': return <span className={`${pill} bg-blue-50 text-blue-700 border-blue-200`}>Under Review</span>
     case 'QC_APPROVED': return <span className={`${pill} bg-brand-50 text-brand-600 border-brand-200`}>QC Approved</span>
     case 'REJECTED': return <span className={`${pill} bg-red-50 text-red-700 border-red-200`}>Rejected</span>
     case 'REINSPECTION': return <span className={`${pill} bg-orange-50 text-orange-700 border-orange-200`}>Reinspection</span>
@@ -414,6 +415,7 @@ export default function Inventory() {
                 { value: 'all', label: 'All Product Status' },
                 { value: 'none', label: 'No Product' },
                 { value: 'PENDING', label: 'Pending Approval' },
+                { value: 'QC_SUBMITTED', label: 'Under Review' },
                 { value: 'QC_APPROVED', label: 'QC Approved' },
                 { value: 'APPROVED', label: 'Approved' },
                 { value: 'REJECTED', label: 'Rejected' },

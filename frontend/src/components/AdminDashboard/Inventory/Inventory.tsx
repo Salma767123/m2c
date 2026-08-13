@@ -51,7 +51,7 @@ interface InventoryItem {
   createdAt: string
   updatedAt: string
   hasProductCreated: boolean
-  productApprovalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | 'NEGOTIATION' | null
+  productApprovalStatus?: 'PENDING' | 'QC_SUBMITTED' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | 'NEGOTIATION' | null
   hasVariants?: boolean
   variants?: InventoryVariant[]
 }
@@ -83,6 +83,7 @@ const getApprovalBadge = (item: InventoryItem) => {
   switch (item.productApprovalStatus) {
     case 'APPROVED': return <Badge className="bg-green-50 text-green-700 border border-green-200">Approved</Badge>
     case 'PENDING': return <Badge className="bg-yellow-50 text-yellow-700 border border-yellow-200">Pending Approval</Badge>
+    case 'QC_SUBMITTED': return <Badge className="bg-blue-50 text-blue-700 border border-blue-200">Pending Review</Badge>
     case 'QC_APPROVED': return <Badge className="bg-blue-50 text-blue-700 border border-blue-200">QC Approved</Badge>
     case 'REJECTED': return <Badge className="bg-red-50 text-red-700 border border-red-200">Rejected</Badge>
     case 'REINSPECTION': return <Badge className="bg-orange-50 text-orange-700 border border-orange-200">Reinspection</Badge>

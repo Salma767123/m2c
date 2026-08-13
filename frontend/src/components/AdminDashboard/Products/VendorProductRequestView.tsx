@@ -32,7 +32,7 @@ import Image from 'next/image'
 import { adminProductService, type AdminProduct } from '@/services/adminProductService'
 import { CARE_INSTRUCTIONS, CareIcon, CATEGORY_COLORS, CATEGORY_BORDER } from '@/components/VendorDashboard/Products/CareInstructionModal'
 import qcCheckerService from '@/services/qcCheckerService'
-import { formatCheckerName } from '@/lib/checkerUtils'
+import { formatCheckerName, formatInspectionDate } from '@/lib/checkerUtils'
 import { hasPermission } from '@/lib/auth'
 import { openDoc } from '@/lib/docViewerBus'
 import ManufacturerInfoCard from '@/components/Shared/ManufacturerInfoCard'
@@ -449,6 +449,8 @@ export default function VendorProductRequestView({ requestId, context = 'vendor-
     switch (status.toLowerCase()) {
       case 'pending':
         return 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+      case 'qc_submitted':
+        return 'bg-blue-50 text-blue-700 border border-blue-200'
       case 'qc_approved':
         return 'bg-blue-50 text-blue-700 border border-blue-200'
       case 'reinspection':
@@ -530,19 +532,34 @@ export default function VendorProductRequestView({ requestId, context = 'vendor-
           <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
           {/* All Products is the read-only catalog view — the approve / reject /
               re-inspection decision lives on the QC report (Vendor Requests) view. */}
-          {!isAllProducts && (product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED' || product.approvalStatus === 'REINSPECTION' || product.approvalStatus === 'REJECTED') && (
+          {!isAllProducts && (product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_SUBMITTED' || product.approvalStatus === 'QC_APPROVED' || product.approvalStatus === 'REINSPECTION' || product.approvalStatus === 'REJECTED') && (
             <>
-              {product.approvalStatus === 'QC_APPROVED' ? (
-                hasPermission('vendor_product_requests:approve') && (
-                  <Button
-                    onClick={() => setShowApprovalModal(true)}
-                    disabled={actionLoading}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    <Check className="h-4 w-4 mr-2" />
-                    {actionLoading ? 'Processing...' : 'Approve'}
-                  </Button>
-                )
+              {(product.approvalStatus === 'QC_SUBMITTED' || product.approvalStatus === 'QC_APPROVED') ? (
+                // QC report is advisory — the admin makes the final call. On a QC-
+                // submitted report all three verbs (Re-Inspection / Reject / Approve)
+                // are available; a QC-approved one keeps the price-approval action.
+                <div className="flex items-center gap-2">
+                  {product.approvalStatus === 'QC_SUBMITTED' && hasPermission('reinspection_review:view') && (
+                    <Button
+                      variant="outline"
+                      onClick={() => window.location.href = `/admin/dashboard/reinspection-review/product/${product.id}`}
+                      className="border-brand-300 text-brand-600 hover:bg-brand-50"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Re-Inspection
+                    </Button>
+                  )}
+                  {hasPermission('vendor_product_requests:approve') && (
+                    <Button
+                      onClick={() => setShowApprovalModal(true)}
+                      disabled={actionLoading}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <Check className="h-4 w-4 mr-2" />
+                      {actionLoading ? 'Processing...' : 'Approve'}
+                    </Button>
+                  )}
+                </div>
               ) : product.approvalStatus === 'REINSPECTION' ? (
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-orange-600 border-orange-200">
@@ -592,7 +609,7 @@ export default function VendorProductRequestView({ requestId, context = 'vendor-
                   )}
                 </div>
               )}
-              {product.approvalStatus === 'PENDING' && hasPermission('vendor_product_requests:approve') && (
+              {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_SUBMITTED') && hasPermission('vendor_product_requests:approve') && (
                 <Button
                   variant="outline"
                   onClick={() => setShowRejectionModal(true)}
@@ -942,7 +959,7 @@ export default function VendorProductRequestView({ requestId, context = 'vendor-
                   {(product.qcInspectionData.serviceStartDate || product.qcInspectionData.inspectionDate) && (
                     <div className="p-2 rounded bg-slate-50 text-center">
                       <p className="text-[10px] text-slate-500">Inspected</p>
-                      <p className="text-xs font-semibold text-slate-800">{product.qcInspectionData.serviceStartDate || product.qcInspectionData.inspectionDate}</p>
+                      <p className="text-xs font-semibold text-slate-800">{formatInspectionDate(product.qcInspectionData.serviceStartDate || product.qcInspectionData.inspectionDate)}</p>
                     </div>
                   )}
                 </div>

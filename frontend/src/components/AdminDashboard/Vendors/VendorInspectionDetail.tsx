@@ -273,6 +273,9 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
         inspection?.checkerLatitude != null && inspection?.checkerLongitude != null
           ? { latitude: inspection.checkerLatitude, longitude: inspection.checkerLongitude }
           : null,
+      locationVerified: inspection?.locationVerified,
+      locationDistanceM: inspection?.locationDistanceM,
+      matchedAddress: (inspection as any)?.locationMatchedAddress,
       // Stamp the report with when it was actually signed/submitted, not "now",
       // so re-opening it always shows a stable date.
       generatedAt: inspection?.submittedAt

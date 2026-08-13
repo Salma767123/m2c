@@ -17,6 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
   CANCELLED: 'bg-slate-100 text-slate-500 ring-slate-200',
   EXPIRED: 'bg-slate-100 text-slate-500 ring-slate-200',
   PENDING: 'bg-amber-50 text-amber-700 ring-amber-200',
+  QC_SUBMITTED: 'bg-blue-50 text-blue-700 ring-blue-200',
   QC_APPROVED: 'bg-blue-50 text-blue-700 ring-blue-200',
   APPROVED: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   NEGOTIATION: 'bg-purple-50 text-purple-700 ring-purple-200',
@@ -34,7 +35,7 @@ function StatusBadge({ status }: { status?: string }) {
 }
 
 const VENDOR_STATUSES = ['ALL', 'SCHEDULED', 'IN_PROGRESS', 'SUBMITTED', 'UNDER_ADMIN_REVIEW', 'COMPLETED', 'REJECTED', 'REINSPECTION', 'CANCELLED', 'EXPIRED']
-const PRODUCT_STATUSES = ['ALL', 'PENDING', 'QC_APPROVED', 'NEGOTIATION', 'APPROVED', 'REJECTED', 'REINSPECTION']
+const PRODUCT_STATUSES = ['ALL', 'PENDING', 'QC_SUBMITTED', 'QC_APPROVED', 'NEGOTIATION', 'APPROVED', 'REJECTED', 'REINSPECTION']
 
 function fmtDate(d?: string | null) {
   if (!d) return '—'

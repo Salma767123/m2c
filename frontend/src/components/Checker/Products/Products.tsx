@@ -56,6 +56,7 @@ const STATUS_TABS = [
     { value: '', label: 'All Statuses' },
     { value: 'PENDING', label: 'Pending' },
     { value: 'REINSPECTION', label: 'Reinspection' },
+    { value: 'QC_SUBMITTED', label: 'Submitted' },
     { value: 'QC_APPROVED', label: 'Approved by QC' },
     { value: 'APPROVED', label: 'Approved by Admin' },
     { value: 'REJECTED', label: 'Rejected' },
@@ -72,6 +73,7 @@ const SORT_OPTIONS = [
 // status pills used across the Vendor Management data grid.
 const APPROVAL_BADGE: Record<string, string> = {
     PENDING: 'bg-amber-50 text-amber-700 border-amber-200/85',
+    QC_SUBMITTED: 'bg-blue-50 text-blue-700 border-blue-200/85',
     REINSPECTION: 'bg-purple-50 text-purple-700 border-purple-200/85',
     QC_APPROVED: 'bg-blue-50 text-blue-700 border-blue-200/85',
     APPROVED: 'bg-emerald-50 text-emerald-700 border-emerald-200/85',
@@ -80,6 +82,7 @@ const APPROVAL_BADGE: Record<string, string> = {
 
 const APPROVAL_LABELS: Record<string, string> = {
     PENDING: 'Pending',
+    QC_SUBMITTED: 'Submitted',
     REINSPECTION: 'Reinspection',
     QC_APPROVED: 'Approved by QC',
     APPROVED: 'Approved by Admin',

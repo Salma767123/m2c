@@ -328,6 +328,7 @@ const startInspection = async (req, res) => {
                 ...(geo.vendorLat != null ? { vendorLatitude: geo.vendorLat, vendorLongitude: geo.vendorLng } : {}),
                 locationVerified: geo.verified === true,
                 ...(geo.distanceM != null ? { locationDistanceM: Math.round(geo.distanceM) } : {}),
+                ...(geo.matchedAddress ? { locationMatchedAddress: geo.matchedAddress } : {}),
                 ...resumeFields,
             },
             include: {
@@ -609,6 +610,7 @@ const completeInspection = async (req, res) => {
             ...(geo.vendorLat != null ? { vendorLatitude: geo.vendorLat, vendorLongitude: geo.vendorLng } : {}),
             locationVerified: geo.verified === true,
             ...(geo.distanceM != null ? { locationDistanceM: Math.round(geo.distanceM) } : {}),
+            ...(geo.matchedAddress ? { locationMatchedAddress: geo.matchedAddress } : {}),
         };
 
         const updatedInspection = await prisma.inspection.update({

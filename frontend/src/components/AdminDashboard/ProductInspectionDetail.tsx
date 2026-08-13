@@ -12,6 +12,8 @@ import { Badge } from '@/components/UI/Badge'
 import productService from '@/services/productService'
 import { generateProductInspectionPdf } from '@/lib/productInspectionReportPdf'
 import { computeInspectionDurations } from '@/lib/inspectionDuration'
+import { formatInspectionDate } from '@/lib/checkerUtils'
+import { verificationLabel, isTestOptional } from '@/components/Checker/Vendor/Steps/PI_data'
 import reinspectionService, { AuditLogEntry } from '@/services/reinspectionService'
 import InspectionAuditTimeline from './ReInspection/InspectionAuditTimeline'
 import ApproveProductModal, { type ApprovableProduct } from './Products/ApproveProductModal'
@@ -115,11 +117,6 @@ const REMARK_LABELS: Record<number, string> = {
     7: "Re-inspection", 8: "Acceptable", 9: "Good", 10: "Excellent",
 }
 
-// Humanize a productVerifications key (e.g. "pv_spec_gsm" → "Spec Gsm").
-function humanizeVerKey(key: string): string {
-    return key.replace(/^pv_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-}
-
 // camelCase / snake_case evidence key → Title Case (e.g. "factoryFrontView" → "Factory Front View").
 function humanizeEvidenceKey(key: string): string {
     return key.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\b\w/g, (c) => c.toUpperCase())
@@ -213,6 +210,9 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
                 location: fd.checkerLocation?.checkerLatitude != null
                     ? { latitude: fd.checkerLocation.checkerLatitude, longitude: fd.checkerLocation.checkerLongitude }
                     : undefined,
+                locationVerified: fd.checkerLocation?.verified,
+                locationDistanceM: fd.checkerLocation?.distanceMeters,
+                matchedAddress: fd.checkerLocation?.matchedAddress,
                 inspectionStartedAt: fd.inspectionStartedAt,
                 inspectionCompletedAt: fd.inspectionCompletedAt,
                 generatedAt: new Date(),
@@ -242,6 +242,9 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
             location: fd.checkerLocation?.checkerLatitude != null
                 ? { latitude: fd.checkerLocation.checkerLatitude, longitude: fd.checkerLocation.checkerLongitude }
                 : undefined,
+            locationVerified: fd.checkerLocation?.verified,
+            locationDistanceM: fd.checkerLocation?.distanceMeters,
+            matchedAddress: fd.checkerLocation?.matchedAddress,
             inspectionStartedAt: fd.inspectionStartedAt,
             inspectionCompletedAt: fd.inspectionCompletedAt,
             generatedAt: new Date(),
@@ -307,6 +310,7 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
         locationVerified: checkerLocation?.verified,
         locationDistanceM: checkerLocation?.distanceMeters,
         checkerLatitude: checkerLocation?.checkerLatitude,
+        matchedAddress: (checkerLocation as any)?.matchedAddress,
     })
     const approvalStatus = (product as any).approvalStatus
 
@@ -324,6 +328,7 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
     }
 
     const statusColors: Record<string, string> = {
+        QC_SUBMITTED: 'bg-blue-50 text-blue-700 border border-blue-200',
         QC_APPROVED: 'bg-green-50 text-green-700 border border-green-200',
         APPROVED: 'bg-green-50 text-green-700 border border-green-200',
         REJECTED: 'bg-red-50 text-red-700 border border-red-200',
@@ -331,7 +336,7 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
         PENDING: 'bg-amber-50 text-amber-700 border border-amber-200',
     }
     const statusLabels: Record<string, string> = {
-        QC_APPROVED: 'Approved by QC', APPROVED: 'Approved', REJECTED: 'Rejected',
+        QC_SUBMITTED: 'Pending Admin Review', QC_APPROVED: 'Approved by QC', APPROVED: 'Approved', REJECTED: 'Rejected',
         REINSPECTION: 'Re-inspection', PENDING: 'Pending',
     }
 
@@ -360,10 +365,21 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
                     </p>
                 </div>
 
-                {/* Admin decision — the approve / reject / re-inspection call, made
-                    after reviewing this report. Only in the Vendor Requests queue. */}
-                {canDecide && approvalStatus === 'QC_APPROVED' && hasPermission('vendor_product_requests:approve') && (
+                {/* Admin decision — the QC report is advisory; the admin makes the
+                    final call. On a QC-submitted (or QC-approved) product the admin can
+                    Approve, Reject, or send back for Re-Inspection. Only in the Vendor
+                    Requests queue. */}
+                {canDecide && (approvalStatus === 'QC_SUBMITTED' || approvalStatus === 'QC_APPROVED') && hasPermission('vendor_product_requests:approve') && (
                     <>
+                        {hasPermission('reinspection_review:view') && (
+                            <Link
+                                href={`/admin/dashboard/reinspection-review/product/${productId}`}
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-brand-600 border border-brand-300 rounded-lg hover:bg-brand-50 transition-colors"
+                            >
+                                <FileText className="w-4 h-4" />
+                                Re-Inspection
+                            </Link>
+                        )}
                         <button
                             onClick={() => setShowRejectModal(true)}
                             disabled={actionLoading}
@@ -432,7 +448,7 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
                     <div>
                         <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Location / Date</p>
                         <p className="font-semibold text-sm">{formData.serviceLocation || '—'}</p>
-                        <p className="text-neutral-400 text-xs mt-0.5">{formData.serviceStartDate}</p>
+                        <p className="text-neutral-400 text-xs mt-0.5">{formatInspectionDate(formData.serviceStartDate)}</p>
                     </div>
                 </div>
             </div>
@@ -455,7 +471,7 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
                                         const ok = entry?.ok
                                         return (
                                             <tr key={key} className="border-b border-slate-50 hover:bg-slate-50/50">
-                                                <td className="p-3 font-medium text-slate-900">{humanizeVerKey(key)}</td>
+                                                <td className="p-3 font-medium text-slate-900">{verificationLabel(key)}</td>
                                                 <td className="p-3 text-center">
                                                     {ok === true ? (
                                                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><CheckCircle className="w-3.5 h-3.5" />Verified</span>
@@ -607,6 +623,7 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
                                             {groupTests.map((test: any, i: number) => {
                                                 const passed = test.pass === true
                                                 const failed = test.fail === true
+                                                const optional = !test.isOther && isTestOptional(test.id, group.packagingType)
                                                 const rightPhotos: any[] = Array.isArray(test.rightPhotos) ? test.rightPhotos : []
                                                 const wrongPhotos: any[] = Array.isArray(test.wrongPhotos) ? test.wrongPhotos : []
                                                 return (
@@ -616,6 +633,7 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
                                                                 <p className="font-semibold text-slate-900 text-sm flex items-center gap-2">
                                                                     {test.label || (test.isOther ? test.subject : "") || `Test ${i + 1}`}
                                                                     {test.isOther && <span className="text-[10px] font-bold uppercase tracking-wide text-brand-600 bg-brand-50 border border-brand-100 px-1.5 py-0.5 rounded">Custom</span>}
+                                                                    {optional && <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">Optional</span>}
                                                                 </p>
                                                                 {test.isOther && test.subject && <p className="text-xs text-slate-500 mt-0.5">Subject: {test.subject}</p>}
                                                                 {test.remarks && <p className="text-xs text-slate-500 mt-0.5">{test.remarks}</p>}
@@ -631,7 +649,7 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
                                                                 </span>
                                                             )}
                                                             {!passed && !failed && (
-                                                                <span className="text-xs text-slate-400">No decision</span>
+                                                                <span className="text-xs text-slate-400">{optional ? "Optional — not tested" : "No decision"}</span>
                                                             )}
                                                         </div>
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
