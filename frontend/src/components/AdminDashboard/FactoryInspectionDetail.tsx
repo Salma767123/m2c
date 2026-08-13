@@ -183,6 +183,9 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 location: inspection.checkerLatitude != null
                     ? { latitude: inspection.checkerLatitude, longitude: inspection.checkerLongitude! }
                     : null,
+                locationVerified: inspection.locationVerified,
+                locationDistanceM: inspection.locationDistanceM,
+                matchedAddress: (inspection as any).locationMatchedAddress,
                 generatedAt: new Date(),
             }
             const pdf = generateFactoryInspectionPdf(vendor, isNewFmt ? fd.verifications : {}, meta, {
@@ -257,6 +260,9 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 location: inspection.checkerLatitude != null
                     ? { latitude: inspection.checkerLatitude, longitude: inspection.checkerLongitude! }
                     : null,
+                locationVerified: inspection.locationVerified,
+                locationDistanceM: inspection.locationDistanceM,
+                matchedAddress: (inspection as any).locationMatchedAddress,
                 generatedAt: new Date(),
             }
             const pdf = generateFactoryInspectionPdf(vendor, isNewFmt ? fd.verifications : {}, meta, {
@@ -281,7 +287,10 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
     const isFormData = rawItems && !Array.isArray(rawItems) && typeof rawItems === 'object'
     const formData = isFormData ? rawItems : {}
     const assignedItems = Array.isArray(rawItems) ? rawItems : []
-    const locationVerification = describeLocationVerification(inspection)
+    const locationVerification = describeLocationVerification({
+        ...inspection,
+        matchedAddress: (inspection as any).locationMatchedAddress,
+    })
 
     // New format: submitted via the 9-step checker form
     const isNewFormat = isFormData && typeof formData.verifications === 'object' && formData.verifications !== null

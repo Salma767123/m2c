@@ -264,6 +264,8 @@ const registerVendor = async (req, res) => {
       longitude,
       warehouseLatitude,
       warehouseLongitude,
+      // Where products are handled → the site a QC product inspection geofences against.
+      productInspectionSite,
 
       // Vendor Type & Products
       vendorType,
@@ -784,6 +786,9 @@ const registerVendor = async (req, res) => {
         latField: 'warehouseLatitude',
         lngField: 'warehouseLongitude',
       }),
+      // Product-handling site for QC product-inspection geofencing. Only WAREHOUSE or
+      // FACTORY are valid; anything else (incl. blank) falls back to FACTORY.
+      productInspectionSite: String(productInspectionSite).toUpperCase() === 'WAREHOUSE' ? 'WAREHOUSE' : 'FACTORY',
 
       // Vendor Type & Products
       vendorType: getVendorTypeEnum(parsedVendorType),
@@ -1855,6 +1860,11 @@ const updateVendorById = async (req, res) => {
         latField: 'warehouseLatitude',
         lngField: 'warehouseLongitude',
       }),
+      // Product-handling site (QC product-inspection geofence). Only update when the
+      // admin form sent a value; normalise to WAREHOUSE/FACTORY.
+      ...(updateData.productInspectionSite !== undefined
+        ? { productInspectionSite: String(updateData.productInspectionSite).toUpperCase() === 'WAREHOUSE' ? 'WAREHOUSE' : 'FACTORY' }
+        : {}),
 
       // Vendor Type & Products
       // Mirror registerVendor: keep both legacy single-enum and the role

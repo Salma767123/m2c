@@ -203,7 +203,10 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         warehouseCountry: data.warehouseCountry || data.country || 'India',
         warehouseLatitude: data.warehouseLatitude || data.latitude || '',
         warehouseLongitude: data.warehouseLongitude || data.longitude || '',
-        
+        // Which address a QC product inspection is geofenced against. Defaults to
+        // FACTORY (also the value when the warehouse is the same as the legal address).
+        productInspectionSite: data.productInspectionSite || 'FACTORY',
+
         // Vendor Type & Products
         vendorType: data.vendorType || ['manufacturer'],
         marketType: Array.isArray(data.marketType) ? data.marketType : (data.marketType ? [data.marketType] : ['domestic']),

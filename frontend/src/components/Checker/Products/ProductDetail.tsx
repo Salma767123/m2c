@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import { qcCheckerService } from "@/services/qcCheckerService"
 import { isInspectionWindowElapsed, formatAssignmentWindow } from "@/lib/inspectionSchedule"
+import { formatInspectionDate } from "@/lib/checkerUtils"
 import { CareIcon, CARE_INSTRUCTIONS, CATEGORY_COLORS, CATEGORY_BORDER } from "@/components/VendorDashboard/Products/CareInstructionModal"
 import ManufacturerInfoCard from "@/components/Shared/ManufacturerInfoCard"
 import { hasManufacturerInfo } from "@/lib/manufacturerInfo"
@@ -48,6 +49,7 @@ const TAB_LABELS: Record<Tab, string> = {
 // products have no UNDER_REVIEW status (that is vendor-only).
 const APPROVAL_COLOR: Record<string, string> = {
     PENDING: "bg-amber-50 text-amber-700 border-amber-200/85",
+    QC_SUBMITTED: "bg-blue-50 text-blue-700 border-blue-200/85",
     REINSPECTION: "bg-purple-50 text-purple-700 border-purple-200/85",
     QC_APPROVED: "bg-blue-50 text-blue-700 border-blue-200/85",
     APPROVED: "bg-emerald-50 text-emerald-700 border-emerald-200/85",
@@ -56,6 +58,7 @@ const APPROVAL_COLOR: Record<string, string> = {
 
 const APPROVAL_LABELS: Record<string, string> = {
     PENDING: "Pending",
+    QC_SUBMITTED: "Submitted",
     REINSPECTION: "Reinspection",
     QC_APPROVED: "Approved by QC",
     APPROVED: "Approved by Admin",
@@ -997,7 +1000,7 @@ function QcActivityTab({ product }: { product: ProductDetailData }) {
                         {/* Inspection meta — even pairs, no gaps */}
                         <Row icon={<ClipboardCheck className="w-4 h-4" />} label="Inspection Type" value={qcVal("serviceType")} />
                         <Row icon={<Layers className="w-4 h-4" />} label="Variants" value={`${variantCount} variant${variantCount === 1 ? "" : "s"}`} />
-                        <Row icon={<Clock className="w-4 h-4" />} label="Inspection Start Date" value={qcVal("serviceStartDate")} />
+                        <Row icon={<Clock className="w-4 h-4" />} label="Inspection Start Date" value={formatInspectionDate(qcVal("serviceStartDate"))} />
                         <Row icon={<Clock className="w-4 h-4" />} label="Inspection Started At" value={formatDateTime(qcVal("inspectionStartedAt")) } />
                         <Row icon={<CheckCircle className="w-4 h-4" />} label="Final Decision" value={qcVal("finalDecision")} />
                         <Row icon={<ClipboardCheck className="w-4 h-4" />} label="Inspection Status" value={qcVal("inspectionStatus")} />

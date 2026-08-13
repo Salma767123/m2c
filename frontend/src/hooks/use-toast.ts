@@ -141,7 +141,33 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
+// Identity key for a toast, used to collapse duplicates. Only string title/
+// description participate (React-node content is treated as non-dedupable and
+// always shows), so this never touches non-serialisable content.
+function toastKey(t: Pick<ToasterToast, "title" | "description" | "variant">) {
+  const title = typeof t.title === "string" ? t.title : ""
+  const description = typeof t.description === "string" ? t.description : ""
+  return `${t.variant ?? ""}|${title}|${description}`
+}
+
 function toast({ ...props }: Toast) {
+  // Dedupe: if an identical toast (same variant/title/description) is already
+  // showing, don't stack a second one. This guards against React StrictMode
+  // double-invoking mount effects and any accidental double-fire across the app,
+  // so a single logical event never renders two identical toasts.
+  const key = toastKey(props)
+  if (key !== "||") {
+    const existing = memoryState.toasts.find((t) => t.open && toastKey(t) === key)
+    if (existing) {
+      const existingId = existing.id
+      return {
+        id: existingId,
+        dismiss: () => dispatch({ type: "DISMISS_TOAST", toastId: existingId }),
+        update: (p: ToasterToast) => dispatch({ type: "UPDATE_TOAST", toast: { ...p, id: existingId } }),
+      }
+    }
+  }
+
   const id = genId()
 
   const update = (props: ToasterToast) =>

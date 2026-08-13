@@ -213,6 +213,10 @@ async function verifyCheckerAtVendor({
   prisma,
   label,
   inspectionType,
+  // Restrict the geofence to ONE registered address. Product inspections pass the
+  // vendor's chosen product-handling site ('FACTORY' | 'WAREHOUSE'); factory/vendor
+  // inspections leave it undefined and are checked against BOTH addresses (OR).
+  site,
 }) {
   const prefix = label ? `${label} — ` : "";
 
@@ -272,12 +276,21 @@ async function verifyCheckerAtVendor({
     }
   }
 
-  const candidates = [];
+  let candidates = [];
   if (factoryLat != null && factoryLng != null) {
     candidates.push({ label: "legal/factory", lat: factoryLat, lng: factoryLng });
   }
   if (vendor?.warehouseLatitude != null && vendor?.warehouseLongitude != null) {
     candidates.push({ label: "warehouse", lat: vendor.warehouseLatitude, lng: vendor.warehouseLongitude });
+  }
+
+  // Product inspection: restrict to the vendor's chosen product-handling site. If that
+  // site has coordinates, measure ONLY against it; if it has none, keep all candidates
+  // as a fallback so a mis-configured vendor doesn't wrongly block the checker.
+  if (site) {
+    const wanted = String(site).toUpperCase() === "WAREHOUSE" ? "warehouse" : "legal/factory";
+    const restricted = candidates.filter((c) => c.label === wanted);
+    if (restricted.length > 0) candidates = restricted;
   }
 
   // Dedupe identical pairs so "legal same as warehouse" measures a single point
@@ -389,9 +402,18 @@ function buildLocationStamp(geo, checkerLatitude, checkerLongitude) {
   // Vendor had no coordinates to measure against. Say so — claiming "Verified at
   // factory — 0m" here would assert a check that never ran.
   if (geo.verified === false || geo.distanceM == null) {
-    return `Location recorded but NOT verified — vendor has no factory coordinates on file (${at})`;
+    return `Location recorded but NOT verified — vendor has no factory/warehouse coordinates on file (${at})`;
   }
-  return `Verified at factory — ${Math.round(geo.distanceM)}m from vendor (${at})`;
+  // Name the address the checker was actually verified against (legal/factory or
+  // warehouse), since the geofence now checks whichever applies.
+  return `Verified at ${matchedAddressLabel(geo.matchedAddress)} — ${Math.round(geo.distanceM)}m from vendor (${at})`;
+}
+
+// Human label for the address the geofence matched.
+function matchedAddressLabel(matchedAddress) {
+  if (matchedAddress === "warehouse") return "warehouse";
+  if (matchedAddress === "legal/factory") return "legal / factory site";
+  return "vendor location";
 }
 
 /**
@@ -422,6 +444,9 @@ function buildLocationSnapshot(geo, checkerLatitude, checkerLongitude) {
     verified: geo?.verified === true,
     geofenceSkipped: geo?.skipped === true,
     reason: geo?.reason || null,
+    // Which registered address the checker was verified against ('legal/factory' |
+    // 'warehouse'), so the report can name the exact site — not just "the factory".
+    matchedAddress: geo?.matchedAddress || null,
     capturedAt: new Date().toISOString(),
   };
 }

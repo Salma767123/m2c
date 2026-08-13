@@ -209,13 +209,17 @@ export default function ProductInspectionForm({
             return v === "PHYSICAL" || v === "VIRTUAL" ? (v as InspectionType) : null
         } catch { return null }
     })()
-    const pausedResume = !!peekDraft(productId)?.pausedAt
+    // A resumable draft = a saved form draft for an inspection whose type was already
+    // chosen. Re-entering one ALWAYS re-asks the inspection type — same as the factory
+    // inspection flow, which re-prompts on every resume. (The first-ever entry has no
+    // saved type, so the dialog still shows, but as the initial choice.)
+    const hasResumableDraft = !!peekDraft(productId) && !!savedType
 
     // Physical vs virtual — chosen in the mandatory dialog before the form is usable.
-    // Null forces the dialog: on a paused resume we deliberately re-ask.
-    const [inspectionType, setInspectionType] = useState<InspectionType | null>(pausedResume ? null : savedType)
+    // Null forces the dialog: on a resume we deliberately re-ask.
+    const [inspectionType, setInspectionType] = useState<InspectionType | null>(hasResumableDraft ? null : savedType)
     // Resume/draft state (mirrors the vendor inspection flow).
-    const [isResume, setIsResume] = useState(pausedResume)
+    const [isResume, setIsResume] = useState(hasResumableDraft)
     const [draftInspectionType] = useState<InspectionType | null>(savedType)
     const [discardConfirm, setDiscardConfirm] = useState<{ type: InspectionType } | null>(null)
     const [savingDraft, setSavingDraft] = useState(false)
@@ -286,6 +290,9 @@ export default function ProductInspectionForm({
     const prefilledRef = useRef<string | null>(null)
 
     const [formData, setFormData] = useState(() => loadDraft(productId, makeDefaultFormData(productName, vendorName)))
+    // Set true by "Save draft & exit" so the debounced autosave (which holds an older
+    // formData without pausedAt) can't fire afterwards and clobber the explicit draft.
+    const skipAutosaveRef = useRef(false)
 
     // Persist a draft whenever the form changes (debounced). Falls back to a
     // photo-stripped draft if the full snapshot exceeds the localStorage quota.
@@ -293,6 +300,7 @@ export default function ProductInspectionForm({
         if (typeof window === "undefined" || !productId) return
         const key = draftKeyFor(productId)
         const t = setTimeout(() => {
+            if (skipAutosaveRef.current) return
             // Heavy re-fetched context is excluded — it is reloaded from the API.
             const { productData: _pd, vendorData: _vd, ...rest } = formData as any
             try {
@@ -422,6 +430,9 @@ export default function ProductInspectionForm({
     // pause so the next open re-prompts the inspection type (resume vs restart).
     const saveDraftAndExit = () => {
         setSavingDraft(true)
+        // Block the debounced autosave from overwriting this explicit draft (which
+        // carries pausedAt) with a stale, un-paused snapshot.
+        skipAutosaveRef.current = true
         const next = { ...formData, pausedAt: new Date().toISOString() }
         try {
             const { productData: _pd, vendorData: _vd, ...rest } = next as any
@@ -446,8 +457,8 @@ export default function ProductInspectionForm({
         { id: "generalInformation",  label: "General Info",          description: "Vendor registration data and inspection context" },
         { id: "productVerification", label: "Product Verification",  description: "Field-level verification of all product data" },
         { id: "packagingInspection", label: "Packaging",             description: "Carton, retail packaging and product type" },
-        { id: "defects",             label: "Defects",               description: "AQL sampling and defect counts" },
         { id: "testing",             label: "Testing",               description: "Comprehensive on-site test battery" },
+        { id: "defects",             label: "Defects",               description: "AQL sampling and defect counts" },
         { id: "review",              label: "Review",                description: "Full summary and final decision" },
         { id: "documentation",       label: "Documentation",         description: "Report, signatures and final submit" },
     ]

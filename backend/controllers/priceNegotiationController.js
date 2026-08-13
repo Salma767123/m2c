@@ -123,11 +123,12 @@ const adminProposePrice = async (req, res) => {
 
     await expireStaleOffers(productId);
 
-    // Only a QC-cleared product can be negotiated; and never one already live.
-    if (!['QC_APPROVED', 'NEGOTIATION'].includes(product.approvalStatus)) {
+    // Only a product with a submitted QC inspection can be negotiated; and never
+    // one already live.
+    if (!['QC_SUBMITTED', 'QC_APPROVED', 'NEGOTIATION'].includes(product.approvalStatus)) {
       return res.status(400).json({
         success: false,
-        error: `Cannot negotiate a product with status ${product.approvalStatus}. QC approval is required first.`,
+        error: `Cannot negotiate a product with status ${product.approvalStatus}. A submitted QC inspection is required first.`,
       });
     }
 

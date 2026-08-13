@@ -53,6 +53,7 @@ interface ProductDetail {
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: 'bg-slate-50 text-slate-700 border border-slate-200',
+  QC_SUBMITTED: 'bg-blue-50 text-blue-700 border border-blue-200',
   QC_APPROVED: 'bg-green-50 text-green-700 border border-green-200',
   UNDER_ADMIN_REVIEW: 'bg-yellow-50 text-yellow-700 border border-yellow-200',
   APPROVED: 'bg-green-50 text-green-700 border border-green-200',
@@ -145,7 +146,9 @@ export default function ProductInspectionReviewPage() {
     );
   }
 
-  const canReview = product.approvalStatus === 'REJECTED';
+  // Admin can act on a freshly QC-submitted report (approve / final-reject /
+  // raise re-inspection) as well as a product already parked in REJECTED review.
+  const canReview = product.approvalStatus === 'REJECTED' || product.approvalStatus === 'QC_SUBMITTED';
   const qcData = product.qcInspectionData || {};
 
   return (

@@ -662,6 +662,12 @@ export default function VendorDetail({
                           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Warehousing Capacity</label>
                           <p className="text-sm font-semibold text-slate-800">{formatSqFt(vd.warehouseSize) || '—'}</p>
                         </div>
+                        <div>
+                          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Product Inspection Site</label>
+                          <p className="text-sm font-semibold text-brand-600">
+                            {String((vd as any).productInspectionSite).toUpperCase() === 'WAREHOUSE' ? 'Warehouse address' : 'Legal / Factory address'}
+                          </p>
+                        </div>
                         {vd.warehouseAddress && (
                           <div>
                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Address Line 1</label>

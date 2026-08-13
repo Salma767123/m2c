@@ -6,8 +6,8 @@
 //   C. Product Being Inspected
 //   D. Product Verification
 //   E. Packaging Inspection
-//   F. Defects (AQL)
-//   G. Testing
+//   F. Testing            (order mirrors the inspection form: Testing before Defects)
+//   G. Defects (AQL)
 //   H. Final Decision
 //   I. Inspector Details
 //   Signature block (manual or digital)
@@ -17,7 +17,8 @@
 // (digitally-signed report). Without it a blank line is drawn for manual signing.
 
 import jsPDF from "jspdf"
-import { formatCheckerName } from "@/lib/checkerUtils"
+import { formatCheckerName, formatInspectionDate } from "@/lib/checkerUtils"
+import { verificationLabel, isTestOptional } from "@/components/Checker/Vendor/Steps/PI_data"
 import { resolveOwnerDesignation } from "@/lib/utils"
 import { formatDuration } from "@/lib/inspectionDuration"
 import autoTable from "jspdf-autotable"
@@ -36,6 +37,11 @@ export interface ReportMeta {
     /** 'PHYSICAL' | 'VIRTUAL'. Decides whether GPS coordinates are printed. */
     inspectionType?: string | null
     location?: { latitude: number; longitude: number } | null
+    /** Location verification so the report names the exact site the checker was verified at. */
+    locationVerified?: boolean | null
+    locationDistanceM?: number | null
+    /** 'legal/factory' | 'warehouse' — which registered address matched. */
+    matchedAddress?: string | null
     inspectionStartedAt?: string
     /** ISO string for when the inspection was completed/submitted. */
     inspectionCompletedAt?: string
@@ -172,6 +178,48 @@ export function generateProductInspectionPdf(
         y = (doc.lastAutoTable?.finalY ?? y) + 16
     }
 
+    // Render a labelled grid of uploaded evidence photos (embedded, not just a count).
+    // Images are base64 data URLs stored on submit, so addImage works synchronously.
+    const photoGrid = (photos: any[] | undefined, heading?: string) => {
+        const imgs = (Array.isArray(photos) ? photos : []).filter((p) => p && (p.data || p.url) && !p.isPdf)
+        if (imgs.length === 0) return
+        const cols = 5
+        const gap = 8
+        const thumbW = (contentW - gap * (cols - 1)) / cols
+        const thumbH = thumbW * 0.75
+        const rowGap = 10
+        // Keep the heading with its first row so a page break never orphans it.
+        if (heading) {
+            ensureSpace(16 + thumbH + rowGap)
+            doc.setFont("helvetica", "bold")
+            doc.setFontSize(8.5)
+            doc.setTextColor(...SLATE)
+            doc.text(`${heading} (${imgs.length})`, margin, y)
+            y += 13
+        }
+        // Draw strictly row by row: reserve the full row height, capture the row's top
+        // once, draw every thumbnail at that same top, then advance y past the row. This
+        // makes it impossible for the next section to overlap the images.
+        for (let i = 0; i < imgs.length; i += cols) {
+            ensureSpace(thumbH + rowGap)
+            const rowY = y
+            imgs.slice(i, i + cols).forEach((img, c) => {
+                const x = margin + c * (thumbW + gap)
+                try {
+                    doc.addImage(img.data || img.url, "JPEG", x, rowY, thumbW, thumbH, undefined, "FAST")
+                } catch {
+                    doc.setDrawColor(226, 232, 240)
+                    doc.rect(x, rowY, thumbW, thumbH)
+                }
+            })
+            y = rowY + thumbH + rowGap
+        }
+        // Extra trailing gap so the NEXT section's title (drawn on its text baseline,
+        // whose ascenders sit ~8pt above y) never visually touches the last image row.
+        y += 12
+        doc.setTextColor(...SLATE)
+    }
+
     // ── Cover header (matches the Factory Inspection Report style) ───────────────
     doc.setFillColor(255, 245, 245)
     doc.rect(0, 0, pageW, 72, "F")
@@ -204,7 +252,7 @@ export function generateProductInspectionPdf(
         ["Primary Phone", val(v.businessPhone)],
         ["Secondary Phone", val(v.phoneNumber2)],
         ["Primary Email", val(v.businessEmail)],
-        ["Inspection Date", val(formData.serviceStartDate)],
+        ["Inspection Date", val(formatInspectionDate(formData.serviceStartDate))],
         ["Service Type", val(formData.serviceType)],
     ]
     runTable(
@@ -275,21 +323,13 @@ export function generateProductInspectionPdf(
         doc.setTextColor(...SLATE)
     } else {
         const verBody = verEntries.map(([key, entry]: [string, any]) => [
-            key.replace(/^pv_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+            verificationLabel(key),
             entry.ok === true ? "Verified" : entry.ok === false ? "Not Verified" : "Not Checked",
             val(entry.remarks),
         ])
         runTable([["Field", "Status", "Remarks"]], verBody)
     }
-    const evidencePhotos = (formData.productEvidencePhotos || []).length
-    if (evidencePhotos > 0) {
-        doc.setFont("helvetica", "normal")
-        doc.setFontSize(9)
-        doc.setTextColor(...MUTED)
-        doc.text(`Photo Evidence: ${evidencePhotos} photo(s) attached`, margin, y)
-        y += 18
-        doc.setTextColor(...SLATE)
-    }
+    photoGrid(formData.productEvidencePhotos, "Product Verification Evidence")
 
     // ── E. Packaging Inspection ────────────────────────────────────────────────
     sectionTitle("E. Packaging Inspection")
@@ -313,18 +353,95 @@ export function generateProductInspectionPdf(
         })
         runTable([["Item", "Inspected", "Remark Code", "Remarks"]], pkgBody)
     }
-    const pkgPhotos = (formData.packagingPhotos || []).length
-    if (pkgPhotos > 0) {
-        doc.setFont("helvetica", "normal")
-        doc.setFontSize(9)
-        doc.setTextColor(...MUTED)
-        doc.text(`Packaging Photos: ${pkgPhotos} photo(s) attached`, margin, y)
-        y += 18
-        doc.setTextColor(...SLATE)
-    }
+    photoGrid(formData.packagingPhotos, "Packaging Photos")
 
     // ── F. Defects (AQL) ──────────────────────────────────────────────────────
-    sectionTitle("F. Defects — AQL Summary")
+    // ── F. Testing ────────────────────────────────────────────────────────────
+    // Report section order mirrors the inspection form: Testing comes before Defects.
+    const testGroups: any[] = Array.isArray(formData.testGroups) ? formData.testGroups : []
+    if (testGroups.length > 0) {
+        sectionTitle("F. Testing")
+        for (const group of testGroups) {
+            const tests: any[] = Array.isArray(group.tests) ? group.tests : []
+            const gPass = tests.filter((t) => t.pass).length
+            const gFail = tests.filter((t) => t.fail).length
+            const groupLabel = `${group.label || "Group"}  (${gPass} passed, ${gFail} failed)`
+            ensureSpace(28)
+            doc.setFont("helvetica", "bold")
+            doc.setFontSize(9)
+            doc.setTextColor(...SLATE)
+            doc.text(groupLabel, margin, y)
+            y += 14
+
+            // Photos per test — kept alongside the row so the pass/fail thumbnails can be
+            // drawn inside the "Pass Photos" / "Fail Photos" cells (didDrawCell below).
+            const rowPhotos = tests.map((t: any) => ({
+                right: (Array.isArray(t.rightPhotos) ? t.rightPhotos : []).filter((p: any) => p && (p.data || p.url)),
+                wrong: (Array.isArray(t.wrongPhotos) ? t.wrongPhotos : []).filter((p: any) => p && (p.data || p.url)),
+            }))
+            const testBody = tests.map((t: any, i: number) => [
+                // Custom tests: show "Name (Subject)  [Custom]" so their data isn't lost.
+                t.isOther
+                    ? `${val(t.label || t.subject)}${t.subject && t.label ? ` (${t.subject})` : ""}  [Custom]`
+                    : val(t.label),
+                t.pass === true ? "Pass" : t.fail === true ? "Fail"
+                    : (!t.isOther && isTestOptional(t.id, group.packagingType) ? "Optional" : "—"),
+                val(t.remarks),
+                rowPhotos[i].right.length ? "" : "—",
+                rowPhotos[i].wrong.length ? "" : "—",
+            ])
+
+            const THUMB = 24, TPAD = 3
+            autoTable(doc, {
+                startY: y,
+                head: [["Test", "Result", "Remarks", "Pass Photos", "Fail Photos"]],
+                body: testBody,
+                margin: { left: margin, right: margin },
+                theme: "grid",
+                headStyles: { fillColor: [255, 245, 245], textColor: BRAND, fontSize: 9, fontStyle: "bold", lineColor: BRAND, lineWidth: 0.5 },
+                bodyStyles: { fontSize: 9, textColor: SLATE, valign: "middle" },
+                alternateRowStyles: { fillColor: [248, 250, 252] },
+                styles: { cellPadding: 5, lineColor: [226, 232, 240], lineWidth: 0.5 },
+                columnStyles: { 3: { cellWidth: 104, halign: "left" }, 4: { cellWidth: 104, halign: "left" } },
+                // Reserve vertical space so the embedded thumbnails fit in the photo cells.
+                didParseCell: (d: any) => {
+                    if (d.section === "body" && (d.column.index === 3 || d.column.index === 4)) {
+                        const set = d.column.index === 3 ? rowPhotos[d.row.index]?.right : rowPhotos[d.row.index]?.wrong
+                        const n = set?.length || 0
+                        if (n > 0) {
+                            const perRow = Math.max(1, Math.floor((d.cell.width - TPAD) / (THUMB + TPAD)))
+                            const lines = Math.ceil(n / perRow)
+                            d.cell.styles.minCellHeight = lines * (THUMB + TPAD) + TPAD
+                        }
+                    }
+                },
+                // Draw each uploaded pass/fail photo as a small thumbnail inside its cell.
+                didDrawCell: (d: any) => {
+                    if (d.section === "body" && (d.column.index === 3 || d.column.index === 4)) {
+                        const set = d.column.index === 3 ? rowPhotos[d.row.index]?.right : rowPhotos[d.row.index]?.wrong
+                        if (!set || set.length === 0) return
+                        const perRow = Math.max(1, Math.floor((d.cell.width - TPAD) / (THUMB + TPAD)))
+                        set.forEach((p: any, i: number) => {
+                            const cx = d.cell.x + TPAD + (i % perRow) * (THUMB + TPAD)
+                            const cy = d.cell.y + TPAD + Math.floor(i / perRow) * (THUMB + TPAD)
+                            try { doc.addImage(p.data || p.url, "JPEG", cx, cy, THUMB, THUMB, undefined, "FAST") } catch { /* skip bad image */ }
+                        })
+                    }
+                },
+            })
+            // @ts-expect-error lastAutoTable is attached by the plugin at runtime
+            y = (doc.lastAutoTable?.finalY ?? y) + 16
+        }
+
+        // Additional evidence — embed the actual photos, grouped by category.
+        const additionalEvidence: Record<string, any[]> = formData.additionalEvidence || {}
+        Object.entries(additionalEvidence)
+            .filter(([, photos]) => Array.isArray(photos) && photos.length > 0)
+            .forEach(([key, photos]) => photoGrid(photos, `Additional Evidence — ${key.replace(/_/g, " ")}`))
+    }
+
+    // ── G. Defects (AQL) ──────────────────────────────────────────────────────
+    sectionTitle("G. Defects — AQL Summary")
     runTable(
         [["Field", "Value"]],
         [
@@ -343,63 +460,15 @@ export function generateProductInspectionPdf(
             ["Minor", String(formData.minorDefects ?? 0), String(formData.maxAllowedMinor ?? 0), val(formData.minorDefectDetails)],
         ]
     )
-    const defectPhotos = (formData.defectPhotos || []).length
-    if (defectPhotos > 0) {
-        doc.setFont("helvetica", "normal")
-        doc.setFontSize(9)
-        doc.setTextColor(...MUTED)
-        doc.text(`Defect Photos: ${defectPhotos} photo(s) attached`, margin, y)
-        y += 18
-        doc.setTextColor(...SLATE)
-    }
-
-    // ── G. Testing ────────────────────────────────────────────────────────────
-    const testGroups: any[] = Array.isArray(formData.testGroups) ? formData.testGroups : []
-    if (testGroups.length > 0) {
-        sectionTitle("G. Testing")
-        for (const group of testGroups) {
-            const tests: any[] = Array.isArray(group.tests) ? group.tests : []
-            const gPass = tests.filter((t) => t.pass).length
-            const gFail = tests.filter((t) => t.fail).length
-            const groupLabel = `${group.label || "Group"}  (${gPass} passed, ${gFail} failed)`
-            ensureSpace(28)
-            doc.setFont("helvetica", "bold")
-            doc.setFontSize(9)
-            doc.setTextColor(...SLATE)
-            doc.text(groupLabel, margin, y)
-            y += 14
-
-            const testBody = tests.map((t: any) => [
-                // Custom tests: show "Name (Subject)  [Custom]" so their data isn't lost.
-                t.isOther
-                    ? `${val(t.label || t.subject)}${t.subject && t.label ? ` (${t.subject})` : ""}  [Custom]`
-                    : val(t.label),
-                t.pass === true ? "Pass" : t.fail === true ? "Fail" : "—",
-                val(t.remarks),
-                String((t.rightPhotos || []).length),
-                String((t.wrongPhotos || []).length),
-            ])
-            runTable([["Test", "Result", "Remarks", "Pass Photos", "Fail Photos"]], testBody)
-        }
-
-        // Additional evidence summary
-        const additionalEvidence: Record<string, any[]> = formData.additionalEvidence || {}
-        const evidenceRows = Object.entries(additionalEvidence)
-            .filter(([, photos]) => Array.isArray(photos) && photos.length > 0)
-            .map(([key, photos]) => [key.replace(/_/g, " "), String(photos.length) + " photo(s)"])
-        if (evidenceRows.length > 0) {
-            ensureSpace(20)
-            doc.setFont("helvetica", "bold")
-            doc.setFontSize(9)
-            doc.text("Additional Evidence", margin, y)
-            y += 14
-            runTable([["Category", "Photos"]], evidenceRows)
-        }
-    }
+    photoGrid(formData.defectPhotos, "Defect Photos")
 
     // ── H. Inspector Details ──────────────────────────────────────────────────
     const loc = meta.location
     const isVirtual = String(meta.inspectionType).toUpperCase() === "VIRTUAL"
+    const matchedSiteLabel =
+        meta.matchedAddress === "warehouse" ? "Warehouse address"
+        : meta.matchedAddress === "legal/factory" ? "Legal / Factory site"
+        : "Vendor location"
     sectionTitle("H. Inspector Details")
     runTable(
         [["Field", "Value"]],
@@ -409,7 +478,7 @@ export function generateProductInspectionPdf(
             ["Email", val(checker.email)],
             ["Phone", val(checker.phone)],
             ["Inspection Type", isVirtual ? "Virtual Inspection" : "Physical Inspection"],
-            ["Inspection Date", val(formData.serviceStartDate)],
+            ["Inspection Date", val(formatInspectionDate(formData.serviceStartDate))],
             ["Inspection Start Time", startTimeStr],
             ["Inspection Complete Time", completeTimeStr],
             // Duration breakdown across pauses (only when time tracking is available).
@@ -425,6 +494,13 @@ export function generateProductInspectionPdf(
             ...(isVirtual
                 ? []
                 : [["GPS Location", loc ? `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}` : "Not available"]]),
+            // Which registered address the checker was verified at (the product's chosen
+            // site). Only shown when verification info was captured (final stored reports).
+            ...(isVirtual || meta.locationVerified == null
+                ? []
+                : [["Verified Site", meta.locationVerified
+                      ? `${matchedSiteLabel}${meta.locationDistanceM != null ? ` — ${Math.round(meta.locationDistanceM)}m away` : ""}`
+                      : "Not verified"]]),
             ["Report Generated", fmtDateTime(generatedAt)],
         ]
     )
@@ -497,7 +573,7 @@ export function generateProductInspectionPdf(
     doc.setFont("helvetica", "bold")
     doc.text("Inspection Date:", margin, blockY + 22)
     doc.setFont("helvetica", "normal")
-    doc.text(val(formData.serviceStartDate), margin + 108, blockY + 22)
+    doc.text(val(formatInspectionDate(formData.serviceStartDate)), margin + 108, blockY + 22)
 
     doc.setFont("helvetica", "bold")
     doc.text("Inspection Start Time:", margin, blockY + 44)

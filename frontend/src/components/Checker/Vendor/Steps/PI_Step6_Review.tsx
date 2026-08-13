@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { CheckCircle2, XCircle, Minus, Pencil, Package, Box, Ruler, Zap, ClipboardList, Building2, User, ChevronDown } from 'lucide-react'
 import type { PackagingItem, TestGroup } from './PI_data'
-import { ADDITIONAL_EVIDENCE_DEFS } from './PI_data'
+import { ADDITIONAL_EVIDENCE_DEFS, verificationLabel } from './PI_data'
 import { qcCheckerService } from '@/services/qcCheckerService'
 import { formatCheckerName, formatInspectionDate } from '@/lib/checkerUtils'
 import { getBusinessTypeLabel } from './PI_Step1_GeneralInfo'
@@ -247,7 +247,7 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
                     <div key={key} className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 flex items-start gap-2">
                       <XCircle className="w-3.5 h-3.5 text-red-500 mt-0.5 shrink-0" />
                       <div>
-                        <p className="text-xs font-bold text-slate-700">{key.replace(/^pv_/, '').replace(/_/g, ' ')}</p>
+                        <p className="text-xs font-bold text-slate-700">{verificationLabel(key)}</p>
                         {val.remarks && <p className="text-xs text-red-700 italic">{val.remarks}</p>}
                       </div>
                     </div>

@@ -542,9 +542,11 @@ const adminReviewProductInspection = async (req, res) => {
             return res.status(404).json({ error: 'Product not found' });
         }
 
-        if (product.approvalStatus !== 'REJECTED') {
+        // Admin can raise a re-inspection (or final-reject / approve) from either a
+        // freshly QC-submitted product OR one already parked in REJECTED review.
+        if (!['REJECTED', 'QC_SUBMITTED'].includes(product.approvalStatus)) {
             return res.status(400).json({
-                error: `Cannot review a product with approval status ${product.approvalStatus}. Only REJECTED products can be reviewed.`,
+                error: `Cannot review a product with approval status ${product.approvalStatus}. Only QC-submitted or rejected products can be reviewed.`,
             });
         }
 

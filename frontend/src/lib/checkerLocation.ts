@@ -42,11 +42,20 @@ export const LOCATION_THRESHOLD_METERS = 1000
  * `showCoords` is the single flag every report/view reads to decide whether to render
  * latitude/longitude at all: false for virtual (show the type instead).
  */
+/** Human label for the address the geofence matched ('legal/factory' | 'warehouse'). */
+export function matchedAddressLabel(matched?: string | null): string | null {
+  if (matched === 'warehouse') return 'Warehouse address'
+  if (matched === 'legal/factory') return 'Legal / Factory site'
+  return null
+}
+
 export function describeLocationVerification(inspection: {
   inspectionType?: InspectionType | string | null
   locationVerified?: boolean | null
   locationDistanceM?: number | null
   checkerLatitude?: number | null
+  /** Which registered address matched: 'legal/factory' | 'warehouse'. */
+  matchedAddress?: string | null
 }): {
   state: 'virtual' | 'verified' | 'mismatch' | 'unverified'
   label: string
@@ -62,13 +71,17 @@ export function describeLocationVerification(inspection: {
     }
   }
   if (inspection.locationVerified) {
+    const site = matchedAddressLabel(inspection.matchedAddress)
+    const distance =
+      inspection.locationDistanceM != null
+        ? `Distance: ${inspection.locationDistanceM}m (allowed: ${LOCATION_THRESHOLD_METERS}m)`
+        : null
+    // Name the exact address the checker was verified at, then the distance.
+    const detail = [site ? `Verified at: ${site}` : null, distance].filter(Boolean).join(' · ') || null
     return {
       state: 'verified',
       label: 'Location Verified',
-      detail:
-        inspection.locationDistanceM != null
-          ? `Distance: ${inspection.locationDistanceM}m (allowed: ${LOCATION_THRESHOLD_METERS}m)`
-          : null,
+      detail,
       showCoords: true,
     }
   }

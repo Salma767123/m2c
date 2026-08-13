@@ -1239,10 +1239,10 @@ const approveProduct = async (req, res) => {
     // agreed (or after the vendor walked away and the admin keeps the current
     // price). The open-offer guard below is what actually blocks a premature
     // approval while a price is still being haggled.
-    if (!['QC_APPROVED', 'NEGOTIATION'].includes(product.approvalStatus)) {
+    if (!['QC_SUBMITTED', 'QC_APPROVED', 'NEGOTIATION'].includes(product.approvalStatus)) {
       return res.status(400).json({
         success: false,
-        message: 'Product must be approved by QC (QC_APPROVED) before Admin approval'
+        message: 'Product must have a submitted QC inspection before Admin approval'
       });
     }
 
@@ -2609,7 +2609,7 @@ const getAllProductsForAdmin = async (req, res) => {
       where: countsWhere,
       _count: { _all: true }
     });
-    const counts = { total: 0, PENDING: 0, QC_APPROVED: 0, APPROVED: 0, REJECTED: 0, REINSPECTION: 0 };
+    const counts = { total: 0, PENDING: 0, QC_SUBMITTED: 0, QC_APPROVED: 0, APPROVED: 0, REJECTED: 0, REINSPECTION: 0 };
     for (const g of grouped) {
       const n = g._count._all;
       if (counts[g.approvalStatus] !== undefined) counts[g.approvalStatus] = n;

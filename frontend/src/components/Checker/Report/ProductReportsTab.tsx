@@ -163,6 +163,8 @@ export default function ProductReportsTab() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case "QC_SUBMITTED":
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Submitted</Badge>
       case "QC_APPROVED":
       case "APPROVED":
         return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" />{status === "QC_APPROVED" ? "Approved by QC" : "Approved by Admin"}</Badge>

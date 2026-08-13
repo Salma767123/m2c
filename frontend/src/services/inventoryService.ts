@@ -20,7 +20,7 @@ export interface InventoryItem {
   notes?: string;
   hasProductCreated: boolean;
   productId?: string;
-  productApprovalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | 'NEGOTIATION' | null;
+  productApprovalStatus?: 'PENDING' | 'QC_SUBMITTED' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | 'NEGOTIATION' | null;
   hasVariants?: boolean;
   variants?: InventoryVariantStock[];
   createdAt: string;
