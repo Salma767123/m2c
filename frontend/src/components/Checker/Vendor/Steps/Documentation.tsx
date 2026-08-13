@@ -13,6 +13,7 @@ import {
 } from "@/lib/productInspectionReportPdf"
 import { showSuccessToast } from "@/lib/toast-utils"
 import { GEOFENCE_DISABLED, getCurrentCoords } from "@/lib/checkerLocation"
+import { computeInspectionDurations } from "@/lib/inspectionDuration"
 
 const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<string> => {
   return new Promise((resolve) => {
@@ -106,6 +107,15 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
     const liveQc = formData?.productData?.assignedQc || null
     const cachedChecker = qcCheckerService.getCheckerData?.() || null
     const checker = liveQc || cachedChecker
+    // Live report: the inspection isn't submitted yet, so "now" is the end anchor.
+    const now = new Date()
+    const d = computeInspectionDurations({
+      startedAt: formData?.inspectionStartedAt,
+      submittedAt: now.toISOString(),
+      totalPausedMs: formData?.totalPausedMs || 0,
+      pausedAt: formData?.pausedAt || null,
+      estimatedDuration: formData?.productData?.qcAssignment?.estimatedDuration,
+    }, now)
     return {
       productName: formData?.items?.[0]?.itemName || formData?.vendor || "Product",
       vendorName: formData?.vendor || formData?.factory || "",
@@ -121,7 +131,15 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
       // Pass the inspection start time so the signed PDF prints it too — the
       // report-page download already did, but buildMeta() omitted it (F-13).
       inspectionStartedAt: formData?.inspectionStartedAt,
-      generatedAt: new Date(),
+      inspectionCompletedAt: now.toISOString(),
+      generatedAt: now,
+      ...(d.totalMs > 0 ? {
+        activeDurationMs: d.activeMs,
+        pausedDurationMs: d.pausedMs,
+        totalDurationMs: d.totalMs,
+        scheduledDurationMs: d.scheduledMs,
+        exceededSchedule: d.exceeded,
+      } : {}),
     }
   }
 

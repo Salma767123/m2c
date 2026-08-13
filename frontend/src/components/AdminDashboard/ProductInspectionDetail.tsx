@@ -6,11 +6,12 @@ import Link from 'next/link'
 import {
     ArrowLeft, ShieldCheck,
     CheckCircle, XCircle, AlertTriangle,
-    Truck, Camera, Download, FlaskConical, Star, Check, X, FileText, MapPin, Video, Factory
+    Truck, Camera, Download, FlaskConical, Star, Check, X, FileText, MapPin, Video, Factory, AlarmClockOff
 } from 'lucide-react'
 import { Badge } from '@/components/UI/Badge'
 import productService from '@/services/productService'
 import { generateProductInspectionPdf } from '@/lib/productInspectionReportPdf'
+import { computeInspectionDurations } from '@/lib/inspectionDuration'
 import reinspectionService, { AuditLogEntry } from '@/services/reinspectionService'
 import InspectionAuditTimeline from './ReInspection/InspectionAuditTimeline'
 import ApproveProductModal, { type ApprovableProduct } from './Products/ApproveProductModal'
@@ -182,6 +183,20 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
         }
     }
 
+    // Duration breakdown fields for the report meta, computed from the stored
+    // inspection timing + the product's scheduled duration.
+    const pdfDurationFields = (fd: any) => {
+        const d = computeInspectionDurations({
+            startedAt: fd.inspectionStartedAt,
+            submittedAt: fd.inspectionCompletedAt,
+            totalPausedMs: fd.totalPausedMs || 0,
+            estimatedDuration: (product as any)?.qcAssignment?.estimatedDuration,
+        })
+        return d.totalMs > 0
+            ? { activeDurationMs: d.activeMs, pausedDurationMs: d.pausedMs, totalDurationMs: d.totalMs, scheduledDurationMs: d.scheduledMs, exceededSchedule: d.exceeded }
+            : {}
+    }
+
     const handleDownloadPdf = async () => {
         if (!product) return
         setDownloading(true)
@@ -198,7 +213,10 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
                 location: fd.checkerLocation?.checkerLatitude != null
                     ? { latitude: fd.checkerLocation.checkerLatitude, longitude: fd.checkerLocation.checkerLongitude }
                     : undefined,
+                inspectionStartedAt: fd.inspectionStartedAt,
+                inspectionCompletedAt: fd.inspectionCompletedAt,
                 generatedAt: new Date(),
+                ...pdfDurationFields(fd),
             }
             const pdf = generateProductInspectionPdf(fd, meta, {})
             pdf.save(`Product_Report_${String(productName).replace(/\s+/g, '_')}_${productId.slice(-8).toUpperCase()}.pdf`)
@@ -224,7 +242,10 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
             location: fd.checkerLocation?.checkerLatitude != null
                 ? { latitude: fd.checkerLocation.checkerLatitude, longitude: fd.checkerLocation.checkerLongitude }
                 : undefined,
+            inspectionStartedAt: fd.inspectionStartedAt,
+            inspectionCompletedAt: fd.inspectionCompletedAt,
             generatedAt: new Date(),
+            ...pdfDurationFields(fd),
         }
         try {
             const pdf = generateProductInspectionPdf(fd, meta, {})
@@ -382,7 +403,12 @@ export default function ProductInspectionDetail({ productId, context }: Props) {
                     <Download className="w-4 h-4" />
                     {downloading ? 'Generating...' : 'Download PDF'}
                 </button>
-                <div className="flex gap-2 flex-shrink-0">
+                <div className="flex gap-2 flex-shrink-0 items-center">
+                    {pdfDurationFields((product as any).qcInspectionData || {}).exceededSchedule && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border bg-red-50 text-red-700 border-red-200">
+                            <AlarmClockOff className="w-3 h-3" /> Exceeded schedule
+                        </span>
+                    )}
                     <Badge className={statusColors[approvalStatus] || 'bg-slate-100 text-slate-700'}>
                         {statusLabels[approvalStatus] || approvalStatus}
                     </Badge>

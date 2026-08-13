@@ -30,7 +30,8 @@ import {
     validateStep,
     validateAll,
     hasErrors,
-    firstErrorMessage,
+    countErrors,
+    countAllErrors,
     type Step as ValidationStep,
     type AllErrors,
 } from "@/components/Checker/Products/validation"
@@ -75,102 +76,23 @@ function loadDraft<T extends Record<string, any>>(productId: string, defaults: T
     }
 }
 
-interface Props {
-    productId: string
-    productName: string
-    vendorName: string
-    onComplete: () => void
-    onCancel: () => void
+// Peek the raw saved draft without merging defaults — used at init to detect a
+// PAUSED draft (one the checker explicitly saved & exited), which re-prompts the
+// inspection type on resume.
+function peekDraft(productId: string): any | null {
+    if (typeof window === "undefined" || !productId) return null
+    try {
+        const raw = window.localStorage.getItem(draftKeyFor(productId))
+        return raw ? JSON.parse(raw) : null
+    } catch {
+        return null
+    }
 }
 
-export default function ProductInspectionForm({
-    productId,
-    productName,
-    vendorName,
-    onComplete,
-    onCancel,
-}: Props) {
-    const [currentStep, setCurrentStep] = useState<Step>("generalInformation")
-    // When true, Next becomes "Save & Continue" and returns to Review
-    const [reviewMode, setReviewMode] = useState(false)
-    const [submitting, setSubmitting] = useState(false)
-    const [errors, setErrors] = useState<AllErrors>({})
-    // Set when the admin-booked window has elapsed — blocks the form entirely.
-    const [expiredError, setExpiredError] = useState<string | null>(null)
-    // Physical vs virtual — chosen in the mandatory dialog before the form is usable.
-    const [inspectionType, setInspectionType] = useState<InspectionType | null>(() => {
-        try {
-            const v = typeof window !== "undefined" ? window.localStorage.getItem(typeKeyFor(productId)) : null
-            return v === "PHYSICAL" || v === "VIRTUAL" ? v : null
-        } catch { return null }
-    })
-
-    // ── Exit-confirmation guard ───────────────────────────────────────────────
-    const [showExitConfirm, setShowExitConfirm] = useState(false)
-    const pendingNavRef = useRef<null | (() => void)>(null)
-    const allowLeaveRef = useRef(false)
-    const rootRef = useRef<HTMLDivElement>(null)
-
-    const requestExit = (action: () => void) => {
-        if (allowLeaveRef.current) { action(); return }
-        pendingNavRef.current = action
-        setShowExitConfirm(true)
-    }
-    const confirmExit = () => {
-        setShowExitConfirm(false)
-        allowLeaveRef.current = true
-        const action = pendingNavRef.current
-        pendingNavRef.current = null
-        action?.()
-    }
-    const cancelExit = () => {
-        setShowExitConfirm(false)
-        pendingNavRef.current = null
-    }
-
-    useEffect(() => {
-        const handler = (e: BeforeUnloadEvent) => {
-            if (allowLeaveRef.current) return
-            e.preventDefault()
-            e.returnValue = ""
-        }
-        window.addEventListener("beforeunload", handler)
-        return () => window.removeEventListener("beforeunload", handler)
-    }, [])
-
-    useEffect(() => {
-        window.history.pushState(null, "", window.location.href)
-        const onPop = () => {
-            if (allowLeaveRef.current) return
-            window.history.pushState(null, "", window.location.href)
-            requestExit(() => { allowLeaveRef.current = true; window.history.back() })
-        }
-        window.addEventListener("popstate", onPop)
-        return () => window.removeEventListener("popstate", onPop)
-    }, [])
-
-    useEffect(() => {
-        const onClickCapture = (e: MouseEvent) => {
-            if (allowLeaveRef.current) return
-            if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
-            const anchor = (e.target as HTMLElement)?.closest("a") as HTMLAnchorElement | null
-            if (!anchor) return
-            if (rootRef.current?.contains(anchor)) return
-            const href = anchor.getAttribute("href")
-            if (!href || href.startsWith("#") || anchor.target === "_blank") return
-            e.preventDefault()
-            e.stopPropagation()
-            e.stopImmediatePropagation()
-            requestExit(() => { allowLeaveRef.current = true; window.location.href = href })
-        }
-        document.addEventListener("click", onClickCapture, true)
-        return () => document.removeEventListener("click", onClickCapture, true)
-    }, [])
-
-    // ── Form data ─────────────────────────────────────────────────────────────
-    const prefilledRef = useRef<string | null>(null)
-
-    const [formData, setFormData] = useState(() => loadDraft(productId, {
+// The blank form. Extracted so a "discard draft & restart" can rebuild it, and
+// the initial state can hydrate it from a saved draft via loadDraft().
+function makeDefaultFormData(productName: string, vendorName: string) {
+    return {
         // Step 1
         client: "M2C",
         vendor: vendorName,
@@ -180,6 +102,11 @@ export default function ProductInspectionForm({
         // Timestamp when the inspection was opened — surfaces as "Inspection
         // Start Time" in the generated report (the complete time is report gen).
         inspectionStartedAt: new Date().toISOString(),
+        // Draft/pause timing (client-side; persisted into qcInspectionData at submit).
+        // pausedAt marks an explicit "save draft & exit"; totalPausedMs accumulates
+        // paused time across resume cycles.
+        pausedAt: null as string | null,
+        totalPausedMs: 0,
         serviceType: "Pre-Shipment Inspection",
         vendorData: null as any,
         productData: null as any,
@@ -248,7 +175,117 @@ export default function ProductInspectionForm({
         productTypeRemark: "",
         aqlWorkmanshipRemark: "",
         onSiteTestsRemark: "",
-    }))
+    }
+}
+
+interface Props {
+    productId: string
+    productName: string
+    vendorName: string
+    onComplete: () => void
+    onCancel: () => void
+}
+
+export default function ProductInspectionForm({
+    productId,
+    productName,
+    vendorName,
+    onComplete,
+    onCancel,
+}: Props) {
+    const [currentStep, setCurrentStep] = useState<Step>("generalInformation")
+    // When true, Next becomes "Save & Continue" and returns to Review
+    const [reviewMode, setReviewMode] = useState(false)
+    const [submitting, setSubmitting] = useState(false)
+    const [errors, setErrors] = useState<AllErrors>({})
+    // Set when the admin-booked window has elapsed — blocks the form entirely.
+    const [expiredError, setExpiredError] = useState<string | null>(null)
+    // The type saved from a prior session (localStorage), and whether the saved draft
+    // was explicitly PAUSED (has pausedAt) — a paused draft re-prompts the type on
+    // resume; a plain reload keeps the choice silently.
+    const savedType: InspectionType | null = (() => {
+        try {
+            const v = typeof window !== "undefined" ? window.localStorage.getItem(typeKeyFor(productId)) : null
+            return v === "PHYSICAL" || v === "VIRTUAL" ? (v as InspectionType) : null
+        } catch { return null }
+    })()
+    const pausedResume = !!peekDraft(productId)?.pausedAt
+
+    // Physical vs virtual — chosen in the mandatory dialog before the form is usable.
+    // Null forces the dialog: on a paused resume we deliberately re-ask.
+    const [inspectionType, setInspectionType] = useState<InspectionType | null>(pausedResume ? null : savedType)
+    // Resume/draft state (mirrors the vendor inspection flow).
+    const [isResume, setIsResume] = useState(pausedResume)
+    const [draftInspectionType] = useState<InspectionType | null>(savedType)
+    const [discardConfirm, setDiscardConfirm] = useState<{ type: InspectionType } | null>(null)
+    const [savingDraft, setSavingDraft] = useState(false)
+
+    // ── Exit-confirmation guard ───────────────────────────────────────────────
+    const [showExitConfirm, setShowExitConfirm] = useState(false)
+    const pendingNavRef = useRef<null | (() => void)>(null)
+    const allowLeaveRef = useRef(false)
+    const rootRef = useRef<HTMLDivElement>(null)
+
+    const requestExit = (action: () => void) => {
+        if (allowLeaveRef.current) { action(); return }
+        pendingNavRef.current = action
+        setShowExitConfirm(true)
+    }
+    const confirmExit = () => {
+        setShowExitConfirm(false)
+        allowLeaveRef.current = true
+        const action = pendingNavRef.current
+        pendingNavRef.current = null
+        action?.()
+    }
+    const cancelExit = () => {
+        setShowExitConfirm(false)
+        pendingNavRef.current = null
+    }
+
+    useEffect(() => {
+        const handler = (e: BeforeUnloadEvent) => {
+            if (allowLeaveRef.current) return
+            e.preventDefault()
+            e.returnValue = ""
+        }
+        window.addEventListener("beforeunload", handler)
+        return () => window.removeEventListener("beforeunload", handler)
+    }, [])
+
+    useEffect(() => {
+        window.history.pushState(null, "", window.location.href)
+        const onPop = () => {
+            if (allowLeaveRef.current) return
+            window.history.pushState(null, "", window.location.href)
+            requestExit(() => { allowLeaveRef.current = true; window.history.back() })
+        }
+        window.addEventListener("popstate", onPop)
+        return () => window.removeEventListener("popstate", onPop)
+    }, [])
+
+    useEffect(() => {
+        const onClickCapture = (e: MouseEvent) => {
+            if (allowLeaveRef.current) return
+            if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+            const anchor = (e.target as HTMLElement)?.closest("a") as HTMLAnchorElement | null
+            if (!anchor) return
+            if (rootRef.current?.contains(anchor)) return
+            const href = anchor.getAttribute("href")
+            if (!href || href.startsWith("#") || anchor.target === "_blank") return
+            e.preventDefault()
+            e.stopPropagation()
+            e.stopImmediatePropagation()
+            requestExit(() => { allowLeaveRef.current = true; window.location.href = href })
+        }
+        document.addEventListener("click", onClickCapture, true)
+        return () => document.removeEventListener("click", onClickCapture, true)
+    }, [])
+
+    // ── Form data ─────────────────────────────────────────────────────────────
+    const prefilledRef = useRef<string | null>(null)
+
+    const [formData, setFormData] = useState(() => loadDraft(productId, makeDefaultFormData(productName, vendorName)))
 
     // Persist a draft whenever the form changes (debounced). Falls back to a
     // photo-stripped draft if the full snapshot exceeds the localStorage quota.
@@ -331,6 +368,79 @@ export default function ProductInspectionForm({
         return () => { cancelled = true }
     }, [productId, vendorName])
 
+    // ── Resume / draft orchestration (mirrors the vendor inspection flow) ──────
+    // Called from the type dialog. A fresh inspection just starts; a paused resume
+    // continues the draft on a matching type, or asks to discard on a different one.
+    const persistType = (type: InspectionType) => {
+        try { window.localStorage.setItem(typeKeyFor(productId), type) } catch { /* ignore */ }
+    }
+
+    const handleTypeChosen = (type: InspectionType) => {
+        if (isResume) {
+            const draftType = draftInspectionType || inspectionType
+            if (type === draftType) {
+                // Same type → resume the saved draft, folding the paused gap into
+                // totalPausedMs so the report's duration stays accurate.
+                setFormData((prev: any) => {
+                    const pausedMs = prev.pausedAt ? Math.max(0, Date.now() - new Date(prev.pausedAt).getTime()) : 0
+                    return { ...prev, totalPausedMs: (prev.totalPausedMs || 0) + pausedMs, pausedAt: null }
+                })
+                setIsResume(false)
+                setInspectionType(type)
+                persistType(type)
+            } else {
+                // Different type → confirm discarding the saved draft first.
+                setDiscardConfirm({ type })
+            }
+        } else {
+            setInspectionType(type)
+            persistType(type)
+        }
+    }
+
+    const confirmDiscardDraft = () => {
+        if (!discardConfirm) return
+        const { type } = discardConfirm
+        // Wipe the saved draft and restart fresh at the current time, keeping only
+        // the already-loaded product/vendor context and the inspector's name.
+        try { window.localStorage.removeItem(draftKeyFor(productId)) } catch { /* ignore */ }
+        setFormData((prev: any) => ({
+            ...makeDefaultFormData(productName, vendorName),
+            productData: prev.productData,
+            vendorData: prev.vendorData,
+            inspectorSignature: prev.inspectorSignature,
+        }))
+        setCurrentStep("generalInformation")
+        setReviewMode(false)
+        setDiscardConfirm(null)
+        setIsResume(false)
+        setInspectionType(type)
+        persistType(type)
+    }
+
+    // Save the half-filled form as a paused draft, then leave. pausedAt marks the
+    // pause so the next open re-prompts the inspection type (resume vs restart).
+    const saveDraftAndExit = () => {
+        setSavingDraft(true)
+        const next = { ...formData, pausedAt: new Date().toISOString() }
+        try {
+            const { productData: _pd, vendorData: _vd, ...rest } = next as any
+            try { window.localStorage.setItem(draftKeyFor(productId), JSON.stringify(rest)) }
+            catch { window.localStorage.setItem(draftKeyFor(productId), JSON.stringify(stripBase64Deep(rest))) }
+            showSuccessToast("Draft saved", "Your progress has been saved — you can resume this inspection later.")
+        } catch {
+            showErrorToast("Could not save draft", "Your device storage is full. Try removing some photos.")
+            setSavingDraft(false)
+            return
+        }
+        setSavingDraft(false)
+        setShowExitConfirm(false)
+        allowLeaveRef.current = true
+        const action = pendingNavRef.current
+        pendingNavRef.current = null
+        ;(action ?? onCancel ?? onComplete)?.()
+    }
+
     // ── Step definitions ──────────────────────────────────────────────────────
     const steps: { id: Step; label: string; description: string }[] = [
         { id: "generalInformation",  label: "General Info",          description: "Vendor registration data and inspection context" },
@@ -355,21 +465,34 @@ export default function ProductInspectionForm({
     // scrolling the whole page to the top. Runs after a short delay so the error
     // DOM (and any step change) has rendered. Falls back to the top if the step
     // hasn't marked a specific field.
-    const scrollToFirstError = () => {
+    // Announce how many fields still need attention (counting the fields the steps
+    // actually highlighted with data-invalid — accurate even for steps that collapse
+    // many missing fields into one summary error), then scroll to + flash the first.
+    // `fallbackCount` (from the error keys) is used only if the DOM highlight hasn't
+    // rendered yet. Runs after a short delay so the invalid DOM exists.
+    const flagAndScrollToErrors = (fallbackCount: number) => {
         const FLASH = ["ring-4", "ring-red-500", "ring-offset-2", "ring-offset-white", "rounded-2xl"]
-        // Poll for the invalid element: the step may need a render (and a
-        // collapsed group may need to expand) before `data-invalid` is in the
-        // DOM, so a single check can miss it and fall back to the top.
+        const announce = (count: number) => {
+            const n = Math.max(count, 1)
+            showErrorToast(
+                `${n} ${n === 1 ? "field needs" : "fields need"} to be completed`,
+                "The required fields are highlighted — jumping to the first one.",
+            )
+        }
         let attempts = 0
         const tryFind = () => {
-            const el = rootRef.current?.querySelector<HTMLElement>('[data-invalid="true"]')
-            if (el) {
+            const els = rootRef.current?.querySelectorAll<HTMLElement>('[data-invalid="true"]')
+            if (els && els.length > 0) {
+                announce(els.length)
+                const el = els[0]
                 el.scrollIntoView({ behavior: "smooth", block: "center" })
                 el.classList.add(...FLASH)
                 window.setTimeout(() => el.classList.remove(...FLASH), 2200)
                 return
             }
             if (attempts++ < 8) { window.setTimeout(tryFind, 80); return }
+            // DOM highlight never appeared — fall back to the error-key count + top.
+            announce(fallbackCount)
             scrollToTop()
         }
         window.setTimeout(tryFind, 60)
@@ -380,8 +503,7 @@ export default function ProductInspectionForm({
         const stepErrors = validateStep(currentStep, formData)
         setErrors((prev) => ({ ...prev, [currentStep]: stepErrors }))
         if (hasErrors(stepErrors)) {
-            showErrorToast("Please complete this step", firstErrorMessage(stepErrors) || "Some required fields are missing.")
-            scrollToFirstError()
+            flagAndScrollToErrors(countErrors(stepErrors))
             return
         }
 
@@ -439,17 +561,26 @@ export default function ProductInspectionForm({
         const all = validateAll(formData)
         if (Object.keys(all).length > 0) {
             setErrors(all)
-            const firstInvalid = steps.find((s) => all[s.id as Step])?.id
-            if (firstInvalid) setCurrentStep(firstInvalid as Step)
-            showErrorToast("Cannot submit yet", "Some required fields are missing. Review the highlighted steps.")
-            scrollToFirstError()
+            const firstInvalid = steps.find((s) => all[s.id as Step])
+            if (firstInvalid) setCurrentStep(firstInvalid.id as Step)
+            flagAndScrollToErrors(countAllErrors(all))
             return
         }
 
         setSubmitting(true)
         try {
+            // Stamp the completion time and fold any still-open pause into totalPausedMs
+            // so the report's active/paused/total duration is accurate. These ride along
+            // in the form payload → persisted into the product's qcInspectionData.
+            const completedIso = new Date().toISOString()
+            const openPauseMs = formData.pausedAt ? Math.max(0, Date.now() - new Date(formData.pausedAt).getTime()) : 0
+            const finalPausedMs = (formData.totalPausedMs || 0) + openPauseMs
+
             const cleanedData = {
                 ...formData,
+                inspectionCompletedAt: completedIso,
+                totalPausedMs: finalPausedMs,
+                pausedAt: null,
                 packagingPhotos: cleanPhotos(formData.packagingPhotos),
                 productEvidencePhotos: cleanPhotos(formData.productEvidencePhotos),
                 defectPhotos: cleanPhotos(formData.defectPhotos),
@@ -540,17 +671,57 @@ export default function ProductInspectionForm({
 
     return (
         <div ref={rootRef} className="min-h-screen font-sans bg-[#f7f7f5]">
-            {/* Mandatory type selection — shown until the checker chooses. Cancelling
-                backs out of the inspection. */}
-            {!inspectionType && (
+            {/* Mandatory type selection — shown until the checker chooses (and re-asked
+                when resuming a paused draft). Cancelling backs out of the inspection. */}
+            {!inspectionType && !discardConfirm && (
                 <InspectionTypeDialog
                     subjectName={productName}
-                    onSelect={(type) => {
-                        setInspectionType(type)
-                        try { window.localStorage.setItem(typeKeyFor(productId), type) } catch { /* ignore */ }
-                    }}
+                    onSelect={handleTypeChosen}
                     onCancel={() => { (onCancel ?? onComplete)() }}
                 />
+            )}
+
+            {/* Discard-draft confirmation — shown when resuming with a DIFFERENT type
+                than the saved draft, which can't be carried over. */}
+            {discardConfirm && (
+                <div
+                    className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    onClick={() => setDiscardConfirm(null)}
+                >
+                    <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-6">
+                            <div className="flex items-start gap-4">
+                                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center">
+                                    <AlertTriangle className="w-6 h-6 text-amber-500" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-lg font-bold text-slate-900">Discard saved draft?</h3>
+                                    <p className="mt-1 text-sm text-slate-600">
+                                        You saved this inspection as a <span className="font-semibold">{(draftInspectionType || "").toLowerCase()}</span> inspection.
+                                        Switching to <span className="font-semibold">{discardConfirm.type.toLowerCase()}</span> will
+                                        <span className="font-semibold text-amber-700"> discard the saved draft</span> and start a fresh inspection at the current time.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
+                            <button
+                                onClick={() => setDiscardConfirm(null)}
+                                className="flex-1 px-4 py-2.5 rounded-xl font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 transition-colors"
+                            >
+                                Go back
+                            </button>
+                            <button
+                                onClick={confirmDiscardDraft}
+                                className="flex-1 px-4 py-2.5 rounded-xl font-semibold bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white transition-colors shadow-sm"
+                            >
+                                Discard &amp; start fresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
             <div className="p-8 max-w-5xl mx-auto">
                 {/* Header */}
@@ -726,18 +897,31 @@ export default function ProductInspectionForm({
                                 <div className="flex-1">
                                     <h3 id="exit-confirm-title" className="text-lg font-bold text-slate-900">Exit inspection?</h3>
                                     <p className="mt-1 text-sm text-slate-600">
-                                        Are you sure you want to exit? Your inspection progress will be lost and won&apos;t be saved.
+                                        {inspectionType
+                                            ? "You can save your progress as a draft and resume this inspection later, or exit without saving."
+                                            : "Are you sure you want to exit? Your inspection progress will be lost and won’t be saved."}
                                     </p>
                                 </div>
                             </div>
                         </div>
-                        <div className="flex gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
-                            <button onClick={cancelExit} className="flex-1 px-4 py-2.5 rounded-xl font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 transition-colors">
-                                Keep editing
-                            </button>
-                            <button onClick={confirmExit} className="flex-1 px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 text-white transition-colors">
-                                Yes, exit
-                            </button>
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 space-y-3">
+                            {inspectionType && (
+                                <button
+                                    onClick={saveDraftAndExit}
+                                    disabled={savingDraft}
+                                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white transition-colors shadow-sm disabled:opacity-70"
+                                >
+                                    {savingDraft ? "Saving draft…" : "Save draft & exit"}
+                                </button>
+                            )}
+                            <div className="flex gap-3">
+                                <button onClick={cancelExit} disabled={savingDraft} className="flex-1 px-4 py-2.5 rounded-xl font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-70">
+                                    Keep editing
+                                </button>
+                                <button onClick={confirmExit} disabled={savingDraft} className="flex-1 px-4 py-2.5 rounded-xl font-semibold border border-red-200 bg-white text-red-600 hover:bg-red-50 transition-colors disabled:opacity-70">
+                                    Exit without saving
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -186,22 +186,22 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
       {/* ── 1. Basic Product Info ─────────────────────────────────────────── */}
       <SectionBlock title="Basic Product Information" icon={<Package className="w-4 h-4" />}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {notEmpty(p.name) && (
-            <VerifyField fieldKey="pv_name" label="Product Name" value={p.name}
-              verifications={verifications} onChange={onVerify} />
-          )}
           {notEmpty(p.category) && (
             <VerifyField fieldKey="pv_category" label="Category" value={p.category}
               verifications={verifications} onChange={onVerify} />
           )}
+          {notEmpty(p.name) && (
+            <VerifyField fieldKey="pv_name" label="Product Name" value={p.name}
+              verifications={verifications} onChange={onVerify} />
+          )}
           {notEmpty(p.singleUnitColor) && (
-            <VerifyField fieldKey="pv_baseColor" label="Base Color"
+            <VerifyField fieldKey="pv_baseColor" label="Product Color"
               value={colorValue(p.singleUnitColor, p.singleUnitColorHex)}
               headerAction={colorSwatch(p.singleUnitColor, p.singleUnitColorHex)}
               verifications={verifications} onChange={onVerify} />
           )}
           {notEmpty(p.uom) && (
-            <VerifyField fieldKey="pv_uom" label="Selling Unit (UOM)" value={UOM_LABELS[p.uom] || p.uom}
+            <VerifyField fieldKey="pv_uom" label="Unit (UOM)" value={UOM_LABELS[p.uom] || p.uom}
               verifications={verifications} onChange={onVerify} />
           )}
           {notEmpty(p.brand) && (
@@ -241,7 +241,52 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
         </SectionBlock>
       )}
 
-      {/* ── 3. Measurements & Specifications ─────────────────────────────── */}
+      {/* ── 3. Variants (no pricing) — shown before measurements ─────────── */}
+      {variants.length > 0 && (
+        <SectionBlock title="Product Variants" icon={<Tag className="w-4 h-4" />}>
+          <div className="space-y-4">
+            {variants.map((variant: any, vi: number) => {
+              const varLabel = [variant.color, variant.size, variant.material]
+                .filter(Boolean).join(' / ') || `Variant ${vi + 1}`
+              return (
+                <div key={vi} className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+                    <p className="text-sm font-bold text-slate-700">Variant {vi + 1}: {varLabel}</p>
+                  </div>
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {notEmpty(variant.color) && (
+                      <VerifyField fieldKey={`pv_var${vi}_color`} label="Color"
+                        value={colorValue(variant.color, variant.colorHex)}
+                        headerAction={colorSwatch(variant.color, variant.colorHex)}
+                        verifications={verifications} onChange={onVerify} />
+                    )}
+                    {notEmpty(variant.size) && (
+                      <VerifyField fieldKey={`pv_var${vi}_size`} label="Size"
+                        value={variant.size} verifications={verifications} onChange={onVerify} />
+                    )}
+                    {notEmpty(variant.material) && (
+                      <VerifyField fieldKey={`pv_var${vi}_material`} label="Material"
+                        value={variant.material} verifications={verifications} onChange={onVerify} />
+                    )}
+                    {notEmpty(variant.variantName) && (
+                      <VerifyField fieldKey={`pv_var${vi}_variantName`} label="Variant Name"
+                        value={variant.variantName} verifications={verifications} onChange={onVerify} />
+                    )}
+                    {Array.isArray(variant.images) && variant.images[0] && (
+                      <VerifyField fieldKey={`pv_var${vi}_image`} label="Variant Image"
+                        value={variant.images[0]} type="image"
+                        verifications={verifications} onChange={onVerify}
+                        documentUrl={variant.images[0] || undefined} />
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </SectionBlock>
+      )}
+
+      {/* ── 4. Measurements & Specifications ─────────────────────────────── */}
       {(notEmpty(p.fabricType) || notEmpty(p.material) || notEmpty(p.fabricSpecifications)) && (
         <SectionBlock title="Measurements & Specifications" icon={<Ruler className="w-4 h-4" />}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -298,51 +343,6 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
                 />
               </div>
             )}
-          </div>
-        </SectionBlock>
-      )}
-
-      {/* ── 4. Variants (no pricing) ─────────────────────────────────────── */}
-      {variants.length > 0 && (
-        <SectionBlock title="Product Variants" icon={<Tag className="w-4 h-4" />}>
-          <div className="space-y-4">
-            {variants.map((variant: any, vi: number) => {
-              const varLabel = [variant.color, variant.size, variant.material]
-                .filter(Boolean).join(' / ') || `Variant ${vi + 1}`
-              return (
-                <div key={vi} className="border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
-                    <p className="text-sm font-bold text-slate-700">Variant {vi + 1}: {varLabel}</p>
-                  </div>
-                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                    {notEmpty(variant.color) && (
-                      <VerifyField fieldKey={`pv_var${vi}_color`} label="Color"
-                        value={colorValue(variant.color, variant.colorHex)}
-                        headerAction={colorSwatch(variant.color, variant.colorHex)}
-                        verifications={verifications} onChange={onVerify} />
-                    )}
-                    {notEmpty(variant.size) && (
-                      <VerifyField fieldKey={`pv_var${vi}_size`} label="Size"
-                        value={variant.size} verifications={verifications} onChange={onVerify} />
-                    )}
-                    {notEmpty(variant.material) && (
-                      <VerifyField fieldKey={`pv_var${vi}_material`} label="Material"
-                        value={variant.material} verifications={verifications} onChange={onVerify} />
-                    )}
-                    {notEmpty(variant.variantName) && (
-                      <VerifyField fieldKey={`pv_var${vi}_variantName`} label="Variant Name"
-                        value={variant.variantName} verifications={verifications} onChange={onVerify} />
-                    )}
-                    {Array.isArray(variant.images) && variant.images[0] && (
-                      <VerifyField fieldKey={`pv_var${vi}_image`} label="Variant Image"
-                        value={variant.images[0]} type="image"
-                        verifications={verifications} onChange={onVerify}
-                        documentUrl={variant.images[0] || undefined} />
-                    )}
-                  </div>
-                </div>
-              )
-            })}
           </div>
         </SectionBlock>
       )}

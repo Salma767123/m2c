@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { GEOFENCE_DISABLED, getCurrentCoords, captureCoordsForSubmit, type CheckerCoords, type InspectionType } from '@/lib/checkerLocation'
 import InspectionTypeDialog from './InspectionTypeDialog'
-import { Check, ArrowLeft, ArrowRight, AlertTriangle, ShieldAlert, Clock, Save, AlarmClockOff } from 'lucide-react'
+import { Check, ArrowLeft, ArrowRight, AlertTriangle, ShieldAlert, Clock, Save, AlarmClockOff, MapPin } from 'lucide-react'
 import { HighlightFieldsProvider } from './Steps/VI_VerifyField'
 import type { Verifications } from './Steps/VI_VerifyField'
 import type { InspectorMeta } from './Steps/VI_Step8_FinalReview'
@@ -59,7 +59,10 @@ function formatScheduledWindow(date?: string | null, time?: string | null): stri
 export default function VendorInspectionForm({ vendorId, vendorName, onComplete }: Props) {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<{ type: 'not_assigned' | 'submitted' | 'unknown' | 'expired'; message: string; scheduledDate?: string | null; scheduledTime?: string | null } | null>(null)
+  const [loadError, setLoadError] = useState<{ type: 'not_assigned' | 'submitted' | 'unknown' | 'expired' | 'location'; message: string; scheduledDate?: string | null; scheduledTime?: string | null; distanceMeters?: number | null; thresholdMeters?: number | null } | null>(null)
+  // Remember the last start attempt so the location-warning card can offer a
+  // "check my location again" retry after the checker moves closer to the site.
+  const lastStartAttemptRef = useRef<{ inspId: string; type: InspectionType; discardDraft: boolean } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [checkerCoords, setCheckerCoords] = useState<CheckerCoords | null>(null)
   // Physical vs virtual. Chosen in the mandatory dialog on first start, or read back
@@ -379,6 +382,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
   const handleStartWithType = async (inspId: string, type: InspectionType, discardDraft = false) => {
     setInspectionType(type)
     setTypeDialogFor(null)
+    lastStartAttemptRef.current = { inspId, type, discardDraft }
     try {
       if (type === 'VIRTUAL' || GEOFENCE_DISABLED) {
         const res = await qcCheckerService.startInspection(inspId, { checkerLatitude: null, checkerLongitude: null, inspectionType: type, discardDraft } as any)
@@ -408,11 +412,35 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
         return
       }
       if (err?.status === 400 && /already/i.test(msg)) return
-      // Everything else here is a genuine block (GPS denied, or the checker is outside
-      // the allowed radius) and must be shown, not swallowed.
+      // Geofence block — the checker is outside the allowed radius of BOTH the
+      // legal/factory and warehouse locations (403), or no on-site GPS reached the
+      // server (400 "Location required"). Show a clear, persistent warning card with
+      // a retry instead of a transient toast, so the inspection cannot start until
+      // they are on-site.
+      const isLocationBlock =
+        (err?.status === 403 && /location|within\s*\d+\s*m|registered locations|nearest/i.test(msg)) ||
+        (err?.status === 400 && /location/i.test(msg))
+      if (isLocationBlock) {
+        setLoadError({
+          type: 'location',
+          message: msg || "Your current location could not be verified against the vendor's registered locations.",
+          distanceMeters: err?.distanceMeters ?? err?.response?.data?.distanceMeters ?? null,
+          thresholdMeters: err?.thresholdMeters ?? err?.response?.data?.thresholdMeters ?? null,
+        })
+        return
+      }
+      // Everything else here is a genuine block (GPS denied on the device, etc.) and
+      // must be shown, not swallowed.
       console.error('Start failed:', err)
       showErrorToast('Could not start inspection', msg || 'Please enable location services and try again.')
     }
+  }
+
+  // Retry the last start attempt after the checker moves closer to the site.
+  const retryLocationStart = () => {
+    const attempt = lastStartAttemptRef.current
+    setLoadError(null)
+    if (attempt) handleStartWithType(attempt.inspId, attempt.type, attempt.discardDraft)
   }
 
   // ── Verification state handler ─────────────────────────────────────────────
@@ -691,28 +719,45 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
     const isSubmitted = loadError.type === 'submitted'
     const isNotAssigned = loadError.type === 'not_assigned'
     const isExpired = loadError.type === 'expired'
+    const isLocation = loadError.type === 'location'
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-[#f7f7f5]">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 max-w-md w-full text-center space-y-5">
           <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto ${
-            isSubmitted || isExpired ? 'bg-amber-50' : 'bg-red-50'
+            isSubmitted || isExpired || isLocation ? 'bg-amber-50' : 'bg-red-50'
           }`}>
             {isSubmitted
               ? <Clock className="w-7 h-7 text-amber-500" />
               : isExpired
                 ? <AlarmClockOff className="w-7 h-7 text-amber-500" />
-                : <ShieldAlert className="w-7 h-7 text-red-500" />
+                : isLocation
+                  ? <MapPin className="w-7 h-7 text-amber-500" />
+                  : <ShieldAlert className="w-7 h-7 text-red-500" />
             }
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900 mb-1">
-              {isSubmitted ? 'Inspection Submitted' : isNotAssigned ? 'Access Denied' : isExpired ? 'Inspection Window Expired' : 'Unable to Start Inspection'}
+              {isSubmitted ? 'Inspection Submitted' : isNotAssigned ? 'Access Denied' : isExpired ? 'Inspection Window Expired' : isLocation ? "You're Not at the Vendor Location" : 'Unable to Start Inspection'}
             </h2>
             <p className="text-slate-600 text-sm leading-relaxed">
               {isExpired
                 ? 'This inspection can no longer be started because its scheduled date and time have already passed.'
                 : loadError.message}
             </p>
+            {isLocation && loadError.distanceMeters != null && (
+              <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-medium text-amber-800">
+                <MapPin className="w-4 h-4 shrink-0" />
+                <span>
+                  You are <span className="font-semibold">{loadError.distanceMeters}m</span> away · must be within{' '}
+                  <span className="font-semibold">{loadError.thresholdMeters ?? 1000}m</span> of the factory or warehouse
+                </span>
+              </div>
+            )}
+            {isLocation && (
+              <p className="text-slate-500 text-xs leading-relaxed mt-3">
+                Move to the vendor&apos;s Legal / Factory site or Warehouse, then check again. A physical inspection can only be started on-site.
+              </p>
+            )}
             {isExpired && (loadError.scheduledDate || loadError.scheduledTime) && (
               <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-medium text-amber-800">
                 <AlarmClockOff className="w-4 h-4 shrink-0" />
@@ -730,12 +775,29 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
               </p>
             )}
           </div>
-          <button
-            onClick={onComplete}
-            className="w-full px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 text-white transition-colors"
-          >
-            Back to Vendor List
-          </button>
+          {isLocation ? (
+            <div className="space-y-2.5">
+              <button
+                onClick={retryLocationStart}
+                className="w-full px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 text-white transition-colors inline-flex items-center justify-center gap-2"
+              >
+                <MapPin className="w-4 h-4" /> Check My Location Again
+              </button>
+              <button
+                onClick={onComplete}
+                className="w-full px-4 py-2.5 rounded-xl font-semibold border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Back to Vendor List
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={onComplete}
+              className="w-full px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 text-white transition-colors"
+            >
+              Back to Vendor List
+            </button>
+          )}
         </div>
       </div>
     )
