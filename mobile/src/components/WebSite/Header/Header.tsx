@@ -24,6 +24,8 @@ import {
   TrendingUp,
   ArrowUpRight,
   Trash2,
+  LifeBuoy,
+  Headset,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -33,11 +35,15 @@ import Sidebar from '../Sidebar/Sidebar';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { getRegionalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
+import { Palette, Radius, Shadow } from '@/constants/theme';
 
 /* ── Hoisted constants (allocated once) ───────────────────────────────────── */
 const RECENT_SEARCHES_KEY = 'recent_searches';
 const MAX_RECENT = 8;
 const fmt = (n: number) => fmtCurrency(n);
+/** Curve on the header's bottom corners. Shared by the shell and its clip layer,
+ *  which must match exactly or the shadow detaches from the visible edge. */
+const HEADER_RADIUS = Radius.xl;
 
 // ─── Main Header ─────────────────────────────────────────────────────────────
 export function Header() {
@@ -164,110 +170,129 @@ export function Header() {
 
   return (
     <>
-      <View style={[s.headerBg, { paddingTop: insets.top }]} onLayout={onHeaderLayout}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        {/* ── Top bar: Menu, Brand, Icons ─────────────────────────────────── */}
-        <View style={s.topBar}>
-          <View style={s.topBarLeft}>
-            <Pressable
-              onPress={async () => {
-                if (typeof Haptics !== 'undefined') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                setSidebarVisible(true);
-              }}
-              accessibilityLabel="Open menu"
-              accessibilityRole="button"
-              style={s.iconBtn}
-            >
-              <Menu size={24} color="#ffffff" />
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/(tabs)' as any)}
-              accessibilityLabel="Go to home"
-              accessibilityRole="button"
-            >
-              <Text style={s.brandName}>M2C MarkDowns</Text>
-              <Text style={s.brandSub}>Private Limited</Text>
-            </Pressable>
-          </View>
-
-          <View style={s.topBarRight}>
-            <Pressable
-              onPress={() => router.push('/(tabs)/wishlist' as any)}
-              accessibilityLabel="View wishlist"
-              accessibilityRole="button"
-              style={s.iconBtn}
-            >
-              <Heart size={22} color="#ffffff" />
-              {wishlistCount > 0 ? (
-                <View style={[s.badge, s.badgeRed]}>
-                  <Text style={s.badgeText}>{wishlistCount > 99 ? '99+' : wishlistCount}</Text>
-                </View>
-              ) : null}
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/(tabs)/profile' as any)}
-              accessibilityLabel="View profile"
-              accessibilityRole="button"
-              style={s.iconBtn}
-            >
-              <User size={22} color="#ffffff" />
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/(tabs)/cart' as any)}
-              accessibilityLabel="View cart"
-              accessibilityRole="button"
-              style={s.iconBtn}
-            >
-              <ShoppingCart size={22} color="#ffffff" />
-              {itemCount > 0 ? (
-                <View style={[s.badge, s.badgeAmber]}>
-                  <Text style={s.badgeTextDark}>{itemCount > 99 ? '99+' : itemCount}</Text>
-                </View>
-              ) : null}
-            </Pressable>
-          </View>
-        </View>
-
-        {/* ── Search bar ──────────────────────────────────────────────────── */}
-        <View style={s.searchWrap}>
-          <View style={s.searchBar}>
-            <Search size={18} color="#9ca3af" style={s.searchIcon} />
-            <TextInput
-              ref={inputRef}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onFocus={() => setIsFocused(true)}
-              placeholder="Search products..."
-              placeholderTextColor="#6b7280"
-              style={s.searchInput}
-              onSubmitEditing={() => handleSearch()}
-              returnKeyType="search"
-              accessibilityLabel="Search products"
-              autoCorrect={false}
-            />
-            {searchQuery.length > 0 ? (
+      {/* Two views, not one: the shell carries the shadow and the inner view does
+          the clipping. `overflow: 'hidden'` is required to make the accent strip
+          follow the curved bottom edge, but on iOS it also clips the shadow off
+          the same view — so they have to be separated. */}
+      <View style={s.headerShell} onLayout={onHeaderLayout}>
+        <View style={[s.headerBg, { paddingTop: insets.top }]}>
+          <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+          {/* ── Top bar: Menu, Brand, Icons ─────────────────────────────────── */}
+          <View style={s.topBar}>
+            <View style={s.topBarLeft}>
+             <Pressable
+  onPress={async () => {
+    if (typeof Haptics !== 'undefined') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSidebarVisible(true);
+  }}
+  accessibilityLabel="Open menu"
+  accessibilityRole="button"
+  style={s.iconBtn}
+>
+  <Menu size={24} color={Palette.onBrand} />
+</Pressable>
               <Pressable
-                onPress={handleClear}
-                style={s.clearBtn}
-                accessibilityLabel="Clear search"
-                accessibilityHint="Clears the search text"
+                onPress={() => router.push('/(tabs)' as any)}
+                accessibilityLabel="Go to home"
                 accessibilityRole="button"
               >
-                <X size={16} color="#9ca3af" />
+                <Text style={s.brandName}>M2C MarkDowns</Text>
+                <Text style={s.brandSub}>Private Limited</Text>
               </Pressable>
-            ) : null}
-            {showOverlay ? (
+            </View>
+
+            <View style={s.topBarRight}>
+             
               <Pressable
-                onPress={handleClose}
-                style={s.cancelBtn}
-                accessibilityLabel="Cancel search"
-                accessibilityHint="Closes the search overlay"
+                onPress={() => router.push('/(tabs)/wishlist' as any)}
+                accessibilityLabel="View wishlist"
                 accessibilityRole="button"
+                style={s.iconBtn}
               >
-                <Text style={s.cancelText}>Cancel</Text>
+                <Heart size={22} color={Palette.onBrand} />
+                {wishlistCount > 0 ? (
+                  <View style={[s.badge, s.badgeBrand]}>
+                    <Text style={s.badgeText}>{wishlistCount > 99 ? '99+' : wishlistCount}</Text>
+                  </View>
+                ) : null}
               </Pressable>
-            ) : null}
+                 <Pressable
+                onPress={() => router.push('/(tabs)/cart' as any)}
+                accessibilityLabel="View cart"
+                accessibilityRole="button"
+                style={s.iconBtn}
+              >
+                <ShoppingCart size={22} color={Palette.onBrand} />
+                {itemCount > 0 ? (
+                  <View style={[s.badge, s.badgeAmber]}>
+                    <Text style={s.badgeTextDark}>{itemCount > 99 ? '99+' : itemCount}</Text>
+                  </View>
+                ) : null}
+              </Pressable>
+              <Pressable
+                onPress={() => router.push('/(tabs)/profile' as any)}
+                accessibilityLabel="View profile"
+                accessibilityRole="button"
+                style={s.iconBtn}
+              >
+                <User size={22} color={Palette.onBrand} />
+              </Pressable>
+           
+               <Pressable
+                onPress={() => router.push('/(any)/support?new=1' as any)}
+                accessibilityLabel="Raise a support ticket"
+                accessibilityRole="button"
+                style={s.iconBtn}
+              >
+                <Headset size={22} color={Palette.onBrand} />
+              </Pressable>
+            </View>
           </View>
+
+          {/* ── Search bar ──────────────────────────────────────────────────── */}
+          <View style={s.searchWrap}>
+            <View style={s.searchBar}>
+              <Search size={18} color={Palette.onBrand} style={s.searchIcon} />
+              <TextInput
+                ref={inputRef}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                onFocus={() => setIsFocused(true)}
+                placeholder="Search products..."
+                placeholderTextColor={Palette.onBrand}
+                style={s.searchInput}
+                onSubmitEditing={() => handleSearch()}
+                returnKeyType="search"
+                accessibilityLabel="Search products"
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 ? (
+                <Pressable
+                  onPress={handleClear}
+                  style={s.clearBtn}
+                  accessibilityLabel="Clear search"
+                  accessibilityHint="Clears the search text"
+                  accessibilityRole="button"
+                >
+                  <X size={16} color={Palette.onBrand} />
+                </Pressable>
+              ) : null}
+              {showOverlay ? (
+                <Pressable
+                  onPress={handleClose}
+                  style={s.cancelBtn}
+                  accessibilityLabel="Cancel search"
+                  accessibilityHint="Closes the search overlay"
+                  accessibilityRole="button"
+                >
+                  <Text style={s.cancelText}>Cancel</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+
+          {/* Deeper-red hairline, clipped to the curve by the parent. */}
+          <View style={s.accentBar} />
         </View>
       </View>
 
@@ -282,7 +307,7 @@ export function Header() {
             {/* Loading */}
             {isSearching ? (
               <View style={s.loadingRow}>
-                <ActivityIndicator size="small" color="#6b7280" />
+                <ActivityIndicator size="small" color={Palette.textMuted} />
                 <Text style={s.loadingText}>Searching...</Text>
               </View>
             ) : null}
@@ -291,7 +316,7 @@ export function Header() {
             {!isSearching && suggestions.length > 0 ? (
               <View>
                 <View style={s.sectionHeader}>
-                  <TrendingUp size={14} color="#6b7280" />
+                  <TrendingUp size={14} color={Palette.textMuted} />
                   <Text style={s.sectionTitle}>Suggestions</Text>
                 </View>
                 {suggestions.map((product) => (
@@ -310,11 +335,11 @@ export function Header() {
                   accessibilityRole="button"
                   accessibilityLabel={`View all results for ${searchQuery}`}
                 >
-                  <Search size={14} color="#111827" />
+                  <Search size={14} color={Palette.primary} />
                   <Text style={s.viewAllText}>
-                    View all results for "{searchQuery.trim()}"
+                    View all results for &ldquo;{searchQuery.trim()}&rdquo;
                   </Text>
-                  <ArrowUpRight size={14} color="#9ca3af" />
+                  <ArrowUpRight size={14} color={Palette.textSubtle} />
                 </Pressable>
               </View>
             ) : null}
@@ -322,8 +347,10 @@ export function Header() {
             {/* No results */}
             {!isSearching && searchQuery.trim().length >= 2 && suggestions.length === 0 ? (
               <View style={s.noResultsWrap}>
-                <Search size={24} color="#d1d5db" />
-                <Text style={s.noResultsText}>No products found for "{searchQuery.trim()}"</Text>
+                <Search size={24} color={Palette.outlineVariant} />
+                <Text style={s.noResultsText}>
+                  No products found for &ldquo;{searchQuery.trim()}&rdquo;
+                </Text>
                 <Pressable
                   onPress={() => handleSearch()}
                   style={s.noResultsBtn}
@@ -338,7 +365,7 @@ export function Header() {
             {searchQuery.trim().length < 2 && recentSearches.length > 0 ? (
               <View>
                 <View style={s.sectionHeader}>
-                  <Clock size={14} color="#6b7280" />
+                  <Clock size={14} color={Palette.textMuted} />
                   <Text style={s.sectionTitle}>Recent Searches</Text>
                   <View style={s.sectionSpacer} />
                   <Pressable
@@ -347,7 +374,7 @@ export function Header() {
                     accessibilityLabel="Clear recent searches"
                     accessibilityRole="button"
                   >
-                    <Trash2 size={14} color="#9ca3af" />
+                    <Trash2 size={14} color={Palette.textSubtle} />
                   </Pressable>
                 </View>
                 {recentSearches.map((query) => (
@@ -357,9 +384,9 @@ export function Header() {
                     style={s.recentRow}
                     accessibilityRole="button"
                   >
-                    <Clock size={14} color="#d1d5db" />
+                    <Clock size={14} color={Palette.outlineVariant} />
                     <Text style={s.recentText} numberOfLines={1}>{query}</Text>
-                    <ArrowUpRight size={14} color="#d1d5db" />
+                    <ArrowUpRight size={14} color={Palette.outlineVariant} />
                   </Pressable>
                 ))}
               </View>
@@ -368,7 +395,7 @@ export function Header() {
             {/* Empty state — no query, no recents */}
             {searchQuery.trim().length < 2 && recentSearches.length === 0 ? (
               <View style={s.emptyWrap}>
-                <Search size={28} color="#d1d5db" />
+                <Search size={28} color={Palette.outlineVariant} />
                 <Text style={s.emptyTitle}>Search products</Text>
                 <Text style={s.emptyDesc}>Find products by name, category, or description</Text>
               </View>
@@ -409,7 +436,7 @@ const SuggestionRow = memo(function SuggestionRow({
           <Image source={{ uri: imageUrl }} style={s.suggImageInner} contentFit="cover" transition={150} />
         ) : (
           <View style={s.suggImagePlaceholder}>
-            <Search size={14} color="#d1d5db" />
+            <Search size={14} color={Palette.outlineVariant} />
           </View>
         )}
       </View>
@@ -428,7 +455,7 @@ const SuggestionRow = memo(function SuggestionRow({
         style={s.suggSearchBtn}
         accessibilityLabel={`Search for ${product.name}`}
       >
-        <ArrowUpRight size={16} color="#9ca3af" />
+        <ArrowUpRight size={16} color={Palette.textSubtle} />
       </Pressable>
     </Pressable>
   );
@@ -438,8 +465,26 @@ export default Header;
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  // Header
-  headerBg: { backgroundColor: '#111827' },
+  /* Header — a solid brand-red panel with a curved bottom edge, so it reads as
+     an object sitting over the page rather than a band welded to the top of it.
+     Only the BOTTOM corners are rounded: the top edge runs under the status bar,
+     where a radius would leave two odd notches of wallpaper.
+
+     Anything drawn on this panel comes from the `onBrand*` tokens — see the note
+     in constants/theme.ts on why the neutral `onInverse*` set and the brand ramp
+     itself are both wrong here. */
+  headerShell: {
+    backgroundColor: Palette.headerSurface,
+    borderBottomLeftRadius: HEADER_RADIUS,
+    borderBottomRightRadius: HEADER_RADIUS,
+    ...Shadow.dropdown,
+  },
+  headerBg: {
+    backgroundColor: Palette.headerSurface,
+    borderBottomLeftRadius: HEADER_RADIUS,
+    borderBottomRightRadius: HEADER_RADIUS,
+    overflow: 'hidden',
+  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -449,31 +494,46 @@ const s = StyleSheet.create({
   },
   topBarLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  iconBtn: { padding: 8, position: 'relative' },
-  brandName: { fontSize: 15, fontWeight: '700', color: '#ffffff', letterSpacing: -0.3 },
-  brandSub: { fontSize: 10, color: '#6b7280', fontWeight: '500', marginTop: -2 },
+iconBtn: { padding: 8, position: 'relative' },
+
+  brandName: { fontSize: 15, fontWeight: '700', color: Palette.onBrand, letterSpacing: 0.3, marginLeft: 8 ,marginTop: -2},
+  brandSub: { fontSize: 10, color: Palette.onBrand, fontWeight: '500', marginLeft: 8 ,marginTop: -2 },
+
+  /* Darker red hairline along the bottom edge. On the web the accent strip is
+     red against a dark bar; with the bar itself red that inverts — the edge has
+     to be a deeper step or the header bleeds into the page below it.
+
+     It stays a plain rectangle: the parent's `overflow: 'hidden'` bends it to the
+     curve. Giving it its own radii would not work — RN clamps a corner radius to
+     half the box height, so a 3px strip can never echo a 24px curve. */
+  accentBar: { height: 3, backgroundColor: Palette.headerEdge },
 
   // Badges
   badge: {
     position: 'absolute', top: 4, right: 4,
-    minWidth: 18, height: 18, borderRadius: 9,
+    minWidth: 18, height: 18, borderRadius: Radius.full,
     alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 4, borderWidth: 1.5, borderColor: '#111827',
+    // Ring matches the bar so the badge reads as punched out of it.
+    paddingHorizontal: 4, borderWidth: 1.5, borderColor: Palette.headerSurface,
   },
-  badgeRed: { backgroundColor: '#ef4444' },
-  badgeAmber: { backgroundColor: '#f59e0b' },
-  badgeText: { color: '#ffffff', fontSize: 9, fontWeight: '800' },
-  badgeTextDark: { color: '#111827', fontSize: 9, fontWeight: '800' },
+  // Both badges must contrast against red, so neither can BE red: wishlist goes
+  // white-on-red, cart keeps amber so "items waiting" stays its own signal.
+  badgeBrand: { backgroundColor: Palette.onBrand },
+  badgeAmber: { backgroundColor: Palette.warning },
+  badgeText: { color: Palette.primary, fontSize: 9, fontWeight: '800' },
+  badgeTextDark: { color: Palette.surfaceInverse, fontSize: 9, fontWeight: '800' },
 
   // Search bar
-  searchWrap: { paddingHorizontal: 16, paddingBottom: 14 },
+  // Extra bottom padding vs. the old square bar: the corner curve eats into the
+  // usable width at the bottom edge, so the field needs clearance from it.
+  searchWrap: { paddingHorizontal: 16, paddingBottom: 18 },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 14,
+    backgroundColor: Palette.onBrandGlass,
+    borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: Palette.onBrandGlassBorder,
     height: 46,
   },
   searchIcon: { marginLeft: 14 },
@@ -481,7 +541,7 @@ const s = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 10,
     paddingVertical: 0,
-    color: '#ffffff',
+    color: Palette.onBrand,
     fontSize: 15,
     height: 46,
   },
@@ -495,7 +555,9 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cancelText: { color: '#fcd34d', fontSize: 13, fontWeight: '600' },
+  // Plain white — this sits on the red bar, where any step of the brand ramp
+  // (including primaryOnDark) is near-invisible.
+  cancelText: { color: Palette.onBrand, fontSize: 13, fontWeight: '600' },
 
   // Overlay
   overlay: {
@@ -504,7 +566,7 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#ffffff',
+    backgroundColor: Palette.surface,
     zIndex: 50,
   },
   overlayContent: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 80 },
@@ -517,7 +579,7 @@ const s = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 2,
   },
-  sectionTitle: { fontSize: 12, fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle: { fontSize: 12, fontWeight: '700', color: Palette.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
   sectionSpacer: { flex: 1 },
 
   // Loading
@@ -525,7 +587,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingVertical: 20,
   },
-  loadingText: { fontSize: 13, color: '#6b7280' },
+  loadingText: { fontSize: 13, color: Palette.textMuted },
 
   // Suggestion rows
   suggRow: {
@@ -535,11 +597,11 @@ const s = StyleSheet.create({
     paddingHorizontal: 2,
     minHeight: 56,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: Palette.outlineSubtle,
   },
   suggImage: {
-    width: 44, height: 44, borderRadius: 10,
-    backgroundColor: '#f3f4f6', overflow: 'hidden',
+    width: 44, height: 44, borderRadius: Radius.md,
+    backgroundColor: Palette.outlineSubtle, overflow: 'hidden',
   },
   suggImageInner: { width: '100%', height: '100%' },
   suggImagePlaceholder: {
@@ -547,10 +609,10 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   suggInfo: { flex: 1, marginLeft: 12 },
-  suggName: { fontSize: 14, fontWeight: '600', color: '#111827' },
+  suggName: { fontSize: 14, fontWeight: '600', color: Palette.ink },
   suggMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  suggPrice: { fontSize: 13, fontWeight: '700', color: '#111827' },
-  suggCategory: { fontSize: 11, color: '#9ca3af' },
+  suggPrice: { fontSize: 13, fontWeight: '700', color: Palette.ink },
+  suggCategory: { fontSize: 11, color: Palette.textSubtle },
   suggSearchBtn: {
     width: 36, height: 36,
     alignItems: 'center', justifyContent: 'center',
@@ -565,20 +627,20 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 2,
   },
-  viewAllText: { flex: 1, fontSize: 13, fontWeight: '600', color: '#111827' },
+  viewAllText: { flex: 1, fontSize: 13, fontWeight: '600', color: Palette.primary },
 
   // No results
   noResultsWrap: {
     alignItems: 'center', paddingVertical: 40, gap: 8,
   },
-  noResultsText: { fontSize: 14, color: '#6b7280', textAlign: 'center' },
+  noResultsText: { fontSize: 14, color: Palette.textMuted, textAlign: 'center' },
   noResultsBtn: {
     marginTop: 8,
-    backgroundColor: '#111827',
-    paddingHorizontal: 20, height: 40, borderRadius: 10,
+    backgroundColor: Palette.primary,
+    paddingHorizontal: 20, height: 40, borderRadius: Radius.md,
     alignItems: 'center', justifyContent: 'center',
   },
-  noResultsBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
+  noResultsBtnText: { color: Palette.onPrimary, fontSize: 13, fontWeight: '700' },
 
   // Recent searches
   recentRow: {
@@ -589,12 +651,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 2,
     minHeight: 48,
     borderBottomWidth: 1,
-    borderBottomColor: '#f9fafb',
+    borderBottomColor: Palette.outlineSubtle,
   },
-  recentText: { flex: 1, fontSize: 14, color: '#374151' },
+  recentText: { flex: 1, fontSize: 14, color: Palette.text },
 
   // Empty state
   emptyWrap: { alignItems: 'center', paddingVertical: 48, gap: 8 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#374151' },
-  emptyDesc: { fontSize: 13, color: '#9ca3af', textAlign: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: Palette.text },
+  emptyDesc: { fontSize: 13, color: Palette.textSubtle, textAlign: 'center' },
 });

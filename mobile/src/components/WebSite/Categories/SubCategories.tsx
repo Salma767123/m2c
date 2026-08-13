@@ -22,6 +22,7 @@ import { useRouter } from 'expo-router';
 import { categoryService, Category } from '@/services/categoryService';
 import { useCart } from '@/context/CartContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Palette } from '@/constants/theme';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Subcategory {
@@ -142,7 +143,7 @@ export function SubCategories({ categorySlug }: Props) {
         <Header title="Category" itemCount={itemCount} />
         <View style={scr.centeredWrap}>
           <View style={scr.errorIcon}>
-            <AlertCircle size={32} color="#dc2626" strokeWidth={1.75} />
+            <AlertCircle size={32} color="#E01A1B" strokeWidth={1.75} />
           </View>
           <Text style={scr.errorTitle}>{error || 'Category Not Found'}</Text>
           <Text style={scr.errorDesc}>{"We couldn't find what you're looking for."}</Text>
@@ -367,7 +368,7 @@ const hdr = StyleSheet.create({
     position: 'absolute',
     top: -3,
     right: -5,
-    backgroundColor: '#111827',
+    backgroundColor: Palette.primary,
     minWidth: 17,
     height: 17,
     borderRadius: 9,
@@ -496,7 +497,7 @@ const list = StyleSheet.create({
   viewAllBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: Palette.primary,
     paddingHorizontal: 14,
     height: 34,
     borderRadius: 10,
@@ -536,7 +537,7 @@ const list = StyleSheet.create({
   emptyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: Palette.primary,
     paddingHorizontal: 20,
     height: 44,
     borderRadius: 12,
@@ -558,13 +559,13 @@ const scr = StyleSheet.create({
   centeredWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   errorIcon: {
     width: 72, height: 72, borderRadius: 24,
-    backgroundColor: '#fef2f2', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+    backgroundColor: '#E01A1B', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
   },
   errorTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 4 },
   errorDesc: { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 20 },
   errorBtns: { flexDirection: 'row', gap: 10 },
   primaryBtn: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#111827',
+    flexDirection: 'row', alignItems: 'center', backgroundColor: Palette.primary,
     paddingHorizontal: 18, height: 44, borderRadius: 12, gap: 6,
   },
   primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },

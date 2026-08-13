@@ -161,7 +161,7 @@ const FormField = React.forwardRef<TextInput, {
           borderRadius: 12,
           borderWidth: 1.5,
           borderColor: hasError
-            ? '#ef4444'
+            ? '#E01A1B'
             : canEdit
               ? '#d1d5db'
               : '#f3f4f6',
@@ -170,7 +170,7 @@ const FormField = React.forwardRef<TextInput, {
         }}
       >
         {LeadingIcon ? (
-          <LeadingIcon size={16} color={hasError ? '#ef4444' : '#9ca3af'} style={{ marginRight: 8 }} />
+          <LeadingIcon size={16} color={hasError ? '#E01A1B' : '#9ca3af'} style={{ marginRight: 8 }} />
         ) : null}
 
         <TextInput
@@ -202,8 +202,8 @@ const FormField = React.forwardRef<TextInput, {
       {/* Inline error OR read-only hint */}
       {hasError ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 }}>
-          <AlertCircle size={12} color="#ef4444" />
-          <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600', flex: 1 }}>{error}</Text>
+          <AlertCircle size={12} color="#E01A1B" />
+          <Text style={{ fontSize: 11, color: '#E01A1B', fontWeight: '600', flex: 1 }}>{error}</Text>
         </View>
       ) : readOnly && readOnlyHint ? (
         <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 5 }}>{readOnlyHint}</Text>

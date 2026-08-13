@@ -72,33 +72,33 @@ export default function PaymentForm({
                 accessibilityLabel={`${method.name}: ${method.description}${isSelected ? ', selected' : ''}`}
                 className={`flex-row items-center p-4 border-2 rounded-2xl gap-3 ${
                   isSelected
-                    ? 'border-[#1a1a2e] bg-[#1a1a2e]/5'
+                    ? 'border-[#E01A1B] bg-[#E01A1B]/5'
                     : 'border-gray-200 bg-white'
                 }`}
               >
                 {/* Radio */}
                 <View
                   className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
-                    isSelected ? 'border-[#1a1a2e]' : 'border-gray-300'
+                    isSelected ? 'border-[#E01A1B]' : 'border-gray-300'
                   }`}
                 >
                   {isSelected && (
-                    <View className="w-3 h-3 rounded-full bg-[#1a1a2e]" />
+                    <View className="w-3 h-3 rounded-full bg-[#E01A1B]" />
                   )}
                 </View>
 
                 {/* Icon */}
                 <View
                   className={`w-10 h-10 rounded-xl items-center justify-center ${
-                    isSelected ? 'bg-[#1a1a2e]' : 'bg-gray-100'
+                    isSelected ? 'bg-[#E01A1B]' : 'bg-gray-100'
                   }`}
                 >
-                  <Icon size={18} color={isSelected ? '#f59e0b' : '#6b7280'} />
+                  <Icon size={18} color={isSelected ? '#ffffff' : '#6b7280'} />
                 </View>
 
                 {/* Label */}
                 <View className="flex-1">
-                  <Text className={`font-bold text-sm ${isSelected ? 'text-[#1a1a2e]' : 'text-gray-800'}`}>
+                  <Text className={`font-bold text-sm ${isSelected ? 'text-[#E01A1B]' : 'text-gray-800'}`}>
                     {method.name}
                   </Text>
                   <Text className="text-xs text-gray-400 mt-0.5">{method.description}</Text>
@@ -106,7 +106,7 @@ export default function PaymentForm({
 
                 {isSelected && (
                   <View className="bg-amber-400 rounded-lg px-2 py-1">
-                    <Text className="text-xs font-bold text-[#1a1a2e]">Selected</Text>
+                    <Text className="text-xs font-bold text-[#E01A1B]">Selected</Text>
                   </View>
                 )}
               </TouchableOpacity>

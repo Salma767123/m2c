@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,7 @@ import {
   getStateName,
   formatPhoneForDisplay,
 } from '@/components/WebSite/CheckOut/CheckoutProcess/constants';
+import { Palette } from '@/constants/theme';
 
 const fmt = (n: number) => `$${n.toFixed(2)}`;
 
@@ -91,7 +92,7 @@ export default function OrderConfirmationScreen() {
           {"We couldn't find your order details."}
         </Text>
         <Pressable onPress={() => router.push('/(tabs)')} accessibilityRole="button">
-          <View style={{ backgroundColor: '#111827', paddingHorizontal: 24, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ backgroundColor: Palette.primary, paddingHorizontal: 24, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Go Home</Text>
           </View>
         </Pressable>
@@ -142,7 +143,7 @@ export default function OrderConfirmationScreen() {
         <View style={{ paddingHorizontal: 16, gap: 14 }}>
           {/* Order info grid */}
           <View style={{ backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#e5e7eb', overflow: 'hidden' }}>
-            <View style={{ backgroundColor: '#111827', paddingHorizontal: 16, paddingVertical: 12 }}>
+            <View style={{ backgroundColor: Palette.surfaceInverse, paddingHorizontal: 16, paddingVertical: 12 }}>
               <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Order Information</Text>
             </View>
             <View style={{ padding: 16, gap: 14 }}>
@@ -243,7 +244,7 @@ export default function OrderConfirmationScreen() {
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: '#111827',
+                  backgroundColor: Palette.primary,
                   height: 52,
                   borderRadius: 14,
                   gap: 8,

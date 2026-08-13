@@ -10,27 +10,24 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
-  interpolateColor,
   Easing,
   runOnJS,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useCart } from '@/context/CartContext';
-import { useWishlist } from '@/context/WishlistContext';
+import { Palette, Radius } from '@/constants/theme';
 import {
   Home,
   ShoppingCart,
   User,
   Grid2X2,
   Package,
-  Heart,
 } from 'lucide-react-native';
 
 /* ── Tab configuration (hoisted, allocated once) ──────────────────────── */
 const TAB_CONFIG = [
   { name: 'index', label: 'Home', icon: Home, title: 'Home' },
   { name: 'categories', label: 'Category', icon: Grid2X2, title: 'Categories' },
-  { name: 'wishlist', label: 'Wishlist', icon: Heart, title: 'Wishlist', badgeKey: 'wishlist' as const },
   { name: 'cart', label: 'Cart', icon: ShoppingCart, title: 'Cart', badgeKey: 'cart' as const },
   { name: 'orders', label: 'Orders', icon: Package, title: 'Orders' },
   { name: 'profile', label: 'Profile', icon: User, title: 'Profile' },
@@ -38,6 +35,8 @@ const TAB_CONFIG = [
 
 const TAB_COUNT = TAB_CONFIG.length;
 const SPRING_CONFIG = { damping: 18, stiffness: 200, mass: 0.8 };
+/** Curve on the nav bar's top corners — mirrors HEADER_RADIUS in the header. */
+const NAV_RADIUS = Radius.xl;
 
 /* ── Badge component ─────────────────────────────────────────────────── */
 const TabBadge = memo(function TabBadge({ count, color }: { count: number; color: string }) {
@@ -73,18 +72,16 @@ const TabItem = memo(function TabItem({
     });
   }, [isActive, progress]);
 
-  const animatedPillStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      progress.value,
-      [0, 1],
-      ['transparent', '#111827'],
-    ),
-    transform: [{ scale: withSpring(isActive ? 1 : 0.95, SPRING_CONFIG) }],
+  // The indicator grows out of the centre rather than fading in — it reads as
+  // the selection sliding across the bar even though each rail is per-tab.
+  const animatedRailStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ scaleX: progress.value }],
   }));
 
   const animatedIconStyle = useAnimatedStyle(() => ({
     transform: [
-      { scale: withSpring(isActive ? 1.1 : 1, SPRING_CONFIG) },
+      { scale: withSpring(isActive ? 1.12 : 1, SPRING_CONFIG) },
       { translateY: withSpring(isActive ? -1 : 0, SPRING_CONFIG) },
     ],
   }));
@@ -97,29 +94,28 @@ const TabItem = memo(function TabItem({
       accessibilityState={{ selected: isActive }}
       style={ts.tabPressable}
     >
-      <Animated.View style={[ts.pill, animatedPillStyle]}>
-        <Animated.View style={animatedIconStyle}>
-          <View className="relative">
-            <Icon
-              color={isActive ? '#ffffff' : '#9ca3af'}
-              size={21}
-              strokeWidth={isActive ? 2.5 : 1.8}
-            />
-            {badge != null && badge > 0 ? (
-              <TabBadge count={badge} color={badgeColor || '#ef4444'} />
-            ) : null}
-          </View>
-        </Animated.View>
-        <Text
-          style={[
-            ts.label,
-            isActive ? ts.labelActive : ts.labelInactive,
-          ]}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
+      {/* Brand rail above the active tab. Same accent language as the header's
+          bottom edge and the drawer's brand rule. */}
+      <Animated.View style={[ts.rail, animatedRailStyle]} />
+
+      <Animated.View style={animatedIconStyle}>
+        <View className="relative">
+          <Icon
+            color={isActive ? Palette.primary : Palette.textSubtle}
+            size={22}
+            strokeWidth={isActive ? 2.4 : 1.8}
+          />
+          {badge != null && badge > 0 ? (
+            <TabBadge count={badge} color={badgeColor || Palette.primary} />
+          ) : null}
+        </View>
       </Animated.View>
+      <Text
+        style={[ts.label, isActive ? ts.labelActive : ts.labelInactive]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 });
@@ -139,7 +135,6 @@ export default function TabLayout() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { itemCount } = useCart();
-  const { wishlistCount } = useWishlist();
 
   const activeIndex = getActiveIndex(pathname);
   const { width } = useWindowDimensions();
@@ -204,12 +199,14 @@ export default function TabLayout() {
 
   const getBadge = (tab: (typeof TAB_CONFIG)[number]) => {
     if (!('badgeKey' in tab) || tab.badgeKey == null) return undefined;
-    return tab.badgeKey === 'cart' ? itemCount : wishlistCount;
+    return itemCount;
   };
 
+  // The bar is white now, so badges can take their semantic colours directly:
+  // amber for "items waiting" in the cart.
   const getBadgeColor = (tab: (typeof TAB_CONFIG)[number]) => {
     if (!('badgeKey' in tab) || tab.badgeKey == null) return undefined;
-    return tab.badgeKey === 'cart' ? '#f59e0b' : '#ef4444';
+    return Palette.warning;
   };
 
   return (
@@ -266,74 +263,82 @@ export default function TabLayout() {
 const ts = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: Palette.background,
   },
   content: {
     flex: 1,
   },
+  /* The bar curves at the TOP, mirroring the header's curved bottom, so the
+     content between them reads as a framed sheet. `overflow: 'hidden'` clips the
+     active rail to that curve; the shadow therefore has to sit on this view
+     WITHOUT the clip — RN draws an outer shadow fine here because the shadow is
+     cast upward, away from the clipped region. */
   navBar: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 12,
+    backgroundColor: Palette.surface,
+    borderTopLeftRadius: NAV_RADIUS,
+    borderTopRightRadius: NAV_RADIUS,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.09,
+    shadowRadius: 18,
+    elevation: 16,
   },
   navInner: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     justifyContent: 'space-evenly',
     paddingHorizontal: 4,
-    paddingTop: 6,
     paddingBottom: 2,
+    borderTopLeftRadius: NAV_RADIUS,
+    borderTopRightRadius: NAV_RADIUS,
+    overflow: 'hidden',
   },
   tabPressable: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 56,
+    paddingTop: 9,
   },
-  pill: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 16,
-    minWidth: 44,
+  rail: {
+    position: 'absolute',
+    top: 0,
+    width: 26,
+    height: 3,
+    borderRadius: Radius.full,
+    backgroundColor: Palette.primary,
   },
   label: {
-    marginTop: 2,
+    marginTop: 3,
     fontSize: 9.5,
-    letterSpacing: 0,
+    letterSpacing: 0.1,
   },
   labelActive: {
-    color: '#ffffff',
+    color: Palette.primary,
     fontWeight: '700',
   },
   labelInactive: {
-    color: '#9ca3af',
+    color: Palette.textSubtle,
     fontWeight: '500',
   },
   badge: {
     minWidth: 16,
     height: 16,
-    borderRadius: 8,
+    borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
     borderWidth: 1.5,
-    borderColor: '#ffffff',
+    borderColor: Palette.surface,
   },
   badgeText: {
     fontSize: 8,
     fontWeight: '800',
-    color: '#ffffff',
+    color: Palette.onPrimary,
     lineHeight: 10,
   },
 });

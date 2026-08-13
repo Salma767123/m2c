@@ -10,6 +10,7 @@ import { Image } from 'expo-image';
 import { ShoppingBag, Check, Package } from 'lucide-react-native';
 import { formatPrice as fmtCurrency, getRegionalPrice } from '@/lib/currency';
 import { bagTypeService, type BagType } from '@/services/bagTypeService';
+import { Palette } from '@/constants/theme';
 
 /** Map BagType's `price` field to `basePrice` so getRegionalPrice() resolves correctly */
 const getBagRegionalPrice = (bag: BagType) =>
@@ -198,7 +199,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   radioSelected: {
-    backgroundColor: '#111827',
+    backgroundColor: Palette.primary,
     borderColor: '#111827',
   },
 

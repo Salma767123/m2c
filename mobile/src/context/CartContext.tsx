@@ -16,7 +16,12 @@ interface CartContextType {
   itemCount: number;
   totalAmount: number;
   refreshCart: () => Promise<void>;
-  addToCart: (productId: string, quantity: number, variantId?: string) => Promise<void>;
+  addToCart: (
+    productId: string,
+    quantity: number,
+    variantId?: string,
+    shipping?: { transportType?: 'AIR' | 'SHIP' | null; courier?: string | null },
+  ) => Promise<void>;
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
   isLoading: boolean;
@@ -158,15 +163,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ── Cart mutation helpers ────────────────────────────────────────────────────
-  const addToCart = async (productId: string, quantity: number, variantId?: string) => {
+  const addToCart = async (
+    productId: string,
+    quantity: number,
+    variantId?: string,
+    shipping?: { transportType?: 'AIR' | 'SHIP' | null; courier?: string | null },
+  ) => {
     const prevCount = itemCount;
     setItemCount((prev) => prev + quantity);
     try {
       const authenticated = await userAuthService.isAuthenticated();
       if (authenticated) {
-        await cartService.addToCart(productId, quantity, variantId);
+        await cartService.addToCart(productId, quantity, variantId, shipping);
       } else {
-        await cartService.addToLocalCart(productId, quantity, variantId);
+        await cartService.addToLocalCart(productId, quantity, variantId, shipping);
       }
       await refreshCart();
     } catch (error) {

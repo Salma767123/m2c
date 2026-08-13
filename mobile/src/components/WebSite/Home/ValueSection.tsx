@@ -1,10 +1,13 @@
 import React from 'react';
-import { View, Text, ScrollView, Dimensions } from 'react-native';
+import { View, Text, Dimensions, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Leaf, Award, Wind, Sun, Home } from 'lucide-react-native';
+import SectionHeading from './SectionHeading';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH * 0.72;
+const { width: SCREEN_W } = Dimensions.get('window');
+const H_PAD = 24;
 const GAP = 14;
+const TILE_W = (SCREEN_W - H_PAD * 2 - GAP) / 2;
 
 type Feature = {
   icon: React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
@@ -42,58 +45,85 @@ const features: Feature[] = [
 
 export default function ValueSection() {
   return (
-    <View
-      className="bg-white py-12"
-      style={{ marginTop: 10, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}
-    >
-      {/* Header — matches web: title + subtitle, no teal eyebrow */}
-      <View className="px-6 mb-8">
-        <Text className="text-gray-900 text-2xl font-bold mb-3">
-          Why Choose M2C MarkDowns
-        </Text>
-        <Text className="text-gray-600 text-sm leading-5">
-          {"We're committed to quality, sustainability, and your comfort. Every product is crafted with care and attention to detail."}
-        </Text>
+    <View style={s.wrap}>
+      {/* Header — eyebrow + title + description, centred like the web section. */}
+      <View style={s.header}>
+        <SectionHeading section="promise" center />
       </View>
 
-      {/* Horizontal carousel — same mobile pattern, but using web's grayscale */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        decelerationRate="fast"
-        snapToInterval={CARD_WIDTH + GAP}
-        snapToAlignment="start"
-        contentContainerStyle={{ paddingHorizontal: 24 }}
-      >
-        {features.map((feature) => (
-          <View
-            key={feature.title}
-            style={{ width: CARD_WIDTH, marginRight: GAP }}
-            className="bg-gray-50 p-6 rounded-3xl border border-gray-100"
-          >
+      {/* 2-column grid of black cards — same panel treatment as the notice
+          board carousel, so the promise section stays on-brand. */}
+      <View style={s.grid}>
+        {features.map((feature, i) => {
+          const fullWidth = i === features.length - 1 && features.length % 2 === 1;
+          return (
             <View
-              className="bg-white rounded-2xl items-center justify-center mb-5"
-              style={{
-                width: 60,
-                height: 60,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.06,
-                shadowRadius: 6,
-                elevation: 2,
-              }}
+              key={feature.title}
+              style={[s.tile, fullWidth && { width: TILE_W * 2 + GAP }]}
             >
-              <feature.icon size={26} color="#3d3d3d" strokeWidth={2.25} />
+              <LinearGradient
+                colors={['#1f2937', '#000000']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={s.tileInner}
+              >
+                <View style={s.iconWrap}>
+                  <feature.icon size={26} color="#ffffff" strokeWidth={2.25} />
+                </View>
+                <Text style={s.title}>{feature.title}</Text>
+                <Text style={s.description}>{feature.description}</Text>
+              </LinearGradient>
             </View>
-            <Text className="text-gray-900 text-base font-semibold mb-2">
-              {feature.title}
-            </Text>
-            <Text className="text-gray-600 text-sm leading-5">
-              {feature.description}
-            </Text>
-          </View>
-        ))}
-      </ScrollView>
+          );
+        })}
+      </View>
     </View>
   );
 }
+
+const s = StyleSheet.create({
+  wrap: {
+    backgroundColor: '#ffffff',
+    paddingTop: 24,
+    paddingBottom: 36,
+    marginTop: 10,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  header: { paddingHorizontal: H_PAD, marginBottom: 20 },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: GAP,
+    paddingHorizontal: H_PAD,
+  },
+  tile: { width: TILE_W },
+  tileInner: {
+    borderRadius: 18,
+    padding: 18,
+    minHeight: 172,
+  },
+  iconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  title: {
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginBottom: 6,
+  },
+  description: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.82)',
+  },
+});

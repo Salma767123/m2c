@@ -285,7 +285,7 @@ export default function BrowseProductsScreen() {
       </Text>
       <TouchableOpacity
         onPress={onRefresh}
-        className="mt-6 bg-gray-900 px-7 py-3 rounded-xl"
+        className="mt-6 bg-brand-500 px-7 py-3 rounded-xl"
         activeOpacity={0.85}
       >
         <Text className="text-white font-bold text-sm">Retry</Text>

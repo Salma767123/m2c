@@ -3,6 +3,7 @@ import { View, Text, Pressable } from 'react-native';
 import { MapPin, Home, Briefcase, Star, Plus, Check, Pencil } from 'lucide-react-native';
 import type { SavedAddress } from '@/services/addressService';
 import { getStateName, formatPhoneForDisplay } from './constants';
+import { Palette } from '@/constants/theme';
 
 interface AddressSelectorProps {
   addresses: SavedAddress[];
@@ -70,7 +71,7 @@ export default function AddressSelector({
                   </View>
                   {/* Default badge */}
                   {addr.isDefault ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#111827', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: Palette.primary, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 }}>
                       <Star size={9} color="#fff" fill="#fff" />
                       <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>Default</Text>
                     </View>
@@ -91,7 +92,7 @@ export default function AddressSelector({
                     </Pressable>
                   ) : null}
                   {selected ? (
-                    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: Palette.primary, alignItems: 'center', justifyContent: 'center' }}>
                       <Check size={13} color="#fff" strokeWidth={3} />
                     </View>
                   ) : null}
@@ -126,23 +127,23 @@ export default function AddressSelector({
         accessibilityState={{ selected: useNewAddress }}
         accessibilityLabel="Use a new shipping address"
       >
-        <View
-          style={{
-            borderWidth: useNewAddress ? 2 : 1.5,
-            borderColor: useNewAddress ? '#1f2937' : '#cbd5e1',
-            borderStyle: 'dashed',
-            borderRadius: 14,
-            padding: 20,
-            backgroundColor: useNewAddress ? '#f8fafc' : '#fff',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            minHeight: 60,
-          }}
-        >
-          <Plus size={18} color={useNewAddress ? '#111827' : '#64748b'} />
-          <Text style={{ fontSize: 14, fontWeight: '600', color: useNewAddress ? '#111827' : '#64748b' }}>
+          <View
+            style={{
+              borderWidth: useNewAddress ? 2 : 1.5,
+              borderColor: useNewAddress ? '#E01A1B' : '#cbd5e1',
+              borderStyle: 'dashed',
+              borderRadius: 14,
+              padding: 20,
+              backgroundColor: '#fff',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              minHeight: 60,
+            }}
+          >
+          <Plus size={18} color={useNewAddress ? '#E01A1B' : '#64748b'} />
+          <Text style={{ fontSize: 14, fontWeight: '600', color: useNewAddress ? '#E01A1B' : '#64748b' }}>
             Use a new address
           </Text>
         </View>

@@ -408,17 +408,17 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
                     justifyContent: 'space-between',
                     paddingHorizontal: 20,
                     paddingVertical: 14,
-                    backgroundColor: isSelected ? '#f0f9ff' : '#fff',
+                    backgroundColor: isSelected ? '#FCE8E8' : '#fff',
                     borderBottomWidth: 1,
                     borderBottomColor: '#f3f4f6',
                   }}>
                     <View>
-                      <Text style={{ fontSize: 15, fontWeight: isSelected ? '700' : '500', color: isSelected ? '#0369a1' : '#111827' }}>
+                      <Text style={{ fontSize: 15, fontWeight: isSelected ? '700' : '500', color: isSelected ? '#E01A1B' : '#111827' }}>
                         {state.name}
                       </Text>
                       <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>{state.isoCode}</Text>
                     </View>
-                    {isSelected ? <Check size={18} color="#0369a1" strokeWidth={2.5} /> : null}
+                    {isSelected ? <Check size={18} color="#E01A1B" strokeWidth={2.5} /> : null}
                   </View>
                 </Pressable>
               );

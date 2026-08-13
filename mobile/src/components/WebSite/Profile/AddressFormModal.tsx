@@ -371,7 +371,7 @@ export default function AddressFormModal({
                     paddingVertical: 14,
                     minHeight: 48,
                     borderWidth: 1.5,
-                    borderColor: fieldError('state') ? '#ef4444' : '#e2e8f0',
+                    borderColor: fieldError('state') ? '#E01A1B' : '#e2e8f0',
                     borderRadius: 12,
                     backgroundColor: '#f8fafc',
                   }}>
@@ -441,8 +441,8 @@ export default function AddressFormModal({
 
           {/* Submit error */}
           {submitError ? (
-            <View style={{ backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 12, padding: 12 }}>
-              <Text style={{ fontSize: 13, color: '#dc2626', fontWeight: '600' }}>{submitError}</Text>
+            <View style={{ backgroundColor: '#E01A1B', borderWidth: 1, borderColor: '#E01A1B', borderRadius: 12, padding: 12 }}>
+              <Text style={{ fontSize: 13, color: '#E01A1B', fontWeight: '600' }}>{submitError}</Text>
             </View>
           ) : null}
         </ScrollView>
@@ -552,14 +552,14 @@ export default function AddressFormModal({
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
     <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 }}>
-      {label}{required ? <Text style={{ color: '#ef4444' }}> *</Text> : null}
+      {label}{required ? <Text style={{ color: '#E01A1B' }}> *</Text> : null}
     </Text>
   );
 }
 
 function ErrorText({ text }: { text?: string }) {
   if (!text) return null;
-  return <Text style={{ fontSize: 11, color: '#ef4444', marginTop: 4, fontWeight: '600' }}>{text}</Text>;
+  return <Text style={{ fontSize: 11, color: '#E01A1B', marginTop: 4, fontWeight: '600' }}>{text}</Text>;
 }
 
 function FormInput({ hasError, onFocus, onBlur, ...rest }: React.ComponentProps<typeof TextInput> & { hasError?: boolean }) {
@@ -576,7 +576,7 @@ function FormInput({ hasError, onFocus, onBlur, ...rest }: React.ComponentProps<
         paddingVertical: 14,
         minHeight: 48,
         borderWidth: 1.5,
-        borderColor: hasError ? '#ef4444' : focused ? '#111827' : '#e2e8f0',
+        borderColor: hasError ? '#E01A1B' : focused ? '#111827' : '#e2e8f0',
         borderRadius: 12,
         backgroundColor: focused ? '#fff' : '#f8fafc',
         fontSize: 14,
