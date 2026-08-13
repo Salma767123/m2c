@@ -537,6 +537,79 @@ class QCCheckerService {
     }
   }
 
+  /**
+   * Request a password-reset email for a QC checker.
+   *
+   * `userType: 'checker'` is required — without it the backend auto-detects and
+   * searches user → admin → vendor, never reaching the qc_checkers table.
+   *
+   * The reset link in the email points at the web portal (the backend builds it
+   * from FRONTEND_URL), so the checker finishes the reset in a browser.
+   */
+  async forgotPassword(email: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const response = await axios.post('/auth/forgot-password', {
+        email: email.trim().toLowerCase(),
+        userType: 'checker',
+      });
+      return response.data;
+    } catch (error: any) {
+      const data = error?.response?.data || {};
+      const err: any = new Error(data.error || data.message || error?.message || 'Failed to send reset email');
+      err.status = error?.response?.status;
+      throw err;
+    }
+  }
+
+  /**
+   * Complete a password reset with the token from the reset email.
+   * No userType needed — the backend finds the owner by token, checking the
+   * qc_checkers table among the others.
+   */
+  async resetPassword(token: string, password: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const response = await axios.post('/auth/reset-password', { token, password });
+      return response.data;
+    } catch (error: any) {
+      const data = error?.response?.data || {};
+      const err: any = new Error(data.error || data.message || error?.message || 'Failed to reset password');
+      err.status = error?.response?.status;
+      throw err;
+    }
+  }
+
+  /**
+   * Save a server-side draft (pause) of an in-progress inspection so the
+   * half-filled form survives a reinstall or a device change — and, just as
+   * importantly, so the backend stamps `pausedAt`. Without that call the paused
+   * time is never folded into `totalPausedMs` and the report's active/paused
+   * split is wrong. Mirrors the web portal's saveInspectionDraft.
+   */
+  async saveInspectionDraft(
+    inspectionId: string,
+    draftData: any,
+  ): Promise<{ success: boolean; message: string; inspection: any }> {
+    try {
+      const token = await this.getCheckerToken();
+      const response = await axios.post(
+        `/inspections/${inspectionId}/draft`,
+        { draftData },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          // The snapshot can carry base64 evidence images.
+          timeout: 120000,
+        },
+      );
+      return response.data;
+    } catch (error: any) {
+      const data = error?.response?.data || {};
+      const err: any = new Error(data.message || data.error || error?.message || 'Failed to save draft');
+      err.status = error?.response?.status;
+      err.code = data.code;
+      throw err;
+    }
+  }
+
   // Start an Inspection (requires GPS location for proximity verification)
   async startInspection(
     inspectionId: string,

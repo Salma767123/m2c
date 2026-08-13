@@ -8,6 +8,7 @@ import {
 } from 'lucide-react-native';
 import qcCheckerService from '../../services/qcCheckerService';
 import { downloadFactoryReportPdf } from '@/lib/reportPdf';
+import { withUnit } from '@/components/Vendor/Steps/fieldHelpers';
 
 interface ViewReportProps {
   reportId: string;
@@ -487,7 +488,7 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
                   <CardGrid>
                     {(vendor.factoryOwnershipType || vendor.ownershipType)
                       ? <VCard label="Ownership Type" value={OWN_TYPE[vendor.factoryOwnershipType || vendor.ownershipType] || (vendor.factoryOwnershipType || vendor.ownershipType)} k="w_ownershipType" vf={vf} /> : null}
-                    {vendor.factorySize ? <VCard label="Warehousing Capacity" value={vendor.factorySize} k="w_factorySize" vf={vf} /> : null}
+                    {vendor.factorySize ? <VCard label="Warehousing Capacity" value={withUnit(vendor.factorySize, 'sq ft')} k="w_factorySize" vf={vf} /> : null}
                     {vendor.factoryAddress ? <VCard label="Address Line 1" value={vendor.factoryAddress} k="w_factoryAddress" vf={vf} /> : null}
                     {vendor.addressLine2 ? <VCard label="Address Line 2" value={vendor.addressLine2} k="w_addressLine2" vf={vf} /> : null}
                     {vendor.addressLine3 ? <VCard label="Address Line 3" value={vendor.addressLine3} k="w_addressLine3" vf={vf} /> : null}
@@ -514,7 +515,7 @@ export function ViewReport({ reportId, onBack }: ViewReportProps) {
               badge={<StepBadge prefixes={['w_']} vf={vf} />}>
               <CardGrid>
                 <VCard label="Ownership Type" value={OWN_TYPE[vendor.ownershipType] || vendor.ownershipType} k="w_ownershipType" vf={vf} />
-                <VCard label="Warehousing Capacity" value={vendor.warehouseSize} k="w_warehouseSize" vf={vf} />
+                <VCard label="Warehousing Capacity" value={withUnit(vendor.warehouseSize, 'sq ft')} k="w_warehouseSize" vf={vf} />
                 {vendor.warehouseAddress ? <VCard label="Address Line 1" value={vendor.warehouseAddress} k="w_warehouseAddress" vf={vf} /> : null}
                 {vendor.warehouseAddressLine2 ? <VCard label="Address Line 2" value={vendor.warehouseAddressLine2} k="w_warehouseAddressLine2" vf={vf} /> : null}
                 {vendor.warehouseAddressLine3 ? <VCard label="Address Line 3" value={vendor.warehouseAddressLine3} k="w_warehouseAddressLine3" vf={vf} /> : null}

@@ -13,7 +13,7 @@ import { router } from 'expo-router';
 import { User, Lock, LogIn, Shield, Eye, EyeOff } from 'lucide-react-native';
 import { qcCheckerService } from '../../services/qcCheckerService';
 import { AppText, Card, Button } from '@/components/UI';
-import { brand, colors, fonts, space, elevation, danger, slate } from '@/constants/design';
+import { brand, colors, fonts, space, elevation, danger } from '@/constants/design';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -88,7 +88,11 @@ export default function LoginScreen() {
     isError ? 'border-red-400' : isFocused ? 'border-brand-500' : 'border-slate-200';
 
   return (
-    <View className="flex-1 bg-slate-900" style={{ paddingTop: insets.top }}>
+    // Brand-red backdrop, matching the web portal's checker login rebrand. Web
+    // uses a from-brand-600/to-brand-700 gradient; those two reds are close
+    // enough that a solid brand-600 reads the same without pulling in a
+    // gradient dependency for one screen.
+    <View className="flex-1" style={{ backgroundColor: brand[600], paddingTop: insets.top }}>
       <StatusBar barStyle="light-content" />
       <KeyboardAwareScrollView
         contentContainerStyle={{ paddingBottom: 20, flexGrow: 1, justifyContent: 'center' }}
@@ -113,7 +117,7 @@ export default function LoginScreen() {
             </View>
             <View className="items-center" style={{ gap: 4 }}>
               <AppText variant="headlineLg" color={colors.white}>QC Checker</AppText>
-              <AppText variant="bodySm" color={slate[400]}>
+              <AppText variant="bodySm" color="rgba(255,255,255,0.9)">
                 Quality Control Portal
               </AppText>
             </View>
@@ -228,6 +232,17 @@ export default function LoginScreen() {
               )}
             </View>
 
+            {/* Forgot password */}
+            <Pressable
+              onPress={() => router.push('/(auth)/ForgotPassword' as any)}
+              disabled={submitting}
+              hitSlop={8}
+              accessibilityRole="link"
+              style={{ alignSelf: 'flex-end', marginTop: -8 }}
+            >
+              <AppText variant="labelLg" color={brand[600]}>Forgot password?</AppText>
+            </Pressable>
+
             {/* Sign In Button */}
             <Button
               label={submitting ? 'Signing in...' : 'Sign In'}
@@ -244,7 +259,7 @@ export default function LoginScreen() {
 
           {/* Footer */}
           <View className="mt-6 items-center">
-            <AppText variant="bodySm" color={slate[400]}>
+            <AppText variant="bodySm" color="rgba(255,255,255,0.75)">
               © {currentYear} QC Checker. All rights reserved.
             </AppText>
           </View>

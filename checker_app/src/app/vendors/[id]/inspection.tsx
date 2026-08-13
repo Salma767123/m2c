@@ -24,6 +24,7 @@ import {
   Clock,
 } from 'lucide-react-native';
 import qcCheckerService from '../../../services/qcCheckerService';
+import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 
 import { HighlightFieldsProvider, Verifications } from '../../../components/Vendor/Steps/VI_VerifyField';
 import VI_Step1_CompanyInfo from '../../../components/Vendor/Steps/VI_Step1_CompanyInfo';
@@ -99,6 +100,7 @@ export default function VendorInspectionScreen() {
   // ── Exit guard state ────────────────────────────────────────────────
   const allowLeaveRef = useRef(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const pendingNavActionRef = useRef<null | (() => void)>(null);
   const dirtyRef = useRef(false);
   const contentScrollRef = useRef<ScrollView>(null);
@@ -176,11 +178,24 @@ export default function VendorInspectionScreen() {
           if ((inspRes as any)?.previousRejectionReason) setPreviousRejectionReason((inspRes as any).previousRejectionReason);
           else if (insp.rejectionReason) setPreviousRejectionReason(insp.rejectionReason);
 
-          // Restore any saved draft for this inspection.
+          // Restore a saved draft. The on-device copy wins because it is written
+          // continuously and is therefore never older than the server's, which is
+          // only pushed on exit. The server copy is the fallback that makes a
+          // draft survive a reinstall or a switch to another device.
           try {
+            let draft: any = null;
             const raw = await AsyncStorage.getItem(draftKey(insp.id));
-            if (raw && !cancelled) {
-              const draft = JSON.parse(raw);
+            if (raw) {
+              try {
+                draft = JSON.parse(raw);
+              } catch {
+                draft = null; // malformed local draft — fall through to the server copy
+              }
+            }
+            if (!draft && insp.draftData && typeof insp.draftData === 'object') {
+              draft = insp.draftData;
+            }
+            if (draft && !cancelled) {
               if (draft.verifications) setVerifications(draft.verifications);
               if (draft.meta) setMeta((prev) => ({ ...prev, ...draft.meta, inspectorName: prev.inspectorName || draft.meta.inspectorName }));
               if (draft.factoryEvidence) setFactoryEvidence(draft.factoryEvidence);
@@ -250,7 +265,7 @@ export default function VendorInspectionScreen() {
     return () => sub.remove();
   }, []);
 
-  const confirmExit = () => {
+  const leaveNow = () => {
     setShowExitConfirm(false);
     allowLeaveRef.current = true;
     const action = pendingNavActionRef.current;
@@ -258,6 +273,39 @@ export default function VendorInspectionScreen() {
     if (action) action();
     else router.back();
   };
+
+  /**
+   * Push the half-filled form to the server, then leave.
+   *
+   * The local AsyncStorage draft already survives an exit on this device, so the
+   * server call is not what saves the work — it is what tells the backend the
+   * inspection is PAUSED. Without it `pausedAt` is never stamped, the pause gap
+   * never lands in `totalPausedMs`, and the report's active-vs-paused duration
+   * counts the checker's break as working time.
+   *
+   * A failed sync is therefore not worth trapping the checker for: warn, and let
+   * them out on the local draft.
+   */
+  const saveDraftAndExit = async () => {
+    if (savingDraft) return;
+    if (!inspectionId) {
+      leaveNow();
+      return;
+    }
+    setSavingDraft(true);
+    try {
+      await qcCheckerService.saveInspectionDraft(inspectionId, {
+        verifications, meta, factoryEvidence, docData, step,
+      });
+      showSuccessToast('Draft saved', 'You can resume this inspection later.');
+    } catch {
+      showErrorToast('Saved on this device only', 'Could not sync the draft — resume it on this phone.');
+    } finally {
+      setSavingDraft(false);
+      leaveNow();
+    }
+  };
+
   const cancelExit = () => {
     setShowExitConfirm(false);
     pendingNavActionRef.current = null;
@@ -589,18 +637,30 @@ export default function VendorInspectionScreen() {
                 <AlertTriangle size={24} color="#e01a1b" />
               </View>
               <View className="flex-1">
-                <Text className="text-lg font-bold text-slate-900">Exit inspection?</Text>
+                <Text className="text-lg font-bold text-slate-900">Save and exit?</Text>
                 <Text className="mt-1 text-sm text-slate-600">
-                  Are you sure you want to exit? Your unsaved changes on this form will be lost.
+                  Your progress is saved as a draft — you can pick this inspection up
+                  where you left off.
                 </Text>
               </View>
             </View>
             <View className="flex-row px-6 py-4 bg-slate-50 border-t border-slate-100" style={{ columnGap: 12 }}>
-              <TouchableOpacity onPress={cancelExit} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-white items-center">
+              <TouchableOpacity
+                onPress={cancelExit}
+                disabled={savingDraft}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-white items-center"
+                style={{ opacity: savingDraft ? 0.5 : 1 }}
+              >
                 <Text className="font-semibold text-slate-700">Keep editing</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={confirmExit} className="flex-1 px-4 py-2.5 rounded-xl bg-brand-500 items-center">
-                <Text className="font-semibold text-white">Yes, exit</Text>
+              <TouchableOpacity
+                onPress={saveDraftAndExit}
+                disabled={savingDraft}
+                className="flex-1 flex-row px-4 py-2.5 rounded-xl bg-brand-500 items-center justify-center"
+                style={{ columnGap: 6, opacity: savingDraft ? 0.7 : 1 }}
+              >
+                {savingDraft ? <ActivityIndicator size="small" color="#ffffff" /> : null}
+                <Text className="font-semibold text-white">{savingDraft ? 'Saving…' : 'Save & exit'}</Text>
               </TouchableOpacity>
             </View>
           </View>
