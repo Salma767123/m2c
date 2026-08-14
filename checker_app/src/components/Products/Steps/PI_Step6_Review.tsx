@@ -333,7 +333,7 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
 
           <Text className="text-[11px] font-semibold text-slate-500 uppercase mb-1.5">Inspection Date</Text>
           <View className="px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 mb-4">
-            <Text className="text-sm text-slate-700">{formatDateDMY(d.serviceStartDate || new Date().toISOString().split('T')[0])}</Text>
+            <Text className="text-sm text-slate-700">{formatDateDMY(d.serviceStartDate || new Date().toLocaleDateString('en-CA'))}</Text>
           </View>
 
           <InvalidAnchor errorKey="inspectionStatus" invalid={!!errors.inspectionStatus}>

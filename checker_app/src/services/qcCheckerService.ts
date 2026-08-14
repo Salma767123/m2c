@@ -440,6 +440,9 @@ class QCCheckerService {
       const err: any = new Error(errData?.message || error.message || 'Failed to start product inspection');
       err.status = error?.response?.status || error?.status;
       err.data = errData;
+      // Geofence details (403 Location mismatch) so the caller can show the gap.
+      err.distanceMeters = errData?.distanceMeters;
+      err.thresholdMeters = errData?.thresholdMeters;
       throw err;
     }
   }
@@ -554,9 +557,12 @@ class QCCheckerService {
       });
       return response.data;
     } catch (error: any) {
-      const data = error?.response?.data || {};
+      // The shared interceptor rejects with a FLAT shape ({ message, status, data })
+      // — there is no `.response`. Read that first, then fall back to a raw axios
+      // error, so the status survives for the caller.
+      const data = error?.data || error?.response?.data || {};
       const err: any = new Error(data.error || data.message || error?.message || 'Failed to send reset email');
-      err.status = error?.response?.status;
+      err.status = error?.status ?? error?.response?.status;
       throw err;
     }
   }
@@ -571,9 +577,10 @@ class QCCheckerService {
       const response = await axios.post('/auth/reset-password', { token, password });
       return response.data;
     } catch (error: any) {
-      const data = error?.response?.data || {};
+      // Flat interceptor shape first — see forgotPassword.
+      const data = error?.data || error?.response?.data || {};
       const err: any = new Error(data.error || data.message || error?.message || 'Failed to reset password');
-      err.status = error?.response?.status;
+      err.status = error?.status ?? error?.response?.status;
       throw err;
     }
   }
@@ -602,9 +609,12 @@ class QCCheckerService {
       );
       return response.data;
     } catch (error: any) {
-      const data = error?.response?.data || {};
+      // Flat interceptor shape first — see forgotPassword. Without this the status
+      // and code were dropped, so callers could not tell an expired window from a
+      // storage failure.
+      const data = error?.data || error?.response?.data || {};
       const err: any = new Error(data.message || data.error || error?.message || 'Failed to save draft');
-      err.status = error?.response?.status;
+      err.status = error?.status ?? error?.response?.status;
       err.code = data.code;
       throw err;
     }

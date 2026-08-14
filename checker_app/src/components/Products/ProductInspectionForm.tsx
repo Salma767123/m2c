@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Modal, Pressable, BackHandler } from 'react-native';
-import { ArrowLeft, ArrowRight, Check, RotateCcw, AlertTriangle } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Check, RotateCcw, AlertTriangle, MapPin, X, Save, AlarmClockOff } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isInspectionWindowElapsed, formatAssignmentWindow } from '@/lib/inspectionSchedule';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import qcCheckerService from '@/services/qcCheckerService';
 import { formatCheckerName } from '@/components/Vendor/Steps/fieldHelpers';
@@ -15,7 +17,8 @@ import {
   validateStep,
   validateAll,
   hasErrors,
-  firstErrorMessage,
+  countErrors,
+  countAllErrors,
   type Step,
   type AllErrors,
 } from './validation';
@@ -39,92 +42,44 @@ interface Props {
   onCancel: () => void;
 }
 
-const STEPS: { id: Step; label: string; description: string }[] = [
-  { id: 'generalInformation', label: 'General Info', description: 'Vendor registration data and inspection context' },
-  { id: 'productVerification', label: 'Product Verification', description: 'Field-level verification of all product data' },
-  { id: 'packagingInspection', label: 'Packaging', description: 'Carton, retail packaging and product type' },
-  { id: 'defects', label: 'Defects', description: 'AQL sampling and defect counts' },
-  { id: 'testing', label: 'Testing', description: 'Comprehensive on-site test battery' },
-  { id: 'review', label: 'Review', description: 'Full summary and final decision' },
-  { id: 'documentation', label: 'Documentation', description: 'Report, signatures and final submit' },
-];
+// Draft + chosen-type storage, one entry per product.
+const draftKeyFor = (productId: string) => `productInspectionDraft:${productId}`;
+const typeKeyFor = (productId: string) => `productInspectionType:${productId}`;
 
-export default function ProductInspectionForm({
-  productId,
-  productName,
-  vendorName,
-  onComplete,
-  onCancel,
-}: Props) {
-  const insets = useSafeAreaInsets();
-  const [currentStep, setCurrentStep] = useState<Step>('generalInformation');
-  const scrollNav = useScrollNav();
-  const invalidFields = useInvalidFieldRegistry();
-  const [reviewMode, setReviewMode] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState<AllErrors>({});
-  // Physical vs virtual — chosen in the mandatory dialog before the form is usable.
-  // Virtual inspections may upload photos from the gallery; physical are camera-only.
-  const [inspectionType, setInspectionType] = useState<InspectionType | null>(null);
+// Drop base64 payloads so an over-quota snapshot can still be saved. The photos
+// are lost, everything the checker typed survives — the right trade when the
+// alternative is saving nothing at all.
+function stripBase64Deep(value: any): any {
+  if (typeof value === 'string') return value.startsWith('data:') ? '' : value;
+  if (Array.isArray(value)) return value.map(stripBase64Deep);
+  if (value && typeof value === 'object') {
+    const out: any = {};
+    for (const [k, v] of Object.entries(value)) out[k] = stripBase64Deep(v);
+    return out;
+  }
+  return value;
+}
 
-  // ── Exit-confirmation guard ─────────────────────────────
-  const [showExitConfirm, setShowExitConfirm] = useState(false);
-  const pendingNavRef = useRef<null | (() => void)>(null);
-  const allowLeaveRef = useRef(false);
-
-  const requestExit = (action: () => void) => {
-    if (allowLeaveRef.current) {
-      action();
-      return;
-    }
-    pendingNavRef.current = action;
-    setShowExitConfirm(true);
-  };
-  const confirmExit = () => {
-    setShowExitConfirm(false);
-    allowLeaveRef.current = true;
-    const action = pendingNavRef.current;
-    pendingNavRef.current = null;
-    action?.();
-  };
-  const cancelExit = () => {
-    setShowExitConfirm(false);
-    pendingNavRef.current = null;
-  };
-
-  // Android hardware back → confirm exit (disabled after submit)
-  useEffect(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (allowLeaveRef.current) return false;
-      requestExit(onCancel);
-      return true;
-    });
-    return () => sub.remove();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onCancel]);
-
-  // ── Form data ─────────────────────────────────────────────────────────────
-  const prefilledRef = useRef<string | null>(null);
-  const startedRef = useRef<string | null>(null);
-
-  // Auto-start the inspection on mount (no selfie / GPS gate). Location is not
-  // sent and start errors are ignored — the form opens straight through.
-  useEffect(() => {
-    if (!productId || startedRef.current === productId) return;
-    startedRef.current = productId;
-    qcCheckerService.startProductInspection(productId).catch(() => {
-      /* ignore — start is best-effort, submission is the source of truth */
-    });
-  }, [productId]);
-
-  const [formData, setFormData] = useState<any>(() => ({
+// The blank form. Extracted so "discard draft & restart" can rebuild it, and the
+// initial state can be merged over by a restored draft.
+function makeDefaultFormData(productName: string, vendorName: string) {
+  return {
     // Step 1
     client: 'M2C',
     vendor: vendorName,
-    serviceStartDate: new Date().toISOString().split('T')[0],
+    // Local calendar date (en-CA → YYYY-MM-DD). toISOString() gives the UTC date,
+    // which is the PREVIOUS day for IST times before 05:30 (web bug F-09).
+    serviceStartDate: new Date().toLocaleDateString('en-CA'),
+    // Timestamp when the inspection was opened — surfaces as "Inspection Start
+    // Time" in the generated report and on the product detail screen.
+    inspectionStartedAt: new Date().toISOString(),
+    // Draft/pause timing. pausedAt marks an explicit "save draft & exit";
+    // totalPausedMs accumulates paused time across resume cycles.
+    pausedAt: null as string | null,
+    totalPausedMs: 0,
     serviceType: 'Pre-Shipment Inspection',
-    vendorData: null,
-    productData: null,
+    vendorData: null as any,
+    productData: null as any,
 
     // Step 2
     productVerifications: {} as Record<string, { ok: boolean | null; remarks: string }>,
@@ -190,12 +145,272 @@ export default function ProductInspectionForm({
     productTypeRemark: '',
     aqlWorkmanshipRemark: '',
     onSiteTestsRemark: '',
-  }));
+  };
+}
+
+const STEPS: { id: Step; label: string; description: string }[] = [
+  { id: 'generalInformation', label: 'General Info', description: 'Vendor registration data and inspection context' },
+  { id: 'productVerification', label: 'Product Verification', description: 'Field-level verification of all product data' },
+  { id: 'packagingInspection', label: 'Packaging', description: 'Carton, retail packaging and product type' },
+  { id: 'defects', label: 'Defects', description: 'AQL sampling and defect counts' },
+  { id: 'testing', label: 'Testing', description: 'Comprehensive on-site test battery' },
+  { id: 'review', label: 'Review', description: 'Full summary and final decision' },
+  { id: 'documentation', label: 'Documentation', description: 'Report, signatures and final submit' },
+];
+
+export default function ProductInspectionForm({
+  productId,
+  productName,
+  vendorName,
+  onComplete,
+  onCancel,
+}: Props) {
+  const insets = useSafeAreaInsets();
+  const [currentStep, setCurrentStep] = useState<Step>('generalInformation');
+  const scrollNav = useScrollNav();
+  const invalidFields = useInvalidFieldRegistry();
+  const [reviewMode, setReviewMode] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<AllErrors>({});
+  // Physical vs virtual — chosen in the mandatory dialog before the form is usable.
+  // Virtual inspections may upload photos from the gallery; physical are camera-only.
+  const [inspectionType, setInspectionType] = useState<InspectionType | null>(null);
+
+  // ── Draft / resume state ────────────────────────────────────────────────
+  // Held behind `hydrating` until the AsyncStorage read below settles.
+  const [hydrating, setHydrating] = useState(true);
+  const [isResume, setIsResume] = useState(false);
+  const [draftInspectionType, setDraftInspectionType] = useState<InspectionType | null>(null);
+  const [discardConfirm, setDiscardConfirm] = useState<{ type: InspectionType } | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
+
+  // ── Exit-confirmation guard ─────────────────────────────
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  // Reason the server refused to start this inspection, if it did. Shown as a
+  // dismissible banner; it does not block the form.
+  const [startWarning, setStartWarning] = useState<string | null>(null);
+  // The admin-booked window has elapsed — blocks the form entirely. Filling it in
+  // would be wasted work: the server refuses the submit for the same reason.
+  const [expiredError, setExpiredError] = useState<string | null>(null);
+  const pendingNavRef = useRef<null | (() => void)>(null);
+  const allowLeaveRef = useRef(false);
+
+  const requestExit = (action: () => void) => {
+    if (allowLeaveRef.current) {
+      action();
+      return;
+    }
+    pendingNavRef.current = action;
+    setShowExitConfirm(true);
+  };
+  const confirmExit = () => {
+    setShowExitConfirm(false);
+    allowLeaveRef.current = true;
+    const action = pendingNavRef.current;
+    pendingNavRef.current = null;
+    action?.();
+  };
+  const cancelExit = () => {
+    setShowExitConfirm(false);
+    pendingNavRef.current = null;
+  };
+
+  // ── Resume / draft orchestration ──────────────────────────────────────────
+  const persistType = (type: InspectionType) => {
+    AsyncStorage.setItem(typeKeyFor(productId), type).catch(() => {});
+  };
+
+  // Called from the type dialog. A fresh inspection just starts; a paused resume
+  // continues the draft on a matching type, or asks to discard on a different one.
+  const handleTypeChosen = (type: InspectionType) => {
+    if (!isResume) {
+      setInspectionType(type);
+      persistType(type);
+      return;
+    }
+    if (type === (draftInspectionType || inspectionType)) {
+      // Same type → resume, folding the paused gap into totalPausedMs so the
+      // report's active/paused split stays accurate.
+      setFormData((prev: any) => {
+        const pausedMs = prev.pausedAt ? Math.max(0, Date.now() - new Date(prev.pausedAt).getTime()) : 0;
+        return { ...prev, totalPausedMs: (prev.totalPausedMs || 0) + pausedMs, pausedAt: null };
+      });
+      setIsResume(false);
+      setInspectionType(type);
+      persistType(type);
+      return;
+    }
+    // Different type → the saved draft cannot carry over; confirm first.
+    setDiscardConfirm({ type });
+  };
+
+  const confirmDiscardDraft = () => {
+    if (!discardConfirm) return;
+    const { type } = discardConfirm;
+    // Wipe the draft and restart fresh at the current time, keeping only the
+    // already-loaded product/vendor context and the inspector's name.
+    AsyncStorage.removeItem(draftKeyFor(productId)).catch(() => {});
+    setFormData((prev: any) => ({
+      ...makeDefaultFormData(productName, vendorName),
+      productData: prev.productData,
+      vendorData: prev.vendorData,
+      inspectorSignature: prev.inspectorSignature,
+    }));
+    setCurrentStep('generalInformation');
+    setReviewMode(false);
+    setDiscardConfirm(null);
+    setIsResume(false);
+    setInspectionType(type);
+    persistType(type);
+  };
+
+  // Save the half-filled form as a paused draft, then leave. pausedAt marks the
+  // pause so the next open re-prompts the inspection type (resume vs restart).
+  const saveDraftAndExit = async () => {
+    if (savingDraft) return;
+    setSavingDraft(true);
+    const { productData: _pd, vendorData: _vd, ...rest } = { ...formData, pausedAt: new Date().toISOString() };
+    try {
+      try {
+        await AsyncStorage.setItem(draftKeyFor(productId), JSON.stringify(rest));
+      } catch {
+        // Over quota with photos — keep the typed work, drop the base64.
+        await AsyncStorage.setItem(draftKeyFor(productId), JSON.stringify(stripBase64Deep(rest)));
+      }
+      showSuccessToast('Draft saved', 'You can resume this inspection later.');
+    } catch {
+      showErrorToast('Could not save draft', 'Your device storage is full. Try removing some photos.');
+      setSavingDraft(false);
+      return;
+    }
+    setSavingDraft(false);
+    setShowExitConfirm(false);
+    allowLeaveRef.current = true;
+    const action = pendingNavRef.current;
+    pendingNavRef.current = null;
+    (action ?? onCancel)?.();
+  };
+
+  // Android hardware back → confirm exit (disabled after submit)
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (allowLeaveRef.current) return false;
+      requestExit(onCancel);
+      return true;
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onCancel]);
+
+  // ── Form data ─────────────────────────────────────────────────────────────
+  const prefilledRef = useRef<string | null>(null);
+  const startedRef = useRef<string | null>(null);
+
+  // Auto-start the inspection on mount (no selfie / GPS gate). Location is not
+  // sent, and a failed start does NOT block the form — submission stays the
+  // source of truth, same as before.
+  //
+  // What changed: the failure is no longer swallowed. The server's reason (most
+  // often a geofence block, now measured against the vendor's factory AND
+  // warehouse) is kept in state and shown as a dismissible banner. Silently
+  // discarding it meant the checker filled all seven steps and only discovered
+  // the block at submit.
+  useEffect(() => {
+    if (!productId || startedRef.current === productId) return;
+    startedRef.current = productId;
+    qcCheckerService.startProductInspection(productId).catch((err: any) => {
+      // "Location required" is the server answering the fact that this call
+      // deliberately sends no GPS — not a real problem the checker can act on.
+      // Surfacing it would fire on every single inspection. A genuine geofence
+      // rejection ("Location mismatch") means the server DID measure a position
+      // and refused it, and that is worth showing.
+      if (err?.data?.error === 'Location required') return;
+      // The booked window has passed (409 INSPECTION_EXPIRED). This is a hard
+      // block, not a warning — the same rule rejects the submit.
+      if (err?.data?.code === 'INSPECTION_EXPIRED' || err?.status === 409) {
+        setExpiredError(err?.message || 'This inspection can no longer be started.');
+        return;
+      }
+      const detail =
+        err?.distanceMeters != null
+          ? ` You are ${Math.round(err.distanceMeters)}m away; the limit is ${err.thresholdMeters ?? 1000}m.`
+          : '';
+      setStartWarning(
+        (err?.message || 'The server could not confirm the start of this inspection.') + detail,
+      );
+    });
+  }, [productId]);
+
+  const [formData, setFormData] = useState<any>(() => makeDefaultFormData(productName, vendorName));
+
+  // ── Draft restore ─────────────────────────────────────────────────────────
+  // AsyncStorage is async, so unlike the web portal (synchronous localStorage in
+  // a useState initializer) the draft cannot be read before the first render.
+  // The form is held behind a spinner until this settles — otherwise the blank
+  // defaults would flash, and the debounced save below would race the restore
+  // and overwrite the draft with an empty form.
+  useEffect(() => {
+    let cancelled = false;
+    if (!productId) return;
+    (async () => {
+      try {
+        const [rawType, rawDraft] = await Promise.all([
+          AsyncStorage.getItem(typeKeyFor(productId)),
+          AsyncStorage.getItem(draftKeyFor(productId)),
+        ]);
+        if (cancelled) return;
+
+        const savedType = rawType === 'PHYSICAL' || rawType === 'VIRTUAL' ? (rawType as InspectionType) : null;
+        let draft: any = null;
+        if (rawDraft) {
+          try {
+            draft = JSON.parse(rawDraft);
+          } catch {
+            draft = null; // malformed draft — start clean rather than crash
+          }
+        }
+        if (draft) setFormData((prev: any) => ({ ...prev, ...draft }));
+
+        setDraftInspectionType(savedType);
+        // A draft the checker explicitly paused re-asks the type on resume; a
+        // plain reopen keeps the saved choice silently.
+        const paused = !!draft?.pausedAt;
+        setIsResume(paused);
+        setInspectionType(paused ? null : savedType);
+      } finally {
+        if (!cancelled) setHydrating(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [productId]);
+
+  // ── Draft persistence — debounced write on every change ───────────────────
+  useEffect(() => {
+    if (!productId || hydrating || allowLeaveRef.current) return;
+    const t = setTimeout(() => {
+      // Re-check on fire, not just on schedule: a submit or an explicit
+      // save-draft-and-exit can land inside the debounce window, and this write
+      // would otherwise resurrect the draft we just deleted, or clear the
+      // pausedAt we just stamped.
+      if (allowLeaveRef.current) return;
+      // productData/vendorData are re-fetched on open, so they are not worth the
+      // quota. Photos are, until the snapshot no longer fits.
+      const { productData: _pd, vendorData: _vd, ...rest } = formData;
+      AsyncStorage.setItem(draftKeyFor(productId), JSON.stringify(rest)).catch(() => {
+        AsyncStorage.setItem(draftKeyFor(productId), JSON.stringify(stripBase64Deep(rest))).catch(() => {});
+      });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [productId, formData, hydrating]);
 
   // ── Autofill from API ─────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-    if (!productId || prefilledRef.current === productId) return;
+    // Wait for the draft restore, otherwise this merge lands on the blank
+    // defaults and is then overwritten when the draft arrives.
+    if (!productId || hydrating || prefilledRef.current === productId) return;
 
     (async () => {
       const cached = await qcCheckerService.getCheckerData();
@@ -211,6 +426,20 @@ export default function ProductInspectionForm({
         if (cancelled || !res?.success) return;
         const product = res.data.product;
         const v = product?.vendor || {};
+
+        // Second guard, independent of the start call: the products list can push
+        // straight here without a window check, because its endpoint does not
+        // return qcAssignment. This detail response does.
+        const sched = product?.qcAssignment || {};
+        if (isInspectionWindowElapsed(sched.scheduledDate, sched.scheduledTime, sched.estimatedDuration)) {
+          setExpiredError(
+            `This inspection can no longer be started — its scheduled window (${formatAssignmentWindow(
+              sched.scheduledDate,
+              sched.scheduledTime,
+              sched.estimatedDuration,
+            )}) has already ended. Please ask the admin to schedule a new assignment.`,
+          );
+        }
 
         setFormData((prev: any) => ({
           ...prev,
@@ -229,7 +458,7 @@ export default function ProductInspectionForm({
     return () => {
       cancelled = true;
     };
-  }, [productId, vendorName]);
+  }, [productId, vendorName, hydrating]);
 
   // Reset the scroll-nav position whenever the active step changes, since each
   // step mounts its own ScrollView starting at the top.
@@ -275,12 +504,27 @@ export default function ProductInspectionForm({
     [],
   );
 
+  // Tell the checker how many fields still need attention, matching the web
+  // portal's "N fields need to be completed" toast.
+  //
+  // Web counts the DOM nodes it marked data-invalid, because several of its steps
+  // collapse many missing fields into a single error string. Our validators keep
+  // one entry per field, so the error object itself is the accurate count and no
+  // registry walk is needed.
+  const announceMissing = (count: number) => {
+    const n = Math.max(count, 1);
+    showErrorToast(
+      `${n} ${n === 1 ? 'field needs' : 'fields need'} to be completed`,
+      'The required fields are highlighted — jumping to the first one.',
+    );
+  };
+
   // ── Navigation ────────────────────────────────────────────────────────────
   const nextStep = () => {
     const stepErrors = validateStep(currentStep, formData);
     setErrors((prev) => ({ ...prev, [currentStep]: stepErrors }));
     if (hasErrors(stepErrors)) {
-      showErrorToast('Please complete this step', firstErrorMessage(stepErrors) || 'Some required fields are missing.');
+      announceMissing(countErrors(stepErrors));
       scrollToFirstError(stepErrors);
       return;
     }
@@ -340,14 +584,25 @@ export default function ProductInspectionForm({
         // scrollToFirstError polls, which covers the remount.
         scrollToFirstError(all[firstInvalid]!);
       }
-      showErrorToast('Cannot submit yet', 'Some required fields are missing. Review the highlighted steps.');
+      announceMissing(countAllErrors(all));
       return;
     }
 
     setSubmitting(true);
     try {
+      // Stamp the completion time and fold any still-open pause into totalPausedMs
+      // so the report's active/paused/total split is accurate. These ride along in
+      // the payload → persisted into the product's qcInspectionData.
+      const completedIso = new Date().toISOString();
+      const openPauseMs = formData.pausedAt
+        ? Math.max(0, Date.now() - new Date(formData.pausedAt).getTime())
+        : 0;
+
       const cleanedData = {
         ...formData,
+        inspectionCompletedAt: completedIso,
+        totalPausedMs: (formData.totalPausedMs || 0) + openPauseMs,
+        pausedAt: null,
         packagingPhotos: cleanPhotos(formData.packagingPhotos),
         productEvidencePhotos: cleanPhotos(formData.productEvidencePhotos),
         defectPhotos: cleanPhotos(formData.defectPhotos),
@@ -382,6 +637,8 @@ export default function ProductInspectionForm({
       }
 
       allowLeaveRef.current = true;
+      // Submitted — the draft has served its purpose and must not resurface.
+      await AsyncStorage.multiRemove([draftKeyFor(productId), typeKeyFor(productId)]).catch(() => {});
       showSuccessToast('Success', 'Product inspection submitted successfully.');
       onComplete();
     } catch (error: any) {
@@ -414,17 +671,80 @@ export default function ProductInspectionForm({
     }
   };
 
+  // Booked window has elapsed — the form is unusable, so don't render it at all.
+  if (expiredError) {
+    return (
+      <View className="flex-1 bg-white items-center justify-center px-6">
+        <View className="w-14 h-14 rounded-full bg-amber-50 items-center justify-center mb-4">
+          <AlarmClockOff size={28} color="#d97706" />
+        </View>
+        <Text className="text-lg font-bold text-slate-900 text-center">Inspection Window Expired</Text>
+        <Text className="text-sm text-slate-600 text-center leading-relaxed mt-2">{expiredError}</Text>
+        <TouchableOpacity
+          onPress={onCancel}
+          className="mt-6 px-5 py-2.5 rounded-xl bg-brand-500 items-center self-stretch"
+        >
+          <Text className="text-white font-semibold text-sm">Back to Products</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Reading the saved draft — hold the form back rather than flash a blank one.
+  if (hydrating) {
+    return (
+      <View className="flex-1 bg-white items-center justify-center">
+        <ActivityIndicator size="large" color="#e01a1b" />
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-white">
-      {/* Mandatory type selection — shown until the checker chooses. Cancelling
-          backs out of the inspection. */}
-      {!inspectionType && (
+      {/* Mandatory type selection — shown until the checker chooses, and re-asked
+          when resuming a paused draft. Cancelling backs out of the inspection. */}
+      {!inspectionType && !discardConfirm && (
         <InspectionTypeDialog
           subjectName={productName}
-          onSelect={setInspectionType}
+          onSelect={handleTypeChosen}
           onCancel={onCancel}
         />
       )}
+
+      {/* Discard-draft confirmation — shown when resuming with a DIFFERENT type
+          than the saved draft, which cannot be carried over. */}
+      <Modal visible={!!discardConfirm} transparent animationType="fade" onRequestClose={() => setDiscardConfirm(null)}>
+        <Pressable className="flex-1 bg-black/50 items-center justify-center px-6" onPress={() => setDiscardConfirm(null)}>
+          <Pressable className="bg-white rounded-2xl overflow-hidden w-full max-w-md" onPress={(e) => e.stopPropagation()}>
+            <View className="p-5 flex-row items-start">
+              <View className="w-11 h-11 rounded-full bg-amber-50 items-center justify-center mr-3">
+                <AlertTriangle size={22} color="#d97706" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-base font-bold text-slate-900">Discard saved draft?</Text>
+                <Text className="text-sm text-slate-600 mt-1">
+                  You saved this inspection as a{' '}
+                  <Text className="font-bold">{(draftInspectionType || '').toLowerCase()}</Text> inspection.
+                  Switching to <Text className="font-bold">{(discardConfirm?.type || '').toLowerCase()}</Text> will{' '}
+                  <Text className="font-bold text-amber-700">discard the saved draft</Text> and start a fresh
+                  inspection at the current time.
+                </Text>
+              </View>
+            </View>
+            <View className="flex-row px-5 py-4 bg-slate-50 border-t border-slate-100" style={{ columnGap: 12 }}>
+              <TouchableOpacity
+                onPress={() => setDiscardConfirm(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white items-center"
+              >
+                <Text className="text-slate-700 font-semibold text-sm">Go back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={confirmDiscardDraft} className="flex-1 py-2.5 rounded-xl bg-amber-500 items-center">
+                <Text className="text-white font-semibold text-sm">Discard & start fresh</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Header */}
       <View className="px-4 pt-2 pb-2 flex-row items-center">
@@ -448,6 +768,19 @@ export default function ProductInspectionForm({
           <Text className="text-xs font-medium text-brand-700 ml-2">
             Editing from Review — tap Save & Continue to return.
           </Text>
+        </View>
+      )}
+
+      {!!startWarning && (
+        <View className="mx-4 mb-2 flex-row items-start bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+          <MapPin size={14} color="#b45309" style={{ marginTop: 2 }} />
+          <View className="flex-1 ml-2">
+            <Text className="text-xs font-bold text-amber-800">Inspection not confirmed by the server</Text>
+            <Text className="text-xs text-amber-800 mt-0.5">{startWarning}</Text>
+          </View>
+          <TouchableOpacity onPress={() => setStartWarning(null)} hitSlop={8} className="ml-2 p-0.5">
+            <X size={14} color="#b45309" />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -559,17 +892,44 @@ export default function ProductInspectionForm({
               <View className="flex-1">
                 <Text className="text-base font-bold text-slate-900">Exit inspection?</Text>
                 <Text className="text-sm text-slate-600 mt-1">
-                  Are you sure you want to exit? Your inspection progress will be lost and won&apos;t be saved.
+                  {inspectionType
+                    ? 'You can save your progress as a draft and resume this inspection later, or exit without saving.'
+                    : "Are you sure you want to exit? Your inspection progress will be lost and won't be saved."}
                 </Text>
               </View>
             </View>
-            <View className="flex-row px-5 py-4 bg-slate-50 border-t border-slate-100" style={{ columnGap: 12 }}>
-              <TouchableOpacity onPress={cancelExit} className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white items-center">
-                <Text className="text-slate-700 font-semibold text-sm">Keep editing</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={confirmExit} className="flex-1 py-2.5 rounded-xl bg-brand-500 items-center">
-                <Text className="text-white font-semibold text-sm">Yes, exit</Text>
-              </TouchableOpacity>
+            <View className="px-5 py-4 bg-slate-50 border-t border-slate-100" style={{ rowGap: 12 }}>
+              {!!inspectionType && (
+                <TouchableOpacity
+                  onPress={saveDraftAndExit}
+                  disabled={savingDraft}
+                  className="flex-row py-2.5 rounded-xl bg-brand-500 items-center justify-center"
+                  style={{ columnGap: 8, opacity: savingDraft ? 0.7 : 1 }}
+                >
+                  {savingDraft ? <ActivityIndicator size="small" color="#fff" /> : <Save size={16} color="#fff" />}
+                  <Text className="text-white font-semibold text-sm">
+                    {savingDraft ? 'Saving draft…' : 'Save draft & exit'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <View className="flex-row" style={{ columnGap: 12 }}>
+                <TouchableOpacity
+                  onPress={cancelExit}
+                  disabled={savingDraft}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white items-center"
+                  style={{ opacity: savingDraft ? 0.5 : 1 }}
+                >
+                  <Text className="text-slate-700 font-semibold text-sm">Keep editing</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={confirmExit}
+                  disabled={savingDraft}
+                  className="flex-1 py-2.5 rounded-xl border border-red-200 bg-white items-center"
+                  style={{ opacity: savingDraft ? 0.5 : 1 }}
+                >
+                  <Text className="text-red-600 font-semibold text-sm">Exit without saving</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </Pressable>
         </Pressable>

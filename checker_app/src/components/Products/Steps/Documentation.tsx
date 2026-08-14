@@ -18,7 +18,9 @@ import { StepHeader } from './piShared';
 import { pickPhotos, Photo } from './piShared';
 import { InvalidAnchor } from './piValidation';
 import SignaturePad from '@/components/General/SignaturePad';
-import { generateReportPdfDataUri, reportFileName, ReportMeta } from './piReportHtml';
+import { WebView } from 'react-native-webview';
+import { generateReportPdfDataUri, buildReportHtml, reportFileName, ReportMeta } from './piReportHtml';
+import { computeInspectionDurations } from '@/lib/inspectionDuration';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import type { ScrollNavHandlers } from '@/components/General/ScrollNav';
 
@@ -53,6 +55,7 @@ export default function Documentation({ formData, setFormData, errors = {}, scro
   const [hasDownloaded, setHasDownloaded] = useState(false);
   const [confirmRemoveDoc, setConfirmRemoveDoc] = useState(false);
   const [confirmRemoveReport, setConfirmRemoveReport] = useState(false);
+  const [previewReport, setPreviewReport] = useState(false);
   const [drawnSignature, setDrawnSignature] = useState<string | null>(null);
 
   const signedDocs: Photo[] = formData.signedDocuments || [];
@@ -60,13 +63,38 @@ export default function Documentation({ formData, setFormData, errors = {}, scro
   const hasSignedDoc = signedDocs.length > 0;
   const hasSignedReport = signedReport.length > 0;
 
-  const buildMeta = (): ReportMeta => ({
-    productName: formData?.productData?.name || formData?.items?.[0]?.itemName || formData?.vendor || 'Product',
-    vendorName: formData?.vendorData?.companyName || formData?.vendor || '',
-    inspectorName: formData?.inspectorSignature || '',
-    location: null,
-    generatedAt: new Date(),
-  });
+  const buildMeta = (): ReportMeta => {
+    // Live report: the inspection is not submitted yet, so "now" is the end anchor.
+    const now = new Date();
+    const d = computeInspectionDurations(
+      {
+        startedAt: formData?.inspectionStartedAt,
+        submittedAt: now.toISOString(),
+        totalPausedMs: formData?.totalPausedMs || 0,
+        pausedAt: formData?.pausedAt || null,
+        estimatedDuration: formData?.productData?.qcAssignment?.estimatedDuration,
+      },
+      now,
+    );
+    return {
+      productName: formData?.productData?.name || formData?.items?.[0]?.itemName || formData?.vendor || 'Product',
+      vendorName: formData?.vendorData?.companyName || formData?.vendor || '',
+      inspectorName: formData?.inspectorSignature || '',
+      location: null,
+      inspectionStartedAt: formData?.inspectionStartedAt,
+      inspectionCompletedAt: now.toISOString(),
+      generatedAt: now,
+      ...(d.totalMs > 0
+        ? {
+            activeDurationMs: d.activeMs,
+            pausedDurationMs: d.pausedMs,
+            totalDurationMs: d.totalMs,
+            scheduledDurationMs: d.scheduledMs,
+            exceededSchedule: d.exceeded,
+          }
+        : {}),
+    };
+  };
 
   const handleDownloadReport = async () => {
     setDownloading(true);
@@ -135,10 +163,13 @@ export default function Documentation({ formData, setFormData, errors = {}, scro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawnSignature, formData]);
 
-  const viewSignedReport = async () => {
-    const report = signedReport[0];
-    if (!report?.data) return;
-    await shareDataUri(report.data, report.name || 'signed-report.pdf');
+  // Show the report inside the app instead of handing the PDF to the OS share
+  // sheet. Rebuilt from the same builder the PDF is printed from, because
+  // Android's WebView cannot render a PDF — a data:application/pdf source is
+  // simply blank there.
+  const viewSignedReport = () => {
+    if (!hasSignedReport) return;
+    setPreviewReport(true);
   };
 
   const removeSignedReport = () => {
@@ -281,6 +312,40 @@ export default function Documentation({ formData, setFormData, errors = {}, scro
       </InvalidAnchor>
 
       <View className="h-6" />
+
+      {/* ── Preview: digitally-signed report ──
+          Rendered from the report builder rather than the stored PDF, since
+          Android's WebView has no PDF renderer. */}
+      <Modal visible={previewReport && hasSignedReport} animationType="slide" onRequestClose={() => setPreviewReport(false)}>
+        <View className="flex-1 bg-slate-900">
+          <View className="flex-row items-center justify-between px-4 pt-14 pb-3">
+            <Text className="text-white text-sm font-semibold flex-1 mr-3" numberOfLines={1}>
+              {signedReport[0]?.name || 'Signed Report'}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setPreviewReport(false)}
+              hitSlop={12}
+              accessibilityLabel="Close preview"
+              className="w-9 h-9 rounded-full bg-white/10 items-center justify-center"
+            >
+              <X size={20} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+          <View className="flex-1 bg-white">
+            <WebView
+              source={{ html: buildReportHtml(formData, buildMeta(), formData.clientSignature || null) }}
+              originWhitelist={['*']}
+              style={{ flex: 1 }}
+              startInLoadingState
+              renderLoading={() => (
+                <View className="absolute inset-0 items-center justify-center bg-white">
+                  <ActivityIndicator size="large" color="#e01a1b" />
+                </View>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Document Center modal ── */}
       <Modal visible={showDocModal} transparent animationType="fade" onRequestClose={() => setShowDocModal(false)}>

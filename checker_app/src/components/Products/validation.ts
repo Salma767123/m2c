@@ -238,3 +238,13 @@ export function firstErrorMessage(errs: StepErrors | undefined): string | null {
   const keys = Object.keys(errs);
   return keys.length > 0 ? errs[keys[0]] : null;
 }
+
+/** Number of missing/invalid fields in a single step. */
+export function countErrors(errs: StepErrors | undefined): number {
+  return errs ? Object.keys(errs).length : 0;
+}
+
+/** Total missing/invalid fields across every step (used on final submit). */
+export function countAllErrors(all: AllErrors): number {
+  return Object.values(all).reduce((n, e) => n + (e ? Object.keys(e).length : 0), 0);
+}

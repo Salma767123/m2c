@@ -11,6 +11,7 @@
 import * as Print from 'expo-print';
 import * as FileSystem from 'expo-file-system/legacy';
 import { CODE_LABELS } from '../PI_data';
+import { formatDuration } from '@/lib/inspectionDuration';
 
 const esc = (s?: unknown): string => {
   if (s === null || s === undefined) return '—';
@@ -25,12 +26,44 @@ const fmtDMY = (value?: string | null): string => {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : String(value ?? '');
 };
 
+// Local clock time for the start/complete stamps, e.g. "14:05".
+const fmtTime = (iso?: string | null): string => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '—' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
 export interface ReportMeta {
   productName: string;
   vendorName: string;
   inspectorName?: string;
   location?: { latitude: number; longitude: number } | null;
   generatedAt: Date;
+  /** ISO string for when the inspection was opened. */
+  inspectionStartedAt?: string | null;
+  /** ISO string for when the inspection was completed/submitted. */
+  inspectionCompletedAt?: string | null;
+  // Duration breakdown (see lib/inspectionDuration.ts). When present, the report
+  // prints Active / Paused / Total rows; exceededSchedule highlights the total.
+  activeDurationMs?: number;
+  pausedDurationMs?: number;
+  totalDurationMs?: number;
+  scheduledDurationMs?: number;
+  exceededSchedule?: boolean;
+}
+
+// Exported so the Documentation step can preview the report in a WebView.
+//
+// The preview renders THIS markup rather than the generated PDF: Android's
+// WebView has no PDF renderer, so a data:application/pdf source shows a blank
+// page there. Since the PDF is printed from exactly this HTML, previewing the
+// source keeps the two identical instead of maintaining a second layout.
+export function buildReportHtml(
+  formData: any,
+  meta: ReportMeta,
+  clientSignatureDataUrl?: string | null,
+): string {
+  return buildHtml(formData, meta, clientSignatureDataUrl);
 }
 
 function buildHtml(formData: any, meta: ReportMeta, clientSignatureDataUrl?: string | null): string {
@@ -100,6 +133,24 @@ function buildHtml(formData: any, meta: ReportMeta, clientSignatureDataUrl?: str
     <div class="meta">Service Type: ${esc(d.serviceType)}</div>
     <div class="meta">Inspection Date: ${esc(fmtDMY(d.serviceStartDate))}</div>
     <div class="meta">Status: ${esc(d.inspectionStatus)}</div>
+    <div class="meta">Inspection Start Time: ${esc(fmtTime(meta.inspectionStartedAt))}</div>
+    <div class="meta">Inspection Complete Time: ${esc(fmtTime(meta.inspectionCompletedAt))}</div>
+    ${
+      meta.totalDurationMs != null && meta.totalDurationMs > 0
+        ? `<div class="meta">Active Duration: ${esc(formatDuration(meta.activeDurationMs || 0))}</div>
+    <div class="meta">Paused Duration: ${esc(formatDuration(meta.pausedDurationMs || 0))}</div>
+    <div class="meta">Total Duration: ${esc(formatDuration(meta.totalDurationMs))}${
+      meta.exceededSchedule ? ' (exceeded scheduled duration)' : ''
+    }</div>`
+        : ''
+    }
+    ${
+      meta.exceededSchedule
+        ? `<div class="meta" style="color:#c81e1e;font-weight:700">Exceeded scheduled duration${
+            meta.scheduledDurationMs ? ` (scheduled ${esc(formatDuration(meta.scheduledDurationMs))})` : ''
+          } &mdash; active work took ${esc(formatDuration(meta.activeDurationMs || 0))}.</div>`
+        : ''
+    }
     <div class="meta">Generated: ${esc(meta.generatedAt.toLocaleString())}</div>
     ${meta.location ? `<div class="meta">Location: ${meta.location.latitude.toFixed(5)}, ${meta.location.longitude.toFixed(5)}</div>` : ''}
 

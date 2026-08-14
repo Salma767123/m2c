@@ -15,7 +15,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import type { TestGroup, TestItem } from '../PI_data';
-import { ADDITIONAL_EVIDENCE_DEFS } from '../PI_data';
+import { ADDITIONAL_EVIDENCE_DEFS, PACKAGING_TOGGLE_GROUPS, relabelForPackaging } from '../PI_data';
 import { StepHeader, Card, ErrorBanner, PhotoGrid, RemarkInput, Photo } from './piShared';
 import { InvalidAnchor } from './piValidation';
 import type { ScrollNavHandlers } from '@/components/General/ScrollNav';
@@ -253,6 +253,7 @@ function TestGroupCard({
   onTestChange,
   onAddOther,
   onRemoveOther,
+  onPackagingTypeChange,
   inspectionType,
 }: {
   group: TestGroup;
@@ -261,8 +262,12 @@ function TestGroupCard({
   onTestChange: (testId: string, patch: Partial<TestItem>) => void;
   onAddOther: () => void;
   onRemoveOther: (testId: string) => void;
+  onPackagingTypeChange: (type: 'Carton' | 'Bale') => void;
   inspectionType?: 'PHYSICAL' | 'VIRTUAL' | null;
 }) {
+  // Only the measurement & functional groups carry the Carton/Bale packaging toggle.
+  const showPackagingToggle = (PACKAGING_TOGGLE_GROUPS as readonly string[]).includes(group.id);
+  const packagingType = group.packagingType || 'Carton';
   const regularTests = group.tests.filter((t) => !t.isOther);
   const otherTests = group.tests.filter((t) => t.isOther);
   const passed = group.tests.filter((t) => t.pass).length;
@@ -305,6 +310,32 @@ function TestGroupCard({
 
       {showTests && (
         <View className="p-3">
+          {showPackagingToggle && (
+            <View className="flex-row items-center mb-3" style={{ columnGap: 10 }}>
+              <Text className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                Packaging Type
+              </Text>
+              <View className="flex-row rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                {(['Carton', 'Bale'] as const).map((type) => {
+                  const active = type === packagingType;
+                  return (
+                    <TouchableOpacity
+                      key={type}
+                      onPress={() => { if (!active) onPackagingTypeChange(type); }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      className={`px-4 py-1.5 rounded-md ${active ? 'bg-brand-500' : ''}`}
+                      activeOpacity={0.8}
+                    >
+                      <Text className={`text-sm font-bold ${active ? 'text-white' : 'text-slate-600'}`}>
+                        {type}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
           {regularTests.map((test) => (
             <TestRow key={test.id} test={test} invalid={test.id === invalidTestId} onChange={(patch) => onTestChange(test.id, patch)} inspectionType={inspectionType} />
           ))}
@@ -339,6 +370,24 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {}, s
     setFormData({
       ...formData,
       testGroups: groups.map((g) => (g.id === groupId ? { ...g, collapsed: !g.collapsed } : g)),
+    });
+  };
+
+  // Carton/Bale toggle for the measurement & functional groups: store the choice and
+  // relabel that group's predefined test names accordingly (custom "Other" rows keep
+  // whatever the checker typed).
+  const setPackagingType = (groupId: string, type: 'Carton' | 'Bale') => {
+    setFormData({
+      ...formData,
+      testGroups: groups.map((g) =>
+        g.id === groupId
+          ? {
+              ...g,
+              packagingType: type,
+              tests: g.tests.map((t) => (t.isOther ? t : { ...t, label: relabelForPackaging(t.label, type) })),
+            }
+          : g,
+      ),
     });
   };
 
@@ -442,6 +491,7 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {}, s
           onTestChange={(testId, patch) => updateTest(group.id, testId, patch)}
           onAddOther={() => addOtherTest(group.id)}
           onRemoveOther={(testId) => removeOtherTest(group.id, testId)}
+          onPackagingTypeChange={(type) => setPackagingType(group.id, type)}
           inspectionType={inspectionType}
         />
       ))}

@@ -111,7 +111,21 @@ export type TestGroup = {
   label: string;
   collapsed: boolean;
   tests: TestItem[];
+  // For the Measurement Inspection & Functional Tests groups: whether the goods are
+  // packed as 'Carton' or 'Bale'. Selecting it relabels the group's test names
+  // (e.g. "Carton Drop Test" ⇄ "Bale Drop Test"). Undefined = Carton (the default).
+  packagingType?: 'Carton' | 'Bale';
 };
+
+// Groups that expose the Carton/Bale packaging toggle (their test names carry the word).
+export const PACKAGING_TOGGLE_GROUPS = ['measurementInspection', 'functionalTests'] as const;
+
+// Swap the packaging word in a test label to the chosen type — "Carton Drop Test"
+// ⇄ "Bale Drop Test". Whole-word, case-insensitive; labels without the word are
+// returned unchanged.
+export function relabelForPackaging(label: string, type: 'Carton' | 'Bale'): string {
+  return label.replace(/\b(carton|bale)\b/gi, type);
+}
 
 export function makeDefaultPackagingItems(): PackagingItem[] {
   return PACKAGING_ITEM_DEFS.map((d) => ({
@@ -129,6 +143,9 @@ export function makeDefaultTestGroups(): TestGroup[] {
     id: g.id,
     label: g.label,
     collapsed: false,
+    ...((PACKAGING_TOGGLE_GROUPS as readonly string[]).includes(g.id)
+      ? { packagingType: 'Carton' as const }
+      : {}),
     tests: g.tests.map((t) => ({
       id: t.id,
       label: t.label,

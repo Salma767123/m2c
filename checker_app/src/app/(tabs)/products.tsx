@@ -567,6 +567,7 @@ import {
   Modal,
   Image,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import {
   Search,
@@ -587,6 +588,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import DateRangeCalendar, { fmtDate } from '../../components/General/DateRangeCalendar';
 import { AppText, Button } from '@/components/UI';
 import { brand, colors, elevation } from '@/constants/design';
+import { isInspectionWindowElapsed, formatAssignmentWindow } from '@/lib/inspectionSchedule';
+import { showErrorToast } from '@/lib/toast-utils';
 
 const PAGE_SIZE = 12;
 const DEFAULT_SORT = 'createdAt:desc';
@@ -654,6 +657,8 @@ export default function ProductsTab() {
   const [dateFrom, setDateFrom] = useState(incoming.dateFrom ?? '');
   const [dateTo, setDateTo] = useState(incoming.dateTo ?? '');
   const [page, setPage] = useState(1);
+  // Product whose booked window is being looked up before its form is opened.
+  const [checkingSchedule, setCheckingSchedule] = useState<string | null>(null);
   const debouncedSearch = useDebounce(searchInput, 300);
 
   useEffect(() => {
@@ -795,11 +800,39 @@ export default function ProductsTab() {
     router.push({ pathname: '/products/[id]' as any, params: { id: p.id, name: p.name } });
   };
 
-  const handleStartInspection = (p: Product) => {
-    router.push({
-      pathname: '/product-inspection' as any,
-      params: { productId: p.id, productName: p.name, vendorName: p.vendor.companyName },
-    });
+  // Opening the form for an expired assignment wastes the checker's time: the
+  // server refuses both the start and the submit. The product detail screen
+  // already gates on this, but this list can push straight past it — and its own
+  // endpoint does not return qcAssignment, so the schedule has to be fetched
+  // before deciding. A failed lookup falls through and lets the form open, where
+  // the same check runs again against the detail response.
+  const handleStartInspection = async (p: Product) => {
+    const go = () =>
+      router.push({
+        pathname: '/product-inspection' as any,
+        params: { productId: p.id, productName: p.name, vendorName: p.vendor.companyName },
+      });
+    setCheckingSchedule(p.id);
+    try {
+      const res = await qcCheckerService.getProductDetails(p.id);
+      const sched = res?.data?.product?.qcAssignment || {};
+      if (isInspectionWindowElapsed(sched.scheduledDate, sched.scheduledTime, sched.estimatedDuration)) {
+        showErrorToast(
+          'Inspection Window Expired',
+          `The booked window (${formatAssignmentWindow(
+            sched.scheduledDate,
+            sched.scheduledTime,
+            sched.estimatedDuration,
+          )}) has already ended. Ask the admin to schedule a new assignment.`,
+        );
+        return;
+      }
+    } catch {
+      /* schedule unknown — let the form open and re-check there */
+    } finally {
+      setCheckingSchedule(null);
+    }
+    go();
   };
 
   return (
@@ -954,11 +987,19 @@ export default function ProductsTab() {
                     {canInspect ? (
                       <TouchableOpacity
                         onPress={() => handleStartInspection(p)}
+                        disabled={checkingSchedule === p.id}
                         activeOpacity={0.85}
                         className="flex-1 flex-row items-center justify-center bg-brand-500 rounded-lg py-2.5"
+                        style={{ opacity: checkingSchedule === p.id ? 0.7 : 1 }}
                       >
-                        <ArrowRight size={14} color="#ffffff" />
-                        <Text className="ml-1.5 text-sm font-bold text-white">Start Inspect</Text>
+                        {checkingSchedule === p.id ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <>
+                            <ArrowRight size={14} color="#ffffff" />
+                            <Text className="ml-1.5 text-sm font-bold text-white">Start Inspect</Text>
+                          </>
+                        )}
                       </TouchableOpacity>
                     ) : null}
                   </View>
