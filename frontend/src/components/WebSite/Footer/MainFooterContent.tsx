@@ -2,14 +2,48 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Instagram, Facebook, Youtube, Mail, Phone, MapPin, ArrowUpRight } from "lucide-react";
+import {
+  Instagram, Facebook, Youtube, Mail, Phone, ArrowRight,
+  Truck, ShieldCheck, Award, Leaf,
+} from "lucide-react";
 import { categoryService, Category } from "@/services/categoryService";
 import { companyInfoService, PublicCompanyInfo } from "@/services/companyInfoService";
 import CompanyLogo from "@/components/Shared/CompanyLogo";
 import Reveal from "@/components/WebSite/Shared/Reveal";
+import { showSuccessToast } from "@/lib/toast-utils";
+
+const RED = "#e01a1b";
+
+/** Column heading — compact uppercase label with a short red→gold accent rule. */
+const ColHeading = ({ children }: { children: React.ReactNode }) => (
+  <h4 className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#26262a]">
+    {children}
+    <span className="mt-2.5 block h-[2px] w-7 rounded-full bg-gradient-to-r from-[#e01a1b] to-[#c9962f]" />
+  </h4>
+);
+
+/**
+ * Footer nav link. The arrow sits directly beside the label (inline-flex +
+ * small gap + w-fit) — it belongs to the link and never stretches to the far
+ * edge of the column. On hover the text turns brand-red, a hairline underline
+ * grows, and the arrow nudges right.
+ */
+const NavLink = ({ href, label }: { href: string; label: string }) => (
+  <Link
+    href={href}
+    className="group inline-flex w-fit items-center gap-3 text-[15px] leading-none text-[#3f3f46] transition-colors duration-200 hover:text-[#e01a1b]"
+  >
+    <span className="relative py-0.5">
+      {label}
+      <span className="absolute -bottom-px left-0 h-px w-0 bg-[#e01a1b] transition-all duration-200 group-hover:w-full" />
+    </span>
+    <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#c9962f]/70 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-[#e01a1b]" />
+  </Link>
+);
 
 const MainFooterContent = () => {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [email, setEmail] = useState("");
   const [companyInfo, setCompanyInfo] = useState<PublicCompanyInfo>({
     companyName: 'M2C MarkDowns Private Limited',
     companyLogo: null,
@@ -28,214 +62,235 @@ const MainFooterContent = () => {
   });
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await categoryService.getAllCategories({
-          status: 'ACTIVE',
-          showRootOnly: 'true'
-        });
-        if (response.success && response.data) {
-          setCategories(response.data.slice(0, 6));
-        }
-      } catch (error) {
-        console.error("Failed to fetch categories for footer:", error);
-      }
-    };
-
-    fetchCategories();
-    companyInfoService.getPublicCompanyInfo().then(info => {
-      setCompanyInfo(info);
-    }).catch(() => {});
+    categoryService.getAllCategories({ status: 'ACTIVE', showRootOnly: 'true' })
+      .then((res) => { if (res.success && res.data) setCategories(res.data.slice(0, 6)); })
+      .catch((e) => console.error("Failed to fetch categories for footer:", e));
+    companyInfoService.getPublicCompanyInfo().then(setCompanyInfo).catch(() => {});
   }, []);
 
-  const buildAddress = () => {
-    const parts = [companyInfo.registeredAddress, companyInfo.city, companyInfo.state, companyInfo.country].filter(Boolean);
-    return parts.join(', ');
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    showSuccessToast("Subscribed", "You're on the list — new arrivals & offers are on the way.");
+    setEmail("");
   };
 
-  return (
-    <div className="relative overflow-hidden bg-linear-to-b from-[#4d0e10] via-[#390a0c] to-[#230608] text-white">
-      {/* Live accent line across the very top of the footer */}
-      <div className="h-1 w-full animate-accent-bar" />
+  // Round social icon buttons (Our Company column).
+  const socials = [
+    { url: companyInfo.socialInstagram, Icon: Instagram, label: "Instagram" },
+    { url: companyInfo.socialFacebook, Icon: Facebook, label: "Facebook" },
+    { url: companyInfo.socialYoutube, Icon: Youtube, label: "YouTube" },
+  ].filter((s) => s.url) as { url: string; Icon: typeof Instagram; label: string }[];
 
-      {/* Ambient glow for depth — subtle, premium, non-interactive */}
-      <div className="pointer-events-none absolute -top-24 -left-24 w-80 h-80 rounded-full bg-[#ff5a5b]/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-32 right-0 w-[28rem] h-[28rem] rounded-full bg-[#ff7a4d]/12 blur-3xl" />
-      {/* Faint grid/hairline texture overlay */}
+  // Social links shown as labelled rows (Let's Connect column).
+  const connectSocials = [
+    { url: companyInfo.socialInstagram, Icon: Instagram, label: "Instagram" },
+    { url: companyInfo.socialFacebook, Icon: Facebook, label: "Facebook" },
+  ].filter((s) => s.url) as { url: string; Icon: typeof Instagram; label: string }[];
+
+  const trust = [
+    { Icon: Truck, title: "Fast Delivery", sub: "Pan-India shipping" },
+    { Icon: ShieldCheck, title: "Secure Payment", sub: "100% protected" },
+    { Icon: Award, title: "Best Quality", sub: "Finest cotton" },
+    { Icon: Leaf, title: "Sustainable", sub: "Eco-friendly craft" },
+  ];
+
+  return (
+    <div className="relative overflow-hidden bg-[#faf9f6] text-[#3f3f46]">
+      {/* Brand hairline across the very top — subtle continuity with the site. */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.05]"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
+        className="h-px w-full"
+        style={{ background: "linear-gradient(90deg, transparent, rgba(224,26,27,0.25), rgba(224,26,27,0.7), rgba(224,26,27,0.25), transparent)" }}
       />
 
-      <div className="relative max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-10 sm:py-12 md:py-14 lg:py-20">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-8 md:gap-10 lg:gap-12">
-          {/* Company Info */}
-          <Reveal className="text-center sm:text-left lg:col-span-1">
-            <h4 className="text-white font-semibold mb-5 text-sm sm:text-base md:text-lg tracking-wide">
-              Our Company
-              <span className="block h-0.5 w-9 bg-[#ff8a8b] rounded-full mt-2.5 mx-auto sm:mx-0" />
-            </h4>
-            <div className="space-y-4 sm:space-y-5">
-              <div className="inline-block">
-                <Link href="/" className="block rounded-xl bg-white/95 p-2.5 ring-1 ring-white/10 transition-transform duration-300 hover:scale-[1.03]">
-                  <CompanyLogo
-                    className="object-cover w-28 sm:w-36 md:w-44 lg:w-48 h-auto"
-                    skeletonClassName="w-28 sm:w-36 md:w-44 lg:w-48 aspect-square bg-white/10"
-                    fallbackWidth={190}
-                    fallbackHeight={50}
-                    fallbackSizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
-                    priority
-                  />
-                </Link>
-              </div>
+      {/* ── Abstract, technology-inspired background pattern (very low opacity) ── */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 footer-grid opacity-60" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 footer-dots opacity-70" />
+      {/* Soft warm/red radial washes for depth */}
+      <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 h-96 w-96 rounded-full bg-[#e01a1b]/[0.04] blur-[100px]" />
+      <div aria-hidden className="pointer-events-none absolute -top-16 right-0 h-[26rem] w-[26rem] rounded-full bg-[#c9962f]/[0.07] blur-[110px]" />
+      {/* Abstract curved contour lines (drift slowly) */}
+      <svg aria-hidden className="footer-contour pointer-events-none absolute right-0 top-4 hidden h-72 w-[30rem] text-[#c9962f] lg:block" viewBox="0 0 480 300" fill="none">
+        <path d="M470 10 C 360 60, 440 150, 300 190 S 150 250, 40 290" stroke="currentColor" strokeWidth="1" strokeOpacity="0.18" strokeLinecap="round" />
+        <path d="M478 70 C 380 110, 430 190, 300 230" stroke="currentColor" strokeWidth="1" strokeOpacity="0.13" strokeLinecap="round" />
+        <path d="M470 130 C 400 160, 420 220, 340 260" stroke={RED} strokeWidth="1" strokeOpacity="0.08" strokeLinecap="round" />
+      </svg>
 
-              <p className="text-white/70 text-xs sm:text-sm md:text-base leading-relaxed max-w-xs sm:max-w-sm mx-auto sm:mx-0">
-                Premium home textiles manufacturer specializing in high-quality towels, kitchen aprons, table linens, and bath accessories. Crafted with finest cotton and sustainable materials for everyday comfort and durability.
-              </p>
+      <div className="relative mx-auto max-w-7xl xl:max-w-420 px-4 sm:px-6 lg:px-8 pt-14 pb-6 sm:pt-16">
+        {/* ── Brand promise / intro ─────────────────────────────────────── */}
+        <Reveal className="mx-auto max-w-2xl text-center">
+          <p className="inline-flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.34em] text-[#c9962f]">
+            <span className="inline-block h-px w-8 bg-gradient-to-r from-transparent to-[#c9962f]" />
+            Our Promise
+            <span className="inline-block h-px w-8 bg-gradient-to-l from-transparent to-[#c9962f]" />
+          </p>
+          <h2 className="mt-4 font-playfair text-3xl font-semibold leading-[1.14] text-[#1c1c1e] sm:text-4xl md:text-[42px]">
+            From Manufacturer to your{' '}
+            <span className="relative whitespace-nowrap italic text-[#e01a1b]">
+              Home.
+              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 120 12" fill="none" preserveAspectRatio="none">
+                <path d="M2 8 C 30 2, 90 2, 118 6" stroke="#e01a1b" strokeOpacity="0.55" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </span>
+          </h2>
+          <p className="mx-auto mt-5 max-w-xl text-sm leading-relaxed text-[#5b5b63] sm:text-[15px]">
+            Premium home textiles crafted with finest cotton and sustainable materials for everyday comfort and durability.
+          </p>
+        </Reveal>
+
+        {/* ── Main grid: Company · Explore · Categories · Let's Connect · Stay Updated ── */}
+        <div className="mt-14 grid grid-cols-1 gap-x-8 gap-y-11 sm:grid-cols-2 lg:grid-cols-12 lg:gap-x-10">
+          {/* Our Company */}
+          <Reveal className="min-w-0 sm:col-span-2 lg:col-span-3">
+            <Link href="/" className="inline-block">
+              <CompanyLogo
+                className="h-11 w-auto object-contain sm:h-12"
+                skeletonClassName="h-11 sm:h-12 w-36 bg-black/5"
+                fallbackWidth={190}
+                fallbackHeight={48}
+              />
+            </Link>
+            <p className="mt-4 max-w-sm text-[14.5px] leading-relaxed text-[#5b5b63]">
+              Premium home textiles manufacturer specializing in high-quality towels, kitchen aprons, table linens and bath accessories — crafted with finest cotton and sustainable materials for everyday comfort.
+            </p>
+            <Link
+              href="/about"
+              className="group mt-5 inline-flex items-center gap-2 rounded-full border border-[#e2e0da] bg-white px-5 py-2 text-[13px] font-semibold text-[#26262a] transition-all duration-200 hover:border-[#e01a1b] hover:text-[#e01a1b] hover:shadow-[0_3px_14px_rgba(224,26,27,0.12)]"
+            >
+              About M2C
+              <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
+            </Link>
+
+            {socials.length > 0 && (
+              <div className="mt-6 flex items-center gap-2.5">
+                {socials.map(({ url, Icon, label }) => (
+                  <a
+                    key={label}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={label}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e2e0da] bg-white text-[#52525b] transition-all duration-200 hover:-translate-y-0.5 hover:scale-105 hover:border-[#e01a1b] hover:text-[#e01a1b]"
+                  >
+                    <Icon className="h-[17px] w-[17px]" />
+                  </a>
+                ))}
+              </div>
+            )}
+          </Reveal>
+
+          {/* Explore */}
+          <Reveal delay={80} className="min-w-0 lg:col-span-2">
+            <ColHeading>Explore</ColHeading>
+            <div className="mt-5 flex flex-col items-start gap-3.5">
+              <NavLink href="/" label="Home" />
+              <NavLink href="/about" label="About" />
+              <NavLink href="/products" label="Products" />
+              <NavLink href="/contact" label="Contact Us" />
             </div>
           </Reveal>
 
-          {/* Navigation Links */}
-          <Reveal delay={90} className="text-center sm:text-left">
-            <h4 className="text-white font-semibold mb-5 text-sm sm:text-base md:text-lg tracking-wide">
-              Navigation
-              <span className="block h-0.5 w-9 bg-[#ff8a8b] rounded-full mt-2.5 mx-auto sm:mx-0" />
-            </h4>
-            <ul className="space-y-3 md:space-y-3.5">
-              {[
-                { href: "/", label: "Home" },
-                { href: "/about", label: "About" },
-                { href: "/products", label: "Products" },
-                { href: "/contact", label: "Contact Us" },
-              ].map((item) => (
-                <li key={item.href} className="flex justify-center sm:justify-start">
-                  <Link
-                    href={item.href}
-                    className="link-underline text-white/70 text-xs sm:text-sm md:text-base hover:text-white transition-colors duration-300"
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Reveal>
-
           {/* Categories */}
-          <Reveal delay={180} className="text-center sm:text-left">
-            <h4 className="text-white font-semibold mb-5 text-sm sm:text-base md:text-lg tracking-wide">
-              Categories
-              <span className="block h-0.5 w-9 bg-[#ff8a8b] rounded-full mt-2.5 mx-auto sm:mx-0" />
-            </h4>
-            <ul className="space-y-3 md:space-y-3.5">
-              <li className="flex justify-center sm:justify-start">
-                <Link
-                  href="/categories"
-                  className="link-underline text-white/70 text-xs sm:text-sm md:text-base hover:text-white transition-colors duration-300"
-                >
-                  All Categories
-                </Link>
-              </li>
-              {categories.map((category) => (
-                <li key={category.id} className="flex justify-center sm:justify-start">
-                  <Link
-                    href={`/categories/${category.slug}`}
-                    className="link-underline text-white/70 text-xs sm:text-sm md:text-base hover:text-white transition-colors duration-300"
-                  >
-                    {category.name}
-                  </Link>
-                </li>
+          <Reveal delay={160} className="min-w-0 lg:col-span-2">
+            <ColHeading>Categories</ColHeading>
+            <div className="mt-5 flex flex-col items-start gap-3.5">
+              <NavLink href="/categories" label="All Categories" />
+              {categories.map((c) => (
+                <NavLink key={c.id} href={`/categories/${c.slug}`} label={c.name} />
               ))}
-            </ul>
+            </div>
           </Reveal>
 
-          {/* Contact Info */}
-          <Reveal delay={270} className="text-center sm:text-left">
-            <h4 className="text-white font-semibold mb-5 text-sm sm:text-base md:text-lg tracking-wide">
-              Contact Info
-              <span className="block h-0.5 w-9 bg-[#ff8a8b] rounded-full mt-2.5 mx-auto sm:mx-0" />
-            </h4>
-            <div className="space-y-4">
+          {/* Let's Connect */}
+          <Reveal delay={240} className="min-w-0 lg:col-span-2">
+            <ColHeading>Let&apos;s Connect</ColHeading>
+            <div className="mt-5 flex flex-col items-start gap-3.5">
               {companyInfo.companyEmail && (
                 <a
                   href={`mailto:${companyInfo.companyEmail}`}
-                  className="group flex items-start gap-3 justify-center sm:justify-start"
+                  className="group inline-flex w-full max-w-full items-center gap-2.5 text-[14px] text-[#3f3f46] transition-colors duration-200 hover:text-[#e01a1b]"
                 >
-                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15 text-white transition-colors duration-300 group-hover:bg-white group-hover:text-[#c41617]">
-                    <Mail className="w-4 h-4" />
-                  </span>
-                  <span className="text-white/70 text-xs sm:text-sm md:text-base break-all sm:break-normal group-hover:text-white transition-colors duration-300 self-center">
-                    {companyInfo.companyEmail}
-                  </span>
+                  <Mail className="h-4 w-4 shrink-0 text-[#c9962f]/80 transition-colors group-hover:text-[#e01a1b]" />
+                  <span className="min-w-0 truncate">{companyInfo.companyEmail}</span>
                 </a>
               )}
               {companyInfo.companyPhone && (
                 <a
                   href={`tel:${companyInfo.companyPhone}`}
-                  className="group flex items-start gap-3 justify-center sm:justify-start"
+                  className="group inline-flex w-fit items-center gap-2.5 text-[14px] text-[#3f3f46] transition-colors duration-200 hover:text-[#e01a1b]"
                 >
-                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15 text-white transition-colors duration-300 group-hover:bg-white group-hover:text-[#c41617]">
-                    <Phone className="w-4 h-4" />
-                  </span>
-                  <span className="text-white/70 text-xs sm:text-sm md:text-base group-hover:text-white transition-colors duration-300 self-center">
-                    {companyInfo.companyPhone}
-                  </span>
+                  <Phone className="h-4 w-4 shrink-0 text-[#c9962f]/80 transition-colors group-hover:text-[#e01a1b]" />
+                  <span>{companyInfo.companyPhone}</span>
                 </a>
               )}
-              {buildAddress() && (
-                <div className="flex items-start gap-3 justify-center sm:justify-start">
-                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15 text-white">
-                    <MapPin className="w-4 h-4" />
-                  </span>
-                  <p className="text-white/70 text-xs sm:text-sm md:text-base leading-relaxed max-w-xs sm:max-w-[13rem] text-center sm:text-left">
-                    {buildAddress()}{companyInfo.zipCode ? ` – ${companyInfo.zipCode}` : ''}
-                  </p>
-                </div>
-              )}
-
-              {/* Social Media Icons */}
-              {(companyInfo.socialInstagram || companyInfo.socialFacebook || companyInfo.socialYoutube) && (
-                <div className="flex justify-center sm:justify-start gap-3 pt-2">
-                  {[
-                    { url: companyInfo.socialInstagram, Icon: Instagram, label: "Instagram" },
-                    { url: companyInfo.socialFacebook, Icon: Facebook, label: "Facebook" },
-                    { url: companyInfo.socialYoutube, Icon: Youtube, label: "YouTube" },
-                  ]
-                    .filter((s) => s.url)
-                    .map(({ url, Icon, label }) => (
-                      <a
-                        key={label}
-                        href={url as string}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/5 ring-1 ring-white/10 flex items-center justify-center text-white hover:text-[#c41617] hover:bg-white hover:ring-white hover:-translate-y-1 hover:shadow-[0_10px_28px_rgba(0,0,0,0.45)] transition-all duration-300"
-                        aria-label={label}
-                      >
-                        <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                      </a>
-                    ))}
-                </div>
-              )}
+              {connectSocials.map(({ url, Icon, label }) => (
+                <a
+                  key={label}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group inline-flex w-fit items-center gap-2.5 text-[14px] text-[#3f3f46] transition-colors duration-200 hover:text-[#e01a1b]"
+                >
+                  <Icon className="h-4 w-4 shrink-0 text-[#c9962f]/80 transition-colors group-hover:text-[#e01a1b]" />
+                  <span>{label}</span>
+                </a>
+              ))}
             </div>
+          </Reveal>
+
+          {/* Stay Updated — newsletter */}
+          <Reveal delay={320} className="min-w-0 sm:col-span-2 lg:col-span-3">
+            <ColHeading>Stay Updated</ColHeading>
+            <form
+              onSubmit={handleSubscribe}
+              className="mt-5 rounded-2xl border border-[#e8e6df] bg-white/80 p-4 shadow-[0_1px_3px_rgba(20,20,20,0.04)] backdrop-blur-sm"
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e01a1b]/[0.07] text-[#e01a1b]">
+                  <Mail className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-bold text-[#26262a]">Get the latest from M2C</p>
+                  <p className="text-[12.5px] text-[#71717a]">New arrivals, offers &amp; more.</p>
+                </div>
+              </div>
+              <div className="mt-3.5 flex items-center gap-2 rounded-full border border-[#e2e0da] bg-[#faf9f6] py-1 pl-4 pr-1 transition-colors focus-within:border-[#e01a1b]/45 focus-within:bg-white">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  aria-label="Email address"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-[#26262a] placeholder-[#a1a1aa] outline-none"
+                />
+                <button
+                  type="submit"
+                  aria-label="Subscribe"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e01a1b] text-white transition-all duration-200 hover:scale-105 hover:bg-[#c41617]"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </form>
           </Reveal>
         </div>
 
-        {/* Brand statement strip — modern hairline divider + tagline */}
-        <div className="mt-10 sm:mt-12 lg:mt-16 pt-6 sm:pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
-          <p className="font-playfair text-lg sm:text-xl md:text-2xl text-white/90 tracking-tight">
-            From Manufacturer <span className="text-[#ff8a8b] italic">to</span> your Home.
-          </p>
-          <Link
-            href="/products"
-            className="group inline-flex items-center gap-2 text-sm font-semibold text-white/80 hover:text-white transition-colors duration-300"
-          >
-            Explore the collection
-            <ArrowUpRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-          </Link>
-        </div>
+        {/* ── Trust strip ──────────────────────────────────────────────── */}
+        <Reveal className="mt-14 border-t border-[#eceae4] pt-7">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-8">
+            {trust.map(({ Icon, title, sub }) => (
+              <div key={title} className="inline-flex items-center gap-2.5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e01a1b]/[0.06] text-[#e01a1b]">
+                  <Icon className="h-[18px] w-[18px]" strokeWidth={1.6} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold leading-tight text-[#26262a]">{title}</p>
+                  <p className="text-[11.5px] leading-tight text-[#8a8a92]">{sub}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Reveal>
       </div>
     </div>
   );

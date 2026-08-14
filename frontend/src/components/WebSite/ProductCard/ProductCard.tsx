@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Product as ServiceProduct } from '@/services/productService';
 import { PublicProduct } from '@/services/publicProductService';
 import { Product as MockProduct } from '@/components/mockData/products';
-import { Star, ShoppingCart, Heart } from 'lucide-react';
+import { Sparkles, ShoppingCart, Heart } from 'lucide-react';
 import { cartService } from '@/services/cartService';
 import { wishlistService } from '@/services/wishlistService';
 import { userAuthService } from '@/services/userAuthService';
@@ -196,166 +196,147 @@ const ProductCard = ({ product }: ProductCardProps) => {
   const effectivePrice = activeOffer ? activeOffer.offerPrice : displayPrice;
   const strikePrice = activeOffer ? activeOffer.originalPrice : regionalOriginalPrice;
 
-  const savings = strikePrice && strikePrice > (effectivePrice || 0)
-    ? strikePrice - (effectivePrice || 0)
+  // Single consolidated discount figure — drives both the image badge and the
+  // price accent so promo info is shown once, not repeated across pills.
+  const discountPct = strikePrice && effectivePrice && strikePrice > effectivePrice
+    ? Math.round((1 - effectivePrice / strikePrice) * 100)
+    : (typeof (product as any).discount === 'number' && (product as any).discount > 0 ? (product as any).discount : null);
+
+  // Actual money saved (auto-calculated from the effective vs. original price).
+  const savingsAmount = strikePrice && effectivePrice && strikePrice > effectivePrice
+    ? strikePrice - effectivePrice
     : null;
+
+  const ratingValue = Number(product.rating) || 0;
+  const reviewCount = Number(product.reviews) || 0;
+  const hasReviews = reviewCount > 0;
 
   return (
     <Link href={`/products/${product.slug || product.id}`} className="block h-full">
-      {/* Gradient frame — a hairline at rest, brand-lit on hover. The 1px padding
-          creates the border so the inner card keeps a clean white surface. */}
-      <div className="group relative h-full rounded-[1.4rem] p-px bg-linear-to-b from-black/[0.08] via-black/[0.04] to-black/[0.08] shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:from-[#e01a1b]/60 hover:via-[#e01a1b]/25 hover:to-[#ff6b3d]/50 hover:shadow-[0_18px_40px_-20px_rgba(224,26,27,0.16)] hover:-translate-y-2 transition-all duration-500 cursor-pointer">
-        {/* Ambient glow bloom behind the card on hover — kept very faint so it
-            reads as a soft lift, not a red halo. */}
-        <div className="pointer-events-none absolute -inset-2 -z-10 rounded-[1.7rem] bg-[#e01a1b]/0 blur-xl transition-all duration-500 group-hover:bg-[#e01a1b]/4" />
+      {/* Borderless editorial tile — the image and content define the card, not a
+          frame. No border, no rest shadow; a whisper of elevation on hover only. */}
+      <div className="group relative h-full flex flex-col overflow-hidden rounded-[14px] bg-white font-sans ring-1 ring-black/[0.06] transition-all duration-300 ease-out hover:-translate-y-1 hover:ring-black/[0.09] hover:shadow-[0_14px_30px_-18px_rgba(0,0,0,0.25)] cursor-pointer">
+        {/* ── Image: the visual hero ─────────────────────────────────────── */}
+        <div className="relative aspect-[5/4] w-full shrink-0 overflow-hidden bg-[radial-gradient(120%_100%_at_50%_0%,#faf9f7_0%,#ece9e4_100%)]">
+          <Image
+            src={imageUrl}
+            alt={product.name}
+            fill
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1536px) 25vw, 20vw"
+            className="object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.03]"
+            unoptimized={!primaryImage}
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = placeholderImage;
+            }}
+          />
 
-        <div className="relative h-full flex flex-col bg-white font-sans rounded-[1.35rem] overflow-hidden">
-          {/* Media */}
-          <div className="relative h-32 sm:h-36 md:h-40 w-full overflow-hidden shrink-0 bg-[radial-gradient(120%_100%_at_50%_0%,#faf9f7_0%,#eceae6_100%)]">
-            <Image
-              src={imageUrl}
-              alt={product.name}
-              fill
-              sizes="(max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
-              className="object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.14]"
-              unoptimized={!primaryImage} // Don't optimize placeholder SVG
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.src = placeholderImage;
-              }}
-            />
+          {/* Single, compact promo accent — top-left */}
+          {discountPct ? (
+            <span className="absolute top-2.5 left-2.5 z-10 rounded-md bg-[#22c55e] px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-white shadow-[0_0_4px_rgba(34,197,94,0.35)]">
+              −{discountPct}%
+            </span>
+          ) : null}
 
-            {/* Bottom scrim — grounds the image and deepens on hover */}
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-black/25 to-transparent opacity-70 transition-opacity duration-500 group-hover:opacity-100" />
-
-            {/* Sheen sweep across the image on hover */}
-            <div className="pointer-events-none absolute inset-0 -translate-x-full skew-x-12 bg-linear-to-r from-transparent via-white/30 to-transparent transition-transform duration-[1000ms] ease-out group-hover:translate-x-full" />
-
-            {activeOffer ? (
-              <div className="absolute top-3 left-3 z-10 rounded-full bg-linear-to-r from-[#e01a1b] to-[#ff5a36] px-2.5 py-1 text-[11px] font-bold tracking-wide text-white shadow-[0_6px_18px_rgba(224,26,27,0.5)] ring-1 ring-white/40">
-                {activeOffer.badge}
-              </div>
-            ) : product.discount ? (
-              <div className="absolute top-3 left-3 z-10 rounded-full bg-linear-to-r from-[#e01a1b] to-[#ff5a36] px-2.5 py-1 text-[11px] font-bold tracking-wide text-white shadow-[0_6px_18px_rgba(224,26,27,0.5)] ring-1 ring-white/40">
-                {product.discount}% OFF
-              </div>
-            ) : null}
-
-            {/* Wishlist Button — frosted glass pill */}
-            <button
-              onClick={handleToggleWishlist}
-              disabled={false}
-              className={`absolute top-3 right-3 p-2 sm:p-2.5 rounded-full backdrop-blur-md ring-1 transition-all duration-300 hover:scale-110 active:scale-95 ${isInWishlist
-                ? 'bg-[#e01a1b] text-white ring-[#e01a1b] shadow-[0_6px_16px_rgba(224,26,27,0.45)]'
-                : 'bg-white/70 text-gray-700 ring-white/60 hover:bg-white hover:text-[#e01a1b]'
-                } disabled:opacity-50 disabled:cursor-not-allowed shadow-md z-10`}
-              title={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-            >
-              <Heart
-                className={`w-4 h-4 sm:w-[18px] sm:h-[18px] ${isInWishlist ? 'fill-current' : ''}`}
-              />
-            </button>
-
-            {/* Category — sits on the image so the body can lead with the product */}
-            <div className="absolute bottom-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-full bg-white/85 backdrop-blur-md px-2.5 py-1 ring-1 ring-black/5 shadow-sm">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#e01a1b]" />
-              <span className="text-[10px] uppercase tracking-[0.14em] text-[#1a1a1a] font-bold">
-                {product.category}
-              </span>
-            </div>
-
-            {!isActuallyInStock && (
-              <div className="absolute bottom-3 right-3 bg-white/85 backdrop-blur-md text-[#1a1a1a] px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ring-black/10 z-10">
-                Out of Stock
-              </div>
+          {/* Rating — compact metric pinned to the image's bottom-left corner */}
+          <div className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 rounded-md bg-white/80 px-1.5 py-0.5 text-[11px] leading-none shadow-sm ring-1 ring-black/[0.06] backdrop-blur-sm">
+            {hasReviews ? (
+              <>
+                <span className="font-bold tabular-nums text-[#1a1a1a]">{ratingValue.toFixed(1)}</span>
+                <Sparkles className="h-3 w-3 text-[#C7A66A] fill-[#C7A66A]" strokeWidth={1.5} />
+                <span className="tabular-nums text-gray-500">{reviewCount}</span>
+              </>
+            ) : (
+              <span className="font-semibold text-gray-600">New</span>
             )}
           </div>
 
-          {/* Body */}
-          <div className="p-2.5 sm:p-3 flex flex-col grow justify-between">
-            {/* Top content - flexible */}
-            <div className="grow">
-              <h3 className="font-playfair text-sm sm:text-base font-semibold text-[#1a1a1a] mb-1 break-words tracking-tight transition-colors duration-300 group-hover:text-[#e01a1b]">
-                {product.name}
-              </h3>
+          {/* Wishlist — compact glyph on a subtle frosted disc so it stays clearly
+              visible over both light and dark product photos. */}
+          <button
+            onClick={handleToggleWishlist}
+            aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+            title={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+            className="absolute top-2 right-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-white/75 backdrop-blur-sm shadow-sm ring-1 ring-black/[0.06] transition-all duration-300 hover:bg-white active:scale-90 focus:outline-none"
+          >
+            <Heart
+              className={`h-4 w-4 transition-all duration-300 ${isInWishlist
+                ? 'fill-[#e01a1b] text-[#e01a1b] scale-110'
+                : 'text-[#3a3a3a] hover:text-[#e01a1b]'
+                }`}
+              strokeWidth={2.2}
+            />
+          </button>
 
-              <div className="flex items-center mb-1.5">
-                <div className="flex items-center flex-wrap gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${i < Math.floor(product.rating || 0) ? 'text-[#f5a524] fill-current' : 'text-gray-200 fill-current'
-                        }`}
-                    />
-                  ))}
-                  <span className="ml-1 text-[11px] text-gray-500">
-                    {product.rating || 0} ({product.reviews || 0})
-                  </span>
-                </div>
-              </div>
-
-              {/* Price — the hero of the card: large, bold sans + tabular figures
-                  so the digits stay crisp and evenly spaced. */}
-              <div className="flex items-end justify-between gap-2 flex-wrap">
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="text-xl sm:text-2xl leading-none font-extrabold text-[#1a1a1a] tracking-tight tabular-nums">
-                    {formatPrice(effectivePrice || 0)}
-                  </span>
-                  {strikePrice && strikePrice > (effectivePrice || 0) ? (
-                    <span className="text-sm text-gray-400 line-through tabular-nums">
-                      {formatPrice(strikePrice)}
-                    </span>
-                  ) : null}
-                </div>
-                {savings ? (
-                  <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200 tabular-nums">
-                    Save {formatPrice(savings)}
-                  </span>
-                ) : null}
-              </div>
+          {!isActuallyInStock && (
+            <div className="absolute inset-0 z-10 grid place-items-center bg-white/45 backdrop-blur-[1px]">
+              <span className="rounded-md bg-[#1a1a1a]/85 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+                Out of Stock
+              </span>
             </div>
+          )}
+        </div>
 
-            {/* Bottom content - fixed at bottom */}
-            <div className="shrink-0">
-              {/* Hairline divider for a refined split */}
-              <div className="h-px w-full bg-linear-to-r from-transparent via-gray-200 to-transparent my-2" />
+        {/* ── Body: Product → Rating → Price → Action ─────────────────────── */}
+        <div className="flex grow flex-col p-2.5">
+          {/* Meta block grows so the price + action stay bottom-aligned across cards */}
+          <div className="grow">
+            <h3 className="font-playfair text-[13px] sm:text-sm font-semibold leading-snug tracking-tight text-[#1a1a1a] line-clamp-2 transition-colors duration-300 group-hover:text-[#e01a1b]">
+              {product.name}
+            </h3>
+          </div>
 
-              {/* Quantity + Add to Cart */}
-              <div className="flex items-center gap-2">
-                {isActuallyInStock && (
-                  <div className="inline-flex items-center shrink-0 rounded-full ring-1 ring-gray-200 bg-gray-50/80 p-0.5">
-                    <button
-                      onClick={handleDecrement}
-                      disabled={quantity <= 1}
-                      aria-label="Decrease quantity"
-                      className="w-7 h-7 flex items-center justify-center rounded-full text-gray-600 hover:bg-white hover:text-[#e01a1b] hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-all duration-200"
-                    >
-                      <span className="text-base font-semibold leading-none">−</span>
-                    </button>
-                    <span className="w-7 text-center font-semibold text-sm text-[#1a1a1a] tabular-nums">{quantity}</span>
-                    <button
-                      onClick={handleIncrement}
-                      aria-label="Increase quantity"
-                      className="w-7 h-7 flex items-center justify-center rounded-full text-gray-600 hover:bg-white hover:text-[#e01a1b] hover:shadow-sm transition-all duration-200"
-                    >
-                      <span className="text-base font-semibold leading-none">+</span>
-                    </button>
-                  </div>
-                )}
+          {/* Price — the financial hero, consolidated on one line */}
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-lg sm:text-xl font-extrabold leading-none tracking-tight tabular-nums text-[#1a1a1a]">
+              {formatPrice(effectivePrice || 0)}
+            </span>
+            {strikePrice && strikePrice > (effectivePrice || 0) ? (
+              <span className="text-xs text-gray-400 line-through tabular-nums">
+                {formatPrice(strikePrice)}
+              </span>
+            ) : null}
+            {savingsAmount ? (
+              <span className="ml-auto rounded bg-[#22c55e]/12 px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums text-[#15803d]">
+                Save {formatPrice(savingsAmount)}
+              </span>
+            ) : null}
+          </div>
 
+          {/* Action — one integrated row, moderate radius */}
+          <div className="mt-2.5 flex items-center gap-2">
+            {isActuallyInStock && (
+              <div className="inline-flex shrink-0 items-center rounded-md ring-1 ring-gray-200 bg-gray-50/70">
                 <button
-                  onClick={handleAddToCart}
-                  disabled={!isActuallyInStock || isAddingToCart || (isActuallyInStock && quantity > currentStock)}
-                  className={`btn-shine group/btn flex-1 min-w-0 whitespace-nowrap py-2 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-2 ${isActuallyInStock
-                    ? 'bg-linear-to-r from-[#e01a1b] to-[#ff4d2d] text-white shadow-[0_8px_22px_-6px_rgba(224,26,27,0.6)] hover:shadow-[0_16px_34px_-8px_rgba(224,26,27,0.75)] hover:brightness-110 active:scale-[0.97]'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed ring-1 ring-gray-200'
-                    } disabled:cursor-not-allowed`}
+                  onClick={handleDecrement}
+                  disabled={quantity <= 1}
+                  aria-label="Decrease quantity"
+                  className="grid h-8 w-7 place-items-center rounded-l-md text-gray-500 transition-colors duration-200 hover:text-[#e01a1b] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-gray-500"
                 >
-                  <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-300 group-hover/btn:scale-110" />
-                  {isAddingToCart ? 'Adding...' : isActuallyInStock ? 'Add to Cart' : 'Out of Stock'}
+                  <span className="text-base font-semibold leading-none">−</span>
+                </button>
+                <span className="w-5 text-center text-sm font-semibold tabular-nums text-[#1a1a1a]">{quantity}</span>
+                <button
+                  onClick={handleIncrement}
+                  aria-label="Increase quantity"
+                  className="grid h-8 w-7 place-items-center rounded-r-md text-gray-500 transition-colors duration-200 hover:text-[#e01a1b]"
+                >
+                  <span className="text-base font-semibold leading-none">+</span>
                 </button>
               </div>
-            </div>
+            )}
+
+            <button
+              onClick={handleAddToCart}
+              disabled={!isActuallyInStock || isAddingToCart || (isActuallyInStock && quantity > currentStock)}
+              className={`btn-shine group/btn flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-semibold transition-all duration-300 ${isActuallyInStock
+                ? 'bg-[#e01a1b] text-white hover:brightness-[1.06] active:scale-[0.98]'
+                : 'cursor-not-allowed bg-gray-100 text-gray-400 ring-1 ring-gray-200'
+                } disabled:cursor-not-allowed`}
+            >
+              <ShoppingCart className="h-4 w-4 transition-transform duration-300 group-hover/btn:scale-110" />
+              {isAddingToCart ? 'Adding…' : isActuallyInStock ? 'Add to Cart' : 'Unavailable'}
+            </button>
           </div>
         </div>
       </div>

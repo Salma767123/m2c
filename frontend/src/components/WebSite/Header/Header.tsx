@@ -11,13 +11,14 @@ import {
   X,
   User,
   Settings,
-  Truck,
-  Store,
-  Headphones,
   ChevronDown,
+  Store,
+  ArrowUpRight,
+  Sparkles,
 } from "lucide-react";
 import { IconUserFilled } from '@tabler/icons-react';
-import Category from "./CategoryBar/CategoryBar";
+import DiscoverNav from "./Discover/DiscoverNav";
+import CategoryRibbon from "./CategoryRibbon/CategoryRibbon";
 import { isAuthenticated } from "@/lib/auth";
 import { cartService } from "@/services/cartService";
 import { wishlistService } from "@/services/wishlistService";
@@ -27,6 +28,7 @@ import NotificationDropdown from "@/components/Shared/NotificationDropdown";
 import { USER_CATEGORIES } from "@/components/Shared/NotificationModal";
 import CompanyLogo from "@/components/Shared/CompanyLogo";
 import { subscribeToAuthChange, dispatchAuthChange } from "@/lib/authEvents";
+import VendorApplicationModal from "@/components/WebSite/Shared/VendorApplicationModal";
 
 // Pages that show the PRIMARY logo. Every other page shows the secondary logo.
 // Edit this list to move a page between the two logos.
@@ -39,6 +41,10 @@ const Header = () => {
   const logoVariant = PRIMARY_LOGO_ROUTES.includes(pathname) ? 'primary' : 'secondary';
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
+  // M2C for Business — opens the existing vendor application form (same modal the
+  // homepage seller banner uses). No new form is built here.
+  const [showVendorModal, setShowVendorModal] = useState(false);
+  const handleVendorEntry = () => setShowVendorModal(true);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
@@ -275,49 +281,23 @@ const Header = () => {
 
   return (
     <div className="sticky top-0 z-50 font-sans isolate">
-      {/* Brand accent bar — a live sliver of primary colour across the top */}
-      <div className="h-1 w-full animate-brand-bar" />
-
-      {/* Utility strip — quick links (Amazon/Flipkart pattern). Desktop only. */}
-      <div className="hidden md:block bg-[#1a1a1a] text-white">
-        <div className="max-w-7xl 2xl:max-w-420 mx-auto px-4 md:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-8 text-xs">
-            <span className="text-gray-300">Direct from Manufacturer to Customer</span>
-            <div className="flex items-center gap-4 lg:gap-5">
-              {isUserLoggedIn && (
-                <>
-                  <Link href="/order" className="inline-flex items-center gap-1.5 text-gray-200 hover:text-white transition-colors">
-                    <Truck className="w-3.5 h-3.5" /> Track Order
-                  </Link>
-                  <span className="h-3 w-px bg-white/20" />
-                </>
-              )}
-              <Link href="/contact" className="inline-flex items-center gap-1.5 text-gray-200 hover:text-white transition-colors">
-                <Headphones className="w-3.5 h-3.5" /> Help Centre
-              </Link>
-              <span className="h-3 w-px bg-white/20" />
-              <Link href="/vendor" className="inline-flex items-center gap-1.5 text-gray-200 hover:text-white transition-colors">
-                <Store className="w-3.5 h-3.5" /> Sell on M2C
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main Header — no heavy shadow: it used to cast over the category nav
           below and make it look 'hidden behind'. The nav row carries the one
           subtle shadow at the bottom of the sticky header stack. */}
-      <header className="relative z-30 bg-white border-b border-gray-100 transition-all duration-300">
-        <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-12 sm:h-14 md:h-16 lg:h-18 xl:h-20 gap-2 sm:gap-3 md:gap-4">
+      {/* No divider between this row and the category ribbon below — the two rows
+          read as one continuous header surface; the ribbon carries the single
+          bottom edge. Same container/max-width as the ribbon so both align. */}
+      <header className="relative z-30 bg-white transition-all duration-300">
+        <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14 sm:h-16 lg:h-[68px] gap-3 sm:gap-4">
 
-            {/* Logo */}
+            {/* Logo — sized to sit comfortably in the row without dominating it. */}
             <Link href="/" className="flex items-center shrink-0">
               <CompanyLogo
                 variant={logoVariant}
-                className="h-10 sm:h-12 md:h-14 lg:h-16 xl:h-18 w-auto object-contain"
-                skeletonClassName="h-10 sm:h-12 md:h-14 lg:h-16 xl:h-18 aspect-square bg-gray-100"
-                fallbackSizes="(max-width: 640px) 48px, (max-width: 768px) 56px, (max-width: 1024px) 64px, (max-width: 1280px) 72px, 80px"
+                className="h-11 sm:h-12 lg:h-14 w-auto object-contain"
+                skeletonClassName="h-11 sm:h-12 lg:h-14 aspect-square bg-gray-100"
+                fallbackSizes="(max-width: 640px) 44px, (max-width: 1024px) 48px, 56px"
                 priority
               />
             </Link>
@@ -325,7 +305,7 @@ const Header = () => {
             {/* Prominent inline search — the primary way to find products
                 (Amazon/Flipkart/Myntra pattern). Fills the header on md+; on
                 mobile the compact search icon in the actions opens the modal. */}
-            <form onSubmit={handleSearchSubmit} className="hidden md:flex flex-1 min-w-0 max-w-3xl mx-3 lg:mx-6">
+            <form onSubmit={handleSearchSubmit} className="hidden md:flex flex-1 min-w-0 max-w-lg lg:max-w-xl mx-4 lg:mx-6">
               <div className="relative w-full">
                 <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -334,11 +314,11 @@ const Header = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search for products, categories & more"
                   aria-label="Search products"
-                  className="w-full pl-10 pr-28 py-2.5 lg:py-3 rounded-full bg-gray-50 border border-gray-200 text-sm text-gray-800 placeholder-gray-400 focus:bg-white focus:border-[#e01a1b] focus:ring-4 focus:ring-[#e01a1b]/10 outline-none transition-all"
+                  className="w-full pl-10 pr-28 py-2 lg:py-2.5 rounded-full bg-gray-50 border border-gray-200 text-sm text-gray-800 placeholder-gray-400 focus:bg-white focus:border-[#e01a1b] focus:ring-4 focus:ring-[#e01a1b]/10 outline-none transition-all"
                 />
                 <button
                   type="submit"
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 bg-[#e01a1b] hover:bg-[#c41617] text-white text-sm font-semibold px-5 py-2 rounded-full transition-colors"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 bg-[#e01a1b] hover:bg-[#c41617] text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-colors"
                 >
                   <Search className="w-4 h-4" />
                   <span className="hidden 2xl:inline">Search</span>
@@ -348,6 +328,9 @@ const Header = () => {
 
             {/* Action Icons */}
             <div className="flex items-center justify-end gap-1 sm:gap-2 shrink-0">
+              {/* DISCOVER ✦ — the marketplace exploration entry point (complements search) */}
+              <DiscoverNav />
+
               {/* Notifications (logged-in users only) */}
               {isUserLoggedIn && (
                 <NotificationDropdown categories={USER_CATEGORIES} colorScheme="brand" />
@@ -393,6 +376,45 @@ const Header = () => {
               >
                 <Search className="w-5 h-5 md:w-6 md:h-6" />
               </button>
+
+              {/* ── SELL ON M2C — premium animated CTA pill (charcoal→gold→red) ──
+                  Vertically centred like the rest of the cluster. On hover: a light
+                  shine sweeps across, the storefront lifts with a sparkle pop, the
+                  arrow flies up-right, and the pill lifts with a brand glow. Opens the
+                  existing vendor application form on click. */}
+              <div className="order-5 hidden lg:flex items-center self-center">
+                <span className="mx-1.5 h-6 w-px bg-[#EFE8DB]" aria-hidden="true" />
+                <button
+                  type="button"
+                  onClick={handleVendorEntry}
+                  aria-label="Sell on M2C"
+                  className="group/sell relative inline-flex items-center gap-2 overflow-hidden rounded-full px-3.5 xl:px-4 py-2 text-[11px] font-bold uppercase tracking-[0.1em] text-white transition-all duration-300 hover:-translate-y-0.5 hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e01a1b]/45"
+                  style={{ backgroundImage: 'linear-gradient(120deg,#e01a1b 0%,#ff5a36 100%)' }}
+                >
+                  {/* diagonal shine sweep on hover */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 -translate-x-[130%] skew-x-[20deg] bg-gradient-to-r from-transparent via-white/35 to-transparent transition-transform duration-[900ms] ease-out group-hover/sell:translate-x-[130%] motion-reduce:hidden"
+                  />
+                  {/* storefront glyph + sparkle pop */}
+                  <span className="relative flex items-center justify-center">
+                    <Store
+                      className="w-4 h-4 transition-transform duration-300 ease-out motion-reduce:transition-none group-hover/sell:-translate-y-0.5 group-hover/sell:scale-110"
+                      strokeWidth={2}
+                    />
+                    <Sparkles
+                      className="absolute -top-2 -right-2 w-2.5 h-2.5 text-amber-200 opacity-0 scale-50 transition-all duration-300 ease-out motion-reduce:transition-none group-hover/sell:opacity-100 group-hover/sell:scale-100"
+                      strokeWidth={2.5}
+                    />
+                  </span>
+                  <span className="relative hidden xl:inline">Sell on M2C</span>
+                  <span className="relative xl:hidden">Sell</span>
+                  <ArrowUpRight
+                    className="relative w-3.5 h-3.5 transition-transform duration-300 ease-out motion-reduce:transition-none group-hover/sell:translate-x-0.5 group-hover/sell:-translate-y-0.5"
+                    strokeWidth={2.5}
+                  />
+                </button>
+              </div>
 
               {/* User Account Dropdown — bordered pill, first in the cluster */}
               <div
@@ -556,6 +578,18 @@ const Header = () => {
                 <span>My Orders</span>
               </Link>
 
+              {/* Sell on M2C — opens the existing vendor form (mobile). */}
+              <button
+                type="button"
+                onClick={() => { setIsMenuOpen(false); handleVendorEntry(); }}
+                aria-label="Sell on M2C"
+                className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base text-[#252525] border border-[#C7A66A]/55 bg-[#FAF7F1] hover:border-[#C7A66A] hover:bg-[#FBF5EA]"
+              >
+                <Store className="w-4 h-4 text-[#C7A66A]" strokeWidth={1.75} />
+                <span className="uppercase tracking-[0.07em] text-[13px] font-semibold">Sell on M2C</span>
+                <ArrowUpRight className="w-3.5 h-3.5 text-[#C7A66A] ml-auto" strokeWidth={2} />
+              </button>
+
               <hr className="my-3 sm:my-4 border-slate-200" />
 
               {isUserLoggedIn && userName && (
@@ -618,10 +652,8 @@ const Header = () => {
         )}
       </header>
 
-      {/* Category navigation — Myntra-style horizontal nav with mega-menus */}
-      <div className="relative z-20">
-        <Category />
-      </div>
+      {/* Adaptive Category Ribbon — fast-access category rail below the header */}
+      <CategoryRibbon />
 
       {/* Search panel — drops down from the header, page stays visible behind */}
       {showSearchModal && (
@@ -692,6 +724,9 @@ const Header = () => {
           </div>
         </>
       )}
+
+      {/* Existing vendor application form — opened by the Seller Portal control. */}
+      <VendorApplicationModal open={showVendorModal} onClose={() => setShowVendorModal(false)} />
     </div>
   );
 };
