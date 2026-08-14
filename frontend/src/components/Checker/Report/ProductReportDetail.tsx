@@ -3,15 +3,18 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useSearchParams } from "next/navigation"
+import { formatInspectionDate } from "@/lib/checkerUtils"
+import { verificationLabel, isTestOptional } from "@/components/Checker/Vendor/Steps/PI_data"
 import type { LucideIcon } from "lucide-react"
 import {
   ArrowLeft, CheckCircle, XCircle,
   AlertTriangle, ClipboardList,
-  Box, Bug, FlaskConical, Camera, Star, Download, Clock, FileText
+  Box, Bug, FlaskConical, Camera, Star, Download, Clock, FileText, AlarmClockOff
 } from "lucide-react"
 import { Badge } from "@/components/UI/Badge"
 import qcCheckerService from "@/services/qcCheckerService"
 import { generateProductInspectionPdf } from "@/lib/productInspectionReportPdf"
+import { computeInspectionDurations } from "@/lib/inspectionDuration"
 import ManufacturerInfoCard from "@/components/Shared/ManufacturerInfoCard"
 import { hasManufacturerInfo } from "@/lib/manufacturerInfo"
 
@@ -92,17 +95,13 @@ const REMARK_LABELS: Record<number, string> = {
   7: "Re-inspection", 8: "Acceptable", 9: "Good", 10: "Excellent",
 }
 
-// Humanize a productVerifications key (e.g. "pv_spec_gsm" → "Spec Gsm").
-function humanizeVerKey(key: string): string {
-  return key.replace(/^pv_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-}
-
 // camelCase / snake_case evidence key → Title Case (e.g. "factoryFrontView" → "Factory Front View").
 function humanizeEvidenceKey(key: string): string {
   return key.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 const statusColors: Record<string, string> = {
+  QC_SUBMITTED: "bg-blue-100 text-blue-800",
   QC_APPROVED: "bg-emerald-100 text-emerald-800",
   APPROVED: "bg-emerald-100 text-emerald-800",
   REJECTED: "bg-red-100 text-red-800",
@@ -111,6 +110,7 @@ const statusColors: Record<string, string> = {
 }
 
 const statusLabels: Record<string, string> = {
+  QC_SUBMITTED: "Submitted",
   QC_APPROVED: "Approved by QC",
   APPROVED: "Approved by Admin",
   REJECTED: "Rejected",
@@ -163,6 +163,12 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
     autoDownloadTriggered.current = true
     const fd = (product.qcInspectionData || {}) as Record<string, any>
     const assignedQc = (product as any).assignedQc
+    const d = computeInspectionDurations({
+      startedAt: fd.inspectionStartedAt,
+      submittedAt: fd.inspectionCompletedAt,
+      totalPausedMs: fd.totalPausedMs || 0,
+      estimatedDuration: (product as any).qcAssignment?.estimatedDuration,
+    })
     const meta = {
       productName: product.name,
       vendorName: product.vendor?.companyName || fd.vendor,
@@ -173,7 +179,19 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
       location: fd.checkerLocation?.checkerLatitude != null
           ? { latitude: fd.checkerLocation.checkerLatitude, longitude: fd.checkerLocation.checkerLongitude }
           : undefined,
+      locationVerified: fd.checkerLocation?.verified,
+      locationDistanceM: fd.checkerLocation?.distanceMeters,
+      matchedAddress: fd.checkerLocation?.matchedAddress,
+      inspectionStartedAt: fd.inspectionStartedAt,
+      inspectionCompletedAt: fd.inspectionCompletedAt,
       generatedAt: new Date(),
+      ...(d.totalMs > 0 ? {
+        activeDurationMs: d.activeMs,
+        pausedDurationMs: d.pausedMs,
+        totalDurationMs: d.totalMs,
+        scheduledDurationMs: d.scheduledMs,
+        exceededSchedule: d.exceeded,
+      } : {}),
     }
     try {
       const pdf = generateProductInspectionPdf(fd, meta, {})
@@ -224,6 +242,17 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fd = (product.qcInspectionData || {}) as Record<string, any>
   const status = product.approvalStatus || "PENDING"
+  const overtime = computeInspectionDurations({
+    startedAt: fd.inspectionStartedAt,
+    submittedAt: fd.inspectionCompletedAt,
+    totalPausedMs: fd.totalPausedMs || 0,
+    estimatedDuration: (product as any).qcAssignment?.estimatedDuration,
+  }).exceeded
+  const overtimeBadge = overtime ? (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border bg-red-50 text-red-700 border-red-200">
+      <AlarmClockOff className="w-3.5 h-3.5" /> Exceeded schedule
+    </span>
+  ) : null
 
   // ── New-schema inspection data (matches the 7-step form + PDF generator) ────
   const productVerifications: [string, any][] = Object.entries(fd.productVerifications || {})
@@ -247,6 +276,12 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
     try {
       const fd = (product.qcInspectionData || {}) as Record<string, any>
       const assignedQc = (product as any).assignedQc
+      const d = computeInspectionDurations({
+        startedAt: fd.inspectionStartedAt,
+        submittedAt: fd.inspectionCompletedAt,
+        totalPausedMs: fd.totalPausedMs || 0,
+        estimatedDuration: (product as any).qcAssignment?.estimatedDuration,
+      })
       const meta = {
         productName: product.name,
         vendorName: product.vendor?.companyName || fd.vendor,
@@ -257,8 +292,19 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
         location: fd.checkerLocation?.checkerLatitude != null
             ? { latitude: fd.checkerLocation.checkerLatitude, longitude: fd.checkerLocation.checkerLongitude }
             : undefined,
+        locationVerified: fd.checkerLocation?.verified,
+        locationDistanceM: fd.checkerLocation?.distanceMeters,
+        matchedAddress: fd.checkerLocation?.matchedAddress,
         inspectionStartedAt: fd.inspectionStartedAt,
+        inspectionCompletedAt: fd.inspectionCompletedAt,
         generatedAt: new Date(),
+        ...(d.totalMs > 0 ? {
+          activeDurationMs: d.activeMs,
+          pausedDurationMs: d.pausedMs,
+          totalDurationMs: d.totalMs,
+          scheduledDurationMs: d.scheduledMs,
+          exceededSchedule: d.exceeded,
+        } : {}),
       }
       const pdf = generateProductInspectionPdf(fd, meta, {})
       pdf.save(`Product_Report_${product.name.replace(/\s+/g, "_")}_${product.baseSku || productId}.pdf`)
@@ -292,6 +338,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
           <Download className="w-4 h-4" />
           {downloading ? "Generating..." : "Download PDF"}
         </button>
+        {overtimeBadge}
         <Badge className={`${statusColors[status] || "bg-gray-100 text-gray-700"} text-sm px-4 py-1.5`}>
           {status === "QC_APPROVED" || status === "APPROVED" ? <CheckCircle className="w-4 h-4 mr-1.5" /> : null}
           {status === "REJECTED" ? <XCircle className="w-4 h-4 mr-1.5" /> : null}
@@ -338,7 +385,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
           <InfoRow label="Vendor" value={fd.vendor} />
           <InfoRow label="Factory" value={fd.factory} />
           <InfoRow label="Service Location" value={fd.serviceLocation} />
-          <InfoRow label="Service Start Date" value={fd.serviceStartDate} />
+          <InfoRow label="Service Start Date" value={formatInspectionDate(fd.serviceStartDate)} />
           <InfoRow label="Service Type" value={fd.serviceType} />
         </div>
       </Section>
@@ -367,7 +414,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
                   const ok = entry?.ok
                   return (
                     <tr key={key} className="border-b border-slate-50 hover:bg-slate-50/50">
-                      <td className="p-3 font-medium text-slate-900">{humanizeVerKey(key)}</td>
+                      <td className="p-3 font-medium text-slate-900">{verificationLabel(key)}</td>
                       <td className="p-3 text-center">
                         {ok === true ? (
                           <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><CheckCircle className="w-3.5 h-3.5" />Verified</span>
@@ -503,6 +550,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
                     {groupTests.map((test, i) => {
                       const passed = test.pass === true
                       const failed = test.fail === true
+                      const optional = !test.isOther && isTestOptional(test.id, group.packagingType)
                       const rightPhotos: any[] = Array.isArray(test.rightPhotos) ? test.rightPhotos : []
                       const wrongPhotos: any[] = Array.isArray(test.wrongPhotos) ? test.wrongPhotos : []
                       return (
@@ -512,6 +560,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
                               <p className="font-semibold text-slate-900 text-sm flex items-center gap-2">
                                 {test.label || (test.isOther ? test.subject : "") || `Test ${i + 1}`}
                                 {test.isOther && <span className="text-[10px] font-bold uppercase tracking-wide text-brand-600 bg-brand-50 border border-brand-100 px-1.5 py-0.5 rounded">Custom</span>}
+                                {optional && <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">Optional</span>}
                               </p>
                               {test.isOther && test.subject && <p className="text-xs text-slate-500 mt-0.5">Subject: {test.subject}</p>}
                               {test.remarks && <p className="text-xs text-slate-500 mt-0.5">{test.remarks}</p>}
@@ -527,7 +576,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
                               </span>
                             )}
                             {!passed && !failed && (
-                              <span className="text-xs text-slate-400">No decision</span>
+                              <span className="text-xs text-slate-400">{optional ? "Optional — not tested" : "No decision"}</span>
                             )}
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

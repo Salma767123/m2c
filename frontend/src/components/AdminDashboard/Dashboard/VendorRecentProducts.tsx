@@ -17,6 +17,8 @@ const getStatusBadge = (status: string) => {
       return <Badge className="bg-green-50 text-green-700 border border-green-200">Active</Badge>
     case 'Pending':
       return <Badge className="bg-yellow-50 text-yellow-700 border border-yellow-200">Pending</Badge>
+    case 'QC_SUBMITTED':
+      return <Badge className="bg-blue-50 text-blue-700 border border-blue-200">Pending Review</Badge>
     case 'REINSPECTION':
       return <Badge className="bg-orange-50 text-orange-700 border border-orange-200 border border-orange-200">Reinspection</Badge>
     default:

@@ -826,7 +826,7 @@ const getQcProductReports = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const where = { qcInspectionData: { not: null } };
-        if (['APPROVED', 'REJECTED', 'REINSPECTION', 'QC_APPROVED', 'PENDING'].includes(status)) {
+        if (['APPROVED', 'REJECTED', 'REINSPECTION', 'QC_SUBMITTED', 'QC_APPROVED', 'PENDING'].includes(status)) {
             where.approvalStatus = status;
         }
         if (search) {

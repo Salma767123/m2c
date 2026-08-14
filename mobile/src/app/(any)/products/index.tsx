@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -33,9 +33,11 @@ import ProductCard from '@/components/WebSite/ProductCard/ProductCard';
 import {
   publicProductService,
   PublicProduct,
+  ProductFacets,
 } from '@/services/publicProductService';
 import { categoryService, Category } from '@/services/categoryService';
 import { useCart } from '@/context/CartContext';
+import { Palette } from '@/constants/theme';
 
 // ─── Types & constants ────────────────────────────────────────────────────
 type LoadState = 'initial' | 'ready' | 'empty' | 'error';
@@ -49,6 +51,13 @@ type Filters = {
   maxPrice?: number;
   minRating: number; // 0 means "any"
   inStockOnly: boolean;
+  newArrivals: boolean;
+  collection: string; // '' | 'featured' | 'top-selling' | 'best-seller'
+  minDiscount: number; // 0 means "any"
+  colors: string[];
+  sizes: string[];
+  materials: string[];
+  fabricTypes: string[];
   sort: SortKey;
 };
 
@@ -63,6 +72,16 @@ const SORT_OPTIONS: SortOption[] = [
   { key: 'price_desc', label: 'Price: High to Low', sortBy: 'basePrice', sortOrder: 'desc' },
   { key: 'rating_desc', label: 'Highest rated', sortBy: 'rating', sortOrder: 'desc' },
 ];
+
+// Homepage collections, driven by product tags — mirrors the web ?collection= param.
+const COLLECTIONS = [
+  { key: 'featured', label: 'Featured', tag: 'Featured' },
+  { key: 'top-selling', label: 'Top Selling', tag: 'Top Selling' },
+  { key: 'best-seller', label: 'Best Seller', tag: 'Best Seller' },
+];
+
+// Discount buckets capped at the real maximum available discount — mirrors web.
+const DISCOUNT_BUCKETS = [10, 20, 30, 40, 50];
 
 // Order matches web: 4-star → 1-star, then "All Ratings" at the bottom.
 // Label uses "& Up" phrasing identical to the web filter sidebar.
@@ -82,6 +101,7 @@ export default function ProductsScreen() {
     category?: string;
     subcategory?: string;
     search?: string;
+    collection?: string;
   }>();
   const { itemCount } = useCart();
 
@@ -93,6 +113,15 @@ export default function ProductsScreen() {
     maxPrice: undefined,
     minRating: 0,
     inStockOnly: false,
+    newArrivals: false,
+    collection: COLLECTIONS.some((c) => c.key === params.collection)
+      ? (params.collection as string)
+      : '',
+    minDiscount: 0,
+    colors: [],
+    sizes: [],
+    materials: [],
+    fabricTypes: [],
     sort: 'newest',
   });
 
@@ -105,6 +134,17 @@ export default function ProductsScreen() {
     return () => clearTimeout(id);
   }, [searchInput]);
 
+  // Keep the collection filter in sync when the ?collection= param changes while
+  // already on this page (e.g. jumping between the home sections' "View All" links).
+  useEffect(() => {
+    setFilters((f) => ({
+      ...f,
+      collection: COLLECTIONS.some((c) => c.key === params.collection)
+        ? (params.collection as string)
+        : '',
+    }));
+  }, [params.collection]);
+
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -112,6 +152,30 @@ export default function ProductsScreen() {
   const [state, setState] = useState<LoadState>('initial');
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Live filter facets (colors/sizes/materials/fabric/discount) — mirrors the web
+  // sidebar. Re-fetched whenever the search/category context changes.
+  const [facets, setFacets] = useState<ProductFacets | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+    publicProductService
+      .getFacets({
+        search: filters.search || undefined,
+        category: filters.category || undefined,
+        subCategory: filters.subCategory || undefined,
+      })
+      .then((res) => {
+        if (!ignore && res.success && res.data) setFacets(res.data);
+      })
+      .catch(() => {
+        /* facets are optional — ignore */
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [filters.search, filters.category, filters.subCategory]);
+
 
   const [showSort, setShowSort] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
@@ -144,6 +208,13 @@ export default function ProductsScreen() {
           maxPrice: filters.maxPrice,
           minRating: filters.minRating > 0 ? filters.minRating : undefined,
           inStock: filters.inStockOnly ? true : undefined,
+          tag: COLLECTIONS.find((c) => c.key === filters.collection)?.tag || undefined,
+          colors: filters.colors.length ? filters.colors.join(',') : undefined,
+          sizes: filters.sizes.length ? filters.sizes.join(',') : undefined,
+          materials: filters.materials.length ? filters.materials.join(',') : undefined,
+          fabricTypes: filters.fabricTypes.length ? filters.fabricTypes.join(',') : undefined,
+          minDiscount: filters.minDiscount > 0 ? filters.minDiscount : undefined,
+          newArrivals: filters.newArrivals ? true : undefined,
           sortBy: sortOption.sortBy,
           sortOrder: sortOption.sortOrder,
         });
@@ -209,6 +280,13 @@ export default function ProductsScreen() {
       maxPrice: undefined,
       minRating: 0,
       inStockOnly: false,
+      newArrivals: false,
+      collection: '',
+      minDiscount: 0,
+      colors: [],
+      sizes: [],
+      materials: [],
+      fabricTypes: [],
       sort: 'newest',
     });
   }, []);
@@ -243,6 +321,27 @@ export default function ProductsScreen() {
         label: 'In stock only',
         onClear: () => setFilters((f) => ({ ...f, inStockOnly: false })),
       });
+    if (filters.newArrivals)
+      chips.push({
+        key: 'newArrivals',
+        label: 'New arrivals',
+        onClear: () => setFilters((f) => ({ ...f, newArrivals: false })),
+      });
+    if (filters.collection) {
+      const collectionLabel = COLLECTIONS.find((c) => c.key === filters.collection)?.label;
+      if (collectionLabel)
+        chips.push({
+          key: 'collection',
+          label: `Collection: ${collectionLabel}`,
+          onClear: () => setFilters((f) => ({ ...f, collection: '' })),
+        });
+    }
+    if (filters.minDiscount > 0)
+      chips.push({
+        key: 'discount',
+        label: `${filters.minDiscount}%+ off`,
+        onClear: () => setFilters((f) => ({ ...f, minDiscount: 0 })),
+      });
     if (filters.minRating > 0)
       chips.push({
         key: 'rating',
@@ -257,6 +356,30 @@ export default function ProductsScreen() {
         onClear: () => setFilters((f) => ({ ...f, minPrice: undefined, maxPrice: undefined })),
       });
     }
+    if (filters.colors.length > 0)
+      chips.push({
+        key: 'colors',
+        label: `Color (${filters.colors.length})`,
+        onClear: () => setFilters((f) => ({ ...f, colors: [] })),
+      });
+    if (filters.sizes.length > 0)
+      chips.push({
+        key: 'sizes',
+        label: `Size (${filters.sizes.length})`,
+        onClear: () => setFilters((f) => ({ ...f, sizes: [] })),
+      });
+    if (filters.materials.length > 0)
+      chips.push({
+        key: 'materials',
+        label: `Material (${filters.materials.length})`,
+        onClear: () => setFilters((f) => ({ ...f, materials: [] })),
+      });
+    if (filters.fabricTypes.length > 0)
+      chips.push({
+        key: 'fabricTypes',
+        label: `Fabric (${filters.fabricTypes.length})`,
+        onClear: () => setFilters((f) => ({ ...f, fabricTypes: [] })),
+      });
     return chips;
   }, [filters]);
 
@@ -267,8 +390,15 @@ export default function ProductsScreen() {
     (filters.category ? 1 : 0) +
     (filters.subCategory ? 1 : 0) +
     (filters.inStockOnly ? 1 : 0) +
+    (filters.newArrivals ? 1 : 0) +
+    (filters.collection ? 1 : 0) +
+    (filters.minDiscount > 0 ? 1 : 0) +
     (filters.minRating > 0 ? 1 : 0) +
-    (filters.minPrice != null || filters.maxPrice != null ? 1 : 0)
+    (filters.minPrice != null || filters.maxPrice != null ? 1 : 0) +
+    (filters.colors.length > 0 ? 1 : 0) +
+    (filters.sizes.length > 0 ? 1 : 0) +
+    (filters.materials.length > 0 ? 1 : 0) +
+    (filters.fabricTypes.length > 0 ? 1 : 0)
   );
 
   // Rich results context matching web: "Showing X of Y products in Category > Sub matching 'search'"
@@ -342,6 +472,7 @@ export default function ProductsScreen() {
           <HeroBanner
             category={filters.category}
             subcategory={filters.subCategory}
+            collection={filters.collection}
           />
         }
         ListEmptyComponent={
@@ -387,6 +518,7 @@ export default function ProductsScreen() {
       <FilterModal
         visible={showFilter}
         filters={filters}
+        facets={facets}
         onApply={(filterFields) => {
           // Merge only filter-specific fields — never touch search or sort.
           setFilters((f) => ({ ...f, ...filterFields }));
@@ -573,7 +705,7 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: '#111827',
+          backgroundColor: Palette.primary,
           paddingLeft: 10,
           paddingRight: 6,
           height: 30,
@@ -662,21 +794,35 @@ function FilterSortBar({
 }
 
 // ─── Hero Banner ─────────────────────────────────────────────────────────────
-function HeroBanner({ category, subcategory }: { category: string; subcategory: string }) {
+function HeroBanner({
+  category,
+  subcategory,
+  collection,
+}: {
+  category: string;
+  subcategory: string;
+  collection: string;
+}) {
+  const collectionLabel = COLLECTIONS.find((c) => c.key === collection)?.label;
+
   const title = category
     ? subcategory
       ? `${category} › ${subcategory}`
       : category
-    : 'Our Collection';
+    : collectionLabel
+      ? collectionLabel
+      : 'Our Collection';
 
   const subtitle = category
     ? 'Browse our selection of premium quality products'
-    : 'Discover authentic handcrafted textiles made by skilled artisans';
+    : collectionLabel
+      ? `Discover our ${collectionLabel.toLowerCase()} picks`
+      : 'Discover authentic handcrafted textiles made by skilled artisans';
 
   return (
     <View
       style={{
-        backgroundColor: '#111827',
+        backgroundColor: Palette.primary,
         marginBottom: 12,
         marginHorizontal: -16, // bleed to edge (list has px-16 padding)
         paddingHorizontal: 20,
@@ -840,7 +986,7 @@ function ListEmpty({
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: '#111827',
+              backgroundColor: Palette.primary,
               paddingHorizontal: 20,
               height: 40,
               borderRadius: 10,
@@ -883,7 +1029,7 @@ function ListEmpty({
         <Pressable onPress={onClearAll} accessibilityRole="button" accessibilityLabel="Clear all filters">
           <View
             style={{
-              backgroundColor: '#111827',
+              backgroundColor: Palette.primary,
               paddingHorizontal: 20,
               height: 40,
               borderRadius: 10,
@@ -993,7 +1139,7 @@ function SortModal({
                         }}
                       >
                         {selected ? (
-                          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#111827' }} />
+                          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: Palette.primary }} />
                         ) : null}
                       </View>
                       <Text
@@ -1022,11 +1168,13 @@ function SortModal({
 function FilterModal({
   visible,
   filters,
+  facets,
   onApply,
   onClose,
 }: {
   visible: boolean;
   filters: Filters;
+  facets: ProductFacets | null;
   onApply: (f: FilterFields) => void;
   onClose: () => void;
 }) {
@@ -1037,6 +1185,13 @@ function FilterModal({
     maxPrice: filters.maxPrice,
     minRating: filters.minRating,
     inStockOnly: filters.inStockOnly,
+    newArrivals: filters.newArrivals,
+    collection: filters.collection,
+    minDiscount: filters.minDiscount,
+    colors: filters.colors,
+    sizes: filters.sizes,
+    materials: filters.materials,
+    fabricTypes: filters.fabricTypes,
   });
   const [minPriceInput, setMinPriceInput] = useState(
     filters.minPrice != null ? String(filters.minPrice) : '',
@@ -1056,6 +1211,13 @@ function FilterModal({
       maxPrice: filters.maxPrice,
       minRating: filters.minRating,
       inStockOnly: filters.inStockOnly,
+      newArrivals: filters.newArrivals,
+      collection: filters.collection,
+      minDiscount: filters.minDiscount,
+      colors: filters.colors,
+      sizes: filters.sizes,
+      materials: filters.materials,
+      fabricTypes: filters.fabricTypes,
     });
     setMinPriceInput(filters.minPrice != null ? String(filters.minPrice) : '');
     setMaxPriceInput(filters.maxPrice != null ? String(filters.maxPrice) : '');
@@ -1084,9 +1246,16 @@ function FilterModal({
       category: draft.category,
       subCategory: draft.subCategory,
       inStockOnly: draft.inStockOnly,
+      newArrivals: draft.newArrivals,
+      collection: draft.collection,
+      minDiscount: draft.minDiscount,
       minRating: draft.minRating,
       minPrice: minPriceInput ? Number(minPriceInput) : undefined,
       maxPrice: maxPriceInput ? Number(maxPriceInput) : undefined,
+      colors: draft.colors,
+      sizes: draft.sizes,
+      materials: draft.materials,
+      fabricTypes: draft.fabricTypes,
     });
   };
 
@@ -1098,6 +1267,13 @@ function FilterModal({
       maxPrice: undefined,
       minRating: 0,
       inStockOnly: false,
+      newArrivals: false,
+      collection: '',
+      minDiscount: 0,
+      colors: [],
+      sizes: [],
+      materials: [],
+      fabricTypes: [],
     });
     setMinPriceInput('');
     setMaxPriceInput('');
@@ -1108,8 +1284,24 @@ function FilterModal({
     (draft.category ? 1 : 0) +
     (draft.subCategory ? 1 : 0) +
     (draft.inStockOnly ? 1 : 0) +
+    (draft.newArrivals ? 1 : 0) +
+    (draft.collection ? 1 : 0) +
+    (draft.minDiscount > 0 ? 1 : 0) +
     (draft.minRating > 0 ? 1 : 0) +
-    (minPriceInput || maxPriceInput ? 1 : 0);
+    (minPriceInput || maxPriceInput ? 1 : 0) +
+    (draft.colors.length > 0 ? 1 : 0) +
+    (draft.sizes.length > 0 ? 1 : 0) +
+    (draft.materials.length > 0 ? 1 : 0) +
+    (draft.fabricTypes.length > 0 ? 1 : 0);
+
+  const toggleInDraft = (field: 'colors' | 'sizes' | 'materials' | 'fabricTypes', value: string) => {
+    setDraft((d) => ({
+      ...d,
+      [field]: d[field].includes(value)
+        ? d[field].filter((x) => x !== value)
+        : [...d[field], value],
+    }));
+  };
 
   const insets = useSafeAreaInsets();
 
@@ -1204,6 +1396,53 @@ function FilterModal({
                     </View>
                   </View>
                 </Pressable>
+
+                <Pressable
+                  onPress={() => setDraft((d) => ({ ...d, newArrivals: !d.newArrivals }))}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: draft.newArrivals }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#ffffff', borderTopWidth: 1, borderTopColor: '#f9fafb' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, color: '#111827', fontWeight: '500' }}>New Arrivals</Text>
+                      <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>Show the latest products</Text>
+                    </View>
+                    {/* Toggle pill */}
+                    <View
+                      style={{
+                        width: 44,
+                        height: 26,
+                        borderRadius: 13,
+                        backgroundColor: draft.newArrivals ? '#111827' : '#e5e7eb',
+                        justifyContent: 'center',
+                        paddingHorizontal: 3,
+                        alignItems: draft.newArrivals ? 'flex-end' : 'flex-start',
+                      }}
+                    >
+                      <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#ffffff', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 2, elevation: 2 }} />
+                    </View>
+                  </View>
+                </Pressable>
+
+                {/* ── Section: Collections ─────────────────────────────── */}
+                <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>Collections</Text>
+                </View>
+                <View style={{ backgroundColor: '#ffffff' }}>
+                  <CategoryRadio
+                    label="All Products"
+                    selected={!draft.collection}
+                    onPress={() => setDraft((d) => ({ ...d, collection: '' }))}
+                  />
+                  {COLLECTIONS.map((c) => (
+                    <CategoryRadio
+                      key={c.key}
+                      label={c.label}
+                      selected={draft.collection === c.key}
+                      onPress={() => setDraft((d) => ({ ...d, collection: c.key }))}
+                    />
+                  ))}
+                </View>
 
                 {/* ── Section: Price Range ─────────────────────────────── */}
                 <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
@@ -1340,7 +1579,7 @@ function FilterModal({
                             }}
                           >
                             {selected ? (
-                              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#111827' }} />
+                              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: Palette.primary }} />
                             ) : null}
                           </View>
 
@@ -1376,6 +1615,286 @@ function FilterModal({
                     );
                   })}
                 </View>
+
+                {/* ── Section: Discount ────────────────────────────────── */}
+                {facets && facets.maxDiscount >= 10 ? (
+                  <>
+                    <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>Discount</Text>
+                    </View>
+                    <View style={{ backgroundColor: '#ffffff' }}>
+                      {DISCOUNT_BUCKETS.filter((d) => d <= facets.maxDiscount).map((d, idx) => {
+                        const selected = draft.minDiscount === d;
+                        return (
+                          <Pressable
+                            key={d}
+                            onPress={() => setDraft((dd) => ({ ...dd, minDiscount: dd.minDiscount === d ? 0 : d }))}
+                            accessibilityRole="radio"
+                            accessibilityState={{ selected }}
+                          >
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                paddingHorizontal: 20,
+                                paddingVertical: 14,
+                                borderBottomWidth: idx < DISCOUNT_BUCKETS.filter((x) => x <= facets.maxDiscount).length - 1 ? 1 : 0,
+                                borderBottomColor: '#f3f4f6',
+                                backgroundColor: selected ? '#f9fafb' : '#ffffff',
+                              }}
+                            >
+                              <View
+                                style={{
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: 10,
+                                  borderWidth: 2,
+                                  borderColor: selected ? '#111827' : '#d1d5db',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  marginRight: 14,
+                                }}
+                              >
+                                {selected ? (
+                                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: Palette.primary }} />
+                                ) : null}
+                              </View>
+                              <Text
+                                style={{
+                                  flex: 1,
+                                  fontSize: 14,
+                                  color: '#111827',
+                                  fontWeight: selected ? '600' : '400',
+                                }}
+                              >
+                                {d}% and above
+                              </Text>
+                              {selected ? <Check size={16} color="#111827" strokeWidth={2.5} /> : null}
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : null}
+
+                {/* ── Section: Color ───────────────────────────────────── */}
+                {facets && facets.colors.length > 0 ? (
+                  <>
+                    <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                        Color ({facets.colors.length})
+                      </Text>
+                    </View>
+                    <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 20, paddingVertical: 16 }}>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {facets.colors.map((c) => {
+                          const active = draft.colors.includes(c.value);
+                          return (
+                            <Pressable
+                              key={c.value}
+                              onPress={() => toggleInDraft('colors', c.value)}
+                              accessibilityRole="checkbox"
+                              accessibilityState={{ checked: active }}
+                            >
+                              <View
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  paddingHorizontal: 12,
+                                  height: 32,
+                                  borderRadius: 16,
+                                  borderWidth: 1,
+                                  borderColor: active ? '#111827' : '#e5e7eb',
+                                  backgroundColor: active ? '#f9fafb' : '#ffffff',
+                                  gap: 6,
+                                }}
+                              >
+                                <View
+                                  style={{
+                                    width: 16,
+                                    height: 16,
+                                    borderRadius: 8,
+                                    backgroundColor: c.hex || '#cccccc',
+                                    borderWidth: 1,
+                                    borderColor: 'rgba(0,0,0,0.1)',
+                                  }}
+                                />
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#111827' }}>
+                                  {c.value}
+                                </Text>
+                                <Text style={{ fontSize: 11, color: '#9ca3af' }}>{c.count}</Text>
+                              </View>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  </>
+                ) : null}
+
+                {/* ── Section: Size ────────────────────────────────────── */}
+                {facets && facets.sizes.length > 0 ? (
+                  <>
+                    <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                        Size ({facets.sizes.length})
+                      </Text>
+                    </View>
+                    <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 20, paddingVertical: 16 }}>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {facets.sizes.map((s) => {
+                          const active = draft.sizes.includes(s.value);
+                          return (
+                            <Pressable
+                              key={s.value}
+                              onPress={() => toggleInDraft('sizes', s.value)}
+                              accessibilityRole="checkbox"
+                              accessibilityState={{ checked: active }}
+                            >
+                              <View
+                                style={{
+                                  paddingHorizontal: 14,
+                                  height: 32,
+                                  borderRadius: 8,
+                                  borderWidth: 1,
+                                  borderColor: active ? '#111827' : '#e5e7eb',
+                                  backgroundColor: active ? '#f9fafb' : '#ffffff',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#111827' }}>
+                                  {s.value}
+                                </Text>
+                              </View>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  </>
+                ) : null}
+
+                {/* ── Section: Material ────────────────────────────────── */}
+                {facets && facets.materials.length > 0 ? (
+                  <>
+                    <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>Material</Text>
+                    </View>
+                    <View style={{ backgroundColor: '#ffffff' }}>
+                      {facets.materials.map((m, idx) => {
+                        const active = draft.materials.includes(m.value);
+                        return (
+                          <Pressable
+                            key={m.value}
+                            onPress={() => toggleInDraft('materials', m.value)}
+                            accessibilityRole="checkbox"
+                            accessibilityState={{ checked: active }}
+                          >
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                paddingHorizontal: 20,
+                                paddingVertical: 13,
+                                borderBottomWidth: idx < facets.materials.length - 1 ? 1 : 0,
+                                borderBottomColor: '#f3f4f6',
+                              }}
+                            >
+                              <View
+                                style={{
+                                  width: 18,
+                                  height: 18,
+                                  borderRadius: 5,
+                                  borderWidth: 2,
+                                  borderColor: active ? '#111827' : '#d1d5db',
+                                  backgroundColor: active ? '#111827' : '#ffffff',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  marginRight: 12,
+                                }}
+                              >
+                                {active ? <Check size={12} color="#ffffff" strokeWidth={3} /> : null}
+                              </View>
+                              <Text
+                                style={{
+                                  flex: 1,
+                                  fontSize: 14,
+                                  color: '#111827',
+                                  fontWeight: active ? '600' : '400',
+                                }}
+                              >
+                                {m.value}
+                              </Text>
+                              <Text style={{ fontSize: 12, color: '#9ca3af' }}>{m.count}</Text>
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : null}
+
+                {/* ── Section: Fabric Type ─────────────────────────────── */}
+                {facets && facets.fabricTypes.length > 0 ? (
+                  <>
+                    <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>Fabric Type</Text>
+                    </View>
+                    <View style={{ backgroundColor: '#ffffff' }}>
+                      {facets.fabricTypes.map((f, idx) => {
+                        const active = draft.fabricTypes.includes(f.value);
+                        return (
+                          <Pressable
+                            key={f.value}
+                            onPress={() => toggleInDraft('fabricTypes', f.value)}
+                            accessibilityRole="checkbox"
+                            accessibilityState={{ checked: active }}
+                          >
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                paddingHorizontal: 20,
+                                paddingVertical: 13,
+                                borderBottomWidth: idx < facets.fabricTypes.length - 1 ? 1 : 0,
+                                borderBottomColor: '#f3f4f6',
+                              }}
+                            >
+                              <View
+                                style={{
+                                  width: 18,
+                                  height: 18,
+                                  borderRadius: 5,
+                                  borderWidth: 2,
+                                  borderColor: active ? '#111827' : '#d1d5db',
+                                  backgroundColor: active ? '#111827' : '#ffffff',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  marginRight: 12,
+                                }}
+                              >
+                                {active ? <Check size={12} color="#ffffff" strokeWidth={3} /> : null}
+                              </View>
+                              <Text
+                                style={{
+                                  flex: 1,
+                                  fontSize: 14,
+                                  color: '#111827',
+                                  fontWeight: active ? '600' : '400',
+                                }}
+                              >
+                                {f.value}
+                              </Text>
+                              <Text style={{ fontSize: 12, color: '#9ca3af' }}>{f.count}</Text>
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : null}
 
               </ScrollView>
 
@@ -1416,7 +1935,7 @@ function FilterModal({
                     style={{
                       height: 52,
                       borderRadius: 12,
-                      backgroundColor: '#111827',
+                      backgroundColor: Palette.primary,
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
@@ -1486,7 +2005,7 @@ function CategoryRadio({
                 width: indent ? 7 : 8,
                 height: indent ? 7 : 8,
                 borderRadius: 5,
-                backgroundColor: '#111827',
+                backgroundColor: Palette.primary,
               }}
             />
           ) : null}

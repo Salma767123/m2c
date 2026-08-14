@@ -107,6 +107,8 @@ interface VendorFormData {
   warehouseCountry: string;
   warehouseLatitude: string;
   warehouseLongitude: string;
+  /** Site a QC product inspection is geofenced against: FACTORY (legal/factory) or WAREHOUSE. */
+  productInspectionSite: string;
   // Slot-keyed Record in edit mode (`{ nameBoard: {file,url,name}, ... }`)
   // mirroring WarehouseDetails state. Pre-fill defaults to empty `{}`; the
   // component's normaliseFactoryImages also tolerates the legacy array shape
@@ -299,6 +301,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     warehouseCountry: "India",
     warehouseLatitude: "",
     warehouseLongitude: "",
+    productInspectionSite: "",
     factoryImages: {},
     factorySiteImages: {},
     factorySiteCapacity: "",
@@ -741,6 +744,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         warehouseCountry: vendor.warehouseCountry || "India",
         warehouseLatitude: vendor.warehouseLatitude != null ? String(vendor.warehouseLatitude) : "",
         warehouseLongitude: vendor.warehouseLongitude != null ? String(vendor.warehouseLongitude) : "",
+        productInspectionSite: vendor.productInspectionSite || "FACTORY",
         // Same slot-keyed Record feeds both steps: WarehouseDetails reads
         // `factoryImages`, CompanyDetails reads `factorySiteImages`. Seeding
         // only one of them left the Company Details photo slots empty in edit

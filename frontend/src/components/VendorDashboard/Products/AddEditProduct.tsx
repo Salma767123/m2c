@@ -223,7 +223,7 @@ interface ProductFormData {
   weightUnit: string
   inStock: boolean
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'
-  approvalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | 'NEGOTIATION'
+  approvalStatus?: 'PENDING' | 'QC_SUBMITTED' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | 'NEGOTIATION'
   approvedAt?: string
   approvedBy?: string
   rejectionReason?: string
@@ -3057,13 +3057,15 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         ? 'bg-green-50 border-green-200 text-green-800'
                         : formData.approvalStatus === 'PENDING'
                           ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
-                          : formData.approvalStatus === 'REJECTED'
-                            ? 'bg-red-50 border-red-200 text-red-800'
-                            : formData.approvalStatus === 'REINSPECTION'
-                              ? 'bg-orange-50 border-orange-200 text-orange-800'
-                              : 'bg-slate-50 border-slate-200 text-slate-800'
+                          : formData.approvalStatus === 'QC_SUBMITTED'
+                            ? 'bg-blue-50 border-blue-200 text-blue-800'
+                            : formData.approvalStatus === 'REJECTED'
+                              ? 'bg-red-50 border-red-200 text-red-800'
+                              : formData.approvalStatus === 'REINSPECTION'
+                                ? 'bg-orange-50 border-orange-200 text-orange-800'
+                                : 'bg-slate-50 border-slate-200 text-slate-800'
                     }`}>
-                      {formData.approvalStatus?.toLowerCase() || 'pending'}
+                      {formData.approvalStatus === 'QC_SUBMITTED' ? 'Under Review' : (formData.approvalStatus?.toLowerCase() || 'pending')}
                       {formData.approvalStatus === 'REJECTED' && formData.rejectionReason && (
                         <div className="mt-1 text-xs">
                           Reason: {formData.rejectionReason}

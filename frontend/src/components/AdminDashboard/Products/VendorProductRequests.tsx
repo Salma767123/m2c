@@ -29,7 +29,7 @@ interface VendorProductRequest {
   originalPrice?: number
   totalStock: number
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'
-  approvalStatus: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | 'NEGOTIATION'
+  approvalStatus: 'PENDING' | 'QC_SUBMITTED' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | 'NEGOTIATION'
   approvedAt?: string
   rejectionReason?: string
   // Negotiation economics — set the moment a negotiation is opened/agreed and
@@ -52,6 +52,15 @@ interface VendorProductRequest {
     email?: string
     status?: string
   } | null
+  // Booked QC window for this product (mirrors factory inspection scheduling). Used to
+  // flag a MISSED/expired assignment in the admin list.
+  qcAssignment?: {
+    scheduledDate?: string | null
+    scheduledTime?: string | null
+    estimatedDuration?: string | null
+    priority?: string | null
+    clientName?: string | null
+  } | null
   images?: Array<{ url: string; isPrimary: boolean }>
   variants?: Array<{
     id: string
@@ -71,18 +80,59 @@ interface VendorProductRequest {
 interface StatusCounts {
   total: number
   pending: number
+  qcSubmitted: number
   qcApproved: number
   approved: number
   rejected: number
   reinspection: number
 }
 
+// True once a product QC assignment's booked window (scheduledDate + scheduledTime +
+// estimatedDuration) has fully elapsed. Mirrors backend utils/inspectionSchedule and
+// the factory list's isPastInspectionWindow — computed client-side because product
+// inspections have no stored EXPIRED status.
+function isPastInspectionWindow(
+  scheduledDate?: string | null,
+  scheduledTime?: string | null,
+  estimatedDuration?: string | null,
+): boolean {
+  if (!scheduledDate) return false
+  const [y, m, d] = scheduledDate.split('-').map((n) => parseInt(n, 10))
+  if (!y || !m || !d) return false
+  let hours = 0, minutes = 0
+  const match = (scheduledTime || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i)
+  if (match) {
+    hours = parseInt(match[1], 10)
+    minutes = parseInt(match[2], 10)
+    const mer = match[3]?.toUpperCase()
+    if (mer === 'PM' && hours < 12) hours += 12
+    if (mer === 'AM' && hours === 12) hours = 0
+  }
+  const start = new Date(y, m - 1, d, hours, minutes, 0, 0)
+  const durStr = (estimatedDuration || '1 hour').toLowerCase()
+  const durNum = parseFloat(durStr) || 1
+  const durMs = durStr.includes('min') ? durNum * 60000 : durStr.includes('day') ? durNum * 86400000 : durNum * 3600000
+  return Date.now() > start.getTime() + durMs
+}
+
+// A product inspection is "missed" when it is assigned + scheduled, the checker has NOT
+// yet submitted (still PENDING/REINSPECTION), and the booked window has passed.
+function isProductInspectionMissed(request: VendorProductRequest): boolean {
+  if (!request.assignedQcId) return false
+  if (request.approvalStatus !== 'PENDING' && request.approvalStatus !== 'REINSPECTION') return false
+  const a = request.qcAssignment
+  if (!a?.scheduledDate) return false
+  return isPastInspectionWindow(a.scheduledDate, a.scheduledTime, a.estimatedDuration)
+}
+
 const getApprovalStatusBadge = (status: string) => {
   switch (status) {
     case 'PENDING':
       return <Badge className="bg-amber-50 text-amber-700 border border-amber-200 font-bold">Pending QC</Badge>
+    case 'QC_SUBMITTED':
+      return <Badge className="bg-blue-50 text-blue-700 border border-blue-200 font-bold">Pending Admin Review</Badge>
     case 'QC_APPROVED':
-      return <Badge className="bg-blue-50 text-blue-700 border border-blue-200 font-bold">QC Approved</Badge>
+      return <Badge className="bg-green-50 text-green-700 border border-green-200 font-bold">QC Approved</Badge>
     case 'APPROVED':
       return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">Approved</Badge>
     case 'REJECTED':
@@ -109,7 +159,7 @@ export default function VendorProductRequests() {
   const [requests, setRequests] = useState<VendorProductRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [statusCounts, setStatusCounts] = useState<StatusCounts>({
-    total: 0, pending: 0, qcApproved: 0, approved: 0, rejected: 0, reinspection: 0,
+    total: 0, pending: 0, qcSubmitted: 0, qcApproved: 0, approved: 0, rejected: 0, reinspection: 0,
   })
   const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalCount: 0, limit: 10 })
 
@@ -157,9 +207,10 @@ export default function VendorProductRequests() {
 
   const loadStatusCounts = useCallback(async () => {
     try {
-      const [all, pending, qcApproved, approved, rejected, reinspection] = await Promise.all([
+      const [all, pending, qcSubmitted, qcApproved, approved, rejected, reinspection] = await Promise.all([
         adminProductService.getAllProducts({ page: 1, limit: 1 }),
         adminProductService.getAllProducts({ page: 1, limit: 1, approvalStatus: 'PENDING' }),
+        adminProductService.getAllProducts({ page: 1, limit: 1, approvalStatus: 'QC_SUBMITTED' }),
         adminProductService.getAllProducts({ page: 1, limit: 1, approvalStatus: 'QC_APPROVED' }),
         adminProductService.getAllProducts({ page: 1, limit: 1, approvalStatus: 'APPROVED' }),
         adminProductService.getAllProducts({ page: 1, limit: 1, approvalStatus: 'REJECTED' }),
@@ -168,6 +219,7 @@ export default function VendorProductRequests() {
       setStatusCounts({
         total: all.data?.pagination?.totalCount ?? 0,
         pending: pending.data?.pagination?.totalCount ?? 0,
+        qcSubmitted: qcSubmitted.data?.pagination?.totalCount ?? 0,
         qcApproved: qcApproved.data?.pagination?.totalCount ?? 0,
         approved: approved.data?.pagination?.totalCount ?? 0,
         rejected: rejected.data?.pagination?.totalCount ?? 0,
@@ -238,7 +290,8 @@ export default function VendorProductRequests() {
   const metricCards = [
     { key: 'all',         label: 'All Requests',   subtitle: 'Total submissions',     count: statusCounts.total,       Icon: ShoppingBag,    iconBg: 'bg-brand-50',    iconColor: 'text-brand-500',   countColor: 'text-slate-900',  activeClass: 'border-brand-400 bg-brand-50/50' },
     { key: 'PENDING',     label: 'Pending QC',     subtitle: 'Awaiting inspection',   count: statusCounts.pending,     Icon: Clock,          iconBg: 'bg-amber-50',    iconColor: 'text-amber-500',   countColor: 'text-amber-700',  activeClass: 'border-amber-400 bg-amber-50/60' },
-    { key: 'QC_APPROVED', label: 'QC Approved',    subtitle: 'Ready for approval',    count: statusCounts.qcApproved,  Icon: CheckCircle,    iconBg: 'bg-blue-50',     iconColor: 'text-blue-500',    countColor: 'text-blue-700',   activeClass: 'border-blue-400 bg-blue-50/60' },
+    { key: 'QC_SUBMITTED',label: 'Pending Review', subtitle: 'Awaiting your decision',count: statusCounts.qcSubmitted, Icon: Clock,          iconBg: 'bg-blue-50',     iconColor: 'text-blue-500',    countColor: 'text-blue-700',   activeClass: 'border-blue-400 bg-blue-50/60' },
+    { key: 'QC_APPROVED', label: 'QC Approved',    subtitle: 'Ready for approval',    count: statusCounts.qcApproved,  Icon: CheckCircle,    iconBg: 'bg-green-50',    iconColor: 'text-green-500',   countColor: 'text-green-700',  activeClass: 'border-green-400 bg-green-50/60' },
     { key: 'APPROVED',    label: 'Approved',        subtitle: 'Live on platform',      count: statusCounts.approved,    Icon: Package,        iconBg: 'bg-emerald-50',  iconColor: 'text-emerald-500', countColor: 'text-emerald-700', activeClass: 'border-emerald-400 bg-emerald-50/60' },
     { key: 'REJECTED',    label: 'Rejected',        subtitle: 'Declined requests',     count: statusCounts.rejected,    Icon: XCircle,        iconBg: 'bg-red-50',      iconColor: 'text-red-500',     countColor: 'text-red-700',    activeClass: 'border-red-400 bg-red-50/60' },
     { key: 'REINSPECTION',label: 'Re-Inspection',  subtitle: 'Needs re-review',       count: statusCounts.reinspection,Icon: AlertTriangle,  iconBg: 'bg-orange-50',   iconColor: 'text-orange-500',  countColor: 'text-orange-700', activeClass: 'border-orange-400 bg-orange-50/60' },
@@ -307,6 +360,7 @@ export default function VendorProductRequests() {
                   options={[
                     { value: 'all',          label: 'All Statuses' },
                     { value: 'PENDING',      label: 'Pending QC' },
+                    { value: 'QC_SUBMITTED', label: 'Pending Admin Review' },
                     { value: 'QC_APPROVED',  label: 'QC Approved' },
                     { value: 'NEGOTIATION',  label: 'Under Negotiation' },
                     { value: 'APPROVED',     label: 'Approved' },
@@ -360,10 +414,16 @@ export default function VendorProductRequests() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {requests.map((request) => (
+                  {requests.map((request) => {
+                    const missed = isProductInspectionMissed(request)
+                    return (
                     <TableRow
                       key={request.id}
-                      className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0"
+                      className={`transition-colors duration-150 border-b last:border-0 ${
+                        missed
+                          ? 'bg-red-50/60 hover:bg-red-50 border-red-100'
+                          : 'hover:bg-slate-50/60 border-slate-100'
+                      }`}
                     >
                       {/* Product: image + name + SKU below */}
                       <TableCell className="py-3 px-3 align-middle">
@@ -423,7 +483,12 @@ export default function VendorProductRequests() {
 
                       {/* Inspection Status */}
                       <TableCell className="py-3 px-3 align-middle">
-                        {getApprovalStatusBadge(request.approvalStatus)}
+                        <div className="flex flex-col items-start gap-1">
+                          {getApprovalStatusBadge(request.approvalStatus)}
+                          {missed && (
+                            <Badge className="bg-red-50 text-red-700 border border-red-200 font-bold">Expired · Missed</Badge>
+                          )}
+                        </div>
                       </TableCell>
 
                       {/* Submitted */}
@@ -448,7 +513,7 @@ export default function VendorProductRequests() {
                               "Review & Negotiate" action; once finalised it stays as a
                               read-only "View Negotiation History" so nothing is hidden. */}
                           {(() => {
-                            const canNegotiate = (request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'NEGOTIATION') && hasPermission('vendor_product_requests:approve')
+                            const canNegotiate = (request.approvalStatus === 'QC_SUBMITTED' || request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'NEGOTIATION') && hasPermission('vendor_product_requests:approve')
                             const canViewHistory = (request.approvalStatus === 'APPROVED' || request.approvalStatus === 'REJECTED') && hasNegotiationHistory(request) && hasPermission('vendor_product_requests:view')
                             if (!canNegotiate && !canViewHistory) return null
                             return (
@@ -461,9 +526,9 @@ export default function VendorProductRequests() {
                               </button>
                             )
                           })()}
-                          {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'REINSPECTION' || request.approvalStatus === 'NEGOTIATION') && (
+                          {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'QC_SUBMITTED' || request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'REINSPECTION' || request.approvalStatus === 'NEGOTIATION') && (
                             <>
-                              {(request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'NEGOTIATION') && hasPermission('vendor_product_requests:approve') && (
+                              {(request.approvalStatus === 'QC_SUBMITTED' || request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'NEGOTIATION') && hasPermission('vendor_product_requests:approve') && (
                                 <button
                                   title="Final Approve & Set Price"
                                   onClick={() => handleApproveClick(request.id)}
@@ -484,9 +549,13 @@ export default function VendorProductRequests() {
                               {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'REINSPECTION') && hasPermission('vendor_product_requests:assign_qc') && (
                                 request.assignedQcId ? (
                                   <button
-                                    title="Reassign QC Checker"
+                                    title={missed ? 'Inspection window missed — reassign with a new date/time' : 'Reassign QC Checker'}
                                     onClick={() => handleAssignClick(request.id)}
-                                    className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                                    className={`p-2 rounded-lg transition-colors ${
+                                      missed
+                                        ? 'text-red-600 hover:text-red-700 hover:bg-red-50 ring-1 ring-red-200'
+                                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                                    }`}
                                   >
                                     <UserCog className="h-4 w-4" />
                                   </button>
@@ -505,7 +574,8 @@ export default function VendorProductRequests() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    )
+                  })}
                 </TableBody>
               </Table>
 

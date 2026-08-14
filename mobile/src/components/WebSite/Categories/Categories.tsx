@@ -22,9 +22,16 @@ import { router } from 'expo-router';
 import { categoryService, type Category } from '@/services/categoryService';
 import { useCart } from '@/context/CartContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Palette, Radius, Shadow } from '@/constants/theme';
+import SectionHeading from '@/components/WebSite/Home/SectionHeading';
+import TopSellingSection from '@/components/WebSite/Home/TopSellingSection';
+import NoticeBoard from '@/components/WebSite/Home/NoticeBoard';
+
+const BANNER = require('../../../../assets/images/categories/cb5.jpg');
 
 const GRID_PAD = 16;
 const GRID_GAP = 12;
+const BANNER_H = 172;
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function Categories() {
@@ -78,14 +85,28 @@ export default function Categories() {
 
   const keyExtractor = useCallback((item: Category) => item.id, []);
 
+  // Mirrors the web page's running order: banner → intro → grid → top-selling
+  // rail → promos → "Need Help?". Everything lives in the FlatList's header and
+  // footer so the whole page scrolls as one and the grid keeps its virtualisation.
   const ListHeader = (
-    <View style={s.listHeader}>
-      <Text style={s.listTitle}>Browse Collections</Text>
-      <View style={s.listCountPill}>
-        <Text style={s.listCountText}>
-          {categories.length} {categories.length === 1 ? 'category' : 'categories'}
-        </Text>
+    <>
+      <CategoryBanner />
+      <View style={s.introWrap}>
+        <SectionHeading section="browseCollections" />
+        <View style={s.listCountPill}>
+          <Text style={s.listCountText}>
+            {categories.length} {categories.length === 1 ? 'category' : 'categories'}
+          </Text>
+        </View>
       </View>
+    </>
+  );
+
+  const ListFooter = (
+    <View style={s.footerWrap}>
+      <TopSellingSection />
+      <NoticeBoard />
+      <NeedHelpCard />
     </View>
   );
 
@@ -110,8 +131,8 @@ export default function Categories() {
         </View>
       ) : error ? (
         <CenteredState
-          icon={<AlertCircle size={32} color="#dc2626" strokeWidth={1.75} />}
-          iconBg="#fef2f2"
+          icon={<AlertCircle size={32} color="#E01A1B" strokeWidth={1.75} />}
+          iconBg="#E01A1B"
           title="Something went wrong"
           body={error}
           action={
@@ -138,6 +159,7 @@ export default function Categories() {
           columnWrapperStyle={s.columnWrapper}
           contentContainerStyle={s.flatListContent}
           ListHeaderComponent={ListHeader}
+          ListFooterComponent={ListFooter}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -193,6 +215,64 @@ function ScreenHeader({ itemCount }: { itemCount: number }) {
               </View>
             ) : null}
           </View>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+// ─── Hero banner ─────────────────────────────────────────────────────────────
+// The web page opens with a photo banner under a black/60 scrim carrying the
+// eyebrow / title / subtitle. Same asset (cb5.jpg, 1366×480) copied into the app
+// so both clients open on the same image.
+function CategoryBanner() {
+  return (
+    <View style={s.banner}>
+      <Image source={BANNER} style={s.bannerImage} contentFit="cover" transition={220} />
+      <View style={s.bannerScrim} />
+      <View style={s.bannerContent}>
+        <View style={s.bannerEyebrowRow}>
+          <View style={s.bannerRule} />
+          <Text style={s.bannerEyebrow} maxFontSizeMultiplier={1.2}>
+            Our Collections
+          </Text>
+        </View>
+        <Text style={s.bannerTitle} maxFontSizeMultiplier={1.2}>
+          Shop by Categories
+        </Text>
+        <Text style={s.bannerSub} maxFontSizeMultiplier={1.2}>
+          Discover our wide range of traditional textile products organized by categories
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ─── Need Help card ──────────────────────────────────────────────────────────
+function NeedHelpCard() {
+  return (
+    <View style={s.helpWrap}>
+      <View style={s.helpCard}>
+        <Text style={s.helpTitle}>Need Help?</Text>
+        <Text style={s.helpBody}>
+          Use our search feature or contact our support team for assistance
+          finding specific products.
+        </Text>
+        <Pressable
+          onPress={() => router.push('/(any)/products' as any)}
+          accessibilityRole="button"
+          accessibilityLabel="Search products"
+          style={({ pressed }) => [s.helpPrimary, pressed && s.helpPressed]}
+        >
+          <Text style={s.helpPrimaryText}>Search Products</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.push('/(any)/support' as any)}
+          accessibilityRole="button"
+          accessibilityLabel="Contact support"
+          style={({ pressed }) => [s.helpGhost, pressed && s.helpPressed]}
+        >
+          <Text style={s.helpGhostText}>Contact Support</Text>
         </Pressable>
       </View>
     </View>
@@ -360,7 +440,7 @@ const s = StyleSheet.create({
     position: 'absolute',
     top: -3,
     right: -5,
-    backgroundColor: '#111827',
+    backgroundColor: Palette.primary,
     minWidth: 17,
     height: 17,
     borderRadius: 9,
@@ -386,29 +466,109 @@ const s = StyleSheet.create({
     gap: GRID_GAP,
     marginBottom: GRID_GAP,
   },
-  listHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 16,
-    paddingBottom: 12,
+  /* The list's contentContainer is inset by GRID_PAD for the grid, so anything
+     that should run edge to edge — the banner, and the rails in the footer —
+     cancels it with a negative margin. */
+  banner: {
+    marginHorizontal: -GRID_PAD,
+    height: BANNER_H,
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  listTitle: {
-    fontSize: 15,
+  bannerImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  // Matches the web's `bg-black/60` — the photo is busy and the copy sits on it.
+  bannerScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
+  bannerContent: { paddingHorizontal: 24, alignItems: 'center' },
+  bannerEyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  bannerRule: { height: 1, width: 22, backgroundColor: Palette.primary },
+  bannerEyebrow: {
+    fontSize: 10,
     fontWeight: '700',
-    color: '#374151',
+    color: 'rgba(255,255,255,0.85)',
+    textTransform: 'uppercase',
+    letterSpacing: 1.6,
   },
+  bannerTitle: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -0.5,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  bannerSub: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: 'rgba(255,255,255,0.88)',
+    textAlign: 'center',
+  },
+
+  introWrap: { paddingTop: 20, paddingBottom: 6 },
   listCountPill: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: Palette.outlineSubtle,
+    borderRadius: Radius.DEFAULT,
     paddingHorizontal: 10,
     paddingVertical: 4,
+    marginTop: 2,
+    marginBottom: 10,
   },
   listCountText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6b7280',
+    color: Palette.textMuted,
   },
+
+  footerWrap: { marginHorizontal: -GRID_PAD, paddingTop: 8 },
+
+  // Need Help
+  helpWrap: { paddingHorizontal: 12, paddingTop: 18 },
+  helpCard: {
+    backgroundColor: Palette.background,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Palette.outline,
+    padding: 20,
+    alignItems: 'center',
+    ...Shadow.cardRest,
+  },
+  helpTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: Palette.ink,
+    letterSpacing: -0.3,
+    marginBottom: 8,
+  },
+  helpBody: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: Palette.textMuted,
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  /* Stacked, not side by side — the same width problem the BrandPromo CTAs hit. */
+  helpPrimary: {
+    alignSelf: 'stretch',
+    height: 46,
+    borderRadius: Radius.full,
+    backgroundColor: Palette.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helpPrimaryText: { fontSize: 14, fontWeight: '800', color: Palette.onPrimary },
+  helpGhost: {
+    alignSelf: 'stretch',
+    height: 46,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Palette.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  helpGhostText: { fontSize: 14, fontWeight: '700', color: Palette.primary },
+  helpPressed: { opacity: 0.88 },
 
   // Centered states
   centeredWrap: {
@@ -440,7 +600,7 @@ const s = StyleSheet.create({
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: Palette.primary,
     paddingHorizontal: 24,
     height: 48,
     borderRadius: 14,

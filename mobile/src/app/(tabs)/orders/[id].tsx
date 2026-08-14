@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,8 @@ import {
   getStateName,
   formatPhoneForDisplay,
 } from '@/components/WebSite/CheckOut/CheckoutProcess/constants';
+import { Palette } from '@/constants/theme';
+import { formatPrice } from '@/lib/currency';
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 type StatusInfo = { icon: any; label: string; bg: string; fg: string; iconBg: string };
@@ -81,8 +83,6 @@ const STEP_INDEX: Record<CustomerStatus, number> = {
   cancelled: -1,
 };
 const getStepIndex = (s: string) => STEP_INDEX[normalizeStatus(s)];
-
-const fmt = (n: number) => `$${n.toFixed(2)}`;
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function OrderDetailsScreen() {
@@ -164,7 +164,7 @@ export default function OrderDetailsScreen() {
             {"The order you're looking for doesn't exist."}
           </Text>
           <Pressable onPress={() => router.back()} accessibilityRole="button">
-            <View style={{ backgroundColor: '#111827', paddingHorizontal: 24, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ backgroundColor: Palette.primary, paddingHorizontal: 24, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Go Back</Text>
             </View>
           </Pressable>
@@ -172,6 +172,15 @@ export default function OrderDetailsScreen() {
       </View>
     );
   }
+
+  /**
+   * Bound to THIS order's currency, not the app region — a USD order opened from
+   * the .in region is still a USD order, and `formatPrice()` with no currency
+   * argument falls back to the region. Previously this screen hardcoded a "$"
+   * prefix, so every INR order displayed as dollars. Mirrors the web's
+   * OrderDetail.tsx, which solves it the same way and for the same reason.
+   */
+  const fmt = (n: number) => formatPrice(n, order.currency === 'USD' ? 'USD' : 'INR');
 
   const s = getStatus(order.status);
   const SIcon = s.icon;
@@ -450,7 +459,7 @@ export default function OrderDetailsScreen() {
                 </View>
               </Pressable>
               <Pressable onPress={() => router.push('/(tabs)/orders' as any)} accessibilityRole="button" style={{ flex: 1 }}>
-                <View style={{ height: 48, borderRadius: 12, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ height: 48, borderRadius: 12, backgroundColor: Palette.primary, alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>All Orders</Text>
                 </View>
               </Pressable>

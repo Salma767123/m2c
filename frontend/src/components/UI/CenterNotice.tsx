@@ -52,6 +52,11 @@ export function showCenterNotice(
   message?: string,
   duration = AUTO_CLOSE_MS
 ): string {
+  // Dedupe: if an identical notice (same type/title/message) is already showing,
+  // reuse it instead of stacking a duplicate — guards against React StrictMode
+  // double-invoking effects and any accidental double-fire.
+  const existing = notices.find((n) => n.type === type && n.title === title && n.message === message);
+  if (existing) return existing.id;
   counter += 1;
   const id = `cn_${counter}`;
   notices = [...notices, { id, type, title, message, duration }];

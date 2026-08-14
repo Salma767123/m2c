@@ -37,6 +37,7 @@ const FACTORY_RESULT_OPTIONS = [
 
 const PRODUCT_STATUS_OPTIONS = [
     { value: '', label: 'All statuses' },
+    { value: 'QC_SUBMITTED', label: 'Pending Admin Review' },
     { value: 'QC_APPROVED', label: 'Pending Approval' },
     { value: 'APPROVED', label: 'Approved by Admin' },
     { value: 'REJECTED', label: 'Rejected' },
@@ -224,6 +225,8 @@ export default function QCReports() {
             case 'PASSED':
             case 'APPROVED':
                 return <Badge className="bg-green-50 text-green-700 border border-green-200">Approved</Badge>
+            case 'QC_SUBMITTED':
+                return <Badge className="bg-blue-50 text-blue-700 border border-blue-200">Pending Admin Review</Badge>
             case 'QC_APPROVED':
                 return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200">QC Approved</Badge>
             case 'REINSPECTION':
@@ -253,6 +256,8 @@ export default function QCReports() {
         switch (approvalStatus) {
             case 'APPROVED':
                 return <Badge className="bg-green-50 text-green-700 border border-green-200">Approved by Admin</Badge>
+            case 'QC_SUBMITTED':
+                return <Badge className="bg-blue-50 text-blue-700 border border-blue-200">Pending Admin Review</Badge>
             case 'QC_APPROVED':
                 return <Badge className="bg-amber-50 text-amber-700 border border-amber-200">Pending Approval</Badge>
             case 'REJECTED':

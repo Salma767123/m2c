@@ -129,7 +129,10 @@ export default function DashboardHome({ checkerID, checkerName }: DashboardHomeP
   const pendingProducts = assignedProducts.filter(p =>
     p.approvalStatus === 'PENDING' || p.approvalStatus === 'REINSPECTION'
   ).length
-  const passedProducts = assignedProducts.filter(p => p.approvalStatus === 'QC_APPROVED' || p.approvalStatus === 'APPROVED').length
+  // "Completed" from the checker's view = they finished & submitted the inspection.
+  // QC_SUBMITTED (awaiting the admin's decision) counts here, alongside the admin's
+  // later QC_APPROVED/APPROVED outcomes.
+  const passedProducts = assignedProducts.filter(p => p.approvalStatus === 'QC_SUBMITTED' || p.approvalStatus === 'QC_APPROVED' || p.approvalStatus === 'APPROVED').length
   const failedProducts = assignedProducts.filter(p => p.approvalStatus === 'REJECTED').length
 
   // Vendor inspection counts — derived from the SAME assigned-vendor list, using the
@@ -165,7 +168,7 @@ export default function DashboardHome({ checkerID, checkerName }: DashboardHomeP
       icon: CheckCircle2,
       trend: activeTab === 'vendor' ? `${pl(passedVendors, "Vendor")}` : `${pl(passedProducts, "Product")}`,
       color: "emerald" as const,
-      onClick: () => router.push(activeTab === 'vendor' ? '/checker/dashboard/vendors?status=&inspectionStatus=Completed' : '/checker/dashboard/products?status=QC_APPROVED,APPROVED'),
+      onClick: () => router.push(activeTab === 'vendor' ? '/checker/dashboard/vendors?status=&inspectionStatus=Completed' : '/checker/dashboard/products?status=QC_SUBMITTED,QC_APPROVED,APPROVED'),
     },
     {
       label: "Rejected",
@@ -179,6 +182,7 @@ export default function DashboardHome({ checkerID, checkerName }: DashboardHomeP
 
   const STATUS_LABELS: Record<string, string> = {
     APPROVED: "Approved by Admin",
+    QC_SUBMITTED: "Submitted",
     QC_APPROVED: "Approved by QC",
     REJECTED: "Rejected",
     REINSPECTION: "Reinspection",
@@ -192,6 +196,7 @@ export default function DashboardHome({ checkerID, checkerName }: DashboardHomeP
   const getStatusBadge = (status: string) => {
     const badgeClasses = {
       APPROVED: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200",
+      QC_SUBMITTED: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200",
       QC_APPROVED: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200",
       REJECTED: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200",
       REINSPECTION: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200",

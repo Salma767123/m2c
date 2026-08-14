@@ -138,6 +138,11 @@ export default function WarehouseDetails({
     // must not be swallowed by the `value || ''` FormData serialiser.
     warehouseLatitude: data.warehouseLatitude ?? "",
     warehouseLongitude: data.warehouseLongitude ?? "",
+    // Where the vendor's PRODUCTS are handled — the site a QC product inspection is
+    // geofenced against. No default: the vendor must actively pick one when the
+    // warehouse differs from the legal/factory address. (When they're the same the
+    // field is hidden and the backend treats a blank value as FACTORY.)
+    productInspectionSite: data.productInspectionSite || "",
     factoryImages: normaliseFactoryImages(data.factoryImages),
   });
 
@@ -179,6 +184,7 @@ export default function WarehouseDetails({
       warehouseCountry: data.warehouseCountry || data.country || "India",
       warehouseLatitude: data.warehouseLatitude ?? "",
       warehouseLongitude: data.warehouseLongitude ?? "",
+      productInspectionSite: data.productInspectionSite || "",
       factoryImages: normaliseFactoryImages(data.factoryImages),
     });
   }
@@ -254,6 +260,9 @@ export default function WarehouseDetails({
       if (latErr) newErrors.warehouseLatitude = latErr;
       const lngErr = validateCoordinate(formData.warehouseLongitude, 'longitude');
       if (lngErr) newErrors.warehouseLongitude = lngErr;
+      // Product-handling site must be actively chosen — no default.
+      if (!formData.productInspectionSite)
+        newErrors.productInspectionSite = 'Please select where your products are handled';
     }
 
     // Required factory image slots (Change 11)
@@ -291,6 +300,7 @@ export default function WarehouseDetails({
         'warehouseState',
         'warehouseZip',
         'warehouseCountry',
+        'productInspectionSite',
         ...FACTORY_IMAGE_SLOTS.map((s) => `factoryImage:${s.id}`),
       ];
       const firstErrorKey = fieldOrder.find((f) => newErrors[f]) ?? Object.keys(newErrors)[0];
@@ -307,6 +317,7 @@ export default function WarehouseDetails({
           selectorMap: {
             ownershipType: '[data-field="ownershipType"]',
             warehouseCountry: '[data-field="warehouseCountry"]',
+            productInspectionSite: '[data-field="productInspectionSite"]',
           },
         });
       }, 350);
@@ -408,6 +419,7 @@ export default function WarehouseDetails({
     warehouseCountry: 'address',
     warehouseLatitude: 'address',
     warehouseLongitude: 'address',
+    productInspectionSite: 'address',
   };
   // factory image slot errors are handled separately in the photos section
 
@@ -420,7 +432,7 @@ export default function WarehouseDetails({
       if (isLinked) {
         return formData.warehouseAddress && formData.warehouseCity ? 'complete' : 'partial';
       }
-      const required = [formData.warehouseAddress, formData.warehouseCity, formData.warehouseState, formData.warehouseZip, formData.warehouseCountry, formData.warehouseLatitude, formData.warehouseLongitude];
+      const required = [formData.warehouseAddress, formData.warehouseCity, formData.warehouseState, formData.warehouseZip, formData.warehouseCountry, formData.warehouseLatitude, formData.warehouseLongitude, formData.productInspectionSite];
       // `warehouseCountry` defaults to "India", so exclude it from the
       // "in progress" trigger — an untouched address reads as empty.
       const userEntered = [formData.warehouseAddress, formData.warehouseCity, formData.warehouseState, formData.warehouseZip];
@@ -877,6 +889,47 @@ export default function WarehouseDetails({
               }
             />
           </div>
+
+          {/* Product-handling site — only asked when the warehouse address DIFFERS from
+              the legal/factory address. It tells the QC team which location to inspect
+              products at (that address is geofenced during product inspections). When the
+              warehouse is the same as the factory, this is moot and stays FACTORY. */}
+          {!isLinked && (
+            <div className="mt-6 pt-5 border-t border-slate-200">
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                Where are your products handled / stored?{' '}
+                <span className="text-brand-500" aria-hidden="true">*</span>
+              </label>
+              <p className="text-xs text-slate-500 mb-3">
+                QC checkers will inspect your products at this location. Pick the address where the goods physically are.
+              </p>
+              <div
+                className="flex flex-wrap gap-2.5"
+                role="radiogroup"
+                aria-label="Product handling site"
+                data-field="productInspectionSite"
+              >
+                {[
+                  { id: 'FACTORY', label: 'Legal / Factory address' },
+                  { id: 'WAREHOUSE', label: 'Warehouse address' },
+                ].map((opt) => (
+                  <ToggleButton
+                    key={opt.id}
+                    selected={formData.productInspectionSite === opt.id}
+                    invalid={!!(errors.productInspectionSite && touched.productInspectionSite)}
+                    onClick={() => handleInputChange('productInspectionSite', opt.id)}
+                  >
+                    <span className="font-semibold">{opt.label}</span>
+                  </ToggleButton>
+                ))}
+              </div>
+              {errors.productInspectionSite && touched.productInspectionSite && (
+                <p className="text-red-600 text-xs mt-2 font-medium" role="alert">
+                  {errors.productInspectionSite}
+                </p>
+              )}
+            </div>
+          )}
         </AccordionSection>
 
         {/* ═══════════════════════════════════════════════════════════════

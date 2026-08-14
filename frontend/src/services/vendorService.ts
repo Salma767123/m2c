@@ -103,6 +103,8 @@ export interface VendorRegistrationData {
    *  "same as legal address". */
   warehouseLatitude?: string;
   warehouseLongitude?: string;
+  /** Where products are handled — the site a QC product inspection geofences against. */
+  productInspectionSite?: 'FACTORY' | 'WAREHOUSE';
 
   // Vendor Type & Products
   vendorType: string | string[];
@@ -349,6 +351,8 @@ export interface VendorProfile {
   factoryLongitude?: number | null;
   warehouseLatitude?: number | null;
   warehouseLongitude?: number | null;
+  /** Where products are handled — the site a QC product inspection geofences against. */
+  productInspectionSite?: 'FACTORY' | 'WAREHOUSE' | null;
   /** Step 6 free-text logistics / compliance fields. */
   packagingCapabilities?: string;
   logisticsPartners?: string;

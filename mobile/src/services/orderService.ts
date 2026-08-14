@@ -35,6 +35,12 @@ export interface Order {
   tax: number;
   discount: number;
   totalAmount: number;
+  /**
+   * Currency the order was actually charged in, fixed at purchase time. Every
+   * amount above must be rendered in THIS currency, not the current app region —
+   * a USD order opened from the .in region is still a USD order.
+   */
+  currency?: string | null;
   paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
   paymentMethod: string;
   paymentId?: string;

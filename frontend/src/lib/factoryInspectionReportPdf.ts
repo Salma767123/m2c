@@ -41,6 +41,11 @@ export interface FactoryReportMeta {
   /** 'PHYSICAL' | 'VIRTUAL'. Decides whether GPS coordinates are printed. */
   inspectionType?: string | null
   location?: { latitude: number; longitude: number } | null
+  /** Location verification, so the report names the exact site the checker was verified at. */
+  locationVerified?: boolean | null
+  locationDistanceM?: number | null
+  /** 'legal/factory' | 'warehouse' — which registered address matched. */
+  matchedAddress?: string | null
   generatedAt?: Date
   // Duration breakdown (see lib/inspectionDuration.ts). When present, the report
   // prints Active / Paused / Total rows; exceededSchedule highlights the total.
@@ -666,6 +671,10 @@ export function generateFactoryInspectionPdf(
   // ── K. Inspection Details ───────────────────────────────────────────────────
   const loc = meta.location
   const isVirtual = String(meta.inspectionType).toUpperCase() === "VIRTUAL"
+  const matchedSiteLabel =
+    meta.matchedAddress === "warehouse" ? "Warehouse address"
+    : meta.matchedAddress === "legal/factory" ? "Legal / Factory site"
+    : "Vendor location"
   sectionTitle("K. Inspection Details")
   runTable(
     [["Field", "Value"]],
@@ -691,6 +700,14 @@ export function generateFactoryInspectionPdf(
       ...(isVirtual
         ? []
         : [["GPS Location", loc ? `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}` : "Not available"]]),
+      // Which registered address the checker was verified at, and the distance. Only
+      // shown when verification info was captured (final stored reports), not the
+      // submit-time preview.
+      ...(isVirtual || meta.locationVerified == null
+        ? []
+        : [["Verified Site", meta.locationVerified
+              ? `${matchedSiteLabel}${meta.locationDistanceM != null ? ` — ${Math.round(meta.locationDistanceM)}m away` : ""}`
+              : "Not verified"]]),
       ["Inspector Remarks",        val(meta.inspectorRemarks)],
     ]
   )

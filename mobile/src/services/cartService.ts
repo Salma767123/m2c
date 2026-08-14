@@ -1,5 +1,6 @@
 import axios from '@/lib/axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCurrency, getRegion } from '@/lib/currency';
 
 export interface CartItem {
   id: string;
@@ -7,6 +8,9 @@ export interface CartItem {
   variantId?: string;
   quantity: number;
   price: number;
+  transportType?: 'AIR' | 'SHIP' | null;
+  courier?: string | null;
+
   product?: {
     id: string;
     name: string;
@@ -57,13 +61,24 @@ function extractError(error: any, fallback: string): Error {
 }
 
 class CartService {
+  // Mirrors the web service: optionally carries the shipping choice (transport +
+  // courier) so the line lands ready to check out. Both are re-validated
+  // server-side at order time.
   async addToCart(
     productId: string,
     quantity: number = 1,
     variantId?: string,
+    shipping?: { transportType?: 'AIR' | 'SHIP' | null; courier?: string | null },
   ): Promise<CartResponse> {
     try {
-      const response = await axios.post('/cart/add', { productId, quantity, variantId });
+      const response = await axios.post('/cart/add', {
+        productId,
+        quantity,
+        variantId,
+        currency: getCurrency(),
+        ...(shipping?.transportType !== undefined ? { transportType: shipping.transportType } : {}),
+        ...(shipping?.courier !== undefined ? { courier: shipping.courier } : {}),
+      });
       return response.data;
     } catch (error: any) {
       throw extractError(error, 'Failed to add item to cart');
@@ -72,7 +87,7 @@ class CartService {
 
   async getCart(): Promise<CartResponse> {
     try {
-      const response = await axios.get('/cart');
+      const response = await axios.get('/cart', { params: { region: getRegion() } });
       return response.data;
     } catch (error: any) {
       throw extractError(error, 'Failed to fetch cart');
@@ -130,6 +145,7 @@ class CartService {
     productId: string,
     quantity: number = 1,
     variantId?: string,
+    shipping?: { transportType?: 'AIR' | 'SHIP' | null; courier?: string | null },
   ): Promise<void> {
     const cart = await this.getLocalCart();
     const existingItem = cart.find(
@@ -138,6 +154,8 @@ class CartService {
 
     if (existingItem) {
       existingItem.quantity += quantity;
+      if (shipping?.transportType !== undefined) existingItem.transportType = shipping.transportType;
+      if (shipping?.courier !== undefined) existingItem.courier = shipping.courier;
     } else {
       cart.push({
         id: Date.now().toString() + Math.random().toString(36).substring(7),
@@ -145,11 +163,47 @@ class CartService {
         variantId,
         quantity,
         price: 0,
+        ...(shipping?.transportType !== undefined ? { transportType: shipping.transportType } : {}),
+        ...(shipping?.courier !== undefined ? { courier: shipping.courier } : {}),
       });
     }
 
     await this.saveLocalCart(cart);
   }
+
+
+
+  // newly added
+// Add near updateCartItem()
+async updateCartItemShipping(
+  itemId: string,
+  updates: { transportType?: 'AIR' | 'SHIP' | null; courier?: string | null },
+): Promise<CartResponse> {
+  try {
+    const response = await axios.put(`/cart/${itemId}`, updates);
+    return response.data;
+  } catch (error: any) {
+    throw extractError(error, 'Failed to update shipping method');
+  }
+}
+
+// Add near updateLocalCartItem() — guest cart shipping persistence
+async updateLocalCartItemShipping(
+  id: string,
+  updates: { transportType?: 'AIR' | 'SHIP' | null; courier?: string | null },
+): Promise<void> {
+  const cart = await this.getLocalCart();
+  const item = cart.find((i) => i.id === id);
+  if (item) {
+    if (updates.transportType !== undefined) (item as any).transportType = updates.transportType;
+    if (updates.courier !== undefined) (item as any).courier = updates.courier;
+    await this.saveLocalCart(cart);
+  }
+}
+
+
+
+
 
   async removeFromLocalCart(id: string): Promise<void> {
     const cart = await this.getLocalCart();

@@ -840,7 +840,7 @@ export default function ProductsTab() {
       {/* Title */}
       <View className="px-4 pt-4 pb-2 bg-gray-50 flex-row items-start justify-between">
         <View className="flex-1">
-          <Text className="text-2xl font-extrabold text-slate-900 mb-1">Assigned Products</Text>
+          <Text className="text-xl font-extrabold text-slate-900 mb-1">Assigned Products</Text>
           <Text className="text-slate-600 text-sm">Review and approve or reject vendor products</Text>
         </View>
       </View>

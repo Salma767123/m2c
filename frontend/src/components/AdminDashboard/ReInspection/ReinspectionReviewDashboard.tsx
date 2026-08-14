@@ -27,6 +27,7 @@ import Pagination from '@/components/UI/Pagination';
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   SUBMITTED: { label: 'Submitted', className: 'bg-brand-50 text-brand-700 border border-brand-200' },
+  QC_SUBMITTED: { label: 'Pending Admin Review', className: 'bg-blue-50 text-blue-700 border border-blue-200' },
   UNDER_ADMIN_REVIEW: { label: 'Under Review', className: 'bg-yellow-50 text-yellow-700 border border-yellow-200' },
   REJECTED: { label: 'Rejected', className: 'bg-red-50 text-red-700 border border-red-200' },
   REINSPECTION: { label: 'Re-Inspection', className: 'bg-amber-50 text-amber-700 border border-amber-200' },
@@ -131,6 +132,7 @@ export default function ReinspectionReviewDashboard() {
     : [
         { value: 'all', label: 'All Statuses' },
         { value: 'PENDING', label: 'Pending' },
+        { value: 'QC_SUBMITTED', label: 'Pending Admin Review' },
         { value: 'QC_APPROVED', label: 'QC Approved' },
         { value: 'APPROVED', label: 'Approved' },
         { value: 'REJECTED', label: 'Rejected' },

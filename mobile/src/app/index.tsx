@@ -10,6 +10,8 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
+import { Palette } from '@/constants/theme';
+import { userAuthService } from '@/services/userAuthService';
 
 export default function SplashScreen() {
   const { width } = useWindowDimensions();
@@ -76,9 +78,10 @@ export default function SplashScreen() {
     animateDot(dot2, 150).start();
     animateDot(dot3, 300).start();
 
-    // Navigate after splash
-    const timer = setTimeout(() => {
-      router.replace('/(tabs)');
+    // Navigate after splash: home only if already logged in, else login.
+    const timer = setTimeout(async () => {
+      const authenticated = await userAuthService.isAuthenticated();
+      router.replace(authenticated ? '/(tabs)' : '/(auth)/Login');
     }, 2800);
 
     return () => clearTimeout(timer);
@@ -154,7 +157,7 @@ export default function SplashScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: Palette.surfaceInverse,
   },
   gradientTop: {
     position: 'absolute',
@@ -212,7 +215,7 @@ const s = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#ffffff',
+    backgroundColor: Palette.primary,
   },
   footer: {
     alignItems: 'center',

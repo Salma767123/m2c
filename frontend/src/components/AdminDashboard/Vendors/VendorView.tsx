@@ -1377,6 +1377,14 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
                   <p className="font-medium">{formatSqFt(vendor.warehouseSize)}</p>
                 </div>
               )}
+              {/* Which address QC product inspections are geofenced against. */}
+              <div className="mt-3">
+                <p className="text-sm text-slate-500">Product Inspection Site</p>
+                <p className="font-medium">
+                  {String(v.productInspectionSite).toUpperCase() === 'WAREHOUSE' ? 'Warehouse address' : 'Legal / Factory address'}
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">Products are location-verified at this address during QC inspection.</p>
+              </div>
               {v.mapLink && (
                 <div className="mt-3">
                   <a href={v.mapLink} target="_blank" rel="noopener noreferrer"

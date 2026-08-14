@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, Dimensions } from 'react-native';
-import { ArrowRight, RefreshCw, PackageSearch } from 'lucide-react-native';
+import { RefreshCw, PackageSearch } from 'lucide-react-native';
 import { router } from 'expo-router';
 import ProductCard from '../ProductCard/ProductCard';
 import { publicProductService, PublicProduct } from '@/services/publicProductService';
+import { Palette } from '@/constants/theme';
+import SectionHeading, { type SectionKey } from './SectionHeading';
 
 const LIMIT = 4;
 const H_MARGIN = 12;   // section card outer margin
@@ -44,7 +46,7 @@ export default function BestSellerSection() {
   if (state === 'empty') return null;
 
   return (
-    <SectionCard title="Best Sellers">
+    <SectionCard section="bestSeller">
       {state === 'loading' ? (
         <Grid>
           {Array.from({ length: LIMIT }).map((_, i) => (
@@ -67,7 +69,13 @@ export default function BestSellerSection() {
 }
 
 // ─── Section card shell (white floating card + header) ──────────────────────
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+function SectionCard({
+  section,
+  children,
+}: {
+  section: SectionKey;
+  children: React.ReactNode;
+}) {
   return (
     <View
       style={{
@@ -85,33 +93,8 @@ function SectionCard({ title, children }: { title: string; children: React.React
         elevation: 2,
       }}
     >
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 2,
-          marginBottom: 14,
-        }}
-      >
-        <Text style={{ flex: 1, color: '#111827', fontSize: 20, fontWeight: '800', letterSpacing: -0.3 }}>
-          {title}
-        </Text>
-        <Pressable onPress={goToAll} accessibilityRole="button" accessibilityLabel="View all products" hitSlop={6}>
-          <View
-            style={{
-              width: 56,
-              height: 38,
-              borderRadius: 19,
-              backgroundColor: '#111827',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <ArrowRight size={20} color="#ffffff" strokeWidth={2.5} />
-          </View>
-        </Pressable>
-      </View>
+      <SectionHeading section={section} onPressCta={goToAll} />
+
       {children}
     </View>
   );
@@ -157,13 +140,13 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
           width: 56,
           height: 56,
           borderRadius: 28,
-          backgroundColor: '#fef2f2',
+          backgroundColor: '#E01A1B',
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: 12,
         }}
       >
-        <PackageSearch size={26} color="#ef4444" strokeWidth={1.5} />
+        <PackageSearch size={26} color="#E01A1B" strokeWidth={1.5} />
       </View>
       <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 4 }}>
         {"Couldn't load products"}
@@ -176,7 +159,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: '#111827',
+            backgroundColor: Palette.primary,
             paddingHorizontal: 20,
             minHeight: 42,
             borderRadius: 11,

@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Pressable, ScrollView, useWindowDimensions, Animated } from 'react-native';
 import { Image } from 'expo-image';
 import { bannerService, BannerImage } from '@/services/bannerService';
+import { Palette } from '@/constants/theme';
 
-const IMAGE_ASPECT_RATIO = 2872 / 1152;
+const IMAGE_ASPECT_RATIO = 3972 / 1252;
 const BANNER_MARGIN = 12;   // side gap so the banner is inset (Flipkart-style)
 const BANNER_RADIUS = 16;
 
@@ -178,13 +179,13 @@ export default function HeroSection() {
                   >
                     {/* Fill — past = full, current = animated, future = none */}
                     {isPast ? (
-                      <View style={{ flex: 1, backgroundColor: '#111827' }} />
+                      <View style={{ flex: 1, backgroundColor: Palette.surfaceInverse }} />
                     ) : isCurrent ? (
                       <Animated.View
                         style={{
                           height: '100%',
                           borderRadius: 3,
-                          backgroundColor: '#111827',
+                          backgroundColor: Palette.surfaceInverse,
                           width: progress.interpolate({
                             inputRange: [0, 1],
                             outputRange: ['0%', '100%'],

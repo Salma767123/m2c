@@ -26,6 +26,7 @@ import {
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
+import { LinearGradient } from 'expo-linear-gradient';
 import ShippingForm from './CheckoutProcess/ShippingForm';
 import PaymentForm from './CheckoutProcess/PaymentForm';
 import ReviewOrder from './CheckoutProcess/ReviewOrder';
@@ -835,9 +836,9 @@ export default function Checkout() {
                     width: 48,
                     height: 48,
                     borderRadius: 24,
-                    backgroundColor: isCompleted ? '#16a34a' : isActive ? '#1a1a2e' : '#f3f4f6',
-                    borderWidth: isActive && !isCompleted ? 2 : 0,
-                    borderColor: '#1a1a2e',
+                    backgroundColor: isActive || isCompleted ? '#E01A1B' : '#f3f4f6',
+                    borderWidth: isActive ? 2 : 0,
+                    borderColor: '#E01A1B',
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginBottom: 8,
@@ -860,7 +861,7 @@ export default function Checkout() {
                   style={{
                     fontSize: 12,
                     fontWeight: isActive || isCompleted ? '700' : '600',
-                    color: isActive || isCompleted ? '#111827' : '#9ca3af',
+                    color: isActive || isCompleted ? '#E01A1B' : '#94a3b8',
                     textAlign: 'center',
                   }}
                 >
@@ -874,7 +875,7 @@ export default function Checkout() {
                   style={{
                     height: 2,
                     flex: 0.5,
-                    backgroundColor: isCompleted ? '#16a34a' : '#e5e7eb',
+                    backgroundColor: isCompleted ? '#E01A1B' : '#cbd5e1',
                     marginBottom: 32,
                     marginHorizontal: 4,
                   }}
@@ -927,8 +928,8 @@ export default function Checkout() {
         <View style={{ flex: 1, marginLeft: 4 }}>
           <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Checkout</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-            <Lock size={12} color="#16a34a" />
-            <Text style={{ fontSize: 13, color: '#16a34a', fontWeight: '600' }}>Secure payment</Text>
+            <Lock size={12} color="#E01A1B" />
+            <Text style={{ fontSize: 13, color: '#E01A1B', fontWeight: '600' }}>Secure payment</Text>
           </View>
         </View>
       </View>
@@ -945,16 +946,18 @@ export default function Checkout() {
           className="bg-white rounded-[24px] overflow-hidden mb-4 shadow-md"
         >
           {/* Card Header */}
-          <View
+          <LinearGradient
+            colors={['#E01A1B', '#E01A1B']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
             style={{
-              backgroundColor: '#f9fafb',
               paddingHorizontal: 20,
               paddingVertical: 14,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
               borderBottomWidth: 1,
-              borderBottomColor: '#e5e7eb',
+              borderBottomColor: '#E01A1B',
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -963,25 +966,25 @@ export default function Checkout() {
                   width: 40,
                   height: 40,
                   borderRadius: 12,
-                  backgroundColor: '#111827',
+                  backgroundColor: '#ffffff',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                {currentStep === 1 ? <Truck size={18} color="#fff" /> : null}
-                {currentStep === 2 ? <CreditCard size={18} color="#fff" /> : null}
-                {currentStep === 3 ? <CheckCircle size={18} color="#fff" /> : null}
+                {currentStep === 1 ? <Truck size={18} color="#E01A1B" /> : null}
+                {currentStep === 2 ? <CreditCard size={18} color="#E01A1B" /> : null}
+                {currentStep === 3 ? <CheckCircle size={18} color="#E01A1B" /> : null}
               </View>
               <View>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#fffff4' }}>
                   {currentStep === 1 ? 'Shipping' : currentStep === 2 ? 'Payment' : 'Review'}
                 </Text>
-                <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>
                   Step {currentStep} of {steps.length}
                 </Text>
               </View>
             </View>
-          </View>
+          </LinearGradient>
 
           {/* Card Content */}
           <View style={{ padding: 24 }}>
@@ -1073,8 +1076,8 @@ export default function Checkout() {
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 }}>
                           <View style={{
                             width: 20, height: 20, borderRadius: 4,
-                            borderWidth: 2, borderColor: saveNewAddressToBook ? '#111827' : '#cbd5e1',
-                            backgroundColor: saveNewAddressToBook ? '#111827' : '#fff',
+                            borderWidth: 2, borderColor: saveNewAddressToBook ? '#E01A1B' : '#cbd5e1',
+                            backgroundColor: saveNewAddressToBook ? '#E01A1B' : '#fff',
                             alignItems: 'center', justifyContent: 'center',
                           }}>
                             {saveNewAddressToBook ? <Check size={14} color="#fff" strokeWidth={3} /> : null}
@@ -1146,12 +1149,17 @@ export default function Checkout() {
                 <View
                   style={{
                     height: 52,
-                    borderRadius: 14,
-                    backgroundColor: placingOrder ? '#9ca3af' : '#111827',
+                    borderRadius: 999,
+                    backgroundColor: placingOrder ? '#9ca3af' : '#E01A1B',
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 8,
+                    shadowColor: placingOrder ? 'transparent' : '#E01A1B',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    elevation: 4,
                   }}
                 >
                   {placingOrder ? <ActivityIndicator size="small" color="#ffffff" /> : null}
@@ -1571,7 +1579,7 @@ export default function Checkout() {
             startInLoadingState={true}
             renderLoading={() => (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <ActivityIndicator size="large" color="#111827" />
+                <ActivityIndicator size="large" color="#E01A1B" />
                 <Text style={{ color: '#6b7280', marginTop: 16, fontSize: 14, fontWeight: '600' }}>Loading payment gateway...</Text>
               </View>
             )}

@@ -14,6 +14,7 @@ import { X, Star, Send, Package } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { reviewService } from '@/services/reviewService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { Palette } from '@/constants/theme';
 
 interface OrderItem {
   productId: string;
@@ -338,7 +339,7 @@ const s = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#111827',
+    backgroundColor: Palette.primary,
   },
 
   // Stars
@@ -390,7 +391,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     height: 52,
     borderRadius: 14,
-    backgroundColor: '#111827',
+    backgroundColor: Palette.primary,
     gap: 8,
   },
   submitBtnDisabled: {

@@ -2,6 +2,8 @@
 // Aligned with the new step IDs: generalInformation, productVerification,
 // packagingInspection, defects, testing, review, documentation.
 
+import { isTestOptional } from "@/components/Checker/Vendor/Steps/PI_data"
+
 export type Step =
     | "generalInformation"
     | "productVerification"
@@ -169,7 +171,11 @@ function validateTesting(d: any): StepErrors {
                 e.testGroups = `Fill in Test Subject and Test Name for the custom test in "${group.label}"`
                 return e
             }
+            // Optional checks may be left unanswered. Carton Drop Test is optional only
+            // when the group is packed as Bale (mandatory for Carton).
+            const optional = !t.isOther && isTestOptional(t.id, group.packagingType)
             if (t.pass !== true && t.fail !== true) {
+                if (optional) continue
                 e.testGroups = `"${displayName}" — select Pass or Fail before continuing`
                 return e
             }
@@ -242,4 +248,14 @@ export function firstErrorMessage(errs: StepErrors | undefined): string | null {
     if (!errs) return null
     const keys = Object.keys(errs)
     return keys.length > 0 ? errs[keys[0]] : null
+}
+
+/** Number of missing/invalid fields in a single step. */
+export function countErrors(errs: StepErrors | undefined): number {
+    return errs ? Object.keys(errs).length : 0
+}
+
+/** Total missing/invalid fields across every step (used on final submit). */
+export function countAllErrors(all: AllErrors): number {
+    return Object.values(all).reduce((n, e) => n + (e ? Object.keys(e).length : 0), 0)
 }

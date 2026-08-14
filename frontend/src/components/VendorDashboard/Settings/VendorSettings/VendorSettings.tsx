@@ -1036,6 +1036,8 @@ export default function VendorSettings() {
   const warehouseOwnership = compact([
     mk("Ownership Type", v.ownershipType, { transform: getOwnershipTypeLabel }),
     mk("Warehousing Capacity", formatSqFt(v.warehouseSize || v.storageCapacity)),
+    // Which address QC checkers inspect your products at (location-verified there).
+    mk("Product Inspection Site", String((v as any).productInspectionSite).toUpperCase() === 'WAREHOUSE' ? 'Warehouse address' : 'Legal / Factory address'),
   ]);
   const warehouseAddress = compact([
     mk(

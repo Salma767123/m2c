@@ -21,6 +21,7 @@ export interface Review {
   user?: {
     name: string;
     image: string | null;
+    country?: string | null;
   };
 }
 

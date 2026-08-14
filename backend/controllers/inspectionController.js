@@ -280,7 +280,7 @@ const startInspection = async (req, res) => {
         // rejected the same case, so a vendor could pass the start and fail the submit.
         const vendor = await prisma.vendor.findUnique({
             where: { id: inspection.vendorId },
-            select: { id: true, factoryLatitude: true, factoryLongitude: true, companyName: true, mapLink: true },
+            select: { id: true, factoryLatitude: true, factoryLongitude: true, warehouseLatitude: true, warehouseLongitude: true, companyName: true, mapLink: true },
         });
 
         const geo = await verifyCheckerAtVendor({
@@ -328,6 +328,7 @@ const startInspection = async (req, res) => {
                 ...(geo.vendorLat != null ? { vendorLatitude: geo.vendorLat, vendorLongitude: geo.vendorLng } : {}),
                 locationVerified: geo.verified === true,
                 ...(geo.distanceM != null ? { locationDistanceM: Math.round(geo.distanceM) } : {}),
+                ...(geo.matchedAddress ? { locationMatchedAddress: geo.matchedAddress } : {}),
                 ...resumeFields,
             },
             include: {
@@ -526,6 +527,8 @@ const completeInspection = async (req, res) => {
                 id: true,
                 factoryLatitude: true,
                 factoryLongitude: true,
+                warehouseLatitude: true,
+                warehouseLongitude: true,
                 mapLink: true,
                 companyName: true,
             },
@@ -607,6 +610,7 @@ const completeInspection = async (req, res) => {
             ...(geo.vendorLat != null ? { vendorLatitude: geo.vendorLat, vendorLongitude: geo.vendorLng } : {}),
             locationVerified: geo.verified === true,
             ...(geo.distanceM != null ? { locationDistanceM: Math.round(geo.distanceM) } : {}),
+            ...(geo.matchedAddress ? { locationMatchedAddress: geo.matchedAddress } : {}),
         };
 
         const updatedInspection = await prisma.inspection.update({

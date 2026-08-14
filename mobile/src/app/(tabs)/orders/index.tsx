@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   ScrollView,
   RefreshControl,
   StatusBar,
+  TextInput,
+  StyleSheet,
 } from 'react-native';
 import { Image } from 'expo-image';
 import {
@@ -16,6 +18,8 @@ import {
   XCircle,
   ChevronRight,
   ShoppingCart,
+  Search,
+  X,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { orderService, Order } from '@/services/orderService';
@@ -23,6 +27,8 @@ import { userAuthService } from '@/services/userAuthService';
 import { showErrorToast } from '@/lib/toast-utils';
 import { OrdersSkeleton } from '@/components/ui/Skeleton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Palette, Radius } from '@/constants/theme';
+import { formatPrice } from '@/lib/currency';
 
 // ─── Status styling ───────────────────────────────────────────────────────────
 type CustomerStatus = 'processing' | 'shipped' | 'delivered' | 'cancelled';
@@ -48,11 +54,36 @@ const STATUS_MAP: Record<CustomerStatus, StatusInfo> = {
 
 const getStatus = (s: string): StatusInfo => STATUS_MAP[normalizeStatus(s)];
 
-const fmt = (n: number) => `$${n.toFixed(2)}`;
+/** Same options as the web list's status dropdown. */
+const STATUS_FILTERS = [
+  { value: 'all', label: 'All' },
+  { value: 'processing', label: 'Processing' },
+  { value: 'shipped', label: 'Shipped' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'cancelled', label: 'Cancelled' },
+] as const;
+
+type StatusFilter = (typeof STATUS_FILTERS)[number]['value'];
+
+/**
+ * Money for an order row.
+ *
+ * Bound to the ORDER's own currency, not the app region. Two reasons, both of
+ * which the previous hardcoded `$${n.toFixed(2)}` got wrong:
+ *  - an INR order rendered as "$1234.00";
+ *  - even using formatPrice() bare would fall back to the region, so a USD order
+ *    viewed from the .in region would render as ₹.
+ * An order's currency is fixed at purchase — it is what the customer was actually
+ * charged and what a refund must be issued in. Mirrors OrderDetail.tsx on the web.
+ */
+const money = (n: number, currency?: string | null) =>
+  formatPrice(n, currency === 'USD' ? 'USD' : 'INR');
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function OrdersScreen() {
   const [tab, setTab] = useState<'active' | 'history'>('active');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -85,9 +116,32 @@ export default function OrdersScreen() {
     fetchOrders();
   }, []);
 
-  const active = orders.filter((o) => !['delivered', 'cancelled'].includes(normalizeStatus(o.status)));
-  const history = orders.filter((o) => ['delivered', 'cancelled'].includes(normalizeStatus(o.status)));
+  /**
+   * Search + status filter, matching the web list's semantics exactly:
+   * search matches the order number OR any item name; the status filter is a
+   * substring test against the normalised status.
+   *
+   * Applied BEFORE the active/history split so the tab counts reflect what the
+   * filters actually leave behind — otherwise a tab could advertise "3" and then
+   * render an empty list.
+   */
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return orders.filter((o) => {
+      const matchesSearch =
+        !q ||
+        o.orderId?.toLowerCase().includes(q) ||
+        (o.items ?? []).some((it: any) => it?.name?.toLowerCase().includes(q));
+      if (!matchesSearch) return false;
+      if (statusFilter === 'all') return true;
+      return normalizeStatus(o.status).includes(statusFilter);
+    });
+  }, [orders, search, statusFilter]);
+
+  const active = filtered.filter((o) => !['delivered', 'cancelled'].includes(normalizeStatus(o.status)));
+  const history = filtered.filter((o) => ['delivered', 'cancelled'].includes(normalizeStatus(o.status)));
   const display = tab === 'active' ? active : history;
+  const isFiltering = search.trim().length > 0 || statusFilter !== 'all';
 
   // ── Loading ─────────────────────────────────────────────────────────────
   if (loading) {
@@ -119,8 +173,63 @@ export default function OrdersScreen() {
     <View style={{ flex: 1, backgroundColor: '#f4f5f7' }}>
       <ScreenHeader total={orders.length} />
 
+      {/* Search — matches order number or any item name, same as the web list. */}
+      <View style={os.searchWrap}>
+        <View style={os.searchBar}>
+          <Search size={16} color={Palette.textSubtle} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by order ID or product"
+            placeholderTextColor={Palette.textSubtle}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            style={os.searchInput}
+            accessibilityLabel="Search orders"
+          />
+          {search.length > 0 ? (
+            <Pressable
+              onPress={() => setSearch('')}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <X size={15} color={Palette.textSubtle} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
+      {/* Status filter — the web uses a dropdown; chips suit a touch target
+          better and keep the current selection visible without a tap. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={os.filterTrack}
+        style={{ flexGrow: 0 }}
+      >
+        {STATUS_FILTERS.map((f) => {
+          const isActive = statusFilter === f.value;
+          return (
+            <Pressable
+              key={f.value}
+              onPress={() => setStatusFilter(f.value)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={`Filter by ${f.label}`}
+              style={[os.filterChip, isActive && os.filterChipActive]}
+            >
+              <Text style={[os.filterChipText, isActive && os.filterChipTextActive]}>
+                {f.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
       {/* Segmented tab control */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>
         <View
           style={{
             flexDirection: 'row',
@@ -135,18 +244,38 @@ export default function OrdersScreen() {
       </View>
 
       {display.length === 0 ? (
-        <EmptyState
-          icon={<ShoppingCart size={40} color="#cbd5e1" />}
-          title={tab === 'active' ? 'No Active Orders' : 'No Order History'}
-          subtitle={
-            tab === 'active'
-              ? 'Your active orders will appear here once you place one.'
-              : 'Completed and cancelled orders will appear here.'
-          }
-          ctaLabel="Start Shopping"
-          ctaIcon={<ShoppingCart size={16} color="#fff" />}
-          onPress={() => router.push('/(tabs)' as any)}
-        />
+        /* "Nothing matched your filters" is a different problem from "you have no
+           orders" — offering Start Shopping to someone mid-search is unhelpful, so
+           the filtered case offers a way back out of the filters instead. */
+        isFiltering ? (
+          <EmptyState
+            icon={<Search size={40} color="#cbd5e1" />}
+            title="No Matching Orders"
+            subtitle={
+              search.trim()
+                ? `No orders match “${search.trim()}”. Try a different order ID or product name.`
+                : 'No orders match the selected status.'
+            }
+            ctaLabel="Clear Filters"
+            onPress={() => {
+              setSearch('');
+              setStatusFilter('all');
+            }}
+          />
+        ) : (
+          <EmptyState
+            icon={<ShoppingCart size={40} color="#cbd5e1" />}
+            title={tab === 'active' ? 'No Active Orders' : 'No Order History'}
+            subtitle={
+              tab === 'active'
+                ? 'Your active orders will appear here once you place one.'
+                : 'Completed and cancelled orders will appear here.'
+            }
+            ctaLabel="Start Shopping"
+            ctaIcon={<ShoppingCart size={16} color="#fff" />}
+            onPress={() => router.push('/(tabs)' as any)}
+          />
+        )
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingTop: 12, paddingBottom: 40, gap: 12 }}
@@ -257,7 +386,7 @@ function OrderCard({ order }: { order: Order }) {
     <Pressable
       onPress={() => router.push(`/(tabs)/orders/${order.id}` as any)}
       accessibilityRole="button"
-      accessibilityLabel={`Order ${order.orderId}, ${status.label}, total ${fmt(order.totalAmount)}`}
+      accessibilityLabel={`Order ${order.orderId}, ${status.label}, total ${money(order.totalAmount, order.currency)}`}
       android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
       style={({ pressed }) => ({
         opacity: pressed ? 0.9 : 1,
@@ -380,14 +509,14 @@ function OrderCard({ order }: { order: Order }) {
               Total
             </Text>
             <Text style={{ fontSize: 19, fontWeight: '800', color: '#0f172a', marginTop: 1, letterSpacing: -0.3 }}>
-              {fmt(order.totalAmount)}
+              {money(order.totalAmount, order.currency)}
             </Text>
           </View>
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: '#111827',
+              backgroundColor: Palette.primary,
               paddingLeft: 16,
               paddingRight: 12,
               height: 40,
@@ -449,7 +578,7 @@ function EmptyState({
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: '#111827',
+            backgroundColor: Palette.primary,
             paddingHorizontal: 28,
             height: 52,
             borderRadius: 14,
@@ -463,3 +592,40 @@ function EmptyState({
     </View>
   );
 }
+
+// ─── Filter bar styles ────────────────────────────────────────────────────────
+const os = StyleSheet.create({
+  searchWrap: { paddingHorizontal: 16, paddingTop: 14 },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 42,
+    paddingHorizontal: 12,
+    borderRadius: Radius.md,
+    backgroundColor: Palette.surface,
+    borderWidth: 1,
+    borderColor: Palette.outline,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13.5,
+    color: Palette.ink,
+    paddingVertical: 0,
+    includeFontPadding: false,
+  },
+
+  filterTrack: { paddingHorizontal: 16, paddingTop: 10, gap: 8 },
+  filterChip: {
+    paddingHorizontal: 14,
+    height: 32,
+    borderRadius: Radius.full,
+    justifyContent: 'center',
+    backgroundColor: Palette.surface,
+    borderWidth: 1,
+    borderColor: Palette.outline,
+  },
+  filterChipActive: { backgroundColor: Palette.primary, borderColor: Palette.primary },
+  filterChipText: { fontSize: 12.5, fontWeight: '600', color: Palette.text },
+  filterChipTextActive: { color: Palette.onPrimary },
+});

@@ -299,7 +299,7 @@ export default function Contact() {
             accessibilityState={{ disabled: isSubmitting }}
             android_ripple={{ color: 'rgba(255,255,255,0.15)' }}
             style={{ opacity: isSubmitting ? 0.7 : 1 }}
-            className="bg-gray-900 py-4 rounded-xl flex-row items-center justify-center"
+            className="bg-brand-500 py-4 rounded-xl flex-row items-center justify-center"
           >
             {isSubmitting ? (
               <>
@@ -373,7 +373,7 @@ export default function Contact() {
             {/* Modal Header */}
             <View className="flex-row items-center justify-between p-5 border-b border-gray-200 bg-gray-50">
               <View className="flex-row items-center flex-1">
-                <View className="w-10 h-10 bg-gray-900 rounded-full items-center justify-center mr-3">
+                <View className="w-10 h-10 bg-brand-500 rounded-full items-center justify-center mr-3">
                   <Store size={20} color="#ffffff" />
                 </View>
                 <View className="flex-1">
@@ -533,7 +533,7 @@ export default function Contact() {
                     accessibilityState={{ disabled: isSubmittingVendor }}
                     android_ripple={{ color: 'rgba(255,255,255,0.15)' }}
                     style={{ opacity: isSubmittingVendor ? 0.7 : 1 }}
-                    className="flex-1 px-6 py-3.5 bg-gray-900 rounded-xl flex-row items-center justify-center"
+                    className="flex-1 px-6 py-3.5 bg-brand-500 rounded-xl flex-row items-center justify-center"
                   >
                     {isSubmittingVendor ? (
                       <>

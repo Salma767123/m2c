@@ -1581,6 +1581,7 @@ const rejectVendorByQc = async (req, res) => {
 // no UNDER_REVIEW for products (vendor statuses use it, product statuses don't).
 const ALLOWED_PRODUCT_APPROVAL_STATUSES = [
     'PENDING',
+    'QC_SUBMITTED',
     'QC_APPROVED',
     'APPROVED',
     'REINSPECTION',
@@ -1702,7 +1703,9 @@ const getProductReports = async (req, res) => {
 
         const where = {
             assignedQcId: qcCheckerId,
-            approvalStatus: { in: ['QC_APPROVED', 'APPROVED', 'REJECTED', 'REINSPECTION'] },
+            // QC_SUBMITTED = the checker finished & submitted; it must appear in their
+            // reports/history right after submitting (admin decision still pending).
+            approvalStatus: { in: ['QC_SUBMITTED', 'QC_APPROVED', 'APPROVED', 'REJECTED', 'REINSPECTION'] },
         };
         if (search) {
             where.OR = [
@@ -1891,6 +1894,9 @@ const startProductInspectionByQc = async (req, res) => {
                         id: true,
                         factoryLatitude: true,
                         factoryLongitude: true,
+                        warehouseLatitude: true,
+                        warehouseLongitude: true,
+                        productInspectionSite: true,
                         mapLink: true,
                         companyName: true,
                     },
@@ -1912,6 +1918,7 @@ const startProductInspectionByQc = async (req, res) => {
         const { verifyCheckerAtVendor, LOCATION_THRESHOLD_METERS } = require('../utils/locationUtils');
         const geo = await verifyCheckerAtVendor({
             vendor: product.vendor,
+            site: product.vendor?.productInspectionSite,
             checkerLatitude,
             checkerLongitude,
             prisma,
@@ -1964,6 +1971,9 @@ const approveProductByQc = async (req, res) => {
                         id: true,
                         factoryLatitude: true,
                         factoryLongitude: true,
+                        warehouseLatitude: true,
+                        warehouseLongitude: true,
+                        productInspectionSite: true,
                         mapLink: true,
                         companyName: true,
                     },
@@ -1994,6 +2004,7 @@ const approveProductByQc = async (req, res) => {
         const { verifyCheckerAtVendor, buildLocationStamp, buildLocationSnapshot } = require('../utils/locationUtils');
         const geo = await verifyCheckerAtVendor({
             vendor: product.vendor,
+            site: product.vendor?.productInspectionSite,
             checkerLatitude,
             checkerLongitude,
             prisma,
@@ -2004,22 +2015,13 @@ const approveProductByQc = async (req, res) => {
             return res.status(geo.status).json(geo.body);
         }
 
-        // Derive the approval status from the checker's ACTUAL decision made
-        // on the Review step (formData.inspectionStatus). The legacy remark-code
-        // average is no longer used — the current inspection form never sends
-        // those fields, so it always defaulted to 10/10 → QC_APPROVED (F-02).
-        let approvalStatus = 'QC_APPROVED';
-        let productStatus = 'INACTIVE'; // Keep as INACTIVE until Admin finalizes with a price
-
-        const decision = formData?.inspectionStatus;
-        if (decision === 'Rejected') {
-            approvalStatus = 'REJECTED';
-        } else if (decision === 'Re-Inspection' || decision === 'On Hold') {
-            approvalStatus = 'REINSPECTION';
-        } else {
-            // 'Approved' (or unset when arriving through this endpoint)
-            approvalStatus = 'QC_APPROVED';
-        }
+        // The checker's decision (formData.inspectionStatus) is ADVISORY ONLY —
+        // mirroring the vendor/factory inspection flow, submitting the report always
+        // lands the product in a neutral QC_SUBMITTED state. The ADMIN then makes the
+        // final call (approve / reject / re-inspection). The checker's recommendation
+        // stays in qcInspectionData.inspectionStatus for the admin to see.
+        const approvalStatus = 'QC_SUBMITTED';
+        const productStatus = 'INACTIVE'; // Stays INACTIVE until the admin finalizes.
 
         const cleanFormData = formData
             ? await resolveBase64InValue(formData, { folder: 'qc-inspections' })
@@ -2045,15 +2047,20 @@ const approveProductByQc = async (req, res) => {
             }
         });
 
+        // The checker's advisory recommendation (for the audit trail + admin
+        // notification only — it does NOT change the product state, which is QC_SUBMITTED).
+        const recommendation = formData?.inspectionStatus || 'Approved';
+        const recIsReinspect = recommendation === 'Re-Inspection' || recommendation === 'On Hold';
+
         // Write audit log (with the verified-location snapshot)
         const locationStamp = buildLocationStamp(geo, checkerLatitude, checkerLongitude);
         await prisma.inspectionAuditLog.create({
             data: {
                 entityType: 'PRODUCT_INSPECTION',
                 entityId: productId,
-                action: approvalStatus === 'QC_APPROVED' ? 'QC_APPROVED' : approvalStatus === 'REINSPECTION' ? 'QC_REINSPECTION' : 'QC_REJECTED',
+                action: recommendation === 'Approved' ? 'QC_APPROVED' : recIsReinspect ? 'QC_REINSPECTION' : 'QC_REJECTED',
                 fromStatus,
-                toStatus: approvalStatus,
+                toStatus: approvalStatus, // QC_SUBMITTED
                 performedById: qcCheckerId,
                 performedByType: 'QC_CHECKER',
                 performedByName: req.user.name || req.user.email || 'QC Checker',
@@ -2063,25 +2070,20 @@ const approveProductByQc = async (req, res) => {
             },
         }).catch(err => console.error('Audit log write failed:', err));
 
-        // Notify admins when product needs review
-        if (approvalStatus === 'REJECTED' || approvalStatus === 'REINSPECTION') {
-            const { notifications } = require('../utils/notificationService');
-            notifications.inspectionSubmitted(product.name, approvalStatus).catch(console.error);
-        }
-
-        // In-app notification for admins
+        // In-app notification for admins — the report is submitted and awaits the
+        // admin's final decision; the checker's recommendation is shown as context.
         const { createNotificationForRole: notifyAdminsQc } = require('./notificationController');
-        const resultLabel = approvalStatus === 'QC_APPROVED' ? 'Approved' : approvalStatus === 'REINSPECTION' ? 'Re-inspection' : 'Rejected';
+        const resultLabel = recommendation === 'Approved' ? 'Approved' : recIsReinspect ? 'Re-inspection' : 'Rejected';
         notifyAdminsQc({
             role: 'ADMIN', type: 'INSPECTION_COMPLETED',
-            title: 'Product Inspection Completed',
-            message: `QC inspection for "${product.name}" — Result: ${resultLabel}`,
+            title: 'Product Inspection Submitted',
+            message: `QC inspection for "${product.name}" is ready for your review — Checker's recommendation: ${resultLabel}`,
             data: { productId: product.id }
         }).catch(() => {});
 
         res.status(200).json({
             success: true,
-            message: `Product ${approvalStatus === 'QC_APPROVED' ? 'approved' : approvalStatus === 'REINSPECTION' ? 'marked for reinspection' : 'rejected'} successfully`,
+            message: 'Product inspection submitted for admin review',
             data: updatedProduct
         });
     } catch (error) {
@@ -2122,6 +2124,9 @@ const rejectProductByQc = async (req, res) => {
                         id: true,
                         factoryLatitude: true,
                         factoryLongitude: true,
+                        warehouseLatitude: true,
+                        warehouseLongitude: true,
+                        productInspectionSite: true,
                         mapLink: true,
                         companyName: true,
                     },
@@ -2152,6 +2157,7 @@ const rejectProductByQc = async (req, res) => {
         const { verifyCheckerAtVendor, buildLocationStamp, buildLocationSnapshot } = require('../utils/locationUtils');
         const geo = await verifyCheckerAtVendor({
             vendor: product.vendor,
+            site: product.vendor?.productInspectionSite,
             checkerLatitude,
             checkerLongitude,
             prisma,
@@ -2173,25 +2179,28 @@ const rejectProductByQc = async (req, res) => {
         const updatedProduct = await prisma.product.update({
             where: { id: productId },
             data: {
-                approvalStatus: 'REJECTED',
-                rejectionReason: reason,
-                rejectionRemarks: remarks || null,
-                rejectionNotes: notes || null,
+                // Advisory only — a QC "Rejected" is a recommendation, not a final
+                // rejection. The product lands in QC_SUBMITTED for the admin to decide;
+                // the checker's reason lives in qcInspectionData (reviewerRemarks). The
+                // product.rejection* columns are left for the ADMIN's final rejection.
+                approvalStatus: 'QC_SUBMITTED',
                 status: 'INACTIVE',
+                lastReviewedAt: new Date(),
                 qcInspectionData: cleanFormData
                     ? { ...cleanFormData, inspectionType, checkerLocation: buildLocationSnapshot(geo, checkerLatitude, checkerLongitude) }
                     : { inspectionType, checkerLocation: buildLocationSnapshot(geo, checkerLatitude, checkerLongitude) }
             }
         });
 
-        // Write audit log
+        // Write audit log — action records the checker's recommendation (reject),
+        // but the product state is the neutral QC_SUBMITTED (admin decides).
         await prisma.inspectionAuditLog.create({
             data: {
                 entityType: 'PRODUCT_INSPECTION',
                 entityId: productId,
                 action: 'QC_REJECTED',
                 fromStatus,
-                toStatus: 'REJECTED',
+                toStatus: 'QC_SUBMITTED',
                 performedById: qcCheckerId,
                 performedByType: 'QC_CHECKER',
                 performedByName: req.user.name || req.user.email || 'QC Checker',

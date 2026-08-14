@@ -442,10 +442,15 @@ model Vendor {
   /// A `mapLink` can still back-fill them, but a value typed by a human always wins.
   factoryLatitude  Float?
   factoryLongitude Float?
-  /// Coordinates of the WAREHOUSE address. Recorded for completeness — inspections are
-  /// geofenced against the factory pair above, not these.
+  /// Coordinates of the WAREHOUSE address.
   warehouseLatitude  Float?
   warehouseLongitude Float?
+  /// Where this vendor's PRODUCTS are physically handled/stored — the site a QC
+  /// PRODUCT inspection is geofenced against. 'FACTORY' = Legal Address & Factory Site
+  /// (factoryLatitude/Longitude), 'WAREHOUSE' = warehouse (warehouseLatitude/Longitude).
+  /// Chosen by the vendor at registration; defaults to FACTORY (also used when the
+  /// warehouse address is the same as the legal/factory address, so the point is shared).
+  productInspectionSite String? @default("FACTORY")
 
   // Vendor Type & Products
   vendorType        VendorType
@@ -994,6 +999,12 @@ enum ProductStatus {
 
 enum ProductApprovalStatus {
   PENDING
+  // The QC checker has finished inspecting and SUBMITTED the report. The
+  // checker's recommendation (Approved / Rejected / Re-Inspection) is advisory
+  // only and lives in qcInspectionData.inspectionStatus — the ADMIN makes the
+  // final call (approve / reject / re-inspection) from this state. Mirrors the
+  // vendor/factory inspection SUBMITTED → admin-review flow.
+  QC_SUBMITTED
   QC_APPROVED
   APPROVED
   REJECTED
@@ -2078,6 +2089,9 @@ model Inspection {
   vendorLongitude   Float? // Snapshot of vendor factory lng at inspection time
   locationVerified  Boolean @default(false)
   locationDistanceM Float? // Distance in meters between checker and vendor
+  // Which registered address the checker was verified against: 'legal/factory' | 'warehouse'.
+  // The geofence checks whichever applies, so the report can name the exact site.
+  locationMatchedAddress String?
 
   // Review tracking
   submittedAt DateTime?

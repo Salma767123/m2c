@@ -11,6 +11,7 @@ import {
 } from '@/services/addressService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import AddressFormModal from './AddressFormModal';
+import { Palette } from '@/constants/theme';
 
 const TYPE_META: Record<string, { label: string; Icon: typeof Home; bg: string; fg: string }> = {
   home: { label: 'Home', Icon: Home, bg: '#ecfdf5', fg: '#047857' },
@@ -188,7 +189,7 @@ export default function AddressBook() {
                       <Text style={{ fontSize: 12, fontWeight: '700', color: meta.fg }}>{meta.label}</Text>
                     </View>
                     {addr.isDefault ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#111827', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Palette.primary, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
                         <Star size={10} color="#fff" fill="#fff" />
                         <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>Default</Text>
                       </View>
@@ -215,8 +216,8 @@ export default function AddressBook() {
                         </View>
                       </Pressable>
                       <Pressable onPress={() => confirmDelete(addr)} disabled={busy} accessibilityRole="button" accessibilityLabel={`Delete ${meta.label} address`} hitSlop={4}>
-                        <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#fef2f2', alignItems: 'center', justifyContent: 'center', opacity: busy ? 0.5 : 1 }}>
-                          <Trash2 size={15} color="#ef4444" />
+                        <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#E01A1B', alignItems: 'center', justifyContent: 'center', opacity: busy ? 0.5 : 1 }}>
+                          <Trash2 size={15} color="#E01A1B" />
                         </View>
                       </Pressable>
                     </View>
@@ -257,7 +258,7 @@ export default function AddressBook() {
           }}
         >
           <Pressable onPress={openAdd} accessibilityRole="button" accessibilityLabel="Add new address">
-            <View style={{ height: 52, borderRadius: 14, backgroundColor: '#111827', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <View style={{ height: 52, borderRadius: 14, backgroundColor: Palette.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <Plus size={18} color="#fff" />
               <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>Add Address</Text>
             </View>
