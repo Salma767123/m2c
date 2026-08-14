@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   User,
   SquarePen,
@@ -9,8 +9,12 @@ import {
   MapPin,
   Package,
   LifeBuoy,
-  LogOut
+  LogOut,
+  Camera,
+  Loader2
 } from 'lucide-react';
+import { dispatchAuthChange } from '@/lib/authEvents';
+import ImageCropModal from '@/components/UI/ImageCropModal';
 import ProfileTab from '@/components/WebSite/Profile/ProfileTab';
 import AddressBook from '@/components/WebSite/Profile/AddressBook';
 import OrderHistory from '@/components/WebSite/Profile/OrderHistory';
@@ -33,10 +37,15 @@ const Profile = () => {
   // User data with placeholders
   const [userProfile, setUserProfile] = useState<UserProfile>({
     id: 'user_123',
+    title: '',
     firstName: '',
+    middleName: '',
     lastName: '',
     email: '',
     phone: '',
+    phoneCode: '+91',
+    whatsapp: '',
+    whatsappCode: '+91',
     gender: 'male',
     joinDate: new Date().toISOString().split('T')[0],
     preferences: {
@@ -47,6 +56,10 @@ const Profile = () => {
   });
 
   const [editedProfile, setEditedProfile] = useState<UserProfile>(userProfile);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [cropFileName, setCropFileName] = useState('profile');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load user profile on mount
   useEffect(() => {
@@ -66,12 +79,30 @@ const Profile = () => {
         const firstName = nameParts[0] || '';
         const lastName = nameParts.slice(1).join(' ') || '';
         
+        // Phone / WhatsApp are stored as "+<code> <number>" — split for the UI.
+        const splitPhone = (v?: string): { code: string; num: string } => {
+          const s = (v || '').trim();
+          if (s.startsWith('+')) {
+            const sp = s.indexOf(' ');
+            if (sp > 0) return { code: s.slice(0, sp), num: s.slice(sp + 1).trim() };
+          }
+          return { code: '+91', num: s };
+        };
+        const ph = splitPhone(userData.phoneNumber);
+        const wa = splitPhone(userData.whatsappNumber);
+
         const profile: UserProfile = {
           id: userData.id,
+          title: userData.title || '',
           firstName,
+          middleName: userData.middleName || '',
           lastName,
           email: userData.email,
-          phone: userData.phoneNumber || '',
+          phone: ph.num,
+          phoneCode: ph.code,
+          whatsapp: wa.num,
+          whatsappCode: wa.code,
+          image: userData.image || '',
           gender: 'male', // Default, can be enhanced later
           joinDate: new Date(userData.createdAt).toISOString().split('T')[0],
           preferences: {
@@ -105,12 +136,20 @@ const Profile = () => {
       }
       
       // Profile update now only covers personal info. Addresses are managed
-      // separately in the Saved Addresses tab.
+      // separately in the Saved Addresses tab. Phone/WhatsApp are stored with
+      // their country code prefix ("+91 98765...").
+      const joinPhone = (code?: string, num?: string) => {
+        const n = (num || '').trim();
+        return n ? `${(code || '+91').trim()} ${n}` : '';
+      };
       const updateData = {
         name: fullName,
-        phoneNumber: editedProfile.phone,
+        title: editedProfile.title || '',
+        middleName: editedProfile.middleName || '',
+        phoneNumber: joinPhone(editedProfile.phoneCode, editedProfile.phone),
+        whatsappNumber: joinPhone(editedProfile.whatsappCode, editedProfile.whatsapp),
       };
-      
+
       const response = await userProfileService.updateProfile(updateData);
       
       if (response.success) {
@@ -131,6 +170,76 @@ const Profile = () => {
   const handleCancel = () => {
     setEditedProfile(userProfile);
     setIsEditing(false);
+  };
+
+  // Mirror the new photo into the stored auth session so the header avatar
+  // updates instantly (same mechanism login uses).
+  const syncStoredImage = (image: string) => {
+    try {
+      const store = localStorage.getItem('userToken') ? localStorage : sessionStorage;
+      const raw = store.getItem('userData');
+      if (raw) {
+        const u = JSON.parse(raw);
+        u.image = image;
+        store.setItem('userData', JSON.stringify(u));
+      }
+      dispatchAuthChange();
+    } catch {
+      /* non-fatal — header will pick it up on next load */
+    }
+  };
+
+  const fileToDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  // Step 1 — pick a file, then open the crop modal (upload happens after crop).
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showErrorToast('Invalid file', 'Please choose an image file.');
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      showErrorToast('Image too large', 'Please choose an image under 8MB.');
+      return;
+    }
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setCropFileName(file.name || 'profile');
+      setCropSrc(dataUrl);
+    } catch {
+      showErrorToast('Error', 'Could not read the selected image.');
+    }
+  };
+
+  // Step 2 — receive the cropped square image and upload it.
+  const handleCropped = async (file: File) => {
+    setCropSrc(null);
+    try {
+      setIsUploadingPhoto(true);
+      const dataUrl = await fileToDataUrl(file);
+      const fullName = `${userProfile.firstName} ${userProfile.lastName}`.trim() || userProfile.email;
+      const response = await userProfileService.updateProfile({ name: fullName, image: dataUrl });
+      if (response.success) {
+        const newImg = response.data?.image || '';
+        setUserProfile((p) => ({ ...p, image: newImg }));
+        setEditedProfile((p) => ({ ...p, image: newImg }));
+        syncStoredImage(newImg);
+        showSuccessToast('Photo updated', 'Your profile photo has been updated successfully.');
+      }
+    } catch (error: any) {
+      console.error('Avatar upload error:', error);
+      showErrorToast('Upload failed', error.message || 'Unable to update your photo.');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -198,20 +307,37 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8 font-sans ">
+      {/* Crop-before-upload modal for the profile photo */}
+      <ImageCropModal
+        src={cropSrc}
+        fileName={cropFileName}
+        title="Crop profile photo"
+        cropShape="round"
+        onCancel={() => setCropSrc(null)}
+        onCropped={handleCropped}
+      />
       <div className="max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-        {/* Page Header — Order-page style with icon + count */}
-        <Reveal className="mb-5 sm:mb-6 lg:mb-8">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <User className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-[#e01a1b] shrink-0" />
-              <div className="min-w-0">
-                <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-1.5">
-                  <span className="h-px w-6 bg-[#e01a1b]" />
-                  Your Account
-                </span>
-                <h1 className="font-playfair text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#1a1a1a] tracking-tight mb-1 sm:mb-2">My Account</h1>
-                <p className="text-sm sm:text-base text-slate-600">Manage your profile and account settings</p>
-              </div>
+        {/* Page Header */}
+        <Reveal className="mb-4 sm:mb-5">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Profile photo (or fallback) in the page heading */}
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full overflow-hidden ring-2 ring-[#e01a1b]/20 bg-white flex items-center justify-center shrink-0 shadow-sm">
+              {userProfile.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={userProfile.image} alt="Profile photo" className="h-full w-full object-cover" />
+              ) : (
+                <User className="w-5 h-5 sm:w-6 sm:h-6 text-[#e01a1b]" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <span className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#e01a1b]">
+                <span className="h-px w-5 bg-[#e01a1b]" />
+                Welcome back
+              </span>
+              <h1 className="font-playfair text-lg sm:text-xl lg:text-2xl font-semibold text-[#1a1a1a] tracking-tight">
+                {`${userProfile.firstName} ${userProfile.lastName}`.trim() || 'My Account'}
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-600">Manage your profile and account settings</p>
             </div>
           </div>
         </Reveal>
@@ -222,11 +348,28 @@ const Profile = () => {
             <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 border border-slate-200 p-3 sm:p-4">
               {/* User Profile Card in Sidebar */}
               <div className="bg-linear-to-b from-gray-50 to-gray-100 rounded-xl p-4 mb-6 border border-gray-200">
-                <div className="mb-3">
-                  <h3 className="font-semibold text-slate-900 text-sm">
-                    {userProfile.firstName} {userProfile.lastName}
-                  </h3>
-                  <p className="text-xs text-slate-600 truncate mt-1">{userProfile.email}</p>
+                <div className="flex flex-col items-center text-center mb-3">
+                  {/* Avatar + upload */}
+                  <div className="relative">
+                    <div className="h-20 w-20 rounded-full overflow-hidden ring-2 ring-[#e01a1b]/20 bg-white flex items-center justify-center shadow-sm">
+                      {userProfile.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={userProfile.image} alt="Profile photo" className="h-full w-full object-cover" />
+                      ) : (
+                        <User className="w-9 h-9 text-[#e01a1b]" />
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingPhoto}
+                      aria-label="Upload profile photo"
+                      className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-[#e01a1b] text-white flex items-center justify-center ring-2 ring-white transition-colors hover:bg-[#c41617] disabled:opacity-60"
+                    >
+                      {isUploadingPhoto ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                    </button>
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+                  </div>
                 </div>
                 {!isEditing ? (
                   <button

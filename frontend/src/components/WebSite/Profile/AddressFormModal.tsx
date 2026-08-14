@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { X, Home, Briefcase, MapPin, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { X, Home, Briefcase, MapPin, Loader2, ChevronDown, Check } from "lucide-react";
 import {
   NAME_REGEX,
   DEFAULT_COUNTRY_ISO,
   getCountry,
+  getCountries,
   getStates,
   getPostalRule,
   validatePostalCode,
@@ -31,6 +33,13 @@ type FormState = {
   type: AddressType;
   name: string;
   phone: string;
+  phone2: string;
+  landline: string;
+  // Each phone field carries its own dial-code country (defaults to the
+  // address country, but the user can override each independently).
+  phoneCountry: string;
+  phone2Country: string;
+  landlineCountry: string;
   address: string;
   addressLine2: string;
   city: string;
@@ -53,6 +62,11 @@ const emptyForm: FormState = {
   type: "home",
   name: "",
   phone: "",
+  phone2: "",
+  landline: "",
+  phoneCountry: DEFAULT_COUNTRY_ISO,
+  phone2Country: DEFAULT_COUNTRY_ISO,
+  landlineCountry: DEFAULT_COUNTRY_ISO,
   address: "",
   addressLine2: "",
   city: "",
@@ -61,6 +75,297 @@ const emptyForm: FormState = {
   country: DEFAULT_COUNTRY_ISO,
   isDefault: false,
 };
+
+/** Compact boutique-style field label. */
+function Label({
+  children,
+  required,
+  hint,
+}: {
+  children: React.ReactNode;
+  required?: boolean;
+  hint?: string;
+}) {
+  return (
+    <label className="mb-1.5 block text-[12px] font-semibold tracking-wide text-slate-600">
+      {children}
+      {required && <span className="text-[#e01a1b]"> *</span>}
+      {hint && <span className="ml-1 font-normal text-slate-400">{hint}</span>}
+    </label>
+  );
+}
+
+/** Compact, searchable country dial-code (flag + code) selector used as the
+ *  prefix of a phone input. Each phone field owns its own instance. */
+function DialCodeSelect({
+  valueIso,
+  onChange,
+  disabled,
+}: {
+  valueIso: string;
+  onChange: (iso: string) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  const countries = useMemo(() => getCountries(), []);
+  const selected = useMemo(() => getCountry(valueIso), [valueIso]);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return countries;
+    return countries.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.isoCode.toLowerCase().includes(q) ||
+        c.phoneCode.includes(q),
+    );
+  }, [countries, query]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setOpen(false); setQuery(""); } };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        aria-label="Select country code"
+        className="flex h-full select-none items-center gap-1 rounded-l-xl border-r border-slate-200 bg-slate-50 px-2.5 text-sm text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-60"
+      >
+        <span className="text-base leading-none">{selected?.flag}</span>
+        <span className="font-medium">{selected?.phoneCode}</span>
+        <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1.5 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_16px_40px_-12px_rgba(0,0,0,0.28)]">
+          <div className="p-2">
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search country or code"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#e01a1b] focus:ring-2 focus:ring-[#e01a1b]/10"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto pb-1">
+            {filtered.map((c) => (
+              <button
+                key={c.isoCode}
+                type="button"
+                onClick={() => { onChange(c.isoCode); setOpen(false); setQuery(""); }}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-slate-50 ${
+                  c.isoCode === valueIso ? "bg-[#fff5f5]" : ""
+                }`}
+              >
+                <span className="text-base leading-none">{c.flag}</span>
+                <span className="flex-1 truncate text-slate-700">{c.name}</span>
+                <span className="tabular-nums text-slate-500">{c.phoneCode}</span>
+              </button>
+            ))}
+            {filtered.length === 0 && <p className="px-3 py-3 text-sm text-slate-400">No matches</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Phone input with its own selectable country dial-code prefix. */
+function PhoneField({
+  label,
+  required,
+  hint,
+  value,
+  onChange,
+  onBlur,
+  placeholder,
+  countryIso,
+  onCountryChange,
+  error,
+  disabled,
+  autoComplete,
+}: {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  value: string;
+  onChange: (v: string) => void;
+  onBlur: () => void;
+  placeholder?: string;
+  countryIso: string;
+  onCountryChange: (iso: string) => void;
+  error?: string;
+  disabled?: boolean;
+  autoComplete?: string;
+}) {
+  return (
+    <div>
+      <Label required={required} hint={hint}>{label}</Label>
+      <div
+        className={`flex items-stretch rounded-xl border bg-white transition-all focus-within:ring-4 focus-within:ring-[#e01a1b]/10 ${
+          error
+            ? "border-red-400 focus-within:border-red-400"
+            : "border-slate-200 focus-within:border-[#e01a1b]"
+        } ${disabled ? "opacity-60" : ""}`}
+      >
+        <DialCodeSelect valueIso={countryIso} onChange={onCountryChange} disabled={disabled} />
+        <input
+          type="tel"
+          maxLength={24}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          disabled={disabled}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          aria-required={required}
+          aria-invalid={!!error}
+          className="min-w-0 flex-1 rounded-r-xl bg-transparent px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none disabled:text-slate-400"
+        />
+      </div>
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
+
+/** Styled, searchable State / Province dropdown — replaces the native <select>
+ *  so it matches the modal's design language instead of the OS menu. Opens
+ *  upward automatically when there isn't room below inside the scroll area. */
+function StateSelect({
+  value,
+  options,
+  onChange,
+  onBlur,
+  disabled,
+  invalid,
+  placeholder = "Select state",
+}: {
+  value: string;
+  options: { isoCode: string; name: string }[];
+  onChange: (iso: string) => void;
+  onBlur?: () => void;
+  disabled?: boolean;
+  invalid?: boolean;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [dropUp, setDropUp] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const selected = useMemo(() => options.find((o) => o.isoCode === value), [options, value]);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(
+      (o) => o.name.toLowerCase().includes(q) || o.isoCode.toLowerCase().includes(q),
+    );
+  }, [options, query]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setQuery(""); onBlur?.(); }
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setOpen(false); setQuery(""); } };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [open, onBlur]);
+
+  const toggle = () => {
+    if (disabled) return;
+    if (!open && btnRef.current) {
+      // Decide open direction against the nearest scroll container (the modal
+      // body) so the menu is never clipped by its overflow.
+      const r = btnRef.current.getBoundingClientRect();
+      let boundBottom = window.innerHeight;
+      let el: HTMLElement | null = btnRef.current.parentElement;
+      while (el) {
+        const oy = getComputedStyle(el).overflowY;
+        if (oy === "auto" || oy === "scroll") { boundBottom = el.getBoundingClientRect().bottom; break; }
+        el = el.parentElement;
+      }
+      const spaceBelow = boundBottom - r.bottom;
+      setDropUp(spaceBelow < 300 && r.top > spaceBelow);
+    }
+    setOpen((o) => !o);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        disabled={disabled}
+        onClick={toggle}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-invalid={invalid}
+        className={`flex w-full items-center justify-between gap-2 rounded-xl border bg-white px-3.5 py-2.5 text-sm outline-none transition-all focus:ring-4 focus:ring-[#e01a1b]/10 disabled:bg-slate-50 ${
+          invalid ? "border-red-400" : "border-slate-200 focus:border-[#e01a1b]"
+        }`}
+      >
+        <span className={`truncate ${selected ? "text-slate-900" : "text-slate-400"}`}>
+          {selected ? selected.name : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          className={`absolute left-0 z-50 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_16px_40px_-12px_rgba(0,0,0,0.28)] ${
+            dropUp ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          }`}
+        >
+          <div className="p-2">
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search state"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#e01a1b] focus:ring-2 focus:ring-[#e01a1b]/10"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto pb-1" role="listbox">
+            {filtered.map((o) => (
+              <button
+                key={o.isoCode}
+                type="button"
+                role="option"
+                aria-selected={o.isoCode === value}
+                onClick={() => { onChange(o.isoCode); setOpen(false); setQuery(""); onBlur?.(); }}
+                className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-slate-50 ${
+                  o.isoCode === value ? "bg-[#fff5f5] font-semibold text-[#e01a1b]" : "text-slate-700"
+                }`}
+              >
+                <span className="truncate">{o.name}</span>
+                {o.isoCode === value && <Check className="h-4 w-4 shrink-0 text-[#e01a1b]" />}
+              </button>
+            ))}
+            {filtered.length === 0 && <p className="px-3 py-3 text-sm text-slate-400">No matches</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AddressFormModal({
   open,
@@ -74,13 +379,20 @@ export default function AddressFormModal({
   const [touched, setTouched] = useState<Touched>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Animation lifecycle: `mounted` keeps the modal in the DOM through its exit
+  // transition; `entered` drives the enter/leave states (fade + scale/translate).
+  const [mounted, setMounted] = useState(false);
+  const [entered, setEntered] = useState(false);
 
   const countryIso = (form.country || DEFAULT_COUNTRY_ISO).toUpperCase();
-  const country = useMemo(() => getCountry(countryIso), [countryIso]);
   const states = useMemo(() => getStates(countryIso), [countryIso]);
   const hasStateList = states.length > 0;
   const postalRule = useMemo(() => getPostalRule(countryIso), [countryIso]);
-  const phoneExample = useMemo(() => getPhoneExample(countryIso), [countryIso]);
+
+  // Per-field dial-code countries (independent of the address country).
+  const phoneIso = (form.phoneCountry || DEFAULT_COUNTRY_ISO).toUpperCase();
+  const phone2Iso = (form.phone2Country || DEFAULT_COUNTRY_ISO).toUpperCase();
+  const landlineIso = (form.landlineCountry || DEFAULT_COUNTRY_ISO).toUpperCase();
 
   useEffect(() => {
     if (!open) return;
@@ -92,6 +404,11 @@ export default function AddressFormModal({
         type: editing.type,
         name: editing.name || "",
         phone: formatPhoneAsYouType(editing.phone || "", editIso),
+        phone2: formatPhoneAsYouType(editing.phone2 || "", editIso),
+        landline: editing.landline || "",
+        phoneCountry: editIso,
+        phone2Country: editIso,
+        landlineCountry: editIso,
         address: editing.address || "",
         addressLine2: editing.addressLine2 || "",
         city: editing.city || "",
@@ -105,6 +422,37 @@ export default function AddressFormModal({
     }
   }, [open, editing, hasNoAddressesYet]);
 
+  // Mount immediately on open and flip `entered` on the next frame so the enter
+  // transition runs; on close, play the exit transition then unmount (~220ms).
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      const raf = requestAnimationFrame(() => setEntered(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setEntered(false);
+    const t = setTimeout(() => setMounted(false), 220);
+    return () => clearTimeout(t);
+  }, [open]);
+
+  // Lock background scroll while the modal is in the DOM; restore on unmount.
+  useEffect(() => {
+    if (!mounted) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [mounted]);
+
+  // Close on Escape (never mid-submit).
+  useEffect(() => {
+    if (!mounted) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !submitting) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [mounted, submitting, onClose]);
+
   const errors: FormErrors = {};
   if (!form.name.trim()) errors.name = "Full name is required";
   else if (form.name.trim().length < 2 || form.name.trim().length > 80)
@@ -113,8 +461,18 @@ export default function AddressFormModal({
     errors.name = "Letters, spaces, hyphens and apostrophes only";
 
   if (!form.phone.trim()) errors.phone = "Phone number is required";
-  else if (!validatePhone(form.phone, countryIso))
-    errors.phone = `Enter a valid phone number for ${country?.name ?? "selected country"}`;
+  else if (!validatePhone(form.phone, phoneIso))
+    errors.phone = `Enter a valid phone number for ${getCountry(phoneIso)?.name ?? "selected country"}`;
+
+  // Secondary phone — optional, validated only when filled.
+  if (form.phone2.trim() && !validatePhone(form.phone2, phone2Iso))
+    errors.phone2 = `Enter a valid phone number for ${getCountry(phone2Iso)?.name ?? "selected country"}`;
+
+  // Landline — optional, loose digit check when filled.
+  if (form.landline.trim()) {
+    const digits = form.landline.replace(/\D/g, "");
+    if (digits.length < 6 || digits.length > 15) errors.landline = "Enter a valid landline number";
+  }
 
   if (!form.address.trim()) errors.address = "Address is required";
   else if (form.address.trim().length < 3 || form.address.trim().length > 100)
@@ -146,8 +504,34 @@ export default function AddressFormModal({
   };
 
   const handleCountryChange = (newIso: string) => {
-    setForm((prev) => ({ ...prev, country: newIso, state: "", zipCode: "", phone: "" }));
-    setTouched((t) => ({ ...t, state: false, zipCode: false, phone: false }));
+    // Changing the address country re-syncs each phone field's dial code to it
+    // (the "auto from address" default); the user can still override per field.
+    setForm((prev) => ({
+      ...prev,
+      country: newIso,
+      state: "",
+      zipCode: "",
+      phone: "",
+      phone2: "",
+      phoneCountry: newIso,
+      phone2Country: newIso,
+      landlineCountry: newIso,
+    }));
+    setTouched((t) => ({ ...t, state: false, zipCode: false, phone: false, phone2: false }));
+  };
+
+  // Switching a single phone field's dial code — reformats that field's value
+  // for the newly chosen country so the digits stay grouped correctly.
+  const changePhoneCountry = (
+    countryKey: "phoneCountry" | "phone2Country" | "landlineCountry",
+    valueKey: "phone" | "phone2" | "landline",
+    iso: string,
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      [countryKey]: iso,
+      [valueKey]: valueKey === "landline" ? prev[valueKey] : formatPhoneAsYouType(prev[valueKey], iso),
+    }));
   };
 
   const handleBlur = (field: keyof FormState) => {
@@ -178,7 +562,9 @@ export default function AddressFormModal({
       const payload: AddressPayload = {
         type: form.type,
         name: form.name.trim(),
-        phone: toE164(form.phone, countryIso),
+        phone: toE164(form.phone, phoneIso),
+        phone2: form.phone2.trim() ? toE164(form.phone2, phone2Iso) : undefined,
+        landline: form.landline.trim() ? toE164(form.landline, landlineIso) : undefined,
         address: form.address.trim(),
         addressLine2: form.addressLine2.trim() || undefined,
         city: form.city.trim(),
@@ -195,48 +581,59 @@ export default function AddressFormModal({
     }
   };
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   const fieldError = (k: keyof FormState) => (touched[k] && errors[k] ? errors[k] : undefined);
   const inputCls = (k: keyof FormState) =>
-    `w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] outline-none transition-colors disabled:bg-slate-100 ${
-      fieldError(k) ? "border-red-500 focus:border-red-500" : "border-slate-300 focus:border-gray-500"
+    `w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition-all focus:ring-4 focus:ring-[#e01a1b]/10 disabled:bg-slate-50 disabled:text-slate-400 ${
+      fieldError(k) ? "border-red-400 focus:border-red-400" : "border-slate-200 focus:border-[#e01a1b]"
     }`;
-  const selectCls = (k: keyof FormState) => `${inputCls(k)} bg-white appearance-none pr-10`;
 
-  const ChevronIcon = (
-    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
-      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-      </svg>
-    </div>
-  );
+  return createPortal(
+    <div
+      onMouseDown={(e) => { if (e.target === e.currentTarget && !submitting) onClose(); }}
+      className={`fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-3 sm:p-4 bg-slate-900/25 backdrop-blur-[6px] transition-opacity duration-200 ease-out motion-reduce:transition-none ${
+        entered ? "opacity-100" : "opacity-0"
+      }`}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={editing ? "Edit Address" : "Add New Address"}
+        className={`relative z-[101] flex max-h-[85dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_30px_80px_-12px_rgba(0,0,0,0.45)] ring-1 ring-black/5 transition-all duration-200 ease-out motion-reduce:transition-none ${
+          entered ? "translate-y-0 scale-100 opacity-100" : "translate-y-2 scale-[0.97] opacity-0"
+        }`}
+      >
+        {/* Brand accent hairline */}
+        <div className="h-1 w-full shrink-0 bg-gradient-to-r from-[#e01a1b] via-[#ff5a36] to-[#e01a1b]" />
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl w-full max-w-2xl max-h-[95vh] sm:max-h-[92vh] overflow-hidden flex flex-col">
-        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 flex items-center justify-between bg-linear-to-r from-gray-700 to-gray-800 shrink-0">
-          <h3 className="text-base sm:text-lg font-bold text-white truncate pr-2">
-            {editing ? "Edit Address" : "Add New Address"}
-          </h3>
+        {/* Header — clean, boutique, not an admin dark bar */}
+        <div className="flex shrink-0 items-center gap-3 px-5 py-3.5 sm:px-6">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e01a1b]/10 text-[#e01a1b]">
+            <MapPin className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[16px] font-bold leading-tight text-slate-900">
+              {editing ? "Edit Address" : "Add New Address"}
+            </h3>
+            <p className="text-[12.5px] text-slate-500">Where should we deliver your order?</p>
+          </div>
           <button
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="p-1.5 text-white/80 hover:bg-white/10 rounded transition-colors disabled:opacity-50 shrink-0"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
             aria-label="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto flex flex-col">
-          <div className="p-4 sm:p-5 lg:p-6 space-y-4 sm:space-y-5 flex-1">
-            {/* Type */}
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto px-5 pb-4 pt-1 sm:px-6">
+            {/* Address Type — refined segmented chips */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Address Type <span className="text-red-500">*</span>
-              </label>
+              <Label required>Address Type</Label>
               <div className="grid grid-cols-3 gap-2">
                 {TYPE_OPTIONS.map((opt) => {
                   const Icon = opt.icon;
@@ -247,13 +644,13 @@ export default function AddressFormModal({
                       type="button"
                       onClick={() => setField("type", opt.value)}
                       disabled={submitting}
-                      className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
+                      className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-all ${
                         active
-                          ? "border-[#e01a1b] bg-[#fff1f1] text-[#c41617]"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                          ? "border-[#e01a1b] bg-[#fff5f5] text-[#e01a1b] shadow-[0_2px_10px_rgba(224,26,27,0.12)]"
+                          : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50"
                       }`}
                     >
-                      <Icon className="w-4 h-4" />
+                      <Icon className="h-4 w-4" />
                       {opt.label}
                     </button>
                   );
@@ -261,27 +658,10 @@ export default function AddressFormModal({
               </div>
             </div>
 
-            {/* Country */}
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Country <span className="text-red-500">*</span>
-              </label>
-              <CountrySelect
-                value={countryIso}
-                onChange={handleCountryChange}
-                onBlur={() => handleBlur("country")}
-                disabled={submitting}
-                invalid={!!fieldError("country")}
-              />
-              {fieldError("country") && <p className="text-red-500 text-xs mt-1">{fieldError("country")}</p>}
-            </div>
-
-            {/* Name + Phone */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Full Name + Primary Phone */}
+            <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Full Name <span className="text-red-500">*</span>
-                </label>
+                <Label required>Full Name</Label>
                 <input
                   type="text"
                   maxLength={80}
@@ -295,35 +675,54 @@ export default function AddressFormModal({
                   aria-invalid={!!fieldError("name")}
                   className={inputCls("name")}
                 />
-                {fieldError("name") && <p className="text-red-500 text-xs mt-1">{fieldError("name")}</p>}
+                {fieldError("name") && <p className="mt-1 text-xs text-red-500">{fieldError("name")}</p>}
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Phone <span className="text-red-500">*</span>
-                  {country && <span className="text-slate-400 font-normal ml-2">({country.phoneCode})</span>}
-                </label>
-                <input
-                  type="tel"
-                  maxLength={20}
-                  value={form.phone}
-                  onChange={(e) => setField("phone", formatPhoneAsYouType(e.target.value, countryIso))}
-                  onBlur={() => handleBlur("phone")}
-                  disabled={submitting}
-                  placeholder={phoneExample || "Phone number"}
-                  autoComplete="tel"
-                  aria-required="true"
-                  aria-invalid={!!fieldError("phone")}
-                  className={inputCls("phone")}
-                />
-                {fieldError("phone") && <p className="text-red-500 text-xs mt-1">{fieldError("phone")}</p>}
-              </div>
+              <PhoneField
+                label="Phone"
+                required
+                value={form.phone}
+                onChange={(v) => setField("phone", formatPhoneAsYouType(v, phoneIso))}
+                onBlur={() => handleBlur("phone")}
+                placeholder={getPhoneExample(phoneIso) || "Phone number"}
+                countryIso={phoneIso}
+                onCountryChange={(iso) => changePhoneCountry("phoneCountry", "phone", iso)}
+                error={fieldError("phone")}
+                disabled={submitting}
+                autoComplete="tel"
+              />
+            </div>
+
+            {/* Secondary Phone + Landline */}
+            <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+              <PhoneField
+                label="Secondary Phone"
+                hint="(Optional)"
+                value={form.phone2}
+                onChange={(v) => setField("phone2", formatPhoneAsYouType(v, phone2Iso))}
+                onBlur={() => handleBlur("phone2")}
+                placeholder={getPhoneExample(phone2Iso) || "Alternate number"}
+                countryIso={phone2Iso}
+                onCountryChange={(iso) => changePhoneCountry("phone2Country", "phone2", iso)}
+                error={fieldError("phone2")}
+                disabled={submitting}
+              />
+              <PhoneField
+                label="Landline"
+                hint="(Optional)"
+                value={form.landline}
+                onChange={(v) => setField("landline", v)}
+                onBlur={() => handleBlur("landline")}
+                placeholder="STD code + number"
+                countryIso={landlineIso}
+                onCountryChange={(iso) => changePhoneCountry("landlineCountry", "landline", iso)}
+                error={fieldError("landline")}
+                disabled={submitting}
+              />
             </div>
 
             {/* Address Line 1 */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Address Line 1 <span className="text-red-500">*</span>
-              </label>
+              <Label required>Address Line 1</Label>
               <input
                 type="text"
                 maxLength={100}
@@ -337,14 +736,12 @@ export default function AddressFormModal({
                 aria-invalid={!!fieldError("address")}
                 className={inputCls("address")}
               />
-              {fieldError("address") && <p className="text-red-500 text-xs mt-1">{fieldError("address")}</p>}
+              {fieldError("address") && <p className="mt-1 text-xs text-red-500">{fieldError("address")}</p>}
             </div>
 
             {/* Address Line 2 */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Address Line 2 <span className="text-slate-400 font-normal">(Optional)</span>
-              </label>
+              <Label hint="(Optional)">Address Line 2</Label>
               <input
                 type="text"
                 maxLength={100}
@@ -357,54 +754,34 @@ export default function AddressFormModal({
                 className={inputCls("addressLine2")}
               />
               {fieldError("addressLine2") && (
-                <p className="text-red-500 text-xs mt-1">{fieldError("addressLine2")}</p>
+                <p className="mt-1 text-xs text-red-500">{fieldError("addressLine2")}</p>
               )}
             </div>
 
-            {/* City / State / Postal */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Country + State (country now sits right beside state) */}
+            <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  City <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  maxLength={50}
-                  value={form.city}
-                  onChange={(e) => setField("city", e.target.value)}
-                  onBlur={() => handleBlur("city")}
+                <Label required>Country</Label>
+                <CountrySelect
+                  value={countryIso}
+                  onChange={handleCountryChange}
+                  onBlur={() => handleBlur("country")}
                   disabled={submitting}
-                  placeholder="City"
-                  autoComplete="address-level2"
-                  aria-required="true"
-                  aria-invalid={!!fieldError("city")}
-                  className={inputCls("city")}
+                  invalid={!!fieldError("country")}
                 />
-                {fieldError("city") && <p className="text-red-500 text-xs mt-1">{fieldError("city")}</p>}
+                {fieldError("country") && <p className="mt-1 text-xs text-red-500">{fieldError("country")}</p>}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  State / Province <span className="text-red-500">*</span>
-                </label>
+                <Label required>State / Province</Label>
                 {hasStateList ? (
-                  <div className="relative">
-                    <select
-                      value={form.state}
-                      onChange={(e) => setField("state", e.target.value)}
-                      onBlur={() => handleBlur("state")}
-                      disabled={submitting}
-                      autoComplete="address-level1"
-                      aria-required="true"
-                      aria-invalid={!!fieldError("state")}
-                      className={selectCls("state")}
-                    >
-                      <option value="">Select</option>
-                      {states.map((s) => (
-                        <option key={s.isoCode} value={s.isoCode}>{s.name}</option>
-                      ))}
-                    </select>
-                    {ChevronIcon}
-                  </div>
+                  <StateSelect
+                    value={form.state}
+                    options={states}
+                    onChange={(iso) => setField("state", iso)}
+                    onBlur={() => handleBlur("state")}
+                    disabled={submitting}
+                    invalid={!!fieldError("state")}
+                  />
                 ) : (
                   <input
                     type="text"
@@ -420,12 +797,31 @@ export default function AddressFormModal({
                     className={inputCls("state")}
                   />
                 )}
-                {fieldError("state") && <p className="text-red-500 text-xs mt-1">{fieldError("state")}</p>}
+                {fieldError("state") && <p className="mt-1 text-xs text-red-500">{fieldError("state")}</p>}
+              </div>
+            </div>
+
+            {/* City + Postal */}
+            <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+              <div>
+                <Label required>City</Label>
+                <input
+                  type="text"
+                  maxLength={50}
+                  value={form.city}
+                  onChange={(e) => setField("city", e.target.value)}
+                  onBlur={() => handleBlur("city")}
+                  disabled={submitting}
+                  placeholder="City"
+                  autoComplete="address-level2"
+                  aria-required="true"
+                  aria-invalid={!!fieldError("city")}
+                  className={inputCls("city")}
+                />
+                {fieldError("city") && <p className="mt-1 text-xs text-red-500">{fieldError("city")}</p>}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  {postalRule.label} <span className="text-red-500">*</span>
-                </label>
+                <Label required>{postalRule.label}</Label>
                 <input
                   type="text"
                   maxLength={12}
@@ -439,7 +835,7 @@ export default function AddressFormModal({
                   aria-invalid={!!fieldError("zipCode")}
                   className={inputCls("zipCode")}
                 />
-                {fieldError("zipCode") && <p className="text-red-500 text-xs mt-1">{fieldError("zipCode")}</p>}
+                {fieldError("zipCode") && <p className="mt-1 text-xs text-red-500">{fieldError("zipCode")}</p>}
               </div>
             </div>
 
@@ -448,26 +844,26 @@ export default function AddressFormModal({
               const editingCurrentDefault = !!editing && editing.isDefault;
               const lockedOn = hasNoAddressesYet || editingCurrentDefault;
               return (
-                <div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
                   <label className={`flex items-center gap-3 select-none ${lockedOn ? "cursor-not-allowed" : "cursor-pointer"}`}>
                     <input
                       type="checkbox"
                       checked={lockedOn ? true : form.isDefault}
                       onChange={(e) => setField("isDefault", e.target.checked)}
                       disabled={submitting || lockedOn}
-                      className="w-4 h-4 accent-gray-800"
+                      className="h-4 w-4 accent-[#e01a1b]"
                     />
-                    <span className="text-sm text-slate-700">
+                    <span className="text-sm font-medium text-slate-700">
                       Set as default shipping address
                     </span>
                   </label>
                   {hasNoAddressesYet && (
-                    <p className="text-xs text-slate-500 mt-1.5 ml-7">
+                    <p className="ml-7 mt-1 text-xs text-slate-500">
                       Your first address is always the default.
                     </p>
                   )}
                   {editingCurrentDefault && !hasNoAddressesYet && (
-                    <p className="text-xs text-slate-500 mt-1.5 ml-7">
+                    <p className="ml-7 mt-1 text-xs text-slate-500">
                       This is your current default. To change it, open another address in your Address Book and choose &ldquo;Set as default&rdquo;.
                     </p>
                   )}
@@ -476,32 +872,34 @@ export default function AddressFormModal({
             })()}
 
             {submitError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                 {submitError}
               </div>
             )}
           </div>
 
-          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2 sm:gap-3 shrink-0">
+          {/* Pinned footer */}
+          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-white px-5 py-3 sm:px-6">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="flex-1 sm:flex-none px-4 sm:px-5 py-2 sm:py-2.5 border border-slate-300 text-slate-700 font-medium rounded-full hover:bg-white transition-colors disabled:opacity-50 text-sm sm:text-base"
+              className="flex-1 rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting || !isValid}
-              className="btn-shine flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2.5 bg-[#e01a1b] hover:bg-[#c41617] text-white font-semibold rounded-full shadow-[0_6px_20px_rgba(224,26,27,0.3)] transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm text-sm sm:text-base"
+              className="btn-shine flex flex-1 items-center justify-center gap-2 rounded-full bg-[#e01a1b] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_6px_20px_rgba(224,26,27,0.28)] transition-all duration-300 hover:bg-[#c41617] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
             >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {editing ? "Save Changes" : "Add Address"}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -120,6 +120,9 @@ model User {
   verificationToken String?
 
   // Additional user profile fields
+  title          String?
+  middleName     String?
+  whatsappNumber String?
   phoneNumber  String?
   address      String?
   addressLine2 String?
@@ -160,6 +163,8 @@ model Address {
   type         String // home, work, other
   name         String?
   phone        String?
+  phone2       String? // optional secondary mobile (E.164)
+  landline     String? // optional landline (free-form, digits/space/dash)
   address      String
   addressLine2 String?
   addressLine3 String?
