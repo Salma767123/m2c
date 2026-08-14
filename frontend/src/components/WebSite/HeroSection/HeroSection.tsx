@@ -2,30 +2,52 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { ArrowRight } from "lucide-react";
 import { bannerService, BannerImage, bannerHref } from "@/services/bannerService";
 
-export default function HeroSection() {
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const [slides, setSlides] =
-    useState<
-      Pick<BannerImage, "id" | "imageUrl" | "altText" | "displayOrder" | "linkType" | "linkValue">[]
-    >([]);
-  const [loading, setLoading] = useState(true);
+type Slide = Pick<BannerImage, "id" | "imageUrl" | "altText" | "displayOrder" | "linkType" | "linkValue">;
 
-  // Fetch dynamic banners. No hardcoded fallback — a skeleton shows while loading,
-  // and the section renders nothing if there are no admin-configured banners.
+const AUTOPLAY_MS = 3500;
+const SLIDE_VW = 82;         // active slide width (vw); the rest peeks at the edges
+const GAP_PX = 14;
+
+/**
+ * M2C COMMERCE REEL — a compact, immersive shopping carousel (not a full-width
+ * banner). The active slide sits at ~82vw with the previous/next slides peeking
+ * at the edges, signalling horizontal browsing. Drag / swipe / keyboard /
+ * autoplay, a hairline numbered progress rail that doubles as the autoplay
+ * timer, and a data-driven "Shop now" action shown only when a banner actually
+ * links somewhere. No invented labels or metadata — the banner artwork leads.
+ * Fully dynamic (admin banner API); click-through preserved via bannerHref().
+ */
+export default function HeroSection() {
+  const [current, setCurrent] = useState(0);
+  const [slides, setSlides] = useState<Slide[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const [docHidden, setDocHidden] = useState(false);
+  const [reduce, setReduce] = useState(false);
+  const [drag, setDrag] = useState(0);
+  const [dragging, setDragging] = useState(false);
+
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const startX = useRef(0);
+  const moved = useRef(false);
+
   useEffect(() => {
-    const fetchBanners = async () => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const on = () => setReduce(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
       try {
         const response = await bannerService.getActiveBanners();
-        if (
-          response.success &&
-          Array.isArray(response.data) &&
-          response.data.length > 0
-        ) {
+        if (response.success && Array.isArray(response.data) && response.data.length > 0) {
           setSlides(response.data);
         }
       } catch (error) {
@@ -33,213 +55,216 @@ export default function HeroSection() {
       } finally {
         setLoading(false);
       }
-    };
-    fetchBanners();
+    })();
   }, []);
 
-  // Auto-play functionality
+  // Pause autoplay when the tab is hidden.
   useEffect(() => {
-    if (!isAutoPlaying || slides.length <= 1) return;
+    const on = () => setDocHidden(document.hidden);
+    document.addEventListener("visibilitychange", on);
+    return () => document.removeEventListener("visibilitychange", on);
+  }, []);
 
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % slides.length);
-    }, 2500);
+  const next = useCallback(() => setCurrent((p) => (p + 1) % slides.length), [slides.length]);
+  const prev = useCallback(() => setCurrent((p) => (p - 1 + slides.length) % slides.length), [slides.length]);
+  const go = useCallback((i: number) => setCurrent(i), []);
 
-    return () => clearInterval(interval);
-  }, [isAutoPlaying, currentSlide, slides.length]);
-
-  // Keyboard navigation
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "ArrowLeft" && currentSlide > 0) {
-        prevSlide();
-      } else if (
-        event.key === "ArrowRight" &&
-        currentSlide < slides.length - 1
-      ) {
-        nextSlide();
-      } else if (event.key === " ") {
-        event.preventDefault();
-        setIsAutoPlaying(!isAutoPlaying);
-      }
+    if (slides.length <= 1) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") prev();
+      else if (e.key === "ArrowRight") next();
     };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [slides.length, next, prev]);
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentSlide, isAutoPlaying, slides.length]);
+  const frozen = paused || docHidden;
 
-  // Pause auto-play on hover (desktop only)
-  const handleMouseEnter = () => {
-    setIsAutoPlaying(false);
+  // ── Drag / swipe (unified pointer) ──
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (slides.length <= 1) return;
+    startX.current = e.clientX;
+    moved.current = false;
+    setDragging(true);
+    setPaused(true);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!dragging) return;
+    const dx = e.clientX - startX.current;
+    if (Math.abs(dx) > 6) moved.current = true;
+    setDrag(dx);
+  };
+  const endDrag = () => {
+    if (!dragging) return;
+    const w = viewportRef.current?.clientWidth || 1;
+    const th = w * 0.12;
+    if (drag < -th) next();
+    else if (drag > th) prev();
+    setDrag(0);
+    setDragging(false);
+    setPaused(false);
   };
 
-  const handleMouseLeave = () => {
-    setIsAutoPlaying(true);
-  };
-
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % slides.length);
-    setIsAutoPlaying(false);
-  };
-
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
-    setIsAutoPlaying(false);
-  };
-
-  const goToSlide = (index: number) => {
-    setCurrentSlide(index);
-    setIsAutoPlaying(false);
-  };
-
-  // Skeleton while banners load — same aspect ratio as the carousel so the page
-  // doesn't jump when the real banner comes in.
   if (loading) {
     return (
-      <section className="relative bg-[#e8e8e8] font-sans overflow-hidden" aria-hidden="true">
-        <div className="relative w-full aspect-[2800/800] bg-linear-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse" />
+      <section className="bg-[#faf7f1] font-sans overflow-hidden py-3 md:py-5" aria-hidden="true">
+        <div className="mx-auto w-[82vw] h-[clamp(260px,50vh,540px)] rounded-2xl bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse" />
       </section>
     );
   }
-
   if (slides.length === 0) return null;
+
+  const multi = slides.length > 1;
+  const trackX = `calc(${(100 - SLIDE_VW) / 2}vw - ${current} * (${SLIDE_VW}vw + ${GAP_PX}px) + ${drag}px)`;
 
   return (
     <section
-      className="relative bg-[#e8e8e8] font-sans overflow-hidden"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      className="relative bg-[#faf7f1] font-sans overflow-hidden py-3 md:py-5"
       role="region"
-      aria-label="Hero image carousel"
+      aria-roledescription="carousel"
+      aria-label="Promotional banners"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => { if (!dragging) setPaused(false); }}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={() => setPaused(false)}
     >
-      {/* Fixed aspect ratio == the admin crop ratio (2800×800 = 3.5:1) so a cropped
-          banner fills the frame exactly with no extra cropping on any screen. */}
-      <div className="relative w-full aspect-[2800/800]">
-        {/* Hero Images - fully visible on all screen sizes */}
-        {slides.map((slide, index) => {
-          const href = bannerHref(slide);
-          const img = (
-            <Image
-              src={slide.imageUrl}
-              alt={slide.altText || `Banner slide ${index + 1}`}
-              fill
-              className={`object-cover object-center ${index === currentSlide ? "animate-hero-parallax" : ""}`}
-              priority={index === 0}
-              sizes="100vw"
-              unoptimized={slide.imageUrl.startsWith("http")}
-            />
-          );
-          return (
-            <div
-              key={slide.id}
-              className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
-                index === currentSlide ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-              }`}
-              aria-hidden={index !== currentSlide}
+      <style>{`
+        @keyframes m2cReelProgress { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+      `}</style>
+
+      {/* Reel viewport */}
+      <div
+        ref={viewportRef}
+        className={`relative h-[clamp(260px,50vh,540px)] ${dragging ? "cursor-grabbing" : "cursor-grab"} select-none`}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onPointerLeave={endDrag}
+      >
+        <div
+          className="flex h-full items-stretch"
+          style={{
+            gap: `${GAP_PX}px`,
+            transform: `translateX(${trackX})`,
+            transition: dragging || reduce ? "none" : "transform 600ms cubic-bezier(0.22,1,0.36,1)",
+          }}
+        >
+          {slides.map((slide, index) => {
+            const href = bannerHref(slide);
+            const active = index === current;
+            const inner = (
+              <>
+                <Image
+                  src={slide.imageUrl}
+                  alt={slide.altText || `Banner ${index + 1}`}
+                  fill
+                  className="object-cover object-center"
+                  priority={index === 0}
+                  loading={index === 0 ? undefined : "lazy"}
+                  sizes="82vw"
+                  unoptimized={slide.imageUrl.startsWith("http")}
+                  draggable={false}
+                />
+                {/* Data-driven action — only when this banner actually links somewhere */}
+                {href && active && (
+                  <>
+                    <span className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/45 to-transparent" />
+                    <span className="group/cta absolute bottom-4 left-4 sm:bottom-5 sm:left-6 inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-[13px] font-semibold text-[#1a1a1a] shadow-sm transition-all duration-300 hover:bg-white">
+                      Shop now
+                      <ArrowRight className="h-4 w-4 text-[#e01a1b] transition-transform duration-300 group-hover/cta:translate-x-0.5" />
+                    </span>
+                  </>
+                )}
+              </>
+            );
+            const cls = `relative h-full w-[82vw] shrink-0 overflow-hidden rounded-2xl bg-[#ece7dd] transition-[opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${active ? "opacity-100 scale-100" : "opacity-45 scale-[0.94]"}`;
+            return href ? (
+              <Link
+                key={slide.id}
+                href={href}
+                className={cls}
+                tabIndex={active ? 0 : -1}
+                aria-hidden={!active}
+                aria-label={slide.altText || `Banner ${index + 1}`}
+                onClickCapture={(e) => { if (moved.current) { e.preventDefault(); e.stopPropagation(); } }}
+                draggable={false}
+              >
+                {inner}
+              </Link>
+            ) : (
+              <div key={slide.id} className={cls} aria-hidden={!active}>{inner}</div>
+            );
+          })}
+        </div>
+
+        {/* Minimal edge navigation */}
+        {multi && (
+          <>
+            <button
+              onClick={prev}
+              aria-label="Previous banner"
+              className="group absolute left-[4vw] top-1/2 z-10 -translate-y-1/2 text-[#1a1a1a]/40 transition-colors hover:text-[#1a1a1a] focus:outline-none focus-visible:text-[#e01a1b]"
             >
-              {/* When the banner links somewhere, the whole slide is clickable.
-                  Only the active slide receives pointer events — the invisible
-                  stacked slides above must not swallow the click. tabIndex -1 keeps
-                  hidden links out of the tab order. */}
-              {href ? (
-                <Link href={href} className="block w-full h-full cursor-pointer" tabIndex={index === currentSlide ? 0 : -1} aria-label={slide.altText || `Banner ${index + 1}`}>
-                  {img}
-                </Link>
-              ) : (
-                img
-              )}
-            </div>
-          );
-        })}
+              <span className="block text-2xl leading-none transition-transform duration-300 group-hover:-translate-x-0.5">‹</span>
+            </button>
+            <button
+              onClick={next}
+              aria-label="Next banner"
+              className="group absolute right-[4vw] top-1/2 z-10 -translate-y-1/2 text-[#1a1a1a]/40 transition-colors hover:text-[#1a1a1a] focus:outline-none focus-visible:text-[#e01a1b]"
+            >
+              <span className="block text-2xl leading-none transition-transform duration-300 group-hover:translate-x-0.5">›</span>
+            </button>
+          </>
+        )}
+      </div>
 
-        {/* Subtle edge vignette for a premium, framed look (desktop) */}
-        <div className="pointer-events-none absolute inset-0 z-[5] hidden md:block bg-linear-to-t from-black/15 via-transparent to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-24 hidden md:block bg-linear-to-t from-black/20 to-transparent" />
-
-        {/* Navigation Controls */}
-        <button
-          onClick={prevSlide}
-          className={`group absolute left-2 sm:left-4 lg:left-6 top-1/2 transform -translate-y-1/2 z-20 bg-white/80 text-gray-900 hover:bg-[#e01a1b] hover:text-white p-1.5 sm:p-2 lg:p-3.5 rounded-full transition-all duration-300 hover:scale-110 hover:shadow-[0_8px_24px_rgba(224,26,27,0.35)] shadow-lg backdrop-blur-md border border-white/60 focus:outline-none focus:ring-2 focus:ring-[#e01a1b] focus:ring-offset-2 ${
-            currentSlide === 0 ? "hidden" : "block"
-          }`}
-          aria-label="Previous slide"
-          disabled={currentSlide === 0}
-        >
-          <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-transform duration-300 group-hover:-translate-x-0.5" />
-        </button>
-
-        <button
-          onClick={nextSlide}
-          className={`group absolute right-2 sm:right-4 lg:right-6 top-1/2 transform -translate-y-1/2 z-20 bg-white/80 text-gray-900 hover:bg-[#e01a1b] hover:text-white p-1.5 sm:p-2 lg:p-3.5 rounded-full transition-all duration-300 hover:scale-110 hover:shadow-[0_8px_24px_rgba(224,26,27,0.35)] shadow-lg backdrop-blur-md border border-white/60 focus:outline-none focus:ring-2 focus:ring-[#e01a1b] focus:ring-offset-2 ${
-            currentSlide === slides.length - 1 ? "hidden" : "block"
-          }`}
-          aria-label="Next slide"
-          disabled={currentSlide === slides.length - 1}
-        >
-          <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-transform duration-300 group-hover:translate-x-0.5" />
-        </button>
-
-        {/* Slide indicators — elegant pills, active one shows an auto-play progress fill */}
-        {slides.length > 1 && (
-          <div className="absolute bottom-2.5 sm:bottom-4 lg:bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 sm:gap-2">
-            {slides.map((slide, index) => (
+      {/* Numbered progress rail — also the autoplay timer */}
+      {multi && (
+        <div className="mt-3 flex items-center justify-center gap-3 sm:gap-4">
+          {slides.map((slide, index) => {
+            const active = index === current;
+            return (
               <button
                 key={slide.id}
-                onClick={() => goToSlide(index)}
-                aria-label={`Go to slide ${index + 1}`}
-                aria-current={index === currentSlide}
-                className={`relative h-1.5 sm:h-2 rounded-full overflow-hidden transition-all duration-500 ${
-                  index === currentSlide
-                    ? "w-7 sm:w-10 bg-white/50"
-                    : "w-1.5 sm:w-2 bg-white/50 hover:bg-white/80"
-                }`}
+                onClick={() => go(index)}
+                aria-label={`Go to banner ${index + 1}`}
+                aria-current={active}
+                className="group flex items-center"
               >
-                {index === currentSlide && (
-                  <span
-                    key={`${slide.id}-${isAutoPlaying}`}
-                    className={`absolute inset-0 rounded-full bg-[#e01a1b] ${
-                      isAutoPlaying ? "animate-hero-progress" : ""
-                    }`}
-                    style={!isAutoPlaying ? { transform: "scaleX(1)", transformOrigin: "left" } : undefined}
-                  />
-                )}
+                <span className={`relative h-[2.5px] overflow-hidden rounded-full bg-[#1a1a1a]/12 transition-all duration-500 ${active ? "w-14 sm:w-16" : "w-4 group-hover:w-6"}`}>
+                  {active && (
+                    <span
+                      key={`${current}-${frozen}-${reduce}`}
+                      className="absolute inset-0 origin-left rounded-full bg-[#e01a1b]"
+                      style={reduce
+                        ? { transform: "scaleX(1)" }
+                        : { animation: `m2cReelProgress ${AUTOPLAY_MS}ms linear forwards`, animationPlayState: frozen ? "paused" : "running" }}
+                      onAnimationEnd={() => { if (!frozen) next(); }}
+                    />
+                  )}
+                </span>
               </button>
-            ))}
-          </div>
-        )}
-
-        {/* Touch/Swipe Area for Mobile */}
-        <div
-          className="absolute inset-0 z-10 md:hidden"
-          onTouchStart={(e) => {
-            const touch = e.touches[0];
-            const startX = touch.clientX;
-
-            const handleTouchEnd = (endEvent: TouchEvent) => {
-              const endTouch = endEvent.changedTouches[0];
-              const endX = endTouch.clientX;
-              const diff = startX - endX;
-
-              if (Math.abs(diff) > 50) {
-                if (diff > 0 && currentSlide < slides.length - 1) {
-                  nextSlide();
-                } else if (diff < 0 && currentSlide > 0) {
-                  prevSlide();
-                }
-              }
-
-              document.removeEventListener("touchend", handleTouchEnd);
-            };
-
-            document.addEventListener("touchend", handleTouchEnd);
-          }}
-        />
-
-        {/* Screen reader announcements */}
-        <div className="sr-only" aria-live="polite" aria-atomic="true">
-          Slide {currentSlide + 1} of {slides.length}
+            );
+          })}
         </div>
-      </div>
+      )}
+
+      {/* Reduced-motion / fallback autoplay (progress bar doesn't animate to drive it) */}
+      {reduce && <ReduceAutoplay paused={frozen} count={slides.length} onTick={next} current={current} />}
+
+      <div className="sr-only" aria-live="polite" aria-atomic="true">Banner {current + 1} of {slides.length}</div>
     </section>
   );
+}
+
+/** Timer-based autoplay used only under prefers-reduced-motion. */
+function ReduceAutoplay({ paused, count, onTick, current }: { paused: boolean; count: number; onTick: () => void; current: number }) {
+  useEffect(() => {
+    if (paused || count <= 1) return;
+    const t = setTimeout(onTick, AUTOPLAY_MS);
+    return () => clearTimeout(t);
+  }, [paused, count, onTick, current]);
+  return null;
 }
