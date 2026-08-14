@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import {
   Search,
   ShoppingCart,
@@ -661,8 +661,12 @@ const Header = () => {
         )}
       </header>
 
-      {/* Adaptive Category Ribbon — fast-access category rail below the header */}
-      <CategoryRibbon />
+      {/* Adaptive Category Ribbon — fast-access category rail below the header.
+          Wrapped in Suspense because it reads useSearchParams(); without a
+          boundary this opts static pages (e.g. /about) out of prerendering. */}
+      <Suspense fallback={null}>
+        <CategoryRibbon />
+      </Suspense>
 
       {/* Search panel — drops down from the header, page stays visible behind */}
       {showSearchModal && (
