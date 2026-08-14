@@ -2,6 +2,10 @@ import axios from '@/lib/axios';
 
 export interface UpdateUserProfileData {
   name: string;
+  title?: string;
+  middleName?: string;
+  whatsappNumber?: string;
+  image?: string;
   phoneNumber?: string;
   address?: string;
   addressLine2?: string;
@@ -17,6 +21,10 @@ export interface UserProfileResponse {
     id: string;
     email: string;
     name: string;
+    title?: string;
+    middleName?: string;
+    whatsappNumber?: string;
+    image?: string;
     phoneNumber?: string;
     address?: string;
     addressLine2?: string;

@@ -8,6 +8,8 @@ export interface SavedAddress {
   type: AddressType;
   name: string;
   phone: string;
+  phone2?: string;
+  landline?: string;
   address: string;
   addressLine2?: string;
   addressLine3?: string;
@@ -25,6 +27,8 @@ export interface AddressPayload {
   type: AddressType;
   name: string;
   phone: string;
+  phone2?: string;
+  landline?: string;
   address: string;
   addressLine2?: string;
   addressLine3?: string;

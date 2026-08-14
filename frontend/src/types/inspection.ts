@@ -203,5 +203,6 @@ export interface ProductDetailData {
     scheduledDate?: string | null
     scheduledTime?: string | null
     estimatedDuration?: string | null
+    assignedAt?: string | null
   } | null
 }

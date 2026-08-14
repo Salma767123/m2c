@@ -1646,6 +1646,9 @@ const getAssignedProducts = async (req, res) => {
                     status: true,
                     approvalStatus: true,
                     createdAt: true,
+                    // Booked inspection window (scheduledDate + scheduledTime) so the
+                    // dashboard cards can show the schedule, matching vendor inspections.
+                    qcAssignment: true,
                     vendor: {
                         select: { companyName: true, ownerName: true, email: true },
                     },
