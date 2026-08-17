@@ -112,14 +112,25 @@ export default function Home() {
         defaultDescription="Discover quality products and reliable suppliers on M2C Marketplace"
       />
       <Header />
+      {/* Section order.
+          Categories sit third because "what do you sell" is a first-time
+          visitor's first question, and at the foot of the page they answered
+          it after the shopping had already happened.
+
+          BrandPromo is a pitch to sellers and makers, not to shoppers, so it
+          moved out of the middle of the product run and down beside
+          DownloadApp — the two "commit to us" asks together.
+
+          NoticeBoard takes over as the breather between product blocks: same
+          job, but aimed at the person actually browsing. */}
       <HeroSection />
       <PromoStrip />
-      <NoticeBoard />
+      <Category />
       <FeaturedProducts />
-      <BrandPromo />
+      <NoticeBoard />
       <TopSelling />
       <BestSeller />
-      <Category />
+      <BrandPromo />
       <DownloadApp />
       <ValueSection />
       <Footer />

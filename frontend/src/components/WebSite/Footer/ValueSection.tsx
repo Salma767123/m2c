@@ -233,31 +233,28 @@ export default function ReadTheLabel() {
     return () => io.disconnect();
   }, []);
 
+  // The ground is the bridge into the footer.
+  //
+  // It used to run from #f4ece4 down to white, which meant the bottom of the
+  // page stepped three times: DownloadApp white, then DOWN to cream here, then
+  // back UP to white, then DOWN again to the footer's bone. Every one of those
+  // steps reads as an edge, and together they are what stopped the section
+  // merging with anything around it.
+  //
+  // It now starts on the white DownloadApp ends on and finishes on the footer's
+  // EXACT bone (#f7f2ec, the BONE constant in MainFooterContent), so there is
+  // no seam left between the app section and the bottom of the page — one
+  // continuous descent.
+  //
+  // Gone with it:
+  //  · the 18px basket weave. Once every other section went flat it was the
+  //    only patterned ground left on the site, so instead of blending it
+  //    announced itself. The cards carry the cloth story already — they are
+  //    hang tags with coloured heads and hairline rules.
+  //  · the two blurred brand blobs (#e01a1b at 5.5%, #b8503c at 6%). They, not
+  //    the specified cream, were what gave the ground its pink-mauve cast.
   return (
-    <section className="relative w-full overflow-hidden bg-linear-to-b from-[#f4ece4] via-[#faf5f1] to-white py-14 sm:py-20">
-      {/* A woven ground, because this shop sells cloth. Built as a soft
-          basket-weave of 18px blocks rather than a hairline crosshatch —
-          1px lines at a tight period resample into a coloured haze on HiDPI
-          displays, which is exactly what turned the category panel pink.
-          Blocks that size have no such artefact at any pixel ratio. */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage:
-            'linear-gradient(45deg, rgba(122,15,16,.03) 25%, transparent 25%, transparent 75%, rgba(122,15,16,.03) 75%),' +
-            'linear-gradient(45deg, rgba(122,15,16,.03) 25%, transparent 25%, transparent 75%, rgba(122,15,16,.03) 75%)',
-          backgroundSize: '18px 18px',
-          backgroundPosition: '0 0, 9px 9px',
-          // Weave fades out before the section ends so it never meets the next
-          // one as a hard edge.
-          maskImage: 'linear-gradient(to bottom, #000 0%, #000 52%, transparent 92%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, #000 52%, transparent 92%)',
-        }}
-      />
-      {/* Warmth in the corners, in brand tones only. */}
-      <span aria-hidden className="pointer-events-none absolute -left-28 -top-16 h-80 w-80 rounded-full bg-[#e01a1b]/[0.055] blur-3xl" />
-      <span aria-hidden className="pointer-events-none absolute -right-24 top-1/3 h-96 w-96 rounded-full bg-[#b8503c]/[0.06] blur-3xl" />
+    <section className="relative w-full overflow-hidden bg-linear-to-b from-white via-[#faf6f1] to-[#f7f2ec] py-14 sm:py-20">
       <style>{`
         /* A tag on a string is a pendulum: it arrives displaced, overswings,
            and loses amplitude each pass until it hangs still. Same physics as

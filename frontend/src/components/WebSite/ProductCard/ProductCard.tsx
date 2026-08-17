@@ -16,9 +16,24 @@ import type { ActiveOffer } from '@/lib/offers';
 
 interface ProductCardProps {
   product: ServiceProduct | PublicProduct | MockProduct;
+  /**
+   * Presentation only — no behaviour, data or handler differs between the two.
+   *
+   * 'grid' (the default) is the original card, byte-identical to what it has
+   * always rendered. The products page, product detail and the notice board all
+   * use it and are unaffected by this prop existing.
+   *
+   * 'showcase' is the homepage Featured treatment: larger name in the brand
+   * serif, quieter price, a resting shadow so the card reads as an object, one
+   * promo badge instead of three coloured elements, no quantity stepper, and an
+   * Add to Cart that sits calm at rest and fills brand red on hover. The point
+   * is that four of these in a row read as four products, not four red bars.
+   */
+  variant?: 'grid' | 'showcase';
 }
 
-const ProductCard = ({ product }: ProductCardProps) => {
+const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
+  const showcase = variant === 'showcase';
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -214,8 +229,19 @@ const ProductCard = ({ product }: ProductCardProps) => {
   return (
     <Link href={`/products/${product.slug || product.id}`} className="block h-full">
       {/* Borderless editorial tile — the image and content define the card, not a
-          frame. No border, no rest shadow; a whisper of elevation on hover only. */}
-      <div className="group relative h-full flex flex-col overflow-hidden rounded-[14px] bg-white font-sans ring-1 ring-black/[0.06] transition-all duration-300 ease-out hover:-translate-y-1 hover:ring-black/[0.09] hover:shadow-[0_14px_30px_-18px_rgba(0,0,0,0.25)] cursor-pointer">
+          frame. No border, no rest shadow; a whisper of elevation on hover only.
+
+          'showcase' breaks that one rule deliberately: on the homepage the cards
+          sit on a warm linen ground, and with no resting shadow a white card on
+          a near-white page has nothing separating it from the surface — it stops
+          reading as an object. The warm-toned ring and shadow give it a table to
+          sit on. */}
+      <div
+        className={`group relative h-full flex flex-col overflow-hidden bg-white font-sans transition-all duration-300 ease-out hover:-translate-y-1 cursor-pointer ${showcase
+          ? 'rounded-[16px] ring-1 ring-[#e3d7c9] shadow-[0_10px_26px_-18px_rgba(74,50,38,0.45)] hover:ring-[#cdb9a5] hover:shadow-[0_26px_48px_-24px_rgba(74,50,38,0.55)]'
+          : 'rounded-[14px] ring-1 ring-black/[0.06] hover:ring-black/[0.09] hover:shadow-[0_14px_30px_-18px_rgba(0,0,0,0.25)]'
+          }`}
+      >
         {/* ── Image: the visual hero ─────────────────────────────────────── */}
         <div className="relative aspect-[5/4] w-full shrink-0 overflow-hidden bg-[radial-gradient(120%_100%_at_50%_0%,#faf9f7_0%,#ece9e4_100%)]">
           <Image
@@ -231,9 +257,17 @@ const ProductCard = ({ product }: ProductCardProps) => {
             }}
           />
 
-          {/* Single, compact promo accent — top-left */}
+          {/* Single, compact promo accent — top-left.
+              Showcase swaps the green for brand oxblood: green is the only
+              foreign colour in the palette, and paired with the green savings
+              pill below it put two of them on every card. */}
           {discountPct ? (
-            <span className="absolute top-2.5 left-2.5 z-10 rounded-md bg-[#22c55e] px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-white shadow-[0_0_4px_rgba(34,197,94,0.35)]">
+            <span
+              className={`absolute top-2.5 left-2.5 z-10 rounded-md text-[11px] font-bold tabular-nums text-white ${showcase
+                ? 'bg-[#7a0f10] px-2 py-1 tracking-[0.03em] shadow-[0_5px_12px_-4px_rgba(122,15,16,0.6)]'
+                : 'bg-[#22c55e] px-1.5 py-0.5 shadow-[0_0_4px_rgba(34,197,94,0.35)]'
+                }`}
+            >
               −{discountPct}%
             </span>
           ) : null}
@@ -278,34 +312,55 @@ const ProductCard = ({ product }: ProductCardProps) => {
         </div>
 
         {/* ── Body: Product → Rating → Price → Action ─────────────────────── */}
-        <div className="flex grow flex-col p-2.5">
+        <div className={`flex grow flex-col ${showcase ? 'p-3.5 sm:p-4' : 'p-2.5'}`}>
           {/* Meta block grows so the price + action stay bottom-aligned across cards */}
           <div className="grow">
-            <h3 className="font-playfair text-[13px] sm:text-sm font-semibold leading-snug tracking-tight text-[#1a1a1a] line-clamp-2 transition-colors duration-300 group-hover:text-[#e01a1b]">
+            {/* Showcase raises the name and drops the price's weight below it.
+                In the grid the price is the hero — correct for a listing. In a
+                handpicked showcase the product is, and a 14px name under a 20px
+                extrabold price inverts that. */}
+            <h3
+              className={`font-playfair font-semibold leading-snug tracking-tight text-[#1a1a1a] line-clamp-2 transition-colors duration-300 group-hover:text-[#e01a1b] ${showcase ? 'text-[15px] sm:text-[17px]' : 'text-[13px] sm:text-sm'
+                }`}
+            >
               {product.name}
             </h3>
           </div>
 
           {/* Price — the financial hero, consolidated on one line */}
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-lg sm:text-xl font-extrabold leading-none tracking-tight tabular-nums text-[#1a1a1a]">
+          <div className={`flex items-baseline gap-2 ${showcase ? 'mt-2.5' : 'mt-2'}`}>
+            <span
+              className={`leading-none tracking-tight tabular-nums text-[#1a1a1a] ${showcase ? 'text-[19px] sm:text-[21px] font-semibold' : 'text-lg sm:text-xl font-extrabold'
+                }`}
+            >
               {formatPrice(effectivePrice || 0)}
             </span>
             {strikePrice && strikePrice > (effectivePrice || 0) ? (
-              <span className="text-xs text-gray-400 line-through tabular-nums">
+              <span className={`line-through tabular-nums ${showcase ? 'text-[12.5px] text-[#8a7d72]' : 'text-xs text-gray-400'}`}>
                 {formatPrice(strikePrice)}
               </span>
             ) : null}
             {savingsAmount ? (
-              <span className="ml-auto rounded bg-[#22c55e]/12 px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums text-[#15803d]">
+              // Savings stays — it is the whole pitch of a markdowns store — but
+              // in showcase it loses the green pill and becomes plain oxblood
+              // text, so the card carries one accent colour instead of three.
+              <span
+                className={`ml-auto tabular-nums ${showcase
+                  ? 'text-[11.5px] font-semibold text-[#7a0f10]'
+                  : 'rounded bg-[#22c55e]/12 px-1.5 py-0.5 text-[10.5px] font-bold text-[#15803d]'
+                  }`}
+              >
                 Save {formatPrice(savingsAmount)}
               </span>
             ) : null}
           </div>
 
-          {/* Action — one integrated row, moderate radius */}
-          <div className="mt-2.5 flex items-center gap-2">
-            {isActuallyInStock && (
+          {/* Action — one integrated row, moderate radius.
+              Showcase drops the stepper: a quantity control belongs on the
+              detail page, and on a listing card it eats width and adds noise
+              beside three other controls. Adding still works, one at a time. */}
+          <div className={`flex items-center gap-2 ${showcase ? 'mt-3' : 'mt-2.5'}`}>
+            {isActuallyInStock && !showcase && (
               <div className="inline-flex shrink-0 items-center rounded-md ring-1 ring-gray-200 bg-gray-50/70">
                 <button
                   onClick={handleDecrement}
@@ -329,10 +384,20 @@ const ProductCard = ({ product }: ProductCardProps) => {
             <button
               onClick={handleAddToCart}
               disabled={!isActuallyInStock || isAddingToCart || (isActuallyInStock && quantity > currentStock)}
-              className={`btn-shine group/btn flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-semibold transition-all duration-300 ${isActuallyInStock
-                ? 'bg-[#e01a1b] text-white hover:brightness-[1.06] active:scale-[0.98]'
-                : 'cursor-not-allowed bg-gray-100 text-gray-400 ring-1 ring-gray-200'
-                } disabled:cursor-not-allowed`}
+              // Showcase keeps the button calm at rest and fills brand red on
+              // hover. Four solid red slabs side by side were the loudest shape
+              // in the section — louder than the products they were selling.
+              // Not a hover-reveal: that leaves touch devices with no visible
+              // buy affordance at all.
+              className={`group/btn flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap font-semibold transition-all duration-300 disabled:cursor-not-allowed ${showcase ? 'h-10 rounded-lg px-4 text-[13px]' : 'btn-shine h-8 rounded-md px-3 text-xs'
+                } ${isActuallyInStock
+                  ? showcase
+                    ? 'bg-[#fbf4ec] text-[#7a0f10] ring-1 ring-[#e2d1bd] hover:bg-[#e01a1b] hover:text-white hover:ring-[#e01a1b] hover:shadow-[0_10px_22px_-10px_rgba(224,26,27,0.65)] active:scale-[0.98]'
+                    : 'bg-[#e01a1b] text-white hover:brightness-[1.06] active:scale-[0.98]'
+                  : showcase
+                    ? 'cursor-not-allowed bg-[#f5f0ea] text-[#a89a8d] ring-1 ring-[#e8ded2]'
+                    : 'cursor-not-allowed bg-gray-100 text-gray-400 ring-1 ring-gray-200'
+                }`}
             >
               <ShoppingCart className="h-4 w-4 transition-transform duration-300 group-hover/btn:scale-110" />
               {isAddingToCart ? 'Adding…' : isActuallyInStock ? 'Add to Cart' : 'Unavailable'}
