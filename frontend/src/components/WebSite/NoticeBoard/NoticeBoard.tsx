@@ -9,98 +9,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Percent, Ticket, TrendingUp, ArrowRight, Sparkles, Star } from 'lucide-react'
+import { Percent, Ticket, TrendingUp, ArrowRight, Sparkles, ChevronLeft, ChevronRight, Star } from 'lucide-react'
 import { offerService } from '@/services/offerService'
 import { couponService } from '@/services/couponService'
 import { publicProductService, type PublicProduct } from '@/services/publicProductService'
 import type { PublicOffer } from '@/lib/offers'
 import { formatPrice, getRegionalPrice, getRegionalOriginalPrice } from '@/lib/currency'
-
-// A flip board: eight fixed tiles, each holding two promotions — one on the
-// front, one on the back. Nothing scrolls. A belt had to loop the same handful
-// of notices past you over and over, and the repetition was the thing you
-// noticed; eight tiles holding sixteen faces show far more while standing still.
-const TILES = 8
-
-// Tiles turn one at a time, snaking: across the top row left to right, then
-// back along the bottom row right to left, so the eye follows one continuous
-// path instead of jumping.
-//
-//   1 → 2 → 3 → 4
-//                 ↓
-//   8 ← 7 ← 6 ← 5
-//
-// DOM order is row-major, so the bottom row's turn order has to be reversed.
-const flipOrder = (i: number) => (i < 4 ? i : 4 + (7 - i))
-
-// Two independent speeds, and only one of them is "the queue". SLOT_S is how
-// soon the next tile sets off; TURN_S is how long any one tile takes to turn
-// and settle. Dropping SLOT_S alone quickens the sweep without touching the
-// flap — shortening TURN_S instead would speed the queue too, but it would
-// take the rock-and-settle out with it, which is the part that was asked for
-// twice.
-//
-// At 0.43 against a 1.6s turn there are always ~4 tiles mid-flip — half the
-// board in motion at once. That overlap IS the effect; the board should look
-// like it is being worked, not like eight tiles taking turns.
-const SLOT_S = 0.43  // gap between one tile starting and the next
-const TURN_S = 1.6   // how long a single tile takes to turn over
-
-// Where the flap sits inside a turn, as [point in the turn, angle past 0].
-//
-// The tile arrives at its mark only 42% of the way through and spends the
-// remaining ~0.9s rocking down to rest: +25, -20, +12, -8, +4, -2, home. Three
-// decaying swings, each smaller than the last.
-//
-// Two things make a flap actually visible, and both are here. Amplitude — a few
-// degrees is a twitch, twenty-five is a swing you can watch. And duration — a
-// flap crammed into the tail of a fast turn is over before the eye finds it, so
-// most of the turn is the flap, not the flip.
-const FLAP: Array<[at: number, deg: number]> = [
-  [0.42, 205],
-  [0.58, 160],
-  [0.71, 192],
-  [0.82, 172],
-  [0.90, 184],
-  [0.96, 178],
-  [1.0, 180],
-]
-
-// The outbound sweep runs clockwise; the return sweep runs back the other way,
-// so the wave reverses instead of always restarting from the top-left corner.
-// The return cannot begin until the outbound one has fully finished — turns
-// overlap by design (SLOT_S < TURN_S), and the last tile out is the first one
-// back, so it would otherwise be asked to turn both ways at once.
-const SWEEP_END_S = (TILES - 1) * SLOT_S + TURN_S
-const CYCLE_S = SWEEP_END_S * 2
-const pct = (t: number) => (t / CYCLE_S) * 100
-
-/**
- * One keyframe track per tile. Its two turns sit at different points in the
- * cycle depending on where the tile falls in each sweep, and a single shared
- * keyframe plus animation-delay cannot express that: a delay shifts BOTH turns
- * together, which is what forced the return sweep to repeat the outbound order.
- *
- * Each track ends on 360deg — visually identical to the 0deg it restarts on, so
- * the loop has no seam.
- *
- * The overshoot is the flap: the tile swings past its mark, tips back a little
- * short, then settles. A turn that stops dead on 180 looks braked; a real board
- * carries momentum into the stop.
- */
-const flipKeyframes = Array.from({ length: TILES }, (_, c) => {
-  const out = c * SLOT_S                             // clockwise position
-  const back = SWEEP_END_S + (TILES - 1 - c) * SLOT_S // anticlockwise position
-  const turn = (from: number, base: number) =>
-    `\n    ${pct(from).toFixed(3)}% { transform: rotateY(${base}deg) }` +
-    FLAP.map(([at, deg]) =>
-      `\n    ${pct(from + TURN_S * at).toFixed(3)}% { transform: rotateY(${base + deg}deg) }`,
-    ).join('')
-  return `@keyframes m2cFlip${c} {
-    0% { transform: rotateY(0deg) }${turn(out, 0)}${turn(back, 180)}
-    100% { transform: rotateY(360deg) }
-  }`
-}).join('\n')
 
 type Notice =
   | { kind: 'app' }
@@ -150,115 +64,114 @@ export default function NoticeBoard() {
     return [{ kind: 'app' }, ...mixed]
   }, [offers, coupons, products])
 
-  // Eight tiles, sixteen faces, filled by walking the notice list. With fewer
-  // than sixteen live notices the list simply wraps — every tile still carries
-  // two different ones, which is what stops a flip landing on the same card.
-  const tiles = useMemo(() => {
-    if (notices.length === 0) return []
-    return Array.from({ length: TILES }, (_, i) => ({
-      front: notices[(i * 2) % notices.length],
-      back: notices[(i * 2 + 1) % notices.length],
-    }))
-  }, [notices])
+  // The track is the cards rendered twice so the auto-scroll can loop seamlessly.
+  const track = notices.length > 1 ? [...notices, ...notices] : notices
 
-  const boardRef = useRef<HTMLDivElement>(null)
+  // ── Scroller ──────────────────────────────────────────────────────────────
+  // Auto-scrolls on its own; cards remain plain clickable links that navigate to the
+  // relevant section/page. The viewer can also swipe/trackpad-scroll natively or use
+  // the arrow buttons. No pointer-capture/drag — that would swallow the card clicks.
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const pausedRef = useRef(false)
+  const posRef = useRef(0) // float source of truth for the auto-scroll position
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Deal the cards in the first time the board scrolls into view. Driven by a
-  // class on the container rather than state — nothing here needs a re-render,
-  // and the stagger is per-card CSS delay.
   useEffect(() => {
-    const el = boardRef.current
-    if (!el) return
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          el.classList.add('m2c-dealt')
-          io.disconnect()
-        }
-      },
-      { threshold: 0.12 },
-    )
-    io.observe(el)
-    return () => io.disconnect()
+    const el = scrollRef.current
+    if (!el || notices.length <= 1) return
+    posRef.current = el.scrollLeft
+    let raf = 0
+    let last = 0
+    const speed = 45 // px per second
+    const step = (t: number) => {
+      if (!last) last = t
+      const dt = Math.min((t - last) / 1000, 0.1) // clamp big gaps (backgrounded tab)
+      last = t
+      if (!pausedRef.current) {
+        // Accumulate in a float and ASSIGN scrollLeft — reading scrollLeft back each
+        // frame loses sub-pixel deltas on HiDPI (browser rounds it) and the scroll
+        // would stall near 0. Wrap on the float too.
+        const half = el.scrollWidth / 2
+        posRef.current += speed * dt
+        if (half > 0 && posRef.current >= half) posRef.current -= half
+        el.scrollLeft = posRef.current
+      }
+      raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
   }, [notices.length])
 
+  // Resume auto-scroll from wherever the user left the strip (resync the accumulator).
+  const resume = () => {
+    if (scrollRef.current) posRef.current = scrollRef.current.scrollLeft
+    pausedRef.current = false
+  }
+  const pause = () => { pausedRef.current = true }
+  const pauseThenResume = () => {
+    pausedRef.current = true
+    if (resumeTimer.current) clearTimeout(resumeTimer.current)
+    resumeTimer.current = setTimeout(resume, 2500)
+  }
+
+  const nudge = (dir: number) => {
+    scrollRef.current?.scrollBy({ left: dir * 320, behavior: 'smooth' })
+    pauseThenResume()
+  }
+
   return (
-    <section className="relative border-t border-black/5 bg-linear-to-b from-[#f7f6f4] to-white pb-11 pt-9">
-      {/* Section header. It was pinned hard against the band above with 4px of
-          clearance and set in small grey text, so it read as a stray caption
-          rather than as the start of a section. The rule between the two ends
-          ties them into one line instead of leaving them floating apart. */}
-      <div className="mx-auto mb-6 flex max-w-[1400px] items-center gap-4 px-4 sm:px-6">
-        <h2 className="inline-flex shrink-0 items-center gap-2 text-[13px] font-bold uppercase tracking-[0.2em] text-[#1a1416] sm:text-[14.5px]">
-          <Sparkles className="h-[17px] w-[17px] text-[#e01a1b]" />
+    <section className="relative bg-linear-to-b from-[#f7f6f4] to-white border-t border-black/5 py-1">
+      {/* Section eyebrow */}
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 mb-1 flex items-center gap-2">
+        <Sparkles className="w-4 h-4 text-[#e01a1b]" />
+        <h2 className="text-xs sm:text-sm font-bold uppercase tracking-[0.14em] text-gray-700">
           What&apos;s happening
         </h2>
-        <span aria-hidden className="h-px min-w-0 flex-1 bg-linear-to-r from-black/[0.14] to-transparent" />
-        <Link
-          href="/offers"
-          className="group inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#e01a1b]/25 px-3.5 py-1.5 text-[12.5px] font-semibold text-[#e01a1b] transition-colors hover:bg-[#fff1f1] sm:text-[13px]"
-        >
-          All offers
-          <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
-        </Link>
+        <span className="ml-auto">
+          <Link href="/offers" className="text-xs font-semibold text-[#e01a1b] hover:underline inline-flex items-center gap-1">
+            All offers <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </span>
       </div>
 
-      <style>{`
-        @keyframes m2cDeal { from { opacity: 0; transform: translateY(24px) scale(.96) } to { opacity: 1; transform: none } }
-        [data-deal] { opacity: 0 }
-        .m2c-dealt [data-deal] { animation: m2cDeal 520ms cubic-bezier(0.22,1,0.36,1) both }
-
-        ${flipKeyframes}
-
-        /* Held until the board has been seen, so the first sweep isn't spent
-           above the fold. Paused again on hover — a turn mid-read is the one
-           thing this animation must never do. */
-        .m2c-flip {
-          animation-duration: ${CYCLE_S}s;
-          /* Applies between every pair of keyframes, so the flap's own steps get
-             it too. ease-in-out is what a swinging thing does — slowest at each
-             extreme, fastest through the middle. An ease-out curve here flattened
-             every rebound into a slide before it could read as a swing. */
-          animation-timing-function: ease-in-out;
-          animation-iteration-count: infinite;
-          animation-play-state: paused;
-        }
-        .m2c-dealt .m2c-flip { animation-play-state: running; }
-        .m2c-board:hover .m2c-flip { animation-play-state: paused; }
-
-        @media (prefers-reduced-motion: reduce) {
-          [data-deal] { opacity: 1 }
-          .m2c-dealt [data-deal] { animation: none }
-          .m2c-flip, .m2c-dealt .m2c-flip { animation-name: none }
-        }
-      `}</style>
-
-      {/* The board — eight tiles, two faces each, turning one at a time. */}
-      <div ref={boardRef} className="m2c-board mx-auto max-w-[1400px] px-4 sm:px-6">
-        <div className="grid grid-cols-2 gap-2 sm:gap-2.5 lg:grid-cols-4">
-          {tiles.map((tile, i) => (
-            <div
-              key={`tile-${i}`}
-              data-deal
-              className="[perspective:1400px]"
-              style={{ animationDelay: `${i * 60}ms` }}
+      {/* Scroller — click a card to navigate; swipe / trackpad / arrows to browse */}
+      <div
+        className="group/board relative"
+        onMouseEnter={pause}
+        onMouseLeave={resume}
+        style={{
+          maskImage: 'linear-gradient(to right, transparent, black 3%, black 97%, transparent)',
+          WebkitMaskImage: 'linear-gradient(to right, transparent, black 3%, black 97%, transparent)',
+        }}
+      >
+        {notices.length > 1 && (
+          <>
+            <button
+              onClick={() => nudge(-1)}
+              aria-label="Scroll left"
+              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-10 hidden sm:flex items-center justify-center w-9 h-9 rounded-full bg-white/90 text-gray-700 shadow-md ring-1 ring-black/5 backdrop-blur hover:bg-[#e01a1b] hover:text-white transition-all opacity-0 group-hover/board:opacity-100"
             >
-              <div
-                className="m2c-flip relative aspect-[7/3] w-full [transform-style:preserve-3d]"
-                // Picks the track for this tile's place in the snake, not its
-                // place in the DOM. Every tile shares one duration and runs
-                // undelayed — the timing lives inside its track, which is the
-                // only way the two sweeps can run in opposite directions.
-                style={{ animationName: `m2cFlip${flipOrder(i)}` }}
-              >
-                <div className="absolute inset-0 [backface-visibility:hidden]">
-                  <NoticeCard notice={tile.front} />
-                </div>
-                <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)]">
-                  <NoticeCard notice={tile.back} />
-                </div>
-              </div>
-            </div>
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => nudge(1)}
+              aria-label="Scroll right"
+              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-10 hidden sm:flex items-center justify-center w-9 h-9 rounded-full bg-white/90 text-gray-700 shadow-md ring-1 ring-black/5 backdrop-blur hover:bg-[#e01a1b] hover:text-white transition-all opacity-0 group-hover/board:opacity-100"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </>
+        )}
+
+        <div
+          ref={scrollRef}
+          onPointerDown={pauseThenResume}
+          onTouchStart={pauseThenResume}
+          onWheel={pauseThenResume}
+          className="flex gap-3 sm:gap-4 px-4 sm:px-6 py-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {track.map((notice, i) => (
+            <NoticeCard key={`${notice.kind}-${i}`} notice={notice} />
           ))}
         </div>
       </div>
@@ -267,14 +180,7 @@ export default function NoticeBoard() {
 }
 
 const CARD =
-  // `block` is load-bearing: most of these cards are <Link>, which renders an
-  // <a> — inline, and width/height do not apply to inline boxes. A card that
-  // is not a direct flex child does not get blockified for free, and it would
-  // silently collapse to its content size.
-  //
-  // Sized by its tile now rather than by fixed widths, so the two faces of a
-  // flip always occupy exactly the same box.
-  'group relative block h-full w-full rounded-xl overflow-hidden ring-1 ring-black/5 shadow-sm'
+  'group relative shrink-0 w-80 sm:w-96 md:w-[26rem] h-40 sm:h-44 rounded-2xl overflow-hidden ring-1 ring-black/5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300'
 
 function scrollToDownloadApp() {
   document.getElementById('download-app')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
