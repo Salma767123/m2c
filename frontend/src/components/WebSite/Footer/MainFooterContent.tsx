@@ -6,7 +6,6 @@ import { Instagram, Facebook, Youtube, Mail, Phone, ArrowRight } from "lucide-re
 import { categoryService, Category } from "@/services/categoryService";
 import { companyInfoService, PublicCompanyInfo } from "@/services/companyInfoService";
 import CompanyLogo from "@/components/Shared/CompanyLogo";
-import { showSuccessToast } from "@/lib/toast-utils";
 
 /**
  * The footer.
@@ -27,7 +26,14 @@ import { showSuccessToast } from "@/lib/toast-utils";
  *    PromoStrip's — and which carried "Pan-India shipping" on a store that
  *    runs NEXT_PUBLIC_SITE_REGION=US and prices in dollars;
  *  · the grid, dot, twin-radial and drifting-contour layers — four decorative
- *    passes behind the content, replaced by the weave.
+ *    passes behind the content, replaced by the weave;
+ *  · the "Stay Updated" newsletter column. Beyond taking three of the twelve
+ *    columns, its submit handler showed a "Subscribed" toast and then discarded
+ *    the address — there is no subscribe endpoint in the backend. It had been
+ *    collecting nothing while telling people otherwise.
+ *
+ * Let's Connect inherited that space, going from two columns (~236px, narrow
+ * enough that the email address had to truncate) to five.
  */
 
 const BONE = '#f7f2ec';
@@ -142,7 +148,6 @@ const ConnectRow = ({
 
 const MainFooterContent = () => {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [email, setEmail] = useState("");
   const [companyInfo, setCompanyInfo] = useState<PublicCompanyInfo>({
     companyName: 'M2C MarkDowns Private Limited',
     companyLogo: null,
@@ -213,25 +218,31 @@ const MainFooterContent = () => {
     return () => observers.forEach((io) => io?.disconnect());
   }, []);
 
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    showSuccessToast("Subscribed", "You're on the list — new arrivals & offers are on the way.");
-    setEmail("");
-  };
-
   /**
    * One set of social links, not two. Instagram and Facebook were rendered
    * twice in this footer — as bare circles under the company blurb AND as
    * labelled rows in Let's Connect — the same two destinations, 400px apart.
-   * The labelled rows win: they say where they go, and they give that column
-   * enough to stand up. YouTube moved in with them so no link was lost.
+   * YouTube moved in with them so no link was lost.
+   *
+   * They are tiles now rather than another set of text rows. Three more rows
+   * in the same column made the socials indistinguishable from navigation, and
+   * the footer is bone and oxblood throughout — each platform's own colour
+   * arriving on hover is the one moment of real colour in it, and it only
+   * appears when someone reaches for it.
+   *
+   * `fill` is passed down as a custom property because the value is per-row
+   * data, which a utility class cannot express.
    */
   const connectSocials = [
-    { url: companyInfo.socialInstagram, Icon: Instagram, label: "Instagram" },
-    { url: companyInfo.socialFacebook, Icon: Facebook, label: "Facebook" },
-    { url: companyInfo.socialYoutube, Icon: Youtube, label: "YouTube" },
-  ].filter((s) => s.url) as { url: string; Icon: typeof Instagram; label: string }[];
+    {
+      url: companyInfo.socialInstagram,
+      Icon: Instagram,
+      label: "Instagram",
+      fill: 'radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%)',
+    },
+    { url: companyInfo.socialFacebook, Icon: Facebook, label: "Facebook", fill: '#1877f2' },
+    { url: companyInfo.socialYoutube, Icon: Youtube, label: "YouTube", fill: '#ff0000' },
+  ].filter((s) => s.url) as { url: string; Icon: typeof Instagram; label: string; fill: string }[];
 
   return (
     <div ref={rootRef} className="relative overflow-hidden text-[#3f3f46]" style={{ background: BONE }}>
@@ -251,9 +262,26 @@ const MainFooterContent = () => {
           transition: opacity .5s ease, transform .75s cubic-bezier(0.22,1,0.36,1);
         }
 
+        /* Each tile's own platform colour, washed in on hover. It lives on a
+           pseudo-element so the fill can cross-fade under the icon and label
+           rather than snapping, and so the resting border and the arriving
+           colour are not fighting over the same property. */
+        .m2c-social::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: var(--fill);
+          opacity: 0;
+          transition: opacity .35s ease;
+        }
+        .m2c-social:hover::before,
+        .m2c-social:focus-visible::before { opacity: 1 }
+
         @media (prefers-reduced-motion: reduce) {
           .m2c-col, .is-woven .m2c-col,
           .m2c-wm span, .is-stamped .m2c-wm span { opacity: 1; transform: none; transition: none; }
+          .m2c-social { transition: none }
+          .m2c-social::before { transition: none }
         }
       `}</style>
 
@@ -312,58 +340,49 @@ const MainFooterContent = () => {
             </div>
           </div>
 
-          {/* Let's Connect */}
-          <div className="m2c-col min-w-0 lg:col-span-2" style={{ transitionDelay: '240ms' }}>
+          {/* Let's Connect — now holding the newsletter's three columns too */}
+          <div className="m2c-col min-w-0 sm:col-span-2 lg:col-span-5" style={{ transitionDelay: '240ms' }}>
             <ColHeading>Let&apos;s Connect</ColHeading>
-            <div className="mt-5 flex flex-col">
+
+            {/* Capped rather than run to the full five columns. The email is the
+                longest string here and it now fits without truncating; letting
+                the rows stretch to ~560px would leave the hairlines running far
+                past the words they close. */}
+            <div className="mt-5 flex max-w-[24rem] flex-col">
               {companyInfo.companyEmail && (
                 <ConnectRow href={`mailto:${companyInfo.companyEmail}`} Icon={Mail} label={companyInfo.companyEmail} clip />
               )}
               {companyInfo.companyPhone && (
                 <ConnectRow href={`tel:${companyInfo.companyPhone}`} Icon={Phone} label={companyInfo.companyPhone} />
               )}
-              {connectSocials.map(({ url, Icon, label }) => (
-                <ConnectRow key={label} href={url} Icon={Icon} label={label} external />
-              ))}
             </div>
-          </div>
 
-          {/* Stay Updated — newsletter */}
-          <div className="m2c-col min-w-0 sm:col-span-2 lg:col-span-3" style={{ transitionDelay: '320ms' }}>
-            <ColHeading>Stay Updated</ColHeading>
-            {/* A bordered field, not a card and not a bare underline.
-                The card version floated over the weave with its own shadow and
-                backdrop-blur; the underline version went the other way and
-                vanished into a warm ground it barely out-contrasted. A form
-                field is entitled to be its own surface — that is what tells
-                you it can be typed in — so it gets white fill and a warm
-                border, and no shadow, so it sits IN the weave rather than
-                above it. */}
-            <p className="mt-5 text-[16.5px] font-bold text-[#1a1416]">Get the latest from M2C</p>
-            <p className="mt-1.5 text-[13.5px] leading-relaxed text-[#6f625f]">
-              New arrivals, offers &amp; more.
-            </p>
-            <form
-              onSubmit={handleSubscribe}
-              className="mt-5 flex max-w-[22rem] items-center gap-2.5 rounded-full border border-[#dfcdc1] bg-white py-1.5 pl-4 pr-1.5 transition-colors focus-within:border-[#e01a1b]"
-            >
-              <Mail className="h-4 w-4 shrink-0 text-[#b8503c]" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                aria-label="Email address"
-                className="min-w-0 flex-1 bg-transparent text-[14.5px] text-[#1a1416] placeholder-[#a3928c] outline-none"
-              />
-              <button
-                type="submit"
-                aria-label="Subscribe"
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e01a1b] text-white transition-all duration-200 hover:scale-105 hover:bg-[#c41617]"
-              >
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </form>
+            {connectSocials.length > 0 && (
+              <>
+                <p className="mt-7 text-[11px] font-bold uppercase tracking-[0.2em] text-[#8c7f7d]">Follow us</p>
+                <div className="mt-3.5 grid max-w-[28rem] grid-cols-3 gap-3">
+                  {connectSocials.map(({ url, Icon, label, fill }) => (
+                    <a
+                      key={label}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`${label} (opens in a new tab)`}
+                      style={{ '--fill': fill } as React.CSSProperties}
+                      className="m2c-social group relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border border-[#e5d8cd] bg-white/70 px-2 py-5 transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_16px_30px_-16px_rgba(74,50,38,0.55)]"
+                    >
+                      <Icon
+                        className="relative z-10 h-6 w-6 text-[#7a0f10] transition-colors duration-300 group-hover:text-white"
+                        strokeWidth={1.8}
+                      />
+                      <span className="relative z-10 text-[12.5px] font-semibold tracking-[0.03em] text-[#4f4442] transition-colors duration-300 group-hover:text-white">
+                        {label}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

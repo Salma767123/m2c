@@ -163,32 +163,59 @@ export default function DownloadApp() {
   }, []);
 
   /**
-   * Ground: dusty rose — brand red, heavily desaturated and lightened.
+   * Ground: a split, not a wash.
    *
-   * Three grounds were tried before it. The woven #f4ece4 → white was identical
-   * to "Read the label" directly below, so the two merged. A flat mid stone was
-   * still the same cream family, only darker. Dark oxblood separated cleanly
-   * but was too heavy for a page that is light throughout.
+   * FOUR full-bleed colours were tried here and every one was rejected. Woven
+   * #f4ece4 → white was identical to "Read the label" directly below, so the
+   * two merged. A flat mid stone was the same cream family, only darker. Dark
+   * oxblood separated cleanly but was too heavy for a page that is light
+   * throughout. Dusty rose differed in hue rather than lightness — cream sits
+   * near 40°, rose near 10° — and still did not land.
    *
-   * Rose works because it differs in HUE rather than in lightness: cream sits
-   * around 40° and this sits around 10°, so it reads as a different material
-   * next to the section below even though both are light and both are warm.
-   * And it is derived from the site's own red rather than borrowed from
-   * outside the palette, which is the test every colour on this page has to
-   * pass.
+   * At four rejections the hue was not the problem. Every other section on this
+   * page is white or a whisper off it; this one was the only solid wash of
+   * colour across the full viewport, roughly 1900x700px of one tint, and a band
+   * that size reads as heavy whatever you pour into it.
    *
-   * The cloth had to deepen with it — at cream it barely out-contrasted a rose
-   * ground and the reveal would have been lost.
+   * So the colour is now CONTAINED: it sits behind the phone and fades out
+   * before it reaches the copy, leaving the right-hand side white like the
+   * Category section directly above. The tint has a job — it is the backdrop
+   * the phone stands against — instead of being a stripe the section happens
+   * to sit on.
+   *
+   * Two layers rather than one because the split has to follow the layout: the
+   * row stacks below lg (phone above copy) so the fade runs top-to-bottom, and
+   * only turns left-to-right once the row goes horizontal.
+   *
+   * The cloth keeps its deepened tone — it lies over the phone, which is still
+   * on the tinted side, so it has the same thing to out-contrast as before.
    */
   return (
     <section
       id="download-app"
       ref={rootRef}
-      className="relative w-full scroll-mt-24 overflow-hidden bg-linear-to-b from-[#fae6e1] via-[#f7dcd6] to-[#f2cfc8] py-14 font-sans sm:py-20"
+      className="relative w-full scroll-mt-24 overflow-hidden bg-white py-14 font-sans sm:py-20"
     >
-      {/* The two blurred washes that lit the dark version are gone. On a light
-          ground they read as the soft radial glows that made the old promise
-          section look generated — the ground carries itself here. */}
+      {/* Stacked layout: tint the top, where the phone is. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 lg:hidden"
+        style={{
+          background:
+            'linear-gradient(180deg, #f8e2dd 0%, #f9e6e1 34%, rgba(249,230,225,0.45) 55%, rgba(255,255,255,0) 74%)',
+        }}
+      />
+      {/* Horizontal layout: tint the left third and fade out before the copy.
+          96deg rather than a flat 90 so the meeting edge is very slightly off
+          vertical — dead vertical reads as two panels butted together. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 hidden lg:block"
+        style={{
+          background:
+            'linear-gradient(96deg, #f6dbd5 0%, #f9e5e0 30%, rgba(249,229,224,0.5) 42%, rgba(255,255,255,0) 56%)',
+        }}
+      />
 
       <style>{`
         /* ── The feed ───────────────────────────────────────────────────────
@@ -367,7 +394,11 @@ export default function DownloadApp() {
             something. Below lg the section stacks and the badges take over,
             since nobody scans their own screen. */}
         <div className="dl-in hidden shrink-0 lg:block" style={{ transitionDelay: '280ms' }}>
-          <div className="rounded-2xl border border-[#e6cdc7] bg-white p-5 text-center shadow-[0_20px_42px_-26px_rgba(120,55,45,.6)]">
+          {/* Faintly tinted, not white. This card now sits on the white half of
+              the split, and a white card on a white ground has only its border
+              to separate it — it stopped reading as an object. The QR panel
+              inside stays pure white, which is what scanners want. */}
+          <div className="rounded-2xl border border-[#ecd7d1] bg-[#fdf6f4] p-5 text-center shadow-[0_22px_44px_-24px_rgba(120,55,45,.42)]">
             <div className="relative mx-auto h-[168px] w-[168px] overflow-hidden rounded-lg bg-white">
               <svg viewBox="-2 -2 29 29" className="h-full w-full" aria-hidden shapeRendering="crispEdges">
                 <path d={QR_PATH} fill="#1a1416" />

@@ -329,9 +329,14 @@ export default function HeroSection() {
             banner is visible: you can see the change coming and how long is
             left. It also drives the rotation — when the fill completes it calls
             next(), which is why hover-pausing the banner pauses the bar and the
-            two can never drift apart. */}
+            two can never drift apart.
+
+            Tighter on phones. The rails were fixed at desktop proportions, so
+            against a banner only ~110px tall on a 390px screen the row of
+            dashes plus 34px of padding read as a second element competing with
+            the image rather than an index under it. */}
         {multi && (
-          <div className="flex items-center justify-center gap-2.5 px-4 pb-5 pt-3.5">
+          <div className="flex items-center justify-center gap-1.5 px-4 pb-2.5 pt-2 sm:gap-2.5 sm:pb-5 sm:pt-3.5">
             {slides.map((slide, index) => {
               const active = index === current;
               return (
@@ -340,10 +345,10 @@ export default function HeroSection() {
                   onClick={() => go(index)}
                   aria-label={`Go to banner ${index + 1}`}
                   aria-current={active}
-                  className="group py-2 focus:outline-none"
+                  className="group py-1.5 focus:outline-none sm:py-2"
                 >
                   <span
-                    className={`relative block h-[3px] overflow-hidden rounded-full transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${active ? "w-16 sm:w-24" : "w-7 group-hover:w-10"}`}
+                    className={`relative block h-[2.5px] overflow-hidden rounded-full transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] sm:h-[3px] ${active ? "w-9 sm:w-16 md:w-24" : "w-4 group-hover:w-6 sm:w-7 sm:group-hover:w-10"}`}
                     style={{ background: "rgba(26,20,22,.14)" }}
                   >
                     {active && (
