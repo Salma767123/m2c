@@ -1,10 +1,12 @@
 "use client"
 
-import { aboutContent, missionStatement, values } from '@/components/mockData/aboutContent';
+import { aboutContent, values } from '@/components/mockData/aboutContent';
 import Image from 'next/image';
 import { CheckCircle, Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { useState, useRef } from 'react';
 import Reveal from '@/components/WebSite/Shared/Reveal';
+import AboutBanner from '@/components/WebSite/About/AboutBanner';
+import AboutMission from '@/components/WebSite/About/AboutMission';
 
 const About = () => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -68,51 +70,12 @@ const About = () => {
   };
   return (
     <div className="bg-white font-sans">
-      {/* Hero Section */}
-      {/* <section className="relative bg-gray-50 py-16 ">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-4xl lg:text-5xl font-bold text-[#3a75c4] mb-6">
-              Our B Too C Story
-            </h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Preserving centuries-old traditions while supporting artisan communities 
-              and bringing authentic handcrafted textiles to your home.
-            </p>
-          </div>
-        </div>
-      </section> */}
+      {/* The banner. Replaces the hero that used to be commented out here —
+          the page had no opening statement at all, so the mission block below
+          was standing in for one. */}
+      <AboutBanner />
 
-      {/* Mission Statement */}
-      <section className="relative min-h-64 py-12 sm:py-16 md:py-20 lg:py-24 overflow-hidden">
-        <div className="absolute inset-0">
-          {missionStatement.image && (
-            <>
-              <Image
-                src={missionStatement.image}
-                alt={missionStatement.title}
-                fill
-                sizes="100vw"
-                className="object-cover grayscale"
-                priority
-              />
-              <div className="absolute inset-0 bg-black/40"></div>
-            </>
-          )}
-        </div>
-        <div className="relative max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 text-center">
-          <Reveal>
-            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#f24344] mb-3">
-              <span className="h-px w-6 bg-[#f24344]" />
-              Our Mission
-            </span>
-            <h2 className={`font-playfair text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight mb-3 sm:mb-6 ${missionStatement.image ? 'text-white' : 'text-[#1a1a1a]'}`}>{missionStatement.title}</h2>
-            <p className={`text-sm sm:text-base lg:text-lg font-medium leading-relaxed ${missionStatement.image ? 'text-white/90' : 'text-gray-600'}`}>
-              {missionStatement.content}
-            </p>
-          </Reveal>
-        </div>
-      </section>
+      <AboutMission />
 
       {/* Video Content Section */}
       <section className="py-10 sm:py-12 lg:py-16 bg-[#f7f7f5] relative overflow-hidden">

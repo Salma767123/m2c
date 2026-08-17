@@ -32,10 +32,50 @@ export const aboutContent: AboutSection[] = [
   }
 ];
 
+/**
+ * The banner at the top of /about.
+ *
+ * Placeholder wording — it says what the business model appears to be from the
+ * mission statement and the seller/maker panels on the homepage. Swap the
+ * three strings for the real positioning line; nothing else needs touching.
+ *
+ * The image is a resized, re-encoded a8.webp (2500x1668, 586KB → 2200x1468,
+ * 280KB). It has to be a plain URL rather than a next/image import because the
+ * banner paints it across sixteen separate strips, each one a CSS background.
+ */
+export const aboutBanner = {
+  eyebrow: 'Maker to customer',
+  title: 'Straight from the loom.',
+  subtitle:
+    'A marketplace for home textiles bought direct from the workshops that weave them — so the price reflects the cloth, not the chain of hands it passed through.',
+  ctaLabel: 'Shop the collection',
+  ctaHref: '/products',
+  image: '/assets/images/about/banner-loom.webp',
+  imageAlt: 'A weaver drawing warp threads across a handloom in a workshop',
+};
+
 export const missionStatement = {
   title: "Our Mission",
+  /**
+   * The statement, split at its own sentence break. It was one 57-word block
+   * set at heading size, which is a wall rather than a statement — the first
+   * sentence is the claim and the second is the reasoning, so they are set at
+   * different sizes instead of the same one.
+   *
+   * `content` is kept whole and unused by the page, in case anything else
+   * ever wants the full paragraph.
+   */
+  lead: "To connect conscious consumers with authentic, handcrafted textiles while supporting traditional artisans and preserving cultural heritage.",
+  support: "We believe that every purchase should tell a story, support a family, and contribute to keeping ancient crafts alive for future generations.",
   content: "To connect conscious consumers with authentic, handcrafted textiles while supporting traditional artisans and preserving cultural heritage. We believe that every purchase should tell a story, support a family, and contribute to keeping ancient crafts alive for future generations.",
-  image: "/assets/images/about/a8.webp"
+  /**
+   * A 4:5 crop of a7.webp, which was sitting unused in this folder and is the
+   * best photograph in it. Contained and portrait — deliberately nothing like
+   * the banner's full-bleed landscape, so the two do not read as the same
+   * device twice. 251KB → 72KB.
+   */
+  image: "/assets/images/about/mission-weaver.webp",
+  imageAlt: "A weaver at her loom, seen through the warp threads",
 };
 
 export const values = [
