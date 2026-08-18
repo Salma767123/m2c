@@ -214,11 +214,30 @@ export default function ProfileTab({
           )}
         </div>
 
-        {/* ── Name ──────────────────────────────────────────────────────────
-            Title · First · Middle · Last. Title gets a narrower track than the
-            three name fields because it holds two characters, not a word —
-            four equal columns put "Mr" in a box the width of a surname. */}
-        <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-[0.6fr_1fr_1fr_1fr] md:gap-5">
+        {/* ── The fields ───────────────────────────────────────────────────
+            One four-column grid, with fields spanning it so every row fills
+            exactly. Eight fields in three complete rows:
+
+              Title  · First · Middle · Last
+              Gender · Email(3)
+              Phone(2)        · WhatsApp(2)
+
+            Two earlier attempts failed here and both failures were visible.
+            Splitting into "personal" and "contact" bands left Gender alone on
+            a row with three empty columns beside it — which reads as a gap,
+            not as a group. And putting all three contact fields on one row
+            gave each about 275px, of which the country selector takes 112, so
+            the WhatsApp placeholder truncated mid-word.
+
+            Spanning fixes both at once. Gender lands directly beneath Title in
+            the same column, so the two dropdowns line up and read as a pair.
+            Email gets three columns, which is what a long address wants. Phone
+            and WhatsApp get two each — roughly 320px for the number after the
+            selector, so nothing clips.
+
+            The sub-group divider is gone with it: rows this even do not need
+            a label to explain themselves. */}
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-4 md:gap-x-5 md:gap-y-6">
           <div>
             <label htmlFor="title" className={labelClass}>Title</label>
             <Dropdown
@@ -270,48 +289,6 @@ export default function ProfileTab({
               className={fieldClass}
             />
           </div>
-        </div>
-
-        {/* ── Contact ─────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
-          <div>
-            <label htmlFor="email" className={labelClass}>
-              <Mail className="h-4 w-4 text-[#a89a8d]" />
-              Email address
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={editedProfile.email}
-              onChange={(e) => handleInputChange("email", e.target.value)}
-              disabled={!isEditing}
-              placeholder="Enter your email address"
-              autoComplete="email"
-              className={fieldClass}
-            />
-          </div>
-
-          {renderPhoneField({
-            id: "phone",
-            label: "Phone number",
-            icon: Phone,
-            code: editedProfile.phoneCode || "+91",
-            number: editedProfile.phone,
-            codeField: "phoneCode",
-            numberField: "phone",
-            placeholder: "Phone number",
-          })}
-
-          {renderPhoneField({
-            id: "whatsapp",
-            label: "WhatsApp number",
-            icon: MessageCircle,
-            code: editedProfile.whatsappCode || "+91",
-            number: editedProfile.whatsapp || "",
-            codeField: "whatsappCode",
-            numberField: "whatsapp",
-            placeholder: "WhatsApp number",
-          })}
 
           <div>
             <label htmlFor="gender" className={labelClass}>Gender</label>
@@ -328,6 +305,47 @@ export default function ProfileTab({
               disabled={!isEditing}
               buttonClassName={dropdownButtonClass}
             />
+          </div>
+          <div className="md:col-span-3">
+            <label htmlFor="email" className={labelClass}>
+              <Mail className="h-4 w-4 text-[#a89a8d]" />
+              Email address
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={editedProfile.email}
+              onChange={(e) => handleInputChange("email", e.target.value)}
+              disabled={!isEditing}
+              placeholder="Enter your email address"
+              autoComplete="email"
+              className={fieldClass}
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            {renderPhoneField({
+              id: "phone",
+              label: "Phone number",
+              icon: Phone,
+              code: editedProfile.phoneCode || "+91",
+              number: editedProfile.phone,
+              codeField: "phoneCode",
+              numberField: "phone",
+              placeholder: "Phone number",
+            })}
+          </div>
+          <div className="md:col-span-2">
+            {renderPhoneField({
+              id: "whatsapp",
+              label: "WhatsApp number",
+              icon: MessageCircle,
+              code: editedProfile.whatsappCode || "+91",
+              number: editedProfile.whatsapp || "",
+              codeField: "whatsappCode",
+              numberField: "whatsapp",
+              placeholder: "WhatsApp number",
+            })}
           </div>
         </div>
       </div>
