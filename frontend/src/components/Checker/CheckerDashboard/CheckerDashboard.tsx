@@ -399,11 +399,17 @@ export default function DashboardHome({ checkerID, checkerName }: DashboardHomeP
                         {formatStatus(product.approvalStatus)}
                       </span>
 
-                      {/* Date */}
-                      {product.createdAt && (
+                      {/* Inspection scheduled date + time (the booked window) —
+                          shown the same way as vendor inspections. */}
+                      {product.qcAssignment?.scheduledDate ? (
                         <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
                           <CalendarDays className="w-3 h-3 shrink-0" />
-                          {new Date(product.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          <span>Scheduled {formatSchedDate(product.qcAssignment.scheduledDate)}{product.qcAssignment.scheduledTime ? ` · ${product.qcAssignment.scheduledTime}` : ''}</span>
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
+                          <CalendarDays className="w-3 h-3 shrink-0" />
+                          <span>Not scheduled yet</span>
                         </p>
                       )}
 

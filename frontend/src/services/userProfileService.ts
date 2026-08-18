@@ -41,6 +41,9 @@ export interface UserStatsResponse {
 
 export interface UpdateUserProfileData {
   name: string;
+  title?: string;
+  middleName?: string;
+  whatsappNumber?: string;
   /**
    * Avatar URL. The backend has always accepted this on PUT /auth/profile and
    * always returned it from GET /auth/me — it was missing from these two
@@ -64,6 +67,9 @@ export interface UserProfileResponse {
     id: string;
     email: string;
     name: string;
+    title?: string;
+    middleName?: string;
+    whatsappNumber?: string;
     image?: string;
     phoneNumber?: string;
     address?: string;

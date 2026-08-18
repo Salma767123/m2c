@@ -1,11 +1,16 @@
 export interface UserProfile {
   id: string
+  title?: string
   firstName: string
+  middleName?: string
   lastName: string
   email: string
-  /** Avatar URL, or empty when the account has never set one. */
-  image: string
   phone: string
+  phoneCode?: string
+  whatsapp?: string
+  whatsappCode?: string
+  /** Avatar URL. Absent until the account sets one; the loader maps it to ''. */
+  image?: string
   gender: 'male' | 'female' | 'other'
   joinDate: string
   preferences: {

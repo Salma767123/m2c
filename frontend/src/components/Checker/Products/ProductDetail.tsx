@@ -363,7 +363,9 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                         <SummaryStat
                             icon={<Clock className="w-5 h-5" />}
                             label="Assigned"
-                            value={formatDate(product.createdAt)}
+                            // The (re)assignment date — updates each time the admin reassigns.
+                            // Falls back to createdAt for legacy records assigned before this was tracked.
+                            value={formatDate((sched?.assignedAt as string | undefined) || product.createdAt)}
                         />
                     </div>
                 </div>

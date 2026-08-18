@@ -53,6 +53,7 @@ const Header = () => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
   const [userName, setUserName] = useState("");
+  const [userImage, setUserImage] = useState("");
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [popularSearches, setPopularSearches] = useState<string[]>([
@@ -120,13 +121,16 @@ const Header = () => {
         try {
           const user = JSON.parse(userData)
           setUserName(user.name || '')
+          setUserImage(user.image || '')
         } catch {
           setIsUserLoggedIn(false)
           setUserName('')
+          setUserImage('')
         }
       } else {
         setIsUserLoggedIn(false)
         setUserName('')
+        setUserImage('')
       }
     }
     checkAuth()
@@ -429,7 +433,12 @@ const Header = () => {
                   onClick={() => setShowAccountDropdown(!showAccountDropdown)}
                   className="flex items-center gap-1.5 px-2.5 lg:px-3 py-2 rounded-lg text-gray-700 hover:text-[#e01a1b] hover:bg-[#fff1f1] text-sm font-medium transition-colors"
                 >
-                  <User className="w-5 h-5 text-[#e01a1b] shrink-0" />
+                  {isUserLoggedIn && userImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={userImage} alt="" className="w-6 h-6 rounded-full object-cover ring-1 ring-[#e01a1b]/25 shrink-0" />
+                  ) : (
+                    <User className="w-5 h-5 text-[#e01a1b] shrink-0" />
+                  )}
                   <span className="max-w-[90px] truncate">
                     {isUserLoggedIn && userName ? userName.split(' ')[0].slice(0, 10) : 'Sign In'}
                   </span>

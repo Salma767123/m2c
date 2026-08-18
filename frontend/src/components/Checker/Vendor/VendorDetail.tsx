@@ -851,15 +851,6 @@ export default function VendorDetail({
                             <span className="inline-flex items-center px-2.5 py-0.5 bg-brand-50 text-brand-700 border border-brand-100 rounded text-xs font-bold">
                               {cert.name}
                             </span>
-                            {cert.documentUrl && (
-                              <button
-                                type="button"
-                                onClick={() => setViewerDoc({ url: cert.documentUrl, name: cert.name || 'Certificate' })}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg transition-colors"
-                              >
-                                <Eye className="w-3.5 h-3.5" /> View
-                              </button>
-                            )}
                           </div>
                           {cert.issuedBy && <Field label="Issued By" value={cert.issuedBy} />}
                           {cert.certificateNumber && <Field label="Certificate #" value={cert.certificateNumber} />}
