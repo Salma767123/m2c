@@ -6,6 +6,7 @@ import { Package } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { categoryService } from '@/services/categoryService';
 import Reveal from '@/components/WebSite/Shared/Reveal';
+import CategoryHero from '@/components/WebSite/Shared/CategoryHero';
 import TopSelling from '@/components/WebSite/Featured/TopSelling';
 import NoticeBoard from '@/components/WebSite/NoticeBoard/NoticeBoard';
 
@@ -108,32 +109,16 @@ export default function Categories() {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
-      {/* Banner Section — min-h so it grows with long copy on mobile */}
-      <div className="relative min-h-40 sm:min-h-52 md:min-h-60 lg:min-h-80 overflow-hidden">
-        <Image
-          src="/assets/images/categories/cb5.jpg"
-          alt="Categories Banner"
-          fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          className="object-cover"
-          priority
-        />
-        <div className="absolute inset-0 bg-black/60" />
-        <div className="relative z-10 flex items-center justify-center min-h-40 sm:min-h-52 md:min-h-60 lg:min-h-80 px-3 sm:px-4 py-5 sm:py-6 md:py-8">
-          <Reveal className="text-center text-white">
-            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-white/80 mb-3">
-              <span className="h-px w-6 bg-[#e01a1b]" />
-              Our Collections
-            </span>
-            <h1 className="font-playfair text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold mb-2 sm:mb-4 tracking-tight">
-              Shop by Categories
-            </h1>
-            <p className="text-sm sm:text-lg md:text-xl max-w-2xl mx-auto">
-              Discover our wide range of traditional textile products organized by categories
-            </p>
-          </Reveal>
-        </div>
-      </div>
+      {/* The same banner /products uses. This page had its own copy of the
+          idea — a flat bg-black/60 over the photograph, an eyebrow ruled on
+          one side only, and no animation — which is how two versions of one
+          thing drift apart. Wording is unchanged. */}
+      <CategoryHero
+        eyebrow="Our Collections"
+        title="Shop by Categories"
+        blurb="Discover our wide range of traditional textile products organized by categories"
+        image="/assets/images/categories/cb5.jpg"
+      />
 
       {/* Categories Content */}
       <div className="py-8 sm:py-10 lg:py-12">
