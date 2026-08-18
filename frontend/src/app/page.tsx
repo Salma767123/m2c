@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Header from '@/components/WebSite/Header/Header';
 import Footer from '@/components/WebSite/Footer/Footer';
 import HeroSection from '@/components/WebSite/HeroSection/HeroSection';
+import PromoStrip from '@/components/WebSite/PromoStrip/PromoStrip';
 import NoticeBoard from '@/components/WebSite/NoticeBoard/NoticeBoard';
 import Category from '@/components/WebSite/Category/Category';
 import FeaturedProducts from '@/components/WebSite/Featured/Products';
@@ -112,6 +113,7 @@ export default function Home() {
       />
       <Header />
       <HeroSection />
+      <PromoStrip />
       <NoticeBoard />
       <FeaturedProducts />
       <BrandPromo />
