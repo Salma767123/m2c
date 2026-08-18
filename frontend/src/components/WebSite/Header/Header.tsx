@@ -29,6 +29,7 @@ import { USER_CATEGORIES } from "@/components/Shared/NotificationModal";
 import CompanyLogo from "@/components/Shared/CompanyLogo";
 import { subscribeToAuthChange, dispatchAuthChange } from "@/lib/authEvents";
 import VendorApplicationModal from "@/components/WebSite/Shared/VendorApplicationModal";
+import LogoutConfirmModal from "@/components/WebSite/Shared/LogoutConfirmModal";
 
 // Pages that show the PRIMARY logo. Every other page shows the secondary logo.
 // Edit this list to move a page between the two logos.
@@ -41,6 +42,8 @@ const Header = () => {
   const logoVariant = PRIMARY_LOGO_ROUTES.includes(pathname) ? 'primary' : 'secondary';
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   // M2C for Business — opens the existing vendor application form (same modal the
   // homepage seller banner uses). No new form is built here.
   const [showVendorModal, setShowVendorModal] = useState(false);
@@ -219,6 +222,7 @@ const Header = () => {
   };
 
   const handleLogout = async () => {
+    setIsLoggingOut(true)
     try {
       // Import user auth service and toast utils
       const { userAuthService } = await import('@/services/userAuthService')
@@ -479,7 +483,10 @@ const Header = () => {
                           </Link>
                           <hr className="my-2 border-slate-100" />
                           <button
-                            onClick={handleLogout}
+                            onClick={() => {
+                              setShowAccountDropdown(false)
+                              setShowLogoutConfirm(true)
+                            }}
                             className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm text-red-600 hover:bg-red-50 transition-all duration-150 text-left font-medium"
                           >
                             <User className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -627,7 +634,7 @@ const Header = () => {
                   <button
                     onClick={() => {
                       setIsMenuOpen(false)
-                      handleLogout()
+                      setShowLogoutConfirm(true)
                     }}
                     className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base text-left"
                   >
@@ -735,6 +742,18 @@ const Header = () => {
 
       {/* Existing vendor application form — opened by the Seller Portal control. */}
       <VendorApplicationModal open={showVendorModal} onClose={() => setShowVendorModal(false)} />
+
+      {/* Both Logout controls — the desktop account dropdown and the mobile
+          menu — now ask first. The dialog portals to document.body, which it
+          has to: this wrapper is `z-50 isolate`, so anything fixed declared
+          inside it is capped at the header's own stacking level. */}
+      <LogoutConfirmModal
+        open={showLogoutConfirm}
+        onCancel={() => setShowLogoutConfirm(false)}
+        onConfirm={handleLogout}
+        isLoggingOut={isLoggingOut}
+        userName={userName || undefined}
+      />
     </div>
   );
 };

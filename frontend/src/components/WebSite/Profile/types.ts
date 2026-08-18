@@ -3,6 +3,8 @@ export interface UserProfile {
   firstName: string
   lastName: string
   email: string
+  /** Avatar URL, or empty when the account has never set one. */
+  image: string
   phone: string
   gender: 'male' | 'female' | 'other'
   joinDate: string

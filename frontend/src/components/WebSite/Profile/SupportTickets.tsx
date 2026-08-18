@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   LifeBuoy, Plus, ArrowLeft, Send, Clock, CheckCircle, AlertCircle,
-  Shield, MessageSquare, Tag, Calendar, User as UserIcon, ChevronRight,
+  Shield, MessageSquare, Tag, Calendar, User as UserIcon, ChevronRight, Loader2,
 } from 'lucide-react'
 import Reveal from '@/components/WebSite/Shared/Reveal'
 import Dropdown from '@/components/UI/Dropdown'
@@ -11,24 +11,49 @@ import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import supportService, { SupportTicket, TicketMessage } from '@/services/supportService'
 import TicketAttachments from '@/components/AdminDashboard/Support/TicketAttachments'
 
+/**
+ * Support.
+ *
+ * Presentation only — every service call, validator and handler below is
+ * unchanged. What changed:
+ *
+ *  · The palette, to match the rest of the account area.
+ *
+ *  · Priority stopped being a second coloured pill. A ticket row used to carry
+ *    a coloured status badge AND a coloured priority badge side by side —
+ *    eight possible colours on one line, competing for the same attention, in
+ *    front of the subject line that actually identifies the ticket. Priority
+ *    is a quiet label with a dot now, and only Urgent and High are coloured,
+ *    because those are the only two that mean "sooner".
+ *
+ *  · All three views (list, new ticket, thread) sit in the same card as the
+ *    other tabs, with the same header rhythm.
+ */
+
 // The ticket status/priority are stored as free strings on the backend. Normalise
 // here so a value written by any portal (admin uses "in-progress", the schema comment
 // says "in_progress") renders consistently for the customer.
 const normStatus = (s?: string) => (s || '').toLowerCase().replace(/_/g, '-')
 
-const STATUS_META: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
-  open: { label: 'Open', cls: 'bg-red-50 text-red-700 border-red-200', icon: <AlertCircle className="w-3.5 h-3.5" /> },
-  'in-progress': { label: 'In Progress', cls: 'bg-blue-50 text-blue-700 border-blue-200', icon: <Clock className="w-3.5 h-3.5" /> },
-  resolved: { label: 'Resolved', cls: 'bg-green-50 text-green-700 border-green-200', icon: <CheckCircle className="w-3.5 h-3.5" /> },
-  closed: { label: 'Closed', cls: 'bg-slate-100 text-slate-600 border-slate-200', icon: <Shield className="w-3.5 h-3.5" /> },
+/**
+ * Status colour is earned: Open needs someone, In Progress is moving,
+ * Resolved is done, Closed is filed away and deliberately colourless.
+ * Contrast on each badge's own ground is 5.4:1 or better.
+ */
+const STATUS_META: Record<string, { label: string; cls: string; Icon: typeof Clock }> = {
+  open: { label: 'Open', cls: 'border-[#f0d8d2] bg-[#fdf3f0] text-[#a01718]', Icon: AlertCircle },
+  'in-progress': { label: 'In Progress', cls: 'border-[#f0e2c4] bg-[#fdf6e8] text-[#84560f]', Icon: Clock },
+  resolved: { label: 'Resolved', cls: 'border-[#d7e7db] bg-[#eef5ef] text-[#2f6b45]', Icon: CheckCircle },
+  closed: { label: 'Closed', cls: 'border-[#e6dcd0] bg-[#faf7f3] text-[#5f5550]', Icon: Shield },
 }
 const statusMeta = (s?: string) => STATUS_META[normStatus(s)] || STATUS_META.open
 
-const PRIORITY_META: Record<string, { label: string; cls: string }> = {
-  urgent: { label: 'Urgent', cls: 'bg-red-50 text-red-700 border-red-200' },
-  high: { label: 'High', cls: 'bg-orange-50 text-orange-700 border-orange-200' },
-  medium: { label: 'Medium', cls: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
-  low: { label: 'Low', cls: 'bg-green-50 text-green-700 border-green-200' },
+/** Only the two that mean "sooner" get ink. Medium and Low are the default. */
+const PRIORITY_META: Record<string, { label: string; dot: string; ink: string }> = {
+  urgent: { label: 'Urgent', dot: 'bg-[#a01718]', ink: 'text-[#a01718]' },
+  high: { label: 'High', dot: 'bg-[#c9761a]', ink: 'text-[#8a5411]' },
+  medium: { label: 'Medium', dot: 'bg-[#c9bcae]', ink: 'text-[#7a6d62]' },
+  low: { label: 'Low', dot: 'bg-[#c9bcae]', ink: 'text-[#7a6d62]' },
 }
 const priorityMeta = (p?: string) => PRIORITY_META[(p || 'medium').toLowerCase()] || PRIORITY_META.medium
 
@@ -50,6 +75,18 @@ const PRIORITY_OPTIONS = [
 const DESCRIPTION_MIN = 20
 const DESCRIPTION_MAX = 600
 
+const CARD =
+  'rounded-2xl border border-[#efe4d8] bg-white p-4 shadow-[0_10px_30px_-24px_rgba(74,50,38,0.5)] sm:p-6 lg:p-7'
+
+const PRIMARY_BTN =
+  'inline-flex shrink-0 items-center gap-2 rounded-full bg-[#e01a1b] px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_10px_24px_-12px_rgba(224,26,27,0.8)] transition-all duration-300 hover:bg-[#c41617] disabled:cursor-not-allowed disabled:opacity-60'
+
+const BACK_BTN =
+  'shrink-0 rounded-full p-2 text-[#7a6d62] transition-colors hover:bg-[#faf7f3] hover:text-[#1a1a1a]'
+
+const EYEBROW =
+  'mb-1.5 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c41617]'
+
 const fmtDate = (iso?: string) => {
   if (!iso) return '—'
   try {
@@ -63,6 +100,37 @@ const fmtDateTime = (iso?: string) => {
       day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true,
     })
   } catch { return '—' }
+}
+
+/** One spinner for all three views, in the page's own colours. */
+function Spinner({ label }: { label: string }) {
+  return (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 className="h-6 w-6 animate-spin text-[#e01a1b]" />
+      <span className="ml-3 text-sm text-[#7a6d62]">{label}</span>
+    </div>
+  )
+}
+
+/** Status badge + priority label, used identically in the list and the thread. */
+function TicketMeta({ ticket, showPriorityWord = false }: { ticket: SupportTicket; showPriorityWord?: boolean }) {
+  const sm = statusMeta(ticket.status)
+  const pm = priorityMeta(ticket.priority)
+  const StatusIcon = sm.Icon
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <span className="font-mono text-[11px] tracking-tight text-[#a89a8d]">{ticket.ticketId}</span>
+      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] ${sm.cls}`}>
+        <StatusIcon className="h-3 w-3" />
+        {sm.label}
+      </span>
+      <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] ${pm.ink}`}>
+        <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${pm.dot}`} />
+        {pm.label}{showPriorityWord ? ' priority' : ''}
+      </span>
+    </div>
+  )
 }
 
 type View = 'list' | 'create' | 'detail'
@@ -98,70 +166,62 @@ export default function SupportTickets() {
   }
 
   return (
-    <Reveal className="bg-white rounded-2xl ring-1 ring-black/5 p-5 sm:p-6">
-      <div className="flex items-center justify-between gap-4 mb-6">
+    <Reveal className={CARD}>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-[#f2e9df] pb-5">
         <div>
-          <h3 className="font-playfair text-lg font-semibold text-[#1a1a1a] flex items-center gap-2">
-            <LifeBuoy className="w-5 h-5 text-[#e01a1b]" /> Support Tickets
-          </h3>
-          <p className="text-sm text-slate-500 mt-0.5">Raise an issue and track responses from our team</p>
+          <span className={EYEBROW}>
+            <span aria-hidden className="h-px w-5 bg-[#c41617]" />
+            We&apos;re here to help
+          </span>
+          <h2 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl">
+            Support
+          </h2>
+          <p className="mt-1 text-[13px] text-[#7a6d62]">
+            Raise an issue and track responses from our team
+          </p>
         </div>
-        <button
-          onClick={() => setView('create')}
-          className="inline-flex items-center gap-2 bg-[#e01a1b] hover:bg-[#c41617] text-white text-sm font-semibold py-2.5 px-4 rounded-full transition-colors shrink-0 shadow-[0_6px_20px_rgba(224,26,27,0.25)]"
-        >
-          <Plus className="w-4 h-4" /> New Ticket
+        <button onClick={() => setView('create')} className={PRIMARY_BTN}>
+          <Plus className="h-4 w-4" /> New ticket
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-[#e01a1b]" />
-          <span className="ml-3 text-slate-500 text-sm">Loading tickets…</span>
-        </div>
+        <Spinner label="Loading tickets…" />
       ) : tickets.length === 0 ? (
-        <div className="text-center py-14">
-          <div className="w-14 h-14 mx-auto rounded-full bg-red-50 flex items-center justify-center mb-4">
-            <LifeBuoy className="w-7 h-7 text-[#e01a1b]" />
-          </div>
-          <p className="font-semibold text-slate-800">No support tickets yet</p>
-          <p className="text-sm text-slate-500 mt-1 mb-5">Have an issue with an order or your account? Raise a ticket and we&apos;ll help.</p>
-          <button
-            onClick={() => setView('create')}
-            className="inline-flex items-center gap-2 bg-[#e01a1b] hover:bg-[#c41617] text-white text-sm font-semibold py-2.5 px-5 rounded-full transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Create your first ticket
+        <div className="rounded-2xl border border-[#efe4d8] bg-[#faf7f3] px-6 py-14 text-center">
+          <span aria-hidden className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-[#fdf3f0] text-[#7a0f10]">
+            <LifeBuoy className="h-5 w-5" />
+          </span>
+          <h3 className="font-playfair text-lg font-semibold text-[#1a1a1a]">No support tickets yet</h3>
+          <p className="mx-auto mt-1.5 mb-6 max-w-sm text-sm leading-relaxed text-[#5f5550]">
+            Have an issue with an order or your account? Raise a ticket and we&apos;ll help.
+          </p>
+          <button onClick={() => setView('create')} className={PRIMARY_BTN}>
+            <Plus className="h-4 w-4" /> Create your first ticket
           </button>
         </div>
       ) : (
         <div className="space-y-3">
-          {tickets.map((t) => {
-            const sm = statusMeta(t.status)
-            const pm = priorityMeta(t.priority)
-            return (
-              <button
-                key={t.id}
-                onClick={() => openDetail(t.id)}
-                className="w-full text-left border border-slate-200 rounded-xl p-4 hover:border-[#e01a1b]/40 hover:bg-red-50/20 transition-colors group"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-mono text-slate-400">{t.ticketId}</span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${sm.cls}`}>
-                        {sm.icon}{sm.label}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${pm.cls}`}>{pm.label}</span>
-                    </div>
-                    <p className="font-semibold text-slate-900 mt-1.5 truncate">{t.subject}</p>
-                    <p className="text-sm text-slate-500 line-clamp-1 mt-0.5">{t.description}</p>
-                    <p className="text-xs text-slate-400 mt-1.5">Raised {fmtDate(t.createdAt)}</p>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-[#e01a1b] shrink-0 mt-1" />
+          {tickets.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => openDetail(t.id)}
+              className="group w-full rounded-xl border border-[#efe4d8] p-4 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-[#e6dcd0] hover:bg-[#faf7f3] hover:shadow-[0_16px_36px_-26px_rgba(74,50,38,0.6)]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <TicketMeta ticket={t} />
+                  {/* The subject is what identifies the ticket, so it is the
+                      largest thing in the row — it used to be the same size as
+                      the description under it. */}
+                  <p className="mt-2 truncate text-[15px] font-semibold text-[#1a1a1a]">{t.subject}</p>
+                  <p className="mt-0.5 line-clamp-1 text-[13.5px] text-[#5f5550]">{t.description}</p>
+                  <p className="mt-1.5 text-xs text-[#a89a8d]">Raised {fmtDate(t.createdAt)}</p>
                 </div>
-              </button>
-            )
-          })}
+                <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-[#c9bcae] transition-colors group-hover:text-[#e01a1b]" />
+              </div>
+            </button>
+          ))}
         </div>
       )}
     </Reveal>
@@ -213,34 +273,51 @@ function CreateTicket({ onCancel, onCreated }: { onCancel: () => void; onCreated
     }
   }
 
+  // Same field definition as Profile Information, so a text input looks the
+  // same wherever it appears in the account area.
   const inputCls = (bad?: boolean) =>
-    `w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-colors ${
-      bad ? 'border-red-400 bg-red-50/40 focus:ring-red-500/30' : 'border-slate-300 focus:ring-[#e01a1b]/30 focus:border-transparent'
+    `w-full rounded-xl border px-4 py-3 text-[15px] text-[#1a1a1a] transition-colors duration-200 placeholder:text-[#a89a8d] focus:outline-none focus:ring-2 ${
+      bad
+        ? 'border-[#e0a9a4] bg-[#fdf6f4] focus:border-[#c41617] focus:ring-[#c41617]/25'
+        : 'border-[#e6dcd0] bg-white focus:border-[#e01a1b] focus:ring-[#e01a1b]/25'
     }`
 
+  const labelCls = 'mb-2 block text-[13px] font-semibold text-[#5f5550]'
+
   return (
-    <Reveal className="bg-white rounded-2xl ring-1 ring-black/5 p-5 sm:p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={onCancel} className="p-2 rounded-full hover:bg-slate-100 transition-colors" aria-label="Back">
-          <ArrowLeft className="w-5 h-5 text-slate-600" />
+    <Reveal className={CARD}>
+      <div className="mb-6 flex items-start gap-3 border-b border-[#f2e9df] pb-5">
+        <button onClick={onCancel} className={BACK_BTN} aria-label="Back to tickets">
+          <ArrowLeft className="h-5 w-5" />
         </button>
         <div>
-          <h3 className="font-playfair text-lg font-semibold text-[#1a1a1a]">New Support Ticket</h3>
-          <p className="text-sm text-slate-500 mt-0.5">Tell us what went wrong and we&apos;ll help sort it out</p>
+          <span className={EYEBROW}>
+            <span aria-hidden className="h-px w-5 bg-[#c41617]" />
+            New ticket
+          </span>
+          <h2 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl">
+            Tell us what happened
+          </h2>
+          <p className="mt-1 text-[13px] text-[#7a6d62]">
+            The more detail you give, the faster we can sort it out
+          </p>
         </div>
       </div>
 
-      <form onSubmit={submit} className="space-y-4">
-        <div className={`grid grid-cols-1 gap-4 ${form.category === 'other' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+      <form onSubmit={submit} className="space-y-5">
+        <div className={`grid grid-cols-1 gap-5 ${form.category === 'other' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Subject <span className="text-red-500">*</span></label>
+            <label htmlFor="ticket-subject" className={labelCls}>
+              Subject <span className="text-[#e01a1b]">*</span>
+            </label>
             <input
+              id="ticket-subject"
               value={form.subject}
               onChange={(e) => { setForm((p) => ({ ...p, subject: e.target.value })); clearErr('subject') }}
               placeholder="Brief summary of your issue"
               className={inputCls(!!errors.subject)}
             />
-            {errors.subject && <p className="text-xs text-red-600 mt-1">{errors.subject}</p>}
+            {errors.subject && <p className="mt-1.5 text-xs font-medium text-[#a01718]">{errors.subject}</p>}
           </div>
           <div>
             <Dropdown
@@ -253,14 +330,17 @@ function CreateTicket({ onCancel, onCreated }: { onCancel: () => void; onCreated
           </div>
           {form.category === 'other' && (
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Specify <span className="text-red-500">*</span></label>
+              <label htmlFor="ticket-other" className={labelCls}>
+                Specify <span className="text-[#e01a1b]">*</span>
+              </label>
               <input
+                id="ticket-other"
                 value={form.otherCategory}
                 onChange={(e) => { setForm((p) => ({ ...p, otherCategory: e.target.value })); clearErr('otherCategory') }}
                 placeholder="Enter the category"
                 className={inputCls(!!errors.otherCategory)}
               />
-              {errors.otherCategory && <p className="text-xs text-red-600 mt-1">{errors.otherCategory}</p>}
+              {errors.otherCategory && <p className="mt-1.5 text-xs font-medium text-[#a01718]">{errors.otherCategory}</p>}
             </div>
           )}
         </div>
@@ -276,28 +356,38 @@ function CreateTicket({ onCancel, onCreated }: { onCancel: () => void; onCreated
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Description <span className="text-red-500">*</span></label>
+          <label htmlFor="ticket-description" className={labelCls}>
+            Description <span className="text-[#e01a1b]">*</span>
+          </label>
           <textarea
+            id="ticket-description"
             value={form.description}
             onChange={(e) => { setForm((p) => ({ ...p, description: e.target.value })); clearErr('description') }}
             rows={5}
             placeholder="Describe your issue in detail — include order numbers or dates where relevant."
-            className={inputCls(!!errors.description) + ' resize-none'}
+            className={inputCls(!!errors.description) + ' resize-none leading-relaxed'}
           />
-          <div className="flex justify-between mt-1">
-            {errors.description ? <p className="text-xs text-red-600">{errors.description}</p> : <span />}
-            <span className={`text-xs ${form.description.length > DESCRIPTION_MAX ? 'text-red-600' : 'text-slate-400'}`}>{form.description.length}/{DESCRIPTION_MAX}</span>
+          <div className="mt-1.5 flex justify-between">
+            {errors.description ? (
+              <p className="text-xs font-medium text-[#a01718]">{errors.description}</p>
+            ) : <span />}
+            <span className={`text-xs tabular-nums ${form.description.length > DESCRIPTION_MAX ? 'font-semibold text-[#a01718]' : 'text-[#a89a8d]'}`}>
+              {form.description.length}/{DESCRIPTION_MAX}
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <button type="button" onClick={onCancel} className="px-5 py-2.5 rounded-full text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
+        <div className="flex items-center justify-end gap-3 border-t border-[#f2e9df] pt-5">
           <button
-            type="submit"
-            disabled={submitting}
-            className="inline-flex items-center gap-2 bg-[#e01a1b] hover:bg-[#c41617] disabled:opacity-60 text-white text-sm font-semibold py-2.5 px-5 rounded-full transition-colors shadow-[0_6px_20px_rgba(224,26,27,0.25)]"
+            type="button"
+            onClick={onCancel}
+            className="rounded-full border border-[#e6dcd0] bg-white px-5 py-2.5 text-[13px] font-semibold text-[#5f5550] transition-colors hover:bg-[#faf7f3]"
           >
-            <Send className="w-4 h-4" /> {submitting ? 'Submitting…' : 'Submit Ticket'}
+            Cancel
+          </button>
+          <button type="submit" disabled={submitting} className={PRIMARY_BTN}>
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            {submitting ? 'Submitting…' : 'Submit ticket'}
           </button>
         </div>
       </form>
@@ -359,74 +449,95 @@ function TicketDetail({ ticketId, onBack }: { ticketId: string; onBack: () => vo
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl ring-1 ring-black/5 p-6 flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-[#e01a1b]" />
-        <span className="ml-3 text-slate-500 text-sm">Loading ticket…</span>
+      <div className={CARD}>
+        <Spinner label="Loading ticket…" />
       </div>
     )
   }
   if (!ticket) {
     return (
-      <div className="bg-white rounded-2xl ring-1 ring-black/5 p-6 text-center py-16">
-        <AlertCircle className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-        <p className="text-slate-500 font-medium">Ticket not found</p>
-        <button onClick={onBack} className="mt-4 text-sm text-[#e01a1b] font-semibold hover:underline">Back to tickets</button>
+      <div className={CARD}>
+        <div className="rounded-2xl border border-[#efe4d8] bg-[#faf7f3] px-6 py-14 text-center">
+          <span aria-hidden className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-[#fdf3f0] text-[#a01718]">
+            <AlertCircle className="h-5 w-5" />
+          </span>
+          <h3 className="font-playfair text-lg font-semibold text-[#1a1a1a]">Ticket not found</h3>
+          <p className="mx-auto mt-1.5 mb-6 max-w-sm text-sm text-[#5f5550]">
+            It may have been removed, or the link is out of date.
+          </p>
+          <button onClick={onBack} className={PRIMARY_BTN}>
+            <ArrowLeft className="h-4 w-4" /> Back to tickets
+          </button>
+        </div>
       </div>
     )
   }
 
   const sm = statusMeta(ticket.status)
-  const pm = priorityMeta(ticket.priority)
   const isClosed = ['resolved', 'closed'].includes(normStatus(ticket.status))
 
   return (
-    <Reveal className="bg-white rounded-2xl ring-1 ring-black/5 p-5 sm:p-6">
-      {/* Header */}
-      <div className="flex items-start gap-3 mb-5">
-        <button onClick={onBack} className="p-2 rounded-full hover:bg-slate-100 transition-colors shrink-0" aria-label="Back">
-          <ArrowLeft className="w-5 h-5 text-slate-600" />
+    <Reveal className={CARD}>
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="mb-5 flex items-start gap-3 border-b border-[#f2e9df] pb-5">
+        <button onClick={onBack} className={BACK_BTN} aria-label="Back to tickets">
+          <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-mono text-slate-400">{ticket.ticketId}</span>
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${sm.cls}`}>{sm.icon}{sm.label}</span>
-            <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${pm.cls}`}>{pm.label} priority</span>
-          </div>
-          <h3 className="font-playfair text-lg font-semibold text-[#1a1a1a] mt-1.5">{ticket.subject}</h3>
-          <div className="flex items-center gap-4 text-xs text-slate-400 mt-1 flex-wrap">
-            <span className="inline-flex items-center gap-1"><Tag className="w-3.5 h-3.5" /> {ticket.category}</span>
-            <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {fmtDate(ticket.createdAt)}</span>
+          <TicketMeta ticket={ticket} showPriorityWord />
+          <h2 className="mt-2 font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a]">
+            {ticket.subject}
+          </h2>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#a89a8d]">
+            <span className="inline-flex items-center gap-1.5">
+              <Tag className="h-3.5 w-3.5" /> {ticket.category}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5" /> {fmtDate(ticket.createdAt)}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Original description */}
-      <div className="bg-slate-50 rounded-xl p-4 mb-4">
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Your issue</p>
-        <p className="text-sm text-slate-700 whitespace-pre-wrap">{ticket.description}</p>
+      {/* ── The original message ───────────────────────────────────────── */}
+      <div className="mb-4 rounded-xl border border-[#efe4d8] bg-[#faf7f3] p-4">
+        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a89a8d]">
+          Your issue
+        </p>
+        <p className="text-[14px] leading-relaxed whitespace-pre-wrap text-[#3d352f]">
+          {ticket.description}
+        </p>
         <TicketAttachments urls={ticket.attachments} />
       </div>
 
-      {/* Conversation */}
-      <div className="space-y-3 mb-4 max-h-[360px] overflow-y-auto pr-1">
+      {/* ── Conversation ───────────────────────────────────────────────── */}
+      <div className="mb-4 max-h-[360px] space-y-3 overflow-y-auto pr-1">
         {messages.length === 0 ? (
-          <div className="text-center py-8 text-sm text-slate-400">
-            <MessageSquare className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-            No replies yet. Our team will respond soon.
+          <div className="py-10 text-center">
+            <MessageSquare className="mx-auto mb-2 h-7 w-7 text-[#d6c9ba]" />
+            <p className="text-sm text-[#7a6d62]">No replies yet. Our team will respond soon.</p>
           </div>
         ) : (
           messages.map((m) => {
             const mine = m.senderType === 'user'
             return (
               <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${mine ? 'bg-[#e01a1b] text-white' : 'bg-slate-100 text-slate-800'}`}>
-                  <div className={`flex items-center gap-1.5 mb-1 text-[11px] font-semibold ${mine ? 'text-white/80' : 'text-slate-500'}`}>
-                    {mine ? <UserIcon className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
+                <div
+                  className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                    mine
+                      ? 'bg-[#e01a1b] text-white'
+                      : 'border border-[#efe4d8] bg-[#faf7f3] text-[#1a1a1a]'
+                  }`}
+                >
+                  <div className={`mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] ${mine ? 'text-white/75' : 'text-[#a89a8d]'}`}>
+                    {mine ? <UserIcon className="h-3 w-3" /> : <Shield className="h-3 w-3" />}
                     {mine ? 'You' : (m.senderName || 'Support')}
                   </div>
-                  <p className="text-sm whitespace-pre-wrap">{m.message}</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.message}</p>
                   <TicketAttachments urls={m.attachments} dark={mine} />
-                  <p className={`text-[10px] mt-1 ${mine ? 'text-white/60' : 'text-slate-400'}`}>{fmtDateTime(m.createdAt)}</p>
+                  <p className={`mt-1 text-[10px] ${mine ? 'text-white/60' : 'text-[#a89a8d]'}`}>
+                    {fmtDateTime(m.createdAt)}
+                  </p>
                 </div>
               </div>
             )
@@ -435,45 +546,48 @@ function TicketDetail({ ticketId, onBack }: { ticketId: string; onBack: () => vo
         <div ref={endRef} />
       </div>
 
-      {/* Reply / actions */}
+      {/* ── Reply / actions ────────────────────────────────────────────── */}
       {isClosed ? (
-        <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <p className="text-sm text-slate-500 inline-flex items-center gap-1.5">
-            <CheckCircle className="w-4 h-4 text-green-600" /> This ticket is {sm.label.toLowerCase()}.
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#f2e9df] pt-4">
+          <p className="inline-flex items-center gap-2 text-sm text-[#5f5550]">
+            <CheckCircle className="h-4 w-4 text-[#2f6b45]" />
+            This ticket is {sm.label.toLowerCase()}.
           </p>
           <button
             onClick={() => setStatus('open', 'Ticket reopened')}
-            className="text-sm font-semibold text-[#e01a1b] hover:underline"
+            className="text-[13px] font-semibold text-[#7a0f10] transition-colors hover:text-[#e01a1b] hover:underline"
           >
             Reopen ticket
           </button>
         </div>
       ) : (
-        <form onSubmit={sendReply} className="border-t border-slate-100 pt-4">
+        <form onSubmit={sendReply} className="border-t border-[#f2e9df] pt-4">
           <div className="flex items-end gap-2">
             <textarea
               value={reply}
               onChange={(e) => setReply(e.target.value)}
               rows={2}
               placeholder="Type your reply…"
-              className="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/30 focus:border-transparent"
+              aria-label="Your reply"
+              className="flex-1 resize-none rounded-xl border border-[#e6dcd0] bg-white px-4 py-3 text-sm leading-relaxed text-[#1a1a1a] transition-colors placeholder:text-[#a89a8d] focus:border-[#e01a1b] focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/25"
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(e) } }}
             />
             <button
               type="submit"
               disabled={sending || !reply.trim()}
-              className="inline-flex items-center gap-2 bg-[#e01a1b] hover:bg-[#c41617] disabled:opacity-50 text-white text-sm font-semibold py-2.5 px-4 rounded-xl transition-colors shrink-0"
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[#e01a1b] px-4 py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#c41617] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Send className="w-4 h-4" /> Send
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Send
             </button>
           </div>
-          <div className="flex justify-end mt-2">
+          <div className="mt-2 flex justify-end">
             <button
               type="button"
               onClick={() => setStatus('resolved', 'Ticket marked as resolved')}
-              className="text-xs font-semibold text-slate-500 hover:text-green-700 transition-colors inline-flex items-center gap-1"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#7a6d62] transition-colors hover:text-[#2f6b45]"
             >
-              <CheckCircle className="w-3.5 h-3.5" /> Mark as resolved
+              <CheckCircle className="h-3.5 w-3.5" /> Mark as resolved
             </button>
           </div>
         </form>
