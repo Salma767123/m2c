@@ -13,11 +13,34 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { getCountryName, getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants";
 import Reveal from "@/components/WebSite/Shared/Reveal";
 
-const TYPE_META: Record<string, { label: string; icon: typeof Home; badgeCls: string }> = {
-  home: { label: "Home", icon: Home, badgeCls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  work: { label: "Work", icon: Briefcase, badgeCls: "bg-[#e01a1b]/10 text-[#e01a1b] border-[#e01a1b]/20" },
-  other: { label: "Other", icon: MapPin, badgeCls: "bg-slate-50 text-slate-700 border-slate-200" },
+/**
+ * Saved Addresses.
+ *
+ * Presentation only — every service call, optimistic update and handler below
+ * is unchanged. What changed is that this tab now looks like the page it sits
+ * in: warm linen and oxblood instead of slate grey, and the same card header
+ * (small label, rule, heading, action on the right) that Profile Information
+ * uses, so moving between tabs does not feel like moving between sites.
+ */
+
+/**
+ * Home / Work / Other used to be emerald, red and slate — three different
+ * colours for a label that carries no urgency. They are one quiet badge now
+ * and the icon does the distinguishing, which leaves exactly one coloured
+ * thing on a card: the Default star, the only part that changes what happens
+ * at checkout.
+ */
+const TYPE_META: Record<string, { label: string; icon: typeof Home }> = {
+  home: { label: "Home", icon: Home },
+  work: { label: "Work", icon: Briefcase },
+  other: { label: "Other", icon: MapPin },
 };
+
+const CARD =
+  "rounded-2xl border border-[#efe4d8] bg-white p-4 shadow-[0_10px_30px_-24px_rgba(74,50,38,0.5)] sm:p-6 lg:p-7";
+
+const PRIMARY_BTN =
+  "inline-flex shrink-0 items-center gap-2 rounded-full bg-[#e01a1b] px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_10px_24px_-12px_rgba(224,26,27,0.8)] transition-all duration-300 hover:bg-[#c41617] disabled:cursor-not-allowed disabled:opacity-60";
 
 export default function AddressBook() {
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
@@ -113,52 +136,70 @@ export default function AddressBook() {
   };
 
   if (loading) {
-    /* Skeleton mirrors the address card list. */
+    /* Mirrors the loaded tab — same card, same header block, same two-column
+       grid — so nothing shifts or changes colour when the fetch lands. */
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
-        {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="border border-slate-100 rounded-lg p-4 space-y-3">
-            <div className="flex justify-between">
-              <div className="h-5 w-32 bg-gray-200 rounded animate-pulse" />
-              <div className="h-6 w-16 bg-gray-100 rounded-full animate-pulse" />
-            </div>
-            <div className="h-4 w-3/4 bg-gray-100 rounded animate-pulse" />
-            <div className="h-4 w-1/2 bg-gray-100 rounded animate-pulse" />
+      <div className={CARD}>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-[#f2e9df] pb-5">
+          <div className="space-y-2">
+            <div className="h-3 w-24 animate-pulse rounded bg-[#f3ece3]" />
+            <div className="h-7 w-48 animate-pulse rounded bg-[#ece2d6]" />
           </div>
-        ))}
+          <div className="h-10 w-36 animate-pulse rounded-full bg-[#f3ece3]" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="space-y-3 rounded-2xl border border-[#efe4d8] p-5">
+              <div className="flex justify-between">
+                <div className="h-6 w-20 animate-pulse rounded-full bg-[#f3ece3]" />
+                <div className="h-6 w-16 animate-pulse rounded-full bg-[#f3ece3]" />
+              </div>
+              <div className="h-4 w-2/5 animate-pulse rounded bg-[#ece2d6]" />
+              <div className="h-4 w-3/4 animate-pulse rounded bg-[#f3ece3]" />
+              <div className="h-4 w-1/2 animate-pulse rounded bg-[#f3ece3]" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
     <>
-      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 border border-slate-200 p-4 sm:p-5 lg:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-5 sm:mb-6">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-[#e01a1b] shrink-0" />
-            <div className="min-w-0">
-              <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a]">Saved Addresses</h2>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                {addresses.length} of {MAX_SAVED_ADDRESSES} addresses used
-              </p>
-            </div>
+      <div className={CARD}>
+        {/* ── Card header ──────────────────────────────────────────────────
+            Identical rhythm to Profile Information: label, heading, and the
+            one control that acts on the whole card, on the right. */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-[#f2e9df] pb-5">
+          <div className="min-w-0">
+            <span className="mb-1.5 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c41617]">
+              <span aria-hidden className="h-px w-5 bg-[#c41617]" />
+              Where we deliver
+            </span>
+            <h2 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl">
+              Saved Addresses
+            </h2>
+            <p className="mt-1 text-[13px] text-[#7a6d62]">
+              {addresses.length} of {MAX_SAVED_ADDRESSES} saved
+            </p>
           </div>
+
           <button
             type="button"
             onClick={openAdd}
             disabled={atLimit}
-            className="btn-shine flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base bg-[#e01a1b] hover:bg-[#c41617] text-white font-semibold rounded-full shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className={PRIMARY_BTN}
             title={atLimit ? `Limit of ${MAX_SAVED_ADDRESSES} addresses reached` : "Add new address"}
           >
-            <Plus className="w-4 h-4" />
-            Add Address
+            <Plus className="h-4 w-4" />
+            Add address
           </button>
         </div>
 
         {addresses.length === 0 ? (
           <EmptyState onAdd={openAdd} />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {addresses.map((addr, index) => (
               <Reveal key={addr.id} delay={index * 90}>
                 <AddressCard
@@ -174,7 +215,7 @@ export default function AddressBook() {
         )}
 
         {atLimit && (
-          <p className="mt-4 text-xs text-slate-500 text-center">
+          <p className="mt-5 text-center text-xs text-[#7a6d62]">
             You&apos;ve reached the {MAX_SAVED_ADDRESSES}-address limit. Delete one to add a new address.
           </p>
         )}
@@ -225,57 +266,66 @@ function AddressCard({
 
   return (
     <div
-      className={`relative h-full border-2 rounded-2xl p-5 transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] ${
+      /* 1px border, not 2px. A 2px border around every card put more ink into
+         the frames than into the addresses inside them. The default card is
+         marked by a warm tint and its badge rather than by a heavier line. */
+      className={`relative h-full rounded-2xl border p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-24px_rgba(74,50,38,0.6)] ${
         addr.isDefault
-          ? "border-[#e01a1b] bg-gradient-to-br from-[#e01a1b]/5 to-white shadow-sm"
-          : "border-slate-200 bg-white hover:border-[#e01a1b]/30"
+          ? "border-[#e8d2cb] bg-[#fdf8f6]"
+          : "border-[#efe4d8] bg-white hover:border-[#e6dcd0]"
       }`}
     >
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold border rounded-full ${meta.badgeCls}`}>
-          <Icon className="w-3.5 h-3.5" />
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e6dcd0] bg-[#faf7f3] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#5f5550]">
+          <Icon className="h-3.5 w-3.5 text-[#a89a8d]" />
           {meta.label}
         </span>
         {addr.isDefault && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-[#e01a1b] text-white rounded-full">
-            <Star className="w-3 h-3 fill-white" />
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#e01a1b] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white">
+            <Star className="h-3 w-3 fill-white" />
             Default
           </span>
         )}
       </div>
 
-      <div className="space-y-1 text-sm">
-        <p className="font-semibold text-slate-900">{addr.name}</p>
-        <p className="text-slate-600">{formatPhoneForDisplay(addr.phone, addr.country)}</p>
-        <p className="text-slate-700 pt-1">
+      {/* The recipient is the line you scan for when you have three of these,
+          so it is set larger than the address beneath it rather than one
+          weight heavier at the same size. */}
+      <p className="text-[15px] font-semibold text-[#1a1a1a]">{addr.name}</p>
+      <p className="mt-0.5 text-[13px] text-[#7a6d62]">
+        {formatPhoneForDisplay(addr.phone, addr.country)}
+      </p>
+
+      <div className="mt-3 space-y-0.5 text-[13.5px] leading-relaxed text-[#5f5550]">
+        <p>
           {addr.address}
           {addr.addressLine2 ? `, ${addr.addressLine2}` : ""}
         </p>
-        <p className="text-slate-700">
+        <p>
           {addr.city}, {getStateName(addr.state, addr.country)} {addr.zipCode}
         </p>
-        <p className="text-slate-500 text-xs">{getCountryName(addr.country) || "—"}</p>
+        <p className="text-xs text-[#a89a8d]">{getCountryName(addr.country) || "—"}</p>
       </div>
 
-      <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+      <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#f2e9df] pt-4">
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={onEdit}
             disabled={busy}
-            className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+            className="rounded-lg p-2 text-[#7a6d62] transition-colors hover:bg-[#faf7f3] hover:text-[#1a1a1a] disabled:opacity-50"
             title="Edit"
           >
-            <Pencil className="w-4 h-4" />
+            <Pencil className="h-4 w-4" />
           </button>
           <button
             type="button"
             onClick={onDelete}
             disabled={busy}
-            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+            className="rounded-lg p-2 text-[#a89a8d] transition-colors hover:bg-[#fdf3f0] hover:text-[#c41617] disabled:opacity-50"
             title="Delete"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="h-4 w-4" />
           </button>
         </div>
         {!addr.isDefault && (
@@ -283,9 +333,9 @@ function AddressCard({
             type="button"
             onClick={onSetDefault}
             disabled={busy}
-            className="text-xs font-semibold text-[#e01a1b] hover:text-[#c41617] hover:underline disabled:opacity-50 flex items-center gap-1"
+            className="flex items-center gap-1.5 text-xs font-semibold text-[#7a0f10] transition-colors hover:text-[#e01a1b] hover:underline disabled:opacity-50"
           >
-            {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Star className="w-3 h-3" />}
+            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Star className="h-3 w-3" />}
             Set as default
           </button>
         )}
@@ -294,20 +344,31 @@ function AddressCard({
   );
 }
 
+/**
+ * Empty state.
+ *
+ * The dashed border is gone, for the same reason it went from Profile
+ * Information: dashes read as "drop a file here" or "not built yet". An empty
+ * address book is neither — it is a normal, correct state for a new customer.
+ * A tinted panel says the same thing without suggesting something is broken.
+ */
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-xl">
-      <MapPin className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-      <h3 className="text-base font-semibold text-slate-900 mb-1">No saved addresses yet</h3>
-      <p className="text-sm text-slate-500 mb-5 max-w-sm mx-auto">
+    <div className="rounded-2xl border border-[#efe4d8] bg-[#faf7f3] px-6 py-12 text-center">
+      <span
+        aria-hidden
+        className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-[#fdf3f0] text-[#7a0f10]"
+      >
+        <MapPin className="h-5 w-5" />
+      </span>
+      <h3 className="font-playfair text-lg font-semibold text-[#1a1a1a]">
+        No saved addresses yet
+      </h3>
+      <p className="mx-auto mt-1.5 mb-6 max-w-sm text-sm leading-relaxed text-[#5f5550]">
         Save your shipping addresses to check out faster next time.
       </p>
-      <button
-        type="button"
-        onClick={onAdd}
-        className="btn-shine inline-flex items-center gap-2 px-5 py-2.5 bg-[#e01a1b] hover:bg-[#c41617] text-white font-semibold rounded-full shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] transition-all"
-      >
-        <Plus className="w-4 h-4" />
+      <button type="button" onClick={onAdd} className={PRIMARY_BTN}>
+        <Plus className="h-4 w-4" />
         Add your first address
       </button>
     </div>
@@ -324,10 +385,20 @@ function DeleteConfirmDialog({
   busy: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-        <h3 className="text-lg font-bold text-slate-900 mb-2">Delete address?</h3>
-        <p className="text-sm text-slate-600 mb-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2a1d16]/55 p-4 backdrop-blur-sm">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-address-title"
+        className="w-full max-w-md rounded-2xl border border-[#efe4d8] bg-white p-6 shadow-[0_30px_70px_-30px_rgba(42,29,22,0.7)]"
+      >
+        <h3
+          id="delete-address-title"
+          className="mb-2 font-playfair text-lg font-semibold text-[#1a1a1a]"
+        >
+          Delete address?
+        </h3>
+        <p className="mb-6 text-sm leading-relaxed text-[#5f5550]">
           This address will be permanently removed. If it&apos;s your default, the next most recent address will become the default.
         </p>
         <div className="flex items-center justify-end gap-3">
@@ -335,17 +406,19 @@ function DeleteConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="px-5 py-2.5 border border-slate-300 text-slate-700 font-medium rounded-full hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-full border border-[#e6dcd0] bg-white px-5 py-2.5 text-[13px] font-semibold text-[#5f5550] transition-colors hover:bg-[#faf7f3] disabled:opacity-50"
           >
             Cancel
           </button>
+          {/* Deleting is the destructive path, so it does not get the same
+              button as "Add address" — oxblood rather than brand red. */}
           <button
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full disabled:opacity-50 flex items-center gap-2"
+            className="inline-flex items-center gap-2 rounded-full bg-[#7a0f10] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#5d0b0c] disabled:opacity-50"
           >
-            {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
             Delete
           </button>
         </div>
