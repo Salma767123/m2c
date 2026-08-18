@@ -36,10 +36,27 @@ import CompanyLogo from "@/components/Shared/CompanyLogo";
  * enough that the email address had to truncate) to five.
  */
 
-const BONE = '#f7f2ec';
-
-const WORDMARK = 'M2C MARKDOWNS';
-
+/**
+ * Clean white, not the warm bone this used to be.
+ *
+ * #f7f2ec was the same cream as half the page above it and read as beige
+ * rather than as a surface. White gives the footer its own zone, and it lands
+ * directly under the dark oxblood trust strip, so the edge between them is the
+ * sharpest on the page — the footer announces itself without needing a rule.
+ *
+ * The greys came with it. Every one in here was warm-toned to sit on cream
+ * (#6f625f, #4f4442, #e5d8cd, #b8503c); left alone on white they go muddy, and
+ * the beige would have survived in the ink after being removed from the
+ * ground. They are neutral now at the same lightness, so contrast is unchanged
+ * and only the temperature moved.
+ *
+ * Brand red and oxblood are untouched — they are the site's colours, not a
+ * temperature choice.
+ */
+/**
+ * No background here. The gradient lives on the <footer> wrapper so it can run
+ * unbroken across this block and the legal bar beneath it — see Footer.tsx.
+ */
 /**
  * The wordmark is set to FIT, not to be cropped.
  *
@@ -53,7 +70,6 @@ const WORDMARK = 'M2C MARKDOWNS';
  * width that caps the type at ~174px; 160px leaves a margin for font fallback,
  * where the metrics differ. 9.4vw keeps the same fit at every width below that.
  */
-const WORDMARK_SIZE = 'clamp(1.6rem, 9.4vw, 10rem)';
 
 /**
  * Column heading. The red→gold gradient dash is gone, and so is the numbering
@@ -63,22 +79,22 @@ const WORDMARK_SIZE = 'clamp(1.6rem, 9.4vw, 10rem)';
  * the rows beneath it.
  */
 const ColHeading = ({ children }: { children: React.ReactNode }) => (
-  <h4 className="flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.24em] text-[#7a0f10]">
-    <span aria-hidden className="h-px w-5 shrink-0 bg-[#e01a1b]" />
+  <h4 className="flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.24em] text-[#f5c8c2]">
+    <span aria-hidden className="h-px w-5 shrink-0 bg-[#f5c8c2]" />
     {children}
   </h4>
 );
 
 /**
- * Footer nav link — a row in the cloth, not a line of text on top of it.
+ * Footer nav link.
  *
- * The arrow is gone: eleven links each carrying a → was eleven pieces of
- * punctuation doing no work. But removing it only fixed a detail. The reason
- * the block still read as a stock footer is that it WAS one — four vertical
- * lists of small type, which is the shape every footer has. So the shape
- * changed: every link is now a full-width row closed by a hairline, and those
- * hairlines are wefts. Warp behind, weft between each row, and the column
- * block is fabric rather than text sitting on a picture of fabric.
+ * The hairline under every row is gone. It was there to read as weft across a
+ * warp ground, and as an idea it worked — but fifteen full-width rules is the
+ * loudest texture in the footer, and what it actually reads as is a directory
+ * listing. It also made the ragged column bottoms (six links, five, four) into
+ * three hard lines stopping at three different heights.
+ *
+ * Nothing replaces it. Spacing separates the rows now, and hover does the rest.
  *
  * 14.5px was fine print, which is why the eye skipped the words and only took
  * in the layout. 18px is navigation.
@@ -93,7 +109,7 @@ const ColHeading = ({ children }: { children: React.ReactNode }) => (
  * screen reader should hear it once.
  */
 const ROW =
-  "group flex w-full items-center gap-2.5 border-b border-[#e5d8cd] py-3 leading-none text-[#4f4442] transition-colors duration-300 hover:border-[#e01a1b]/45";
+  "group flex w-full items-center gap-2.5 py-[7px] leading-none text-[#fdf6f1] transition-colors duration-300";
 const SWAP = "transition-transform duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-full";
 
 /**
@@ -108,7 +124,7 @@ const SWAP = "transition-transform duration-[420ms] ease-[cubic-bezier(0.22,1,0.
 const SwapLabel = ({ label, wrapper = "", line = "" }: { label: string; wrapper?: string; line?: string }) => (
   <span className={`relative block h-[1.4em] overflow-hidden ${wrapper}`}>
     <span className={`block leading-[1.4] ${SWAP} ${line}`}>{label}</span>
-    <span aria-hidden className={`absolute inset-x-0 top-full block leading-[1.4] text-[#e01a1b] ${SWAP} ${line}`}>
+    <span aria-hidden className={`absolute inset-x-0 top-full block leading-[1.4] text-[#ffd9d4] ${SWAP} ${line}`}>
       {label}
     </span>
   </span>
@@ -139,7 +155,7 @@ const ConnectRow = ({
     {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
     className={`${ROW} text-[16px]`}
   >
-    <Icon className="h-4 w-4 shrink-0 text-[#b8503c] transition-colors duration-300 group-hover:text-[#e01a1b]" />
+    <Icon className="h-4 w-4 shrink-0 text-[#eec4bd] transition-colors duration-300 group-hover:text-white" />
     {/* The email overruns a 236px column, so its two copies truncate together —
         applied to one only, the red copy would arrive a different length. */}
     <SwapLabel label={label} wrapper="min-w-0 flex-1" line={clip ? "truncate" : ""} />
@@ -167,7 +183,6 @@ const MainFooterContent = () => {
 
   const rootRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-  const wordmarkRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     categoryService.getAllCategories({ status: 'ACTIVE', showRootOnly: 'true' })
@@ -193,7 +208,6 @@ const MainFooterContent = () => {
     if (!root) return;
     const targets: Array<[HTMLElement | null, string, number]> = [
       [gridRef.current, 'is-woven', 0.12],
-      [wordmarkRef.current, 'is-stamped', 0.7],
     ];
     if (typeof IntersectionObserver === 'undefined') {
       targets.forEach(([, cls]) => root.classList.add(cls));
@@ -245,21 +259,12 @@ const MainFooterContent = () => {
   ].filter((s) => s.url) as { url: string; Icon: typeof Instagram; label: string; fill: string }[];
 
   return (
-    <div ref={rootRef} className="relative overflow-hidden text-[#3f3f46]" style={{ background: BONE }}>
+    <div ref={rootRef} className="relative overflow-hidden text-[#fdf6f1]">
       <style>{`
         .m2c-col { opacity: 0; transform: translateY(22px); }
         .is-woven .m2c-col {
           opacity: 1; transform: none;
           transition: opacity .6s ease, transform .7s cubic-bezier(0.22,1,0.36,1);
-        }
-
-        /* Driven by is-stamped, from its own observer on the wordmark itself —
-           under the columns' trigger it had already risen by the time it
-           scrolled into view. */
-        .m2c-wm span { display: inline-block; opacity: 0; transform: translateY(0.3em); }
-        .is-stamped .m2c-wm span {
-          opacity: 1; transform: translateY(0);
-          transition: opacity .5s ease, transform .75s cubic-bezier(0.22,1,0.36,1);
         }
 
         /* Each tile's own platform colour, washed in on hover. It lives on a
@@ -278,21 +283,14 @@ const MainFooterContent = () => {
         .m2c-social:focus-visible::before { opacity: 1 }
 
         @media (prefers-reduced-motion: reduce) {
-          .m2c-col, .is-woven .m2c-col,
-          .m2c-wm span, .is-stamped .m2c-wm span { opacity: 1; transform: none; transition: none; }
+          .m2c-col, .is-woven .m2c-col { opacity: 1; transform: none; transition: none; }
           .m2c-social { transition: none }
           .m2c-social::before { transition: none }
         }
       `}</style>
 
-      {/* Brand hairline across the very top — subtle continuity with the site. */}
-      <div
-        className="absolute inset-x-0 top-0 z-10 h-px"
-        style={{ background: "linear-gradient(90deg, transparent, rgba(224,26,27,0.25), rgba(224,26,27,0.7), rgba(224,26,27,0.25), transparent)" }}
-      />
-
-      <div className="relative mx-auto max-w-7xl px-4 pt-14 sm:px-6 sm:pt-16 lg:px-8 xl:max-w-420">
-        <div ref={gridRef} className="relative grid grid-cols-1 gap-x-8 gap-y-11 sm:grid-cols-2 lg:grid-cols-12 lg:gap-x-10">
+      <div className="relative mx-auto max-w-7xl px-4 pt-16 sm:px-6 sm:pt-20 lg:px-8 lg:pt-24 xl:max-w-420">
+        <div ref={gridRef} className="relative grid grid-cols-1 gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-12 lg:gap-x-10">
           {/* Our Company */}
           <div className="m2c-col min-w-0 sm:col-span-2 lg:col-span-3">
             <Link href="/" className="inline-block">
@@ -303,45 +301,67 @@ const MainFooterContent = () => {
                 fallbackHeight={56}
               />
             </Link>
-            <p className="mt-5 max-w-[21rem] text-[14.5px] leading-[1.7] text-[#6f625f]">
-              Premium home textiles manufacturer specializing in high-quality towels, kitchen aprons, table linens and bath accessories — crafted with finest cotton and sustainable materials for everyday comfort.
+            <p className="mt-5 max-w-[19rem] text-[14.5px] leading-[1.65] text-[#e8cfc9]">
+              Home textiles bought direct from the workshops that weave them — towels, aprons, table linen and bath accessories in cotton that lasts.
             </p>
             {/* Solid oxblood rather than a white pill on a warm ground. The
                 white pill was a second surface floating over the weave, the
                 same mismatch the newsletter card had. */}
             <Link
               href="/about"
-              className="group mt-6 inline-flex items-center gap-2 rounded-full bg-[#7a0f10] px-6 py-2.5 text-[13px] font-semibold tracking-[0.04em] text-[#fdf6f1] transition-colors duration-200 hover:bg-[#e01a1b]"
+              className="group mt-6 inline-flex items-center gap-2 rounded-full bg-[#fdf6f1] px-6 py-2.5 text-[13px] font-semibold tracking-[0.04em] text-[#6b1b1e] transition-colors duration-200 hover:bg-white"
             >
               About M2C
               <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
             </Link>
           </div>
 
-          {/* Explore */}
+          {/* ── Shop ────────────────────────────────────────────────────
+              Categories lead, because that is what someone scrolling to the
+              foot of a shop is usually looking for. */}
           <div className="m2c-col min-w-0 lg:col-span-2" style={{ transitionDelay: '80ms' }}>
-            <ColHeading>Explore</ColHeading>
-            <div className="mt-5 flex flex-col">
-              <NavLink href="/" label="Home" />
-              <NavLink href="/about" label="About" />
-              <NavLink href="/products" label="Products" />
-              <NavLink href="/contact" label="Contact Us" />
-            </div>
-          </div>
-
-          {/* Categories */}
-          <div className="m2c-col min-w-0 lg:col-span-2" style={{ transitionDelay: '160ms' }}>
-            <ColHeading>Categories</ColHeading>
-            <div className="mt-5 flex flex-col">
+            <ColHeading>Shop</ColHeading>
+            <div className="mt-4 flex flex-col -ml-0.5">
+              <NavLink href="/products" label="All Products" />
               <NavLink href="/categories" label="All Categories" />
-              {categories.map((c) => (
+              {categories.slice(0, 4).map((c) => (
                 <NavLink key={c.id} href={`/categories/${c.slug}`} label={c.name} />
               ))}
             </div>
           </div>
 
+          {/* ── Help ────────────────────────────────────────────────────
+              The column this footer did not have. Every one of these pages
+              already existed and only Terms, Privacy and Returns were linked
+              at all — from the bottom bar, at 12px, under the copyright.
+              Track order, Returns & FAQ and Contact are the three things
+              people come to a shop's footer to find. */}
+          <div className="m2c-col min-w-0 lg:col-span-2" style={{ transitionDelay: '160ms' }}>
+            <ColHeading>Help</ColHeading>
+            <div className="mt-4 flex flex-col -ml-0.5">
+              <NavLink href="/order" label="Track Order" />
+              <NavLink href="/returns" label="Returns &amp; FAQ" />
+              <NavLink href="/contact" label="Contact Us" />
+              <NavLink href="/about" label="About M2C" />
+              <NavLink href="/offers" label="Offers" />
+            </div>
+          </div>
+
+          {/* ── Account ─────────────────────────────────────────────────
+              Signed out these still work: /profile and /wishlist bounce to
+              login, which is the normal behaviour for an account link. */}
+          <div className="m2c-col min-w-0 lg:col-span-2" style={{ transitionDelay: '200ms' }}>
+            <ColHeading>Account</ColHeading>
+            <div className="mt-4 flex flex-col -ml-0.5">
+              <NavLink href="/profile" label="My Account" />
+              <NavLink href="/profile" label="My Orders" />
+              <NavLink href="/wishlist" label="Wishlist" />
+              <NavLink href="/cart" label="Cart" />
+            </div>
+          </div>
+
           {/* Let's Connect — now holding the newsletter's three columns too */}
-          <div className="m2c-col min-w-0 sm:col-span-2 lg:col-span-5" style={{ transitionDelay: '240ms' }}>
+          <div className="m2c-col min-w-0 sm:col-span-2 lg:col-span-3" style={{ transitionDelay: '240ms' }}>
             <ColHeading>Let&apos;s Connect</ColHeading>
 
             {/* Capped rather than run to the full five columns. The email is the
@@ -359,8 +379,8 @@ const MainFooterContent = () => {
 
             {connectSocials.length > 0 && (
               <>
-                <p className="mt-7 text-[11px] font-bold uppercase tracking-[0.2em] text-[#8c7f7d]">Follow us</p>
-                <div className="mt-3.5 grid max-w-[28rem] grid-cols-3 gap-3">
+                <p className="mt-7 text-[11px] font-bold uppercase tracking-[0.2em] text-[#eecdc7]">Follow us</p>
+                <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
                   {connectSocials.map(({ url, Icon, label, fill }) => (
                     <a
                       key={label}
@@ -369,15 +389,18 @@ const MainFooterContent = () => {
                       rel="noopener noreferrer"
                       aria-label={`${label} (opens in a new tab)`}
                       style={{ '--fill': fill } as React.CSSProperties}
-                      className="m2c-social group relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border border-[#e5d8cd] bg-white/70 px-2 py-5 transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_16px_30px_-16px_rgba(74,50,38,0.55)]"
+                      title={label}
+                      className="m2c-social group relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full border border-white/20 bg-white/10 transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-0.5 hover:border-transparent hover:shadow-[0_12px_24px_-14px_rgba(74,50,38,0.6)]"
                     >
+                      {/* The label was set beside the icon in a tile roughly
+                          130x96. Two of those is a lot of furniture to say
+                          "Instagram, Facebook" — everyone knows the glyphs, and
+                          the name survives on the accessible name and the
+                          tooltip. */}
                       <Icon
-                        className="relative z-10 h-6 w-6 text-[#7a0f10] transition-colors duration-300 group-hover:text-white"
+                        className="relative z-10 h-[18px] w-[18px] text-[#f8d5d0] transition-colors duration-300 group-hover:text-white"
                         strokeWidth={1.8}
                       />
-                      <span className="relative z-10 text-[12.5px] font-semibold tracking-[0.03em] text-[#4f4442] transition-colors duration-300 group-hover:text-white">
-                        {label}
-                      </span>
                     </a>
                   ))}
                 </div>
@@ -387,31 +410,10 @@ const MainFooterContent = () => {
         </div>
       </div>
 
-      {/* A single hairline where the weft used to run — a divider, not a
-          pattern. */}
-      <div className="relative mx-auto mt-14 h-px max-w-7xl px-4 sm:px-6 lg:px-8 xl:max-w-420">
-        <span aria-hidden className="block h-px w-full bg-[#e0d3c6]" />
-      </div>
-
-      {/* ── Wordmark ─────────────────────────────────────────────────────── */}
-      <div ref={wordmarkRef} className="relative mx-auto max-w-7xl px-4 pb-6 pt-8 sm:px-6 lg:px-8 xl:max-w-420">
-        <div
-          aria-label={WORDMARK}
-          role="img"
-          className="m2c-wm select-none whitespace-nowrap text-center font-extrabold leading-[0.86] tracking-[-0.02em] text-[#7a0f10]/[0.13]"
-          style={{ fontSize: WORDMARK_SIZE }}
-        >
-          {WORDMARK.split('').map((ch, i) =>
-            ch === ' ' ? (
-              <span key={i} className="w-[0.26em]" />
-            ) : (
-              <span key={i} style={{ transitionDelay: `${700 + i * 45}ms` }}>
-                {ch}
-              </span>
-            ),
-          )}
-        </div>
-      </div>
+      {/* Space the divider used to hold. The rule stays gone — with one
+          continuous gradient there is nothing to separate — but the columns
+          still need to stop before the legal line starts. */}
+      <div aria-hidden className="h-12 sm:h-14" />
     </div>
   );
 };
