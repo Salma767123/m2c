@@ -1,121 +1,58 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 
 /**
- * "Read the label" — the brand promise drawn as the thing this shop actually
- * ships: five woven care tags hanging from a rail.
+ * The M2C standard — a trust strip.
  *
- * This replaced a blush panel of five rainbow gradient orbs. The orbs used
- * red/blue/green/orange/purple — five hues that appear nowhere else on the
- * site — over blue-toned text (#152036) against a warm-red brand. A palette
- * that ignores the brand is what made the section read as generic filler
- * rather than as part of this store.
+ * This was five woven care tags hanging from a rail, sliding out of a bunch
+ * and swaying on a shared wave. It was the best-made thing on the homepage and
+ * it was the wrong thing to make: a full viewport of prose with no product, no
+ * price and nothing clickable, sitting as the last block before the footer, so
+ * the page closed on an explainer instead of on something to buy. Reviewed as
+ * "feeling like an information site rather than an ecommerce application",
+ * which was correct.
  *
- * It ran for a while as one material, one ink, one accent — five identical
- * tags differing only by number. That read as monotonous in review, so each tag
- * now carries its own hue through the orb, the header tint, the number, the
- * rule and the footer. The discipline that survived is the palette: five
- * related hues, not five arbitrary ones. See `labels` below.
+ * Three things were doing that, and all three are gone:
  *
- * The closing white "trust pill" was dropped — its first item ("Quality
- * Assured / Strict quality checks") repeated PromoStrip's assurance from the
- * top of the same page, and its "10K+ Happy Homes" was an unverified figure.
+ * It ran dark for a while — deep oxblood, to buy attention from contrast
+ * rather than from height. That worked while the footer was light and this was
+ * the only dark block on the page. The footer is maroon now, so a dark strip
+ * sitting directly on top of it was two dark masses competing instead of one
+ * anchor. Light again, and the contrast it needs comes from the maroon
+ * immediately below it.
  *
- * Copy is unchanged from the tightened version: every line is a claim the
- * section already made, with no new specs invented. Replace with real numbers
- * (thread count, GSM, certificate no.) when they're confirmed.
+ *  · A heading and an intro paragraph. That pairing is what makes a block read
+ *    as an article. One small eyebrow line carries the same voice without
+ *    asking to be read.
+ *
+ *  · Five accent hues — red, plum, olive, gold, clay. Defensible as a family,
+ *    but five colours across five cards is a brochure. The icons already tell
+ *    the five apart, so colour has nothing left to do; there is one accent now.
+ *
+ *  · ~600px of height and 478 lines of animation for five sentences nobody
+ *    buys anything from. It is about 150px now, and the homepage gets the rest
+ *    back for products.
+ *
+ * The copy is unchanged and the drawn icons are kept exactly — a cotton boll,
+ * a struck-through flask, a weave in cross-section, sun over cloth, a
+ * dimensioned mattress. They were drawn for these five claims and nothing off
+ * a shelf says any of it.
+ *
+ * Replace the copy with real numbers (thread count, GSM, certificate no.) when
+ * they are confirmed.
  */
-/**
- * A hue per tag, and it runs through the whole card — orb, header tint, number,
- * rule and footer — not just the icon.
- *
- * That distinction is the point. Dropping a coloured disc onto a plain white
- * card gives you a coloured disc on a plain white card; the card is what read
- * as plain. Colouring the object is what makes each of the five visibly its own
- * thing.
- *
- * Five hues, one family: brand red, then plum, olive, gold and clay. Distinct
- * enough that no two cards are mistaken for each other, related enough that
- * they look chosen rather than assigned — which is where the original
- * red/blue/green/orange/purple went wrong. `ink` is the darkened version for
- * type; every one of them clears 4.5:1 on white, and the gold had to be taken
- * from #a5701a (4.2:1) down to #8f6015 to get there.
- */
-const labels = [
-  { n: '01', kind: 'Fibre',   title: '100% Cotton',        copy: 'Pure cotton throughout. Never blended with polyester.',
-    hue: { from: '#ef3b3c', to: '#c81516', ink: '#b81314', tint: '#fdefee' } },
-  { n: '02', kind: 'Safety',  title: 'OEKO-TEX Certified', copy: 'Independently tested free of harmful substances.',
-    hue: { from: '#9a6386', to: '#70415d', ink: '#70415d', tint: '#f7f0f4' } },
-  { n: '03', kind: 'Comfort', title: 'Breathable Weave',   copy: 'Temperature-regulating, so you stay cool all night.',
-    hue: { from: '#8b9a52', to: '#66743a', ink: '#5f6d34', tint: '#f4f6ec' } },
-  { n: '04', kind: 'Color',   title: 'Fade-Resistant',     copy: 'Color holds wash after wash, year after year.',
-    hue: { from: '#dda43a', to: '#b8801f', ink: '#8f6015', tint: '#fdf5e7' } },
-  { n: '05', kind: 'Fit',     title: 'Made for US Sizes',  copy: 'Cut to standard American mattress and pillow sizes.',
-    hue: { from: '#c9674f', to: '#a8452f', ink: '#a8452f', tint: '#fbf0ec' } },
-];
-
-/**
- * The curtain. Every tag runs the SAME sway on the SAME period and differs
- * only in when it starts, which is what turns five hanging cards into one
- * length of cloth with a ripple passing through it. Giving each its own period
- * instead — the first version did, 6.2s / 7.4s / 5.6s / 8.1s / 6.8s — reads as
- * five objects twitching separately, never as one.
- *
- * Direction comes from the sign: a more negative delay is further along, so
- * tag 01 leads and tag 05 trails, and the wave travels left to right. Four
- * steps span half a period, so the row carries half a wave at any moment —
- * one side lifting while the other falls.
- */
-const SWAY_PERIOD_S = 4.8;
-const SWAY_STEP_S = 0.6;
-// toFixed because 3 * 0.6 lands on 1.7999999999999998 and that ends up in the
-// rendered markup.
-const swayPhase = (i: number, total: number) => `${(-((total - 1 - i) * SWAY_STEP_S)).toFixed(2)}s`;
-
-/**
- * One mark per tag, each drawn for the check it sits on — a cotton boll for
- * fibre, a struck-out flask for harmful substances, a weave cross-section for
- * breathability, sun over cloth for colourfastness, a dimensioned mattress for
- * fit. Drawn as paths rather than taken from an icon library on purpose: a
- * flat icon pack is exactly the look this section was rebuilt to escape, and
- * only purpose-drawn marks can be about these five specific things. That holds
- * even now they sit inside orbs — the orb supplies the colour, the drawing
- * still supplies the meaning.
- */
-const ORB_SHADOW = 'inset 0 2px 3px rgba(255,255,255,.32)';
-
-/**
- * The mark, now white line-work on a coloured orb rather than multi-coloured
- * line-work on bare card stock. Every path draws in currentColor, and the orb
- * sets that to white — so one set of paths works on all five hues and the
- * drawing stays specific to its check instead of reverting to a stock icon.
- */
-function Orb({ from, to, ink, children }: { from: string; to: string; ink: string; children: React.ReactNode }) {
-  return (
-    <span
-      className="grid h-16 w-16 shrink-0 place-items-center rounded-full text-white"
-      style={{
-        background: `linear-gradient(150deg, ${from} 0%, ${to} 100%)`,
-        boxShadow: `0 13px 22px -11px ${ink}, ${ORB_SHADOW}`,
-      }}
-    >
-      <svg
-        aria-hidden
-        viewBox="0 0 48 48"
-        fill="none"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-8 w-8"
-      >
-        {children}
-      </svg>
-    </span>
-  );
-}
 
 const GLASS = 'rgba(255,255,255,.22)';
+
+const labels = [
+  { n: '01', kind: 'Fibre',   title: '100% Cotton',        copy: 'Pure cotton throughout. Never blended with polyester.' },
+  { n: '02', kind: 'Safety',  title: 'OEKO-TEX Certified', copy: 'Independently tested free of harmful substances.' },
+  { n: '03', kind: 'Comfort', title: 'Breathable Weave',   copy: 'Temperature-regulating, so you stay cool all night.' },
+  { n: '04', kind: 'Color',   title: 'Fade-Resistant',     copy: 'Color holds wash after wash, year after year.' },
+  { n: '05', kind: 'Fit',     title: 'Made for US Sizes',  copy: 'Cut to standard American mattress and pillow sizes.' },
+];
 
 const MARKS = [
   // 01 Fibre — a cotton boll: four lobes around a dark seed head.
@@ -168,310 +105,82 @@ const MARKS = [
   </>,
 ];
 
-/**
- * The rail. All five tags start bunched at the left — pushed together the way
- * clothes sit on a hanger rail — then slide right and settle one per slot.
- *
- * The bunch offset is expressed in percent of the tag's OWN width, so it
- * tracks the card at any container width: one slot is the card plus its
- * gutter, near enough 110% of the card. BUNCH_LEAD pushes the whole pile a
- * little past the first slot so tag 01 has somewhere to travel from too,
- * rather than just fading in where it already is.
- *
- * Durations rise with distance instead of being shared. Tag 05 has four slots
- * to cross and tag 01 has almost none; on one duration the far tag would have
- * to move four times faster and would streak past the near ones. Scaling the
- * time keeps every tag moving at roughly the same speed, which is what makes
- * the row look like objects being pushed apart rather than five independent
- * animations that happen to end together.
- */
-const BUNCH_STEP = 110;   // % of card width per slot
-const BUNCH_LEAD = 20;    // % — extra so the first tag also travels
-const PEEL_MS = 70;       // gap between one tag leaving the bunch and the next
-const SLIDE_BASE_MS = 520;
-const SLIDE_STEP_MS = 180;
-
-const bunchX = (i: number) => `${-(i * BUNCH_STEP + BUNCH_LEAD)}%`;
-const slideMs = (i: number) => SLIDE_BASE_MS + i * SLIDE_STEP_MS;
-const peelMs = (i: number) => i * PEEL_MS;
-// The tag starts swinging partway through its trip, not on arrival — a hanging
-// thing swings while it is being moved and settles after it stops.
-const swingDelayMs = (i: number) => peelMs(i) + Math.round(slideMs(i) * 0.45);
-
-export default function ReadTheLabel() {
-  const rowRef = useRef<HTMLDivElement>(null);
-
-  /**
-   * Own observer rather than the shared <Reveal>. Reveal carries a 1.4s
-   * fail-safe timer that calls setVisible(true) unconditionally, so every
-   * Reveal on the page flips 1.4 seconds after mount whether it has been
-   * scrolled to or not. For a fade nobody notices; for a 1.55s pendulum it
-   * meant the tags dropped while still far below the fold and were long
-   * settled by the time anyone reached them — the animation ran, just never
-   * where it could be seen.
-   *
-   * Same approach as the flip board: a class on the container, no state,
-   * because nothing here needs a re-render and the stagger is CSS delay.
-   */
-  useEffect(() => {
-    const el = rowRef.current;
-    if (!el) return;
-    if (typeof IntersectionObserver === 'undefined') {
-      el.classList.add('m2c-dealt');
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          el.classList.add('m2c-dealt');
-          io.disconnect();
-        }
-      },
-      { threshold: 0.2 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
-  // The ground is the bridge into the footer.
-  //
-  // It used to run from #f4ece4 down to white, which meant the bottom of the
-  // page stepped three times: DownloadApp white, then DOWN to cream here, then
-  // back UP to white, then DOWN again to the footer's bone. Every one of those
-  // steps reads as an edge, and together they are what stopped the section
-  // merging with anything around it.
-  //
-  // It now starts on the white DownloadApp ends on and finishes on the footer's
-  // EXACT bone (#f7f2ec, the BONE constant in MainFooterContent), so there is
-  // no seam left between the app section and the bottom of the page — one
-  // continuous descent.
-  //
-  // Gone with it:
-  //  · the 18px basket weave. Once every other section went flat it was the
-  //    only patterned ground left on the site, so instead of blending it
-  //    announced itself. The cards carry the cloth story already — they are
-  //    hang tags with coloured heads and hairline rules.
-  //  · the two blurred brand blobs (#e01a1b at 5.5%, #b8503c at 6%). They, not
-  //    the specified cream, were what gave the ground its pink-mauve cast.
+export default function ValueSection() {
   return (
-    <section className="relative w-full overflow-hidden bg-linear-to-b from-white via-[#faf6f1] to-[#f7f2ec] py-14 sm:py-20">
-      <style>{`
-        /* A tag on a string is a pendulum: it arrives displaced, overswings,
-           and loses amplitude each pass until it hangs still. Same physics as
-           the flip board's flap — and the same lesson applies, that the easing
-           runs between EVERY pair of keyframes, so ease-in-out is what makes
-           each pass slow at the ends and quick through the bottom. An ease-out
-           here would decelerate into every rebound and turn the swing into a
-           slide. */
-        @keyframes m2cTagDrop {
-          0%   { transform: rotate(-13deg) }
-          17%  { transform: rotate(8.5deg) }
-          33%  { transform: rotate(-5.4deg) }
-          48%  { transform: rotate(3.4deg) }
-          62%  { transform: rotate(-2deg) }
-          75%  { transform: rotate(1.1deg) }
-          87%  { transform: rotate(-0.5deg) }
-          100% { transform: rotate(0deg) }
-        }
-        /* The curtain stroke. At 2.4deg on a 392px tag hinged at the pin the
-           bottom edge travels about 16px — plainly visible, while adjacent
-           tags stay only ~13px apart at their widest divergence, inside the
-           28px gutter, so the row never collides. */
-        @keyframes m2cTagSway {
-          0%, 100% { transform: rotate(-2.4deg) }
-          50%      { transform: rotate(2.4deg) }
-        }
-        @keyframes m2cTagKick {
-          0%   { transform: rotate(0deg) }
-          14%  { transform: rotate(7.5deg) }
-          32%  { transform: rotate(-5deg) }
-          49%  { transform: rotate(3.2deg) }
-          65%  { transform: rotate(-1.9deg) }
-          80%  { transform: rotate(1deg) }
-          92%  { transform: rotate(-0.4deg) }
-          100% { transform: rotate(0deg) }
-        }
+    <section className="relative border-t border-[#efe4d8] bg-white py-10 font-sans sm:py-12">
+      <div className="relative mx-auto max-w-420 px-4 sm:px-6 lg:px-8">
+        {/* ── Masthead ────────────────────────────────────────────────────
+            The band used to be a dead end: five claims and nowhere to go from
+            them. Now it ends somewhere. Top right on desktop and centred at
+            the foot on mobile — the same placement Featured and Best Sellers
+            use, so the third call to action on the page behaves like the
+            other two.
 
-        /* The pin rides along with the tag rather than staying put, which is
-           what makes this read as sliding ALONG the rail instead of being
-           dropped onto a fixed hook.
+            Brand red, the same pill Featured and Best Sellers carry, so the
+            third call to action on the page matches the other two. */}
+        <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
+          <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c41617] sm:text-xs">
+            <span aria-hidden className="h-px w-6 bg-[#c41617]" />
+            The M2C standard
+          </span>
 
-           The bunch only applies once the five tags actually share one row.
-           Below lg they wrap onto two or three rows, where there is no single
-           rail to bunch against and a -456% offset would throw the last tag
-           clean off the screen — so small screens get a plain slide in. */
-        .m2c-tag {
-          opacity: 0;
-          transform: translateX(-45%);
-          transition: opacity .4s ease, transform .8s cubic-bezier(0.22,1,0.36,1);
-        }
-        @media (min-width: 1024px) {
-          .m2c-tag {
-            transform: translateX(var(--bunch, 0%));
-            transition-duration: .4s, var(--slide, .8s);
-          }
-        }
-        /* Specificity, not source order, is what lets this beat the rule
-           inside the media query. */
-        .m2c-dealt .m2c-tag { opacity: 1; transform: translateX(0); }
-
-        /* Two elements, two transforms. One element carrying both would mean
-           the infinite sway silently eats the entrance — an animation and a
-           transition (or two animations) on one property don't compose. Both
-           hinge on the same point: the pin at the top of the string. */
-        .m2c-hang { transform-origin: top center; transform: rotate(-13deg); }
-        .m2c-dealt .m2c-hang { animation: m2cTagDrop 1.55s ease-in-out both; }
-        /* Longhand, not the shorthand. The phase arrives as a custom property
-           per tag; writing it as an inline animation-delay instead would
-           survive the hover rule below and drag the kick out of time with it. */
-        .m2c-sway {
-          transform-origin: top center;
-          animation-name: m2cTagSway;
-          animation-duration: ${SWAY_PERIOD_S}s;
-          animation-timing-function: ease-in-out;
-          animation-iteration-count: infinite;
-          animation-delay: var(--phase, 0s);
-        }
-
-        .m2c-tag:hover .m2c-sway {
-          animation-name: m2cTagKick;
-          animation-duration: 1.25s;
-          animation-timing-function: ease-in-out;
-          animation-iteration-count: 1;
-          animation-delay: 0s;
-        }
-        .m2c-tag:hover .m2c-card {
-          transform: translateY(-3px);
-          box-shadow: 0 18px 34px -22px rgba(60,30,20,.55);
-          border-color: #dcccc2;
-        }
-        .m2c-tag:hover .m2c-rule { width: 3.5rem; }
-
-        @media (prefers-reduced-motion: reduce) {
-          .m2c-tag { opacity: 1; transform: none !important; }
-          .m2c-hang, .m2c-sway,
-          .m2c-tag:hover .m2c-sway { animation: none !important; transform: none !important; }
-          .m2c-tag:hover .m2c-card { transform: none; }
-        }
-      `}</style>
-
-      {/* Eyebrow / heading / subtitle are lifted verbatim from Featured
-          Products, Top Selling, Best Seller and Shop by Category so this reads
-          as the same site: Playfair semibold on the same size ramp, the red
-          dash-and-caps eyebrow, grey subtitle. Left-aligned from lg like the
-          rest of them. */}
-      <div className="relative mx-auto mb-10 max-w-420 px-3 text-center sm:px-4 sm:mb-14 md:px-6 lg:px-8 lg:text-left">
-        <span className="mb-3 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#e01a1b] sm:text-xs">
-          <span className="h-px w-6 bg-[#e01a1b]" />
-          The M2C standard
-        </span>
-        <h2 className="font-playfair mb-2 text-2xl font-semibold tracking-tight text-[#1a1a1a] sm:text-3xl md:mb-3 md:text-4xl xl:text-[2.75rem]">
-          Read the label
-        </h2>
-        <p className="mx-auto max-w-full text-sm leading-relaxed text-gray-500 md:text-base lg:mx-0 lg:max-w-2xl lg:text-lg xl:max-w-3xl">
-          Five checks every M2C piece passes before it ships.
-        </p>
-      </div>
-
-      <div
-        ref={rowRef}
-        className="relative mx-auto flex max-w-420 flex-wrap justify-center gap-x-5 gap-y-14 px-3 sm:px-4 md:px-6 lg:flex-nowrap lg:gap-x-7 lg:px-8"
-      >
-        {/* The rail the tags hang from. Desktop only — once the row wraps
-            there is no single line for it to be. */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-x-10 top-0 hidden h-px bg-linear-to-r from-transparent via-black/10 to-transparent lg:block"
-        />
-
-        {labels.map(({ n, kind, title, copy, hue }, i) => (
-          <div
-            key={title}
-            className="m2c-tag relative basis-[calc(50%-0.625rem)] sm:basis-[calc(33.333%-0.834rem)] lg:basis-0 lg:grow"
-            style={
-              {
-                '--bunch': bunchX(i),
-                '--slide': `${slideMs(i)}ms`,
-                transitionDelay: `${peelMs(i)}ms`,
-                // Front of the rack first: 01 sits on top of the pile and peels
-                // away, uncovering 02, and so on. Left in DOM order the pile
-                // would be face-05 throughout and empty out from behind.
-                zIndex: labels.length - i,
-              } as React.CSSProperties
-            }
+          <Link
+            href="/products"
+            className="group hidden shrink-0 items-center gap-2 rounded-full bg-[#e01a1b] px-6 py-2.5 text-[12.5px] font-semibold uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_-12px_rgba(224,26,27,0.75)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c41617] lg:inline-flex"
           >
-            {/* The pin stays outside the swing — it's the fixed point. */}
-            <span
-              aria-hidden
-              className="absolute left-1/2 top-0 z-10 h-[7px] w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1a1416] ring-2 ring-[#f6f2ee]"
-            />
+            Shop the collection
+            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+          </Link>
+        </div>
 
-            <div className="m2c-hang" style={{ animationDelay: `${swingDelayMs(i)}ms` }}>
-              <div className="m2c-sway" style={{ '--phase': swayPhase(i, labels.length) } as React.CSSProperties}>
-                {/* String */}
-                <span aria-hidden className="mx-auto block h-9 w-px bg-[#1a1416]/25" />
+        {/* No cards. Five items will not divide evenly into two or three
+            columns, and with nothing drawn round them an unfilled last row
+            reads as a list ending rather than a hole.
 
-                {/* Real label anatomy: punched header → stamped body → filed
-                    footer. The first pass was a plain white rounded box with
-                    the copy floating in the top half, which left ~80px of dead
-                    white at the bottom of every card — that void, not the
-                    colour or the motion, was what made the row look unfinished.
-                    The footer is pinned with mt-auto so the card fills to the
-                    same depth whatever the copy length. */}
-                <div className="m2c-card relative mx-auto flex min-h-[392px] w-full max-w-[300px] flex-col overflow-hidden rounded-[14px] border border-[#e3d5cb] bg-linear-to-b from-white to-[#fdfaf7] text-center shadow-[0_14px_34px_-24px_rgba(70,38,24,.6)] transition-[transform,box-shadow,border-color] duration-300">
-                  {/* Punched header — the reinforced strip a tag is threaded
-                      through, and the reason the eyelet reads as an opening
-                      rather than a dot floating on white. */}
-                  <div className="relative h-[46px] shrink-0 border-b border-[#ece0d8]" style={{ background: hue.tint }}>
-                    <span aria-hidden className="absolute left-1/2 top-0 h-[17px] w-px -translate-x-1/2 bg-[#1a1416]/25" />
-                    <span
-                      aria-hidden
-                      className="absolute left-1/2 top-[16px] h-[13px] w-[13px] -translate-x-1/2 rounded-full bg-[#f0e8e1] shadow-[inset_0_1.5px_2px_rgba(70,38,24,.34)] ring-[1.5px] ring-[#d6c6bb]"
-                    />
-                  </div>
-
-                  {/* Type is sized and weighted to be read at a glance. The
-                      first pass set the copy at 14px in #8c7f7d — about 3.6:1
-                      on this card, under the 4.5:1 body-text threshold — and
-                      the footer at 10px in #a3928c, roughly 2.7:1, which is why
-                      it looked switched off rather than quiet. Both are darker
-                      now; the palette itself is unchanged. */}
-                  <div className="relative flex flex-1 flex-col items-center px-5 pb-4 pt-7">
-                    {/* The inner frame every printed label carries. */}
-                    <span aria-hidden className="pointer-events-none absolute inset-[7px] rounded-[8px] border border-[#eee2da]" />
-
-                    <span className="relative text-[15px] font-bold tracking-[0.3em]" style={{ color: hue.ink }}>{n}</span>
-
-                    <h3 className="relative mt-4 text-[16px] font-bold uppercase leading-[1.3] tracking-[0.06em] text-[#1a1416] sm:text-[18px]">
-                      {title}
-                    </h3>
-
-                    <span aria-hidden className="m2c-rule relative mt-4 block h-[2px] w-11 rounded-full transition-[width] duration-300" style={{ background: hue.ink, opacity: 0.75 }} />
-
-                    <p className="relative mt-4 text-[14px] leading-[1.6] text-[#6f625f] sm:text-[15.5px]">{copy}</p>
-
-                    {/* The mark, in the gap the copy left behind. No tinted
-                        disc behind it — a coloured circle with a glyph in the
-                        middle is the orb this section was built to replace.
-                        The mark sits flat on the stock, the way a printed
-                        label carries one. */}
-                    <span className="relative mt-5 flex items-center justify-center">
-                      <Orb from={hue.from} to={hue.to} ink={hue.ink}>{MARKS[i]}</Orb>
-                    </span>
-
-                    {/* Filed footer. Each tag names the check it belongs to, so
-                        the bottom of the card carries information rather than
-                        ornament — and no two footers read the same. */}
-                    <span className="relative mt-auto flex w-full items-center justify-center gap-2 border-t border-[#eee2da] pt-4 text-[11.5px] font-bold uppercase tracking-[0.22em]" style={{ color: hue.ink }}>
-                      <span aria-hidden className="h-[5px] w-[5px] rotate-45" style={{ background: hue.ink, opacity: 0.8 }} />
-                      {kind}
-                    </span>
-                  </div>
-                </div>
+            Hairlines between the columns on lg only — below that the items
+            stack, and a divider between stacked rows would fence them off
+            rather than separate them. */}
+        <div className="grid grid-cols-1 gap-x-8 gap-y-7 sm:grid-cols-2 lg:grid-cols-5 lg:gap-x-0">
+          {labels.map((l, i) => (
+            <div
+              key={l.n}
+              className={`group flex items-start gap-3.5 lg:px-5 ${
+                i > 0 ? 'lg:border-l lg:border-[#efe4d8]' : ''
+              } ${i === 0 ? 'lg:pl-0' : ''}`}
+            >
+              <span
+                aria-hidden
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#f0dcd6] bg-[#fdf3f0] text-[#c41617] transition-colors duration-300 group-hover:border-[#c41617] group-hover:bg-[#c41617] group-hover:text-white"
+              >
+                <svg
+                  viewBox="0 0 48 48"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-[22px] w-[22px]"
+                >
+                  {MARKS[i]}
+                </svg>
+              </span>
+              <div className="min-w-0">
+                <p className="text-[14.5px] font-semibold text-[#1a1a1a]">{l.title}</p>
+                <p className="mt-1 text-[13px] leading-relaxed text-[#5f5550]">{l.copy}</p>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+
+        {/* Mobile only — the desktop control lives in the masthead. */}
+        <div className="mt-8 flex justify-center lg:hidden">
+          <Link
+            href="/products"
+            className="group inline-flex items-center gap-2 rounded-full bg-[#e01a1b] px-6 py-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_-12px_rgba(224,26,27,0.8)] transition-all duration-300 hover:bg-[#c41617]"
+          >
+            Shop the collection
+            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+          </Link>
+        </div>
       </div>
     </section>
   );
