@@ -669,8 +669,12 @@ const Header = () => {
       </header>
 
       {/* Adaptive Category Ribbon — fast-access category rail below the header.
-          Wrapped in Suspense because it reads useSearchParams(); without a
-          boundary this opts static pages (e.g. /about) out of prerendering. */}
+          Wrapped in Suspense because CategoryRibbon calls useSearchParams(), which
+          opts a route out of static pre-rendering unless a boundary is present.
+          Without this, `next build` fails while prerendering every page that
+          carries the header (/about, /terms, /cart, /categories …).
+          fallback={null} is deliberate: the ribbon is client-only today anyway, so
+          leaving it out of the prerendered HTML changes nothing visually. */}
       <Suspense fallback={null}>
         <CategoryRibbon />
       </Suspense>

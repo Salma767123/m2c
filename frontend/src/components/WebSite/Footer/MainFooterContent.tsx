@@ -1,11 +1,8 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import {
-  Instagram, Facebook, Youtube, Mail, Phone, ArrowRight,
-  Truck, ShieldCheck, Award, Leaf,
-} from "lucide-react";
+import { Instagram, Facebook, Youtube, Mail, Phone, ArrowRight } from "lucide-react";
 import { categoryService, Category } from "@/services/categoryService";
 import { companyInfoService, PublicCompanyInfo } from "@/services/companyInfoService";
 import CompanyLogo from "@/components/Shared/CompanyLogo";
@@ -85,7 +82,6 @@ const ColHeading = ({ children }: { children: React.ReactNode }) => (
   <h4 className="flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.24em] text-[#f5c8c2]">
     <span aria-hidden className="h-px w-5 shrink-0 bg-[#f5c8c2]" />
     {children}
-    <span className="mt-2.5 block h-[2px] w-7 rounded-full bg-gradient-to-r from-[#e01a1b] to-[#c9962f]" />
   </h4>
 );
 
@@ -135,9 +131,29 @@ const SwapLabel = ({ label, wrapper = "", line = "" }: { label: string; wrapper?
 );
 
 const NavLink = ({ href, label }: { href: string; label: string }) => (
-  <Link
+  <Link href={href} className={`${ROW} text-[17px] sm:text-[18px]`}>
+    <SwapLabel label={label} wrapper="min-w-0 flex-1" />
+  </Link>
+);
+
+/** Contact row — the same swap, with the icon leading it. */
+const ConnectRow = ({
+  href,
+  Icon,
+  label,
+  external = false,
+  clip = false,
+}: {
+  href: string;
+  Icon: typeof Instagram;
+  label: string;
+  external?: boolean;
+  clip?: boolean;
+}) => (
+  <a
     href={href}
-    className="group inline-flex w-fit items-center gap-3 text-[15px] leading-none text-[#3f3f46] transition-colors duration-200 hover:text-[#e01a1b]"
+    {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+    className={`${ROW} text-[16px]`}
   >
     <Icon className="h-4 w-4 shrink-0 text-[#eec4bd] transition-colors duration-300 group-hover:text-white" />
     {/* The email overruns a 236px column, so its two copies truncate together —
@@ -242,19 +258,6 @@ const MainFooterContent = () => {
     { url: companyInfo.socialYoutube, Icon: Youtube, label: "YouTube", fill: '#ff0000' },
   ].filter((s) => s.url) as { url: string; Icon: typeof Instagram; label: string; fill: string }[];
 
-  // Social links shown as labelled rows (Let's Connect column).
-  const connectSocials = [
-    { url: companyInfo.socialInstagram, Icon: Instagram, label: "Instagram" },
-    { url: companyInfo.socialFacebook, Icon: Facebook, label: "Facebook" },
-  ].filter((s) => s.url) as { url: string; Icon: typeof Instagram; label: string }[];
-
-  const trust = [
-    { Icon: Truck, title: "Fast Delivery", sub: "Pan-India shipping" },
-    { Icon: ShieldCheck, title: "Secure Payment", sub: "100% protected" },
-    { Icon: Award, title: "Best Quality", sub: "Finest cotton" },
-    { Icon: Leaf, title: "Sustainable", sub: "Eco-friendly craft" },
-  ];
-
   return (
     <div ref={rootRef} className="relative overflow-hidden text-[#fdf6f1]">
       <style>{`
@@ -289,18 +292,21 @@ const MainFooterContent = () => {
       <div className="relative mx-auto max-w-7xl px-4 pt-16 sm:px-6 sm:pt-20 lg:px-8 lg:pt-24 xl:max-w-420">
         <div ref={gridRef} className="relative grid grid-cols-1 gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-12 lg:gap-x-10">
           {/* Our Company */}
-          <Reveal className="min-w-0 sm:col-span-2 lg:col-span-3">
+          <div className="m2c-col min-w-0 sm:col-span-2 lg:col-span-3">
             <Link href="/" className="inline-block">
               <CompanyLogo
-                className="h-11 w-auto object-contain sm:h-12"
-                skeletonClassName="h-11 sm:h-12 w-36 bg-black/5"
-                fallbackWidth={190}
-                fallbackHeight={48}
+                className="h-12 w-auto object-contain sm:h-14"
+                skeletonClassName="h-12 sm:h-14 w-40 bg-black/5"
+                fallbackWidth={220}
+                fallbackHeight={56}
               />
             </Link>
             <p className="mt-5 max-w-[19rem] text-[14.5px] leading-[1.65] text-[#e8cfc9]">
               Home textiles bought direct from the workshops that weave them — towels, aprons, table linen and bath accessories in cotton that lasts.
             </p>
+            {/* Solid oxblood rather than a white pill on a warm ground. The
+                white pill was a second surface floating over the weave, the
+                same mismatch the newsletter card had. */}
             <Link
               href="/about"
               className="group mt-6 inline-flex items-center gap-2 rounded-full bg-[#fdf6f1] px-6 py-2.5 text-[13px] font-semibold tracking-[0.04em] text-[#6b1b1e] transition-colors duration-200 hover:bg-white"
@@ -308,24 +314,7 @@ const MainFooterContent = () => {
               About M2C
               <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
             </Link>
-
-            {socials.length > 0 && (
-              <div className="mt-6 flex items-center gap-2.5">
-                {socials.map(({ url, Icon, label }) => (
-                  <a
-                    key={label}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={label}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e2e0da] bg-white text-[#52525b] transition-all duration-200 hover:-translate-y-0.5 hover:scale-105 hover:border-[#e01a1b] hover:text-[#e01a1b]"
-                  >
-                    <Icon className="h-[17px] w-[17px]" />
-                  </a>
-                ))}
-              </div>
-            )}
-          </Reveal>
+          </div>
 
           {/* ── Shop ────────────────────────────────────────────────────
               Categories lead, because that is what someone scrolling to the
@@ -339,7 +328,7 @@ const MainFooterContent = () => {
                 <NavLink key={c.id} href={`/categories/${c.slug}`} label={c.name} />
               ))}
             </div>
-          </Reveal>
+          </div>
 
           {/* ── Help ────────────────────────────────────────────────────
               The column this footer did not have. Every one of these pages
@@ -381,22 +370,10 @@ const MainFooterContent = () => {
                 past the words they close. */}
             <div className="mt-5 flex max-w-[24rem] flex-col">
               {companyInfo.companyEmail && (
-                <a
-                  href={`mailto:${companyInfo.companyEmail}`}
-                  className="group inline-flex w-full max-w-full items-center gap-2.5 text-[14px] text-[#3f3f46] transition-colors duration-200 hover:text-[#e01a1b]"
-                >
-                  <Mail className="h-4 w-4 shrink-0 text-[#c9962f]/80 transition-colors group-hover:text-[#e01a1b]" />
-                  <span className="min-w-0 truncate">{companyInfo.companyEmail}</span>
-                </a>
+                <ConnectRow href={`mailto:${companyInfo.companyEmail}`} Icon={Mail} label={companyInfo.companyEmail} clip />
               )}
               {companyInfo.companyPhone && (
-                <a
-                  href={`tel:${companyInfo.companyPhone}`}
-                  className="group inline-flex w-fit items-center gap-2.5 text-[14px] text-[#3f3f46] transition-colors duration-200 hover:text-[#e01a1b]"
-                >
-                  <Phone className="h-4 w-4 shrink-0 text-[#c9962f]/80 transition-colors group-hover:text-[#e01a1b]" />
-                  <span>{companyInfo.companyPhone}</span>
-                </a>
+                <ConnectRow href={`tel:${companyInfo.companyPhone}`} Icon={Phone} label={companyInfo.companyPhone} />
               )}
             </div>
 

@@ -1,25 +1,86 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ArrowRight } from "lucide-react";
 import { bannerService, BannerImage, bannerHref } from "@/services/bannerService";
 
 type Slide = Pick<BannerImage, "id" | "imageUrl" | "altText" | "displayOrder" | "linkType" | "linkValue">;
 
-const AUTOPLAY_MS = 3500;
-const SLIDE_VW = 82;         // active slide width (vw); the rest peeks at the edges
-const GAP_PX = 14;
+// How long each banner holds before the next weaves in — 6s, then 4s, then 3s
+// all read as sluggish in review, so 2.4s.
+//
+// Note this is the whole slot, not the still time: the ~700ms weave runs at the
+// start of it, leaving about 1.7s of stationary artwork. That is short for
+// copy-heavy banners (the usual advice for those is 5–7s) and it only works
+// while the headlines stay to a few words. If a banner ever carries a
+// paragraph, this needs to go back up.
+//
+// The progress rail's fill is driven by this same constant and is what calls
+// next(), so the bar and the rotation cannot drift apart — changing this number
+// changes both.
+const AUTOPLAY_MS = 2400;
+
+// The frame's shape, and the only thing that sets its height. The artwork is
+// 3.5:1; holding the frame at 3.0 stands it ~17% taller, paid for with ~7% off
+// each side. That is the whole trade, and it is the only one available until
+// taller artwork exists — squeezing further starts cutting into headlines.
+//
+// It is deliberately a single number with no min-height and no vh ceiling
+// beside it. Both of those used to add height by making the frame squarer than
+// the picture on some screens and not others, so the crop changed per device —
+// the min-height alone took ~60% off the sides of a phone. One ratio means a
+// phone shows exactly what the desktop shows, just smaller.
+//
+// Set this to 2 when the 2:1 exports land: same frame, ~75% taller, no crop.
+const BANNER_RATIO = 3.0;
+
+// Full bleed — no container, no side margin. At 100vw the same ratio also buys
+// height for free: the frame is ~19% wider than the contained version was, so
+// it stands ~19% taller without cropping a single pixel more.
+const CONTAINER = "w-full";
+
+// The weave. Ten columns, alternating in from top and bottom a beat apart.
+// Twelve looked busy on a phone; eight lost the effect on a wide monitor.
+//
+// Both numbers were raised together, and they have to be: WEAVE_MS is how long
+// one column takes, WEAVE_STAGGER is the beat between them. Slowing the columns
+// alone makes them overlap into a single soft wipe — the gap between them is
+// what you actually read as weaving. Total run is now WEAVE_MS + 9 × STAGGER,
+// about 700ms against the 3000ms hold, so roughly a quarter of each slide is
+// spent changing. Much past this and the banner is in motion more than it is
+// still.
+const STRIPS = 10;
+const WEAVE_MS = 450;
+const WEAVE_STAGGER = 28;
+const WEAVE_TOTAL = WEAVE_MS + WEAVE_STAGGER * (STRIPS - 1);
+
+// Two banner edges resting behind the front one — depth borrowed from a
+// coverflow without its cost. They never move: the stack says "there are more
+// of these", the weave says "here comes the next one", and a card flying
+// forward while the picture also assembled itself would tell both stories at
+// once. Kept to a ~1.6% inset per layer so the banner barely gives up any size.
+// Columns don't all travel the same distance. Every one arriving from exactly
+// one frame-height away made the weave read as a machine shutter; alternating
+// the run gives the columns different speeds over the same duration, which is
+// what a hand-thrown weave actually looks like.
+const WEAVE_RUN = [101, 138, 116, 165];
+
+const SWIPE_PX = 48;                // travel before a drag counts as a swipe
 
 /**
- * M2C COMMERCE REEL — a compact, immersive shopping carousel (not a full-width
- * banner). The active slide sits at ~82vw with the previous/next slides peeking
- * at the edges, signalling horizontal browsing. Drag / swipe / keyboard /
- * autoplay, a hairline numbered progress rail that doubles as the autoplay
- * timer, and a data-driven "Shop now" action shown only when a banner actually
- * links somewhere. No invented labels or metadata — the banner artwork leads.
- * Fully dynamic (admin banner API); click-through preserved via bannerHref().
+ * M2C HERO — a full-bleed promotional banner that WEAVES between slides.
+ *
+ * Each banner is cut into ten vertical columns; odd columns drop from the top,
+ * even ones rise from the bottom, each a beat behind the last, so the next
+ * banner knits itself shut over the one before. This shop sells woven cloth —
+ * the transition is the product, not a stock effect.
+ *
+ * All the motion lives in the moment of change. Between slides the banner is
+ * perfectly still: no zoom, no drift. Six seconds of slow creep is tiring; one
+ * strong moment is memorable, and it leaves the artwork alone to be read.
+ *
+ * Swipe, keyboard, autoplay and hover-pause all survive. Fully dynamic (admin
+ * banner API); click-through preserved via bannerHref().
  */
 export default function HeroSection() {
   const [current, setCurrent] = useState(0);
@@ -28,10 +89,8 @@ export default function HeroSection() {
   const [paused, setPaused] = useState(false);
   const [docHidden, setDocHidden] = useState(false);
   const [reduce, setReduce] = useState(false);
-  const [drag, setDrag] = useState(0);
   const [dragging, setDragging] = useState(false);
 
-  const viewportRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
   const moved = useRef(false);
 
@@ -81,7 +140,9 @@ export default function HeroSection() {
 
   const frozen = paused || docHidden;
 
-  // ── Drag / swipe (unified pointer) ──
+  // Swipe as a gesture, not as direct manipulation. Dragging the artwork under
+  // the finger belonged to a reel that slid sideways; a weave has nothing to
+  // drag, so the pointer only decides which way to go.
   const onPointerDown = (e: React.PointerEvent) => {
     if (slides.length <= 1) return;
     startX.current = e.clientX;
@@ -91,41 +152,39 @@ export default function HeroSection() {
   };
   const onPointerMove = (e: React.PointerEvent) => {
     if (!dragging) return;
-    const dx = e.clientX - startX.current;
-    if (Math.abs(dx) > 6) moved.current = true;
-    setDrag(dx);
+    if (Math.abs(e.clientX - startX.current) > 6) moved.current = true;
   };
-  const endDrag = () => {
+  const endDrag = (e: React.PointerEvent) => {
     if (!dragging) return;
-    const w = viewportRef.current?.clientWidth || 1;
-    const th = w * 0.12;
-    if (drag < -th) next();
-    else if (drag > th) prev();
-    setDrag(0);
+    const dx = e.clientX - startX.current;
+    if (dx < -SWIPE_PX) next();
+    else if (dx > SWIPE_PX) prev();
     setDragging(false);
     setPaused(false);
   };
 
+  // One rule, every screen: the frame is the shape of the picture.
+  const frameStyle: React.CSSProperties = { aspectRatio: `${BANNER_RATIO}` };
+
   if (loading) {
     return (
-      <section className="bg-[#faf7f1] font-sans overflow-hidden py-3 md:py-5" aria-hidden="true">
-        <div className="mx-auto w-[82vw] h-[clamp(260px,50vh,540px)] rounded-2xl bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse" />
+      <section className="w-full bg-[#faf7f1] py-3 font-sans md:py-5" aria-hidden="true">
+        <div className={CONTAINER}>
+          <div className="w-full animate-pulse rounded-2xl bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200" style={frameStyle} />
+        </div>
       </section>
     );
   }
   if (slides.length === 0) return null;
 
   const multi = slides.length > 1;
-  const trackX = `calc(${(100 - SLIDE_VW) / 2}vw - ${current} * (${SLIDE_VW}vw + ${GAP_PX}px) + ${drag}px)`;
 
   return (
     <section
-      className="relative bg-[#faf7f1] font-sans overflow-hidden py-3 md:py-5"
+      className="relative w-full bg-[#faf7f1] font-sans"
       role="region"
       aria-roledescription="carousel"
       aria-label="Promotional banners"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => { if (!dragging) setPaused(false); }}
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
     >
@@ -133,91 +192,128 @@ export default function HeroSection() {
         @keyframes m2cReelProgress { from { transform: scaleX(0) } to { transform: scaleX(1) } }
       `}</style>
 
-      {/* Reel viewport */}
+      <div className={CONTAINER}>
+      <div className="relative">
+
+      {/* No stacked edges any more — they existed to give a contained card some
+          depth. Edge to edge there is nothing for a card to sit on. */}
       <div
-        ref={viewportRef}
-        className={`relative h-[clamp(260px,50vh,540px)] ${dragging ? "cursor-grabbing" : "cursor-grab"} select-none`}
+        className={`relative z-10 w-full overflow-hidden bg-[#1a1416] ${dragging ? "cursor-grabbing" : "cursor-grab"} select-none`}
+        style={frameStyle}
+        // Hover-pause belongs to the banner itself, not the section. On the
+        // section it covered the full page width, so drifting anywhere near the
+        // hero — including the empty margin beside it — froze the rotation and
+        // made the carousel look stuck.
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => { if (!dragging) setPaused(false); }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        onPointerLeave={endDrag}
       >
-        <div
-          className="flex h-full items-stretch"
-          style={{
-            gap: `${GAP_PX}px`,
-            transform: `translateX(${trackX})`,
-            transition: dragging || reduce ? "none" : "transform 600ms cubic-bezier(0.22,1,0.36,1)",
-          }}
-        >
-          {slides.map((slide, index) => {
-            const href = bannerHref(slide);
-            const active = index === current;
-            const inner = (
-              <>
-                <Image
-                  src={slide.imageUrl}
-                  alt={slide.altText || `Banner ${index + 1}`}
-                  fill
-                  className="object-cover object-center"
-                  priority={index === 0}
-                  loading={index === 0 ? undefined : "lazy"}
-                  sizes="82vw"
-                  unoptimized={slide.imageUrl.startsWith("http")}
-                  draggable={false}
-                />
-                {/* Data-driven action — only when this banner actually links somewhere */}
-                {href && active && (
-                  <>
-                    <span className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/45 to-transparent" />
-                    <span className="group/cta absolute bottom-4 left-4 sm:bottom-5 sm:left-6 inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-[13px] font-semibold text-[#1a1a1a] shadow-sm transition-all duration-300 hover:bg-white">
-                      Shop now
-                      <ArrowRight className="h-4 w-4 text-[#e01a1b] transition-transform duration-300 group-hover/cta:translate-x-0.5" />
-                    </span>
-                  </>
-                )}
-              </>
-            );
-            const cls = `relative h-full w-[82vw] shrink-0 overflow-hidden rounded-2xl bg-[#ece7dd] transition-[opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${active ? "opacity-100 scale-100" : "opacity-45 scale-[0.94]"}`;
-            return href ? (
-              <Link
-                key={slide.id}
-                href={href}
-                className={cls}
-                tabIndex={active ? 0 : -1}
-                aria-hidden={!active}
-                aria-label={slide.altText || `Banner ${index + 1}`}
-                onClickCapture={(e) => { if (moved.current) { e.preventDefault(); e.stopPropagation(); } }}
-                draggable={false}
-              >
-                {inner}
-              </Link>
-            ) : (
-              <div key={slide.id} className={cls} aria-hidden={!active}>{inner}</div>
-            );
-          })}
-        </div>
+        {slides.map((slide, index) => {
+          const href = bannerHref(slide);
+          const active = index === current;
 
-        {/* Minimal edge navigation */}
+          // The outgoing banner is never animated away — it simply sits there
+          // until the incoming weave has covered it, then blinks out. Animating
+          // both at once opens gaps between the columns mid-transition.
+          const layer = (
+            <>
+              {Array.from({ length: STRIPS }, (_, i) => {
+                const fromTop = i % 2 === 0;
+                // Each column is a FULL-SIZE copy of the banner, clipped to its
+                // own slice. Slicing instead by narrow boxes with an oversized
+                // image inside meant every column carried its own rounding
+                // error, and where two of them disagreed by half a pixel a
+                // hairline seam showed through the middle of the picture.
+                // Clipping a full-size layer has no per-column arithmetic at
+                // all, and the 0.5px bleed closes the joins for good.
+                const l = (i * 100) / STRIPS;
+                const r = 100 - ((i + 1) * 100) / STRIPS;
+                const run = WEAVE_RUN[i % WEAVE_RUN.length];
+                return (
+                  <span
+                    key={i}
+                    aria-hidden
+                    className="absolute inset-0"
+                    style={{
+                      clipPath: `inset(-2px calc(${r}% - 0.5px) -2px calc(${l}% - 0.5px))`,
+                      transform: active ? "translateY(0)" : `translateY(${fromTop ? "-" : ""}${run}%)`,
+                      transition: reduce
+                        ? "none"
+                        : active
+                          ? `transform ${WEAVE_MS}ms cubic-bezier(0.22,1,0.36,1) ${i * WEAVE_STAGGER}ms`
+                          : `transform 0s linear ${WEAVE_TOTAL + 60}ms`,
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={slide.imageUrl}
+                      alt=""
+                      draggable={false}
+                      loading={index === 0 ? "eager" : "lazy"}
+                      fetchPriority={index === 0 && i === 0 ? "high" : "auto"}
+                      className="absolute inset-0 h-full w-full object-cover object-center"
+                    />
+                  </span>
+                );
+              })}
+            </>
+          );
+
+          const cls = "absolute inset-0 block overflow-hidden";
+          const style: React.CSSProperties = {
+            zIndex: active ? 2 : 1,
+            opacity: active ? 1 : 0,
+            // The delay belongs to hiding only. Applied in both directions it
+            // also held the INCOMING banner invisible for the whole weave, so
+            // the columns animated behind an opacity of 0 and the slide simply
+            // appeared, finished. Arriving must be instant; leaving waits until
+            // the weave above it has closed.
+            transition: reduce || active ? "none" : `opacity 0s linear ${WEAVE_TOTAL + 60}ms`,
+          };
+
+          return href ? (
+            <Link
+              key={slide.id}
+              href={href}
+              className={cls}
+              style={style}
+              tabIndex={active ? 0 : -1}
+              aria-hidden={!active}
+              aria-label={slide.altText || `Banner ${index + 1}`}
+              onClickCapture={(e) => { if (moved.current) { e.preventDefault(); e.stopPropagation(); } }}
+              draggable={false}
+            >
+              {layer}
+            </Link>
+          ) : (
+            <div key={slide.id} className={cls} style={style} aria-hidden={!active}>{layer}</div>
+          );
+        })}
+
+        {/* Edge navigation, lifted above the banner layers */}
         {multi && (
           <>
             <button
               onClick={prev}
               aria-label="Previous banner"
-              className="group absolute left-[4vw] top-1/2 z-10 -translate-y-1/2 text-[#1a1a1a]/40 transition-colors hover:text-[#1a1a1a] focus:outline-none focus-visible:text-[#e01a1b]"
+              className="group absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/25 p-2 text-white/70 backdrop-blur-sm transition-colors hover:bg-black/45 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 sm:left-5"
             >
               <span className="block text-2xl leading-none transition-transform duration-300 group-hover:-translate-x-0.5">‹</span>
             </button>
             <button
               onClick={next}
               aria-label="Next banner"
-              className="group absolute right-[4vw] top-1/2 z-10 -translate-y-1/2 text-[#1a1a1a]/40 transition-colors hover:text-[#1a1a1a] focus:outline-none focus-visible:text-[#e01a1b]"
+              className="group absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/25 p-2 text-white/70 backdrop-blur-sm transition-colors hover:bg-black/45 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 sm:right-5"
             >
               <span className="block text-2xl leading-none transition-transform duration-300 group-hover:translate-x-0.5">›</span>
             </button>
           </>
         )}
+
+      </div>
       </div>
 
         {/* Progress rails — one per banner, on their own row beneath the frame

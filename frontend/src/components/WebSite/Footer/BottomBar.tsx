@@ -21,18 +21,13 @@ const BottomBar = () => {
     { href: "/returns", label: "Returns & FAQ" },
   ];
 
+  // The centred M2C monogram that used to sit above this row is gone — the
+  // oversized wordmark ending the section above says the same thing at fifteen
+  // times the size, and two brand marks stacked read as indecision. Ground
+  // colour matches the loom so the footer stays one object.
   return (
     <div className="text-[#f4ded9]">
       <div className="mx-auto max-w-7xl xl:max-w-420 px-4 sm:px-6 lg:px-8">
-        {/* Centre monogram mark */}
-        <div className="flex items-center justify-center gap-3 py-5 sm:gap-4">
-          <span className="hidden h-px max-w-[22rem] flex-1 bg-gradient-to-r from-transparent to-[#e01a1b]/25 sm:block" />
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e01a1b]/30 bg-white font-playfair text-[13px] font-semibold italic tracking-tight text-[#e01a1b] shadow-[0_1px_2px_rgba(224,26,27,0.08)]">
-            M2C
-          </span>
-          <span className="hidden h-px max-w-[22rem] flex-1 bg-gradient-to-l from-transparent to-[#e01a1b]/25 sm:block" />
-        </div>
-
         {/* Copyright + legal */}
         <div className="flex flex-col items-center justify-between gap-3 py-5 sm:flex-row sm:gap-6">
           <p className="order-2 text-center text-[13px] text-[#eecdc7] sm:order-1 sm:text-left">
