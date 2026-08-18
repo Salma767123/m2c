@@ -22,7 +22,7 @@ const BottomBar = () => {
   ];
 
   return (
-    <div className="border-t border-[#eceae4] bg-[#f4f3ef] text-[#3f3f46]">
+    <div className="text-[#f4ded9]">
       <div className="mx-auto max-w-7xl xl:max-w-420 px-4 sm:px-6 lg:px-8">
         {/* Centre monogram mark */}
         <div className="flex items-center justify-center gap-3 py-5 sm:gap-4">
@@ -34,20 +34,20 @@ const BottomBar = () => {
         </div>
 
         {/* Copyright + legal */}
-        <div className="flex flex-col items-center justify-between gap-3 border-t border-[#eceae4] py-5 sm:flex-row sm:gap-6">
-          <p className="order-2 text-center text-[13px] text-[#8a8a92] sm:order-1 sm:text-left">
+        <div className="flex flex-col items-center justify-between gap-3 py-5 sm:flex-row sm:gap-6">
+          <p className="order-2 text-center text-[13px] text-[#eecdc7] sm:order-1 sm:text-left">
             © {new Date().getFullYear()} {companyName}. All Rights Reserved
           </p>
           <div className="order-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:order-2 sm:justify-end">
             {legal.map((l, i) => (
               <span key={l.href} className="flex items-center gap-4">
-                {i > 0 && <span className="h-3 w-px bg-[#d8d6ce]" aria-hidden />}
+                {i > 0 && <span className="h-3 w-px bg-white/25" aria-hidden />}
                 <Link
                   href={l.href}
-                  className="group relative whitespace-nowrap text-[13px] text-[#5b5b63] transition-colors duration-200 hover:text-[#e01a1b]"
+                  className="group relative whitespace-nowrap text-[13px] text-[#f4ded9] transition-colors duration-200 hover:text-white"
                 >
                   {l.label}
-                  <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-[#e01a1b] transition-all duration-200 group-hover:w-full" />
+                  <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-white transition-all duration-200 group-hover:w-full" />
                 </Link>
               </span>
             ))}

@@ -22,16 +22,31 @@ import { formatPrice, getRegionalPrice, getRegionalOriginalPrice } from '@/lib/c
 // noticed; eight tiles holding sixteen faces show far more while standing still.
 const TILES = 8
 
-// Tiles turn one at a time, snaking: across the top row left to right, then
-// back along the bottom row right to left, so the eye follows one continuous
-// path instead of jumping.
+// Tiles turn one at a time, snaking: across a row left to right, then back
+// along the next one right to left, so the eye follows one continuous path
+// instead of jumping.
 //
-//   1 → 2 → 3 → 4
-//                 ↓
-//   8 ← 7 ← 6 ← 5
+//   4 columns              2 columns
+//   1 → 2 → 3 → 4          1 → 2
+//                 ↓             ↓
+//   8 ← 7 ← 6 ← 5          4 ← 3
+//                          ↓
+//                          5 → 6
+//                               ↓
+//                          8 ← 7
 //
-// DOM order is row-major, so the bottom row's turn order has to be reversed.
-const flipOrder = (i: number) => (i < 4 ? i : 4 + (7 - i))
+// This used to be hard-coded to the four-column layout: `i < 4 ? i : 4 + (7-i)`.
+// The board is grid-cols-2 below lg, where that expression maps the sweep to
+// row 1, row 2, then JUMPS to row 4 and comes back up to row 3 — which is
+// exactly why the flipping looked random on a phone. The path was computed for
+// a grid that is not the one on screen.
+//
+// DOM order is row-major, so every odd row's turn order has to be reversed.
+const snakeOrder = (i: number, cols: number) => {
+  const row = Math.floor(i / cols)
+  const col = i % cols
+  return row * cols + (row % 2 === 0 ? col : cols - 1 - col)
+}
 
 // Two independent speeds, and only one of them is "the queue". SLOT_S is how
 // soon the next tile sets off; TURN_S is how long any one tile takes to turn
@@ -101,6 +116,21 @@ const flipKeyframes = Array.from({ length: TILES }, (_, c) => {
     100% { transform: rotateY(360deg) }
   }`
 }).join('\n')
+
+/**
+ * Which track each tile runs, per column count.
+ *
+ * It cannot be an inline style any more: the answer depends on the breakpoint,
+ * and inline styles cannot be media-queried. So each tile carries a stable
+ * class for its DOM position and the stylesheet decides which sweep position
+ * that is — two columns by default, four from lg, matching the grid exactly.
+ */
+const tileTracks = [
+  ...Array.from({ length: TILES }, (_, i) => `.m2c-t${i} { animation-name: m2cFlip${snakeOrder(i, 2)} }`),
+  '@media (min-width: 1024px) {',
+  ...Array.from({ length: TILES }, (_, i) => `  .m2c-t${i} { animation-name: m2cFlip${snakeOrder(i, 4)} }`),
+  '}',
+].join('\n        ')
 
 type Notice =
   | { kind: 'app' }
@@ -183,7 +213,7 @@ export default function NoticeBoard() {
   }, [notices.length])
 
   return (
-    <section className="relative border-t border-black/5 bg-linear-to-b from-[#f7f6f4] to-white pb-11 pt-9">
+    <section className="relative border-t border-black/5 bg-linear-to-b from-[#f7f6f4] to-white pb-7 pt-6 sm:pb-11 sm:pt-9">
       {/* Section header. It was pinned hard against the band above with 4px of
           clearance and set in small grey text, so it read as a stray caption
           rather than as the start of a section. The rule between the two ends
@@ -226,6 +256,8 @@ export default function NoticeBoard() {
         .m2c-dealt .m2c-flip { animation-play-state: running; }
         .m2c-board:hover .m2c-flip { animation-play-state: paused; }
 
+        ${tileTracks}
+
         @media (prefers-reduced-motion: reduce) {
           [data-deal] { opacity: 1 }
           .m2c-dealt [data-deal] { animation: none }
@@ -243,13 +275,13 @@ export default function NoticeBoard() {
               className="[perspective:1400px]"
               style={{ animationDelay: `${i * 60}ms` }}
             >
+              {/* The track comes from tileTracks in the stylesheet above, which
+                  picks this tile's place in the snake for the column count
+                  actually on screen. Every tile shares one duration and runs
+                  undelayed — the timing lives inside its track, which is the
+                  only way the two sweeps can run in opposite directions. */}
               <div
-                className="m2c-flip relative aspect-[7/3] w-full [transform-style:preserve-3d]"
-                // Picks the track for this tile's place in the snake, not its
-                // place in the DOM. Every tile shares one duration and runs
-                // undelayed — the timing lives inside its track, which is the
-                // only way the two sweeps can run in opposite directions.
-                style={{ animationName: `m2cFlip${flipOrder(i)}` }}
+                className={`m2c-flip m2c-t${i} relative aspect-[5/2] w-full [transform-style:preserve-3d] sm:aspect-[7/3]`}
               >
                 <div className="absolute inset-0 [backface-visibility:hidden]">
                   <NoticeCard notice={tile.front} />

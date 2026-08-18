@@ -2,10 +2,29 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Package, Eye, Download, Star, Truck, CheckCircle, Clock, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Package, Eye, Download, Star, Truck, CheckCircle, Clock, AlertCircle, ChevronLeft, ChevronRight, ShoppingBag } from 'lucide-react'
 import orderService, { Order as APIOrder } from '@/services/orderService'
 import Reveal from '@/components/WebSite/Shared/Reveal'
 import { formatPrice } from '@/lib/currency'
+import { showErrorToast } from '@/lib/toast-utils'
+
+/**
+ * Order History.
+ *
+ * Presentation only — the fetch, the pagination maths, the status
+ * normalisation and the invoice call are all unchanged. What changed:
+ *
+ *  · The palette. Slate cards with green/blue/red/yellow bootstrap badges
+ *    became linen and oxblood, matching the rest of the account area.
+ *
+ *  · Status still carries colour, because here colour means something —
+ *    Delivered and Cancelled are not interchangeable. But the four are drawn
+ *    from a warm range now, and Processing is deliberately colourless: it is
+ *    the state where nothing has happened yet.
+ *
+ *  · The order number leads each card instead of sharing the line with a
+ *    status icon, a date and a badge all set at similar weight.
+ */
 
 const ORDERS_PER_PAGE = 5
 
@@ -26,6 +45,51 @@ function getPageRange(current: number, total: number): Array<number | '…'> {
   pages.push(total);
   return pages;
 }
+
+const CARD =
+  'rounded-2xl border border-[#efe4d8] bg-white p-4 shadow-[0_10px_30px_-24px_rgba(74,50,38,0.5)] sm:p-6 lg:p-7'
+
+const PRIMARY_BTN =
+  'inline-flex items-center justify-center gap-2 rounded-full bg-[#e01a1b] px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_10px_24px_-12px_rgba(224,26,27,0.8)] transition-all duration-300 hover:bg-[#c41617]'
+
+const QUIET_BTN =
+  'inline-flex items-center justify-center gap-2 rounded-full border border-[#e6dcd0] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#5f5550] transition-colors duration-200 hover:bg-[#faf7f3] hover:text-[#1a1a1a]'
+
+const PAGE_BTN =
+  'flex shrink-0 items-center gap-1 rounded-lg border border-[#e6dcd0] bg-white px-2 py-2 text-sm font-medium text-[#5f5550] transition-colors hover:bg-[#faf7f3] disabled:cursor-not-allowed disabled:opacity-40 sm:gap-2 sm:px-4'
+
+/**
+ * Status presentation, in one place.
+ *
+ * Contrast on each badge's own ground: Delivered 5.4:1, Shipped 5.6:1,
+ * Cancelled 5.9:1, Processing 6.5:1 — all clear of 4.5:1 for text this size.
+ */
+const STATUS_META = {
+  delivered: {
+    label: 'Delivered',
+    icon: CheckCircle,
+    badge: 'border-[#d7e7db] bg-[#eef5ef] text-[#2f6b45]',
+    ink: 'text-[#2f6b45]',
+  },
+  shipped: {
+    label: 'Shipped',
+    icon: Truck,
+    badge: 'border-[#f0e2c4] bg-[#fdf6e8] text-[#84560f]',
+    ink: 'text-[#84560f]',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    icon: AlertCircle,
+    badge: 'border-[#f0d8d2] bg-[#fdf3f0] text-[#a01718]',
+    ink: 'text-[#a01718]',
+  },
+  processing: {
+    label: 'Processing',
+    icon: Clock,
+    badge: 'border-[#e6dcd0] bg-[#faf7f3] text-[#5f5550]',
+    ink: 'text-[#a89a8d]',
+  },
+} as const
 
 export default function OrderHistory() {
   const [orders, setOrders] = useState<APIOrder[]>([])
@@ -54,7 +118,7 @@ export default function OrderHistory() {
     }
   }
 
-  const getNormalizedStatus = (status: string): 'processing' | 'shipped' | 'delivered' | 'cancelled' => {
+  const getNormalizedStatus = (status: string): keyof typeof STATUS_META => {
     const s = status.toLowerCase()
     if (['delivered', 'completed', 'received', 'returned'].includes(s)) return 'delivered'
     if (['shipped', 'dispatched', 'shipped_to_customer'].includes(s)) return 'shipped'
@@ -62,35 +126,7 @@ export default function OrderHistory() {
     return 'processing'
   }
 
-  const getStatusIcon = (status: string) => {
-    const normalized = getNormalizedStatus(status)
-    switch (normalized) {
-      case 'delivered': return <CheckCircle className="w-5 h-5 text-green-600" />
-      case 'shipped': return <Truck className="w-5 h-5 text-blue-600" />
-      case 'cancelled': return <AlertCircle className="w-5 h-5 text-red-600" />
-      default: return <Clock className="w-5 h-5 text-yellow-600" />
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    const normalized = getNormalizedStatus(status)
-    switch (normalized) {
-      case 'delivered': return 'bg-green-100 text-green-800 border-green-200'
-      case 'shipped': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200'
-      default: return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-    }
-  }
-
-  const formatStatus = (status: string) => {
-    const normalized = getNormalizedStatus(status)
-    switch (normalized) {
-      case 'delivered': return 'Delivered'
-      case 'shipped': return 'Shipped'
-      case 'cancelled': return 'Cancelled'
-      default: return 'Processing'
-    }
-  }
+  const statusMeta = (status: string) => STATUS_META[getNormalizedStatus(status)]
 
   const totalPages = Math.ceil(orders.length / ORDERS_PER_PAGE)
   const paginatedOrders = orders.slice(
@@ -116,184 +152,255 @@ export default function OrderHistory() {
       }
     } catch (err) {
       console.error(err);
-      alert("Failed to generate invoice. Please try again later.");
+      // Was a native window.alert — the one place on the storefront that used
+      // one. Everything else reports failure through the toast system, so this
+      // does too.
+      showErrorToast('Invoice Failed', 'Could not generate the invoice. Please try again later.');
     }
   };
 
+  /* ── Card header, shared by every state ───────────────────────────────
+     Same rhythm as Profile Information and Saved Addresses: small label,
+     heading, and the count on the right where it does not compete. */
+  const header = (
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-[#f2e9df] pb-5">
+      <div>
+        <span className="mb-1.5 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c41617]">
+          <span aria-hidden className="h-px w-5 bg-[#c41617]" />
+          Your purchases
+        </span>
+        <h2 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl">
+          Order History
+        </h2>
+      </div>
+      {orders.length > 0 && (
+        <span className="text-[13px] text-[#7a6d62]">
+          {orders.length} order{orders.length !== 1 ? 's' : ''} total
+        </span>
+      )}
+    </div>
+  )
+
   if (loading) {
-    /* Skeleton mirrors the loaded order list — 3 order-row placeholders. */
+    /* Mirrors a loaded order card — header block, three rows, same shapes. */
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="border border-slate-100 rounded-lg p-4 space-y-3">
-            <div className="flex justify-between">
-              <div className="h-5 w-32 bg-gray-200 rounded animate-pulse" />
-              <div className="h-5 w-20 bg-gray-200 rounded-full animate-pulse" />
-            </div>
-            <div className="flex gap-3 items-center">
-              <div className="w-16 h-16 bg-gray-200 rounded-lg animate-pulse shrink-0" />
-              <div className="flex-1 space-y-2">
-                <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse" />
-                <div className="h-3 w-1/2 bg-gray-100 rounded animate-pulse" />
-              </div>
-              <div className="h-5 w-16 bg-gray-200 rounded animate-pulse" />
-            </div>
+      <div className={CARD}>
+        <div className="mb-6 flex items-end justify-between gap-3 border-b border-[#f2e9df] pb-5">
+          <div className="space-y-2">
+            <div className="h-3 w-24 animate-pulse rounded bg-[#f3ece3]" />
+            <div className="h-7 w-44 animate-pulse rounded bg-[#ece2d6]" />
           </div>
-        ))}
+          <div className="h-4 w-24 animate-pulse rounded bg-[#f3ece3]" />
+        </div>
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="space-y-4 rounded-2xl border border-[#efe4d8] p-5">
+              <div className="flex justify-between">
+                <div className="space-y-2">
+                  <div className="h-5 w-36 animate-pulse rounded bg-[#ece2d6]" />
+                  <div className="h-3 w-28 animate-pulse rounded bg-[#f3ece3]" />
+                </div>
+                <div className="h-6 w-24 animate-pulse rounded-full bg-[#f3ece3]" />
+              </div>
+              <div className="flex items-center gap-4 rounded-xl bg-[#faf7f3] p-3">
+                <div className="h-16 w-16 shrink-0 animate-pulse rounded-lg bg-[#ece2d6]" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 animate-pulse rounded bg-[#ece2d6]" />
+                  <div className="h-3 w-1/3 animate-pulse rounded bg-[#f3ece3]" />
+                </div>
+                <div className="h-5 w-16 animate-pulse rounded bg-[#ece2d6]" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-center items-center min-h-[300px] text-red-600">
-        <AlertCircle className="w-12 h-12 mb-4" />
-        <p>{error}</p>
-        <button
-          onClick={fetchOrders}
-          className="btn-shine inline-flex items-center justify-center mt-4 px-4 py-2 bg-[#e01a1b] text-white rounded-full font-semibold hover:bg-[#c41617] transition-colors"
-        >
-          Try Again
-        </button>
+      <div className={CARD}>
+        {header}
+        <div className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-[#efe4d8] bg-[#faf7f3] px-6 py-12 text-center">
+          <span aria-hidden className="mb-4 grid h-12 w-12 place-items-center rounded-full bg-[#fdf3f0] text-[#a01718]">
+            <AlertCircle className="h-5 w-5" />
+          </span>
+          <h3 className="font-playfair text-lg font-semibold text-[#1a1a1a]">
+            We couldn&apos;t load your orders
+          </h3>
+          <p className="mx-auto mt-1.5 mb-6 max-w-sm text-sm leading-relaxed text-[#5f5550]">{error}</p>
+          <button onClick={fetchOrders} className={PRIMARY_BTN}>
+            Try again
+          </button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 border border-slate-200 p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <Package className="w-6 h-6 text-[#e01a1b]" />
-          <h2 className="font-playfair text-xl font-semibold text-[#1a1a1a]">Order History</h2>
-        </div>
-        {orders.length > 0 && (
-          <span className="text-sm text-slate-500">{orders.length} order{orders.length !== 1 ? 's' : ''} total</span>
-        )}
-      </div>
+    <div className={CARD}>
+      {header}
 
       {orders.length === 0 ? (
-        <div className="text-center py-12">
-          <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">No orders yet</h3>
-          <p className="text-slate-600 mb-6">Start shopping to see your orders here</p>
-          <Link href="/products">
-            <button className="btn-shine inline-flex items-center justify-center bg-[#e01a1b] text-white px-6 py-3 rounded-full font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300">
-              Start Shopping
-            </button>
+        /* No orders is a normal state for a new customer, not a failure — so
+           it reads as an invitation and the only thing with weight on it is
+           the way out. */
+        <div className="rounded-2xl border border-[#efe4d8] bg-[#faf7f3] px-6 py-14 text-center">
+          <span aria-hidden className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-[#fdf3f0] text-[#7a0f10]">
+            <ShoppingBag className="h-5 w-5" />
+          </span>
+          <h3 className="font-playfair text-lg font-semibold text-[#1a1a1a]">No orders yet</h3>
+          <p className="mx-auto mt-1.5 mb-6 max-w-sm text-sm leading-relaxed text-[#5f5550]">
+            When you place your first order it will appear here, with tracking and invoices.
+          </p>
+          <Link href="/products" className={PRIMARY_BTN}>
+            Start shopping
           </Link>
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600 mb-4">
-            <span>Showing {(currentPage - 1) * ORDERS_PER_PAGE + 1}–{Math.min(currentPage * ORDERS_PER_PAGE, orders.length)} of {orders.length}</span>
-          </div>
+          <p className="mb-4 text-[13px] text-[#7a6d62]">
+            Showing {(currentPage - 1) * ORDERS_PER_PAGE + 1}–
+            {Math.min(currentPage * ORDERS_PER_PAGE, orders.length)} of {orders.length}
+          </p>
 
-          <div className="space-y-4 sm:space-y-6">
-            {paginatedOrders.map((order, index) => (
-              <Reveal key={order.id} delay={index * 90} className="border border-slate-200 rounded-2xl ring-1 ring-black/5 p-4 sm:p-5 lg:p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] hover:-translate-y-1 hover:ring-[#e01a1b]/20 transition-all duration-500">
-                {/* Order Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3 sm:gap-4">
-                  <div className="flex items-start sm:items-center flex-wrap gap-2 sm:gap-4 min-w-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="shrink-0">{getStatusIcon(order.status)}</span>
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-slate-900 text-sm sm:text-base break-all">{order.orderId}</h3>
-                        <p className="text-xs sm:text-sm text-slate-600">Placed on {new Date(order.createdAt).toLocaleDateString()}</p>
+          <div className="space-y-4 sm:space-y-5">
+            {paginatedOrders.map((order, index) => {
+              const meta = statusMeta(order.status)
+              const StatusIcon = meta.icon
+
+              return (
+                <Reveal
+                  key={order.id}
+                  delay={index * 90}
+                  className="rounded-2xl border border-[#efe4d8] p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-[#e6dcd0] hover:shadow-[0_18px_40px_-26px_rgba(74,50,38,0.6)] sm:p-5"
+                >
+                  {/* ── Order header ───────────────────────────────────────
+                      The order number is what a customer reads out on the
+                      phone, so it leads. Date sits under it, status and total
+                      sit opposite — three pieces of information, three
+                      distinct sizes, rather than four things at one weight. */}
+                  <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                    <div className="min-w-0">
+                      <h3 className="font-mono text-[15px] font-semibold break-all text-[#1a1a1a]">
+                        {order.orderId}
+                      </h3>
+                      <p className="mt-0.5 text-[13px] text-[#7a6d62]">
+                        Placed {new Date(order.createdAt).toLocaleDateString(undefined, {
+                          day: 'numeric', month: 'short', year: 'numeric',
+                        })}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end sm:gap-1.5">
+                      <span
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${meta.badge}`}
+                      >
+                        <StatusIcon className="h-3.5 w-3.5" />
+                        {meta.label}
+                      </span>
+                      <div className="text-right">
+                        <p className="font-playfair text-lg font-semibold text-[#1a1a1a]">
+                          {money(order.totalAmount, order)}
+                        </p>
+                        <p className="text-[11px] uppercase tracking-[0.08em] text-[#a89a8d]">
+                          {order.paymentStatus}
+                        </p>
                       </div>
                     </div>
-                    <span className={`px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium border whitespace-nowrap ${getStatusColor(order.status)}`}>
-                      {formatStatus(order.status)}
-                    </span>
                   </div>
-                  <div className="text-left sm:text-right shrink-0">
-                    <p className="text-base sm:text-lg font-bold text-slate-900">{money(order.totalAmount, order)}</p>
-                    <p className="text-xs text-slate-500">{order.paymentStatus}</p>
-                  </div>
-                </div>
 
-                {/* Order Items */}
-                <div className="space-y-3 mb-4">
-                  {order.items.map((item) => (
-                    <div key={item.id} className="flex items-start gap-3 sm:gap-4 p-3 bg-slate-50 rounded-lg">
-                      {item.productImage ? (
-                        <img
-                          src={item.productImage}
-                          alt={item.productName}
-                          className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg border border-slate-200 shrink-0"
-                        />
-                      ) : (
-                        <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-200 rounded-lg border border-slate-200 flex items-center justify-center shrink-0">
-                          <Package className="w-6 h-6 sm:w-8 sm:h-8 text-slate-400" />
+                  {/* ── Items ──────────────────────────────────────────── */}
+                  <div className="space-y-2.5">
+                    {order.items.map((item) => (
+                      <div key={item.id} className="flex items-start gap-3 rounded-xl bg-[#faf7f3] p-3 sm:gap-4">
+                        {item.productImage ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={item.productImage}
+                            alt={item.productName}
+                            loading="lazy"
+                            className="h-14 w-14 shrink-0 rounded-lg border border-[#e6dcd0] object-cover sm:h-16 sm:w-16"
+                          />
+                        ) : (
+                          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-[#e6dcd0] bg-white sm:h-16 sm:w-16">
+                            <Package className="h-6 w-6 text-[#a89a8d]" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-sm font-medium break-words text-[#1a1a1a] sm:text-[15px]">
+                            {item.productName}
+                          </h4>
+                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#7a6d62] sm:text-[13px]">
+                            <span>Qty: {item.quantity}</span>
+                            {item.color && <span>{item.color}</span>}
+                            {item.size && <span>Size: {item.size}</span>}
+                          </div>
                         </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900 text-sm sm:text-base break-words">{item.productName}</h4>
-                        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs sm:text-sm text-slate-600 mt-1">
-                          <span>Qty: {item.quantity}</span>
-                          {item.color && <span>{item.color}</span>}
-                          {item.size && <span>Size: {item.size}</span>}
+                        <div className="shrink-0 text-right">
+                          <p className="text-sm font-semibold text-[#1a1a1a] sm:text-[15px]">
+                            {money(item.totalPrice, order)}
+                          </p>
+                          <p className="text-xs text-[#a89a8d]">{money(item.unitPrice, order)} each</p>
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-semibold text-slate-900 text-sm sm:text-base">{money(item.totalPrice, order)}</p>
-                        <p className="text-xs sm:text-sm text-slate-600">{money(item.unitPrice, order)} each</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
 
-                </div>
-
-                {/* Order Actions */}
-                <div className="flex flex-wrap gap-2 sm:gap-3 pt-4 border-t border-slate-200">
-                  <Link href={`/order/${order.orderId}`} className="flex-1 sm:flex-none">
-                    <button className="btn-shine w-full flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-[#e01a1b] text-white rounded-full font-semibold hover:bg-[#c41617] transition-colors">
-                      <Eye className="w-4 h-4" />
-                      View Details
+                  {/* ── Actions ────────────────────────────────────────── */}
+                  <div className="mt-4 flex flex-wrap gap-2 border-t border-[#f2e9df] pt-4 sm:gap-3">
+                    <Link href={`/order/${order.orderId}`} className={`${PRIMARY_BTN} flex-1 sm:flex-none`}>
+                      <Eye className="h-4 w-4" />
+                      View details
+                    </Link>
+                    {getNormalizedStatus(order.status) === 'delivered' && (
+                      /* ⚠️ This button has never had an onClick — it was inert
+                         before this redesign and it still is. Left in place
+                         rather than removed, because deciding whether reviews
+                         ship is not a UI call. */
+                      <button className={`${QUIET_BTN} flex-1 sm:flex-none`}>
+                        <Star className="h-4 w-4" />
+                        Write review
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDownloadInvoice(order.id)}
+                      className={`${QUIET_BTN} flex-1 sm:flex-none`}
+                    >
+                      <Download className="h-4 w-4" />
+                      Invoice
                     </button>
-                  </Link>
-                  {formatStatus(order.status) === 'Delivered' && (
-                    <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition-colors">
-                      <Star className="w-4 h-4" />
-                      Write Review
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDownloadInvoice(order.id)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                    Invoice
-                  </button>
-                </div>
-              </Reveal>
-            ))}
+                  </div>
+                </Reveal>
+              )
+            })}
           </div>
 
-          {/* Pagination — responsive: icon-only on mobile, smart range, label on sm+ */}
+          {/* Pagination — icon-only on mobile, smart range, labels on sm+ */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between gap-2 pt-6 mt-6 border-t border-slate-200">
+            <div className="mt-6 flex items-center justify-between gap-2 border-t border-[#f2e9df] pt-6">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
                 aria-label="Previous page"
-                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+                className={PAGE_BTN}
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="h-4 w-4" />
                 <span className="hidden sm:inline">Previous</span>
               </button>
 
-              <div className="flex items-center gap-0.5 sm:gap-1 overflow-hidden">
+              <div className="flex items-center gap-0.5 overflow-hidden sm:gap-1">
                 {getPageRange(currentPage, totalPages).map((page, i) =>
                   page === '…' ? (
-                    <span key={`oh-e-${i}`} className="px-1 sm:px-2 text-slate-400 text-sm">…</span>
+                    <span key={`oh-e-${i}`} className="px-1 text-sm text-[#a89a8d] sm:px-2">…</span>
                   ) : (
                     <button
                       key={`oh-p-${page}`}
                       onClick={() => setCurrentPage(page as number)}
                       aria-current={page === currentPage ? 'page' : undefined}
-                      className={`min-w-8 h-8 sm:min-w-9 sm:h-9 px-1.5 sm:px-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${currentPage === page
-                        ? 'bg-[#e01a1b] text-white'
-                        : 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
+                      className={`h-8 min-w-8 px-1.5 text-xs font-medium transition-colors sm:h-9 sm:min-w-9 sm:px-2 sm:text-sm ${currentPage === page
+                        ? 'rounded-lg bg-[#e01a1b] text-white'
+                        : 'rounded-lg border border-[#e6dcd0] bg-white text-[#5f5550] hover:bg-[#faf7f3]'
                         }`}
                     >
                       {page}
@@ -306,10 +413,10 @@ export default function OrderHistory() {
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
                 aria-label="Next page"
-                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+                className={PAGE_BTN}
               >
                 <span className="hidden sm:inline">Next</span>
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           )}

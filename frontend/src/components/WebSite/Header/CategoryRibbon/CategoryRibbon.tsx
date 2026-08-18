@@ -27,13 +27,46 @@ const productImg = (p: PublicProduct) => p.images?.find((i) => i.isPrimary)?.url
  * reusable panel that repositions/crossfades as you move between categories;
  * mobile gets a two-level discovery layer. Fully dynamic; routing unchanged.
  */
+/**
+ * Fetched once per page load, not once per page VIEW.
+ *
+ * Every route renders its own <Header />, so this component remounts on each
+ * navigation and used to refire the request every time - which is why the rail
+ * kept emptying and refilling as you moved around the site. Held at module
+ * scope, the second mount has the categories before it renders.
+ *
+ * A module-level binding rather than a ref or state: it has to outlive the
+ * component, since the whole point is that the component is being destroyed
+ * and rebuilt.
+ */
+let CATEGORY_CACHE: Category[] | null = null;
+
+/**
+ * Placeholder chip widths, in pixels. Uneven and fixed rather than random or
+ * uniform: real category names are not the same length, and a row of
+ * identical blocks reads as a broken component, while anything random would
+ * differ between the server render and the client one.
+ */
+const SKELETON_CHIPS = [104, 148, 132, 96, 156, 116];
+
 export default function CategoryRibbon() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeSlug = pathname?.startsWith('/products') ? searchParams.get('category') : null;
 
   const [mounted, setMounted] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
+
+  /**
+   * Seeded from the module-level cache, so on every navigation after the
+   * first the rail paints filled on its very first frame.
+   *
+   * Safe against hydration: the cache is empty in a fresh module, which is
+   * what the server always has, so the prerendered HTML and the first client
+   * render agree. It is only ever populated later, on the client, and by then
+   * React is past hydration and simply rendering.
+   */
+  const [categories, setCategories] = useState<Category[]>(() => CATEGORY_CACHE ?? []);
+  const [loadingCategories, setLoadingCategories] = useState(() => CATEGORY_CACHE === null);
   const [reduce, setReduce] = useState(false);
   const [active, setActive] = useState<number | null>(null);
   const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null);
@@ -59,10 +92,21 @@ export default function CategoryRibbon() {
   }, []);
 
   useEffect(() => {
+    // Already in hand from an earlier page — nothing to wait for.
+    if (CATEGORY_CACHE) return;
+
     categoryService
       .getAllCategories({ status: 'ACTIVE', showRootOnly: 'true', includeSubcategories: 'true', sortBy: 'sortOrder', sortOrder: 'asc' })
-      .then((res) => { if (res.success && res.data) setCategories(res.data as unknown as Category[]); })
-      .catch((e) => console.error('Failed to fetch categories:', e));
+      .then((res) => {
+        if (res.success && res.data) {
+          CATEGORY_CACHE = res.data as unknown as Category[];
+          setCategories(CATEGORY_CACHE);
+        }
+      })
+      .catch((e) => console.error('Failed to fetch categories:', e))
+      // Whether it worked or not, stop showing a skeleton for something that
+      // is no longer on its way.
+      .finally(() => setLoadingCategories(false));
   }, []);
 
   const activeSubs = useCallback((cat?: Category) => (cat?.subcategories || []).filter((s) => !s.status || s.status === 'ACTIVE'), []);
@@ -91,7 +135,23 @@ export default function CategoryRibbon() {
   }, []);
   useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
 
-  useEffect(() => { setActive(null); setMobileOpen(false); setMobileCat(null); }, [pathname]);
+  /**
+   * A string, not the searchParams object: Next hands back a new
+   * ReadonlyURLSearchParams instance on most renders, so depending on it
+   * directly would re-run this constantly.
+   */
+  const searchKey = searchParams?.toString() ?? '';
+
+  /**
+   * Close on any navigation.
+   *
+   * This used to watch `pathname` alone, which never changes when you move
+   * between categories - /products?category=terry-towels and
+   * /products?category=cotton-bags share the path, and only the query differs.
+   * So the flyout stayed open across the click and sat on top of the page you
+   * had just navigated to.
+   */
+  useEffect(() => { setActive(null); setMobileOpen(false); setMobileCat(null); }, [pathname, searchKey]);
 
   // Re-measure the anchor on resize so the panel stays under its node.
   useEffect(() => {
@@ -172,32 +232,88 @@ export default function CategoryRibbon() {
         </Link>
         <span className="h-4 w-px shrink-0 bg-gray-300" aria-hidden="true" />
 
-        <div className="relative min-w-0 flex-1">
-          <nav ref={railRef} aria-label="Product categories" className="flex items-center overflow-x-auto scrollbar-hide">
-            {categories.map((cat, i) => {
-              const isActive = active === i;
-              const isRoute = activeSlug === cat.slug;
-              const dim = active !== null && !isActive;
-              return (
-                <div key={cat.id} className="flex shrink-0 items-center">
-                  {i > 0 && <span aria-hidden className="mx-0.5 text-gray-300">·</span>}
-                  <div className="relative" style={{ opacity: dim ? 0.55 : 1, transition: 'opacity 200ms' }} onMouseEnter={(e) => openTo(i, e.currentTarget)}>
-                    <Link
-                      href={catHref(cat)}
-                      onFocus={(e) => openTo(i, e.currentTarget.parentElement as HTMLElement)}
-                      aria-expanded={isActive}
-                      className={`block whitespace-nowrap rounded-lg px-3.5 py-2 text-[12px] font-semibold uppercase tracking-[0.09em] transition-all duration-200 hover:bg-gray-50 focus:outline-none ${isActive || isRoute ? 'text-[#c41617]' : 'text-[#e01a1b] hover:text-[#c41617]'}`}
+          <div className="relative min-w-0 flex-1">
+            <nav ref={railRef} aria-label="Product categories" className="overflow-x-auto scrollbar-hide">
+              <div ref={trackRef} className="relative flex w-max items-center">
+                {/* Shown only on a cold start. It occupies the same 46px track
+                    at the same rhythm as the real chips, so when the names
+                    arrive they replace the bars in place rather than pushing
+                    the rail into a different shape. */}
+                {loadingCategories &&
+                  SKELETON_CHIPS.map((w, i) => (
+                    <div key={`sk-${i}`} className="shrink-0 px-4 py-2" aria-hidden>
+                      <span
+                        className="block h-[11px] animate-pulse rounded-full"
+                        style={{ width: w, background: 'rgba(26,20,22,.09)', animationDelay: `${i * 90}ms` }}
+                      />
+                    </div>
+                  ))}
+
+                {categories.map((cat, i) => {
+                  const isActive = active === i;
+                  const dim = active !== null && !isActive;
+                  return (
+                    <div
+                      key={cat.id}
+                      ref={(el) => { itemRefs.current[i] = el; }}
+                      className="shrink-0"
+                      style={{ opacity: dim ? 0.68 : 1, transition: reduce ? undefined : 'opacity 220ms' }}
+                      onMouseEnter={(e) => openTo(i, e.currentTarget)}
                     >
-                      {cat.name}
-                    </Link>
-                    <span className={`pointer-events-none absolute bottom-1 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-[#e01a1b] transition-transform duration-300 ${isActive || isRoute ? 'scale-x-100' : 'scale-x-0'}`} />
-                  </div>
-                </div>
-              );
-            })}
-          </nav>
-          <span className={`pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-white to-transparent transition-opacity ${fadeL ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
-          <span className={`pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent transition-opacity ${fadeR ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
+                      <Link
+                        href={catHref(cat)}
+                        // Every link inside the panel dismisses it; the chip
+                        // that opens the panel never did. Waiting for the
+                        // route effect leaves it up for a frame or two, and
+                        // the pointer is still resting on the chip afterwards,
+                        // so it has nothing to leave.
+                        onClick={() => setActive(null)}
+                        onFocus={(e) => openTo(i, e.currentTarget.parentElement as HTMLElement)}
+                        aria-expanded={isActive}
+                        className="block whitespace-nowrap px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.12em] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e01a1b]/40"
+                        style={{ color: INK }}
+                      >
+                        {cat.name}
+                      </Link>
+                    </div>
+                  );
+                })}
+
+                {/* THE LABEL — a woven black tag with a red seam stitched along
+                    its bottom edge, which is what this shop actually makes. It
+                    rides above the rail and carries its own copy of every name,
+                    clipped to its own bounds, so the text it covers is always
+                    white and the text it leaves is always ink — no colour race
+                    against the slide. Its two edges are timed apart, so it
+                    pulls taut on the way across and snaps shut on arrival. */}
+                <span
+                  ref={pillRef}
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-0 z-20 overflow-hidden rounded-[11px]"
+                  style={{ left: 0, right: 0, opacity: 0, background: LABEL_BG, boxShadow: '0 4px 14px -4px rgba(26,20,22,.55)' }}
+                >
+                  <span ref={pillInnerRef} className="absolute inset-y-0 flex w-max items-center" style={{ left: 0 }}>
+                    {categories.map((cat) => (
+                      <span key={cat.id} className="whitespace-nowrap px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-white">
+                        {cat.name}
+                      </span>
+                    ))}
+                  </span>
+                  {/* A single hairline held inside the edge — the border a
+                      woven tag gets from its own selvedge. Solid, not broken:
+                      at this size a dashed rule reads as noise, not texture. */}
+                  <span
+                    aria-hidden
+                    className="absolute inset-[4px] rounded-[7px]"
+                    style={{ border: `1px solid ${LABEL_SEAM}`, opacity: 0.34 }}
+                  />
+                </span>
+              </div>
+            </nav>
+            {/* Scroll fades now bleed into the groove, not the page. */}
+            <span className={`pointer-events-none absolute inset-y-0 left-0 z-30 w-6 transition-opacity ${fadeL ? 'opacity-100' : 'opacity-0'}`} style={{ background: `linear-gradient(to right, ${GROOVE}, transparent)` }} aria-hidden="true" />
+            <span className={`pointer-events-none absolute inset-y-0 right-0 z-30 w-8 transition-opacity ${fadeR ? 'opacity-100' : 'opacity-0'}`} style={{ background: `linear-gradient(to left, ${GROOVE}, transparent)` }} aria-hidden="true" />
+          </div>
         </div>
       </div>
 

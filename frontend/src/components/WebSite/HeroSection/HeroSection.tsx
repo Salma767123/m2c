@@ -220,36 +220,58 @@ export default function HeroSection() {
         )}
       </div>
 
-      {/* Numbered progress rail — also the autoplay timer */}
-      {multi && (
-        <div className="mt-3 flex items-center justify-center gap-3 sm:gap-4">
-          {slides.map((slide, index) => {
-            const active = index === current;
-            return (
-              <button
-                key={slide.id}
-                onClick={() => go(index)}
-                aria-label={`Go to banner ${index + 1}`}
-                aria-current={active}
-                className="group flex items-center"
-              >
-                <span className={`relative h-[2.5px] overflow-hidden rounded-full bg-[#1a1a1a]/12 transition-all duration-500 ${active ? "w-14 sm:w-16" : "w-4 group-hover:w-6"}`}>
-                  {active && (
-                    <span
-                      key={`${current}-${frozen}-${reduce}`}
-                      className="absolute inset-0 origin-left rounded-full bg-[#e01a1b]"
-                      style={reduce
-                        ? { transform: "scaleX(1)" }
-                        : { animation: `m2cReelProgress ${AUTOPLAY_MS}ms linear forwards`, animationPlayState: frozen ? "paused" : "running" }}
-                      onAnimationEnd={() => { if (!frozen) next(); }}
-                    />
-                  )}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+        {/* Progress rails — one per banner, on their own row beneath the frame
+            rather than laid over the artwork.
+
+            Over the picture they had to be white at 45% with a drop shadow to
+            survive whatever was underneath, and on the Black Friday banner they
+            landed in the middle of the gold ribbon. Below the frame they sit on
+            a known background, so the track can be dark and the red fill reads
+            at full strength.
+
+            The active rail fills across its own run, so the duration of every
+            banner is visible: you can see the change coming and how long is
+            left. It also drives the rotation — when the fill completes it calls
+            next(), which is why hover-pausing the banner pauses the bar and the
+            two can never drift apart.
+
+            Tighter on phones. The rails were fixed at desktop proportions, so
+            against a banner only ~110px tall on a 390px screen the row of
+            dashes plus 34px of padding read as a second element competing with
+            the image rather than an index under it. */}
+        {multi && (
+          <div className="flex items-center justify-center gap-1.5 px-4 pb-2.5 pt-2 sm:gap-2.5 sm:pb-5 sm:pt-3.5">
+            {slides.map((slide, index) => {
+              const active = index === current;
+              return (
+                <button
+                  key={slide.id}
+                  onClick={() => go(index)}
+                  aria-label={`Go to banner ${index + 1}`}
+                  aria-current={active}
+                  className="group py-1.5 focus:outline-none sm:py-2"
+                >
+                  <span
+                    className={`relative block h-[2.5px] overflow-hidden rounded-full transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] sm:h-[3px] ${active ? "w-9 sm:w-16 md:w-24" : "w-4 group-hover:w-6 sm:w-7 sm:group-hover:w-10"}`}
+                    style={{ background: "rgba(26,20,22,.14)" }}
+                  >
+                    {active && (
+                      <span
+                        key={`${current}-${frozen}-${reduce}`}
+                        className="absolute inset-0 origin-left rounded-full bg-[#e01a1b]"
+                        style={reduce
+                          ? { transform: "scaleX(1)" }
+                          : { animation: `m2cReelProgress ${AUTOPLAY_MS}ms linear forwards`, animationPlayState: frozen ? "paused" : "running" }}
+                        onAnimationEnd={() => { if (!frozen) next(); }}
+                      />
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Reduced-motion / fallback autoplay (progress bar doesn't animate to drive it) */}
       {reduce && <ReduceAutoplay paused={frozen} count={slides.length} onTick={next} current={current} />}
