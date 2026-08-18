@@ -12,7 +12,38 @@ interface LogoutConfirmModalProps {
   isLoggingOut?: boolean;
   /** Shown above the heading when we know who is signing out. */
   userName?: string;
+  /**
+   * Which words the dialog uses. Must match the control that opened it — the
+   * header calls this action "Logout" and the account sidebar calls it "Sign
+   * Out", and a dialog that renames the action mid-flow makes the reader stop
+   * and check they pressed the right thing.
+   */
+  variant?: 'signout' | 'logout';
 }
+
+/**
+ * The two wordings, kept whole rather than assembled from a verb.
+ *
+ * Built by interpolation this reads fine in English and breaks the moment the
+ * cancel button needs "Stay signed in" against "Stay logged in" — the verb is
+ * not the only thing that changes.
+ */
+const COPY = {
+  signout: {
+    title: 'Sign out of your account?',
+    confirm: 'Sign out',
+    busy: 'Signing out…',
+    cancel: 'Stay signed in',
+    signedInAs: 'Signed in as',
+  },
+  logout: {
+    title: 'Log out of your account?',
+    confirm: 'Log out',
+    busy: 'Logging out…',
+    cancel: 'Stay logged in',
+    signedInAs: 'Logged in as',
+  },
+} as const;
 
 /**
  * "Are you sure you want to sign out?"
@@ -44,7 +75,9 @@ export default function LogoutConfirmModal({
   onConfirm,
   isLoggingOut = false,
   userName,
+  variant = 'signout',
 }: LogoutConfirmModalProps) {
+  const copy = COPY[variant];
   const panelRef = useRef<HTMLDivElement | null>(null);
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   const restoreFocusTo = useRef<HTMLElement | null>(null);
@@ -154,7 +187,7 @@ export default function LogoutConfirmModal({
 
         {userName && (
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a89a8d]">
-            Signed in as {userName}
+            {copy.signedInAs} {userName}
           </p>
         )}
 
@@ -162,7 +195,7 @@ export default function LogoutConfirmModal({
           id="logout-title"
           className="mt-1.5 font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl"
         >
-          Sign out of your account?
+          {copy.title}
         </h2>
 
         {/* Column-reverse on mobile: Cancel is the safe option, so it sits
@@ -176,7 +209,7 @@ export default function LogoutConfirmModal({
             disabled={isLoggingOut}
             className="rounded-full border border-[#e6dcd0] bg-white px-5 py-2.5 text-[13.5px] font-semibold text-[#5f5550] transition-colors hover:bg-[#faf7f3] disabled:opacity-50"
           >
-            Stay signed in
+            {copy.cancel}
           </button>
           {/* Oxblood, not brand red. Brand red is the colour of "buy" all over
               this site; the destructive action should not borrow it. */}
@@ -187,7 +220,7 @@ export default function LogoutConfirmModal({
             className="inline-flex items-center justify-center gap-2 rounded-full bg-[#7a0f10] px-5 py-2.5 text-[13.5px] font-semibold text-white transition-colors hover:bg-[#5d0b0c] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isLoggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
-            {isLoggingOut ? 'Signing out…' : 'Sign out'}
+            {isLoggingOut ? copy.busy : copy.confirm}
           </button>
         </div>
       </div>

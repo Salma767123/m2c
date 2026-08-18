@@ -762,6 +762,9 @@ const Header = () => {
         onConfirm={handleLogout}
         isLoggingOut={isLoggingOut}
         userName={userName || undefined}
+        // Both controls here are labelled "Logout", so the dialog says log
+        // out. The account sidebar says "Sign Out" and gets the other wording.
+        variant="logout"
       />
     </div>
   );
