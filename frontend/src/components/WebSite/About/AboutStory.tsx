@@ -44,6 +44,9 @@ const PHOTO_DRIFT = 38;
 /** The panel drifts against it, so the two layers visibly separate. */
 const PANEL_DRIFT = -14;
 
+/** The word sits furthest back, so it moves least. */
+const WORD_DRIFT = 20;
+
 
 /** A chapter arrives once it is properly into the viewport. */
 const ARRIVE_MARGIN = '0px 0px -18% 0px';
@@ -80,6 +83,7 @@ export default function AboutStory() {
 
         row.style.setProperty('--py', `${(t * PHOTO_DRIFT).toFixed(1)}px`);
         row.style.setProperty('--cy', `${(t * PANEL_DRIFT).toFixed(1)}px`);
+        row.style.setProperty('--wy', `${(t * WORD_DRIFT).toFixed(1)}px`);
       }
       if (running) raf = requestAnimationFrame(frame);
     };
@@ -217,15 +221,42 @@ export default function AboutStory() {
             margin: 0;
             transform: translateY(calc(-50% + var(--cy, 0px)));
           }
-          /* The panel is capped at 36rem for readability but has to start at
-             50% to overlap the photograph, so a wide screen leaves a deep
-             outer margin — around 420px at 1900px. A vertical chapter label
-             was tried in it and taken out: at a readable size it looked like
-             stray text rather than a device, and at a size that would have
-             read as deliberate it competed with the heading. The linen ground
-             is what stopped that margin looking blank; it does not also need
-             something written in it. */
           .eb-row[data-flip="1"] .eb-copy { left: auto; right: 50% }
+
+          /* ── The word ────────────────────────────────────────────────────
+             The panel is capped at 36rem for readability but has to start at
+             50% to overlap the photograph, so a wide screen leaves a deep
+             outer margin — around 420px at 1900px. This is what fills it.
+
+             A vertical chapter label was tried there first and taken out: at
+             a readable size it looked like stray text, and at a size that
+             would have read as deliberate it competed with the heading. One
+             word at 8rem has neither problem — it is too large to be mistaken
+             for a caption and too pale to be read before the heading is.
+
+             Aligned to the outer edge rather than positioned by offset, so a
+             short word and a long one both tuck the same distance under the
+             panel instead of one of them floating loose in the margin. */
+          .eb-word {
+            position: absolute;
+            top: 50%;
+            right: 2rem;
+            text-align: right;
+            transform: translateY(calc(-50% + var(--wy, 0px)));
+            white-space: nowrap;
+            line-height: .82;
+            letter-spacing: -.02em;
+            /* Oxblood at 9% rather than a flat beige: it picks up the brand
+               without becoming a colour of its own, and it sits ON the linen
+               instead of looking like a second, paler ground. */
+            color: rgba(122, 15, 16, .09);
+            will-change: transform;
+          }
+          .eb-row[data-flip="1"] .eb-word {
+            right: auto;
+            left: 2rem;
+            text-align: left;
+          }
         }
 
         /* ── Arrival ───────────────────────────────────────────────────────
@@ -267,6 +298,20 @@ export default function AboutStory() {
           data-flip={index % 2 === 1 ? '1' : undefined}
           className="eb-row mb-14 last:mb-0 sm:mb-16 lg:mb-24"
         >
+          {/* First in the DOM on purpose. It has no z-index of its own, so
+              paint order is source order — being first puts it behind both the
+              photograph and the panel, which is what lets the panel cover its
+              opening letters and the photograph swallow it entirely if a long
+              word reaches that far. */}
+          {chapter.keyword && (
+            <span
+              aria-hidden
+              className="eb-word hidden font-playfair text-[6.5rem] font-semibold uppercase lg:block xl:text-[8rem]"
+            >
+              {chapter.keyword}
+            </span>
+          )}
+
           {chapter.image && (
             <div className="eb-art">
               <div className="eb-photo">

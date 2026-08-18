@@ -2,21 +2,35 @@ export interface AboutSection {
   title: string;
   content: string;
   image?: string;
+  /**
+   * One word, set very large and very pale behind the chapter's text panel,
+   * bleeding out into the empty margin beside it.
+   *
+   * A vertical version of the chapter title was tried in that margin and
+   * taken out — at a readable size it looked like stray text. A single word
+   * works where the label did not, because at 8rem it stops being a caption
+   * and becomes part of the composition. Keep them short: anything past about
+   * nine characters runs out of margin.
+   */
+  keyword?: string;
 }
 
 export const aboutContent: AboutSection[] = [
   {
     title: "Our Journey of Handcrafted Story",
+    keyword: "Origins",
     content: "For centuries, the art of textile making has been woven into the very fabric of our culture. What began in humble homes with simple looms has evolved into a rich tradition that connects us to our ancestors. Every thread tells a story of dedication, skill, and the timeless beauty of handcrafted goods.",
     image: "/assets/images/about/a6.jpg"
   },
   {
     title: "The Traditional Craft",
+    keyword: "Craft",
     content: "In the early morning hours, when the world is still quiet, our artisans begin their work. Using techniques passed down through generations, they transform simple cotton and linen into beautiful, functional pieces. The rhythmic sound of the loom, the careful selection of threads, and the patient process of weaving create textiles that are not just products, but pieces of living history.",
     image: "/assets/images/about/a2.jpg"
   },
   {
     title: "Home-Made Excellence",
+    keyword: "Home",
     content: "Our marketplace celebrates the beauty of home-made products. Each towel, apron, and textile piece is crafted in small workshops and family homes where quality takes precedence over quantity. These aren't mass-produced items – they're lovingly made pieces that carry the warmth and care of human hands.",
     // Was a3.png, a 1200x600 PNG weighing 1385KB for a photograph. Same
     // pixels as webp: 83KB, a 94% saving.
@@ -24,11 +38,13 @@ export const aboutContent: AboutSection[] = [
   },
   {
     title: "Preserving Tradition",
+    keyword: "Heritage",
     content: "In a world of fast fashion and machine production, we stand as guardians of traditional textile arts. Our vendors are not just suppliers – they are keepers of ancient knowledge, master craftspeople who ensure that the skills of their ancestors continue to flourish in the modern world.",
     image: "/assets/images/about/a4.jpg"
   },
   {
     title: "The Future of Handcraft",
+    keyword: "Future",
     content: "While we honor our past, we also embrace the future. Our artisans are incorporating sustainable materials and eco-friendly practices into their traditional methods. This fusion of old wisdom and new consciousness creates textiles that are not only beautiful and functional but also kind to our planet.",
     image: "/assets/images/about/a5.jpg"
   }

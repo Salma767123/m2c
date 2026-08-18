@@ -1,12 +1,30 @@
 "use client"
 
 import { values } from '@/components/mockData/aboutContent';
-import { CheckCircle } from 'lucide-react';
+import { BadgeCheck, Award, Leaf, Landmark, Users } from 'lucide-react';
 import Reveal from '@/components/WebSite/Shared/Reveal';
 import AboutBanner from '@/components/WebSite/About/AboutBanner';
 import AboutMission from '@/components/WebSite/About/AboutMission';
 import AboutVideo from '@/components/WebSite/About/AboutVideo';
 import AboutStory from '@/components/WebSite/About/AboutStory';
+
+/**
+ * One icon per value, and a different one each time.
+ *
+ * The section used to repeat the same CheckCircle five times, which is
+ * decoration rather than information — the eye landed on five identical red
+ * discs instead of on the five different words. These distinguish.
+ *
+ * Keyed off the title so aboutContent stays pure copy with no presentation in
+ * it. Anything unmapped falls back rather than rendering a hole.
+ */
+const VALUE_ICONS: Record<string, typeof BadgeCheck> = {
+  Authenticity: BadgeCheck,
+  Quality: Award,
+  Sustainability: Leaf,
+  Heritage: Landmark,
+  Community: Users,
+};
 
 const About = () => {
   return (
@@ -22,30 +40,93 @@ const About = () => {
 
       <AboutStory />
 
-      {/* Values Section */}
-      <section className="py-10 sm:py-12 lg:py-16 bg-[#f7f7f5]">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <Reveal className="text-center mb-8 sm:mb-10 lg:mb-12">
-            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
-              <span className="h-px w-6 bg-[#e01a1b]" />
-              What We Stand For
+      {/* ── Our Values ─────────────────────────────────────────────────────
+          A trust band, which is the ecommerce idiom for this — icon, short
+          label, one line — not the type-only editorial treatment it briefly
+          had. Shoppers read this pattern without thinking about it.
+
+          What was actually wrong with the original, all of it fixed here
+          rather than thrown out with the icons:
+
+           · The same CheckCircle on all five cards. One icon repeated is
+             decoration, not information, and as a filled brand-red disc with
+             a glow it outshouted the words it was labelling. Five distinct
+             icons now, in an outline weight inside a soft rose disc.
+
+           · Five items in a three-column grid is 3 + 2 with a framed hole in
+             the last row. flex-wrap with justify-center means an incomplete
+             final row centres itself instead — it reads as deliberate at
+             every breakpoint.
+
+           · #f7f7f5 and text-gray-600 are cool greys, on a page that is warm
+             linen and oxblood everywhere else.
+
+           · The cards were large enough to be the section. A trust band is
+             supporting information; these are compact.
+
+          The ground is white and the cards carry the tint, which is the
+          reverse of everywhere else on this page. Two reasons. White cards on
+          an off-white band barely separated — they were the same surface with
+          a line drawn round them. And AboutStory directly above is #faf6f0,
+          so an off-white band here merged straight into it; white gives the
+          two sections a clean break with no divider needed.
+
+          On hover a card rises AND brightens to white, so the lift is a
+          change of surface rather than just a shadow. */}
+      <section className="border-y border-[#f2e9df] bg-white py-12 font-sans sm:py-14 lg:py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <Reveal className="mx-auto mb-8 max-w-2xl text-center sm:mb-10 lg:mb-12">
+            {/* #c41617 rather than brand #e01a1b: at 11px bold on this ground
+                the brand red measures 4.3:1, this reads the same and makes
+                5.1:1. */}
+            <span className="mb-3 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c41617] sm:text-xs">
+              <span aria-hidden className="h-px w-6 bg-[#c41617]" />
+              What we stand for
             </span>
-            <h2 className="font-playfair text-2xl sm:text-3xl md:text-4xl font-semibold text-[#1a1a1a] tracking-tight mb-3 sm:mb-4">Our Values</h2>
-            <p className="text-sm sm:text-base lg:text-lg text-gray-600 max-w-2xl mx-auto">
-              These core principles guide everything we do, from selecting artisan partners
-              to delivering exceptional products to your doorstep.
+            <h2 className="mb-3 font-playfair text-2xl font-semibold tracking-tight text-[#1a1a1a] sm:mb-4 sm:text-3xl md:text-4xl">
+              Our Values
+            </h2>
+            <p className="text-sm leading-relaxed text-[#5f5550] sm:text-base lg:text-lg">
+              These core principles guide everything we do, from selecting artisan
+              partners to delivering exceptional products to your doorstep.
             </p>
           </Reveal>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-            {values.map((value, index) => (
-              <Reveal key={index} delay={index * 90} className="group text-center p-6 sm:p-7 lg:p-8 rounded-2xl bg-white ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] hover:-translate-y-1.5 hover:ring-[#e01a1b]/20 transition-all duration-500">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#e01a1b] rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 shadow-[0_6px_20px_rgba(224,26,27,0.3)] group-hover:scale-110 transition-transform duration-300">
-                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                </div>
-                <h3 className="text-lg sm:text-xl font-semibold text-[#1a1a1a] mb-1 sm:mb-2">{value.title}</h3>
-                <p className="text-sm sm:text-base text-gray-600">{value.description}</p>
-              </Reveal>
-            ))}
+
+          {/* flex-wrap, not grid. With five items there is no column count
+              that divides evenly at every breakpoint, and a grid leaves the
+              gap on the left where it looks like a missing card. Wrapping and
+              centring puts the short row in the middle, where it looks
+              intended. Widths subtract their share of the gap so the rows sit
+              flush. */}
+          <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
+            {values.map((value, index) => {
+              const Icon = VALUE_ICONS[value.title] ?? BadgeCheck;
+              return (
+                <Reveal
+                  key={value.title}
+                  delay={index * 90}
+                  className="w-full sm:w-[calc(50%-0.5rem)] md:w-[calc(33.333%-0.667rem)] lg:w-[calc(20%-0.8rem)]"
+                >
+                  <div className="group h-full rounded-xl border border-[#efe4d8] bg-[#faf7f3] p-5 text-center transition-all duration-300 hover:-translate-y-1 hover:border-[#e8d2cb] hover:bg-white hover:shadow-[0_18px_38px_-24px_rgba(74,50,38,0.55)]">
+                    {/* Outline icon in a soft rose disc, not white-on-solid-red
+                        with a glow. It labels the value; it should not be
+                        louder than it. */}
+                    <span
+                      aria-hidden
+                      className="mx-auto mb-3.5 grid h-11 w-11 place-items-center rounded-full bg-[#fdf3f0] text-[#c41617] transition-colors duration-300 group-hover:bg-[#c41617] group-hover:text-white"
+                    >
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <h3 className="text-[15px] font-semibold text-[#1a1a1a] sm:text-base">
+                      {value.title}
+                    </h3>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-[#5f5550]">
+                      {value.description}
+                    </p>
+                  </div>
+                </Reveal>
+              );
+            })}
           </div>
         </div>
       </section>
