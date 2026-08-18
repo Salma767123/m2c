@@ -4,8 +4,18 @@ import ProductCard from '../ProductCard/ProductCard';
 import Category from '@/components/WebSite/CategoryCopy/Category';
 import VendorPartnerCTA from '@/components/WebSite/VendorPartnerCTA/VendorPartnerCTA';
 import Reveal from '@/components/WebSite/Shared/Reveal';
+import CategoryHero from '@/components/WebSite/Shared/CategoryHero';
 import SectionBackdrop from '@/components/WebSite/Shared/SectionBackdrop';
 import { Search, Filter, ChevronDown, Star, ChevronLeft, ChevronRight, X } from 'lucide-react';
+
+/**
+ * The banner's fallback, used with nothing selected and for any category whose
+ * admin record has no description. Both strings are the page's own original
+ * copy, kept word for word.
+ */
+const DEFAULT_BANNER_TITLE = 'Our Product Collection';
+const DEFAULT_BANNER_BLURB =
+  'Discover authentic, handcrafted textiles made by skilled artisans using traditional techniques passed down through generations.';
 
 function getPageRange(current: number, total: number): Array<number | '…'> {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -18,7 +28,7 @@ function getPageRange(current: number, total: number): Array<number | '…'> {
   pages.push(total);
   return pages;
 }
-import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { productService, Product } from '@/services/productService';
 import { categoryService } from '@/services/categoryService';
@@ -653,43 +663,60 @@ const Products = () => {
     </div>
   );
 
-  // HD banner backdrop for the collection header — prefer the CURRENT category's
-  // own photo (contextual), else the first category with an image. Falls back to
-  // the plain light header when nothing is available.
+  /**
+   * Whatever the banner is currently about: the chosen subcategory if there is
+   * one, else the chosen category, else nothing.
+   *
+   * The banner used to be the same on all nine categories - "Our Product
+   * Collection" over a paragraph about skilled artisans, whether you were
+   * looking at Terry Towels or Cotton Bags. Only the photograph changed. It now
+   * takes its name, its description and its photograph from the record the
+   * admin already fills in, so every category has its own banner and one added
+   * tomorrow gets one without anybody editing this file.
+   */
+  const bannerSubject = useMemo(() => {
+    const category = categoryName
+      ? categoriesList.find((c) => c?.name === categoryName)
+      : undefined;
+    const subcategory =
+      subcategoryName && Array.isArray(category?.subcategories)
+        ? category.subcategories.find((s: { name?: string }) => s?.name === subcategoryName)
+        : undefined;
+    return subcategory ?? category;
+  }, [categoriesList, categoryName, subcategoryName]);
+
+  const bannerTitle: string = bannerSubject?.name?.trim() || DEFAULT_BANNER_TITLE;
+
+  // A category with the field left blank falls back rather than showing a gap.
+  const bannerBlurb: string = bannerSubject?.description?.trim() || DEFAULT_BANNER_BLURB;
+
+  /**
+   * Names the parent once a subcategory is selected, so the banner says where
+   * you are rather than repeating its own headline.
+   */
+  const bannerEyebrow: string =
+    bannerSubject && subcategoryName && categoryName && categoryName !== bannerSubject.name
+      ? categoryName
+      : 'Shop';
+
+  // Prefer the subject's own photo, then the parent category's, then any
+  // category's, so the header is never left flat when something is available.
   const bannerImage: string | undefined = (
+    bannerSubject?.image ||
     (categoryName && categoriesList.find((c) => c?.name === categoryName && c?.image)?.image) ||
     categoriesList.find((c) => c?.image)?.image
   ) as string | undefined;
 
   return (
     <div className='font-sans'>
-      {/* Hero Section */}
-      <section className={`relative overflow-hidden font-sans ${bannerImage ? 'py-10 sm:py-12 lg:py-14' : 'bg-[#f7f7f5] py-6 sm:py-8'}`}>
-        {bannerImage && (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={bannerImage} alt="" className="absolute inset-0 h-full w-full object-cover" />
-            {/* readability overlays: darken + a brand-tinted vignette */}
-            <div className="absolute inset-0 bg-linear-to-b from-black/65 via-black/45 to-black/65" />
-            <div className="absolute inset-0 bg-[radial-gradient(120%_120%_at_50%_0%,rgba(224,26,27,0.28)_0%,transparent_55%)]" />
-          </>
-        )}
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Reveal className="text-center">
-            <span className={`inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] mb-3 ${bannerImage ? 'text-white/90' : 'text-[#e01a1b]'}`}>
-              <span className={`h-px w-6 ${bannerImage ? 'bg-white/70' : 'bg-[#e01a1b]'}`} />
-              Shop
-            </span>
-            <h1 className={`font-playfair text-2xl sm:text-3xl lg:text-5xl font-semibold mb-4 sm:mb-6 tracking-tight ${bannerImage ? 'text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)]' : 'text-[#1a1a1a]'}`}>
-              Our Product Collection
-            </h1>
-            <p className={`text-base sm:text-lg lg:text-xl max-w-3xl mx-auto ${bannerImage ? 'text-white/90' : 'text-gray-600'}`}>
-              Discover authentic, handcrafted textiles made by skilled artisans using traditional techniques
-              passed down through generations.
-            </p>
-          </Reveal>
-        </div>
-      </section>
+      {/* The banner is a shared component now — /categories renders the same
+          one. See CategoryHero for what animates and why. */}
+      <CategoryHero
+        eyebrow={bannerEyebrow}
+        title={bannerTitle}
+        blurb={bannerBlurb}
+        image={bannerImage}
+      />
 
       {/* Filters and Search */}
       <section className="py-3 bg-white">
