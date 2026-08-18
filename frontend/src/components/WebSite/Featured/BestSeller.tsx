@@ -32,8 +32,6 @@ import { publicProductService, PublicProduct } from '@/services/publicProductSer
 /** How many the row asks for. Six is the design target; four is what is tagged. */
 const BEST_SELLER_COUNT = 6;
 
-/** The shelf draws first, then the cards land on it. */
-const SHELF_MS = 620;
 const CARDS_BEGIN_MS = 260;
 const CARD_STAGGER_MS = 80;
 const CARD_MS = 660;
@@ -123,8 +121,8 @@ export default function BestSeller() {
             <div className="mx-auto mt-3 h-9 w-64 animate-pulse rounded bg-[#f3e5e0] md:h-11 md:w-80 lg:mx-0" />
             <div className="mx-auto mt-2.5 h-4 w-full max-w-lg animate-pulse rounded bg-[#f8eeeb] lg:mx-0" />
           </div>
-          <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 lg:gap-6">
-            {Array.from({ length: 4 }).map((_, i) => (
+          <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 md:gap-6 xl:grid-cols-6 xl:gap-5">
+            {Array.from({ length: BEST_SELLER_COUNT }).map((_, i) => (
               <div
                 key={i}
                 className="overflow-hidden rounded-[16px] bg-white ring-1 ring-[#e3d7c9] shadow-[0_10px_26px_-18px_rgba(74,50,38,0.45)]"
@@ -147,40 +145,21 @@ export default function BestSeller() {
     return null; // Don't show section if no products
   }
 
-  // ── Shape the row to whatever the tag returned ──────────────────────────
-  const capped = products.slice(0, BEST_SELLER_COUNT);
-  const usable = capped.length > 1 && capped.length % 2 === 1 ? capped.slice(0, -1) : capped;
-  // Largest of three or four that divides the count exactly, never more
-  // columns than there are products: 4 → 4, 6 → 3, 3 → 3, 2 → 2.
-  const cols = Math.min(usable.length, usable.length % 3 === 0 ? 3 : 4);
+  // Six columns, however many products come back — the same grid Featured
+  // uses, at the same shell width, so a card here is the same size as a card
+  // there without either section having to know about the other.
+  //
+  // There is no count logic any more, and none is needed: a fixed six-column
+  // grid fills left to right and leaves the remainder empty. Four products
+  // sit in four slots with space to their right, and the row completes itself
+  // the moment two more are tagged Best Seller in the admin. The earlier
+  // version derived a column count to avoid that space, which cost a card
+  // size that matched nothing else on the page.
+  const visible = products.slice(0, BEST_SELLER_COUNT);
 
   return (
     <section className={`relative overflow-hidden py-8 font-sans sm:py-10 lg:py-14 ${GROUND}`}>
       <style>{`
-        /* Columns, not fixed widths — this is what keeps the row reaching the
-           full container instead of leaving a third of it empty, which is what
-           the original version of this section did. */
-        .bs-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem }
-        @media (min-width: 640px) { .bs-grid { gap: 1.25rem } }
-        @media (min-width: 1024px) {
-          .bs-grid { grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 1.5rem }
-        }
-
-        /* ── The shelf ─────────────────────────────────────────────────────
-           A hairline that draws itself across the row before the products
-           arrive, so they land on something rather than fading in over
-           nothing. Decoration with a job — it is the same rule Featured uses
-           as the rail its cloth unrolls from, doing the opposite duty here. */
-        @keyframes bsShelf {
-          from { transform: scaleX(0) }
-          to   { transform: scaleX(1) }
-        }
-        .bs-shelf { transform: scaleX(0); transform-origin: left center }
-        .bs-grid.is-in ~ .bs-shelf {
-          transform: none;
-          animation: bsShelf ${SHELF_MS}ms cubic-bezier(0.22, 0.72, 0.24, 1) backwards;
-        }
-
         /* ── The cards ─────────────────────────────────────────────────────
            Rise, fade and settle out of a slight under-scale, staggered across
            the row. The easing overshoots a touch at the end so each card
@@ -227,6 +206,17 @@ export default function BestSeller() {
               className="hidden h-px flex-1 lg:block"
               style={{ background: 'linear-gradient(90deg, #e8d1cb 0%, rgba(232,209,203,0) 100%)' }}
             />
+
+            {/* Top right on desktop, matching Featured exactly — same shape,
+                same size, same corner. Two product sections carrying the same
+                action should carry it in the same place. */}
+            <Link
+              href="/products?collection=best-seller"
+              className="group hidden shrink-0 items-center gap-2 rounded-full bg-[#e01a1b] px-6 py-2.5 text-[12.5px] font-semibold uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_-12px_rgba(224,26,27,0.75)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c41617] hover:shadow-[0_16px_30px_-12px_rgba(224,26,27,0.6)] lg:inline-flex"
+            >
+              View all products
+              <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+            </Link>
           </div>
 
           <h2 className="mt-3 text-center font-playfair text-2xl font-semibold tracking-tight text-[#1a1a1a] sm:text-3xl md:text-4xl lg:text-left xl:text-[2.75rem]">
@@ -243,10 +233,9 @@ export default function BestSeller() {
 
         <div
           ref={gridRef}
-          className="bs-grid"
-          style={{ '--cols': String(cols) } as React.CSSProperties}
+          className="bs-grid grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 md:gap-6 xl:grid-cols-6 xl:gap-5"
         >
-          {usable.map((product, index) => (
+          {visible.map((product, index) => (
             <div
               key={product.id}
               className="bs-card"
@@ -257,15 +246,9 @@ export default function BestSeller() {
           ))}
         </div>
 
-        {/* The shelf the cards stand on. A sibling of the grid so the
-            animation can key off the grid being in view. */}
-        <span
-          aria-hidden
-          className="bs-shelf mt-5 block h-[2px] w-full rounded-full"
-          style={{ background: 'linear-gradient(90deg, #e8cfc8 0%, #cfa79c 50%, #e8cfc8 100%)' }}
-        />
-
-        <div className="mt-7 flex justify-center">
+        {/* Mobile only — the desktop call to action lives in the masthead,
+            the same way Featured's does. */}
+        <div className="mt-7 flex justify-center lg:hidden">
           <Link
             href="/products?collection=best-seller"
             className="btn-shine group inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-[#e01a1b] px-6 py-2.5 text-[13.5px] font-semibold text-white shadow-[0_10px_24px_-12px_rgba(224,26,27,0.8)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c41617] sm:px-7 sm:py-3 sm:text-sm"

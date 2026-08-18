@@ -18,7 +18,9 @@ export const aboutContent: AboutSection[] = [
   {
     title: "Home-Made Excellence",
     content: "Our marketplace celebrates the beauty of home-made products. Each towel, apron, and textile piece is crafted in small workshops and family homes where quality takes precedence over quantity. These aren't mass-produced items – they're lovingly made pieces that carry the warmth and care of human hands.",
-    image: "/assets/images/about/a3.png"
+    // Was a3.png, a 1200x600 PNG weighing 1385KB for a photograph. Same
+    // pixels as webp: 83KB, a 94% saving.
+    image: "/assets/images/about/a3.webp"
   },
   {
     title: "Preserving Tradition",

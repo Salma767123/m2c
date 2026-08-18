@@ -251,8 +251,6 @@ export default function FeaturedProducts() {
             <div className="mx-auto mt-2.5 h-4 w-full max-w-md animate-pulse rounded bg-[#eee4d8] lg:mx-0" />
           </div>
 
-          <div className="h-[3px] w-full rounded-full bg-[#e2d4c3]" />
-
           <div className="grid grid-cols-2 gap-4 pt-5 sm:gap-5 md:grid-cols-3 md:gap-6 xl:grid-cols-6 xl:gap-5">
             {Array.from({ length: FEATURED_COUNT }).map((_, i) => (
               <div
@@ -407,14 +405,6 @@ export default function FeaturedProducts() {
             Handpicked selection of our finest traditional textiles, crafted by master artisans
           </p>
         </div>
-
-        {/* The rail the cloth unrolls from. Decoration with a job: it gives the
-            animation a physical origin instead of the cloth sliding off nothing. */}
-        <div
-          aria-hidden
-          className="h-[3px] w-full rounded-full"
-          style={{ background: 'linear-gradient(90deg, #e2d4c3 0%, #bda78e 50%, #e2d4c3 100%)' }}
-        />
 
         {/* ── Grid ─────────────────────────────────────────────────────────
             Columns, not fixed widths — this is what closes the ~496px gap.
