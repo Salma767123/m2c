@@ -326,7 +326,7 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                                 {windowElapsed ? "Inspection Window Expired" : "Scheduled Inspection Window"}
                             </p>
                             <p className="text-sm font-medium text-slate-900">
-                                {formatAssignmentWindow(sched.scheduledDate, sched.scheduledTime, sched.estimatedDuration)}
+                                {formatAssignmentWindow(sched.scheduledDate, sched.scheduledTime)}
                             </p>
                             {windowElapsed && (
                                 <p className="text-xs text-red-600 mt-0.5">

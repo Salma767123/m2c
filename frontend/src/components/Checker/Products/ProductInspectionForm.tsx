@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Check, ArrowLeft, ArrowRight, AlertTriangle, RotateCcw, AlarmClockOff } from "lucide-react"
+import { Check, ArrowLeft, ArrowRight, AlertTriangle, RotateCcw, AlarmClockOff, Loader2, MapPin } from "lucide-react"
 
 // ── Step components ───────────────────────────────────────────────────────────
 import PI_Step1_GeneralInfo from "@/components/Checker/Vendor/Steps/PI_Step1_GeneralInfo"
@@ -24,7 +24,7 @@ import { qcCheckerService } from "@/services/qcCheckerService"
 import { formatCheckerName } from "@/lib/checkerUtils"
 import { isInspectionWindowElapsed, formatAssignmentWindow } from "@/lib/inspectionSchedule"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
-import { captureCoordsForSubmit, type InspectionType } from "@/lib/checkerLocation"
+import { captureCoordsForSubmit, GEOFENCE_DISABLED, type InspectionType } from "@/lib/checkerLocation"
 import InspectionTypeDialog from "@/components/Checker/Vendor/InspectionTypeDialog"
 import {
     validateStep,
@@ -223,6 +223,11 @@ export default function ProductInspectionForm({
     const [draftInspectionType] = useState<InspectionType | null>(savedType)
     const [discardConfirm, setDiscardConfirm] = useState<{ type: InspectionType } | null>(null)
     const [savingDraft, setSavingDraft] = useState(false)
+    // True while acquiring GPS + running the start-time geofence check.
+    const [verifyingLocation, setVerifyingLocation] = useState(false)
+    // Set once the checker's on-site location has been verified this session, so
+    // the gate never re-prompts within the same open inspection.
+    const locationVerifiedRef = useRef(false)
 
     // ── Exit-confirmation guard ───────────────────────────────────────────────
     const [showExitConfirm, setShowExitConfirm] = useState(false)
@@ -289,7 +294,13 @@ export default function ProductInspectionForm({
     // ── Form data ─────────────────────────────────────────────────────────────
     const prefilledRef = useRef<string | null>(null)
 
-    const [formData, setFormData] = useState(() => loadDraft(productId, makeDefaultFormData(productName, vendorName)))
+    const [formData, setFormData] = useState(() => {
+        const d = loadDraft(productId, makeDefaultFormData(productName, vendorName))
+        // The Inspection Date is always the day the inspection is actually performed
+        // — never a stale value carried over by an old or reassigned draft.
+        d.serviceStartDate = new Date().toLocaleDateString("en-CA")
+        return d
+    })
     // Set true by "Save draft & exit" so the debounced autosave (which holds an older
     // formData without pausedAt) can't fire afterwards and clobber the explicit draft.
     const skipAutosaveRef = useRef(false)
@@ -383,7 +394,38 @@ export default function ProductInspectionForm({
         try { window.localStorage.setItem(typeKeyFor(productId), type) } catch { /* ignore */ }
     }
 
-    const handleTypeChosen = (type: InspectionType) => {
+    // Geofence gate for the START of a physical product inspection — mirrors the
+    // vendor/factory flow. Virtual inspections and the ENABLE_GEOFENCE=false escape
+    // hatch skip it. Returns false (and toasts) when the checker isn't on-site, so
+    // the caller can refuse to open the inspection.
+    const verifyPhysicalPresence = async (type: InspectionType): Promise<boolean> => {
+        if (type === "VIRTUAL" || GEOFENCE_DISABLED) { locationVerifiedRef.current = true; return true }
+        setVerifyingLocation(true)
+        try {
+            const coords = await captureCoordsForSubmit(type) // may throw if location is denied
+            const res = await qcCheckerService.startProductInspection(
+                productId,
+                coords ? { latitude: coords.latitude, longitude: coords.longitude } : null,
+            )
+            if (!res.success) {
+                showErrorToast("Location check failed", res.message || "You must be at the vendor's product-handling site to begin a physical inspection.")
+                return false
+            }
+            locationVerifiedRef.current = true
+            return true
+        } catch (e: any) {
+            showErrorToast("Location required", e?.message || "Enable location access — you must be at the vendor's site to begin a physical inspection.")
+            return false
+        } finally {
+            setVerifyingLocation(false)
+        }
+    }
+
+    const handleTypeChosen = async (type: InspectionType) => {
+        if (verifyingLocation) return
+        // Block the physical inspection from opening until the checker's location
+        // is verified against the vendor's registered product-handling site.
+        if (!(await verifyPhysicalPresence(type))) return
         if (isResume) {
             const draftType = draftInspectionType || inspectionType
             if (type === draftType) {
@@ -425,6 +467,21 @@ export default function ProductInspectionForm({
         setInspectionType(type)
         persistType(type)
     }
+
+    // When the form opens straight into a PHYSICAL inspection (the type was
+    // persisted, so the type dialog is skipped), still enforce the on-site
+    // geofence check once. On failure, drop back to the type dialog.
+    useEffect(() => {
+        if (locationVerifiedRef.current || verifyingLocation) return
+        if (inspectionType !== "PHYSICAL") return
+        let active = true
+        ;(async () => {
+            const ok = await verifyPhysicalPresence("PHYSICAL")
+            if (active && !ok) setInspectionType(null)
+        })()
+        return () => { active = false }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [inspectionType])
 
     // Save the half-filled form as a paused draft, then leave. pausedAt marks the
     // pause so the next open re-prompts the inspection type (resume vs restart).
@@ -684,12 +741,28 @@ export default function ProductInspectionForm({
         <div ref={rootRef} className="min-h-screen font-sans bg-[#f7f7f5]">
             {/* Mandatory type selection — shown until the checker chooses (and re-asked
                 when resuming a paused draft). Cancelling backs out of the inspection. */}
-            {!inspectionType && !discardConfirm && (
+            {!inspectionType && !discardConfirm && !verifyingLocation && (
                 <InspectionTypeDialog
                     subjectName={productName}
                     onSelect={handleTypeChosen}
                     onCancel={() => { (onCancel ?? onComplete)() }}
                 />
+            )}
+
+            {/* On-site location verification (physical inspection start gate) */}
+            {verifyingLocation && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
+                    <div className="bg-white rounded-2xl shadow-xl border border-slate-200 px-6 py-5 flex items-center gap-3 max-w-sm">
+                        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#e01a1b]/10 text-[#e01a1b]">
+                            <MapPin className="w-5 h-5" />
+                            <Loader2 className="absolute -bottom-1 -right-1 w-4 h-4 animate-spin text-[#e01a1b]" />
+                        </span>
+                        <div>
+                            <p className="text-sm font-bold text-slate-900">Verifying your location…</p>
+                            <p className="text-xs text-slate-500">Confirming you&apos;re at the vendor&apos;s product-handling site.</p>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Discard-draft confirmation — shown when resuming with a DIFFERENT type

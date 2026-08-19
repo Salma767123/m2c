@@ -499,6 +499,34 @@ class QCCheckerService {
         }
     }
 
+    // Start Product Inspection — a pure geofence gate (no DB writes). Verifies
+    // the checker is at the vendor's product-handling site (factory/warehouse,
+    // per the vendor's registration) BEFORE a physical inspection begins.
+    // Throws with the backend's message (e.g. "Location mismatch") on failure.
+    async startProductInspection(
+        productId: string,
+        coords?: { latitude: number; longitude: number } | null,
+    ): Promise<{ success: boolean; message?: string; locationVerification?: any }> {
+        try {
+            const response = await axios.post(`/qc-checkers/products/${productId}/start`, {
+                checkerLatitude: coords?.latitude ?? null,
+                checkerLongitude: coords?.longitude ?? null,
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${this.getCheckerToken()}`
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            const data = error?.response?.data || {};
+            const msg = data.message || data.error || error?.message || 'Location verification failed';
+            const err = new Error(msg) as Error & { status?: number; code?: string };
+            err.status = error?.response?.status;
+            err.code = data.code;
+            throw err;
+        }
+    }
+
     // Reject Product — same location contract as approveProduct above.
     async rejectProduct(
         productId: string,
