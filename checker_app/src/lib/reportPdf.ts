@@ -217,6 +217,30 @@ function stepForKey(key: string): string {
   return 'Other';
 }
 
+/**
+ * Verification key → the field name the checker saw ("c_gstNumber" → "GST
+ * Number"). Mirrors the on-screen report's helper, so the Issues table can name
+ * the field instead of only naming its step.
+ */
+function fieldLabelForKey(key: string): string {
+  const rest = key.replace(/^(certDoc_|cert_|vt_|mf_|ct_|c_|w_|o_)/, '');
+  const spaced = rest.replace(/_/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+  const WORD: Record<string, string> = {
+    wh: 'Warehouse', legal: 'Legal', prod: 'Product', img: 'Image',
+    cat: 'Category', photo: 'Photo', spec: 'Spec', var: 'Variant',
+    std: 'Standard', dims: 'Dimensions', sku: 'SKU', uom: 'UOM',
+    gst: 'GST', id: 'ID', qc: 'QC',
+  };
+  const words = spaced.split(/\s+/).filter(Boolean).map((w) => {
+    const lower = w.toLowerCase();
+    if (WORD[lower]) return WORD[lower];
+    if (/^\d+$/.test(w)) return String(Number(w) + 1);
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  });
+  const deduped = words.filter((w, i) => i === 0 || w.toLowerCase() !== words[i - 1].toLowerCase());
+  return deduped.join(' ') || key;
+}
+
 type VF = Record<string, { ok: boolean | null; remarks?: string }>;
 
 function sectionStatus(vf: VF, prefixes: string[]): string {
@@ -228,78 +252,52 @@ function sectionStatus(vf: VF, prefixes: string[]): string {
 }
 
 // ── Shared HTML fragments ───────────────────────────────────────────────────
-const STYLES = `
-  body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 0; padding: 24px; color: #1e293b; font-size: 13px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .m2c-head { display:flex; align-items:center; margin-bottom:8px; }
-  .m2c-logo { width:36px; height:36px; background:#222; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-right:10px; }
-  .m2c-logo span { color:#fff; font-weight:900; font-size:14px; letter-spacing:1px; }
-  .m2c-name { font-size:11px; font-weight:700; color:#222; margin:0; letter-spacing:0.5px; }
-  .m2c-sub { font-size:8px; color:#888; margin:2px 0 0; }
-  .head-rule { border:none; border-top:1.5px solid #222; margin:0 0 16px; }
-  .banner { background:#222; color:#fff; border-radius:12px; padding:20px; margin-bottom:20px; display:flex; flex-wrap:wrap; }
-  .banner-item { width:50%; margin-bottom:12px; }
-  .banner-label { font-size:10px; color:#9ca3af; text-transform:uppercase; font-weight:600; margin-bottom:2px; }
-  .banner-value { font-size:13px; font-weight:600; }
-  .section { border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; margin-bottom:16px; }
-  .sh { background:#f8fafc; padding:10px 16px; border-bottom:1px solid #e2e8f0; font-weight:700; font-size:13px; color:#1e293b; display:flex; align-items:center; justify-content:space-between; }
-  .sh .status { font-size:10px; font-weight:700; }
-  .subhead { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; padding:12px 16px 4px; }
-  table { width:100%; border-collapse:collapse; }
-  tr { border-bottom:1px solid #f1f5f9; }
-  td.k { color:#6b7280; font-size:11px; padding:6px 12px; text-transform:uppercase; font-weight:600; width:40%; }
-  td.v { font-size:13px; padding:6px 12px; font-weight:600; }
-  .grid-table th { text-align:left; padding:6px 8px; font-size:10px; font-weight:600; color:#fff; background:#222; text-transform:uppercase; }
-  .grid-table td { padding:6px 8px; font-size:12px; border-bottom:1px solid #f1f5f9; }
-  .result { display:inline-block; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:700; color:#fff; }
-  .photos { display:flex; flex-wrap:wrap; gap:8px; padding:12px; }
-  .photos img { width:120px; height:120px; object-fit:cover; border-radius:8px; border:1px solid #e2e8f0; }
-  .issue { display:flex; gap:8px; padding:10px 16px; border-bottom:1px solid #f1f5f9; }
-  .issue-step { font-size:11px; font-weight:700; color:#b91c1c; }
-  .issue-remark { font-size:12px; color:#7f1d1d; margin-top:2px; }
-  .foot { text-align:center; font-size:9px; color:#bbb; margin-top:30px; padding-top:10px; border-top:1px solid #eee; }
+/**
+ * Report stylesheet — red masthead, red section rules, red-headed grid tables.
+ *
+ * Defined once and used by BOTH documents. The factory report used to carry its
+ * own older look (dark logo header, dark summary banner, grey card per section,
+ * header-less two-column tables), so the two reports the same checker hands over
+ * on the same day didn't look like the same document.
+ */
+const REPORT_STYLES = `
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 0; padding: 40px; color: #334155; font-size: 11px; }
+  .pdf-head { background:#fff5f5; border-bottom:2px solid #e01a1b; padding:16px 40px; margin:-40px -40px 20px; display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; }
+  .pdf-head h1 { color:#e01a1b; font-size:20px; font-weight:700; margin:0; }
+  .pdf-head .sub { color:#334155; font-size:11px; margin-top:5px; }
+  .pdf-head .gen { color:#64748b; font-size:9px; white-space:nowrap; padding-top:4px; }
+  .sec-title { color:#e01a1b; font-weight:700; font-size:12px; border-bottom:1.2px solid #e01a1b; padding-bottom:5px; margin:18px 0 8px; display:flex; align-items:baseline; justify-content:space-between; }
+  .sec-title .status { font-size:9px; font-weight:700; }
+  .wtab { width:100%; border-collapse:collapse; margin-bottom:6px; }
+  .wtab th { background:#fff5f5; color:#e01a1b; border:0.7px solid #e01a1b; font-size:9px; font-weight:700; text-align:left; padding:5px 6px; text-transform:uppercase; }
+  .wtab td { border:0.5px solid #e2e8f0; color:#334155; font-size:9.5px; padding:5px 6px; vertical-align:top; }
+  .wtab tbody tr:nth-child(even) td { background:#f8fafc; }
+  .note { color:#64748b; font-size:9px; margin:4px 0 10px; }
+  .grp { font-size:10px; font-weight:700; color:#334155; margin:10px 0 4px; }
+  .subhead { font-size:9px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; margin:12px 0 4px; }
+  .inline-photo { display:flex; align-items:center; gap:12px; margin:10px 0; }
+  .inline-photo img { width:90px; height:90px; object-fit:cover; border-radius:4px; border:0.5px solid #e2e8f0; }
+  .inline-photo span { font-size:9px; color:#64748b; font-style:italic; }
+  .thumbs { display:flex; flex-wrap:wrap; gap:10px; }
+  .thumb { width:31%; }
+  .thumb img { width:100%; height:110px; object-fit:cover; border:0.5px solid #e2e8f0; border-radius:4px; }
+  .thumb .cap { font-size:7px; color:#64748b; margin-top:2px; word-break:break-all; }
+  .sigwrap { margin-top:26px; border-top:0.7px solid #e01a1b; padding-top:16px; display:flex; gap:24px; }
+  .sigcol { flex:1; }
+  .sigrow { font-size:10px; margin-bottom:8px; color:#334155; }
+  .wfoot { margin-top:30px; padding-top:8px; border-top:0.5px solid #eee; font-size:8px; color:#64748b; }
 `;
 
-function m2cHeader(): string {
-  return `
-  <div class="m2c-head">
-    <div class="m2c-logo"><span>M2C</span></div>
-    <div>
-      <p class="m2c-name">M 2 C MarkDowns Private Limited</p>
-      <p class="m2c-sub">Quality Control Division</p>
-    </div>
-  </div>
-  <hr class="head-rule" />`;
-}
-
-function m2cFooter(): string {
-  return `<div class="foot">Confidential — M2C MarkDowns Pvt. Ltd.</div>`;
-}
-
 const kvRow = (label: string, value?: unknown) =>
-  `<tr><td class="k">${esc(label)}</td><td class="v">${esc(val(value))}</td></tr>`;
+  `<tr><td>${esc(label)}</td><td>${esc(val(value))}</td></tr>`;
 
-function kvSection(title: string, rows: [string, unknown][], status?: string, subheads?: string): string {
+// Grid table with a red header row, matching the product report's `wtab`.
+const kvTable = (rows: [string, unknown][], heads: [string, string] = ['Field', 'Value']): string => {
   const body = rows.filter(([, v]) => v !== undefined).map(([l, v]) => kvRow(l, v)).join('');
-  if (!body && !subheads) return '';
-  const statusHtml = status
-    ? `<span class="status" style="color:${statusColor(status)}">${status}</span>`
+  return body
+    ? `<table class="wtab"><thead><tr><th>${esc(heads[0])}</th><th>${esc(heads[1])}</th></tr></thead><tbody>${body}</tbody></table>`
     : '';
-  return `<div class="section"><div class="sh"><span>${esc(title)}</span>${statusHtml}</div>${
-    subheads || ''
-  }<table>${body}</table></div>`;
-}
-
-function statusColor(status: string): string {
-  return status === 'Verified' ? '#16a34a' : status === 'Issues Found' ? '#dc2626' : '#ca8a04';
-}
-
-// ── Section composition ─────────────────────────────────────────────────────
-// kvSection covers "heading + one table". Sections that interleave sub-headings,
-// tables and photos (A, B, C, H in the web report) compose these three instead.
-const kvTable = (rows: [string, unknown][]): string => {
-  const body = rows.filter(([, v]) => v !== undefined).map(([l, v]) => kvRow(l, v)).join('');
-  return body ? `<table>${body}</table>` : '';
 };
 
 const subhead = (title: string): string => `<div class="subhead">${esc(title)}</div>`;
@@ -307,20 +305,27 @@ const subhead = (title: string): string => `<div class="subhead">${esc(title)}</
 function sectionHtml(title: string, status: string | undefined, inner: string): string {
   if (!inner) return '';
   const statusHtml = status
-    ? `<span class="status" style="color:${statusColor(status)}">${status}</span>`
+    ? `<span class="status" style="color:${statusColor(status)}">${esc(status)}</span>`
     : '';
-  return `<div class="section"><div class="sh"><span>${esc(title)}</span>${statusHtml}</div>${inner}</div>`;
+  return `<div class="sec-title"><span>${esc(title)}</span>${statusHtml}</div>${inner}`;
 }
 
-// A single inline photo with its caption beside it — the report's Company Logo,
-// Owner Profile Photo and Main Contact Photo all render this way.
+// A single inline photo beside its caption — Company Logo, Owner Profile Photo,
+// Main Contact Photo.
 function inlinePhoto(src: unknown, caption: string): string {
   if (!src || typeof src !== 'string') return '';
   if (!(src.startsWith('http') || src.startsWith('data:image'))) return '';
-  return `<div style="display:flex;align-items:center;gap:12px;margin:10px 0">
-    <img src="${src}" alt="${esc(caption)}" style="width:90px;height:90px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0"/>
-    <span style="font-size:11px;color:#64748b;font-style:italic">${esc(caption)}</span>
-  </div>`;
+  return `<div class="inline-photo"><img src="${src}" alt="${esc(caption)}"/><span>${esc(caption)}</span></div>`;
+}
+
+function kvSection(title: string, rows: [string, unknown][], status?: string, subheads?: string): string {
+  const table = kvTable(rows);
+  if (!table && !subheads) return '';
+  return sectionHtml(title, status, (subheads || '') + table);
+}
+
+function statusColor(status: string): string {
+  return status === 'Verified' ? '#16a34a' : status === 'Issues Found' ? '#dc2626' : '#ca8a04';
 }
 
 function photoBlock(photos: any[] | undefined | null, label: string): string {
@@ -330,12 +335,13 @@ function photoBlock(photos: any[] | undefined | null, label: string): string {
       const src = typeof p === 'string' ? p : p?.data || p?.url;
       const isImg = src && typeof src === 'string' && (src.startsWith('http') || src.startsWith('data:image'));
       const caption = (typeof p !== 'string' && (p?.label || p?.name)) || `${label} ${i + 1}`;
+      // Caption under each thumbnail, as the product report prints them.
       return isImg
-        ? `<img src="${src}" alt="${esc(caption)}"/>`
-        : `<div style="width:120px;height:120px;background:#f1f5f9;border-radius:8px;border:1px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:10px;color:#94a3b8;text-align:center;padding:4px">${esc(caption)}</div>`;
+        ? `<div class="thumb"><img src="${src}" alt="${esc(caption)}"/><div class="cap">${esc(caption)}</div></div>`
+        : `<div class="thumb"><div style="height:110px;background:#f8fafc;border:0.5px dashed #cbd5e1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#94a3b8;text-align:center;padding:4px">${esc(caption)}</div></div>`;
     })
     .join('');
-  return `<div class="subhead">${esc(label)} (${photos.length})</div><div class="photos">${imgs}</div>`;
+  return `${subhead(`${label} (${photos.length})`)}<div class="thumbs">${imgs}</div>`;
 }
 
 // ── Canonical signature page / internal banner ──────────────────────────────
@@ -393,11 +399,7 @@ export function buildFactoryHtml(report: any, variant: ReportVariant, checkerNam
   const isNewFormat = fd && typeof fd.verifications === 'object' && fd.verifications !== null;
   const vf: VF = isNewFormat ? (fd.verifications as VF) : {};
   const v: Record<string, any> = report?.vendor || {};
-  const reportId: string = report?.id || '';
-  const ref = reportId ? reportId.slice(-8).toUpperCase() : '—';
   const vendorName = v.companyName || fd.vendorName || 'Report';
-  const resultColor =
-    report?.result === 'PASSED' ? '#059669' : report?.result === 'FAILED' ? '#dc2626' : '#6b7280';
 
   let sections = '';
 
@@ -544,21 +546,21 @@ export function buildFactoryHtml(report: any, variant: ReportVariant, checkerNam
     if (activeFacilities.length > 0 || !blank(v.productionCapacity)) {
       let facHtml = '';
       if (!blank(v.productionCapacity)) {
-        facHtml += `<div class="subhead">Overall Production Capacity</div><table>${kvRow('Monthly Production Capacity', v.productionCapacity)}</table>`;
+        facHtml +=
+          subhead('Overall Production Capacity') +
+          kvTable([['Monthly Production Capacity', v.productionCapacity]]);
       }
       activeFacilities.forEach((fk) => {
         const details = facilityDetails[fk] || {};
-        const rows = Object.entries(details)
-          .filter(([, dv]) => !blank(dv))
-          .map(([dk, dv]) => kvRow(dk.replace(/([A-Z])/g, ' $1').trim(), dv))
-          .join('');
-        facHtml += `<div class="subhead">${esc(FACILITY_LABELS[fk])}</div><table>${
-          kvRow('Facility Status', 'Active — declared') + rows
-        }</table>`;
+        const rows: [string, unknown][] = [
+          ['Facility Status', 'Active — declared'],
+          ...Object.entries(details)
+            .filter(([, dv]) => !blank(dv))
+            .map(([dk, dv]) => [dk.replace(/([A-Z])/g, ' $1').trim(), dv] as [string, unknown]),
+        ];
+        facHtml += subhead(FACILITY_LABELS[fk]) + kvTable(rows, ['Detail', 'Value']);
       });
-      sections += `<div class="section"><div class="sh"><span>F. Manufacturing Facilities</span><span class="status" style="color:${statusColor(
-        sectionStatus(vf, ['mf_']),
-      )}">${sectionStatus(vf, ['mf_'])}</span></div>${facHtml}</div>`;
+      sections += sectionHtml('F. Manufacturing Facilities', sectionStatus(vf, ['mf_']), facHtml);
     }
 
     // G. Certifications & Quality Control
@@ -566,17 +568,16 @@ export function buildFactoryHtml(report: any, variant: ReportVariant, checkerNam
     if (certifications.length > 0 || !blank(v.complianceStandards) || !blank(v.packagingCapabilities)) {
       let certHtml = '';
       if (certifications.length > 0) {
-        certHtml += `<div class="subhead">Quality Certifications</div><table class="grid-table"><tr><th>Certificate Name</th><th>Expiry Date</th><th>Description</th></tr>${certifications
+        certHtml += `${subhead('Quality Certifications')}<table class="wtab"><thead><tr><th>Certificate Name</th><th>Expiry Date</th><th>Description</th></tr></thead><tbody>${certifications
           .map((c: any) => `<tr><td>${esc(val(c.name))}</td><td>${esc(fmtDate(c.expiryDate))}</td><td>${esc(val(c.description))}</td></tr>`)
-          .join('')}</table>`;
+          .join('')}</tbody></table>`;
       }
-      const stdRows =
-        (!blank(v.complianceStandards) ? kvRow('Compliance Standards', v.complianceStandards) : '') +
-        (!blank(v.packagingCapabilities) ? kvRow('Packaging Capabilities', v.packagingCapabilities) : '');
-      if (stdRows) certHtml += `<div class="subhead">Standards & Packaging</div><table>${stdRows}</table>`;
-      sections += `<div class="section"><div class="sh"><span>G. Certifications & Quality Control</span><span class="status" style="color:${statusColor(
-        sectionStatus(vf, ['cert_', 'certDoc_']),
-      )}">${sectionStatus(vf, ['cert_', 'certDoc_'])}</span></div>${certHtml}</div>`;
+      const stdTable = kvTable([
+        ['Compliance Standards', blank(v.complianceStandards) ? undefined : v.complianceStandards],
+        ['Packaging Capabilities', blank(v.packagingCapabilities) ? undefined : v.packagingCapabilities],
+      ]);
+      if (stdTable) certHtml += subhead('Standards & Packaging') + stdTable;
+      sections += sectionHtml('G. Certifications & Quality Control', sectionStatus(vf, ['cert_', 'certDoc_']), certHtml);
     }
 
     // H. Contact & Trade Information — the named contact person, their photo,
@@ -650,15 +651,17 @@ export function buildFactoryHtml(report: any, variant: ReportVariant, checkerNam
     // J. Issues Found
     const issues = allEntries.filter(([, e]) => e.ok === false);
     if (issues.length > 0) {
-      const issueHtml = issues
+      // Step | Field | Remarks, as the web report prints it — the field name was
+      // previously folded into the step line and effectively lost.
+      const issueHtml = `<table class="wtab"><thead><tr><th>Step</th><th>Field</th><th>Remarks</th></tr></thead><tbody>${issues
         .map(
           ([k, e]) =>
-            `<div class="issue"><div><div class="issue-step">${esc(stepForKey(k))}</div><div class="issue-remark">${
-              e.remarks ? esc(e.remarks) : '<i>No remarks provided.</i>'
-            }</div></div></div>`,
+            `<tr><td>${esc(stepForKey(k))}</td><td>${esc(fieldLabelForKey(k))}</td><td>${
+              e.remarks ? esc(e.remarks) : '—'
+            }</td></tr>`,
         )
-        .join('');
-      sections += `<div class="section"><div class="sh"><span>J. Issues Found</span></div>${issueHtml}</div>`;
+        .join('')}</tbody></table>`;
+      sections += sectionHtml('J. Issues Found', undefined, issueHtml);
     }
 
     // K. Inspection Details
@@ -691,23 +694,41 @@ export function buildFactoryHtml(report: any, variant: ReportVariant, checkerNam
     ]);
     if (timing.exceeded) sections += overtimeNote(timing.scheduledMs, timing.activeMs);
 
-    // Inspector evidence photos. The vendor's registration photos are printed in
-    // B (Warehouse Images); these are the shots the checker took on the visit,
-    // so they stay a section of their own rather than being mixed in.
-    const evidence = Array.isArray(fd.factoryPhotos) ? fd.factoryPhotos : [];
+    // Inspector evidence photos — the shots the checker took on the visit. The
+    // vendor's registration photos are printed in B (Warehouse Images).
+    //
+    // Three payload shapes have to be read, or the section prints empty for
+    // whoever submitted it: the app posts `factoryEvidence` (an object keyed by
+    // slot — nameBoard, frontView, routeMap and the warehouse trio), web posts
+    // `inspectorEvidenceImages` (an array of {label, dataUrl}), and older rows
+    // carry `factoryPhotos`.
+    const evidence: any[] = [
+      ...(Array.isArray(fd.inspectorEvidenceImages) ? fd.inspectorEvidenceImages : []),
+      ...(Array.isArray(fd.factoryPhotos) ? fd.factoryPhotos : []),
+      ...(fd.factoryEvidence && typeof fd.factoryEvidence === 'object'
+        ? Object.entries(fd.factoryEvidence)
+            .filter(([, photo]: [string, any]) => photo?.url || photo?.data)
+            .map(([slot, photo]: [string, any]) => ({
+              // "warehouseNameBoard" → "Warehouse Name Board"
+              name: photo.name || slot.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()).trim(),
+              url: photo.url || photo.data,
+            }))
+        : []),
+    ].map((p: any) => ({ ...p, url: p?.url || p?.data || p?.dataUrl, name: p?.name || p?.label }));
+
     if (evidence.length > 0) {
-      sections += `<div class="section"><div class="sh"><span>L. Inspector Evidence Photos</span></div>${photoBlock(
-        evidence,
-        'Inspector Evidence Photos',
-      )}</div>`;
+      sections += sectionHtml(
+        'L. Inspector Evidence Photos',
+        undefined,
+        photoBlock(evidence, 'Inspector Evidence Photos'),
+      );
     }
   } else {
     // ── Legacy 7-step form fallback (old app reports) ──
     const assignedItems = Array.isArray(report?.itemsToInspect) ? report.itemsToInspect : [];
-    sections += `<div class="section"><div class="sh"><span>Legacy Report Format</span></div><table>${kvRow(
-      'Note',
-      'This inspection was submitted using the legacy form format.',
-    )}</table></div>`;
+    sections += kvSection('Legacy Report Format', [
+      ['Note', 'This inspection was submitted using the legacy form format.'],
+    ]);
     sections += kvSection('Section 1 — Factory Details', [
       ['Vendor Name', fd.vendorName],
       ['Factory Name', fd.factoryName],
@@ -744,20 +765,20 @@ export function buildFactoryHtml(report: any, variant: ReportVariant, checkerNam
       ['Remarks', fd.inspectorRemarks || report?.notes],
     ]);
     if (Array.isArray(fd.factoryPhotos) && fd.factoryPhotos.length > 0) {
-      sections += `<div class="section"><div class="sh"><span>Section 7 — Evidence</span></div>${photoBlock(
-        fd.factoryPhotos,
-        'Factory Photos',
-      )}</div>`;
+      sections += sectionHtml(
+        'Section 7 — Evidence',
+        undefined,
+        photoBlock(fd.factoryPhotos, 'Factory Photos'),
+      );
     }
     if (assignedItems.length > 0) {
-      sections += `<div class="section"><div class="sh"><span>Items Assigned for Inspection</span></div><div style="padding:12px">${assignedItems
-        .map(
-          (it: any) =>
-            `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:8px"><div style="font-weight:600">${esc(
-              it.itemName,
-            )}</div>${it.description ? `<div style="font-size:11px;color:#6b7280;margin-top:2px">${esc(it.description)}</div>` : ''}</div>`,
-        )
-        .join('')}</div>`;
+      sections += sectionHtml(
+        'Items Assigned for Inspection',
+        undefined,
+        `<table class="wtab"><thead><tr><th>Item</th><th>Description</th></tr></thead><tbody>${assignedItems
+          .map((it: any) => `<tr><td>${esc(it.itemName)}</td><td>${esc(val(it.description))}</td></tr>`)
+          .join('')}</tbody></table>`,
+      );
     }
   }
 
@@ -773,27 +794,22 @@ export function buildFactoryHtml(report: any, variant: ReportVariant, checkerNam
       ? signaturePage('Factory Inspection Report', dateStr, checkerName || fd.inspectorName || report?.checker?.name)
       : internalBanner(checkerName);
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${STYLES}</style></head><body>
-  ${m2cHeader()}
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+  // Same masthead the product report uses: red title band, "<vendor> ·
+  // Inspector: <name>", generated timestamp on the right. The dark summary
+  // banner is gone — its four values already appear in the sections below.
+  const inspectorName = checkerName || fd.inspectorName || report?.checker?.name || '';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${REPORT_STYLES}</style></head><body>
+  <div class="pdf-head">
     <div>
       <h1>Factory Inspection Report</h1>
-      <p style="font-size:12px;color:#6b7280;margin:0">${esc(vendorName)} &bull; REF: ${ref}</p>
+      <div class="sub">${esc(vendorName)}${inspectorName ? `  &middot;  Inspector: ${esc(inspectorName)}` : ''}</div>
     </div>
-    ${report?.result ? `<span class="result" style="background:${resultColor}">${esc(report.result)}</span>` : ''}
-  </div>
-  <div class="banner">
-    <div class="banner-item"><div class="banner-label">Vendor</div><div class="banner-value">${esc(vendorName)}</div></div>
-    <div class="banner-item"><div class="banner-label">Client</div><div class="banner-value">${esc(report?.clientName)}</div></div>
-    <div class="banner-item"><div class="banner-label">Completed On</div><div class="banner-value">${
-      report?.completedAt ? esc(new Date(report.completedAt).toLocaleDateString('en-IN')) : '—'
-    }</div></div>
-    <div class="banner-item"><div class="banner-label">Priority</div><div class="banner-value">${esc(report?.priority)}</div></div>
+    <div class="gen">Generated: ${esc(fmtDateTime(new Date()))}</div>
   </div>
   ${sections}
   ${selfieHtml}
   ${closing}
-  ${m2cFooter()}
+  <div class="wfoot">M2C — Confidential Factory Inspection Report</div>
   </body></html>`;
 }
 
@@ -814,7 +830,11 @@ function buildSelfieHtml(fd: any): string {
     })
     .join('');
   if (!tiles.trim()) return '';
-  return `<div class="section"><div class="sh"><span>Selfie Verification</span></div><div style="display:flex;gap:16px;padding:16px">${tiles}</div></div>`;
+  return sectionHtml(
+    'Selfie Verification',
+    undefined,
+    `<div style="display:flex;gap:16px;padding:8px 0">${tiles}</div>`,
+  );
 }
 
 // ── Product report HTML — faithful HTML port of the web PDF ─────────────────
@@ -928,27 +948,13 @@ export function buildProductHtml(report: any, variant: ReportVariant, checkerNam
   const pkgCount = (fd.packagingPhotos || []).length;
   if (pkgCount > 0) body += note(`Packaging Photos: ${pkgCount} photo(s) attached`);
 
-  // ── F. Defects — AQL Summary ──
-  body += secTitle('F. Defects — AQL Summary');
-  body += gridTable(['Field', 'Value'], [
-    ['Inspection Level', val(fd.inspectionLevel)],
-    ['Sample Size', val(fd.sampleSize)],
-    ['AQL Critical', val(fd.aqlCritical)],
-    ['AQL Major', val(fd.aqlMajor)],
-    ['AQL Minor', val(fd.aqlMinor)],
-  ]);
-  body += gridTable(['Severity', 'Found', 'Max Allowed', 'Details'], [
-    ['Critical', String(fd.criticalDefects ?? 0), String(fd.maxAllowedCritical ?? 0), val(fd.criticalDefectDetails)],
-    ['Major', String(fd.majorDefects ?? 0), String(fd.maxAllowedMajor ?? 0), val(fd.majorDefectDetails)],
-    ['Minor', String(fd.minorDefects ?? 0), String(fd.maxAllowedMinor ?? 0), val(fd.minorDefectDetails)],
-  ]);
-  const defCount = (fd.defectPhotos || []).length;
-  if (defCount > 0) body += note(`Defect Photos: ${defCount} photo(s) attached`);
-
-  // ── G. Testing ──
+  // ── F. Testing ──
+  // Testing precedes Defects here, matching the web report: the tests are what
+  // the AQL summary then counts against, and the two documents must letter their
+  // sections identically or a report can't be discussed by section.
   const testGroups: any[] = Array.isArray(fd.testGroups) ? fd.testGroups : [];
   if (testGroups.length > 0) {
-    body += secTitle('G. Testing');
+    body += secTitle('F. Testing');
     for (const group of testGroups) {
       const tests: any[] = Array.isArray(group.tests) ? group.tests : [];
       const gPass = tests.filter((t) => t.pass).length;
@@ -973,6 +979,23 @@ export function buildProductHtml(report: any, variant: ReportVariant, checkerNam
       body += `<div class="grp">Additional Evidence</div>` + gridTable(['Category', 'Photos'], evRows);
     }
   }
+
+  // ── G. Defects — AQL Summary ──
+  body += secTitle('G. Defects — AQL Summary');
+  body += gridTable(['Field', 'Value'], [
+    ['Inspection Level', val(fd.inspectionLevel)],
+    ['Sample Size', val(fd.sampleSize)],
+    ['AQL Critical', val(fd.aqlCritical)],
+    ['AQL Major', val(fd.aqlMajor)],
+    ['AQL Minor', val(fd.aqlMinor)],
+  ]);
+  body += gridTable(['Severity', 'Found', 'Max Allowed', 'Details'], [
+    ['Critical', String(fd.criticalDefects ?? 0), String(fd.maxAllowedCritical ?? 0), val(fd.criticalDefectDetails)],
+    ['Major', String(fd.majorDefects ?? 0), String(fd.maxAllowedMajor ?? 0), val(fd.majorDefectDetails)],
+    ['Minor', String(fd.minorDefects ?? 0), String(fd.maxAllowedMinor ?? 0), val(fd.minorDefectDetails)],
+  ]);
+  const defCount = (fd.defectPhotos || []).length;
+  if (defCount > 0) body += note(`Defect Photos: ${defCount} photo(s) attached`);
 
   // ── H. Inspector Details ──
   const timing = timingRows({
