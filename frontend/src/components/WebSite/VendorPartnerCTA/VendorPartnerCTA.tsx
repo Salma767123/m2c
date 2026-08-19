@@ -39,9 +39,15 @@ import Reveal from '@/components/WebSite/Shared/Reveal';
  * The colours are sampled from the artwork rather than matched by eye: navy
  * #0c1e38, gold #bd8023, the button's brighter gold #f8b341, cream ground
  * #f9f2e9. m2cseller-photo.webp is the photograph cut straight out of
- * m2cseller.png (source box 1240,132 557x661, right of the badge and inside the
- * artwork's white margin) — 56KB against the original's 1602KB, and the full
- * PNG no longer loads on this page at all.
+ * m2cseller.png — source box 1324,132 473x661: right of the badge, inside the
+ * artwork's white margin, and 84px further right than the first attempt, which
+ * sliced a fourth figure in half and left her as a strip of shoulder and hair
+ * down the photo's leading edge. 55KB against the original's 1602KB, and the
+ * full PNG no longer loads on this page at all.
+ *
+ * That leading edge matters more than it looks: the panel is 335x176 against a
+ * 557-wide source, so `cover` scales by WIDTH and crops nothing horizontally —
+ * whatever sits at the source's left edge is on screen, every time.
  */
 
 /** The four perk titles, verbatim from the artwork. */
@@ -116,16 +122,27 @@ export default function VendorPartnerCTA() {
                 src="/assets/images/banner/m2cseller-photo.webp"
                 alt=""
                 loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover object-[50%_12%] transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                /* origin-left, not the default centre. Scaling from the centre
+                   walks the photo's left edge outward on hover, which drags
+                   darker content up against the cream and turns a soft join
+                   into a hard vertical line — the edge appearing to "cut".
+                   Anchored left, that edge never moves: the zoom grows to the
+                   right, into the panel, where it is clipped and unseen. */
+                className="absolute inset-0 h-full w-full origin-left object-cover object-[50%_12%] transition-transform duration-700 ease-out group-hover:scale-[1.03]"
               />
-              {/* Fades the photo's cut edge into the cream so the two halves
+              {/* Softens the photo's cut edge into the cream so the two halves
                   read as one panel rather than as a picture pasted beside text.
                   The stop fades to the ground's own colour at zero alpha —
                   `transparent` is rgba(0,0,0,0) and would drag the midpoint
-                  through black, leaving a grey smear along the seam. */}
+                  through black, leaving a grey smear along the seam.
+
+                  Narrower than it was: at 5rem the wash reached far enough in to
+                  sit on the nearest face, which is the wrong thing to fog. The
+                  crop it has to hide is only an edge now, not a sliced figure,
+                  so it needs less room to do it. */}
               <span
                 aria-hidden
-                className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-linear-to-r from-[#f2e6d5] to-[rgba(242,230,213,0)]"
+                className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-linear-to-r from-[#f2e6d5] via-[rgba(242,230,213,0.55)] to-[rgba(242,230,213,0)]"
               />
             </div>
           </Link>

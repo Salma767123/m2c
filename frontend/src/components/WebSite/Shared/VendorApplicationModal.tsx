@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Send, Store, X, Building2, FileText, Globe, Mail, Phone, User, Check, Loader2 } from 'lucide-react';
-import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { showCenterNotice } from '@/components/UI/CenterNotice';
 import { enquiryService } from '@/services/enquiryService';
 
 const EMPTY = {
@@ -158,13 +158,67 @@ export default function VendorApplicationModal({
       setGstError('');
       setGstTouched(false);
       onClose();
-      showSuccessToast(
-        'Application Submitted!',
-        'Thank you for your interest! We will review your application and get back to you soon.',
+      // Centre-screen rather than a corner toast: submitting an application is
+      // the end of a task, and the confirmation should stop you rather than
+      // slide past in the corner while you are looking at the form.
+      //
+      // 9s, well past the 2s default: this message is about twice as long as a
+      // plain acknowledgement and it carries the one instruction that matters —
+      // that the registration link arrives by email — so it has to survive long
+      // enough to actually be read.
+      showCenterNotice(
+        'success',
+        'Thank You!',
+        'We’ve received your enquiry. The vendor registration link will be sent to your registered email, or our team will contact you shortly.',
+        9000,
+        'Done',
       );
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '';
-      showErrorToast('Submission Failed', message || 'Unable to submit application. Please try again.');
+      // Logged in full, shown in plain language. The API's own string used to
+      // reach the customer whenever it returned one, which is how an internal
+      // message ends up in front of a shopper.
+      console.error('Vendor application error:', error);
+      /**
+       * 409 is not a failure, it is an answer.
+       *
+       * The API refuses a second enquiry from an address that already has one
+       * awaiting review (enquiryController: findFirst on email + status
+       * 'pending', then 409). Verified against the live endpoint — a fresh
+       * address returns 201, the same address again returns 409 with "An
+       * enquiry with this email is already pending review."
+       *
+       * That case must not say "Try Again", because trying again with the same
+       * address cannot ever succeed; it would send someone round a loop with no
+       * exit. Amber rather than red, and rather than the `info` blue, which is
+       * the one colour this storefront has none of: nothing here is broken.
+       *
+       * enquiryService rethrows with the status attached — it used to collapse
+       * the axios error into `new Error(message)`, which kept the text and lost
+       * the code, so this case could not be told apart at all.
+       */
+      const status = (error as { status?: number } | null)?.status;
+
+      if (status === 409) {
+        showCenterNotice(
+          'warning',
+          'Already Applied',
+          'We already have an enquiry pending for this email address. Our team will be in touch with you shortly.',
+          9000,
+          'Close',
+        );
+        return;
+      }
+
+      // The modal is deliberately NOT closed on failure — the form is still
+      // behind this, still filled in — so "Try Again" dismisses straight back
+      // onto it rather than sending anyone off to start over.
+      showCenterNotice(
+        'error',
+        'Something Went Wrong',
+        'We couldn’t submit your enquiry. Please try again, or contact us if the issue continues.',
+        7000,
+        'Try Again',
+      );
     } finally {
       setIsSubmitting(false);
     }
