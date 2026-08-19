@@ -21,6 +21,11 @@ interface CategoryHeroProps {
 /**
  * The banner that opens edge to edge and lands as a card.
  *
+ * Resting heights are 210 / 255 / 300px, down about a quarter from 280 / 340 /
+ * 400. The opening heights came down with them, keeping the open-to-rest ratio
+ * near 1.65 — that ratio is the whole gesture, so cutting the resting height
+ * alone would have left a collapse out of all proportion to where it lands.
+ *
  * ── Why this is a component and not markup in two files ───────────────────
  *
  * It was written inside Products.tsx, so /categories carried its own
@@ -84,8 +89,8 @@ export default function CategoryHero({
            Percentages, not vw: 100vw includes the scrollbar, which would leave
            the card about 7px wider than the grid on either side. */
         .cat-hero {
-          --cat-open: min(70vh, 430px);
-          --cat-rest: 280px;
+          --cat-open: min(56vh, 330px);
+          --cat-rest: 210px;
           --rail: max(1rem, calc((100% - 105rem) / 2));
           --lift: 1rem;
           --cat-radius: 1rem;
@@ -117,8 +122,8 @@ export default function CategoryHero({
 
         @media (min-width: 640px) {
           .cat-hero {
-            --cat-open: min(74vh, 540px);
-            --cat-rest: 340px;
+            --cat-open: min(60vh, 420px);
+            --cat-rest: 255px;
             --rail: max(1.5rem, calc((100% - 105rem) / 2));
             --lift: 1.5rem;
             --cat-radius: 1.5rem;
@@ -126,8 +131,8 @@ export default function CategoryHero({
         }
         @media (min-width: 1024px) {
           .cat-hero {
-            --cat-open: min(78vh, 660px);
-            --cat-rest: 400px;
+            --cat-open: min(64vh, 500px);
+            --cat-rest: 300px;
             --rail: max(2rem, calc((100% - 105rem) / 2));
           }
         }

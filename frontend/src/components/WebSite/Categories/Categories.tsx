@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Package } from 'lucide-react';
+import { Package, LifeBuoy, Search, MessageCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { categoryService } from '@/services/categoryService';
 import Reveal from '@/components/WebSite/Shared/Reveal';
 import CategoryHero from '@/components/WebSite/Shared/CategoryHero';
 import TopSelling from '@/components/WebSite/Featured/TopSelling';
 import NoticeBoard from '@/components/WebSite/NoticeBoard/NoticeBoard';
+import SectionBackdrop from '@/components/WebSite/Shared/SectionBackdrop';
 
 interface Category {
   id: string;
@@ -195,29 +196,79 @@ export default function Categories() {
       {/* What's Happening — live offers / coupons board */}
       <NoticeBoard />
 
-      {/* Need Help card */}
+      {/* ── Need Help ─────────────────────────────────────────────────────
+          The card was bg-[#f7f7f5] on a bg-gray-50 page — #f7f7f5 against
+          #f9fafb, which is the same colour to any eye — held apart only by a
+          1px ring and a 2px shadow. It did not read as a card at all, just as
+          text that happened to be centred at the bottom of the page.
+
+          A warm ground of its own, a mark to arrive at, and motion. The words
+          are untouched.
+
+          The card is a plain div and the animation lives on its contents. A
+          <Reveal> carries `will-change: transform`, which opens a containing
+          block that survives `.is-visible` resetting the transform — the trap
+          that catches absolutely-positioned children elsewhere in this
+          codebase, and SectionBackdrop is nothing but absolutely-positioned
+          children. */}
       <div className="pb-10 sm:pb-12 lg:pb-16">
         <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <Reveal className="bg-[#f7f7f5] rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-5 sm:p-6 lg:p-8 text-center">
-            <h2 className="font-playfair text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a1a1a] mb-3 sm:mb-4 tracking-tight">Need Help?</h2>
-            <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
-              Use our search feature or contact our support team for assistance finding specific products.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-              <Link
-                href="/products"
-                className="btn-shine inline-flex items-center justify-center gap-2 bg-[#e01a1b] text-white px-6 py-3 rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 font-semibold text-sm sm:text-base"
-              >
-                Search Products
-              </Link>
-              <Link
-                href="/contact"
-                className="inline-flex items-center justify-center gap-2 border border-[#e01a1b] text-[#e01a1b] px-6 py-3 rounded-full hover:bg-[#e01a1b] hover:text-white transition-all duration-300 font-semibold text-sm sm:text-base"
-              >
-                Contact Support
-              </Link>
+          <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-[#fdf8f6] via-white to-[#faece8] p-6 text-center ring-1 ring-[#f0dcd6] shadow-[0_20px_60px_-34px_rgba(26,20,22,0.35)] sm:p-8 lg:p-12">
+            {/* The same drifting dot grid, blur blobs and outline rings the
+                product sections use — so the card has something living in it
+                rather than being a still panel. */}
+            <SectionBackdrop />
+
+            <div className="relative">
+              {/* Staggered rather than simultaneous: 0, 90, 180, 270ms, so the
+                  block assembles downward instead of appearing all at once. */}
+              <Reveal className="mb-5 flex justify-center">
+                {/* No halo behind the mark. It pulsed on a loop at the top of
+                    the block and read as a vibration rather than as emphasis —
+                    a support card should be calm. The mark just sits there; the
+                    staggered entrance is the only movement it needs. */}
+                <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-b from-[#fdf1ef] to-[#f9e3df] text-[#e01a1b] ring-1 ring-[#f0d5cf]">
+                  <LifeBuoy className="h-8 w-8" strokeWidth={1.6} />
+                </span>
+              </Reveal>
+
+              <Reveal delay={90}>
+                <h2 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl md:text-3xl">
+                  Need Help?
+                </h2>
+                {/* A short seam under the name — the one piece of brand colour
+                    that stops the three lines reading as one centred stack. */}
+                <span aria-hidden className="mx-auto mt-4 block h-[3px] w-12 rounded-full bg-[#e01a1b] sm:w-14" />
+              </Reveal>
+
+              <Reveal delay={180}>
+                <p className="mx-auto mt-5 max-w-xl text-sm text-balance text-gray-600 sm:text-base">
+                  Use our search feature or contact our support team for assistance finding specific products.
+                </p>
+              </Reveal>
+
+              <Reveal delay={270}>
+                <div className="mt-6 flex flex-col justify-center gap-3 sm:mt-8 sm:flex-row sm:gap-4">
+                  <Link
+                    href="/products"
+                    className="btn-shine group inline-flex items-center justify-center gap-2 rounded-full bg-[#e01a1b] px-6 py-3 text-sm font-semibold text-white shadow-[0_6px_20px_rgba(224,26,27,0.3)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c41617] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] sm:text-base"
+                  >
+                    <Search className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
+                    Search Products
+                  </Link>
+                  {/* The outline button had no lift while the one beside it
+                      did, so the pair behaved like two different controls. */}
+                  <Link
+                    href="/contact"
+                    className="group inline-flex items-center justify-center gap-2 rounded-full border border-[#e01a1b] bg-white/70 px-6 py-3 text-sm font-semibold text-[#e01a1b] backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#e01a1b] hover:text-white hover:shadow-[0_12px_30px_rgba(224,26,27,0.28)] sm:text-base"
+                  >
+                    <MessageCircle className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
+                    Contact Support
+                  </Link>
+                </div>
+              </Reveal>
             </div>
-          </Reveal>
+          </div>
         </div>
       </div>
     </div>

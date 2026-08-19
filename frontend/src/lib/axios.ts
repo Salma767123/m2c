@@ -1,6 +1,29 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import { showErrorToast } from './toast-utils';
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    /**
+     * "I show my own error message — do not add yours."
+     *
+     * The interceptor below raises a corner toast for 403, 500 and network
+     * failures on every request in the app. That is a good safety net: a
+     * request that fails with nobody watching should never do so silently.
+     * But it fires whether or not the caller handled the error, so a form that
+     * shows its own message ends up telling the user twice — once in the
+     * middle of the screen and once in the corner, for a single click.
+     *
+     * Eight of the storefront's eleven forms show their own error, so this is
+     * not one page's quirk. Opt-in, so nothing changes for the 120-odd callers
+     * that say nothing: silence is still the safety net's job.
+     *
+     * A 401 is deliberately NOT covered. That branch signs the user out and
+     * redirects, which is behaviour, not a message.
+     */
+    skipErrorToast?: boolean;
+  }
+}
+
 // Every backend route is mounted under `/api`, while services call paths like
 // `/vendor-dashboard/chart`. Normalise the configured base so it always ends in
 // exactly one `/api` — whether or not NEXT_PUBLIC_API_URL already includes it —
@@ -80,6 +103,7 @@ axiosInstance.interceptors.response.use(
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
+      const quiet = error.config?.skipErrorToast === true;
 
       switch (status) {
         case 401:
@@ -124,7 +148,7 @@ axiosInstance.interceptors.response.use(
         case 403:
           // Geofence blocks ("Location mismatch") are handled by the inspection UI's
           // own warning card — don't double-toast them here as "Access Denied".
-          if (data?.error !== 'Location mismatch' && data?.error !== 'Location required') {
+          if (!quiet && data?.error !== 'Location mismatch' && data?.error !== 'Location required') {
             showErrorToast('Access Denied', data?.error || 'You do not have permission to perform this action');
           }
           break;
@@ -132,7 +156,9 @@ axiosInstance.interceptors.response.use(
           // Not found — let the caller decide whether to surface
           break;
         case 500:
-          showErrorToast('Server Error', data?.error || 'Internal server error. Please try again.');
+          if (!quiet) {
+            showErrorToast('Server Error', data?.error || 'Internal server error. Please try again.');
+          }
           break;
         default:
           break;
@@ -143,7 +169,9 @@ axiosInstance.interceptors.response.use(
       return Promise.reject({ message: errorMessage, status, data });
     } else if (error.request) {
       // Network error
-      showErrorToast('Network Error', 'Please check your internet connection.');
+      if (error.config?.skipErrorToast !== true) {
+        showErrorToast('Network Error', 'Please check your internet connection.');
+      }
       return Promise.reject({ message: 'Network error. Please check your connection.', status: 0, data: null });
     } else {
       return Promise.reject({ message: error.message || 'Request failed', status: 0, data: null });
