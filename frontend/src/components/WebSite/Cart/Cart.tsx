@@ -432,23 +432,28 @@ export default function Order() {
 
   if (!isHydrated || loading) {
     return (
-      <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8 font-sans">
+      <div className="min-h-screen bg-[#f9f5f2] py-4 sm:py-6 lg:py-8 font-sans">
         <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
           <div className="mb-5 sm:mb-6 lg:mb-8">
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <ShoppingCart className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-[#e01a1b] shrink-0" />
+              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                {/* The same mark as the loaded masthead, unanimated. The
+                    skeleton exists so the page does not jump when the cart
+                    arrives, which it would if the two headers differed. */}
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-linear-to-b from-[#fdf1ef] to-[#f9e3df] ring-1 ring-[#f2d9d3] sm:h-14 sm:w-14">
+                  <ShoppingCart className="h-6 w-6 text-[#e01a1b] sm:h-7 sm:w-7" strokeWidth={1.9} />
+                </span>
                 <div className="min-w-0">
                   <h1 className="font-playfair text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#1a1a1a] mb-1 sm:mb-2">Shopping Cart</h1>
-                  <p className="text-sm sm:text-base text-slate-600">Review your items and proceed to checkout</p>
+                  <p className="text-sm sm:text-base text-[#6b625b]">Review your items and proceed to checkout</p>
                 </div>
               </div>
             </div>
           </div>
           <div className="animate-pulse space-y-3 sm:space-y-4">
-            <div className="h-24 sm:h-32 bg-slate-200 rounded-xl sm:rounded-2xl"></div>
-            <div className="h-24 sm:h-32 bg-slate-200 rounded-xl sm:rounded-2xl"></div>
-            <div className="h-24 sm:h-32 bg-slate-200 rounded-xl sm:rounded-2xl"></div>
+            <div className="h-24 sm:h-32 bg-[#ece7e0] rounded-xl sm:rounded-2xl"></div>
+            <div className="h-24 sm:h-32 bg-[#ece7e0] rounded-xl sm:rounded-2xl"></div>
+            <div className="h-24 sm:h-32 bg-[#ece7e0] rounded-xl sm:rounded-2xl"></div>
           </div>
         </div>
       </div>
@@ -644,21 +649,98 @@ export default function Order() {
   const summary = calculateSummary()
 
   return (
-    <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8 font-sans">
+    <div className="min-h-screen bg-[#f9f5f2] py-4 sm:py-6 lg:py-8 font-sans">
+      <style>{`
+        /* ── The count leaving the cart ────────────────────────────────
+           Two halves of one gesture, played whenever the number of lines
+           changes: the basket rocks as though something has just been
+           dropped into it, and the count comes out from underneath it,
+           small and to the left, arriving where it sits.
+
+           They are tied together by a React key on the item count, so both
+           elements remount and replay the moment the count changes and at
+           no other time. Nothing is scheduled, nothing is timed out, and
+           there is no state to leave behind if the page unmounts mid-play.
+
+           Transform only. Both animate composited properties, so neither
+           can reflow the masthead or move the heading beside them.
+           (No backticks in here — this is a JS template literal.) */
+        @keyframes cartRock {
+          0%   { transform: rotate(0deg) scale(1) }
+          20%  { transform: rotate(-9deg) scale(1.07) }
+          44%  { transform: rotate(7deg) scale(1.04) }
+          68%  { transform: rotate(-3deg) scale(1.015) }
+          100% { transform: rotate(0deg) scale(1) }
+        }
+        .cart-mark {
+          animation: cartRock 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+          /* Low, so the badge tips on its bottom edge like something with
+             weight in it, rather than spinning about its middle. */
+          transform-origin: 50% 82%;
+        }
+
+        /* Starts small, low and tucked left — behind the basket — then
+           travels out to rest. The overshoot at 62% is what makes it read
+           as being tipped out rather than merely faded in. */
+        @keyframes countOut {
+          0%   { transform: translate(-14px, 4px) scale(0.5); opacity: 0 }
+          62%  { transform: translate(0, 0) scale(1.12); opacity: 1 }
+          100% { transform: translate(0, 0) scale(1); opacity: 1 }
+        }
+        .cart-count {
+          animation: countOut 520ms 90ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+
+        /* Anyone who has asked not to be moved gets both, instantly and
+           in place. The fill mode is "both", so the resting frame is the one
+           that sticks and nothing is left mid-rock or invisible.
+           (Note the wording: a backtick here would close this very
+           template literal, which is exactly how this block broke once.) */
+        @media (prefers-reduced-motion: reduce) {
+          .cart-mark, .cart-count { animation: none }
+        }
+      `}</style>
+
       <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         {/* Header — Order-page style with icon + count */}
         <div className="mb-5 sm:mb-6 lg:mb-8">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <ShoppingCart className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-[#e01a1b] shrink-0" />
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              {/* A mark, not a loose glyph.
+                  A bare 28px basket is thin for the one symbol this page is
+                  named after, and `items-center` was centring it across a
+                  TWO-LINE block — so it came to rest in the gap between the
+                  title and the line under it, touching neither. Given a chip
+                  of its own it has a size and a position: tall enough to span
+                  both lines, and aligned to them rather than to the space
+                  between them.
+
+                  The chip is what rocks now. The glyph alone had barely any
+                  area to move, so the gesture was easy to miss; a 56px badge
+                  tilting on its lower edge is the same movement, legible. */}
+              <span
+                key={'cart-mark-' + cartItems.length}
+                className="cart-mark flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-linear-to-b from-[#fdf1ef] to-[#f9e3df] ring-1 ring-[#f2d9d3] sm:h-14 sm:w-14"
+              >
+                <ShoppingCart className="h-6 w-6 text-[#e01a1b] sm:h-7 sm:w-7" strokeWidth={1.9} />
+              </span>
               <div className="min-w-0">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">Shopping Cart</h1>
-                <p className="text-sm sm:text-base text-slate-600">Review your items and proceed to checkout</p>
+                {/* The count sits with the title, not at the far edge of the
+                    masthead. Pinned right it was a lone figure across a wide
+                    empty band, related to nothing beside it; here it reads as
+                    part of the heading it is counting. */}
+                <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 sm:mb-2">
+                  <h1 className="font-playfair text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-[#1a1a1a]">Shopping Cart</h1>
+                  <span
+                    key={'cart-count-' + cartItems.length}
+                    className="cart-count inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#6b625b] ring-1 ring-[#efe6df] sm:text-[13px]"
+                  >
+                    <span className="font-bold tabular-nums text-[#c41617]">{cartItems.length}</span>
+                    Items
+                  </span>
+                </div>
+                <p className="text-sm sm:text-base text-[#6b625b]">Review your items and proceed to checkout</p>
               </div>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="text-xl sm:text-2xl font-bold text-slate-900">{cartItems.length}</p>
-              <p className="text-xs sm:text-sm text-slate-600">Items</p>
             </div>
           </div>
         </div>
@@ -669,27 +751,46 @@ export default function Order() {
             {cartItems.length > 0 && (
               <div className="space-y-3 sm:space-y-4 lg:space-y-6">
                 {cartItems.map((item) => (
-                  <div key={item.id} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6 hover:shadow-md transition-shadow">
-                    <div className="flex items-start gap-3 sm:gap-4">
+                  <div key={item.id} className="group rounded-xl bg-white p-4 shadow-[0_1px_2px_rgba(90,60,40,0.05)] ring-1 ring-[#efe6df] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-18px_rgba(110,75,45,0.32)] hover:ring-[#e5d8cd] sm:rounded-2xl sm:p-5 lg:p-6">
+                    {/* Three columns from lg: picture, description, money.
+                        It was a two-column flex, and everything about money sat
+                        at the BOTTOM of the description column — so the unit
+                        price finished at the far left of the card and the
+                        stepper at the far right, roughly 700px apart, while the
+                        right ~40% of every card stayed empty. Reading "how many
+                        of these am I buying" meant crossing the whole card.
+
+                        Now money is one right-hand column: unit price, the
+                        stepper that changes it, and the line total, stacked in
+                        the order you ask the questions. Below lg it drops under
+                        the description as a full-width row, because at phone
+                        widths a third column is a third of nothing. */}
+                    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 sm:gap-4 lg:grid-cols-[auto_minmax(0,1fr)_11rem] lg:gap-6">
                       {/* Product Image */}
                       <div className="shrink-0">
                         {item.images && item.images.length > 0 ? (
-                          <Image
-                            src={item.images[0]}
-                            alt={item.name}
-                            width={96}
-                            height={96}
-                            className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-cover rounded-lg sm:rounded-xl border border-slate-200"
-                          />
+                          /* The frame crops and the picture moves inside it, so
+                             the card's own geometry never changes on hover —
+                             a photo that grew the box would nudge every line
+                             below it. */
+                          <div className="h-16 w-16 overflow-hidden rounded-lg ring-1 ring-[#efe6df] sm:h-20 sm:w-20 sm:rounded-xl md:h-24 md:w-24">
+                            <Image
+                              src={item.images[0]}
+                              alt={item.name}
+                              width={96}
+                              height={96}
+                              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.07]"
+                            />
+                          </div>
                         ) : (
-                          <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 flex items-center justify-center bg-gray-100 rounded-lg sm:rounded-xl border border-slate-200">
-                            <Package className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-gray-400" />
+                          <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-[#f6f1ea] ring-1 ring-[#efe6df] sm:h-20 sm:w-20 sm:rounded-xl md:h-24 md:w-24">
+                            <Package className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-[#c9aeab]" />
                           </div>
                         )}
                       </div>
 
                       {/* Product Details */}
-                      <div className="flex-1 min-w-0">
+                      <div className="min-w-0">
                         {/* Stock/price warnings */}
                         {!item.inStock ? (
                           <div className="flex items-center gap-1.5 mb-2 px-2.5 py-1.5 bg-red-50 rounded-lg w-fit">
@@ -703,34 +804,57 @@ export default function Order() {
                           </div>
                         ) : null}
 
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="min-w-0 flex-1">
-                            <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-1 break-words">{item.name}</h3>
+                        <div className="mb-2">
+                          <div className="min-w-0">
+                            <h3 className="text-base sm:text-lg font-semibold text-[#1a1a1a] mb-1 break-words">{item.name}</h3>
                             <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mb-2">
-                              {item.rating !== undefined && (
-                                <div className="flex items-center gap-1">
-                                  <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-400 fill-current" />
-                                  <span className="text-xs sm:text-sm text-slate-600">{item.rating}</span>
-                                  <span className="text-xs sm:text-sm text-slate-500">({item.reviews || 0})</span>
-                                </div>
-                              )}
+                              {/* Nothing at all until a product has been rated,
+                                  and the chip appears on its own the moment one
+                                  is — the condition is the live review count,
+                                  so no edit here is ever needed.
+
+                                  What this replaced showed a filled star beside
+                                  "(0)" on everything, because rating comes back
+                                  null for all but one product in the catalogue
+                                  and `{item.rating}` rendered as nothing. That
+                                  reads as a score of nought rather than as an
+                                  absence of one, which is the worse of the two
+                                  lies. Saying nothing is the honest third
+                                  option, and it keeps the card quiet until
+                                  there is something worth saying. */}
+                              {(item.reviews ?? 0) > 0 && item.rating ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-[#fdf8ee] px-2 py-0.5 text-xs font-semibold text-[#8a6a2f] ring-1 ring-[#f0e3c8]">
+                                  <Star className="h-3 w-3 fill-current text-[#e8a33d]" />
+                                  {item.rating}
+                                  <span className="font-medium text-[#b0a087]">({item.reviews})</span>
+                                </span>
+                              ) : null}
                             </div>
                             <div className="flex items-center flex-wrap gap-1.5 sm:gap-2">
                               {item.discount != null && item.discount > 0 ? (
-                                <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 sm:py-1 rounded-full font-semibold">
+                                <span className="inline-flex items-center rounded-full bg-[#fdf1ef] px-2 py-0.5 text-xs font-semibold text-[#c41617] ring-1 ring-[#f4dcd7] sm:py-1">
                                   Save {item.discount}%
                                 </span>
                               ) : null}
                             </div>
+                            {/* flex-wrap + nowrap per pair. This was a plain
+                                `flex gap-4`, so on a phone the label and the
+                                value competed for one cramped row and the
+                                VALUE lost: "Size: Set of 8" came out as three
+                                stacked lines, "38 x 42 cm" as four. Wrapping
+                                between pairs and never inside one keeps each
+                                fact on a single line. The old border-top is
+                                gone with it — it drew a rule across part of
+                                the card and stopped, which read as a mistake. */}
                             {item.variantDetails && (item.variantDetails.color || item.variantDetails.size) && (
-                              <div className="flex gap-4 mt-2 mb-2 text-sm text-slate-700 font-medium border-t border-slate-100 pt-2">
+                              <div className="mt-2 mb-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-[#4a423c]">
                                 {item.variantDetails.color && (
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-slate-500">Color:</span>
+                                  <div className="flex items-center gap-2 whitespace-nowrap">
+                                    <span className="text-[#8a807a]">Color:</span>
                                     <div className="flex items-center gap-1">
                                       {item.variantDetails.colorHex && (
                                         <div
-                                          className="w-3 h-3 rounded-full border border-slate-300"
+                                          className="w-3 h-3 rounded-full border border-[#e3dbd1]"
                                           style={{ backgroundColor: item.variantDetails.colorHex }}
                                         />
                                       )}
@@ -739,20 +863,27 @@ export default function Order() {
                                   </div>
                                 )}
                                 {item.variantDetails.size && (
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-slate-500">Size:</span>
+                                  <div className="flex items-center gap-2 whitespace-nowrap">
+                                    <span className="text-[#8a807a]">Size:</span>
                                     <span>{item.variantDetails.size}</span>
                                   </div>
                                 )}
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
+                        </div>
+
+                        {/* Item actions. In the description column rather than
+                            on a row of their own: a separate row is placed
+                            below the tallest column, so a line with a quantity
+                            above one pushed these down and left a void under
+                            the colour and size. */}
+                        <div className="mt-2 flex items-center gap-2">
                             <button
                               onClick={() => moveToWishlist(item)}
                               aria-label="Move to wishlist"
                               title="Move this item to your wishlist and remove it from the cart"
-                              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-[#e01a1b] hover:bg-[#e01a1b]/5 hover:text-[#e01a1b]"
+                              className="inline-flex items-center gap-1.5 rounded-full ring-1 ring-[#efe6df] px-2.5 py-1.5 text-xs font-semibold text-[#6b625b] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] hover:ring-[#f4dcd7]"
                             >
                               <Heart className="w-3.5 h-3.5" />
                               <span className="hidden sm:inline">Move to Wishlist</span>
@@ -762,21 +893,45 @@ export default function Order() {
                               onClick={() => removeItem(item.id)}
                               aria-label="Remove item"
                               title="Remove from cart"
-                              className="p-1.5 sm:p-2 text-slate-400 transition-colors hover:text-gray-600"
+                              className="rounded-full p-1.5 text-[#b3a99f] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] sm:p-2"
                             >
                               <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                             </button>
-                          </div>
                         </div>
+                      </div>
 
-                        {/* Price and Quantity */}
-                        <div className="flex items-center justify-between flex-wrap gap-3 mt-3 sm:mt-4">
+                      {/* ── Money ────────────────────────────────────────
+                          Unit price, the control that changes it, and what
+                          the line actually costs — in the order the questions
+                          get asked, and all within one glance of each other.
+
+                          A row under the description below lg, its own column
+                          from lg. Right-aligned there so the figures form a
+                          column the eye can run down across items, which is
+                          the only way to compare them without arithmetic. */}
+                      <div className="col-span-2 mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#f0e8df] pt-3 sm:mt-4 lg:col-span-1 lg:mt-0 lg:flex-col lg:items-end lg:justify-start lg:gap-2.5 lg:border-0 lg:pt-0 lg:text-right">
+                          {/* The big figure is what this LINE costs, not what one
+                              of them costs.
+
+                              It was the unit price, with the line total added
+                              underneath behind a "LINE TOTAL" label — which
+                              meant the largest number on the card was never the
+                              number the customer was checking, and the one that
+                              was arrived wearing a caption explaining itself.
+                              Promoting the total removes both problems: the
+                              label goes, and the unit price becomes the small
+                              print it always was.
+
+                              The struck price scales with it, or the comparison
+                              would be a line total against a single unit's
+                              original — a discount several times larger than
+                              the real one. */}
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-lg sm:text-xl font-bold text-slate-900">{formatPrice(item.price)}</span>
+                            <span className="text-xl font-bold tabular-nums text-[#1a1a1a] sm:text-[22px]">{formatPrice(item.price * item.quantity)}</span>
                             {item.offerStrikePrice ? (
-                              <span className="text-xs sm:text-sm text-slate-500 line-through">{formatPrice(item.offerStrikePrice)}</span>
+                              <span className="text-xs sm:text-sm text-[#8a807a] line-through tabular-nums">{formatPrice(item.offerStrikePrice * item.quantity)}</span>
                             ) : item.originalPrice ? (
-                              <span className="text-xs sm:text-sm text-slate-500 line-through">{formatPrice(item.originalPrice)}</span>
+                              <span className="text-xs sm:text-sm text-[#8a807a] line-through tabular-nums">{formatPrice(item.originalPrice * item.quantity)}</span>
                             ) : null}
                             {item.activeOffer && (
                               <span className="inline-flex items-center rounded-full bg-linear-to-r from-[#e01a1b] to-[#ff5a36] px-2 py-0.5 text-[10px] font-bold text-white">
@@ -793,20 +948,20 @@ export default function Order() {
                                 Only {item.availableStock} in stock
                               </span>
                             ) : null}
-                            <div className="flex items-center border border-slate-300 rounded-lg">
+                            <div className="flex items-center overflow-hidden rounded-full ring-1 ring-[#e9ded2]">
                               <button
                                 onClick={() => updateQuantity(item.id, item.productId, item.quantity - 1)}
                                 aria-label="Decrease quantity"
-                                className="p-1.5 sm:p-2 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                className="p-1.5 text-[#6b625b] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] disabled:cursor-not-allowed disabled:opacity-30 sm:p-2"
                                 disabled={!item.inStock || item.quantity <= 1}
                               >
                                 <Minus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                               </button>
-                              <span className="px-3 sm:px-4 py-1 sm:py-2 font-medium text-sm sm:text-base">{item.quantity}</span>
+                              <span className="px-3 py-1 text-sm font-semibold tabular-nums text-[#1a1a1a] sm:px-4 sm:py-2 sm:text-base">{item.quantity}</span>
                               <button
                                 onClick={() => updateQuantity(item.id, item.productId, item.quantity + 1)}
                                 aria-label="Increase quantity"
-                                className="p-1.5 sm:p-2 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                className="p-1.5 text-[#6b625b] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] disabled:cursor-not-allowed disabled:opacity-30 sm:p-2"
                                 disabled={!item.inStock || (item.availableStock != null && item.quantity >= item.availableStock)}
                               >
                                 <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -814,6 +969,29 @@ export default function Order() {
                             </div>
                           </div>
 
+                          {/* The unit price, now the small print.
+                              Only where there is more than one — at a quantity
+                              of one it would sit directly beneath an identical
+                              figure and say the same thing twice. */}
+                          {item.quantity > 1 && (
+                            <span className="text-xs font-medium tabular-nums text-[#8a807a]">
+                              {formatPrice(item.price)} each
+                            </span>
+                          )}
+
+                      </div>
+
+                      {/* ── Shipping ─────────────────────────────────────
+                          Its own row spanning the description and money
+                          columns, since it is about the line as a whole and is
+                          wider than an 11rem column can hold.
+
+                          Guarded on the wrapper, not just inside it: rendered
+                          unconditionally it left an empty box carrying a top
+                          margin under every line that has no shipping choice —
+                          which, in the current catalogue, is all of them. */}
+                      {transportOptionsFor(item).length >= 1 && (
+                      <div className="col-span-2 mt-3 lg:col-span-3 lg:col-start-2">
                           {/* Shipping method — only when the product actually offers a
                               choice. AIR and SHIP carry different rates and delivery
                               windows, so this changes what the customer pays. */}
@@ -840,13 +1018,13 @@ export default function Order() {
                             const mode = item.transportType || (Array.isArray(cfg.transportTypes) ? cfg.transportTypes[0] : undefined)
                             const days = mode === 'AIR' ? cfg.airDeliveryDays : cfg.shipDeliveryDays
                             return (
-                              <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3.5 py-2.5">
-                                <Truck className="w-4 h-4 text-slate-500" />
-                                <span className="text-xs font-medium text-slate-700">
-                                  Shipping: <span className="font-semibold text-slate-900">{mode === 'AIR' ? 'Air' : 'Sea'}</span>
-                                  {days ? <span className="text-slate-400"> · {days} days</span> : null}
-                                  {item.courier ? <span className="text-slate-400"> · </span> : null}
-                                  {item.courier ? <span className="font-semibold text-slate-900">{courierName(item.courier)}</span> : null}
+                              <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#efeae3] bg-[#faf7f3] px-3.5 py-2.5">
+                                <Truck className="w-4 h-4 text-[#8a807a]" />
+                                <span className="text-xs font-medium text-[#4a423c]">
+                                  Shipping: <span className="font-semibold text-[#1a1a1a]">{mode === 'AIR' ? 'Air' : 'Sea'}</span>
+                                  {days ? <span className="text-[#b3a99f]"> · {days} days</span> : null}
+                                  {item.courier ? <span className="text-[#b3a99f]"> · </span> : null}
+                                  {item.courier ? <span className="font-semibold text-[#1a1a1a]">{courierName(item.courier)}</span> : null}
                                 </span>
                                 <Link href={shippingHref} className="text-xs font-semibold text-[#e01a1b] hover:underline ml-1">
                                   Change
@@ -854,8 +1032,8 @@ export default function Order() {
                               </div>
                             )
                           })()}
-                        </div>
                       </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -865,9 +1043,9 @@ export default function Order() {
             {/* Empty State — Order-page style polished card */}
             {cartItems.length === 0 && (
               <Reveal className="bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] p-6 sm:p-8 lg:p-12 text-center">
-                <ShoppingCart className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 text-slate-300 mx-auto mb-3 sm:mb-4" />
+                <ShoppingCart className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 text-[#d9d0c6] mx-auto mb-3 sm:mb-4" />
                 <h3 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a] mb-2">Your cart is empty</h3>
-                <p className="text-sm sm:text-base text-slate-600 mb-5 sm:mb-6">Add some items to get started</p>
+                <p className="text-sm sm:text-base text-[#6b625b] mb-5 sm:mb-6">Add some items to get started</p>
                 <Link href="/products">
                   <button className="btn-shine inline-flex items-center justify-center gap-2 bg-[#e01a1b] text-white px-6 py-3 text-sm sm:text-base rounded-full font-semibold hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300">
                     Continue Shopping
@@ -880,8 +1058,13 @@ export default function Order() {
           {/* Order Summary */}
           {cartItems.length > 0 && (
             <div className="lg:col-span-1">
-              {/* Promo Code */}
-              <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6 mb-4 sm:mb-6">
+              {/* ── Summary ──────────────────────────────────────────────
+                  Promo code and totals in ONE card, not two stacked ones.
+                  They are a single job — work out what this costs — and
+                  splitting them put a heading, a border and a shadow between
+                  a customer and the only number they are looking for. */}
+              <div className="overflow-hidden rounded-xl bg-white shadow-[0_1px_2px_rgba(90,60,40,0.05)] ring-1 ring-[#efe6df] sm:rounded-2xl lg:sticky lg:top-8">
+              <div className="border-b border-[#f0e8df] p-4 sm:p-5 lg:p-6">
                 <h3 className="font-playfair text-base sm:text-lg font-semibold text-[#1a1a1a] mb-3 sm:mb-4">Promo Code</h3>
                 <div className="flex gap-2 sm:gap-3">
                   <input
@@ -889,7 +1072,7 @@ export default function Order() {
                     placeholder="Enter promo code"
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
-                    className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-slate-300 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] outline-none"
+                    className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-[#e3dbd1] rounded-lg sm:rounded-xl focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] outline-none"
                   />
                   <button
                     onClick={applyPromoCode}
@@ -930,20 +1113,18 @@ export default function Order() {
                 )}
               </div>
 
-
-              <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden lg:sticky lg:top-8">
-                <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-linear-to-r from-slate-50 to-white">
+                <div className="border-b border-[#f0e8df] bg-linear-to-r from-[#faf5ef] to-white px-4 py-3 sm:px-6 sm:py-4">
                   <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a]">Order Summary</h2>
                 </div>
 
                 <div className="p-4 sm:p-5 lg:p-6">
                   <div className="space-y-4 mb-6">
                     <div className="flex justify-between">
-                      <span className="text-slate-600">Subtotal</span>
-                      <span className="font-medium">{formatPrice(summary.subtotal)}</span>
+                      <span className="text-[#6b625b]">Subtotal</span>
+                      <span className="font-medium tabular-nums text-[#1a1a1a]">{formatPrice(summary.subtotal)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-600">Shipping</span>
+                      <span className="text-[#6b625b]">Shipping</span>
                       <span className="font-medium">
                         {summary.shipping === 0 ? (
                           <span className="text-green-600 flex items-center gap-1">
@@ -956,8 +1137,8 @@ export default function Order() {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-600">Tax (GST)</span>
-                      <span className="font-medium">{formatPrice(summary.tax)}</span>
+                      <span className="text-[#6b625b]">Tax (GST)</span>
+                      <span className="font-medium tabular-nums text-[#1a1a1a]">{formatPrice(summary.tax)}</span>
                     </div>
                     {summary.discount > 0 && (
                       <div className="flex justify-between text-green-600">
@@ -965,10 +1146,10 @@ export default function Order() {
                         <span className="font-medium">-{formatPrice(summary.discount)}</span>
                       </div>
                     )}
-                    <div className="border-t border-slate-200 pt-4">
-                      <div className="flex justify-between text-lg font-bold">
-                        <span>Total</span>
-                        <span>{formatPrice(summary.total)}</span>
+                    <div className="border-t border-[#f0e8df] pt-4">
+                      <div className="flex items-baseline justify-between font-bold text-[#1a1a1a]">
+                        <span className="text-base sm:text-lg">Total</span>
+                        <span className="text-xl tabular-nums sm:text-2xl">{formatPrice(summary.total)}</span>
                       </div>
                     </div>
                   </div>
@@ -976,7 +1157,7 @@ export default function Order() {
                   {cartItems.some(needsTransportChoice) ? (
                     <button
                       disabled
-                      className="w-full bg-slate-300 text-slate-500 font-semibold py-4 px-6 rounded-xl shadow-none flex items-center justify-center gap-2 mb-4 cursor-not-allowed"
+                      className="w-full bg-[#e8e2d9] text-[#8a807a] font-semibold py-4 px-6 rounded-xl shadow-none flex items-center justify-center gap-2 mb-4 cursor-not-allowed"
                     >
                       <Truck className="w-5 h-5" />
                       Choose a shipping method to proceed
@@ -984,7 +1165,7 @@ export default function Order() {
                   ) : cartItems.some(item => !item.inStock || (item.availableStock !== undefined && item.quantity > item.availableStock)) ? (
                     <button
                       disabled
-                      className="w-full bg-slate-300 text-slate-500 font-semibold py-4 px-6 rounded-xl shadow-none flex items-center justify-center gap-2 mb-4 cursor-not-allowed"
+                      className="w-full bg-[#e8e2d9] text-[#8a807a] font-semibold py-4 px-6 rounded-xl shadow-none flex items-center justify-center gap-2 mb-4 cursor-not-allowed"
                     >
                       <CreditCard className="w-5 h-5" />
                       Remove out of stock items to proceed
@@ -1012,8 +1193,8 @@ export default function Order() {
             <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Package className="w-6 h-6 sm:w-7 sm:h-7 text-[#e01a1b] shrink-0" />
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-slate-900">You Might Also Like</h2>
-                <p className="text-xs sm:text-sm text-slate-600">Similar products based on your cart</p>
+                <h2 className="font-playfair text-xl sm:text-2xl font-semibold text-[#1a1a1a]">You Might Also Like</h2>
+                <p className="text-xs sm:text-sm text-[#6b625b]">Similar products based on your cart</p>
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3">
@@ -1036,8 +1217,8 @@ export default function Order() {
                 <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
                   <s.Icon className="w-6 h-6 sm:w-7 sm:h-7 text-[#e01a1b] shrink-0" />
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900">{s.title}</h2>
-                    <p className="text-xs sm:text-sm text-slate-600">{s.subtitle}</p>
+                    <h2 className="font-playfair text-xl sm:text-2xl font-semibold text-[#1a1a1a]">{s.title}</h2>
+                    <p className="text-xs sm:text-sm text-[#6b625b]">{s.subtitle}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3">

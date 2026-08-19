@@ -50,7 +50,7 @@ export default function PaymentForm({ formData, updateFormData, paymentSettings 
     <div className="space-y-6">
       {/* Payment Method Selection */}
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-4">Payment Method</label>
+        <label className="block text-sm font-medium text-[#4a423c] mb-4">Payment Method</label>
         <div className="grid grid-cols-1 gap-4">
           {availablePaymentMethods.map((method) => {
             const Icon = method.icon
@@ -71,10 +71,10 @@ export default function PaymentForm({ formData, updateFormData, paymentSettings 
                   onChange={(e) => updateFormData("paymentMethod", e.target.value)}
                   className="mr-3 accent-[#e01a1b]"
                 />
-                <Icon className="w-5 h-5 mr-3 text-slate-600" />
+                <Icon className="w-5 h-5 mr-3 text-[#6b625b]" />
                 <div className="flex-1">
                   <span className="font-semibold text-[#1a1a1a]">{method.name}</span>
-                  <p className="text-xs text-slate-600">{method.description}</p>
+                  <p className="text-xs text-[#6b625b]">{method.description}</p>
                 </div>
               </label>
             )
@@ -84,9 +84,9 @@ export default function PaymentForm({ formData, updateFormData, paymentSettings 
 
       {/* Razorpay Payment Info */}
       {formData.paymentMethod === "razorpay" && (
-        <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
-          <h4 className="font-medium text-blue-900 mb-2">Razorpay Payment</h4>
-          <p className="text-sm text-blue-700">
+        <div className="rounded-xl border-l-2 border-[#e01a1b] bg-[#fdf6f4] p-4 ring-1 ring-[#f4e2de]">
+          <h4 className="mb-2 font-semibold text-[#1a1a1a]">Razorpay Payment</h4>
+          <p className="text-sm text-[#5a524b]">
             You will be redirected to Razorpay&apos;s secure payment gateway to complete your payment using cards, UPI, net banking, or wallets.
           </p>
         </div>

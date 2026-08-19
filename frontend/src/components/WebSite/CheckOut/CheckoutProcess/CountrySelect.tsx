@@ -101,10 +101,10 @@ export default function CountrySelect({
   };
 
   const baseStyle =
-    "w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#e01a1b]/40 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed outline-none transition-colors text-left bg-white";
+    "w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#e01a1b]/40 disabled:bg-[#f3ece5] disabled:text-[#8a807a] disabled:cursor-not-allowed outline-none transition-colors text-left bg-white";
   const triggerStyle = invalid
     ? `${baseStyle} border-red-500 focus:border-red-500`
-    : `${baseStyle} border-slate-300 focus:border-[#e01a1b]`;
+    : `${baseStyle} border-[#e5dbd0] focus:border-[#e01a1b]`;
 
   return (
     <div ref={containerRef} className="relative">
@@ -122,16 +122,16 @@ export default function CountrySelect({
         <span className="truncate">
           {selected ? `${selected.flag} ${selected.name}` : "Select country"}
         </span>
-        <svg className="h-4 w-4 shrink-0 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-4 w-4 shrink-0 text-[#8a807a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
-          <div className="p-2 border-b border-slate-100 bg-slate-50">
+        <div className="absolute z-30 mt-1 w-full bg-white border border-[#f0e8df] rounded-xl shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-[#f5efe8] bg-[#faf6f2]">
             <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#a2968b]" />
               <input
                 ref={inputRef}
                 type="text"
@@ -142,14 +142,14 @@ export default function CountrySelect({
                 }}
                 onKeyDown={handleKey}
                 placeholder="Search country, ISO code, or +phone code..."
-                className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:border-[#e01a1b] focus:ring-1 focus:ring-[#e01a1b]/40 outline-none"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-[#f0e8df] rounded-lg focus:border-[#e01a1b] focus:ring-1 focus:ring-[#e01a1b]/40 outline-none"
               />
             </div>
           </div>
 
           <div ref={listRef} role="listbox" className="max-h-64 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-slate-500">No countries match &quot;{query}&quot;</p>
+              <p className="px-4 py-3 text-sm text-[#8a807a]">No countries match &quot;{query}&quot;</p>
             ) : (
               filtered.map((c, idx) => {
                 const isSelected = c.isoCode === value;
@@ -165,12 +165,12 @@ export default function CountrySelect({
                     onClick={() => choose(c.isoCode)}
                     className={`w-full flex items-center justify-between gap-3 px-4 py-2 text-sm text-left transition-colors ${
                       isActive ? "bg-[#e01a1b]/5" : "bg-white"
-                    } ${isSelected ? "font-semibold text-[#1a1a1a]" : "text-slate-700"}`}
+                    } ${isSelected ? "font-semibold text-[#1a1a1a]" : "text-[#4a423c]"}`}
                   >
                     <span className="flex items-center gap-2 truncate">
                       <span className="shrink-0">{c.flag}</span>
                       <span className="truncate">{c.name}</span>
-                      <span className="text-xs text-slate-400 shrink-0">{c.phoneCode}</span>
+                      <span className="text-xs text-[#a2968b] shrink-0">{c.phoneCode}</span>
                     </span>
                     {isSelected && <Check className="w-4 h-4 text-[#e01a1b] shrink-0" />}
                   </button>

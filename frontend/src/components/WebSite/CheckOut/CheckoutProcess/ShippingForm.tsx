@@ -182,30 +182,30 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
     showError(field) ? `${field}-error` : undefined
 
   const inputStyle = (field: keyof CheckoutFormData) => {
-    const base = "w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#e01a1b]/40 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed outline-none transition-colors"
+    const base = "w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#e01a1b]/40 disabled:bg-[#f3ece5] disabled:text-[#8a807a] disabled:cursor-not-allowed outline-none transition-colors"
     return showError(field)
       ? `${base} border-red-500 focus:border-red-500`
-      : `${base} border-slate-300 focus:border-[#e01a1b]`
+      : `${base} border-[#e5dbd0] focus:border-[#e01a1b]`
   }
 
 
   return (
     <div className="space-y-6">
       {isPreFilled && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3 shadow-sm">
-          <svg className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex items-start gap-3 rounded-lg border-l-2 border-[#e01a1b] bg-[#fdf6f4] p-4 ring-1 ring-[#f4e2de]">
+          <svg className="w-5 h-5 text-[#e01a1b] mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <div className="text-sm text-blue-800">
-            <p className="font-semibold text-blue-900">Address auto-filled from your profile</p>
-            <p className="text-blue-600 mt-1">Filled: {preFilledFields.join(", ")}. You can edit any field if needed.</p>
+          <div className="text-sm text-[#5a524b]">
+            <p className="font-semibold text-[#1a1a1a]">Address auto-filled from your profile</p>
+            <p className="mt-1 text-[#6b625b]">Filled: {preFilledFields.join(", ")}. You can edit any field if needed.</p>
           </div>
         </div>
       )}
 
       {/* Country */}
       <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-2">
+        <label className="block text-sm font-semibold text-[#4a423c] mb-2">
           Country <span className="text-red-500">*</span>
         </label>
         <CountrySelect
@@ -217,7 +217,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
           ariaDescribedBy={describedBy("country")}
         />
         {country && (
-          <p className="text-xs text-slate-500 mt-1.5">
+          <p className="text-xs text-[#8a807a] mt-1.5">
             Shipping to {country.flag} {country.name} · Phone code {country.phoneCode}
           </p>
         )}
@@ -227,7 +227,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
       {/* Name — First / Middle / Last */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">First Name <span className="text-red-500">*</span></label>
+          <label className="block text-sm font-semibold text-[#4a423c] mb-2">First Name <span className="text-red-500">*</span></label>
           <input
             type="text"
             maxLength={50}
@@ -245,7 +245,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
           {renderError("firstName")}
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">Middle Name <span className="text-slate-400 font-normal">(Optional)</span></label>
+          <label className="block text-sm font-semibold text-[#4a423c] mb-2">Middle Name <span className="text-[#a2968b] font-normal">(Optional)</span></label>
           <input
             type="text"
             maxLength={50}
@@ -262,7 +262,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
           {renderError("middleName")}
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name <span className="text-red-500">*</span></label>
+          <label className="block text-sm font-semibold text-[#4a423c] mb-2">Last Name <span className="text-red-500">*</span></label>
           <input
             type="text"
             maxLength={50}
@@ -284,7 +284,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
       {/* Contact — Email / Phone */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">Email Address <span className="text-red-500">*</span></label>
+          <label className="block text-sm font-semibold text-[#4a423c] mb-2">Email Address <span className="text-red-500">*</span></label>
           <input
             type="email"
             maxLength={254}
@@ -302,9 +302,9 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
           {renderError("email")}
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
+          <label className="block text-sm font-semibold text-[#4a423c] mb-2">
             Phone Number <span className="text-red-500">*</span>
-            {country && <span className="text-slate-400 font-normal ml-2">({country.phoneCode})</span>}
+            {country && <span className="text-[#a2968b] font-normal ml-2">({country.phoneCode})</span>}
           </label>
           <input
             type="tel"
@@ -326,7 +326,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
 
       {/* Address Line 1 — full width (long field) */}
       <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-2">Address Line 1 <span className="text-red-500">*</span></label>
+        <label className="block text-sm font-semibold text-[#4a423c] mb-2">Address Line 1 <span className="text-red-500">*</span></label>
         <input
           type="text"
           maxLength={100}
@@ -347,7 +347,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
       {/* Address Line 2 / Line 3 / Landmark */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">Address Line 2 <span className="text-slate-400 font-normal">(Optional)</span></label>
+          <label className="block text-sm font-semibold text-[#4a423c] mb-2">Address Line 2 <span className="text-[#a2968b] font-normal">(Optional)</span></label>
           <input
             type="text"
             maxLength={100}
@@ -364,7 +364,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
           {renderError("addressLine2")}
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">Address Line 3 <span className="text-slate-400 font-normal">(Optional)</span></label>
+          <label className="block text-sm font-semibold text-[#4a423c] mb-2">Address Line 3 <span className="text-[#a2968b] font-normal">(Optional)</span></label>
           <input
             type="text"
             maxLength={100}
@@ -381,7 +381,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
           {renderError("addressLine3")}
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">Landmark <span className="text-slate-400 font-normal">(Optional)</span></label>
+          <label className="block text-sm font-semibold text-[#4a423c] mb-2">Landmark <span className="text-[#a2968b] font-normal">(Optional)</span></label>
           <input
             type="text"
             maxLength={100}
@@ -400,7 +400,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5">
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">City <span className="text-red-500">*</span></label>
+          <label className="block text-sm font-semibold text-[#4a423c] mb-2">City <span className="text-red-500">*</span></label>
           <input
             type="text"
             maxLength={50}
@@ -418,7 +418,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
           {renderError("city")}
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
+          <label className="block text-sm font-semibold text-[#4a423c] mb-2">
             State / Province <span className="text-red-500">*</span>
           </label>
           {hasStateList ? (
@@ -451,7 +451,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
           {renderError("state")}
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
+          <label className="block text-sm font-semibold text-[#4a423c] mb-2">
             {postalRule.label} <span className="text-red-500">*</span>
           </label>
           <input
