@@ -255,6 +255,13 @@ function CourierModal({ courier, onClose, onSaved }: { courier: Courier | null; 
             </div>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tracking website URL <span className="font-normal text-gray-400">(optional)</span></label>
+            <input value={form.trackingUrl || ''} onChange={(e) => set('trackingUrl', e.target.value)} placeholder="https://track.example.com/{tracking}"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#e01a1b]" />
+            <p className="text-xs text-gray-400 mt-1.5">Shown to the customer when they track this order. Use <code className="rounded bg-gray-100 px-1">{'{tracking}'}</code> where the tracking ID goes — otherwise it links to the courier&apos;s tracking page.</p>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Sort order</label>

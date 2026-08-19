@@ -1,12 +1,174 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Instagram, Facebook, Youtube, Mail, Phone, MapPin, ArrowUpRight } from "lucide-react";
+import { Instagram, Facebook, Youtube, Mail, Phone, ArrowRight } from "lucide-react";
 import { categoryService, Category } from "@/services/categoryService";
 import { companyInfoService, PublicCompanyInfo } from "@/services/companyInfoService";
 import CompanyLogo from "@/components/Shared/CompanyLogo";
-import Reveal from "@/components/WebSite/Shared/Reveal";
+import { useSamePageTop } from "@/components/WebSite/Shared/useSamePageTop";
+
+/**
+ * The footer.
+ *
+ * It carried a full loom for a while — vertical warp threads the whole height
+ * with the columns in the gaps, and a weft that wove across on arrival. The
+ * client didn't want the ruled pattern, so the ground is now a plain warm bone
+ * and the only rules left are the hairlines closing each link row, which are
+ * structure rather than pattern.
+ *
+ * Removed earlier, and still gone:
+ *  · the "— OUR PROMISE —" headline block, which repeated the eyebrow and the
+ *    layout of the section directly above it, and opened the footer with a
+ *    42px hero headline;
+ *  · its subtitle, which was the same sentence as the company column's
+ *    description 150px below it;
+ *  · the four trust badges, which were the third set on one page after
+ *    PromoStrip's — and which carried "Pan-India shipping" on a store that
+ *    runs NEXT_PUBLIC_SITE_REGION=US and prices in dollars;
+ *  · the grid, dot, twin-radial and drifting-contour layers — four decorative
+ *    passes behind the content, replaced by the weave;
+ *  · the "Stay Updated" newsletter column. Beyond taking three of the twelve
+ *    columns, its submit handler showed a "Subscribed" toast and then discarded
+ *    the address — there is no subscribe endpoint in the backend. It had been
+ *    collecting nothing while telling people otherwise.
+ *
+ * Let's Connect inherited that space, going from two columns (~236px, narrow
+ * enough that the email address had to truncate) to five.
+ */
+
+/**
+ * Clean white, not the warm bone this used to be.
+ *
+ * #f7f2ec was the same cream as half the page above it and read as beige
+ * rather than as a surface. White gives the footer its own zone, and it lands
+ * directly under the dark oxblood trust strip, so the edge between them is the
+ * sharpest on the page — the footer announces itself without needing a rule.
+ *
+ * The greys came with it. Every one in here was warm-toned to sit on cream
+ * (#6f625f, #4f4442, #e5d8cd, #b8503c); left alone on white they go muddy, and
+ * the beige would have survived in the ink after being removed from the
+ * ground. They are neutral now at the same lightness, so contrast is unchanged
+ * and only the temperature moved.
+ *
+ * Brand red and oxblood are untouched — they are the site's colours, not a
+ * temperature choice.
+ */
+/**
+ * No background here. The gradient lives on the <footer> wrapper so it can run
+ * unbroken across this block and the legal bar beneath it — see Footer.tsx.
+ */
+/**
+ * The wordmark is set to FIT, not to be cropped.
+ *
+ * It used to run at clamp(2.2rem, 12.2vw, 12.5rem) and overflow the container
+ * deliberately, so the final S was sliced by the edge. Two problems: it read as
+ * a bug rather than a crop, and vw keeps growing after the container stops at
+ * 1680px, so the wider the monitor the more of the word was lost.
+ *
+ * "M2C MARKDOWNS" measures about 9.3em wide in Outfit ExtraBold at this
+ * tracking (M and W are ~0.9em each, S and 2 ~0.6em). Against a 1616px content
+ * width that caps the type at ~174px; 160px leaves a margin for font fallback,
+ * where the metrics differ. 9.4vw keeps the same fit at every width below that.
+ */
+
+/**
+ * Column heading. The red→gold gradient dash is gone, and so is the numbering
+ * that briefly replaced it — a lead rule and the label alone, which is exactly
+ * how the eyebrows on Featured Products, Top Selling and Shop by Category are
+ * built. Oxblood rather than near-black, so the heading lifts off the ink of
+ * the rows beneath it.
+ */
+const ColHeading = ({ children }: { children: React.ReactNode }) => (
+  <h4 className="flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.24em] text-[#f5c8c2]">
+    <span aria-hidden className="h-px w-5 shrink-0 bg-[#f5c8c2]" />
+    {children}
+  </h4>
+);
+
+/**
+ * Footer nav link.
+ *
+ * The hairline under every row is gone. It was there to read as weft across a
+ * warp ground, and as an idea it worked — but fifteen full-width rules is the
+ * loudest texture in the footer, and what it actually reads as is a directory
+ * listing. It also made the ragged column bottoms (six links, five, four) into
+ * three hard lines stopping at three different heights.
+ *
+ * Nothing replaces it. Spacing separates the rows now, and hover does the rest.
+ *
+ * 14.5px was fine print, which is why the eye skipped the words and only took
+ * in the layout. 18px is navigation.
+ *
+ * Hover swaps the label. The word rides up out of the row and a red copy of it
+ * rises into the same place from below, both moving together inside a clipped
+ * box exactly one line tall. Nothing grows, slides sideways or underlines —
+ * the row simply changes state, which is a cleaner read at 18px than a rule
+ * racing across 236px of column.
+ *
+ * The second copy is aria-hidden: it is the same word twice in the DOM, and a
+ * screen reader should hear it once.
+ */
+const ROW =
+  "group flex w-full items-center gap-2.5 py-[7px] leading-none text-[#fdf6f1] transition-colors duration-300";
+const SWAP = "transition-transform duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-full";
+
+/**
+ * The swap itself, shared by every row in the footer. It lived inside NavLink
+ * at first, which meant the Let's Connect column — email, phone, socials — had
+ * only a colour change while the two columns beside it swapped, and one column
+ * behaving differently from its neighbours reads as a bug rather than a choice.
+ *
+ * The clip box is sized in em, not pixels, so it tracks the font size across
+ * breakpoints; a fixed pixel height crops the descenders at 18px.
+ */
+const SwapLabel = ({ label, wrapper = "", line = "" }: { label: string; wrapper?: string; line?: string }) => (
+  <span className={`relative block h-[1.4em] overflow-hidden ${wrapper}`}>
+    <span className={`block leading-[1.4] ${SWAP} ${line}`}>{label}</span>
+    <span aria-hidden className={`absolute inset-x-0 top-full block leading-[1.4] text-[#ffd9d4] ${SWAP} ${line}`}>
+      {label}
+    </span>
+  </span>
+);
+
+/**
+ * Clicking one of these while already on that page used to do nothing at all —
+ * see useSamePageTop for why, and for what it does instead.
+ */
+const NavLink = ({ href, label }: { href: string; label: string }) => {
+  const samePageTop = useSamePageTop();
+  return (
+    <Link href={href} onClick={samePageTop(href)} className={`${ROW} text-[17px] sm:text-[18px]`}>
+      <SwapLabel label={label} wrapper="min-w-0 flex-1" />
+    </Link>
+  );
+};
+
+/** Contact row — the same swap, with the icon leading it. */
+const ConnectRow = ({
+  href,
+  Icon,
+  label,
+  external = false,
+  clip = false,
+}: {
+  href: string;
+  Icon: typeof Instagram;
+  label: string;
+  external?: boolean;
+  clip?: boolean;
+}) => (
+  <a
+    href={href}
+    {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+    className={`${ROW} text-[16px]`}
+  >
+    <Icon className="h-4 w-4 shrink-0 text-[#eec4bd] transition-colors duration-300 group-hover:text-white" />
+    {/* The email overruns a 236px column, so its two copies truncate together —
+        applied to one only, the red copy would arrive a different length. */}
+    <SwapLabel label={label} wrapper="min-w-0 flex-1" line={clip ? "truncate" : ""} />
+  </a>
+);
 
 const MainFooterContent = () => {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -27,216 +189,239 @@ const MainFooterContent = () => {
     socialYoutube: null,
   });
 
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await categoryService.getAllCategories({
-          status: 'ACTIVE',
-          showRootOnly: 'true'
-        });
-        if (response.success && response.data) {
-          setCategories(response.data.slice(0, 6));
-        }
-      } catch (error) {
-        console.error("Failed to fetch categories for footer:", error);
-      }
-    };
+  const rootRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
-    fetchCategories();
-    companyInfoService.getPublicCompanyInfo().then(info => {
-      setCompanyInfo(info);
-    }).catch(() => {});
+  useEffect(() => {
+    categoryService.getAllCategories({ status: 'ACTIVE', showRootOnly: 'true' })
+      .then((res) => { if (res.success && res.data) setCategories(res.data.slice(0, 6)); })
+      .catch((e) => console.error("Failed to fetch categories for footer:", e));
+    companyInfoService.getPublicCompanyInfo().then(setCompanyInfo).catch(() => {});
   }, []);
 
-  const buildAddress = () => {
-    const parts = [companyInfo.registeredAddress, companyInfo.city, companyInfo.state, companyInfo.country].filter(Boolean);
-    return parts.join(', ');
-  };
+  /**
+   * TWO triggers, not one — and neither of them watches the footer.
+   *
+   * A single observer on the root at 10% fired after ~70px of a 700px footer,
+   * i.e. the moment its top edge appeared. That is roughly right for the
+   * columns, which sit at the top, and completely wrong for the wordmark, which
+   * sits at the very bottom: it had finished rising before it was ever on
+   * screen. Whatever is being animated has to be the thing observed.
+   *
+   * Not <Reveal> for either, for the same reason as the rest of the page: its
+   * 1.4s fail-safe fires whether the element has been reached or not.
+   */
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const targets: Array<[HTMLElement | null, string, number]> = [
+      [gridRef.current, 'is-woven', 0.12],
+    ];
+    if (typeof IntersectionObserver === 'undefined') {
+      targets.forEach(([, cls]) => root.classList.add(cls));
+      return;
+    }
+    const observers = targets.map(([el, cls, threshold]) => {
+      if (!el) return null;
+      const io = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) {
+            root.classList.add(cls);
+            io.disconnect();
+          }
+        },
+        // The last 5% of the viewport doesn't count, so nothing starts while
+        // it is still clipping the bottom edge.
+        { threshold, rootMargin: '0px 0px -5% 0px' },
+      );
+      io.observe(el);
+      return io;
+    });
+    return () => observers.forEach((io) => io?.disconnect());
+  }, []);
+
+  /**
+   * One set of social links, not two. Instagram and Facebook were rendered
+   * twice in this footer — as bare circles under the company blurb AND as
+   * labelled rows in Let's Connect — the same two destinations, 400px apart.
+   * YouTube moved in with them so no link was lost.
+   *
+   * They are tiles now rather than another set of text rows. Three more rows
+   * in the same column made the socials indistinguishable from navigation, and
+   * the footer is bone and oxblood throughout — each platform's own colour
+   * arriving on hover is the one moment of real colour in it, and it only
+   * appears when someone reaches for it.
+   *
+   * `fill` is passed down as a custom property because the value is per-row
+   * data, which a utility class cannot express.
+   */
+  const connectSocials = [
+    {
+      url: companyInfo.socialInstagram,
+      Icon: Instagram,
+      label: "Instagram",
+      fill: 'radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%)',
+    },
+    { url: companyInfo.socialFacebook, Icon: Facebook, label: "Facebook", fill: '#1877f2' },
+    { url: companyInfo.socialYoutube, Icon: Youtube, label: "YouTube", fill: '#ff0000' },
+  ].filter((s) => s.url) as { url: string; Icon: typeof Instagram; label: string; fill: string }[];
 
   return (
-    <div className="relative overflow-hidden bg-linear-to-b from-[#4d0e10] via-[#390a0c] to-[#230608] text-white">
-      {/* Live accent line across the very top of the footer */}
-      <div className="h-1 w-full animate-accent-bar" />
+    <div ref={rootRef} className="relative overflow-hidden text-[#fdf6f1]">
+      <style>{`
+        .m2c-col { opacity: 0; transform: translateY(22px); }
+        .is-woven .m2c-col {
+          opacity: 1; transform: none;
+          transition: opacity .6s ease, transform .7s cubic-bezier(0.22,1,0.36,1);
+        }
 
-      {/* Ambient glow for depth — subtle, premium, non-interactive */}
-      <div className="pointer-events-none absolute -top-24 -left-24 w-80 h-80 rounded-full bg-[#ff5a5b]/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-32 right-0 w-[28rem] h-[28rem] rounded-full bg-[#ff7a4d]/12 blur-3xl" />
-      {/* Faint grid/hairline texture overlay */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.05]"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
+        /* Each tile's own platform colour, washed in on hover. It lives on a
+           pseudo-element so the fill can cross-fade under the icon and label
+           rather than snapping, and so the resting border and the arriving
+           colour are not fighting over the same property. */
+        .m2c-social::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: var(--fill);
+          opacity: 0;
+          transition: opacity .35s ease;
+        }
+        .m2c-social:hover::before,
+        .m2c-social:focus-visible::before { opacity: 1 }
 
-      <div className="relative max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-10 sm:py-12 md:py-14 lg:py-20">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-8 md:gap-10 lg:gap-12">
-          {/* Company Info */}
-          <Reveal className="text-center sm:text-left lg:col-span-1">
-            <h4 className="text-white font-semibold mb-5 text-sm sm:text-base md:text-lg tracking-wide">
-              Our Company
-              <span className="block h-0.5 w-9 bg-[#ff8a8b] rounded-full mt-2.5 mx-auto sm:mx-0" />
-            </h4>
-            <div className="space-y-4 sm:space-y-5">
-              <div className="inline-block">
-                <Link href="/" className="block rounded-xl bg-white/95 p-2.5 ring-1 ring-white/10 transition-transform duration-300 hover:scale-[1.03]">
-                  <CompanyLogo
-                    className="object-cover w-28 sm:w-36 md:w-44 lg:w-48 h-auto"
-                    skeletonClassName="w-28 sm:w-36 md:w-44 lg:w-48 aspect-square bg-white/10"
-                    fallbackWidth={190}
-                    fallbackHeight={50}
-                    fallbackSizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
-                    priority
-                  />
-                </Link>
-              </div>
+        @media (prefers-reduced-motion: reduce) {
+          .m2c-col, .is-woven .m2c-col { opacity: 1; transform: none; transition: none; }
+          .m2c-social { transition: none }
+          .m2c-social::before { transition: none }
+        }
+      `}</style>
 
-              <p className="text-white/70 text-xs sm:text-sm md:text-base leading-relaxed max-w-xs sm:max-w-sm mx-auto sm:mx-0">
-                Premium home textiles manufacturer specializing in high-quality towels, kitchen aprons, table linens, and bath accessories. Crafted with finest cotton and sustainable materials for everyday comfort and durability.
-              </p>
+      <div className="relative mx-auto max-w-7xl px-4 pt-16 sm:px-6 sm:pt-20 lg:px-8 lg:pt-24 xl:max-w-420">
+        <div ref={gridRef} className="relative grid grid-cols-1 gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-12 lg:gap-x-10">
+          {/* Our Company */}
+          <div className="m2c-col min-w-0 sm:col-span-2 lg:col-span-3">
+            <Link href="/" className="inline-block">
+              <CompanyLogo
+                className="h-12 w-auto object-contain sm:h-14"
+                skeletonClassName="h-12 sm:h-14 w-40 bg-black/5"
+                fallbackWidth={220}
+                fallbackHeight={56}
+              />
+            </Link>
+            <p className="mt-5 max-w-[19rem] text-[14.5px] leading-[1.65] text-[#e8cfc9]">
+              Home textiles bought direct from the workshops that weave them — towels, aprons, table linen and bath accessories in cotton that lasts.
+            </p>
+            {/* Solid oxblood rather than a white pill on a warm ground. The
+                white pill was a second surface floating over the weave, the
+                same mismatch the newsletter card had. */}
+            <Link
+              href="/about"
+              className="group mt-6 inline-flex items-center gap-2 rounded-full bg-[#fdf6f1] px-6 py-2.5 text-[13px] font-semibold tracking-[0.04em] text-[#6b1b1e] transition-colors duration-200 hover:bg-white"
+            >
+              About M2C
+              <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
+            </Link>
+          </div>
+
+          {/* ── Shop ────────────────────────────────────────────────────
+              Categories lead, because that is what someone scrolling to the
+              foot of a shop is usually looking for. */}
+          <div className="m2c-col min-w-0 lg:col-span-2" style={{ transitionDelay: '80ms' }}>
+            <ColHeading>Shop</ColHeading>
+            <div className="mt-4 flex flex-col -ml-0.5">
+              <NavLink href="/products" label="All Products" />
+              <NavLink href="/categories" label="All Categories" />
+              {categories.slice(0, 4).map((c) => (
+                <NavLink key={c.id} href={`/categories/${c.slug}`} label={c.name} />
+              ))}
             </div>
-          </Reveal>
+          </div>
 
-          {/* Navigation Links */}
-          <Reveal delay={90} className="text-center sm:text-left">
-            <h4 className="text-white font-semibold mb-5 text-sm sm:text-base md:text-lg tracking-wide">
-              Navigation
-              <span className="block h-0.5 w-9 bg-[#ff8a8b] rounded-full mt-2.5 mx-auto sm:mx-0" />
-            </h4>
-            <ul className="space-y-3 md:space-y-3.5">
-              {[
-                { href: "/", label: "Home" },
-                { href: "/about", label: "About" },
-                { href: "/products", label: "Products" },
-                { href: "/contact", label: "Contact Us" },
-              ].map((item) => (
-                <li key={item.href} className="flex justify-center sm:justify-start">
-                  <Link
-                    href={item.href}
-                    className="link-underline text-white/70 text-xs sm:text-sm md:text-base hover:text-white transition-colors duration-300"
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Reveal>
+          {/* ── Help ────────────────────────────────────────────────────
+              The column this footer did not have. Every one of these pages
+              already existed and only Terms, Privacy and Returns were linked
+              at all — from the bottom bar, at 12px, under the copyright.
+              Track order, Returns & FAQ and Contact are the three things
+              people come to a shop's footer to find. */}
+          <div className="m2c-col min-w-0 lg:col-span-2" style={{ transitionDelay: '160ms' }}>
+            <ColHeading>Help</ColHeading>
+            <div className="mt-4 flex flex-col -ml-0.5">
+              <NavLink href="/order" label="Track Order" />
+              <NavLink href="/returns" label="Returns &amp; FAQ" />
+              <NavLink href="/contact" label="Contact Us" />
+              <NavLink href="/about" label="About M2C" />
+              <NavLink href="/offers" label="Offers" />
+            </div>
+          </div>
 
-          {/* Categories */}
-          <Reveal delay={180} className="text-center sm:text-left">
-            <h4 className="text-white font-semibold mb-5 text-sm sm:text-base md:text-lg tracking-wide">
-              Categories
-              <span className="block h-0.5 w-9 bg-[#ff8a8b] rounded-full mt-2.5 mx-auto sm:mx-0" />
-            </h4>
-            <ul className="space-y-3 md:space-y-3.5">
-              <li className="flex justify-center sm:justify-start">
-                <Link
-                  href="/categories"
-                  className="link-underline text-white/70 text-xs sm:text-sm md:text-base hover:text-white transition-colors duration-300"
-                >
-                  All Categories
-                </Link>
-              </li>
-              {categories.map((category) => (
-                <li key={category.id} className="flex justify-center sm:justify-start">
-                  <Link
-                    href={`/categories/${category.slug}`}
-                    className="link-underline text-white/70 text-xs sm:text-sm md:text-base hover:text-white transition-colors duration-300"
-                  >
-                    {category.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Reveal>
+          {/* ── Account ─────────────────────────────────────────────────
+              Signed out these still work: /profile and /wishlist bounce to
+              login, which is the normal behaviour for an account link. */}
+          <div className="m2c-col min-w-0 lg:col-span-2" style={{ transitionDelay: '200ms' }}>
+            <ColHeading>Account</ColHeading>
+            <div className="mt-4 flex flex-col -ml-0.5">
+              <NavLink href="/profile" label="My Account" />
+              <NavLink href="/profile" label="My Orders" />
+              <NavLink href="/wishlist" label="Wishlist" />
+              <NavLink href="/cart" label="Cart" />
+            </div>
+          </div>
 
-          {/* Contact Info */}
-          <Reveal delay={270} className="text-center sm:text-left">
-            <h4 className="text-white font-semibold mb-5 text-sm sm:text-base md:text-lg tracking-wide">
-              Contact Info
-              <span className="block h-0.5 w-9 bg-[#ff8a8b] rounded-full mt-2.5 mx-auto sm:mx-0" />
-            </h4>
-            <div className="space-y-4">
+          {/* Let's Connect — now holding the newsletter's three columns too */}
+          <div className="m2c-col min-w-0 sm:col-span-2 lg:col-span-3" style={{ transitionDelay: '240ms' }}>
+            <ColHeading>Let&apos;s Connect</ColHeading>
+
+            {/* Capped rather than run to the full five columns. The email is the
+                longest string here and it now fits without truncating; letting
+                the rows stretch to ~560px would leave the hairlines running far
+                past the words they close. */}
+            <div className="mt-5 flex max-w-[24rem] flex-col">
               {companyInfo.companyEmail && (
-                <a
-                  href={`mailto:${companyInfo.companyEmail}`}
-                  className="group flex items-start gap-3 justify-center sm:justify-start"
-                >
-                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15 text-white transition-colors duration-300 group-hover:bg-white group-hover:text-[#c41617]">
-                    <Mail className="w-4 h-4" />
-                  </span>
-                  <span className="text-white/70 text-xs sm:text-sm md:text-base break-all sm:break-normal group-hover:text-white transition-colors duration-300 self-center">
-                    {companyInfo.companyEmail}
-                  </span>
-                </a>
+                <ConnectRow href={`mailto:${companyInfo.companyEmail}`} Icon={Mail} label={companyInfo.companyEmail} clip />
               )}
               {companyInfo.companyPhone && (
-                <a
-                  href={`tel:${companyInfo.companyPhone}`}
-                  className="group flex items-start gap-3 justify-center sm:justify-start"
-                >
-                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15 text-white transition-colors duration-300 group-hover:bg-white group-hover:text-[#c41617]">
-                    <Phone className="w-4 h-4" />
-                  </span>
-                  <span className="text-white/70 text-xs sm:text-sm md:text-base group-hover:text-white transition-colors duration-300 self-center">
-                    {companyInfo.companyPhone}
-                  </span>
-                </a>
-              )}
-              {buildAddress() && (
-                <div className="flex items-start gap-3 justify-center sm:justify-start">
-                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15 text-white">
-                    <MapPin className="w-4 h-4" />
-                  </span>
-                  <p className="text-white/70 text-xs sm:text-sm md:text-base leading-relaxed max-w-xs sm:max-w-[13rem] text-center sm:text-left">
-                    {buildAddress()}{companyInfo.zipCode ? ` – ${companyInfo.zipCode}` : ''}
-                  </p>
-                </div>
-              )}
-
-              {/* Social Media Icons */}
-              {(companyInfo.socialInstagram || companyInfo.socialFacebook || companyInfo.socialYoutube) && (
-                <div className="flex justify-center sm:justify-start gap-3 pt-2">
-                  {[
-                    { url: companyInfo.socialInstagram, Icon: Instagram, label: "Instagram" },
-                    { url: companyInfo.socialFacebook, Icon: Facebook, label: "Facebook" },
-                    { url: companyInfo.socialYoutube, Icon: Youtube, label: "YouTube" },
-                  ]
-                    .filter((s) => s.url)
-                    .map(({ url, Icon, label }) => (
-                      <a
-                        key={label}
-                        href={url as string}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/5 ring-1 ring-white/10 flex items-center justify-center text-white hover:text-[#c41617] hover:bg-white hover:ring-white hover:-translate-y-1 hover:shadow-[0_10px_28px_rgba(0,0,0,0.45)] transition-all duration-300"
-                        aria-label={label}
-                      >
-                        <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                      </a>
-                    ))}
-                </div>
+                <ConnectRow href={`tel:${companyInfo.companyPhone}`} Icon={Phone} label={companyInfo.companyPhone} />
               )}
             </div>
-          </Reveal>
-        </div>
 
-        {/* Brand statement strip — modern hairline divider + tagline */}
-        <div className="mt-10 sm:mt-12 lg:mt-16 pt-6 sm:pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
-          <p className="font-playfair text-lg sm:text-xl md:text-2xl text-white/90 tracking-tight">
-            From Manufacturer <span className="text-[#ff8a8b] italic">to</span> your Home.
-          </p>
-          <Link
-            href="/products"
-            className="group inline-flex items-center gap-2 text-sm font-semibold text-white/80 hover:text-white transition-colors duration-300"
-          >
-            Explore the collection
-            <ArrowUpRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-          </Link>
+            {connectSocials.length > 0 && (
+              <>
+                <p className="mt-7 text-[11px] font-bold uppercase tracking-[0.2em] text-[#eecdc7]">Follow us</p>
+                <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+                  {connectSocials.map(({ url, Icon, label, fill }) => (
+                    <a
+                      key={label}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`${label} (opens in a new tab)`}
+                      style={{ '--fill': fill } as React.CSSProperties}
+                      title={label}
+                      className="m2c-social group relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full border border-white/20 bg-white/10 transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-0.5 hover:border-transparent hover:shadow-[0_12px_24px_-14px_rgba(74,50,38,0.6)]"
+                    >
+                      {/* The label was set beside the icon in a tile roughly
+                          130x96. Two of those is a lot of furniture to say
+                          "Instagram, Facebook" — everyone knows the glyphs, and
+                          the name survives on the accessible name and the
+                          tooltip. */}
+                      <Icon
+                        className="relative z-10 h-[18px] w-[18px] text-[#f8d5d0] transition-colors duration-300 group-hover:text-white"
+                        strokeWidth={1.8}
+                      />
+                    </a>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Space the divider used to hold. The rule stays gone — with one
+          continuous gradient there is nothing to separate — but the columns
+          still need to stop before the legal line starts. */}
+      <div aria-hidden className="h-12 sm:h-14" />
     </div>
   );
 };

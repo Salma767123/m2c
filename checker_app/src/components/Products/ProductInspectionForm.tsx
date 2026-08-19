@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Modal, Pressable, BackHandler } from 'react-native';
-import { ArrowLeft, ArrowRight, Check, RotateCcw, AlertTriangle, MapPin, X, Save, AlarmClockOff } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Check, RotateCcw, AlertTriangle, Save, AlarmClockOff } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isInspectionWindowElapsed, formatAssignmentWindow } from '@/lib/inspectionSchedule';
+import { GEOFENCE_DISABLED, captureCoordsForSubmit } from '@/lib/checkerLocation';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import qcCheckerService from '@/services/qcCheckerService';
 import { formatCheckerName } from '@/components/Vendor/Steps/fieldHelpers';
@@ -175,6 +176,11 @@ export default function ProductInspectionForm({
   // Physical vs virtual — chosen in the mandatory dialog before the form is usable.
   // Virtual inspections may upload photos from the gallery; physical are camera-only.
   const [inspectionType, setInspectionType] = useState<InspectionType | null>(null);
+  // True while acquiring GPS + running the start-time geofence check.
+  const [verifyingLocation, setVerifyingLocation] = useState(false);
+  // Set once the checker's on-site position has been verified this session, so
+  // the gate never re-prompts within the same open inspection.
+  const locationVerifiedRef = useRef(false);
 
   // ── Draft / resume state ────────────────────────────────────────────────
   // Held behind `hydrating` until the AsyncStorage read below settles.
@@ -188,7 +194,6 @@ export default function ProductInspectionForm({
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   // Reason the server refused to start this inspection, if it did. Shown as a
   // dismissible banner; it does not block the form.
-  const [startWarning, setStartWarning] = useState<string | null>(null);
   // The admin-booked window has elapsed — blocks the form entirely. Filling it in
   // would be wasted work: the server refuses the submit for the same reason.
   const [expiredError, setExpiredError] = useState<string | null>(null);
@@ -229,9 +234,63 @@ export default function ProductInspectionForm({
     AsyncStorage.setItem(typeKeyFor(productId), type).catch(() => {});
   };
 
+  /**
+   * Geofence gate for the START of a PHYSICAL product inspection (mirrors the
+   * web flow and the factory one). Virtual inspections and the
+   * ENABLE_GEOFENCE=false escape hatch skip it.
+   *
+   * The form used to open regardless and only learn about a location block at
+   * submit — seven steps later. Returns false when the checker isn't on-site,
+   * so the caller refuses to open the inspection.
+   */
+  const verifyPhysicalPresence = async (type: InspectionType): Promise<boolean> => {
+    if (type === 'VIRTUAL' || GEOFENCE_DISABLED) {
+      locationVerifiedRef.current = true;
+      return true;
+    }
+    setVerifyingLocation(true);
+    try {
+      const coords = await captureCoordsForSubmit(type); // throws if location is denied/off
+      const res = await qcCheckerService.startProductInspection(
+        productId,
+        coords ? { latitude: coords.latitude, longitude: coords.longitude } : null,
+      );
+      if (!res?.success) {
+        showErrorToast(
+          'Location check failed',
+          res?.message || "You must be at the vendor's product-handling site to begin a physical inspection.",
+        );
+        return false;
+      }
+      locationVerifiedRef.current = true;
+      return true;
+    } catch (e: any) {
+      // The booked window has passed — a hard block, not a location problem.
+      if (e?.data?.code === 'INSPECTION_EXPIRED' || e?.status === 409) {
+        setExpiredError(e?.message || 'This inspection can no longer be started.');
+        return false;
+      }
+      const detail =
+        e?.distanceMeters != null
+          ? ` You are ${Math.round(e.distanceMeters)}m away; the limit is ${e.thresholdMeters ?? 1000}m.`
+          : '';
+      showErrorToast(
+        'Location required',
+        (e?.message || "Enable location access — you must be at the vendor's site to begin a physical inspection.") + detail,
+      );
+      return false;
+    } finally {
+      setVerifyingLocation(false);
+    }
+  };
+
   // Called from the type dialog. A fresh inspection just starts; a paused resume
   // continues the draft on a matching type, or asks to discard on a different one.
-  const handleTypeChosen = (type: InspectionType) => {
+  const handleTypeChosen = async (type: InspectionType) => {
+    if (verifyingLocation) return;
+    // A physical inspection cannot open until the checker's position is verified
+    // against the vendor's registered product-handling site.
+    if (!(await verifyPhysicalPresence(type))) return;
     if (!isResume) {
       setInspectionType(type);
       persistType(type);
@@ -313,42 +372,10 @@ export default function ProductInspectionForm({
 
   // ── Form data ─────────────────────────────────────────────────────────────
   const prefilledRef = useRef<string | null>(null);
-  const startedRef = useRef<string | null>(null);
-
-  // Auto-start the inspection on mount (no selfie / GPS gate). Location is not
-  // sent, and a failed start does NOT block the form — submission stays the
-  // source of truth, same as before.
-  //
-  // What changed: the failure is no longer swallowed. The server's reason (most
-  // often a geofence block, now measured against the vendor's factory AND
-  // warehouse) is kept in state and shown as a dismissible banner. Silently
-  // discarding it meant the checker filled all seven steps and only discovered
-  // the block at submit.
-  useEffect(() => {
-    if (!productId || startedRef.current === productId) return;
-    startedRef.current = productId;
-    qcCheckerService.startProductInspection(productId).catch((err: any) => {
-      // "Location required" is the server answering the fact that this call
-      // deliberately sends no GPS — not a real problem the checker can act on.
-      // Surfacing it would fire on every single inspection. A genuine geofence
-      // rejection ("Location mismatch") means the server DID measure a position
-      // and refused it, and that is worth showing.
-      if (err?.data?.error === 'Location required') return;
-      // The booked window has passed (409 INSPECTION_EXPIRED). This is a hard
-      // block, not a warning — the same rule rejects the submit.
-      if (err?.data?.code === 'INSPECTION_EXPIRED' || err?.status === 409) {
-        setExpiredError(err?.message || 'This inspection can no longer be started.');
-        return;
-      }
-      const detail =
-        err?.distanceMeters != null
-          ? ` You are ${Math.round(err.distanceMeters)}m away; the limit is ${err.thresholdMeters ?? 1000}m.`
-          : '';
-      setStartWarning(
-        (err?.message || 'The server could not confirm the start of this inspection.') + detail,
-      );
-    });
-  }, [productId]);
+  // The inspection is started by verifyPhysicalPresence() when the checker picks
+  // a type — with GPS attached — rather than fire-and-forget on mount. Starting
+  // without coordinates only ever earned a "Location required" the checker could
+  // do nothing about, and left a physical inspection openable from anywhere.
 
   const [formData, setFormData] = useState<any>(() => makeDefaultFormData(productName, vendorName));
 
@@ -378,7 +405,17 @@ export default function ProductInspectionForm({
             draft = null; // malformed draft — start clean rather than crash
           }
         }
-        if (draft) setFormData((prev: any) => ({ ...prev, ...draft }));
+        // The Inspection Date is always the day the inspection is actually
+        // performed — never a stale value carried over by an old or reassigned
+        // draft. (Local date, not UTC: toISOString() rolls back a day in IST
+        // before 05:30.)
+        if (draft) {
+          setFormData((prev: any) => ({
+            ...prev,
+            ...draft,
+            serviceStartDate: new Date().toLocaleDateString('en-CA'),
+          }));
+        }
 
         setDraftInspectionType(savedType);
         // A resumable draft = a saved draft for an inspection whose type was already
@@ -387,7 +424,13 @@ export default function ProductInspectionForm({
         // has no saved type, so the dialog still shows, as the initial choice.)
         const hasResumableDraft = !!draft && !!savedType;
         setIsResume(hasResumableDraft);
-        setInspectionType(hasResumableDraft ? null : savedType);
+        // Always ask, on every entry. Restoring `savedType` here meant a checker
+        // who picked a type and left before anything was saved came back with the
+        // choice already made for them — and a physical/virtual mix-up decides
+        // whether the server geofences the inspection, so it must not be silent.
+        // `savedType` is still kept (as draftInspectionType) to detect a switch
+        // on resume and offer to discard the draft.
+        setInspectionType(null);
       } finally {
         if (!cancelled) setHydrating(false);
       }
@@ -712,8 +755,8 @@ export default function ProductInspectionForm({
 
   return (
     <View className="flex-1 bg-white">
-      {/* Mandatory type selection — shown until the checker chooses, and re-asked
-          when resuming a paused draft. Cancelling backs out of the inspection. */}
+      {/* Mandatory type selection — asked on every entry into the form, not just
+          the first. Cancelling backs out of the inspection. */}
       {!inspectionType && !discardConfirm && (
         <InspectionTypeDialog
           subjectName={productName}
@@ -721,6 +764,20 @@ export default function ProductInspectionForm({
           onCancel={onCancel}
         />
       )}
+
+      {/* Acquiring GPS can take a few seconds — without this the dialog looks
+          frozen after the tap. */}
+      <Modal visible={verifyingLocation} transparent animationType="fade">
+        <View className="flex-1 items-center justify-center" style={{ backgroundColor: 'rgba(15,23,42,0.6)' }}>
+          <View className="bg-white rounded-2xl px-6 py-5 items-center" style={{ rowGap: 10 }}>
+            <ActivityIndicator size="large" color="#e01a1b" />
+            <Text className="text-sm font-semibold text-slate-800">Checking your location…</Text>
+            <Text className="text-xs text-slate-500 text-center">
+              A physical inspection can only be started at the vendor&apos;s site.
+            </Text>
+          </View>
+        </View>
+      </Modal>
 
       {/* Discard-draft confirmation — shown when resuming with a DIFFERENT type
           than the saved draft, which cannot be carried over. */}
@@ -779,19 +836,6 @@ export default function ProductInspectionForm({
           <Text className="text-xs font-medium text-brand-700 ml-2">
             Editing from Review — tap Save & Continue to return.
           </Text>
-        </View>
-      )}
-
-      {!!startWarning && (
-        <View className="mx-4 mb-2 flex-row items-start bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-          <MapPin size={14} color="#b45309" style={{ marginTop: 2 }} />
-          <View className="flex-1 ml-2">
-            <Text className="text-xs font-bold text-amber-800">Inspection not confirmed by the server</Text>
-            <Text className="text-xs text-amber-800 mt-0.5">{startWarning}</Text>
-          </View>
-          <TouchableOpacity onPress={() => setStartWarning(null)} hitSlop={8} className="ml-2 p-0.5">
-            <X size={14} color="#b45309" />
-          </TouchableOpacity>
         </View>
       )}
 

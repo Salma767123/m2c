@@ -384,16 +384,7 @@ function FactoryReportsTab() {
                         <InspectionTypeChip type={row.inspectionType} />
                         {row.priority ? <PriorityChip priority={row.priority} /> : null}
                       </View>
-                      <View className="flex-row items-center flex-wrap" style={{ columnGap: 12, rowGap: 2 }}>
-                        <View className="flex-row items-center" style={{ gap: 4 }}>
-                          <CalendarDays size={11} color={colors.textFaint} />
-                          <AppText variant="labelSm" color={colors.textFaint}>Assigned {row.assignedDate}</AppText>
-                        </View>
-                        <View className="flex-row items-center" style={{ gap: 4 }}>
-                          <CalendarDays size={11} color={colors.textFaint} />
-                          <AppText variant="labelSm" color={colors.textFaint}>Completed {row.inspectionDate}</AppText>
-                        </View>
-                      </View>
+                      <DatePair assigned={row.assignedDate} completed={row.inspectionDate} />
                     </View>
                     <View style={{ flexShrink: 0 }}>
                       <ResultBadge result={row.result} />
@@ -680,11 +671,18 @@ function ProductReportsTab() {
           <View style={{ rowGap: 12 }}>
             {filteredProducts.map((p: any) => {
               const thumb = p.images?.[0]?.url;
-              const inspectedOn = p.updatedAt
-                ? new Date(p.updatedAt).toLocaleDateString('en-IN')
+              // Assigned = the admin's QC assignment date; Completed On = the
+              // checker's own submission (lastReviewedAt, backfilled server-side
+              // from the audit trail for legacy rows). These used to be the
+              // product's createdAt / updatedAt, which meant "Submitted" was the
+              // day the vendor created the product and "Inspected" moved every
+              // time anything on the row changed.
+              const assignedOn = p.qcAssignment?.assignedAt || p.qcAssignment?.scheduledDate;
+              const assignedLabel = assignedOn
+                ? new Date(assignedOn).toLocaleDateString('en-IN')
                 : '—';
-              const submittedOn = p.createdAt
-                ? new Date(p.createdAt).toLocaleDateString('en-IN')
+              const completedLabel = p.lastReviewedAt
+                ? new Date(p.lastReviewedAt).toLocaleDateString('en-IN')
                 : '—';
               const vendorCode = p.vendor?.vendorCode;
               const opening = openingId === p.id;
@@ -721,10 +719,7 @@ function ProductReportsTab() {
                       {vendorCode ? (
                         <AppText variant="bodySm" color={colors.textMuted} numberOfLines={1}>ID: {vendorCode}</AppText>
                       ) : null}
-                      <View className="flex-row items-center flex-wrap" style={{ gap: 4 }}>
-                        <CalendarDays size={11} color={colors.textFaint} />
-                        <AppText variant="labelSm" color={colors.textFaint}>Submitted {submittedOn} · Inspected {inspectedOn}</AppText>
-                      </View>
+                      <DatePair assigned={assignedLabel} completed={completedLabel} />
                     </View>
                     <View style={{ flexShrink: 0 }}>
                       {opening
@@ -771,6 +766,32 @@ function ProductReportsTab() {
 }
 
 // ─── Shared Components ───────────────────────────────────────────────────────
+
+/**
+ * The two report dates, as a labelled pair.
+ *
+ * They used to run together in one sentence ("Assigned Date 12 Aug 2026 ·
+ * Completed On 19 Aug 2026"), which wrapped mid-date on a narrow phone and left
+ * the reader working out where one date ended and the next began. Two aligned
+ * columns — small-caps label above the value — read at a glance and never wrap.
+ */
+function DatePair({ assigned, completed }: { assigned?: string; completed?: string }) {
+  const Item = ({ label, value }: { label: string; value?: string }) => (
+    <View style={{ minWidth: 96 }}>
+      <View className="flex-row items-center" style={{ gap: 4 }}>
+        <CalendarDays size={10} color="#94a3b8" />
+        <Text className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{label}</Text>
+      </View>
+      <Text className="text-[12px] font-semibold text-slate-600 mt-0.5">{value || '—'}</Text>
+    </View>
+  );
+  return (
+    <View className="flex-row mt-1" style={{ columnGap: 18 }}>
+      <Item label="Assigned" value={assigned} />
+      <Item label="Completed" value={completed} />
+    </View>
+  );
+}
 
 /**
  * Search field + filter trigger, identical to the Vendors and Products tabs.

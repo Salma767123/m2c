@@ -26,6 +26,13 @@ export interface CenterNotice {
   title: string;
   message?: string;
   duration: number;
+  /**
+   * Label for the dismiss button. Optional, and "OK" when it is not given —
+   * every existing caller keeps exactly the button it had. It exists because
+   * some confirmations end a task rather than merely reporting on one, and
+   * "Done" or "Try Again" tells the reader what dismissing this will do.
+   */
+  actionLabel?: string;
 }
 
 // How long the popup stays before it begins fading out.
@@ -50,7 +57,8 @@ export function showCenterNotice(
   type: NoticeType,
   title: string,
   message?: string,
-  duration = AUTO_CLOSE_MS
+  duration = AUTO_CLOSE_MS,
+  actionLabel?: string
 ): string {
   // Dedupe: if an identical notice (same type/title/message) is already showing,
   // reuse it instead of stacking a duplicate — guards against React StrictMode
@@ -59,7 +67,7 @@ export function showCenterNotice(
   if (existing) return existing.id;
   counter += 1;
   const id = `cn_${counter}`;
-  notices = [...notices, { id, type, title, message, duration }];
+  notices = [...notices, { id, type, title, message, duration, actionLabel }];
   emit();
   return id;
 }
@@ -137,7 +145,7 @@ function NoticeCard({ notice }: { notice: CenterNotice }) {
           onClick={close}
           className="mt-5 px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold rounded-lg transition-colors duration-200"
         >
-          OK
+          {notice.actionLabel ?? "OK"}
         </button>
       </div>
     </div>

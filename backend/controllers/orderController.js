@@ -9,7 +9,7 @@ const { resolveUsdRate, toINR, resolveUnitPrice } = require('../utils/orderCurre
 const { evaluateCoupon } = require('../utils/couponPricing');
 const { calculateLogistics, convertShippingToOrderCurrency, qualifiesForFreeShipping } = require('../utils/logistics');
 const { isVisibleInRegion } = require('../utils/regionVisibility');
-const { isValidCourier } = require('../utils/couriers');
+const { isCourierAvailable } = require('../utils/couriers');
 const { applyBestOffer, qualifyingThresholdIds } = require('../utils/offers');
 
 /** Round a money value to 2 decimals, avoiding float artefacts (e.g. 115.19999). */
@@ -311,7 +311,7 @@ const createOrder = async (req, res) => {
                         error: `Please choose a courier partner for "${product.name}" before placing the order.`,
                     });
                 }
-                if (!isValidCourier(item.courier, currency, lineTransport)) {
+                if (!(await isCourierAvailable(item.courier, currency, lineTransport))) {
                     return res.status(400).json({
                         success: false,
                         error: `The selected courier is not available for "${product.name}".`,
@@ -322,10 +322,39 @@ const createOrder = async (req, res) => {
 
             // Region drives the SHIP lane's cost (SURFACE domestic vs SEA international).
             // The order currency is the source of truth: INR = .in, USD = .com.
-            computedShippingInr += calculateLogistics(
-                product.logisticsConfig, item.quantity, lineTransport || undefined,
-                currency === 'INR' ? 'IN' : 'US'
-            ).totalShippingCost;
+            const lineRegion = currency === 'INR' ? 'IN' : 'US';
+            const lineLogistics = calculateLogistics(
+                product.logisticsConfig, item.quantity, lineTransport || undefined, lineRegion
+            );
+            computedShippingInr += lineLogistics.totalShippingCost;
+
+            // Full logistics snapshot — everything the customer selected/was quoted for
+            // this line, so the admin order view shows the complete shipping picture.
+            const lineDims = product.logisticsConfig?.dimensions || null;
+            let cbmPerUnit = null, cbmTotal = null;
+            if (lineDims && lineDims.length && lineDims.width && lineDims.height) {
+                const toM = (v) => (String(lineDims.unit).toUpperCase() === 'IN' ? Number(v) * 0.0254 : Number(v) / 100);
+                cbmPerUnit = Math.round(toM(lineDims.length) * toM(lineDims.width) * toM(lineDims.height) * 1e4) / 1e4;
+                cbmTotal = Math.round(cbmPerUnit * item.quantity * 1e4) / 1e4;
+            }
+            let lineDeliveryDays = null;
+            if (lineTransport === 'AIR') {
+                lineDeliveryDays = product.logisticsConfig?.airDeliveryDays ?? null;
+            } else if (lineTransport === 'SHIP') {
+                lineDeliveryDays = lineRegion === 'IN'
+                    ? (product.logisticsConfig?.surfaceDeliveryDays ?? product.logisticsConfig?.shipDeliveryDays ?? null)
+                    : (product.logisticsConfig?.shipDeliveryDays ?? null);
+            }
+            const lineLogisticsSnapshot = (lineTransport || lineCourier) ? {
+                transportType: lineTransport,
+                courier: lineCourier,
+                totalWeightKg: lineLogistics.totalWeightKg ?? null,
+                shippingCostInr: lineLogistics.totalShippingCost ?? null,
+                deliveryDays: lineDeliveryDays,
+                dimensions: lineDims,
+                cbmPerUnit,
+                cbmTotal,
+            } : null;
 
             // Calculate Vendor Settlement using vendor's base price.
             //
@@ -366,6 +395,7 @@ const createOrder = async (req, res) => {
                 totalPriceINR: toINR(itemTotal, currency, orderExchangeRate),
                 transportType: lineTransport,
                 courier: lineCourier,
+                logistics: lineLogisticsSnapshot || undefined,
                 // Offer snapshot (customer-side only). Unset when no offer applied, so
                 // legacy/no-offer lines are written exactly as before.
                 originalUnitPrice: offerResult.offer ? offerResult.originalUnitPrice : undefined,
@@ -1001,7 +1031,9 @@ const getOrderById = async (req, res) => {
                 where: { id },
                 include: {
                     items: ACTIVE_ITEMS_FILTER,
-                    statusHistory: true
+                    statusHistory: true,
+                    hub: { select: { name: true, city: true, state: true } },
+                    shipments: { select: { hub: { select: { name: true, city: true, state: true } } } }
                 }
             });
         }
@@ -1012,7 +1044,9 @@ const getOrderById = async (req, res) => {
                 where: { orderId: id },
                 include: {
                     items: ACTIVE_ITEMS_FILTER,
-                    statusHistory: true
+                    statusHistory: true,
+                    hub: { select: { name: true, city: true, state: true } },
+                    shipments: { select: { hub: { select: { name: true, city: true, state: true } } } }
                 }
             });
         }
@@ -1032,9 +1066,40 @@ const getOrderById = async (req, res) => {
             });
         }
 
+        // Timeline places (city/state only):
+        //   processing → the vendor's warehouse/factory (where the goods are stored)
+        //   shipped    → the admin hub the order was routed through
+        //   received   → the customer's shipping address (already on the order)
+        const primaryVendorId = order.vendorId
+            || order.items?.find((i) => i.vendorId)?.vendorId
+            || null;
+        let vendorLocation = null;
+        if (primaryVendorId) {
+            const v = await prisma.vendor.findUnique({
+                where: { id: primaryVendorId },
+                select: {
+                    warehouseCity: true, warehouseState: true,
+                    factoryCity: true, factoryState: true,
+                    businessCity: true, businessState: true,
+                },
+            }).catch(() => null);
+            if (v) {
+                const city = v.warehouseCity || v.factoryCity || v.businessCity || null;
+                const state = v.warehouseState || v.factoryState || v.businessState || null;
+                if (city || state) vendorLocation = { city, state };
+            }
+        }
+        // The admin hub handling the final hub→customer leg is assigned per
+        // VendorShipment; fall back to the order-level hub if one is set there.
+        const shipmentHub = order.shipments
+            ?.map((s) => s.hub)
+            .find((h) => h && (h.city || h.state)) || null;
+        const hubSrc = (order.hub && (order.hub.city || order.hub.state)) ? order.hub : shipmentHub;
+        const hubLocation = hubSrc ? { city: hubSrc.city, state: hubSrc.state } : null;
+
         res.json({
             success: true,
-            data: order
+            data: { ...order, vendorLocation, hubLocation }
         });
     } catch (error) {
         console.error('Get order error:', error);

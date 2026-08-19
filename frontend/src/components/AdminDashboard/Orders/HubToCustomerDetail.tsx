@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Package, CreditCard, User, MapPin, Truck, Star, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order, VendorShipment } from "@/services/orderService";
+import { courierService, type Courier } from "@/services/courierService";
+import adminProductService from "@/services/adminProductService";
+import Dropdown from "@/components/UI/Dropdown";
 import { formatOrderAmount } from "@/lib/currency";
 import { hasPermission } from "@/lib/auth";
 import { getCountryName, getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants";
@@ -18,9 +21,59 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Ship-to-customer dispatch modal — courier partner + tracking ID.
+  const [couriers, setCouriers] = useState<Courier[]>([]);
+  const [showShipModal, setShowShipModal] = useState(false);
+  const [shipCourier, setShipCourier] = useState("");
+  const [shipTracking, setShipTracking] = useState("");
+  const [submittingShip, setSubmittingShip] = useState(false);
+
   useEffect(() => {
     fetchOrderDetails();
   }, [orderId]);
+
+  // Load the region's courier partners for the dispatch dropdown.
+  useEffect(() => {
+    if (!order?.currency) return;
+    const region = order.currency === "USD" ? "US" : "IN";
+    courierService.getActiveCouriers(region).then(setCouriers).catch(() => setCouriers([]));
+  }, [order?.currency]);
+
+  // Couriers the admin configured for the product(s) in this order — the dispatch
+  // dropdown is restricted to these (union across the order's products).
+  const [allowedCourierIds, setAllowedCourierIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!order?.items?.length) return;
+    const productIds = [...new Set(order.items.map((i) => i.productId).filter(Boolean))];
+    Promise.all(
+      productIds.map((pid) => adminProductService.getProduct(pid).then((r) => r.data).catch(() => null)),
+    ).then((products) => {
+      const ids = new Set<string>();
+      for (const p of products) {
+        const cids = (p?.logisticsConfig as { courierIds?: string[] } | undefined)?.courierIds;
+        if (Array.isArray(cids)) cids.forEach((id) => id && ids.add(id));
+      }
+      setAllowedCourierIds(ids);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id]);
+
+  // The courier the customer chose at checkout (first item that has one) — used as
+  // the pre-selected default in the dispatch modal.
+  const customerCourierId = useMemo(
+    () => order?.items?.map((i) => i.logistics?.courier || i.courier).find(Boolean) || "",
+    [order?.id], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  // Dropdown options: the product's configured couriers (plus the customer's choice
+  // as a safety net); falls back to all region couriers for legacy products with no
+  // courier config.
+  const courierOptions = useMemo(() => {
+    const list = allowedCourierIds.size > 0
+      ? couriers.filter((c) => allowedCourierIds.has(c.id) || c.id === customerCourierId)
+      : couriers;
+    return list.map((c) => ({ value: c.id, label: c.name }));
+  }, [couriers, allowedCourierIds, customerCourierId]);
 
   const fetchOrderDetails = async () => {
     try {
@@ -53,8 +106,42 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
     }
   };
 
+  // Opens the dispatch modal instead of updating directly — the admin must
+  // pick a courier partner and enter the tracking ID before shipping.
   const handleMarkOutForDelivery = () => {
-    handleUpdateStatus("SHIPPED_TO_CUSTOMER");
+    // Pre-select the courier the customer chose; admin can change it below.
+    setShipCourier(customerCourierId || "");
+    setShipTracking("");
+    setShowShipModal(true);
+  };
+
+  const handleConfirmShip = async () => {
+    if (!shipCourier) {
+      showErrorToast("Please select a courier partner.");
+      return;
+    }
+    if (!shipTracking.trim()) {
+      showErrorToast("Please enter the tracking ID.");
+      return;
+    }
+    try {
+      setSubmittingShip(true);
+      const res = await orderService.updateAdminOrderStatus(
+        orderId,
+        "SHIPPED_TO_CUSTOMER",
+        undefined,
+        { courier: shipCourier, trackingReference: shipTracking.trim() },
+      );
+      if (res.success) {
+        showSuccessToast("Order shipped to customer — tracking details sent");
+        setOrder(res.data);
+        setShowShipModal(false);
+      }
+    } catch (error: any) {
+      showErrorToast(error.message || "Failed to update order status");
+    } finally {
+      setSubmittingShip(false);
+    }
   };
 
   const handleMarkAsDelivered = () => {
@@ -529,6 +616,75 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           <p className="text-sm text-green-800">
             This order has been successfully delivered to the customer. The order lifecycle is now complete.
           </p>
+        </div>
+      )}
+
+      {/* Ship-to-customer dispatch modal — courier partner + tracking ID */}
+      {showShipModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
+            <div className="h-1 w-full bg-gradient-to-r from-orange-500 via-orange-400 to-orange-500" />
+            <div className="flex items-center gap-3 px-6 py-4">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-orange-50 text-orange-600">
+                <Truck className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-[16px] font-bold text-slate-900">Ship to Customer</h3>
+                <p className="text-[12.5px] text-slate-500">Order #{order.orderId}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 px-6 pb-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Courier Partner <span className="text-orange-600">*</span>
+                </label>
+                <Dropdown
+                  value={shipCourier}
+                  options={courierOptions}
+                  onChange={(v) => setShipCourier(v as string)}
+                  placeholder={courierOptions.length ? "Select a courier partner" : "No couriers configured"}
+                  disabled={submittingShip}
+                />
+                {customerCourierId && shipCourier === customerCourierId && (
+                  <p className="mt-1.5 text-xs text-slate-500">Defaulted to the courier the customer selected — change it if needed.</p>
+                )}
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Tracking ID <span className="text-orange-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={shipTracking}
+                  onChange={(e) => setShipTracking(e.target.value)}
+                  disabled={submittingShip}
+                  placeholder="Enter the courier tracking ID"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none transition-all focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 disabled:bg-slate-50"
+                />
+                <p className="mt-1.5 text-xs text-slate-500">The customer is notified with this tracking ID.</p>
+              </div>
+            </div>
+
+            <div className="mt-2 flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setShowShipModal(false)}
+                disabled={submittingShip}
+                className="rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmShip}
+                disabled={submittingShip || !shipCourier || !shipTracking.trim()}
+                className="inline-flex items-center gap-2 rounded-full bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submittingShip ? "Shipping…" : "Confirm & Ship"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

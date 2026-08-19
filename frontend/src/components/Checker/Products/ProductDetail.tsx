@@ -326,7 +326,7 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                                 {windowElapsed ? "Inspection Window Expired" : "Scheduled Inspection Window"}
                             </p>
                             <p className="text-sm font-medium text-slate-900">
-                                {formatAssignmentWindow(sched.scheduledDate, sched.scheduledTime, sched.estimatedDuration)}
+                                {formatAssignmentWindow(sched.scheduledDate, sched.scheduledTime)}
                             </p>
                             {windowElapsed && (
                                 <p className="text-xs text-red-600 mt-0.5">
@@ -363,7 +363,9 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                         <SummaryStat
                             icon={<Clock className="w-5 h-5" />}
                             label="Assigned"
-                            value={formatDate(product.createdAt)}
+                            // The (re)assignment date — updates each time the admin reassigns.
+                            // Falls back to createdAt for legacy records assigned before this was tracked.
+                            value={formatDate((sched?.assignedAt as string | undefined) || product.createdAt)}
                         />
                     </div>
                 </div>

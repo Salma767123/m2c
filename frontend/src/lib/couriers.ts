@@ -21,6 +21,8 @@ export interface Courier {
   modes: TransportMode[];
   isActive?: boolean;
   sortOrder?: number;
+  /** Public tracking-website URL. May contain a `{tracking}` placeholder. */
+  trackingUrl?: string | null;
 }
 
 // Fallback catalogue (matches the seed) — used before the DB list loads and to resolve
@@ -107,4 +109,23 @@ export function courierById(id?: string | null): Courier | undefined {
 /** Human-readable name for an id; falls back to the id itself. */
 export function courierName(id?: string | null): string {
   return courierById(id)?.name || id || '';
+}
+
+/**
+ * Resolve a courier's public tracking-website URL for a given tracking id.
+ * If the stored URL has a `{tracking}` placeholder it's substituted; otherwise
+ * the URL is returned as-is (the courier's tracking page). Returns null when the
+ * courier has no tracking URL configured.
+ */
+export function courierTrackingUrl(id?: string | null, trackingId?: string | null): string | null {
+  const raw = courierById(id)?.trackingUrl;
+  if (!raw || !raw.trim()) return null;
+  const tid = (trackingId || '').trim();
+  let url = raw.trim();
+  // Substitute the tracking id where the admin placed the {tracking} token.
+  if (url.includes('{tracking}')) url = url.replace(/\{tracking\}/g, encodeURIComponent(tid));
+  // Ensure it's an absolute external URL — a bare "www.example.com" would otherwise
+  // be treated as a same-site relative path (localhost:3000/www.example.com → 404).
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  return url;
 }

@@ -2036,6 +2036,7 @@ import {
   UserCircle,
   ChevronDown,
   ChevronUp,
+  Video,
 } from 'lucide-react-native';
 import qcCheckerService from '../../services/qcCheckerService';
 import { API_BASE_URL } from '../../lib/apiBase';
@@ -3512,6 +3513,11 @@ export default function VendorDetailScreen() {
                     const isFailed = badge.label === 'Failed' || badge.label === 'Rejected';
                     const dateLabel =
                       formatDate(insp.scheduledDate) || insp.scheduledDate || '';
+                    // How the inspection was carried out. Anything not explicitly
+                    // VIRTUAL is on-site — the column defaults to PHYSICAL and
+                    // older rows predate the choice (mirrors web).
+                    const isVirtualInsp =
+                      String(insp.inspectionType || '').toUpperCase() === 'VIRTUAL';
 
                     return (
                       <TouchableOpacity
@@ -3540,15 +3546,38 @@ export default function VendorDetailScreen() {
 
                           {/* Main content */}
                           <View className="flex-1 p-3.5" style={{ gap: 10 }}>
-                            {/* Top row: PO + Date */}
+                            {/* Top row: PO + type + Date */}
                             <View className="flex-row items-center justify-between">
-                              <View
-                                className="rounded-md px-2 py-0.5"
-                                style={{ backgroundColor: '#F1F5F9' }}
-                              >
-                                <Text className="text-[11px] font-bold font-mono text-slate-600">
-                                  {insp.poNumber || '—'}
-                                </Text>
+                              <View className="flex-row items-center" style={{ gap: 6 }}>
+                                <View
+                                  className="rounded-md px-2 py-0.5"
+                                  style={{ backgroundColor: '#F1F5F9' }}
+                                >
+                                  <Text className="text-[11px] font-bold font-mono text-slate-600">
+                                    {insp.poNumber || '—'}
+                                  </Text>
+                                </View>
+                                {/* Physical (on-site, geofenced) vs Virtual (online,
+                                    no location capture) — mirrors the web history row. */}
+                                <View
+                                  className="flex-row items-center rounded-md px-2 py-0.5"
+                                  style={{
+                                    backgroundColor: isVirtualInsp ? '#e0f2fe' : '#f1f5f9',
+                                    gap: 4,
+                                  }}
+                                >
+                                  {isVirtualInsp ? (
+                                    <Video size={10} color="#0284c7" />
+                                  ) : (
+                                    <MapPin size={10} color="#64748b" />
+                                  )}
+                                  <Text
+                                    className="text-[10px] font-bold"
+                                    style={{ color: isVirtualInsp ? '#0369a1' : '#475569' }}
+                                  >
+                                    {isVirtualInsp ? 'Virtual' : 'Physical'}
+                                  </Text>
+                                </View>
                               </View>
                               <View className="flex-row items-center" style={{ gap: 4 }}>
                                 <Calendar size={11} color="#94A3B8" />

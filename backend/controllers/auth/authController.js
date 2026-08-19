@@ -5,6 +5,7 @@ const { prisma } = require("../../config/database");
 const sessionManager = require("../../utils/auth/sessionManager");
 const { sendEmail: sendSMTPEmail, sendEmailWithEnv } = require("../../config/connectSMTP");
 const { sendTemplatedEmail } = require("../../utils/emailTemplateRenderer");
+const { resolveBase64InValue } = require("../../config/cloudinary");
 
 // Email helper - uses SMTP configuration
 const sendEmail = async (emailData) => {
@@ -1071,6 +1072,9 @@ const getCurrentUser = async (req, res) => {
         id: true,
         email: true,
         name: true,
+        title: true,
+        middleName: true,
+        whatsappNumber: true,
         image: true,
         isVerified: true,
         isActive: true,
@@ -1084,6 +1088,7 @@ const getCurrentUser = async (req, res) => {
         zipCode: true,
         country: true,
         dateOfBirth: true,
+        gender: true,
       },
     });
     let userType = "user";
@@ -1230,6 +1235,11 @@ const updateProfile = async (req, res) => {
   try {
     const {
       name,
+      email,
+      gender,
+      title,
+      middleName,
+      whatsappNumber,
       image,
       phoneNumber,
       address,
@@ -1253,10 +1263,47 @@ const updateProfile = async (req, res) => {
       });
     }
 
+    // Email is editable — validate format and enforce uniqueness across users
+    // (excluding the current account) before we allow the change.
+    let normalizedEmail;
+    if (email !== undefined && email !== null && String(email).trim() !== "") {
+      normalizedEmail = String(email).trim().toLowerCase();
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+      if (!EMAIL_RE.test(normalizedEmail)) {
+        return res.status(400).json({ success: false, error: "Enter a valid email address" });
+      }
+      const taken = await prisma.user.findFirst({
+        where: { email: normalizedEmail, NOT: { id: userId } },
+        select: { id: true },
+      });
+      if (taken) {
+        return res.status(400).json({ success: false, error: "This email is already in use" });
+      }
+    }
+
+    // Gender is optional; only accept the known values.
+    let normalizedGender;
+    if (gender !== undefined) {
+      const g = String(gender).trim().toLowerCase();
+      normalizedGender = ["male", "female", "other"].includes(g) ? g : null;
+    }
+
+    // Profile photos arrive as base64 data URIs from the browser — upload them
+    // to Cloudinary and store the resulting URL (never the raw base64 in the DB).
+    const resolvedImage =
+      image !== undefined
+        ? await resolveBase64InValue(image, { folder: "customers/photos" })
+        : undefined;
+
     // Prepare update data
     const updateData = {
       name,
-      ...(image !== undefined && { image }),
+      ...(normalizedEmail !== undefined && { email: normalizedEmail }),
+      ...(normalizedGender !== undefined && { gender: normalizedGender }),
+      ...(title !== undefined && { title }),
+      ...(middleName !== undefined && { middleName }),
+      ...(whatsappNumber !== undefined && { whatsappNumber }),
+      ...(resolvedImage !== undefined && { image: resolvedImage }),
       ...(phoneNumber !== undefined && { phoneNumber }),
       ...(address !== undefined && { address }),
       ...(addressLine2 !== undefined && { addressLine2 }),
@@ -1282,6 +1329,9 @@ const updateProfile = async (req, res) => {
           id: true,
           email: true,
           name: true,
+          title: true,
+          middleName: true,
+          whatsappNumber: true,
           image: true,
           isVerified: true,
           isActive: true,
@@ -1294,6 +1344,7 @@ const updateProfile = async (req, res) => {
           zipCode: true,
           country: true,
           dateOfBirth: true,
+          gender: true,
           createdAt: true,
         },
       });
@@ -1600,6 +1651,8 @@ function validateAddressPayload(body) {
     type,
     name,
     phone,
+    phone2,
+    landline,
     address,
     addressLine2,
     addressLine3,
@@ -1623,6 +1676,20 @@ function validateAddressPayload(body) {
   if (!validatePhone(phone, countryIso)) {
     const countryName = Country.getCountryByCode(countryIso)?.name || "selected country";
     return `Enter a valid phone number for ${countryName}`;
+  }
+
+  // Secondary phone is optional; when present it must be a valid mobile number.
+  if (phone2 && String(phone2).trim()) {
+    if (!validatePhone(phone2, countryIso)) {
+      const countryName = Country.getCountryByCode(countryIso)?.name || "selected country";
+      return `Enter a valid secondary phone number for ${countryName}`;
+    }
+  }
+
+  // Landline is optional and free-form (STD/area code + number); loose digit check.
+  if (landline && String(landline).trim()) {
+    const digits = String(landline).replace(/\D/g, "");
+    if (digits.length < 6 || digits.length > 15) return "Enter a valid landline number";
   }
 
   if (!address || String(address).trim().length < 3) return "Address is required (min 3 chars)";
@@ -1672,6 +1739,8 @@ function normalizeAddressData(body) {
     type: String(body.type).toLowerCase(),
     name: String(body.name).trim(),
     phone: phoneE164,
+    phone2: body.phone2 && String(body.phone2).trim() ? toE164(body.phone2, countryIso) : "",
+    landline: body.landline ? String(body.landline).trim() : "",
     address: String(body.address).trim(),
     addressLine2: body.addressLine2 ? String(body.addressLine2).trim() : "",
     addressLine3: body.addressLine3 ? String(body.addressLine3).trim() : "",

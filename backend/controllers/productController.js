@@ -1589,7 +1589,9 @@ const assignQCCheckerToProduct = async (req, res) => {
     if (scheduledTime !== undefined) qcAssignment.scheduledTime = scheduledTime;
     if (priority !== undefined) qcAssignment.priority = priority;
     if (estimatedDuration !== undefined) qcAssignment.estimatedDuration = estimatedDuration;
-    const hasSchedule = Object.keys(qcAssignment).length > 0;
+    // Stamp the (re)assignment moment so the "Assigned" date reflects THIS assignment,
+    // not the product's creation date — it updates every time the admin reassigns.
+    qcAssignment.assignedAt = new Date().toISOString();
 
     // Verify QC Checker exists
     const checker = await prisma.qCChecker.findUnique({ where: { id: qcCheckerId } });
@@ -1619,7 +1621,9 @@ const assignQCCheckerToProduct = async (req, res) => {
       where: { id },
       data: {
         assignedQcId: qcCheckerId,
-        ...(hasSchedule ? { qcAssignment: { ...(product.qcAssignment || {}), ...qcAssignment } } : {}),
+        // Always merge (never wipe an existing schedule) so a bare quick-reassign
+        // still records the new assignedAt while keeping the booked window.
+        qcAssignment: { ...(product.qcAssignment || {}), ...qcAssignment },
       },
       include: {
         assignedQc: {

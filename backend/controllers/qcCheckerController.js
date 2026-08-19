@@ -1646,6 +1646,9 @@ const getAssignedProducts = async (req, res) => {
                     status: true,
                     approvalStatus: true,
                     createdAt: true,
+                    // Booked inspection window (scheduledDate + scheduledTime) so the
+                    // dashboard cards can show the schedule, matching vendor inspections.
+                    qcAssignment: true,
                     vendor: {
                         select: { companyName: true, ownerName: true, email: true },
                     },
@@ -1729,6 +1732,10 @@ const getProductReports = async (req, res) => {
                     rejectionReason: true,
                     createdAt: true,
                     updatedAt: true,
+                    // assignedAt (admin's QC assignment date) + QC submission time so the
+                    // reports table can show "Assigned" and "Completed On".
+                    qcAssignment: true,
+                    lastReviewedAt: true,
                     vendor: {
                         select: { companyName: true, ownerName: true, vendorCode: true },
                     },
@@ -1742,6 +1749,33 @@ const getProductReports = async (req, res) => {
                 take: limit,
             }),
         ]);
+
+        // "Completed On" is the QC's inspection-submission date (lastReviewedAt).
+        // Legacy rows submitted before that stamp existed have it null — recover the
+        // real submission time from the audit trail (the QC_SUBMITTED transition the
+        // checker performed), so the column reflects the QC submission, never the
+        // admin's later approval.
+        const missingIds = products.filter((p) => !p.lastReviewedAt).map((p) => p.id);
+        if (missingIds.length > 0) {
+            const logs = await prisma.inspectionAuditLog.findMany({
+                where: {
+                    entityType: 'PRODUCT_INSPECTION',
+                    entityId: { in: missingIds },
+                    toStatus: 'QC_SUBMITTED',
+                    performedByType: 'QC_CHECKER',
+                },
+                select: { entityId: true, createdAt: true },
+                orderBy: { createdAt: 'desc' },
+            });
+            const latestByEntity = {};
+            for (const l of logs) {
+                // orderBy desc → the first row seen per entity is its latest submission.
+                if (!latestByEntity[l.entityId]) latestByEntity[l.entityId] = l.createdAt;
+            }
+            for (const p of products) {
+                if (!p.lastReviewedAt && latestByEntity[p.id]) p.lastReviewedAt = latestByEntity[p.id];
+            }
+        }
 
         res.status(200).json({
             success: true,

@@ -40,7 +40,12 @@ class ContactEnquiryService {
     hearAboutUs?: string;
     hearAboutUsOther?: string;
   }): Promise<{ success: boolean; message: string; data?: ContactEnquiry }> {
-    const response = await axios.post('/contact-enquiries/submit', data);
+    // The contact form shows its own centre-screen result, so the shared
+    // interceptor must not add a corner toast on top of it — one failed click
+    // was producing two error messages saying the same thing.
+    const response = await axios.post('/contact-enquiries/submit', data, {
+      skipErrorToast: true,
+    });
     return response.data;
   }
 

@@ -150,6 +150,35 @@ html, body {
   animation: m2c-shimmer 6s linear infinite;
 }
 
+/* ── Footer (light theme) abstract background pattern ────────────────
+   Extremely light grid + red micro-dots + soft curved contours. All
+   kept at very low opacity so they never interfere with readability;
+   motion is slow and disabled under prefers-reduced-motion (below). */
+@keyframes m2c-grid-drift {
+  from { background-position: 0 0; }
+  to   { background-position: 44px 44px; }
+}
+@keyframes m2c-contour-drift {
+  0%   { transform: translate3d(0, 0, 0);      opacity: 0.55; }
+  50%  { transform: translate3d(-16px, 9px, 0); opacity: 0.9; }
+  100% { transform: translate3d(0, 0, 0);      opacity: 0.55; }
+}
+.footer-grid {
+  background-image:
+    linear-gradient(to right, rgba(30, 30, 30, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(30, 30, 30, 0.04) 1px, transparent 1px);
+  background-size: 44px 44px;
+  animation: m2c-grid-drift 42s linear infinite;
+}
+.footer-dots {
+  background-image: radial-gradient(rgba(224, 26, 27, 0.05) 1.1px, transparent 1.5px);
+  background-size: 26px 26px;
+}
+.footer-contour {
+  animation: m2c-contour-drift 26s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
 /* Slow zoom for the active hero slide. */
 .animate-ken-burns {
   animation: m2c-ken-burns 6s ease-out forwards;
@@ -225,7 +254,9 @@ html, body {
   .animate-accent-bar,
   .animate-float-slow,
   .animate-float-slower,
-  .animate-marquee {
+  .animate-marquee,
+  .footer-grid,
+  .footer-contour {
     animation: none !important;
   }
 }

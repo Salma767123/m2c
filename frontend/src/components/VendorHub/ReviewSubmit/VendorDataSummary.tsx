@@ -567,6 +567,14 @@ export default function VendorDataSummary({
 
       <AccordionSection {...sectionProps('warehouse', 'Warehouse / Factory', 'Operating locations and premises', <Warehouse className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('warehouse'))}>
         <div className="flex flex-col">
+          <InfoRow
+            label="Where are your products handled / stored?"
+            value={
+              data.productInspectionSite === 'WAREHOUSE' ? 'Warehouse address'
+                : data.productInspectionSite === 'FACTORY' ? 'Legal / Factory address'
+                  : 'Not provided'
+            }
+          />
           {data.sameAsWarehouse ? (
             /* Linked to Company Details — repeating the mirrored address /
                photos here would just duplicate the section above. */

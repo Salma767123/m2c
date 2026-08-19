@@ -1,23 +1,19 @@
 "use client"
 
-import { use } from "react"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import ProductReportDetail from "@/components/Checker/Report/ProductReportDetail"
 
-interface ProductReportPageProps {
-  params: Promise<{
-    id: string
-  }>
-}
-
-export default function ProductReportPage({ params }: ProductReportPageProps) {
+/**
+ * Product inspection report detail is intentionally NOT viewable by QC checkers.
+ * The reports list no longer links here, and any direct navigation is redirected
+ * back to the Product Inspection Reports tab.
+ */
+export default function ProductReportPage() {
   const router = useRouter()
-  const { id } = use(params)
 
-  return (
-    <ProductReportDetail
-      productId={id}
-      onBack={() => router.push("/checker/dashboard/report?tab=product")}
-    />
-  )
+  useEffect(() => {
+    router.replace("/checker/dashboard/report?tab=product")
+  }, [router])
+
+  return null
 }

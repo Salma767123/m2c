@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils';
 import { wishlistService } from '@/services/wishlistService';
 import { trackProductView } from '@/services/analyticsService';
+import { recordRecentlyViewed } from '@/lib/browsingHistory';
 import reviewService from '@/services/reviewService';
 import { getCountryName, getCountryFlag } from '@/components/WebSite/CheckOut/CheckoutProcess/constants';
 import Image from 'next/image';
@@ -158,6 +159,8 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
               source,
             });
           }
+          // Keep a client-side "recently viewed" list for the empty-cart page.
+          recordRecentlyViewed(response.data.id);
         }
       } catch (error) {
         console.error('Failed to fetch product:', error);
@@ -1217,6 +1220,37 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                               </div>
                             )}
 
+                            {/* CBM (volumetric) breakdown — auto-calculated per unit,
+                                then scaled to the chosen quantity. */}
+                            {(product.logisticsConfig as LogisticsConfig).dimensions && (() => {
+                              const d = (product.logisticsConfig as LogisticsConfig).dimensions!;
+                              const unit = (d.unit || 'CM').toUpperCase();
+                              const toM = (v: number) => (unit === 'IN' ? v * 0.0254 : v / 100);
+                              const perUnit = toM(d.length) * toM(d.width) * toM(d.height);
+                              const total = perUnit * quantity;
+                              const formula = unit === 'IN' ? '× 2.54³ ÷ 1,000,000' : '÷ 1000 ÷ 1000';
+                              return (
+                                <div className="rounded-lg border border-gray-100 bg-gray-50/70 p-3 text-xs">
+                                  <div className="mb-1.5 flex items-center justify-between">
+                                    <span className="flex items-center gap-1.5 font-semibold text-gray-700">
+                                      <Box className="h-3.5 w-3.5" /> CBM (Volumetric)
+                                    </span>
+                                    <span className="font-bold tabular-nums text-gray-900">{total.toFixed(4)} m³</span>
+                                  </div>
+                                  <div className="space-y-0.5 text-[11px] leading-relaxed text-gray-500">
+                                    <div>
+                                      Per unit: {d.length} × {d.width} × {d.height} {formula} ={' '}
+                                      <span className="font-medium tabular-nums text-gray-700">{perUnit.toFixed(4)} m³</span>
+                                    </div>
+                                    <div>
+                                      Total: {perUnit.toFixed(4)} × {quantity} {quantity === 1 ? 'unit' : 'units'} ={' '}
+                                      <span className="font-medium tabular-nums text-gray-700">{total.toFixed(4)} m³</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
                             {/* Max weight warning */}
                             {logisticsResult.exceedsMaxWeight && (
                               <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-2.5 text-xs text-red-700">
@@ -1550,7 +1584,9 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
 
 
             const hasDescription = !!(product.description || (product.tags && product.tags.length));
-            const hasShipping = !!product.dispatchTimeline;
+            // Shipping tab shows admin-configured logistics only (delivery time +
+            // shipping cost). The vendor's dispatch timeline is intentionally not shown.
+            const hasShipping = !!(logisticsResult || product.logisticsConfig);
 
             const tabs: { id: string; label: string }[] = [];
             if (hasDescription) tabs.push({ id: 'description', label: 'Description' });
@@ -1657,15 +1693,8 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                           </div>
                         )}
 
-                        {active === 'shipping' && product.dispatchTimeline && (
+                        {active === 'shipping' && (
                           <div className="space-y-3">
-                            <div className="flex items-center gap-3 rounded-xl bg-[#fff5f5] ring-1 ring-[#ffdede] p-3.5">
-                              <span className="flex items-center justify-center w-9 h-9 rounded-full bg-[#e01a1b]/10 text-[#e01a1b] shrink-0"><Truck className="w-4 h-4" /></span>
-                              <div>
-                                <p className="text-[13px] font-semibold text-gray-900">Dispatch in {product.dispatchTimeline.totalDays} days</p>
-                                <p className="text-[12px] text-gray-500">{product.dispatchTimeline.processingDays} days processing + {product.dispatchTimeline.shippingDays} days shipping</p>
-                              </div>
-                            </div>
                             {logisticsResult && (
                               <div className="grid grid-cols-2 gap-3">
                                 <div className="rounded-xl bg-gray-50 ring-1 ring-gray-100 p-3 text-center">

@@ -34,8 +34,21 @@ class EnquiryService {
                 headers: { 'Content-Type': 'application/json' }
             });
             return response.data;
-        } catch (error: any) {
-            throw new Error(error.message || 'Failed to submit enquiry');
+        } catch (error: unknown) {
+            // Carry the HTTP status across. `new Error(message)` keeps only a
+            // string, which threw away the one thing the caller needs: a 409
+            // means this email already has an enquiry awaiting review, and that
+            // is a different conversation from a genuine failure. The status
+            // was unreachable from the modal until this stopped discarding it.
+            const err = error as {
+                message?: string;
+                response?: { status?: number; data?: { message?: string } };
+            };
+            const wrapped = new Error(
+                err.response?.data?.message || err.message || 'Failed to submit enquiry'
+            ) as Error & { status?: number };
+            wrapped.status = err.response?.status;
+            throw wrapped;
         }
     }
 

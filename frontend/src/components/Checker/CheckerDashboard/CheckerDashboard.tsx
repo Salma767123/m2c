@@ -76,6 +76,29 @@ function formatSchedDate(ymd?: string): string {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+// Normalize an inspection's scheduledTime to a consistent 12-hour clock with a
+// meridiem, whatever the admin stored: 24-hour ("20:50" → "8:50 PM"), bare
+// ("09:00" → "9:00 AM"), or already-12h ("08:16 AM" → "8:16 AM"). Anything
+// unparseable is returned untouched so we never blank out a real value.
+function formatSchedTime(raw?: string): string {
+  if (!raw) return ''
+  const s = String(raw).trim()
+  const m = s.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])?$/)
+  if (!m) return s
+  let h = parseInt(m[1], 10)
+  const min = m[2]
+  const mer = m[3]?.toUpperCase()
+  if (mer) {
+    // Already 12-hour — just canonicalize (drop any leading zero, uppercase).
+    if (h === 0) h = 12
+    return `${h}:${min} ${mer}`
+  }
+  // 24-hour (or bare) input → convert to 12-hour.
+  const suffix = h >= 12 ? 'PM' : 'AM'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${h12}:${min} ${suffix}`
+}
+
 const getVendorStatusBadge = (status: string) =>
   `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${VENDOR_MAIN_STATUS_COLORS[status] || "bg-amber-50 text-amber-700 border-amber-200"}`
 
@@ -399,11 +422,17 @@ export default function DashboardHome({ checkerID, checkerName }: DashboardHomeP
                         {formatStatus(product.approvalStatus)}
                       </span>
 
-                      {/* Date */}
-                      {product.createdAt && (
+                      {/* Inspection scheduled date + time (the booked window) —
+                          shown the same way as vendor inspections. */}
+                      {product.qcAssignment?.scheduledDate ? (
                         <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
                           <CalendarDays className="w-3 h-3 shrink-0" />
-                          {new Date(product.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          <span>Scheduled {formatSchedDate(product.qcAssignment.scheduledDate)}{product.qcAssignment.scheduledTime ? ` · ${formatSchedTime(product.qcAssignment.scheduledTime)}` : ''}</span>
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
+                          <CalendarDays className="w-3 h-3 shrink-0" />
+                          <span>Not scheduled yet</span>
                         </p>
                       )}
 
@@ -462,7 +491,7 @@ export default function DashboardHome({ checkerID, checkerName }: DashboardHomeP
                         {schedDate ? (
                           <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
                             <CalendarDays className="w-3 h-3 shrink-0" />
-                            <span>Scheduled {formatSchedDate(schedDate)}{schedTime ? ` · ${schedTime}` : ''}</span>
+                            <span>Scheduled {formatSchedDate(schedDate)}{schedTime ? ` · ${formatSchedTime(schedTime)}` : ''}</span>
                           </p>
                         ) : (
                           <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
