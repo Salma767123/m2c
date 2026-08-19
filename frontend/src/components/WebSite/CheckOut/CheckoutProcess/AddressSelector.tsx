@@ -76,7 +76,7 @@ export default function AddressSelector({
         <h3 id="saved-address-heading" className="font-playfair text-base font-semibold text-[#1a1a1a]">
           Ship to a saved address
         </h3>
-        <span className="text-xs text-slate-500">{addresses.length} saved</span>
+        <span className="text-xs text-[#8a807a]">{addresses.length} saved</span>
       </div>
 
       <div
@@ -102,7 +102,7 @@ export default function AddressSelector({
               className={`relative text-left border-2 rounded-2xl p-4 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${
                 selected
                   ? "border-[#e01a1b] bg-gradient-to-br from-[#e01a1b]/5 to-white shadow-sm"
-                  : "border-slate-200 bg-white hover:border-[#e01a1b]/40"
+                  : "border-[#f0e8df] bg-white hover:border-[#e01a1b]/40"
               }`}
             >
               <div className="absolute top-3 right-3 flex items-center gap-1.5">
@@ -110,7 +110,7 @@ export default function AddressSelector({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onEdit(addr.id); }}
-                    className="w-6 h-6 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full flex items-center justify-center transition-colors cursor-pointer"
+                    className="w-6 h-6 bg-[#f3ece5] hover:bg-[#ece3d9] text-[#6b625b] rounded-full flex items-center justify-center transition-colors cursor-pointer"
                     title="Edit address"
                   >
                     <Pencil className="w-3 h-3" />
@@ -123,7 +123,7 @@ export default function AddressSelector({
                 )}
               </div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold border border-slate-200 bg-slate-50 text-slate-700 rounded-full">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold border border-[#f0e8df] bg-[#faf6f2] text-[#4a423c] rounded-full">
                   <Icon className="w-3 h-3" />
                   {meta.label}
                 </span>
@@ -134,9 +134,9 @@ export default function AddressSelector({
                   </span>
                 )}
               </div>
-              <p className="text-sm font-semibold text-slate-900 truncate">{addr.name}</p>
-              <p className="text-xs text-slate-600 truncate">{formatPhoneForDisplay(addr.phone, addr.country)}</p>
-              <p className="text-xs text-slate-700 mt-1 line-clamp-2">
+              <p className="text-sm font-semibold text-[#1a1a1a] truncate">{addr.name}</p>
+              <p className="text-xs text-[#6b625b] truncate">{formatPhoneForDisplay(addr.phone, addr.country)}</p>
+              <p className="text-xs text-[#4a423c] mt-1 line-clamp-2">
                 {addr.address}
                 {addr.addressLine2 ? `, ${addr.addressLine2}` : ""}, {addr.city}, {getStateName(addr.state, addr.country)} {addr.zipCode}
               </p>
@@ -156,7 +156,7 @@ export default function AddressSelector({
           className={`relative text-left border-2 border-dashed rounded-2xl p-4 transition-all focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 flex items-center justify-center gap-2 min-h-[140px] disabled:opacity-60 disabled:cursor-not-allowed ${
             useNewAddress
               ? "border-[#e01a1b] bg-[#e01a1b]/5 text-[#e01a1b]"
-              : "border-slate-300 bg-white text-slate-600 hover:border-[#e01a1b]/40 hover:text-[#1a1a1a]"
+              : "border-[#e5dbd0] bg-white text-[#6b625b] hover:border-[#e01a1b]/40 hover:text-[#1a1a1a]"
           }`}
         >
           <Plus className="w-5 h-5" />

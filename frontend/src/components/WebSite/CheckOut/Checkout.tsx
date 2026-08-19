@@ -92,6 +92,17 @@ export interface CheckoutFormData {
 export default function Checkout() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
+
+  /**
+   * Whether the order list is showing every line or just the first few.
+   *
+   * A basket of nine put nine full rows in the summary card, so the card ran
+   * far past the form beside it and the page scrolled a long way to reach a
+   * total that was already decided. The card now shows the first three and
+   * offers the rest, which keeps it near the height of the step it sits
+   * beside. Totals are never collapsed — they are the reason for the card.
+   */
+  const [showAllItems, setShowAllItems] = useState(false)
   const [shippingValid, setShippingValid] = useState(false)
   const [loading, setLoading] = useState(true)
   const [placingOrder, setPlacingOrder] = useState(false)
@@ -707,31 +718,57 @@ export default function Checkout() {
     { id: 3, name: "Review", icon: CheckCircle }
   ]
 
+  /**
+   * The step rail.
+   *
+   * It was a bordered white pill floating above the form, which made three
+   * words look like a fourth panel on a page that already had two. Here it is
+   * just type on the page: a number, a name, and a rule between them that
+   * fills as you go. Nothing to draw a box around.
+   */
   const renderStepIndicator = () => (
-    <div className="max-w-2xl mx-auto flex items-center justify-between sm:justify-center mb-5 sm:mb-6 lg:mb-8 bg-[#fdfdfd] px-3 sm:px-4 py-3 sm:py-4 rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      {steps.map((step, index) => (
-        <div key={step.id} className="flex items-center min-w-0">
-          <div className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 shrink-0 transition-colors ${currentStep >= step.id
-            ? "bg-[#e01a1b] border-[#e01a1b] text-white"
-            : "border-slate-300 text-slate-400"
-            }`}>
-            {currentStep > step.id ? (
-              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-            ) : (
-              <step.icon className="w-4 h-4 sm:w-5 sm:h-5" />
+    <ol className="mb-8 flex items-center gap-2 sm:gap-3 lg:mb-10">
+      {steps.map((step, index) => {
+        const done = currentStep > step.id
+        const active = currentStep === step.id
+        return (
+          <li key={step.id} className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3 last:flex-none">
+            <span
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold tabular-nums transition-colors duration-300 sm:h-8 sm:w-8 sm:text-xs ${
+                done
+                  ? 'bg-[#1f7a4d] text-white'
+                  : active
+                    ? 'bg-[#e01a1b] text-white shadow-[0_4px_14px_-4px_rgba(224,26,27,0.7)]'
+                    : 'bg-[#f1e9e2] text-[#a2968b]'
+              }`}
+            >
+              {done ? <CheckCircle className="h-4 w-4" /> : step.id}
+            </span>
+
+            <span
+              className={`truncate text-[13px] font-semibold transition-colors duration-300 sm:text-sm ${
+                active ? 'text-[#1a1a1a]' : done ? 'text-[#6b625b]' : 'text-[#a2968b]'
+              } ${active ? 'inline' : 'hidden sm:inline'}`}
+            >
+              {step.name}
+            </span>
+
+            {/* The connector belongs to the step BEFORE it, and fills only
+                once that step is behind you — so the rule is a record of
+                progress rather than a decoration between labels. */}
+            {index < steps.length - 1 && (
+              <span aria-hidden className="ml-1 h-px min-w-4 flex-1 bg-[#eadfd4] sm:ml-2">
+                <span
+                  className={`block h-px origin-left bg-[#1f7a4d] transition-transform duration-500 ease-out ${
+                    done ? 'scale-x-100' : 'scale-x-0'
+                  }`}
+                />
+              </span>
             )}
-          </div>
-          {/* Label: hidden on mobile, shown sm+; on mobile only show label for the active step */}
-          <span className={`ml-2 text-xs sm:text-sm font-medium truncate ${currentStep >= step.id ? "text-[#e01a1b]" : "text-slate-400"} ${currentStep === step.id ? "inline" : "hidden sm:inline"}`}>
-            {step.name}
-          </span>
-          {index < steps.length - 1 && (
-            <div className={`flex-1 sm:flex-none sm:w-16 h-0.5 mx-2 sm:mx-4 min-w-4 ${currentStep > step.id ? "bg-[#e01a1b]" : "bg-slate-300"
-              }`} />
-          )}
-        </div>
-      ))}
-    </div>
+          </li>
+        )
+      })}
+    </ol>
   )
 
   const renderShippingForm = () => {
@@ -754,7 +791,7 @@ export default function Checkout() {
         {useNewAddress && (
           <>
             {savedAddresses.length > 0 && (
-              <div className="border-t border-slate-200 pt-6">
+              <div className="border-t border-[#f0e8df] pt-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-playfair text-base font-semibold text-[#1a1a1a]">
                     {editingAddressId ? "Edit shipping address" : "Enter new shipping address"}
@@ -770,7 +807,7 @@ export default function Checkout() {
                           if (addr) applySavedAddressToForm(addr)
                         }
                       }}
-                      className="px-4 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200 transition-colors"
+                      className="px-4 py-1.5 text-sm font-medium text-[#4a423c] bg-[#f3ece5] border border-[#e5dbd0] rounded-lg hover:bg-[#ece3d9] transition-colors"
                     >
                       Cancel
                     </button>
@@ -793,16 +830,16 @@ export default function Checkout() {
                   disabled={placingOrder}
                   className="w-4 h-4 accent-[#e01a1b]"
                 />
-                <span className="text-sm text-slate-700">
+                <span className="text-sm text-[#4a423c]">
                   Save this address to my address book
-                  <span className="text-slate-400 ml-1">
+                  <span className="text-[#a2968b] ml-1">
                     ({savedAddresses.length}/{MAX_SAVED_ADDRESSES} used)
                   </span>
                 </span>
               </label>
             )}
             {isAuthed && !canSaveMore && (
-              <p className="text-xs text-slate-500 pt-2">
+              <p className="text-xs text-[#8a807a] pt-2">
                 You&apos;ve reached the {MAX_SAVED_ADDRESSES}-address limit — this address won&apos;t be saved to your address book.
               </p>
             )}
@@ -823,43 +860,43 @@ export default function Checkout() {
   if (loading) {
     /* Skeleton mirrors the checkout layout (form on left, order summary on right). */
     return (
-      <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8">
+      <div className="min-h-screen bg-[#faf6f2] py-4 sm:py-6 lg:py-8">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           <div className="lg:col-span-2 space-y-4">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 lg:p-6 space-y-3">
-                <div className="h-5 w-40 bg-gray-200 rounded animate-pulse" />
+              <div key={i} className="bg-white rounded-xl border border-[#f0e8df] p-4 sm:p-5 lg:p-6 space-y-3">
+                <div className="h-5 w-40 bg-[#ece3d9] rounded animate-pulse" />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                   {Array.from({ length: 4 }).map((_, j) => (
                     <div key={j} className="space-y-2">
-                      <div className="h-3 w-20 bg-gray-100 rounded animate-pulse" />
-                      <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
+                      <div className="h-3 w-20 bg-[#f3ece5] rounded animate-pulse" />
+                      <div className="h-10 w-full bg-[#ece3d9] rounded animate-pulse" />
                     </div>
                   ))}
                 </div>
               </div>
             ))}
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 lg:p-6 space-y-4 h-fit">
-            <div className="h-5 w-32 bg-gray-200 rounded animate-pulse" />
+          <div className="bg-white rounded-xl border border-[#f0e8df] p-4 sm:p-5 lg:p-6 space-y-4 h-fit">
+            <div className="h-5 w-32 bg-[#ece3d9] rounded animate-pulse" />
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="flex gap-3 items-center">
-                <div className="w-12 h-12 bg-gray-200 rounded-lg animate-pulse shrink-0" />
+                <div className="w-12 h-12 bg-[#ece3d9] rounded-lg animate-pulse shrink-0" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse" />
-                  <div className="h-3 w-1/2 bg-gray-100 rounded animate-pulse" />
+                  <div className="h-4 w-3/4 bg-[#ece3d9] rounded animate-pulse" />
+                  <div className="h-3 w-1/2 bg-[#f3ece5] rounded animate-pulse" />
                 </div>
               </div>
             ))}
-            <div className="border-t border-gray-100 pt-4 space-y-2">
+            <div className="border-t border-[#f5efe8] pt-4 space-y-2">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex justify-between">
-                  <div className="h-4 w-20 bg-gray-100 rounded animate-pulse" />
-                  <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-4 w-20 bg-[#f3ece5] rounded animate-pulse" />
+                  <div className="h-4 w-16 bg-[#ece3d9] rounded animate-pulse" />
                 </div>
               ))}
             </div>
-            <div className="h-11 w-full bg-gray-200 rounded-lg animate-pulse" />
+            <div className="h-11 w-full bg-[#ece3d9] rounded-lg animate-pulse" />
           </div>
         </div>
       </div>
@@ -868,11 +905,11 @@ export default function Checkout() {
 
   if (!loading && cartItems.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-[#faf6f2]">
         <div className="text-center max-w-md mx-auto p-8">
-          <ShoppingBag className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+          <ShoppingBag className="w-16 h-16 text-[#d0c4b8] mx-auto mb-4" />
           <h2 className="font-playfair text-2xl font-semibold text-[#1a1a1a] mb-2">Your cart is empty</h2>
-          <p className="text-slate-500 mb-6">Add some items to your cart before proceeding to checkout.</p>
+          <p className="text-[#8a807a] mb-6">Add some items to your cart before proceeding to checkout.</p>
           <Link href="/products">
             <button className="btn-shine inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#e01a1b] text-white rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 font-semibold">
               Browse Products
@@ -884,230 +921,361 @@ export default function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8 font-sans">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-        {/* Header — Order-page style with icon */}
-        <Reveal className="mb-5 sm:mb-6 lg:mb-8">
-          <Link href="/cart">
-            <button className="flex items-center gap-2 text-sm sm:text-base text-slate-600 hover:text-[#e01a1b] transition-colors mb-3 sm:mb-4">
-              <ArrowLeft className="w-4 h-4" />
-              Back to Cart
-            </button>
-          </Link>
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <Lock className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-[#e01a1b] shrink-0" />
-            <div className="min-w-0">
-              <h1 className="font-playfair text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#1a1a1a] mb-1 sm:mb-2">Checkout</h1>
-              <p className="text-sm sm:text-base text-slate-600">Complete your purchase securely</p>
-            </div>
-          </div>
-        </Reveal>
+    /**
+     * ── Two panes, not two cards ─────────────────────────────────────────
+     *
+     * The page was a 3-column grid of boxes on a grey ground: a white card
+     * with a solid red banner across it, and a second white card beside it.
+     * Three surfaces competing on a page whose whole job is to hold attention
+     * on one thing at a time.
+     *
+     * Now the page IS the layout. The flow sits on white and the order sits
+     * on a dark warm panel that runs to the right edge of the screen and the
+     * full height of the viewport. There is no card chrome anywhere: the only
+     * two regions are the thing you are doing and the thing you are buying,
+     * and they are told apart by ground colour rather than by borders.
+     *
+     * The grid is deliberately NOT capped by a max-width container — a panel
+     * that stops short of the edge is a stripe, not a pane. The CONTENT is
+     * capped instead, and the two columns are pulled toward the seam
+     * (justify-self end / start) so they stay a readable pair on a wide
+     * screen while the outer margins take the slack.
+     *
+     * Below lg the panes stack and the order falls beneath the form, which is
+     * the existing behaviour: on a phone the first thing wanted is the field
+     * to fill, not the arithmetic.
+     */
+    <div className="min-h-screen bg-[#faf6f2] font-sans">
+      {/* An ordinary contained page.
+          Two earlier attempts made this a pair of full-height panes running to
+          the screen edge. Both failed for the same reason: a pane has to be as
+          wide as its column, and the order summary is only ever ~26rem of
+          content — so the rest of the column was empty ground, first dark and
+          then cream, with nothing in it. A card is sized by what it holds.
 
-        {renderStepIndicator()}
+          So: one centred container, the flow on the page itself, and the order
+          as a card beside it. Nothing bleeds, nothing is stretched to fill. */}
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_23rem] xl:gap-10">
+          <div>
+          <div className="w-full">
+            <Link href="/cart">
+              <button className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-[#6b625b] transition-colors hover:text-[#e01a1b] sm:mb-6">
+                <ArrowLeft className="h-4 w-4" />
+                Back to Cart
+              </button>
+            </Link>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
-          {/* Checkout Form */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[#c41617] bg-linear-to-r from-[#e01a1b] to-[#c41617]">
-                <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#fffff4]">
-                  {currentStep === 1 && "Shipping Information"}
-                  {currentStep === 2 && "Payment Information"}
-                  {currentStep === 3 && "Review Your Order"}
-                </h2>
+            <div className="mb-7 flex items-center gap-3 sm:gap-4 lg:mb-9">
+              {/* The same mark language as the cart: a chip with weight,
+                  aligned to the two-line block rather than to the gap in it. */}
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-linear-to-b from-[#fdf1ef] to-[#f9e3df] ring-1 ring-[#f2d9d3] sm:h-14 sm:w-14">
+                <Lock className="h-6 w-6 text-[#e01a1b] sm:h-7 sm:w-7" strokeWidth={1.9} />
+              </span>
+              <div className="min-w-0">
+                <h1 className="font-playfair text-2xl font-semibold tracking-tight text-[#1a1a1a] sm:text-3xl lg:text-4xl">
+                  Checkout
+                </h1>
+                <p className="mt-1 text-sm text-[#6b625b] sm:text-base">Complete your purchase securely</p>
               </div>
+            </div>
 
-              <div className="p-4 sm:p-5 lg:p-6">
-                {error && (
-                  <div className="mb-4 p-3 sm:p-4 bg-red-50 text-red-600 rounded-lg border border-red-200 text-sm">
-                    {error}
-                  </div>
-                )}
+            {renderStepIndicator()}
 
-                {currentStep === 1 && renderShippingForm()}
-                {currentStep === 2 && renderPaymentForm()}
-                {currentStep === 3 && renderReview()}
+            {/* The step's own name, as a heading on the page. This was set in
+                white on a solid red bar across the top of the card — the
+                loudest element on a page where the loudest thing should be
+                the button that finishes it. */}
+            {/* Ruled caption above the heading — the same device the policy
+                pages and the category banners use. Bare type on bare white was
+                the flattest part of the page. */}
+            <div className="mb-5 sm:mb-6">
+              <span className="inline-flex items-center gap-2.5 text-[10.5px] font-semibold uppercase tracking-[0.24em] text-[#c41617]">
+                <span aria-hidden className="h-px w-6 bg-[#e01a1b]" />
+                Step {currentStep} of 3
+              </span>
+              <h2 className="mt-2 font-playfair text-xl font-semibold text-[#1a1a1a] sm:text-2xl">
+                {currentStep === 1 && "Shipping Information"}
+                {currentStep === 2 && "Payment Information"}
+                {currentStep === 3 && "Review Your Order"}
+              </h2>
+            </div>
 
-                {/* Navigation Buttons */}
-                <div className="flex justify-between gap-3 mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-slate-200">
+            {/* The step sits on a card, like the order beside it.
+                An earlier draft had the flow directly on the page, which suited
+                a full-bleed two-pane layout. That layout is gone, and what was
+                left was a form with nothing behind it: white inputs floating on
+                the page's own colour while the order summary next to it sat on
+                a proper surface. A field needs a ground to sit on, or the eye
+                cannot tell the form from the page. */}
+            {/* Keyed on the step, so the card is a NEW element every time you
+                advance and the reveal plays again. Without the key React would
+                reuse the same node, the observer would have long since fired,
+                and only the very first step would ever animate.
+
+                The animation belongs here and not on the order card beside it:
+                `.reveal` carries will-change, which opens a containing block —
+                and the order card is sticky, which a containing block would
+                quietly break. */}
+            <Reveal key={`step-${currentStep}`} className="rounded-2xl bg-white p-5 shadow-[0_2px_4px_rgba(120,80,50,0.05)] ring-1 ring-[#efe4d6] sm:p-6 lg:p-7">
+              {error && (
+                <div className="mb-5 rounded-xl border border-[#f2d0cd] bg-[#fdf1ef] p-3 text-sm text-[#c41617] sm:p-4">
+                  {error}
+                </div>
+              )}
+
+              {currentStep === 1 && renderShippingForm()}
+              {currentStep === 2 && renderPaymentForm()}
+              {currentStep === 3 && renderReview()}
+
+              {/* ── Navigation ──────────────────────────────────────────── */}
+              <div className="mt-8 border-t border-[#f0e8df] pt-6 sm:mt-10">
+              <div className="flex items-center justify-between gap-3">
+                {/* Hidden on the first step rather than shown greyed out. A
+                    disabled control that can never be enabled is furniture,
+                    and "Back to Cart" above already goes where it would. */}
+                {currentStep > 1 ? (
                   <button
                     onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-                    disabled={currentStep === 1 || placingOrder}
-                    className="px-4 sm:px-6 py-2.5 sm:py-3 border border-slate-300 text-slate-700 font-medium rounded-lg sm:rounded-xl hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
+                    disabled={placingOrder}
+                    className="rounded-full px-5 py-2.5 text-sm font-semibold text-[#6b625b] ring-1 ring-[#e5dbd0] transition-colors hover:bg-[#faf6f2] hover:text-[#1a1a1a] disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:py-3 sm:text-base"
                   >
                     Previous
                   </button>
-                  <button
-                    onClick={() => {
-                      if (currentStep === 1 && !canAdvanceShipping) {
-                        return;
-                      }
-                      if (currentStep < 3) {
-                        if (currentStep === 1) {
-                          void handleShippingStepAdvance()
-                        } else {
-                          setCurrentStep(currentStep + 1)
-                        }
-                      } else {
-                        handlePlaceOrder()
-                      }
-                    }}
-                    disabled={
-                      placingOrder ||
-                      cartItems.some(item =>
-                        item.product?.inStock === false ||
-                        (item.product?.availableStock !== undefined && item.quantity > item.product?.availableStock)
-                      ) ||
-                      itemsMissingTransport.length > 0 ||
-                      (currentStep === 1 && !canAdvanceShipping)
+                ) : (
+                  <span />
+                )}
+
+                <button
+                  onClick={() => {
+                    if (currentStep === 1 && !canAdvanceShipping) {
+                      return;
                     }
-                    className="btn-shine px-5 sm:px-6 lg:px-8 py-2.5 sm:py-3 bg-[#e01a1b] hover:bg-[#c41617] text-white font-semibold rounded-full transition-all duration-300 hover:-translate-y-0.5 shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center gap-2 text-sm sm:text-base"
-                  >
-                    {placingOrder && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {currentStep === 3 ? (placingOrder ? "Placing Order..." : "Place Order") : "Continue"}
-                  </button>
-                  {/* A disabled button with no reason is a dead end — say what's wrong
-                      and where to fix it. */}
-                  {itemsMissingTransport.length > 0 && (
-                    <p className="text-xs text-amber-700 mt-2 text-right">
-                      Choose a shipping method for{" "}
-                      {itemsMissingTransport.map((i) => i.product?.name).filter(Boolean).join(", ")} in your{" "}
-                      <Link href="/cart" className="font-semibold underline">cart</Link>.
-                    </p>
-                  )}
+                    if (currentStep < 3) {
+                      if (currentStep === 1) {
+                        void handleShippingStepAdvance()
+                      } else {
+                        setCurrentStep(currentStep + 1)
+                      }
+                    } else {
+                      handlePlaceOrder()
+                    }
+                  }}
+                  disabled={
+                    placingOrder ||
+                    cartItems.some(item =>
+                      item.product?.inStock === false ||
+                      (item.product?.availableStock !== undefined && item.quantity > item.product?.availableStock)
+                    ) ||
+                    itemsMissingTransport.length > 0 ||
+                    (currentStep === 1 && !canAdvanceShipping)
+                  }
+                  className="btn-shine flex items-center gap-2 rounded-full bg-[#e01a1b] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_6px_20px_rgba(224,26,27,0.3)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c41617] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0 sm:px-8 sm:py-3 sm:text-base"
+                >
+                  {placingOrder && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {currentStep === 3 ? (placingOrder ? "Placing Order..." : "Place Order") : "Continue"}
+                </button>
                 </div>
+
+                {/* A disabled button with no reason is a dead end — say what's wrong
+                    and where to fix it. */}
+                {itemsMissingTransport.length > 0 && (
+                  <p className="mt-3 text-right text-xs text-amber-700">
+                    Choose a shipping method for{" "}
+                    {itemsMissingTransport.map((i) => i.product?.name).filter(Boolean).join(", ")} in your{" "}
+                    <Link href="/cart" className="font-semibold underline">cart</Link>.
+                  </p>
+                )}
               </div>
-            </div>
+            </Reveal>
           </div>
+        </div>
 
-          {/* Order Summary */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden lg:sticky lg:top-8">
-              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-linear-to-r from-slate-50 to-white">
-                <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a]">Order Summary</h2>
-              </div>
+        {/* ── The order ────────────────────────────────────────────────────
+            Dark, warm, and running to the edge. Sticky and its own scroller
+            from lg, so a long basket scrolls INSIDE the panel while the form
+            stays where it is — the list used to be a 240px box with its own
+            scrollbar sitting inside a card inside a column. */}
+        {/* ── The order ──────────────────────────────────────────────────
+            A card: white, with a warm hairline and a soft shadow, sticky from
+            lg so it follows you down the steps. It ends where its content
+            ends, which is the whole reason for a card over a pane.
 
-              <div className="p-4 sm:p-5 lg:p-6">
+            One dark object inside it — the Total. Being the heaviest thing on
+            the page is the point there; it was not the point across 37% of the
+            screen, which is what the first build did. */}
+        <aside className="mt-8 lg:mt-0">
+          <div className="relative overflow-hidden rounded-2xl bg-white p-5 shadow-[0_2px_4px_rgba(120,80,50,0.05)] ring-1 ring-[#efe4d6] sm:p-6 lg:sticky lg:top-8">
+            {/* The weave, at a whisper — the same warp-and-weft hairlines the
+                policy banner carries. It is the one texture this business owns,
+                and it keeps a plain white card from looking undesigned. */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-[0.03]"
+              style={{
+                backgroundImage:
+                  'repeating-linear-gradient(90deg,#8a6a49 0 1px,transparent 1px 15px),' +
+                  'repeating-linear-gradient(0deg,#8a6a49 0 1px,transparent 1px 15px)',
+              }}
+            />
 
-                {/* Cart Items Preview (Optional) */}
-                <div className="mb-6 space-y-4 max-h-60 overflow-y-auto pr-2">
-                  {cartItems.map((item) => {
-                    const hasVariantImg = item.variant?.images && item.variant.images.length > 0;
-                    const displayImgUrl = hasVariantImg
-                      ? item.variant?.images?.[0]
-                      : item.product?.images?.[0]?.url;
+            <div className="relative">
+              <h2 className="mb-6 font-playfair text-lg font-semibold text-[#1a1a1a] sm:text-xl">Order Summary</h2>
 
-                    const itemColor = item.variant?.color || item.product?.singleUnitColor;
-                    const itemSize = item.variant?.size || item.product?.singleUnitSize;
-                    const itemColorHex = item.variant?.colorHex || item.product?.singleUnitColorHex;
+              {(() => { const VISIBLE_LINES = 3; const hiddenCount = cartItems.length - VISIBLE_LINES; return (
+              <>
+              <ul className="mb-4 space-y-3.5">
+                {(showAllItems ? cartItems : cartItems.slice(0, VISIBLE_LINES)).map((item) => {
+                  const hasVariantImg = item.variant?.images && item.variant.images.length > 0;
+                  const displayImgUrl = hasVariantImg
+                    ? item.variant?.images?.[0]
+                    : item.product?.images?.[0]?.url;
 
-                    return (
-                      <div key={item.id} className="flex gap-3 text-sm border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                        <div className="w-16 h-16 bg-gray-100 rounded-md shrink-0 overflow-hidden">
+                  const itemColor = item.variant?.color || item.product?.singleUnitColor;
+                  const itemSize = item.variant?.size || item.product?.singleUnitSize;
+                  const itemColorHex = item.variant?.colorHex || item.product?.singleUnitColorHex;
+
+                  return (
+                    <li key={item.id} className="flex gap-3 text-sm">
+                      {/* The quantity rides on the thumbnail as a badge, the way
+                          it does on the header cart. It was a "Qty: 2" line
+                          competing with the colour and size beneath the name.
+
+                          Two elements, not one. The badge sits OUTSIDE the
+                          frame that clips the photograph: putting it inside
+                          meant overflow-hidden — which is what rounds the
+                          image — cut the badge in half, so it showed as a
+                          sliver of red with the number missing. The clip has
+                          to belong to the picture alone. */}
+                      <div className="relative shrink-0">
+                        <div className="h-14 w-14 overflow-hidden rounded-lg bg-white ring-1 ring-[#ece0cf]">
                           {displayImgUrl ? (
-                            <img src={displayImgUrl} alt={item.product?.name || "Product"} className="w-full h-full object-cover" />
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={displayImgUrl} alt={item.product?.name || "Product"} className="h-full w-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">No Img</div>
+                            <div className="flex h-full w-full items-center justify-center text-[10px] text-[#b3a99f]">No Img</div>
                           )}
                         </div>
-                        <div className="flex-1 flex flex-col justify-between">
-                          <p className="font-medium text-slate-900 break-words">{item.product?.name || "Product"}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-slate-500">Qty: {item.quantity}</span>
-                            {(itemColor || itemSize) && (
-                              <div className="flex items-center gap-2 text-xs text-slate-500 ml-2">
-                                {itemColor && (
-                                  <span className="flex items-center gap-1">
-                                    {itemColorHex && (
-                                      <span
-                                        className="w-2.5 h-2.5 rounded-full border border-slate-300 inline-block"
-                                        style={{ backgroundColor: itemColorHex }}
-                                      />
-                                    )}
-                                    {itemColor}
-                                  </span>
-                                )}
-                                {itemColor && itemSize && <span>|</span>}
-                                {itemSize && <span>Size: {itemSize}</span>}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          <span className="font-medium text-slate-900">{formatPrice(getItemPrice(item) * item.quantity)}</span>
-                          {item.product?.activeOffer && (
-                            <span className="mt-0.5 inline-flex items-center rounded-full bg-[#e01a1b]/10 text-[#e01a1b] px-1.5 py-0.5 text-[9px] font-bold">
-                              {item.product.activeOffer.badge}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                <div className="space-y-4 mb-6 border-t border-slate-200 pt-4">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Subtotal</span>
-                    <span className="font-medium">{formatPrice(orderSummary.subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Shipping</span>
-                    <span className="font-medium">
-                      {orderSummary.shipping === 0 ? (
-                        <span className="text-green-600 flex items-center gap-1">
-                          <Truck className="w-4 h-4" />
-                          Free
+                        <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#2f1e1a] px-1 text-[10px] font-bold leading-none tabular-nums text-white ring-2 ring-white">
+                          {item.quantity}
                         </span>
-                      ) : (
-                        `${formatPrice(orderSummary.shipping)}`
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Tax (GST)</span>
-                    <span className="font-medium">{formatPrice(orderSummary.tax)}</span>
-                  </div>
-                  {orderSummary.discount > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Discount</span>
-                      <span className="font-medium">-{formatPrice(orderSummary.discount)}</span>
-                    </div>
-                  )}
-                  <div className="border-t border-slate-200 pt-4">
-                    <div className="flex justify-between text-lg font-bold">
-                      <span>Total</span>
-                      <span>{formatPrice(orderSummary.total)}</span>
-                    </div>
-                    {/*
-                      Our Razorpay account settles in INR, so a USD order is
-                      converted server-side before the payment is created.
-                      Say so here — otherwise the gateway suddenly quoting
-                      rupees reads as a wrong amount. Same rate the server
-                      uses, so the figure matches the actual charge.
-                    */}
-                    {getCurrency() === 'USD' && orderSummary.total > 0 && (
-                      <p className="mt-1.5 text-xs text-slate-500">
-                        Charged as {formatPrice(convertUSDtoINR(orderSummary.total), 'INR')} — billed in INR at today&apos;s exchange rate.
-                      </p>
-                    )}
-                  </div>
-                </div>
+                      </div>
 
-                {/* Security Badges */}
-                <div className="space-y-3 pt-4 border-t border-slate-200">
-                  <div className="flex items-center gap-3 text-sm text-slate-600">
-                    <Lock className="w-4 h-4 text-green-600" />
-                    <span>SSL Encrypted Checkout</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words font-medium leading-snug text-[#1a1a1a]">{item.product?.name || "Product"}</p>
+                        {(itemColor || itemSize) && (
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#8a807a]">
+                            {itemColor && (
+                              <span className="flex items-center gap-1 whitespace-nowrap">
+                                {itemColorHex && (
+                                  <span
+                                    className="inline-block h-2.5 w-2.5 rounded-full ring-1 ring-black/15"
+                                    style={{ backgroundColor: itemColorHex }}
+                                  />
+                                )}
+                                {itemColor}
+                              </span>
+                            )}
+                            {itemSize && <span className="whitespace-nowrap">Size: {itemSize}</span>}
+                          </div>
+                        )}
+                        {item.product?.activeOffer && (
+                          <span className="mt-1.5 inline-flex items-center rounded-full bg-[#fdf1ef] px-1.5 py-0.5 text-[9px] font-bold text-[#c41617] ring-1 ring-[#f4dcd7]">
+                            {item.product.activeOffer.badge}
+                          </span>
+                        )}
+                      </div>
+
+                      <span className="shrink-0 font-semibold tabular-nums text-[#1a1a1a]">
+                        {formatPrice(getItemPrice(item) * item.quantity)}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+
+              {hiddenCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllItems((v) => !v)}
+                  aria-expanded={showAllItems}
+                  className="mb-5 inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-full bg-[#f6f0e8] py-2.5 text-xs font-semibold text-[#4a423c] ring-1 ring-[#e8dccd] transition-colors hover:bg-[#efe6da] hover:text-[#1a1a1a]"
+                >
+                  {showAllItems ? 'Show fewer items' : `Show all ${cartItems.length} items`}
+                  <span aria-hidden className={`transition-transform duration-200 ${showAllItems ? 'rotate-180' : ''}`}>
+                    &#9662;
+                  </span>
+                </button>
+              )}
+              </>
+              ); })()}
+
+              <div className="space-y-3 border-t border-[#eee2d2] pt-5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[#6b625b]">Subtotal</span>
+                  <span className="font-medium tabular-nums">{formatPrice(orderSummary.subtotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#6b625b]">Shipping</span>
+                  <span className="font-medium tabular-nums">
+                    {orderSummary.shipping === 0 ? (
+                      <span className="flex items-center gap-1 text-[#1f7a4d]">
+                        <Truck className="h-4 w-4" />
+                        Free
+                      </span>
+                    ) : (
+                      `${formatPrice(orderSummary.shipping)}`
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#6b625b]">Tax (GST)</span>
+                  <span className="font-medium tabular-nums">{formatPrice(orderSummary.tax)}</span>
+                </div>
+                {orderSummary.discount > 0 && (
+                  <div className="flex justify-between text-[#1f7a4d]">
+                    <span>Discount</span>
+                    <span className="font-medium tabular-nums">-{formatPrice(orderSummary.discount)}</span>
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-slate-600">
-                    <Shield className="w-4 h-4 text-blue-600" />
-                    <span>Money Back Guarantee</span>
-                  </div>
+                )}
+              </div>
+
+              {/* The one dark object on the page, and the only one that earns
+                  it: the figure the whole checkout exists to arrive at. */}
+              <div className="mt-5 rounded-2xl bg-linear-to-br from-[#2f1e1a] to-[#1f1312] px-5 py-4 text-white shadow-[0_14px_34px_-20px_rgba(70,40,25,0.85)]">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-base font-semibold sm:text-lg">Total</span>
+                  <span className="font-playfair text-2xl font-semibold tabular-nums sm:text-[28px]">
+                    {formatPrice(orderSummary.total)}
+                  </span>
+                </div>
+                {/*
+                  Our Razorpay account settles in INR, so a USD order is
+                  converted server-side before the payment is created.
+                  Say so here — otherwise the gateway suddenly quoting
+                  rupees reads as a wrong amount. Same rate the server
+                  uses, so the figure matches the actual charge.
+                */}
+                {getCurrency() === 'USD' && orderSummary.total > 0 && (
+                  <p className="mt-2 text-xs leading-relaxed text-white/55">
+                    Charged as {formatPrice(convertUSDtoINR(orderSummary.total), 'INR')} — billed in INR at today&apos;s exchange rate.
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-7 space-y-2.5 border-t border-[#eee2d2] pt-5">
+                <div className="flex items-center gap-3 text-xs text-[#6b625b] sm:text-sm">
+                  <Lock className="h-4 w-4 text-[#1f7a4d]" />
+                  <span>SSL Encrypted Checkout</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-[#6b625b] sm:text-sm">
+                  <Shield className="h-4 w-4 text-[#3f6ea8]" />
+                  <span>Money Back Guarantee</span>
                 </div>
               </div>
             </div>
           </div>
+        </aside>
         </div>
       </div>
     </div>
