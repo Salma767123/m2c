@@ -41,6 +41,12 @@ interface ProductReportSummary {
   rejectionReason?: string
   createdAt?: string
   updatedAt?: string
+  /** QC's inspection-submission time (Completed On); legacy rows backfilled from
+   *  the QC_SUBMITTED audit entry server-side. */
+  lastReviewedAt?: string | null
+  /** Admin's QC assignment snapshot — assignedAt is the Assigned date;
+   *  scheduledDate is the fallback for legacy assignments. */
+  qcAssignment?: { assignedAt?: string | null; scheduledDate?: string | null } | null
   vendor?: { companyName?: string; vendorCode?: string }
   images?: { url: string }[]
 }
@@ -309,8 +315,8 @@ export default function ProductReportsTab() {
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor ID</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Category</TableHead>
-                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Submitted</TableHead>
-                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Inspected On</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Assigned</TableHead>
+                <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Completed On</TableHead>
                 <TableHead className="font-bold !text-brand-500/60 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Result</TableHead>
               </TableRow>
             </TableHeader>
@@ -318,8 +324,7 @@ export default function ProductReportsTab() {
               {filteredProducts.map((product) => (
                 <TableRow
                   key={product.id}
-                  onClick={() => router.push(`/checker/dashboard/report/product/${product.id}`)}
-                  className="hover:bg-slate-50/50 cursor-pointer"
+                  className="hover:bg-slate-50/40"
                 >
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -346,13 +351,14 @@ export default function ProductReportsTab() {
                   </TableCell>
                   <TableCell className="text-slate-600 text-sm">{product.category || "—"}</TableCell>
                   <TableCell className="text-slate-600 text-sm">
-                    {product.createdAt
-                      ? new Date(product.createdAt).toLocaleDateString("en-IN")
-                      : "—"}
+                    {(() => {
+                      const d = product.qcAssignment?.assignedAt || product.qcAssignment?.scheduledDate
+                      return d ? new Date(d).toLocaleDateString("en-IN") : "—"
+                    })()}
                   </TableCell>
                   <TableCell className="text-slate-600 text-sm">
-                    {product.updatedAt
-                      ? new Date(product.updatedAt).toLocaleDateString("en-IN")
+                    {product.lastReviewedAt
+                      ? new Date(product.lastReviewedAt).toLocaleDateString("en-IN")
                       : "—"}
                   </TableCell>
                   <TableCell>{getStatusBadge(product.approvalStatus || "")}</TableCell>
