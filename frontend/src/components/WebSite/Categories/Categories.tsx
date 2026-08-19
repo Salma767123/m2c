@@ -223,16 +223,12 @@ export default function Categories() {
               {/* Staggered rather than simultaneous: 0, 90, 180, 270ms, so the
                   block assembles downward instead of appearing all at once. */}
               <Reveal className="mb-5 flex justify-center">
-                <span className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-b from-[#fdf1ef] to-[#f9e3df] text-[#e01a1b] ring-1 ring-[#f0d5cf]">
-                  {/* Two halos on the same loop, the second offset, so the
-                      pulse reads as continuous rather than as a blink. */}
-                  <span aria-hidden className="absolute inset-0 animate-ping rounded-2xl bg-[#e01a1b]/10 motion-reduce:animate-none" />
-                  <span
-                    aria-hidden
-                    className="absolute inset-0 animate-ping rounded-2xl bg-[#e01a1b]/[0.07] motion-reduce:animate-none"
-                    style={{ animationDelay: '900ms' }}
-                  />
-                  <LifeBuoy className="relative h-8 w-8" strokeWidth={1.6} />
+                {/* No halo behind the mark. It pulsed on a loop at the top of
+                    the block and read as a vibration rather than as emphasis —
+                    a support card should be calm. The mark just sits there; the
+                    staggered entrance is the only movement it needs. */}
+                <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-b from-[#fdf1ef] to-[#f9e3df] text-[#e01a1b] ring-1 ring-[#f0d5cf]">
+                  <LifeBuoy className="h-8 w-8" strokeWidth={1.6} />
                 </span>
               </Reveal>
 
