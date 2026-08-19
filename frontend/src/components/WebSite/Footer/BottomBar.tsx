@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
+import { useSamePageTop } from "@/components/WebSite/Shared/useSamePageTop";
 import { companyInfoService } from "@/services/companyInfoService";
 
 const DEFAULT_COMPANY_NAME = 'M2C MarkDowns Private Limited';
@@ -13,6 +14,10 @@ function getServerCompanyName() { return DEFAULT_COMPANY_NAME; }
 const subscribe = () => () => {};
 
 const BottomBar = () => {
+  // Terms / Privacy / Returns all link to pages this bar itself sits on, so
+  // this is the row where a dead same-page click is most likely to be met.
+  const samePageTop = useSamePageTop();
+
   const companyName = useSyncExternalStore(subscribe, getCompanyName, getServerCompanyName);
 
   const legal = [
@@ -39,6 +44,7 @@ const BottomBar = () => {
                 {i > 0 && <span className="h-3 w-px bg-white/25" aria-hidden />}
                 <Link
                   href={l.href}
+                  onClick={samePageTop(l.href)}
                   className="group relative whitespace-nowrap text-[13px] text-[#f4ded9] transition-colors duration-200 hover:text-white"
                 >
                   {l.label}

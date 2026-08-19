@@ -6,6 +6,7 @@ import { Instagram, Facebook, Youtube, Mail, Phone, ArrowRight } from "lucide-re
 import { categoryService, Category } from "@/services/categoryService";
 import { companyInfoService, PublicCompanyInfo } from "@/services/companyInfoService";
 import CompanyLogo from "@/components/Shared/CompanyLogo";
+import { useSamePageTop } from "@/components/WebSite/Shared/useSamePageTop";
 
 /**
  * The footer.
@@ -130,11 +131,18 @@ const SwapLabel = ({ label, wrapper = "", line = "" }: { label: string; wrapper?
   </span>
 );
 
-const NavLink = ({ href, label }: { href: string; label: string }) => (
-  <Link href={href} className={`${ROW} text-[17px] sm:text-[18px]`}>
-    <SwapLabel label={label} wrapper="min-w-0 flex-1" />
-  </Link>
-);
+/**
+ * Clicking one of these while already on that page used to do nothing at all —
+ * see useSamePageTop for why, and for what it does instead.
+ */
+const NavLink = ({ href, label }: { href: string; label: string }) => {
+  const samePageTop = useSamePageTop();
+  return (
+    <Link href={href} onClick={samePageTop(href)} className={`${ROW} text-[17px] sm:text-[18px]`}>
+      <SwapLabel label={label} wrapper="min-w-0 flex-1" />
+    </Link>
+  );
+};
 
 /** Contact row — the same swap, with the icon leading it. */
 const ConnectRow = ({

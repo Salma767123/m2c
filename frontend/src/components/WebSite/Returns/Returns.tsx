@@ -1,152 +1,169 @@
-import { RotateCcw, Clock, Package, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import Reveal from '@/components/WebSite/Shared/Reveal';
+import {
+  RotateCcw,
+  Clock,
+  Package,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  LifeBuoy,
+} from 'lucide-react';
+import LegalPage, {
+  LegalList,
+  LegalNote,
+  LegalText,
+  type LegalSection,
+} from '@/components/WebSite/Shared/LegalPage';
 
-const Returns = () => {
+/**
+ * A step in "How to Return". Three of these, and they were three copies of the
+ * same fourteen lines of markup differing only in a digit and two strings.
+ */
+function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#f7f7f5] py-8 sm:py-10 lg:py-12">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-        <div className="bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_10px_40px_rgba(0,0,0,0.06)] p-4 sm:p-6 lg:p-8">
-          <Reveal className="text-center mb-6 sm:mb-8">
-            <RotateCcw className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-[#e01a1b] mb-3 sm:mb-4" />
-            <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-3">
-              <span className="h-px w-6 bg-[#e01a1b]" />
-              Hassle-Free
-            </span>
-            <h1 className="font-playfair text-2xl sm:text-3xl md:text-4xl font-semibold text-[#1a1a1a] tracking-tight">Returns &amp; Exchanges</h1>
-            <p className="text-sm sm:text-base text-gray-600 mt-2">Easy returns within 30 days</p>
-          </Reveal>
-
-          <div className="space-y-8">
-            <section>
-              <div className="flex items-center mb-4">
-                <Clock className="h-6 w-6 text-[#e01a1b] mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">Return Policy</h2>
-              </div>
-              <p className="text-gray-700 mb-4">
-                We want you to be completely satisfied with your purchase. If you're not happy 
-                with your order, you can return it within 30 days of delivery for a full refund.
-              </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-blue-800 font-medium">30-Day Return Window</p>
-                <p className="text-[#c41617] text-sm mt-1">
-                  Returns must be initiated within 30 days of delivery date
-                </p>
-              </div>
-            </section>
-
-            <section>
-              <div className="flex items-center mb-4">
-                <CheckCircle className="h-6 w-6 text-green-600 mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">Eligible Items</h2>
-              </div>
-              <ul className="list-disc list-inside text-gray-700 space-y-2">
-                <li>Items in original condition with tags attached</li>
-                <li>Unworn and unwashed clothing</li>
-                <li>Electronics in original packaging</li>
-                <li>Books in sellable condition</li>
-                <li>Home goods without damage</li>
-              </ul>
-            </section>
-
-            <section>
-              <div className="flex items-center mb-4">
-                <XCircle className="h-6 w-6 text-gray-600 mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">Non-Returnable Items</h2>
-              </div>
-              <ul className="list-disc list-inside text-gray-700 space-y-2">
-                <li>Personalized or customized items</li>
-                <li>Perishable goods</li>
-                <li>Intimate apparel and swimwear</li>
-                <li>Items damaged by misuse</li>
-                <li>Digital downloads</li>
-              </ul>
-            </section>
-
-            <section>
-              <div className="flex items-center mb-4">
-                <Package className="h-6 w-6 text-[#e01a1b] mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">How to Return</h2>
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <div className="shrink-0 w-8 h-8 bg-[#e01a1b] text-white rounded-full flex items-center justify-center text-sm font-medium">
-                    1
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-900">Start Your Return</h3>
-                    <p className="text-gray-700 text-sm">
-                      Contact our customer service or use our online return portal
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="shrink-0 w-8 h-8 bg-[#e01a1b] text-white rounded-full flex items-center justify-center text-sm font-medium">
-                    2
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-900">Package Your Items</h3>
-                    <p className="text-gray-700 text-sm">
-                      Include all original packaging, tags, and accessories
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="shrink-0 w-8 h-8 bg-[#e01a1b] text-white rounded-full flex items-center justify-center text-sm font-medium">
-                    3
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-900">Ship It Back</h3>
-                    <p className="text-gray-700 text-sm">
-                      Use the prepaid return label we provide
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section>
-              <div className="flex items-center mb-4">
-                <AlertCircle className="h-6 w-6 text-[#e01a1b] mr-3" />
-                <h2 className="text-xl font-semibold text-gray-900">Refund Information</h2>
-              </div>
-              <div className="space-y-4">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="font-medium text-gray-900 mb-2">Processing Time</h3>
-                  <p className="text-gray-700 text-sm">
-                    Refunds are processed within 5-7 business days after we receive your return
-                  </p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="font-medium text-gray-900 mb-2">Refund Method</h3>
-                  <p className="text-gray-700 text-sm">
-                    Refunds are issued to the original payment method used for purchase
-                  </p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="font-medium text-gray-900 mb-2">Return Shipping</h3>
-                  <p className="text-gray-700 text-sm">
-                    We provide free return shipping labels for all eligible returns
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <section className="bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-5 lg:p-6">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Need Help?</h2>
-              <p className="text-sm sm:text-base text-gray-700 mb-3 sm:mb-4">
-                Our customer service team is here to help with your return.
-              </p>
-              <div className="space-y-1.5 sm:space-y-2 text-sm sm:text-base">
-                <p className="text-gray-700 break-all">Email: returns@yourstore.com</p>
-                <p className="text-gray-700">Phone: (555) 123-4567</p>
-                <p className="text-gray-700">Hours: Monday-Friday, 9 AM - 6 PM EST</p>
-              </div>
-            </section>
-          </div>
-        </div>
+    <div className="flex items-start gap-3.5">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#e01a1b] text-[13px] font-semibold text-white">
+        {n}
+      </span>
+      <div className="min-w-0 pt-1">
+        <h3 className="text-[14.5px] font-semibold text-[#1a1a1a]">{title}</h3>
+        <p className="mt-0.5 text-[14px] leading-relaxed text-[#5a524b]">{children}</p>
       </div>
     </div>
   );
-};
+}
+
+/** One of the three refund facts. */
+function Fact({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl bg-[#faf7f3] p-4 ring-1 ring-black/5">
+      <h3 className="text-[13.5px] font-semibold text-[#1a1a1a]">{title}</h3>
+      <p className="mt-1.5 text-[13.5px] leading-relaxed text-[#5a524b]">{children}</p>
+    </div>
+  );
+}
+
+/**
+ * Every word is the original. What changed is the shell (see LegalPage) and
+ * three things this page was doing on its own:
+ *
+ *  - Two `bg-blue-50 / border-blue-200 / text-blue-800` boxes, the only blue
+ *    anywhere on this site. One of them even held red text inside a blue box.
+ *  - Section headings at `text-gray-900` where Terms used `text-[#1a1a1a]`.
+ *  - Green and grey section icons on two of six. The eligible/ineligible
+ *    distinction now rests on the check and cross glyphs and on the headings,
+ *    which is where it should rest anyway — colour alone is not something every
+ *    reader can act on.
+ */
+const SECTIONS: LegalSection[] = [
+  {
+    id: 'return-policy',
+    title: 'Return Policy',
+    icon: <Clock />,
+    body: (
+      <>
+        <LegalText className="mb-4">
+          We want you to be completely satisfied with your purchase. If you&apos;re not happy
+          with your order, you can return it within 30 days of delivery for a full refund.
+        </LegalText>
+        <LegalNote title="30-Day Return Window">
+          Returns must be initiated within 30 days of delivery date
+        </LegalNote>
+      </>
+    ),
+  },
+  {
+    id: 'eligible-items',
+    title: 'Eligible Items',
+    icon: <CheckCircle />,
+    body: (
+      <LegalList>
+        <li>Items in original condition with tags attached</li>
+        <li>Unworn and unwashed clothing</li>
+        <li>Electronics in original packaging</li>
+        <li>Books in sellable condition</li>
+        <li>Home goods without damage</li>
+      </LegalList>
+    ),
+  },
+  {
+    id: 'non-returnable-items',
+    title: 'Non-Returnable Items',
+    icon: <XCircle />,
+    body: (
+      <LegalList>
+        <li>Personalized or customized items</li>
+        <li>Perishable goods</li>
+        <li>Intimate apparel and swimwear</li>
+        <li>Items damaged by misuse</li>
+        <li>Digital downloads</li>
+      </LegalList>
+    ),
+  },
+  {
+    id: 'how-to-return',
+    title: 'How to Return',
+    icon: <Package />,
+    body: (
+      <div className="space-y-4">
+        <Step n={1} title="Start Your Return">
+          Contact our customer service or use our online return portal
+        </Step>
+        <Step n={2} title="Package Your Items">
+          Include all original packaging, tags, and accessories
+        </Step>
+        <Step n={3} title="Ship It Back">
+          Use the prepaid return label we provide
+        </Step>
+      </div>
+    ),
+  },
+  {
+    id: 'refund-information',
+    title: 'Refund Information',
+    icon: <AlertCircle />,
+    body: (
+      // Three short, parallel facts. Stacked full width they read as a list
+      // that lost its bullets; side by side they read as what they are.
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Fact title="Processing Time">
+          Refunds are processed within 5-7 business days after we receive your return
+        </Fact>
+        <Fact title="Refund Method">
+          Refunds are issued to the original payment method used for purchase
+        </Fact>
+        <Fact title="Return Shipping">
+          We provide free return shipping labels for all eligible returns
+        </Fact>
+      </div>
+    ),
+  },
+  {
+    id: 'need-help',
+    title: 'Need Help?',
+    icon: <LifeBuoy />,
+    body: (
+      <>
+        <LegalText className="mb-4">
+          Our customer service team is here to help with your return.
+        </LegalText>
+        <LegalNote>
+          <p className="break-all">Email: returns@yourstore.com</p>
+          <p>Phone: (555) 123-4567</p>
+          <p>Hours: Monday-Friday, 9 AM - 6 PM EST</p>
+        </LegalNote>
+      </>
+    ),
+  },
+];
+
+const Returns = () => (
+  <LegalPage
+    icon={<RotateCcw />}
+    eyebrow="Hassle-Free"
+    title="Returns & Exchanges"
+    meta="Easy returns within 30 days"
+    sections={SECTIONS}
+  />
+);
 
 export default Returns;
