@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
-import Reveal from '@/components/WebSite/Shared/Reveal';
 import { pageScroller, scrollPageToTop } from '@/lib/pageScroll';
 
 /**
@@ -123,22 +122,61 @@ export default function LegalPage({ icon, eyebrow, title, meta, sections }: Lega
 
   const [headH, setHeadH] = useState(0);
 
+  /**
+   * Watched, not measured once.
+   *
+   * The header is 51px tall when this page mounts and 110px a moment later:
+   * the category ribbon inside it is fetched from the API and does not exist
+   * until that request comes back. So a single measurement records a header
+   * that has not finished being one — and every offset driven from it inherits
+   * the error. Measured: --legal-head stuck at 51 while the header stood at
+   * 110, which pinned the phone contents bar 59px too high, behind the very
+   * header it is offset to clear, and left every anchor landing its heading
+   * underneath it. That is the exact bug this measurement was introduced to
+   * fix, arriving again through the back door of timing.
+   *
+   * A ResizeObserver answers the question that is actually being asked — how
+   * tall is the header NOW — and nothing else would have caught it, because no
+   * event announces the ribbon's arrival. It covers viewport resizes too, the
+   * watched box being one of the things that changes then; the window listener
+   * stays as a cheap net for the first frames, before there is a header to
+   * watch at all.
+   */
   useEffect(() => {
+    let frame = 0;
+    let ro: ResizeObserver | null = null;
+    let tries = 0;
+
+    const schedule = () => {
+      if (frame === 0) frame = requestAnimationFrame(measure);
+    };
+
     const measure = () => {
+      frame = 0;
       const el = document.querySelector('div.sticky.top-0.z-50');
       setHeadH(el ? Math.round(el.getBoundingClientRect().height) : 0);
+
+      if (el) {
+        if (!ro) {
+          ro = new ResizeObserver(schedule);
+          ro.observe(el);
+        }
+        return;
+      }
+
+      // No header on the page yet. Look again next frame, but not forever —
+      // a page that genuinely has no header should settle at an offset of 0
+      // rather than spin a callback for the length of the visit.
+      if (tries++ < 60) schedule();
     };
-    // Deferred so it does not run in the effect body, and so it reads a laid-out
-    // header rather than one still waiting on its web font.
-    let frame = requestAnimationFrame(measure);
-    const onResize = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(measure);
-    };
-    window.addEventListener('resize', onResize, { passive: true });
+
+    measure();
+    window.addEventListener('resize', schedule, { passive: true });
+
     return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener('resize', onResize);
+      if (frame) cancelAnimationFrame(frame);
+      ro?.disconnect();
+      window.removeEventListener('resize', schedule);
     };
   }, []);
 
@@ -338,6 +376,16 @@ export default function LegalPage({ icon, eyebrow, title, meta, sections }: Lega
         @media print {
           .legal-page { background: #fff }
           .legal-aside, .legal-toc-mobile { display: none !important }
+
+          /* On paper the ground and the washes are ink spent on no
+             information. Keep the words, drop every decorative layer. */
+          .legal-banner {
+            background: #fff !important;
+            box-shadow: none !important;
+            padding: 0 0 1rem !important;
+          }
+          .legal-banner, .legal-banner * { color: #000 !important }
+          .legal-banner [aria-hidden='true'] { display: none !important }
           .legal-card {
             box-shadow: none !important;
             border: 0 !important;
@@ -349,34 +397,119 @@ export default function LegalPage({ icon, eyebrow, title, meta, sections }: Lega
       `}</style>
 
       <div className="mx-auto max-w-[95rem] px-3 py-8 sm:px-4 sm:py-10 md:px-6 lg:px-8 lg:py-12">
-        {/* ── Masthead ────────────────────────────────────────────────────
-            The same four pieces as before — mark, caption, name, revision line
-            — with the caption ruled on both sides rather than one. A single
-            rule reads as the beginning of something; a pair reads as a caption,
-            which is what it is. Same decision as the category banner. */}
-        <Reveal className="mb-8 text-center sm:mb-10">
-          <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-b from-[#fdf1ef] to-[#f9e3df] text-[#e01a1b] ring-1 ring-[#f0d5cf] sm:h-16 sm:w-16 [&>svg]:h-7 [&>svg]:w-7 sm:[&>svg]:h-8 sm:[&>svg]:w-8 [&>svg]:[stroke-width:1.6]">
-            {icon}
-          </span>
+        {/* ── Banner ──────────────────────────────────────────
+            A band, not a photograph.
 
-          <span className="mb-3 inline-flex items-center gap-3 text-[10.5px] font-semibold uppercase tracking-[0.3em] text-[#c41617] sm:text-[11px]">
-            <span aria-hidden className="h-px w-8 bg-[#c41617]/40" />
-            {eyebrow}
-            <span aria-hidden className="h-px w-8 bg-[#c41617]/40" />
-          </span>
+            This was the shared CategoryHero for a while, backdrop and opening
+            animation and all, and on a policy page it was wrong twice over. A
+            photograph of towels behind the words "Privacy Policy" is decoration
+            arguing with a document — every wide shot in the library is either
+            busy enough to fight the type or pale enough to lose it, and there
+            is no third kind. And the opening gesture is a shop greeting you; a
+            policy is a page you were SENT to, usually mid checkout, usually to
+            check one clause. Making that page perform is making someone wait
+            for a document they arrived at in a hurry.
 
-          <h1 className="font-playfair text-3xl font-semibold tracking-tight text-balance text-[#1a1a1a] sm:text-4xl lg:text-5xl">
-            {title}
-          </h1>
+            So: static, and built from colour. Four flat layers, no image
+            request, nothing to animate, and nothing to crop badly at a
+            breakpoint nobody checked.
 
-          {/* The revision line as a pill rather than loose grey text. It is
-              metadata about the document, not part of it, and should not read
-              like the first sentence. */}
-          <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-[12.5px] font-medium text-[#6b625b] ring-1 ring-black/5 sm:text-[13px]">
-            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#e01a1b]" />
-            {meta}
-          </p>
-        </Reveal>
+            Light, and warm rather than grey. The first build of this band was
+            near-black, and a black rectangle across the top of a page of small
+            print reads as a warning notice — heavy in a place that only needs
+            to say which document you are on. Cream carries the same brand
+            without the weight, and it is the storefront's own warm palette:
+            the Sell-on-M2C band and the Questions card are already this
+            colour. The page ground is a cooler grey, so the band is held apart
+            from it by a warm ring and a soft shadow rather than by contrast.
+
+            It sits INSIDE the page container rather than full bleed, so its
+            edges are the same edges as the contents rail and the document card
+            underneath — the full-bleed version overhung them by the width of
+            the gutter, which reads as a near miss rather than as a decision. */}
+        <div className="legal-banner relative mb-8 overflow-hidden rounded-2xl bg-linear-to-br from-[#fdf9f3] via-[#faf3e8] to-[#f3e7d6] px-6 py-10 text-center shadow-[0_16px_44px_-30px_rgba(120,80,40,0.5)] ring-1 ring-[#ecdfcc] sm:mb-9 sm:rounded-3xl sm:px-10 sm:py-11 lg:py-12">
+          {/* 1. The weave. Two sets of hairlines at right angles — warp and
+                 weft — which is the one texture this business can claim as its
+                 own, and it costs a gradient rather than a download.
+
+                 A style rather than an arbitrary class because it is two
+                 stacked repeating gradients. The hard stops are exempt from
+                 the fade-to-your-own-colour rule that governs the soft
+                 gradients here: nothing interpolates across a stop that begins
+                 and ends at the same position.
+
+                 Far fainter and wider apart than the dark version needed. The
+                 same lines that read as texture against near-black read as
+                 GRAPH PAPER against cream — a pale ground gives a thread
+                 nowhere to hide, so it has to be most of the way to invisible
+                 before it stops being a grid and starts being a surface. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-[0.03]"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(90deg,#8a6a49 0 1px,transparent 1px 15px),' +
+                'repeating-linear-gradient(0deg,#8a6a49 0 1px,transparent 1px 15px)',
+            }}
+          />
+
+          {/* 2. Brand warmth from the top, so the mark and the caption sit IN
+                 it rather than on a flat ground. Fades to its own colour at
+                 zero alpha — `transparent` is rgba(0,0,0,0) and would drag the
+                 midpoint through black, greying the band's shoulders. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(78%_100%_at_50%_0%,rgba(224,26,27,0.10)_0%,rgba(224,26,27,0)_66%)]"
+          />
+
+          {/* 3. A gold counterweight in the far corner, off the axis of the
+                 type. Lit from one place the band reads flat; two warm sources
+                 give it a diagonal. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(58%_92%_at_92%_108%,rgba(189,128,35,0.22)_0%,rgba(189,128,35,0)_60%)]"
+          />
+
+          {/* 4. A hairline of brand colour along the top edge — the seam that
+                 tells you the band is a made thing and not a gap. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-[rgba(224,26,27,0)] via-[#e01a1b] to-[rgba(224,26,27,0)]"
+          />
+
+          <div className="relative">
+            {/* The mark, in the warm chip this masthead has always used. It
+                reads at a glance because the ground is a known colour — which
+                is the whole argument for a band over a photograph, where what
+                sat behind it was pot luck and a chip could vanish outright. */}
+            <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-b from-[#fdf1ef] to-[#f9e3df] text-[#e01a1b] ring-1 ring-[#f2d9d3] sm:h-16 sm:w-16 [&>svg]:h-7 [&>svg]:w-7 sm:[&>svg]:h-8 sm:[&>svg]:w-8 [&>svg]:[stroke-width:1.6]">
+              {icon}
+            </span>
+
+            {/* Ruled on both sides. A single rule reads as the beginning of
+                something; a pair reads as a caption, which is what it is. */}
+            <span className="mb-3 inline-flex items-center gap-3 text-[10.5px] font-semibold uppercase tracking-[0.3em] text-[#c41617] sm:text-[11px]">
+              <span aria-hidden className="h-px w-8 bg-[#c41617]/40" />
+              {eyebrow}
+              <span aria-hidden className="h-px w-8 bg-[#c41617]/40" />
+            </span>
+
+            <h1 className="font-playfair text-3xl font-semibold tracking-tight text-balance text-[#1a1a1a] sm:text-4xl lg:text-5xl">
+              {title}
+            </h1>
+
+            {/* The one piece of brand colour in the stack, and what stops three
+                centred lines reading as one undifferentiated block. */}
+            <span aria-hidden className="mx-auto mt-5 block h-[3px] w-12 rounded-full bg-[#e01a1b] sm:w-14" />
+
+            {/* The revision line as a pill. It is metadata ABOUT the document,
+                not part of it, and should not read like its first sentence. */}
+            <p className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-[12.5px] font-medium text-[#6b625b] ring-1 ring-black/5 sm:text-[13px]">
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#e01a1b]" />
+              {meta}
+            </p>
+          </div>
+        </div>
 
         {/* ── Contents, small screens ─────────────────────────────────────
             This was a closed <details> saying "Contents · 6 sections", and on a
@@ -468,14 +601,14 @@ export default function LegalPage({ icon, eyebrow, title, meta, sections }: Lega
             about 470px, and the whole point of this layout is that the text
             stays at a readable width. The prose also carries its own max-w-68ch
             inside, so widening the page can never widen the reading line. */}
-        <div className="lg:grid lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-x-9 xl:grid-cols-[17rem_minmax(0,1fr)_20rem] xl:gap-x-10">
+        <div className="lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:gap-x-8 xl:grid-cols-[18.5rem_minmax(0,1fr)_21rem] xl:gap-x-9">
           {/* ── Contents, large screens ───────────────────────────────────
               Sticky, outside <Reveal> on purpose (see the note above the
               component), and offset to clear the header stack. */}
           <aside className="legal-aside hidden lg:block">
             <nav aria-label="On this page" className="sticky" style={{ top: headH + 24 }}>
-              <p className="mb-4 inline-flex items-center gap-2.5 text-[10.5px] font-semibold uppercase tracking-[0.24em] text-[#8a807a]">
-                <span aria-hidden className="h-px w-5 bg-[#e01a1b]" />
+              <p className="mb-4 inline-flex items-center gap-2.5 text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8a807a]">
+                <span aria-hidden className="h-px w-6 bg-[#e01a1b]" />
                 On this page
               </p>
 
@@ -511,14 +644,14 @@ export default function LegalPage({ icon, eyebrow, title, meta, sections }: Lega
                         href={`#${section.id}`}
                         onClick={(e) => jumpTo(e, section.id)}
                         aria-current={isActive ? 'true' : undefined}
-                        className={`relative z-10 flex items-baseline gap-2.5 rounded-xl py-2.5 pl-4 pr-3 text-[13px] leading-snug transition-colors duration-300 ${
+                        className={`relative z-10 flex items-baseline gap-2.5 rounded-xl py-3 pl-4 pr-3.5 text-[15px] leading-snug transition-colors duration-300 ${
                           isActive
                             ? 'font-semibold text-[#1a1a1a]'
                             : 'text-[#7a716a] hover:text-[#1a1a1a]'
                         }`}
                       >
                         <span
-                          className={`text-[10.5px] font-semibold tabular-nums transition-colors duration-300 ${
+                          className={`text-[12px] font-semibold tabular-nums transition-colors duration-300 ${
                             isActive ? 'text-[#e01a1b]' : 'text-[#b3a99f]'
                           }`}
                         >
@@ -537,7 +670,7 @@ export default function LegalPage({ icon, eyebrow, title, meta, sections }: Lega
                   e.preventDefault();
                   scrollPageToTop();
                 }}
-                className="mt-5 inline-flex items-center gap-1.5 pl-4 text-[12px] font-medium text-[#8a807a] transition-colors hover:text-[#e01a1b]"
+                className="mt-5 inline-flex items-center gap-1.5 pl-4 text-[13.5px] font-medium text-[#8a807a] transition-colors hover:text-[#e01a1b]"
               >
                 <span aria-hidden>↑</span> Back to top
               </a>
@@ -601,8 +734,8 @@ export default function LegalPage({ icon, eyebrow, title, meta, sections }: Lega
               block a sticky element should not be sitting in. */}
           <aside className="legal-aside mt-8 hidden xl:mt-0 xl:block">
             <div className="sticky" style={{ top: headH + 24 }}>
-              <p className="mb-4 inline-flex items-center gap-2.5 text-[10.5px] font-semibold uppercase tracking-[0.24em] text-[#8a807a]">
-                <span aria-hidden className="h-px w-5 bg-[#e01a1b]" />
+              <p className="mb-4 inline-flex items-center gap-2.5 text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8a807a]">
+                <span aria-hidden className="h-px w-6 bg-[#e01a1b]" />
                 More policies
               </p>
 
@@ -611,10 +744,10 @@ export default function LegalPage({ icon, eyebrow, title, meta, sections }: Lega
                   <li key={policy.href}>
                     <Link
                       href={policy.href}
-                      className="group flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 text-[13px] font-medium text-[#4a423c] ring-1 ring-black/5 transition-colors duration-200 hover:text-[#1a1a1a] hover:ring-[#e6dcd0]"
+                      className="group flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3.5 text-[15px] font-medium text-[#4a423c] ring-1 ring-black/5 transition-colors duration-200 hover:text-[#1a1a1a] hover:ring-[#e6dcd0]"
                     >
                       {policy.label}
-                      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#b3a99f] transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-[#e01a1b]" />
+                      <ArrowRight className="h-4 w-4 shrink-0 text-[#b3a99f] transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-[#e01a1b]" />
                     </Link>
                   </li>
                 ))}
@@ -623,16 +756,16 @@ export default function LegalPage({ icon, eyebrow, title, meta, sections }: Lega
               {/* The one thing a policy page cannot do is answer a question it
                   did not anticipate. */}
               <div className="mt-4 rounded-xl border-l-2 border-[#e01a1b] bg-[#faf7f3] px-4 py-3.5 ring-1 ring-black/5">
-                <p className="text-[13px] font-semibold text-[#1a1a1a]">Questions?</p>
-                <p className="mt-1 text-[12.5px] leading-relaxed text-[#5a524b]">
+                <p className="text-[15px] font-semibold text-[#1a1a1a]">Questions?</p>
+                <p className="mt-1.5 text-[13.5px] leading-relaxed text-[#5a524b]">
                   Our team is here to help, any day of the week.
                 </p>
                 <Link
                   href="/contact"
-                  className="group mt-2.5 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#e01a1b] transition-colors hover:text-[#c41617]"
+                  className="group mt-3 inline-flex items-center gap-1.5 text-[14px] font-semibold text-[#e01a1b] transition-colors hover:text-[#c41617]"
                 >
                   Contact us
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
+                  <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
                 </Link>
               </div>
             </div>
