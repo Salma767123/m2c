@@ -9,89 +9,14 @@ import {
   Store,
   Loader2,
   Check,
-  CheckCircle2,
-  AlertTriangle,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import Reveal from '@/components/WebSite/Shared/Reveal';
-import { toast } from '@/hooks/use-toast';
+import { showCenterNotice } from '@/components/UI/CenterNotice';
 import { contactEnquiryService } from '@/services/contactEnquiryService';
 import { HEAR_ABOUT_US_OPTIONS } from '@/lib/enquirySources';
 import Dropdown from '@/components/UI/Dropdown';
 import VendorApplicationModal from '@/components/WebSite/Shared/VendorApplicationModal';
-
-/**
- * The send result for THIS form only.
- *
- * ── Why it is here and not in toast-utils ─────────────────────────────────
- *
- * showSuccessToast/showErrorToast feed the shared Toast primitive, which 123
- * files across the admin, vendor and checker dashboards also use. Restyling
- * that would restyle every toast in the product. So this styles one call site
- * instead: `toast()` spreads whatever it is given straight onto <Toast>, and
- * <Toast> merges className through tailwind-merge, so a class passed here
- * simply beats the base one. Nothing shared is touched, and every other toast
- * in the product stays exactly as it was.
- *
- * ── What it fixes ─────────────────────────────────────────────────────────
- *
- * The shared toast tells success from failure with a single pixel of border
- * colour — green-500 against red-500 — on an otherwise identical white box.
- * Glanced at from across a desk those are the same notification, and a reader
- * who cannot separate the two hues has nothing else to go on. Here the outcome
- * is carried by an icon and a tinted disc as well, so the shape says it before
- * the colour does.
- */
-function showSendResult(ok: boolean, title: string, description: string) {
-  const Icon = ok ? CheckCircle2 : AlertTriangle;
-
-  toast({
-    /**
-     * No `variant`, and both lines composed into `description`.
-     *
-     * `title` cannot take JSX: ToasterToast is `ToastProps & { title?: ReactNode }`,
-     * and ToastProps extends the div's DOM props, which already declare
-     * `title?: string` — the HTML tooltip attribute. The intersection of those
-     * two collapses back to string, so an icon cannot go there. A ReactNode
-     * description has no such collision.
-     *
-     * Leaving `variant` at its default also keeps the `destructive` class off
-     * the root, whose `group-[.destructive]:` rules would otherwise fight the
-     * close-button colour set below at equal specificity — a race decided by
-     * whichever rule Tailwind happened to emit second.
-     */
-    // Top right, level with every other toast on the site — the vendor
-    // application's "Application Submitted!" lands there and this should read as
-    // the same kind of message, not as a different system. It was offset below
-    // the header for a while so it would not cover the account menu; sitting a
-    // category bar lower made it look misplaced, and matching the rest is worth
-    // more than the clearance.
-    className:
-      'items-start gap-3 rounded-2xl border-0 bg-white p-4 pr-10 ' +
-      'shadow-[0_18px_50px_rgba(26,20,22,0.16)] ring-1 ' +
-      (ok ? 'ring-[#c6e6d0]' : 'ring-[#f3ccc9]') +
-      // The dismiss control is opacity-0 until group-hover, which on a phone
-      // means invisible and unreachable. There is no hover to wait for.
-      ' [&_[toast-close]]:opacity-100 [&_[toast-close]]:text-[#8a807a]',
-    description: (
-      <span className="flex items-start gap-3">
-        <span
-          className={`mt-px flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-            ok ? 'bg-[#e7f6ec] text-[#15803d]' : 'bg-[#fdecea] text-[#c41617]'
-          }`}
-        >
-          <Icon className="h-[17px] w-[17px]" strokeWidth={2.2} />
-        </span>
-        <span className="block">
-          <span className="block text-[14.5px] font-semibold text-[#1a1a1a]">{title}</span>
-          <span className="mt-0.5 block text-[13.5px] leading-relaxed text-[#5a524b]">
-            {description}
-          </span>
-        </span>
-      </span>
-    ),
-  });
-}
 
 /**
  * The vendor band's ground - the pale rose panel from the homepage's Best
@@ -313,19 +238,25 @@ const Contact = () => {
       setFormData({ name: '', email: '', subject: '', message: '', hearAboutUs: '', hearAboutUsOther: '' });
       setHearAboutUsError(false);
       setHearAboutUsOtherError(false);
-      showSendResult(
-        true,
+      // Centre-screen, not a corner toast. Sending the form is the end of the
+      // task and the confirmation should land in front of you; the same popup
+      // the vendor application uses, so the two read as one system. 4.5s rather
+      // than the 2s default, because there are two lines to read.
+      showCenterNotice(
+        'success',
         'Thanks for contacting us!',
-        'We’ve received your message and will get back to you soon.'
+        'We’ve received your message and will get back to you soon.',
+        4500,
       );
     } catch (error: unknown) {
       // Still logged in full; the customer just gets plain language rather than
       // whatever string the API happened to return.
       console.error('Contact form error:', error);
-      showSendResult(
-        false,
+      showCenterNotice(
+        'error',
         'Something went wrong',
-        'We couldn’t send your message. Please try again.'
+        'We couldn’t send your message. Please try again.',
+        4500,
       );
     } finally {
       setIsSubmitting(false);

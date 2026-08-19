@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Outfit, Poppins } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/UI/Toaster";
+import { CenterNoticeHost } from "@/components/UI/CenterNotice";
 import PageTracker from "@/components/Analytics/PageTracker";
 import { ExchangeRateLoader } from "@/components/Shared/ExchangeRateLoader";
 import DocViewerProvider from "@/components/Shared/DocViewerProvider";
@@ -58,6 +59,11 @@ export default function RootLayout({
         <ExchangeRateLoader />
         {children}
         <Toaster />
+        {/* Centre-screen confirmations. Already mounted in the admin, vendor
+            and checker layouts; the storefront had no host, so a call to
+            centerNotice from a public page went nowhere. Renders null until
+            something is showing. */}
+        <CenterNoticeHost />
         <DocViewerProvider />
       </body>
     </html>
