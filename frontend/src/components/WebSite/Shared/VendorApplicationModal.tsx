@@ -1,14 +1,71 @@
 'use client';
 
-import { Mail, Phone, Send, Store, X, Building2, FileText, Globe } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Send, Store, X, Building2, FileText, Globe, Mail, Phone, User, Check, Loader2 } from 'lucide-react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { enquiryService } from '@/services/enquiryService';
 
+const EMPTY = {
+  name: '',
+  companyName: '',
+  gstNumber: '',
+  email: '',
+  phone: '',
+  website: '',
+};
+
+/** Fifteen alphanumerics. The backend's rule; repeated here only to guide. */
+const GST_PATTERN = /^[A-Z0-9]{15}$/i;
+const GST_LENGTH = 15;
+
+const LABEL_CLASS =
+  'mb-2 block text-[13px] font-semibold text-[#3d352f] transition-colors duration-200 ' +
+  // The wrapper is a `group`, so the caption picks up brand red the moment the
+  // caret lands in its field. Pure CSS — no focus state tracked in React.
+  'group-focus-within:text-[#e01a1b]';
+
+const FIELD_CLASS =
+  'w-full rounded-xl border border-[#e6dcd0] bg-white py-3 text-[15px] text-[#1a1a1a] outline-none ' +
+  'transition-colors placeholder:text-[#a89a8d] focus:border-[#e01a1b] focus:ring-2 focus:ring-[#e01a1b]/15';
+
 /**
- * Reusable "Join Us as a Vendor" application modal. Self-contained state +
- * submit — mirrors the vendor form on the Contact page so both entry points
- * (Contact page + home BrandPromo banner) share one implementation.
+ * The mark that fades into a field once it holds something usable. Scale as
+ * well as opacity: at this size a fade alone reads as a rendering glitch,
+ * where a thing that grows into place reads as a response.
+ */
+function FieldTick({ done }: { done: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none absolute right-3.5 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full bg-[#e6f5ec] text-[#1f9d57] transition-all duration-300 ${
+        done ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
+      }`}
+    >
+      <Check className="h-3.5 w-3.5" strokeWidth={3} />
+    </span>
+  );
+}
+
+/**
+ * "Join Us as a Vendor" — one application form for all three entry points:
+ * the header's SELL ON M2C button, the home page's BrandPromo banner, and the
+ * contact page's vendor section.
+ *
+ * ── Why it is portalled ───────────────────────────────────────────────────
+ *
+ * The header is `sticky top-0 z-50 isolate`. `isolate` opens a stacking
+ * context, so an overlay declared inside it can never rise above the header's
+ * own level no matter what z-index it asks for — and one of the three triggers
+ * lives in the header. Portalling to document.body takes it out of that
+ * context entirely, which is also why the same component can be dropped
+ * anywhere without thinking about where it sits in the tree.
+ *
+ * ── Keyboard and focus ────────────────────────────────────────────────────
+ *
+ * Escape closes. Focus moves to the first field on open and returns to
+ * whatever opened it on close. Tab cycles inside the dialog rather than
+ * walking off into the page behind the scrim. None of which it had.
  */
 export default function VendorApplicationModal({
   open,
@@ -17,264 +74,439 @@ export default function VendorApplicationModal({
   open: boolean;
   onClose: () => void;
 }) {
-  const [vendorFormData, setVendorFormData] = useState({
-    name: '',
-    companyName: '',
-    gstNumber: '',
-    email: '',
-    phone: '',
-    website: '',
-  });
-  const [isSubmittingVendor, setIsSubmittingVendor] = useState(false);
+  const [form, setForm] = useState(EMPTY);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [gstError, setGstError] = useState('');
+  /**
+   * The GST field used to complain from the very first character, because it
+   * validated a 15-character rule on every keystroke: type "2" and it told you
+   * off for not having typed the other fourteen yet. It now waits until you
+   * leave the field, or until you have typed enough that the length can no
+   * longer be the problem.
+   */
+  const [gstTouched, setGstTouched] = useState(false);
 
-  const handleVendorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const firstFieldRef = useRef<HTMLInputElement | null>(null);
+  const restoreFocusTo = useRef<HTMLElement | null>(null);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    // GST numbers are written in upper case everywhere else they appear.
+    const next = name === 'gstNumber' ? value.toUpperCase() : value;
+    setForm((prev) => ({ ...prev, [name]: next }));
 
-    // Convert GST number to uppercase
-    const updatedValue = name === 'gstNumber' ? value.toUpperCase() : value;
-
-    setVendorFormData((prev) => ({
-      ...prev,
-      [name]: updatedValue,
-    }));
-
-    // Validate GST number on change
     if (name === 'gstNumber') {
-      if (value && !/^[A-Z0-9]{15}$/i.test(value)) {
-        setGstError('GST Number must be exactly 15 alphanumeric characters');
-      } else {
-        setGstError('');
-      }
+      const complete = next.length >= GST_LENGTH;
+      if (!next || (!gstTouched && !complete)) setGstError('');
+      else if (!GST_PATTERN.test(next)) setGstError(`GST Number must be exactly ${GST_LENGTH} alphanumeric characters`);
+      else setGstError('');
     }
   };
 
-  const handleVendorSubmit = async (e: React.FormEvent) => {
+  const handleGstBlur = () => {
+    setGstTouched(true);
+    if (form.gstNumber && !GST_PATTERN.test(form.gstNumber)) {
+      setGstError(`GST Number must be exactly ${GST_LENGTH} alphanumeric characters`);
+    }
+  };
+
+  /**
+   * Which required answers are usable, recomputed on every keystroke. Separate
+   * from whether the browser will let the form submit — native validation only
+   * speaks up once you try, and a six-field form should say where you are
+   * while you are still inside it.
+   */
+  const filled = useMemo(() => ({
+    name: form.name.trim() !== '',
+    companyName: form.companyName.trim() !== '',
+    // Deliberately loose: this decides whether to draw a tick, not whether to
+    // accept the address.
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()),
+    gstNumber: GST_PATTERN.test(form.gstNumber),
+    phone: form.phone.trim() !== '',
+  }), [form]);
+
+  const answeredCount = Object.values(filled).filter(Boolean).length;
+  const requiredCount = Object.keys(filled).length;
+  const readyToSend = answeredCount === requiredCount;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate GST number before submission
-    if (!vendorFormData.gstNumber) {
+    setGstTouched(true);
+    if (!form.gstNumber) {
       setGstError('GST Number is required');
       return;
     }
-
-    if (!/^[A-Z0-9]{15}$/i.test(vendorFormData.gstNumber)) {
-      setGstError('GST Number must be exactly 15 alphanumeric characters');
+    if (!GST_PATTERN.test(form.gstNumber)) {
+      setGstError(`GST Number must be exactly ${GST_LENGTH} alphanumeric characters`);
       return;
     }
 
-    setIsSubmittingVendor(true);
+    setIsSubmitting(true);
     try {
       await enquiryService.submitEnquiry({
-        name: vendorFormData.name,
-        companyName: vendorFormData.companyName,
-        gstNumber: vendorFormData.gstNumber,
-        email: vendorFormData.email,
-        phone: vendorFormData.phone,
-        website: vendorFormData.website || undefined,
+        name: form.name,
+        companyName: form.companyName,
+        gstNumber: form.gstNumber,
+        email: form.email,
+        phone: form.phone,
+        website: form.website || undefined,
       });
-      setVendorFormData({ name: '', companyName: '', gstNumber: '', email: '', phone: '', website: '' });
+      setForm(EMPTY);
       setGstError('');
+      setGstTouched(false);
       onClose();
-      showSuccessToast('Application Submitted!', 'Thank you for your interest! We will review your application and get back to you soon.');
-    } catch (error: any) {
-      showErrorToast('Submission Failed', error.message || 'Unable to submit application. Please try again.');
+      showSuccessToast(
+        'Application Submitted!',
+        'Thank you for your interest! We will review your application and get back to you soon.',
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '';
+      showErrorToast('Submission Failed', message || 'Unable to submit application. Please try again.');
     } finally {
-      setIsSubmittingVendor(false);
+      setIsSubmitting(false);
     }
   };
 
-  if (!open) return null;
+  useEffect(() => {
+    if (!open) return;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-3 sm:p-4">
-      <div className="bg-white rounded-lg shadow-2xl max-w-5xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 sm:p-5 lg:p-6 border-b border-gray-200 bg-gray-50 shrink-0">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-linear-to-br from-[#e01a1b] to-[#8d1618] rounded-full flex items-center justify-center shrink-0">
-              <Store className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-            </div>
+    restoreFocusTo.current = document.activeElement as HTMLElement | null;
+    // After paint, or the field is not focusable yet.
+    const raf = requestAnimationFrame(() => firstFieldRef.current?.focus());
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSubmitting) {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+
+      const focusables = panelRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusables?.length) return;
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+
+    // <body> is the scroll container in this app — globals.css puts
+    // overflow-x: hidden on html and body, which forces overflow-y from
+    // visible to auto — so locking scroll means locking the body, not the
+    // documentElement.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      restoreFocusTo.current?.focus?.();
+    };
+  }, [open, isSubmitting, onClose]);
+
+  // `open` is false on every server render and on hydration at all three call
+  // sites, so this returns null before createPortal ever looks for the body.
+  if (!open || typeof document === 'undefined') return null;
+
+  const gstCount = form.gstNumber.length;
+
+  return createPortal(
+    <div
+      className="va-overlay fixed inset-0 z-[200] flex items-end justify-center bg-[#2a1d16]/55 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      // Only the scrim closes, and only on mousedown — a drag that starts
+      // inside the panel and releases outside must not dismiss it.
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && !isSubmitting) onClose();
+      }}
+    >
+      <style>{`
+        @keyframes vaFade { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes vaPanel {
+          from { opacity: 0; transform: translateY(16px) scale(.98) }
+          to   { opacity: 1; transform: none }
+        }
+        .va-overlay { animation: vaFade 180ms ease-out both }
+        .va-panel { animation: vaPanel 260ms cubic-bezier(0.22, 0.94, 0.30, 1) both }
+        @media (prefers-reduced-motion: reduce) {
+          .va-overlay, .va-panel { animation: none }
+        }
+      `}</style>
+
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="vendor-application-title"
+        className="va-panel flex max-h-[94vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-[#efe4d8] bg-white shadow-[0_30px_70px_-30px_rgba(42,29,22,0.7)] sm:max-h-[90vh] sm:rounded-2xl"
+      >
+        {/* Header. Warm ground rather than gray-50, and the subtitle no longer
+            hides on mobile — it is the one line explaining what this is. */}
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#efe4d8] bg-[#faf7f3] p-5 sm:p-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              aria-hidden
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#e01a1b] text-white shadow-[0_6px_18px_-6px_rgba(224,26,27,0.7)]"
+            >
+              <Store className="h-5 w-5" />
+            </span>
             <div className="min-w-0">
-              <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">Vendor Application</h2>
-              <p className="text-xs sm:text-sm text-gray-600 hidden sm:block">Fill in your details to join our marketplace</p>
+              <h2
+                id="vendor-application-title"
+                className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl"
+              >
+                Vendor Application
+              </h2>
+              <p className="mt-0.5 text-[13px] text-[#5f5550]">Fill in your details to join our marketplace</p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
+            disabled={isSubmitting}
             aria-label="Close"
-            className="text-gray-400 hover:text-gray-600 transition-colors shrink-0 p-1"
+            className="-mr-1 -mt-1 shrink-0 rounded-full p-2 text-[#a89a8d] transition-colors hover:bg-white hover:text-[#1a1a1a] disabled:opacity-40"
           >
-            <X className="w-5 h-5 sm:w-6 sm:h-6" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-4 sm:p-5 lg:p-6 overflow-y-auto flex-1">
-          <form onSubmit={handleVendorSubmit} className="space-y-4 sm:space-y-5">
-            {/* Row 1: Full Name | Company Name */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-              <div>
-                <label htmlFor="vendor-name" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Full Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="vendor-name"
-                  name="name"
-                  required
-                  value={vendorFormData.name}
-                  onChange={handleVendorChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all"
-                  placeholder="Enter your full name"
-                />
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6">
+          <form id="vendor-application-form" onSubmit={handleSubmit}>
+            {/* The meter. Green on completion rather than staying brand red:
+                the colour change is the moment worth marking, and it is
+                catchable from the corner of the eye while you are still
+                looking at the last field. */}
+            <div className="mb-6">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a89a8d]">
+                  Your application
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1.5 text-[12.5px] font-semibold tabular-nums transition-colors duration-300 ${
+                    readyToSend ? 'text-[#1f9d57]' : 'text-[#7a6d62]'
+                  }`}
+                >
+                  {readyToSend && <Check aria-hidden className="h-3.5 w-3.5" strokeWidth={3} />}
+                  {readyToSend ? 'Ready to send' : `${answeredCount} of ${requiredCount} complete`}
+                </span>
               </div>
-
-              <div>
-                <label htmlFor="company-name" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Company Name <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    id="company-name"
-                    name="companyName"
-                    required
-                    value={vendorFormData.companyName}
-                    onChange={handleVendorChange}
-                    className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all"
-                    placeholder="Your company name"
-                  />
-                </div>
+              <div
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={requiredCount}
+                aria-valuenow={answeredCount}
+                aria-label="Required fields completed"
+                className="h-1 overflow-hidden rounded-full bg-[#eee3d7]"
+              >
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ease-out ${
+                    readyToSend ? 'bg-[#1f9d57]' : 'bg-[#e01a1b]'
+                  }`}
+                  style={{ width: `${(answeredCount / requiredCount) * 100}%` }}
+                />
               </div>
             </div>
 
-            {/* Row 2: GST Number | Email Address */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <label htmlFor="gst-number" className="block text-sm font-semibold text-gray-700 mb-2">
-                  GST Number <span className="text-red-500">*</span>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div className="group">
+                <label htmlFor="vendor-name" className={LABEL_CLASS}>
+                  Full Name <span className="text-[#e01a1b]">*</span>
                 </label>
                 <div className="relative">
-                  <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <User aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#c0b3a6]" />
                   <input
+                    ref={firstFieldRef}
                     type="text"
-                    id="gst-number"
-                    name="gstNumber"
+                    id="vendor-name"
+                    name="name"
                     required
-                    maxLength={15}
-                    value={vendorFormData.gstNumber}
-                    onChange={handleVendorChange}
-                    className={`w-full pl-11 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all ${
-                      gstError ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                    }`}
-                    placeholder="e.g., 29ABCDE1234F1Z5"
+                    value={form.name}
+                    onChange={handleChange}
+                    className={`${FIELD_CLASS} pl-11 pr-11`}
+                    placeholder="Enter your full name"
                   />
+                  <FieldTick done={filled.name} />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">15 alphanumeric characters (e.g., 22AAAAA0000A1Z5)</p>
-                {gstError && <p className="text-red-500 text-sm mt-1">{gstError}</p>}
               </div>
 
-              <div>
-                <label htmlFor="vendor-email" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email Address <span className="text-red-500">*</span>
+              <div className="group">
+                <label htmlFor="vendor-company" className={LABEL_CLASS}>
+                  Company Name <span className="text-[#e01a1b]">*</span>
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Building2 aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#c0b3a6]" />
+                  <input
+                    type="text"
+                    id="vendor-company"
+                    name="companyName"
+                    required
+                    value={form.companyName}
+                    onChange={handleChange}
+                    className={`${FIELD_CLASS} pl-11 pr-11`}
+                    placeholder="Your company name"
+                  />
+                  <FieldTick done={filled.companyName} />
+                </div>
+              </div>
+
+              <div className="group">
+                <label htmlFor="vendor-gst" className={LABEL_CLASS}>
+                  GST Number <span className="text-[#e01a1b]">*</span>
+                </label>
+                <div className="relative">
+                  <FileText aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#c0b3a6]" />
+                  <input
+                    type="text"
+                    id="vendor-gst"
+                    name="gstNumber"
+                    required
+                    maxLength={GST_LENGTH}
+                    value={form.gstNumber}
+                    onChange={handleChange}
+                    onBlur={handleGstBlur}
+                    className={`${FIELD_CLASS} pl-11 pr-16 font-medium tracking-[0.06em] ${
+                      gstError ? 'border-[#e01a1b]! bg-red-50/40!' : ''
+                    }`}
+                    placeholder="29ABCDE1234F1Z5"
+                  />
+                  {/* A live count instead of a hint that repeats the rule: it
+                      answers "how many more" without being read twice. */}
+                  <span
+                    aria-hidden
+                    className={`pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-semibold tabular-nums transition-colors ${
+                      filled.gstNumber ? 'text-[#1f9d57]' : 'text-[#a89a8d]'
+                    }`}
+                  >
+                    {gstCount}/{GST_LENGTH}
+                  </span>
+                </div>
+                <p className={`mt-1.5 text-[12.5px] ${gstError ? 'text-[#e01a1b]' : 'text-[#a89a8d]'}`}>
+                  {gstError || 'Fifteen letters and digits, e.g. 22AAAAA0000A1Z5'}
+                </p>
+              </div>
+
+              <div className="group">
+                <label htmlFor="vendor-email" className={LABEL_CLASS}>
+                  Email Address <span className="text-[#e01a1b]">*</span>
+                </label>
+                <div className="relative">
+                  <Mail aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#c0b3a6]" />
                   <input
                     type="email"
                     id="vendor-email"
                     name="email"
                     required
-                    value={vendorFormData.email}
-                    onChange={handleVendorChange}
-                    className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all"
+                    value={form.email}
+                    onChange={handleChange}
+                    className={`${FIELD_CLASS} pl-11 pr-11`}
                     placeholder="your.email@company.com"
                   />
+                  <FieldTick done={filled.email} />
                 </div>
               </div>
-            </div>
 
-            {/* Row 3: Phone Number | Website URL */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <label htmlFor="vendor-phone" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Phone Number <span className="text-red-500">*</span>
+              <div className="group">
+                <label htmlFor="vendor-phone" className={LABEL_CLASS}>
+                  Phone Number <span className="text-[#e01a1b]">*</span>
                 </label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Phone aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#c0b3a6]" />
                   <input
                     type="tel"
                     id="vendor-phone"
                     name="phone"
                     required
-                    value={vendorFormData.phone}
-                    onChange={handleVendorChange}
-                    className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all"
-                    placeholder="+1 (555) 123-4567"
+                    value={form.phone}
+                    onChange={handleChange}
+                    className={`${FIELD_CLASS} pl-11 pr-11`}
+                    // Was +1 (555) 123-4567 — a US format, and 555 is the range
+                    // reserved for fiction — shown to applicants who are being
+                    // asked for an Indian GST number in the field above it.
+                    placeholder="+91 98765 43210"
                   />
+                  <FieldTick done={filled.phone} />
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="vendor-website" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Website URL <span className="text-gray-500 text-xs">(Optional)</span>
+              <div className="group">
+                <label htmlFor="vendor-website" className={LABEL_CLASS}>
+                  Website URL <span className="font-normal text-[#a89a8d]">(optional)</span>
                 </label>
                 <div className="relative">
-                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Globe aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#c0b3a6]" />
                   <input
                     type="url"
                     id="vendor-website"
                     name="website"
-                    value={vendorFormData.website}
-                    onChange={handleVendorChange}
-                    className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all"
+                    value={form.website}
+                    onChange={handleChange}
+                    className={`${FIELD_CLASS} pl-11 pr-4`}
                     placeholder="https://www.yourcompany.com"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                <strong>Note:</strong> After submitting your application, our team will review your details and contact you within 2-3 business days.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-3 pt-4">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={isSubmittingVendor}
-                className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 border border-gray-300 text-gray-700 rounded-full hover:bg-gray-50 transition-colors font-semibold disabled:opacity-50 text-sm sm:text-base"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmittingVendor}
-                className="btn-shine flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-[#e01a1b] text-white rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] transition-all duration-300 font-semibold flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed text-sm sm:text-base"
-              >
-                {isSubmittingVendor ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-5 h-5" />
-                    Submit Application
-                  </>
-                )}
-              </button>
-            </div>
+            {/* Was a blue notice — the only blue anywhere on this site, sitting
+                directly above the submit button and pulling attention off it.
+                Warm, quieter, and it still says the one thing worth knowing. */}
+            <p className="mt-6 rounded-xl border border-[#efe4d8] bg-[#faf7f3] px-4 py-3 text-[13.5px] leading-relaxed text-[#5f5550]">
+              <span className="font-semibold text-[#1a1a1a]">What happens next.</span>{' '}
+              Our team reviews your details and gets back to you within 2&ndash;3 business days.
+            </p>
           </form>
         </div>
+
+        {/* Pinned, so on a phone the buttons are reachable without scrolling to
+            the bottom of a six-field form. */}
+        <div className="shrink-0 border-t border-[#efe4d8] bg-[#faf7f3] p-4 sm:p-5">
+          <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end sm:gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="rounded-full border border-[#e6dcd0] bg-white px-6 py-3 text-[14px] font-semibold text-[#5f5550] transition-colors hover:bg-[#faf7f3] disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="vendor-application-form"
+              disabled={isSubmitting}
+              className={`btn-shine inline-flex items-center justify-center gap-2 rounded-full bg-[#e01a1b] px-8 py-3 text-[14px] font-semibold text-white shadow-[0_6px_20px_rgba(224,26,27,0.3)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c41617] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0 ${
+                readyToSend ? 'ring-4 ring-[#e01a1b]/15' : ''
+              }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 aria-hidden className="h-4.5 w-4.5 animate-spin" />
+                  Submitting…
+                </>
+              ) : (
+                <>
+                  <Send aria-hidden className="h-4.5 w-4.5" />
+                  Submit Application
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
