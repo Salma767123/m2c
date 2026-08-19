@@ -41,9 +41,43 @@ function getCouriers(region, mode) {
 }
 
 // True when `id` is a real courier that serves this region + mode.
+// NOTE: validates against the STATIC list only — kept for legacy slug ids.
 function isValidCourier(id, region, mode) {
   if (!id) return false;
   return getCouriers(region, mode).some((c) => c.id === id);
+}
+
+// DB-aware courier validation — the admin-managed `Courier` table is the source of
+// truth for the storefront picker, so an order's courier must be validated against
+// it, not the static list above. Courier ids are Mongo ObjectIds; legacy lines that
+// still reference the old slug ids fall back to the static catalogue.
+async function isCourierAvailable(id, region, mode) {
+  if (!id) return false;
+  const r = normalizeCourierRegion(region);
+  const m = mode ? String(mode).toUpperCase() : null;
+
+  if (/^[0-9a-fA-F]{24}$/.test(String(id))) {
+    try {
+      // Lazy require to avoid loading the DB client in contexts that only need the
+      // static helpers (and to sidestep any require cycle at module load).
+      const { prisma } = require('../config/database');
+      const courier = await prisma.courier.findFirst({
+        where: {
+          id: String(id),
+          isActive: true,
+          ...(r ? { region: r } : {}),
+          ...(m ? { modes: { has: m } } : {}),
+        },
+        select: { id: true },
+      });
+      return !!courier;
+    } catch {
+      return false;
+    }
+  }
+
+  // Non-ObjectId → legacy slug id from the pre-DB hardcoded catalogue.
+  return isValidCourier(id, r, m);
 }
 
 // Human-readable name for an id ("blue-dart" -> "Blue Dart"); falls back to the id.
@@ -52,4 +86,4 @@ function courierName(id) {
   return c ? c.name : (id || null);
 }
 
-module.exports = { COURIERS, normalizeCourierRegion, getCouriers, isValidCourier, courierName };
+module.exports = { COURIERS, normalizeCourierRegion, getCouriers, isValidCourier, isCourierAvailable, courierName };

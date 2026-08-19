@@ -20,6 +20,7 @@ import { IconUserFilled } from '@tabler/icons-react';
 import DiscoverNav from "./Discover/DiscoverNav";
 import CategoryRibbon from "./CategoryRibbon/CategoryRibbon";
 import { isAuthenticated } from "@/lib/auth";
+import { recordSearch } from "@/lib/browsingHistory";
 import { cartService } from "@/services/cartService";
 import { wishlistService } from "@/services/wishlistService";
 import { userAuthService } from "@/services/userAuthService";
@@ -275,6 +276,7 @@ const Header = () => {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
+      recordSearch(searchQuery.trim());
       setShowSearchModal(false);
       router.push(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
       setSearchQuery(""); // Clear it after sending
@@ -282,6 +284,7 @@ const Header = () => {
   };
 
   const handleSearchShortcut = (term: string) => {
+    recordSearch(term);
     setShowSearchModal(false);
     router.push(`/products?search=${encodeURIComponent(term)}`);
     setSearchQuery("");
@@ -339,9 +342,13 @@ const Header = () => {
               {/* DISCOVER ✦ — the marketplace exploration entry point (complements search) */}
               <DiscoverNav />
 
-              {/* Notifications (logged-in users only) */}
+              {/* Notifications (logged-in users only) — placed right after the
+                  account/profile (order-4); it shares order-5 with the SELL entry
+                  but sits earlier in the DOM, so it lands between them. */}
               {isUserLoggedIn && (
-                <NotificationDropdown categories={USER_CATEGORIES} colorScheme="brand" />
+                <div className="order-5 flex items-center">
+                  <NotificationDropdown categories={USER_CATEGORIES} colorScheme="brand" />
+                </div>
               )}
 
               {/* Wishlist — same format as Account & Cart */}

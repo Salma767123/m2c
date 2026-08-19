@@ -1,6 +1,6 @@
 const { prisma } = require('../config/database');
 const { isVisibleInRegion, normalizeRegion } = require('../utils/regionVisibility');
-const { isValidCourier } = require('../utils/couriers');
+const { isCourierAvailable } = require('../utils/couriers');
 const { resolveUsdRate, resolveUnitPrice } = require('../utils/orderCurrency');
 const { buildActiveOffer, qualifyingThresholdIds } = require('../utils/offers');
 
@@ -95,7 +95,7 @@ const addToCart = async (req, res) => {
     // The courier list is region- and mode-specific, so a courier only makes sense
     // alongside a transport the product offers.
     const shippingMode = transportType != null ? transportType : (allowedTransports.length === 1 ? allowedTransports[0] : null);
-    if (courier != null && !isValidCourier(courier, currency, shippingMode)) {
+    if (courier != null && !(await isCourierAvailable(courier, currency, shippingMode))) {
       return res.status(400).json({
         success: false,
         error: 'Selected courier is not available for this shipping method'
@@ -489,7 +489,7 @@ const updateCartItem = async (req, res) => {
     // resolved transport mode (the new choice if supplied, else the stored one).
     if (wantsCourier && courier !== null) {
       const mode = wantsTransport ? transportType : (cartItem.transportType || (allowed.length === 1 ? allowed[0] : null));
-      if (!isValidCourier(courier, cartItem.currency, mode)) {
+      if (!(await isCourierAvailable(courier, cartItem.currency, mode))) {
         return res.status(400).json({
           success: false,
           error: 'Selected courier is not available for this shipping method'

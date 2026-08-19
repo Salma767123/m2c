@@ -1,4 +1,5 @@
 const { prisma } = require('../config/database');
+const { isCourierAvailable, courierName } = require('../utils/couriers');
 const { recomputeAndPersistOrderStatus } = require('../utils/computeOrderStatus');
 const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
 const { withWriteRetry } = require('../utils/dbRetry');
@@ -470,7 +471,9 @@ const updateAdminOrderStatus = async (req, res) => {
     try {
         const adminId = req.userId || req.adminId;
         const { id } = req.params;
-        const { status } = req.body;
+        const { status, courier, trackingReference } = req.body;
+        const courierId = courier != null ? String(courier).trim() : '';
+        const trackingId = trackingReference != null ? String(trackingReference).trim() : '';
 
         if (status !== undefined && status !== null && status !== '') {
             if (typeof status !== 'string' || !ALLOWED_ORDER_STATUSES.has(status)) {
@@ -514,6 +517,24 @@ const updateAdminOrderStatus = async (req, res) => {
         }
 
         const nextStatus = status || order.status;
+
+        // Shipping to the customer requires the courier partner + tracking ID the
+        // admin entered in the dispatch modal, so the customer can be notified with it.
+        if (status === 'SHIPPED_TO_CUSTOMER') {
+            if (!courierId || !trackingId) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Courier partner and tracking ID are required to ship the order to the customer.',
+                });
+            }
+            if (!(await isCourierAvailable(courierId, order.currency, null))) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'The selected courier partner is not available.',
+                });
+            }
+        }
+
         const updatedOrder = await prisma.$transaction(async (tx) => {
             // Optimistic locking — re-read inside transaction
             const fresh = await tx.order.findUnique({
@@ -605,12 +626,17 @@ const updateAdminOrderStatus = async (req, res) => {
                 where: { id: order.id },
                 data: {
                     status: nextStatus,
+                    // Freeze the dispatch courier + tracking ID onto the order when it
+                    // ships to the customer (shown to the customer + on the order pages).
+                    ...(status === 'SHIPPED_TO_CUSTOMER' ? { courier: courierId, trackingReference: trackingId } : {}),
                     statusHistory: {
                         create: {
                             status: nextStatus,
                             updatedBy: adminId,
                             updatedByType: 'admin',
-                            comment: `Admin updated status to ${nextStatus}`,
+                            comment: status === 'SHIPPED_TO_CUSTOMER'
+                                ? `Admin shipped to customer via ${courierName(courierId) || courierId} · Tracking ${trackingId}`
+                                : `Admin updated status to ${nextStatus}`,
                         },
                     },
                 },
@@ -664,7 +690,7 @@ const updateAdminOrderStatus = async (req, res) => {
             // In-app notifications for customer on key order status changes
             if (order.customerId) {
                 const customerStatusMessages = {
-                    'SHIPPED_TO_CUSTOMER': { title: 'Order Shipped!', message: `Your order #${order.orderId} has been shipped and is on its way!` },
+                    'SHIPPED_TO_CUSTOMER': { title: 'Order Shipped!', message: `Your order #${order.orderId} is on its way via ${courierName(courierId) || 'our courier partner'}. Tracking ID: ${trackingId}` },
                     'DELIVERED': { title: 'Order Delivered', message: `Your order #${order.orderId} has been delivered. Enjoy your purchase!` },
                     'CANCELLED': { title: 'Order Cancelled', message: `Your order #${order.orderId} has been cancelled.` },
                     'RETURNED': { title: 'Refund Processed', message: `Your order #${order.orderId} has been returned and a refund will be processed.` },

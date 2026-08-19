@@ -179,8 +179,7 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
             <td style="padding:12px 8px; border-bottom:1px solid #f0f0ee; text-align:center; color:#9ca3af; font-size:12px;">${i + 1}</td>
             <td style="padding:12px 8px; border-bottom:1px solid #f0f0ee;">
                 <div style="font-weight:600; color:#1a1a1a;">${escapeHtml(item.productName)}</div>
-                ${item.sku ? `<div style="font-size:11px; color:#9ca3af; margin-top:2px;">SKU: ${escapeHtml(item.sku)}</div>` : ''}
-                ${item.size ? `<div style="font-size:11px; color:#9ca3af;">Size: ${escapeHtml(item.size)}</div>` : ''}
+                ${item.size ? `<div style="font-size:11px; color:#9ca3af; margin-top:2px;">Size: ${escapeHtml(item.size)}</div>` : ''}
                 ${item.color ? `<div style="font-size:11px; color:#9ca3af;">Color: ${escapeHtml(item.color)}</div>` : ''}
             </td>
             <td style="padding:12px 8px; border-bottom:1px solid #f0f0ee; text-align:center;">${item.quantity}</td>

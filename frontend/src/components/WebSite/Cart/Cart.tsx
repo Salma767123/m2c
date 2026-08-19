@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { cartService } from "@/services/cartService"
+import { wishlistService } from "@/services/wishlistService"
 import { couponService } from "@/services/couponService"
 import { publicProductService, PublicProduct } from "@/services/publicProductService"
+import { getRecentSearches, getRecentlyViewed } from "@/lib/browsingHistory"
 import { userAuthService } from "@/services/userAuthService"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, getCurrency, getRegion, convertINRtoUSD } from "@/lib/currency"
@@ -13,6 +15,7 @@ import { applyOfferToPrice, type ActiveOffer } from "@/lib/offers"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
 import { courierName } from "@/lib/couriers"
 import Reveal from "@/components/WebSite/Shared/Reveal"
+import ProductCard from "@/components/WebSite/ProductCard/ProductCard"
 import {
   ShoppingCart,
   Plus,
@@ -20,7 +23,6 @@ import {
   Trash2,
   CreditCard,
   Truck,
-  Shield,
   Star,
   Heart,
   Share2,
@@ -28,6 +30,8 @@ import {
   Package,
   Clock,
   CheckCircle,
+  Sparkles,
+  TrendingUp,
 } from "lucide-react"
 
 interface OrderItem {
@@ -75,13 +79,122 @@ export default function Order() {
   const [isHydrated, setIsHydrated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [similarProducts, setSimilarProducts] = useState<PublicProduct[]>([])
+
+  // Empty-cart discovery rails.
+  const [suggested, setSuggested] = useState<PublicProduct[]>([])
+  const [topSelling, setTopSelling] = useState<PublicProduct[]>([])
+  const [recentlyViewed, setRecentlyViewed] = useState<PublicProduct[]>([])
+  const emptyRailsLoaded = useRef(false)
 
   const pendingUpdates = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  // While true, cart-changed events are ignored — set by the cart's own
+  // mutations so a self-triggered event doesn't refetch over the optimistic
+  // update. External adds (e.g. a similar product) arrive while it's false.
+  const suppressRefetch = useRef(false)
+  const suppressCartEvents = () => {
+    suppressRefetch.current = true
+    setTimeout(() => { suppressRefetch.current = false }, 1500)
+  }
 
+  // Similar products — same-category items as what's in the cart (excludes the
+  // cart items themselves). Keyed by product+category so it doesn't refetch when
+  // only quantities change; falls back to recent products if categories are sparse.
+  const cartSignature = cartItems.map((i) => `${i.productId}:${i.category || ''}`).sort().join('|')
   useEffect(() => {
-    const fetchCart = async () => {
+    if (cartItems.length === 0) { setSimilarProducts([]); return }
+    let cancelled = false
+    const run = async () => {
+      const cats = Array.from(new Set(cartItems.map((i) => i.category).filter(Boolean))) as string[]
+      const inCart = new Set(cartItems.map((i) => i.productId))
       try {
-        setLoading(true)
+        let pool: PublicProduct[] = []
+        if (cats.length) {
+          const results = await Promise.all(
+            cats.slice(0, 4).map((c) =>
+              publicProductService
+                .getProducts({ category: c, limit: 8 })
+                .then((r) => (r.success && r.data ? r.data.items : []))
+                .catch(() => [] as PublicProduct[]),
+            ),
+          )
+          pool = results.flat()
+        }
+        // Fallback so the rail isn't empty when categories are sparse.
+        if (pool.length === 0) {
+          const r = await publicProductService.getProducts({ limit: 8, sortBy: 'createdAt', sortOrder: 'desc' })
+          pool = r.success && r.data ? r.data.items : []
+        }
+        const seen = new Set<string>()
+        const list = pool.filter((p) => {
+          if (inCart.has(p.id) || seen.has(p.id)) return false
+          seen.add(p.id)
+          return true
+        }).slice(0, 6)
+        if (!cancelled) setSimilarProducts(list)
+      } catch {
+        if (!cancelled) setSimilarProducts([])
+      }
+    }
+    run()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartSignature])
+
+  // When the cart is empty, populate the three discovery rails:
+  //   · Suggested for You — from the user's last search term, else random picks
+  //   · Top Selling       — the "Top Selling" tagged catalogue
+  //   · Recently Viewed   — products the user recently opened
+  useEffect(() => {
+    if (loading || cartItems.length > 0 || emptyRailsLoaded.current) return
+    emptyRailsLoaded.current = true
+    let cancelled = false
+
+    const shuffle = <T,>(arr: T[]): T[] => {
+      const a = [...arr]
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+          ;[a[i], a[j]] = [a[j], a[i]]
+      }
+      return a
+    }
+
+    const run = async () => {
+      // Suggested — last search term, else a random sample of the catalogue.
+      const searches = getRecentSearches()
+      let sug: PublicProduct[] = []
+      if (searches.length) {
+        const r = await publicProductService.getProducts({ search: searches[0], limit: 8 }).catch(() => null)
+        sug = r?.success && r.data ? r.data.items : []
+      }
+      if (sug.length === 0) {
+        const r = await publicProductService.getProducts({ limit: 18, sortBy: 'createdAt', sortOrder: 'desc' }).catch(() => null)
+        sug = shuffle(r?.success && r.data ? r.data.items : [])
+      }
+      if (!cancelled) setSuggested(sug.slice(0, 6))
+
+      // Top Selling.
+      const ts = await publicProductService.getTopSellingProducts(6).catch(() => null)
+      if (!cancelled) setTopSelling(ts?.success && ts.data ? ts.data.items : [])
+
+      // Recently viewed — resolve stored ids to live products.
+      const ids = getRecentlyViewed().slice(0, 8)
+      if (ids.length) {
+        const results = await Promise.all(
+          ids.map((id) =>
+            publicProductService.getProduct(id).then((r) => (r.success ? r.data : null)).catch(() => null),
+          ),
+        )
+        if (!cancelled) setRecentlyViewed(results.filter(Boolean).slice(0, 6) as PublicProduct[])
+      }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [loading, cartItems.length])
+
+  const loadCart = useCallback(async (silent = false) => {
+      try {
+        if (!silent) setLoading(true)
         const authenticated = userAuthService.isAuthenticated()
         setIsAuthenticated(authenticated)
 
@@ -244,13 +357,24 @@ export default function Order() {
         console.error('Failed to fetch cart:', error)
         showErrorToast('Error', 'Failed to load cart items')
       } finally {
-        setLoading(false)
+        if (!silent) setLoading(false)
         setIsHydrated(true)
       }
-    }
-
-    fetchCart()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => { loadCart() }, [loadCart])
+
+  // Refresh when the cart changes elsewhere (e.g. adding a similar product below).
+  // Self-triggered events are ignored — those already update state optimistically.
+  useEffect(() => {
+    const onCartChanged = () => {
+      if (suppressRefetch.current) return
+      loadCart(true)
+    }
+    window.addEventListener('cart-changed', onCartChanged)
+    return () => window.removeEventListener('cart-changed', onCartChanged)
+  }, [loadCart])
 
   const [promoCode, setPromoCode] = useState("")
   const [appliedPromo, setAppliedPromo] = useState("")
@@ -359,6 +483,7 @@ export default function Order() {
     if (item && newQuantity === item.quantity) return
 
     // Optimistic update — instant UI feedback
+    suppressCartEvents() // ignore the cart-changed we are about to cause
     setCartItems(items =>
       items.map(i => i.id === id ? { ...i, quantity: newQuantity } : i)
     )
@@ -390,23 +515,45 @@ export default function Order() {
     }, 400)
   }
 
-  const removeItem = async (id: string) => {
+  const removeItem = async (id: string, opts?: { silent?: boolean }) => {
+    suppressCartEvents() // ignore the cart-changed we are about to cause
     try {
       if (!isAuthenticated) {
         cartService.removeFromLocalCart(id)
         setCartItems(items => items.filter(item => item.id !== id))
-        showSuccessToast('Removed', 'Item removed from cart')
+        if (!opts?.silent) showSuccessToast('Removed', 'Item removed from cart')
         return
       }
 
       // Remove via API
       await cartService.removeFromCart(id)
       setCartItems(items => items.filter(item => item.id !== id))
-      showSuccessToast('Removed', 'Item removed from cart')
+      if (!opts?.silent) showSuccessToast('Removed', 'Item removed from cart')
       } catch (error: unknown) {
         console.error('Failed to remove item:', error)
         showErrorToast('Error', 'Failed to remove item')
       }
+
+  }
+
+  // Move a cart line to the wishlist: ensure it's in the wishlist (add only if
+  // it isn't already there), then remove it from the cart.
+  const moveToWishlist = async (item: OrderItem) => {
+    try {
+      if (isAuthenticated) {
+        const inList = wishlistService.isInWishlistSync(item.productId)
+          || (await wishlistService.isInWishlist(item.productId))
+        if (!inList) await wishlistService.addToWishlist(item.productId)
+      } else {
+        wishlistService.addToLocalWishlist(item.productId)
+      }
+    } catch (error) {
+      console.error('Failed to move item to wishlist:', error)
+      showErrorToast('Error', 'Could not move item to wishlist')
+      return
+    }
+    await removeItem(item.id, { silent: true })
+    showSuccessToast('Moved to Wishlist', `${item.name} moved to your wishlist`)
   }
 
   const applyPromoCode = async () => {
@@ -559,11 +706,7 @@ export default function Order() {
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="min-w-0 flex-1">
                             <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-1 break-words">{item.name}</h3>
-                            <p className="hidden sm:block text-sm text-slate-600 mb-2 line-clamp-2">{item.description}</p>
                             <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mb-2">
-                              <span className="text-xs bg-[#e01a1b]/10 text-[#e01a1b] px-2 py-0.5 sm:py-1 rounded-full">
-                                {item.category}
-                              </span>
                               {item.rating !== undefined && (
                                 <div className="flex items-center gap-1">
                                   <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-400 fill-current" />
@@ -573,11 +716,6 @@ export default function Order() {
                               )}
                             </div>
                             <div className="flex items-center flex-wrap gap-1.5 sm:gap-2">
-                              {item.material && (
-                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 sm:py-1 rounded-full">
-                                  {item.material}
-                                </span>
-                              )}
                               {item.discount != null && item.discount > 0 ? (
                                 <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 sm:py-1 rounded-full font-semibold">
                                   Save {item.discount}%
@@ -609,13 +747,26 @@ export default function Order() {
                               </div>
                             )}
                           </div>
-                          <button
-                            onClick={() => removeItem(item.id)}
-                            aria-label="Remove item"
-                            className="p-1.5 sm:p-2 text-slate-400 hover:text-gray-500 transition-colors shrink-0"
-                          >
-                            <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                          </button>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              onClick={() => moveToWishlist(item)}
+                              aria-label="Move to wishlist"
+                              title="Move this item to your wishlist and remove it from the cart"
+                              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-[#e01a1b] hover:bg-[#e01a1b]/5 hover:text-[#e01a1b]"
+                            >
+                              <Heart className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">Move to Wishlist</span>
+                              <span className="sm:hidden">Wishlist</span>
+                            </button>
+                            <button
+                              onClick={() => removeItem(item.id)}
+                              aria-label="Remove item"
+                              title="Remove from cart"
+                              className="p-1.5 sm:p-2 text-slate-400 transition-colors hover:text-gray-600"
+                            >
+                              <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                            </button>
+                          </div>
                         </div>
 
                         {/* Price and Quantity */}
@@ -847,22 +998,6 @@ export default function Order() {
                       </button>
                     </Link>
                   )}
-
-                  {/* Trust Badges */}
-                  <div className="space-y-3 pt-4 border-t border-slate-200">
-                    <div className="flex items-center gap-3 text-sm text-slate-600">
-                      <Shield className="w-5 h-5 text-green-600" />
-                      <span>Secure checkout with SSL encryption</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-slate-600">
-                      <Truck className="w-5 h-5 text-[#e01a1b]" />
-                      <span>Free shipping on orders over $100</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-slate-600">
-                      <Package className="w-5 h-5 text-purple-600" />
-                      <span>30-day return policy</span>
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -870,6 +1005,50 @@ export default function Order() {
             </div>
           )}
         </div>
+
+        {/* Similar Products — driven by the categories of items in the cart */}
+        {similarProducts.length > 0 && (
+          <section className="mt-8 sm:mt-10 lg:mt-12">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+              <Package className="w-6 h-6 sm:w-7 sm:h-7 text-[#e01a1b] shrink-0" />
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900">You Might Also Like</h2>
+                <p className="text-xs sm:text-sm text-slate-600">Similar products based on your cart</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3">
+              {similarProducts.map((p) => (
+                <ProductCard key={p.id} product={p} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Empty-cart discovery rails */}
+        {cartItems.length === 0 && (
+          <>
+            {[
+              { key: 'sug', title: 'Suggested for You', subtitle: 'Picks based on what you’ve been searching for', Icon: Sparkles, items: suggested },
+              { key: 'top', title: 'Top Selling', subtitle: 'Most loved by our customers', Icon: TrendingUp, items: topSelling },
+              { key: 'rv', title: 'Recently Viewed', subtitle: 'Pick up where you left off', Icon: Clock, items: recentlyViewed },
+            ].filter((s) => s.items.length > 0).map((s) => (
+              <section key={s.key} className="mt-8 sm:mt-10 lg:mt-12">
+                <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                  <s.Icon className="w-6 h-6 sm:w-7 sm:h-7 text-[#e01a1b] shrink-0" />
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900">{s.title}</h2>
+                    <p className="text-xs sm:text-sm text-slate-600">{s.subtitle}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3">
+                  {s.items.map((p) => (
+                    <ProductCard key={p.id} product={p} />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </>
+        )}
       </div>
     </div>
   )

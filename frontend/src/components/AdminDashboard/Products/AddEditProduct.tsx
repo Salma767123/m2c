@@ -3274,6 +3274,29 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         />
                       </div>
                     </div>
+
+                    {/* Auto-calculated CBM (volumetric shipping volume in cubic metres).
+                        Formula: (L × W × H) ÷ 1000 ÷ 1000 for centimetres — i.e. convert
+                        each edge to metres and multiply. Inches convert via ×2.54³. */}
+                    {(() => {
+                      const d = formData.logisticsConfig?.dimensions;
+                      const unit = (d?.unit || 'CM').toUpperCase();
+                      const toMetres = (v?: number) => (unit === 'IN' ? (v || 0) * 0.0254 : (v || 0) / 100);
+                      const cbm = toMetres(d?.length) * toMetres(d?.width) * toMetres(d?.height);
+                      return (
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700">CBM (Cubic Meter)</label>
+                            <p className="mt-0.5 text-xs text-slate-400">
+                              Auto-calculated · L × W × H {unit === 'IN' ? '× 2.54³ ÷ 1,000,000' : '÷ 1000 ÷ 1000'}
+                            </p>
+                          </div>
+                          <div className="text-xl font-bold tabular-nums text-slate-900">
+                            {cbm.toFixed(4)} <span className="text-xs font-medium text-slate-500">m³</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
 

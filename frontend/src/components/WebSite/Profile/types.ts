@@ -11,7 +11,7 @@ export interface UserProfile {
   whatsappCode?: string
   /** Avatar URL. Absent until the account sets one; the loader maps it to ''. */
   image?: string
-  gender: 'male' | 'female' | 'other'
+  gender: 'male' | 'female' | 'other' | ''
   joinDate: string
   preferences: {
     newsletter: boolean

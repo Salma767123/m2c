@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X, Copy, MapPin } from "lucide-react";
+import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X, Copy, MapPin, ExternalLink, Mail, Phone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Dropdown from "@/components/UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
@@ -10,6 +10,9 @@ import { formatOrderAmount } from "@/lib/currency";
 import adminReviewService from "@/services/adminReviewService";
 import { hasPermission } from "@/lib/auth";
 import { getCountryName, getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants";
+import { transportModeLabel, courierName } from "@/lib/couriers";
+import { courierService } from "@/services/courierService";
+import VendorService, { VendorProfile } from "@/services/vendorService";
 
 interface VendorToHubDetailProps {
   orderId: string;
@@ -39,6 +42,21 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
   // Guard against duplicate status/review submissions from rapid double-clicks.
   const [isProcessing, setIsProcessing] = useState(false);
   const processingRef = useRef(false);
+
+  // Force a re-render once the admin-managed courier catalogue is loaded, so
+  // courierName() can resolve DB courier ids to their display names.
+  const [, setCourierTick] = useState(0);
+  useEffect(() => {
+    courierService.getActiveCouriers().then(() => setCourierTick((t) => t + 1)).catch(() => {});
+  }, []);
+
+  // Full vendor record (logo + business contact) for the Vendor Information card.
+  const [vendor, setVendor] = useState<VendorProfile | null>(null);
+  useEffect(() => {
+    const vid = shipment?.vendorId;
+    if (!vid) { setVendor(null); return; }
+    VendorService.getVendorById(vid).then((res) => setVendor(res.vendor)).catch(() => setVendor(null));
+  }, [shipment?.vendorId]);
 
   useEffect(() => {
     fetchShipmentDetails();
@@ -458,6 +476,67 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                     </p>
                   </div>
                 </div>
+
+                {/* Logistics the customer selected at checkout (frozen at order time) */}
+                {(item.logistics || item.transportType || item.courier) && (
+                  <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                    <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <Truck className="h-3.5 w-3.5" /> Selected Logistics
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+                      <div>
+                        <p className="text-xs text-slate-500">Transport</p>
+                        <p className="text-sm font-medium text-slate-900">
+                          {(item.logistics?.transportType || item.transportType)
+                            ? transportModeLabel((item.logistics?.transportType || item.transportType) as 'AIR' | 'SHIP', order?.currency)
+                            : '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500">Courier Partner</p>
+                        <p className="text-sm font-medium text-slate-900">
+                          {(item.logistics?.courier || item.courier) ? courierName((item.logistics?.courier || item.courier) as string) : '—'}
+                        </p>
+                      </div>
+                      {typeof item.logistics?.deliveryDays === 'number' && (
+                        <div>
+                          <p className="text-xs text-slate-500">Delivery</p>
+                          <p className="text-sm font-medium text-slate-900">{item.logistics.deliveryDays} days</p>
+                        </div>
+                      )}
+                      {typeof item.logistics?.totalWeightKg === 'number' && (
+                        <div>
+                          <p className="text-xs text-slate-500">Total Weight</p>
+                          <p className="text-sm font-medium text-slate-900">{item.logistics.totalWeightKg} KG</p>
+                        </div>
+                      )}
+                      {typeof item.logistics?.cbmTotal === 'number' && (
+                        <div>
+                          <p className="text-xs text-slate-500">CBM (Volumetric)</p>
+                          <p className="text-sm font-medium text-slate-900">{item.logistics.cbmTotal} m³</p>
+                        </div>
+                      )}
+                      {item.logistics?.dimensions && (
+                        <div>
+                          <p className="text-xs text-slate-500">Dimensions</p>
+                          <p className="text-sm font-medium text-slate-900">
+                            {item.logistics.dimensions.length} × {item.logistics.dimensions.width} × {item.logistics.dimensions.height} {item.logistics.dimensions.unit}
+                          </p>
+                        </div>
+                      )}
+                      {typeof item.logistics?.shippingCostInr === 'number' && (
+                        <div>
+                          <p className="text-xs text-slate-500">Line Shipping</p>
+                          <p className="text-sm font-medium text-slate-900">
+                            {order?.currency === 'USD' && order?.exchangeRate
+                              ? money(item.logistics.shippingCostInr / order.exchangeRate)
+                              : money(item.logistics.shippingCostInr)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -492,10 +571,103 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           <Building2 className="h-5 w-5 text-slate-600" />
           <h2 className="text-lg font-semibold text-slate-900">Vendor Information</h2>
         </div>
-        <div className="grid grid-cols-1 gap-4">
-          <div>
-            <p className="text-sm text-slate-600">Vendor Name</p>
-            <p className="text-base font-medium text-slate-900 mt-1">{shipment.vendorName}</p>
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+          {/* Vendor logo */}
+          <div className="shrink-0">
+            {vendor?.companyLogo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={vendor.companyLogo}
+                alt={vendor.companyName || shipment.vendorName}
+                className="h-16 w-16 rounded-xl object-cover ring-1 ring-slate-200"
+              />
+            ) : (
+              <div className="grid h-16 w-16 place-items-center rounded-xl bg-slate-100 text-xl font-bold text-slate-400 ring-1 ring-slate-200">
+                {(vendor?.companyName || shipment.vendorName || "?").charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+
+          {/* Vendor name (clickable) + business contact details */}
+          <div className="min-w-0 flex-1 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <p className="text-sm text-slate-600">Vendor Name</p>
+              <button
+                type="button"
+                onClick={() => router.push(`/admin/dashboard/vendors/view/${shipment.vendorId}`)}
+                className="mt-1 inline-flex items-center gap-1.5 text-base font-semibold text-[#e01a1b] transition-colors hover:text-[#c41617] hover:underline"
+                title="View vendor profile"
+              >
+                {vendor?.companyName || shipment.vendorName}
+                <ExternalLink className="h-3.5 w-3.5" />
+              </button>
+              {vendor?.ownerName && (
+                <p className="mt-0.5 text-sm text-slate-500">Owner: {vendor.ownerName}</p>
+              )}
+            </div>
+
+            {(vendor?.businessEmail || vendor?.email) && (
+              <div>
+                <p className="text-sm text-slate-600">Primary Email</p>
+                <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-900 break-all">
+                  <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  {vendor?.businessEmail || vendor?.email}
+                </p>
+              </div>
+            )}
+            {vendor?.businessEmail2 && (
+              <div>
+                <p className="text-sm text-slate-600">Secondary Email</p>
+                <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-900 break-all">
+                  <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  {vendor.businessEmail2}
+                </p>
+              </div>
+            )}
+            {vendor?.businessPhone && (
+              <div>
+                <p className="text-sm text-slate-600">Primary Phone</p>
+                <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-900">
+                  <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  {vendor.businessPhone}
+                </p>
+              </div>
+            )}
+            {vendor?.phoneNumber2 && (
+              <div>
+                <p className="text-sm text-slate-600">Secondary Phone</p>
+                <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-900">
+                  <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  {vendor.phoneNumber2}
+                </p>
+              </div>
+            )}
+            {vendor && (() => {
+              // Full company address — every field, in the same order as the
+              // vendor registration form (Line 1/2/3 · Landmark · City · State · ZIP · Country).
+              const lines = [
+                vendor.businessAddress,
+                vendor.addressLine2,
+                vendor.addressLine3,
+                vendor.landmark ? `Landmark: ${vendor.landmark}` : null,
+                [vendor.businessCity, vendor.businessState, vendor.businessZipCode].filter(Boolean).join(", "),
+                vendor.businessCountry,
+              ].filter((l) => l && String(l).trim());
+              if (lines.length === 0) return null;
+              return (
+                <div className="sm:col-span-2">
+                  <p className="text-sm text-slate-600">Address</p>
+                  <div className="mt-1 flex items-start gap-1.5 text-sm font-medium text-slate-900">
+                    <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <span>
+                      {lines.map((l, i) => (
+                        <span key={i} className="block leading-relaxed">{l}</span>
+                      ))}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>

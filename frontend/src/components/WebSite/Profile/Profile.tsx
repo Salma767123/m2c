@@ -189,7 +189,9 @@ const Profile = () => {
           whatsapp: wa.num,
           whatsappCode: wa.code,
           image: userData.image || '',
-          gender: 'male', // Default, can be enhanced later
+          gender: (['male', 'female', 'other'].includes(String(userData.gender || '').toLowerCase())
+            ? String(userData.gender).toLowerCase()
+            : '') as UserProfile['gender'],
           joinDate: new Date(userData.createdAt).toISOString().split('T')[0],
           preferences: {
             newsletter: false,
@@ -228,6 +230,12 @@ const Profile = () => {
         return;
       }
 
+      const email = (editedProfile.email || '').trim();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        showErrorToast('Validation Error', 'Enter a valid email address');
+        return;
+      }
+
       // Profile update now only covers personal info. Addresses are managed
       // separately in the Saved Addresses tab. Phone/WhatsApp are stored with
       // their country code prefix ("+91 98765...").
@@ -237,6 +245,8 @@ const Profile = () => {
       };
       const updateData = {
         name: fullName,
+        email,
+        gender: editedProfile.gender || '',
         title: editedProfile.title || '',
         middleName: editedProfile.middleName || '',
         phoneNumber: joinPhone(editedProfile.phoneCode, editedProfile.phone),

@@ -15,7 +15,7 @@ const REGIONS = ['IN', 'US'];
 const MODES = ['AIR', 'SHIP'];
 
 function buildCourierData(body) {
-  const { name, code, color, logo, region, modes, isActive, sortOrder } = body;
+  const { name, code, color, logo, region, modes, isActive, sortOrder, trackingUrl } = body;
   if (!name || !String(name).trim()) return { error: 'Name is required' };
   if (!code || !String(code).trim()) return { error: 'Code (short badge) is required' };
   if (!REGIONS.includes(region)) return { error: `region must be one of ${REGIONS.join(', ')}` };
@@ -32,6 +32,8 @@ function buildCourierData(body) {
       modes: cleanModes,
       isActive: isActive === undefined ? true : !!isActive,
       sortOrder: Number(sortOrder) || 0,
+      // Optional tracking-website URL — empty clears it.
+      trackingUrl: trackingUrl && String(trackingUrl).trim() ? String(trackingUrl).trim() : null,
     },
   };
 }

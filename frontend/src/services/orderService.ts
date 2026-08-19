@@ -24,6 +24,17 @@ export interface OrderItem {
     transportType?: 'AIR' | 'SHIP' | null;
     /** Courier partner id the customer chose (see lib/couriers). */
     courier?: string | null;
+    /** Full logistics snapshot frozen at order time (see backend OrderItem.logistics). */
+    logistics?: {
+        transportType?: 'AIR' | 'SHIP' | null;
+        courier?: string | null;
+        totalWeightKg?: number | null;
+        shippingCostInr?: number | null;
+        deliveryDays?: number | null;
+        dimensions?: { length: number; width: number; height: number; unit: 'CM' | 'IN' } | null;
+        cbmPerUnit?: number | null;
+        cbmTotal?: number | null;
+    } | null;
 }
 
 export interface AdminReviewData {
@@ -114,6 +125,8 @@ export interface Order {
     customerName?: string;
     customerPhone?: string;
     trackingReference?: string;
+    /** Courier partner id chosen at ship-to-customer (resolve via lib/couriers). */
+    courier?: string | null;
     // DEPRECATED: These now live on VendorShipment
     vendorCarrier?: string;
     vendorTrackingId?: string;
@@ -124,6 +137,10 @@ export interface Order {
     actualDelivery?: string;
     statusHistory?: any[];
     adminReview?: AdminReviewData | null;
+    /** Vendor warehouse/factory origin (city/state) — "processing" place. */
+    vendorLocation?: { city?: string | null; state?: string | null } | null;
+    /** Admin hub the order routed through (city/state) — "shipped" place. */
+    hubLocation?: { city?: string | null; state?: string | null } | null;
 }
 
 export interface CreateOrderParams {
@@ -308,9 +325,14 @@ class OrderService {
         }
     }
 
-    async updateAdminOrderStatus(id: string, status: string, assignedHubId?: string): Promise<{ success: boolean; data: Order }> {
+    async updateAdminOrderStatus(
+        id: string,
+        status: string,
+        assignedHubId?: string,
+        extra?: { courier?: string; trackingReference?: string },
+    ): Promise<{ success: boolean; data: Order }> {
         try {
-            const response = await axios.put(`/orders/admin/${id}/status`, { status, assignedHubId });
+            const response = await axios.put(`/orders/admin/${id}/status`, { status, assignedHubId, ...(extra || {}) });
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to update admin order status');
