@@ -11,6 +11,7 @@ import {
   Modal,
   Image,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import {
   Search,
@@ -29,8 +30,9 @@ import {
   SlidersHorizontal,
   Check,
 } from 'lucide-react-native';
-import { router } from 'expo-router';
 import qcCheckerService from '../../../services/qcCheckerService';
+import { downloadProductReportPdf } from '@/lib/reportPdf';
+import { showErrorToast } from '@/lib/toast-utils';
 import { useDebounce } from '../../../hooks/useDebounce';
 import DateRangeCalendar, { fmtDate } from '@/components/General/DateRangeCalendar';
 import { AppText, StatusBadge } from '@/components/UI';
@@ -357,12 +359,12 @@ function FactoryReportsTab() {
           <View style={{ rowGap: 12 }}>
             {filteredInspections.map((insp) => {
               const row = buildRow(insp);
+              // Factory rows are a read-only summary — nothing opens on tap.
               return (
-                <Pressable
+                <View
                   key={insp.id}
-                  onPress={() => router.push({ pathname: '/factory-report/[id]' as any, params: { id: insp.id } })}
                   className="bg-white rounded-2xl border border-slate-200 overflow-hidden p-5"
-                  style={({ pressed }) => [{ backgroundColor: pressed ? '#f8fafc' : '#ffffff' }, elevation.card]}
+                  style={[{ backgroundColor: '#ffffff' }, elevation.card]}
                 >
                   <View className="flex-row items-center" style={{ gap: 14 }}>
                     <View className="w-11 h-11 bg-brand-50 rounded-full items-center justify-center">
@@ -397,7 +399,7 @@ function FactoryReportsTab() {
                       <ResultBadge result={row.result} />
                     </View>
                   </View>
-                </Pressable>
+                </View>
               );
             })}
           </View>
@@ -473,6 +475,30 @@ function ProductReportsTab() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Tapping a row opens the product report PDF directly, like the factory tab.
+  // The list rows lack qcInspectionData, so the full product is fetched first.
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const [checkerName, setCheckerName] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    qcCheckerService.getCheckerData().then((d) => { if (d?.name) setCheckerName(d.name); }).catch(() => {});
+  }, []);
+
+  const openProductReportPdf = async (productId: string) => {
+    if (openingId) return;
+    setOpeningId(productId);
+    try {
+      const res = await qcCheckerService.getProductDetails(productId);
+      const product = res?.data?.product;
+      if (!product) throw new Error('Report not found.');
+      await downloadProductReportPdf(product, { variant: 'canonical', checkerName, preview: true });
+    } catch (err: any) {
+      showErrorToast('Could not open report', err?.message || 'Please try again.');
+    } finally {
+      setOpeningId(null);
+    }
+  };
 
   // Same draft-then-Apply sheet as the factory tab and the Vendors / Products
   // list screens.
@@ -661,12 +687,19 @@ function ProductReportsTab() {
                 ? new Date(p.createdAt).toLocaleDateString('en-IN')
                 : '—';
               const vendorCode = p.vendor?.vendorCode;
+              const opening = openingId === p.id;
               return (
                 <Pressable
                   key={p.id}
-                  onPress={() => router.push({ pathname: '/product-report/[id]' as any, params: { id: p.id } })}
+                  onPress={() => openProductReportPdf(p.id)}
+                  disabled={!!openingId}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open report for ${p.name}`}
                   className="bg-white rounded-2xl border border-slate-200 overflow-hidden p-5"
-                  style={({ pressed }) => [{ backgroundColor: pressed ? '#f8fafc' : '#ffffff' }, elevation.card]}
+                  style={({ pressed }) => [
+                    { backgroundColor: pressed ? '#f8fafc' : '#ffffff', opacity: openingId && !opening ? 0.6 : 1 },
+                    elevation.card,
+                  ]}
                 >
                   <View className="flex-row items-center" style={{ gap: 14 }}>
                     {thumb ? (
@@ -694,7 +727,9 @@ function ProductReportsTab() {
                       </View>
                     </View>
                     <View style={{ flexShrink: 0 }}>
-                      <StatusBadge status={p.approvalStatus} label={productStatusLabel(p.approvalStatus)} />
+                      {opening
+                        ? <ActivityIndicator size="small" color={brand[500]} />
+                        : <StatusBadge status={p.approvalStatus} label={productStatusLabel(p.approvalStatus)} />}
                     </View>
                   </View>
                 </Pressable>

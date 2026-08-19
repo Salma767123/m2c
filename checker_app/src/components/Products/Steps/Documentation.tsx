@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, ActivityIndicator } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   FileText,
@@ -21,6 +21,10 @@ import SignaturePad from '@/components/General/SignaturePad';
 import { WebView } from 'react-native-webview';
 import { generateReportPdfDataUri, buildReportHtml, reportFileName, ReportMeta } from './piReportHtml';
 import { computeInspectionDurations } from '@/lib/inspectionDuration';
+import { GEOFENCE_DISABLED, getCurrentCoords, type CheckerCoords } from '@/lib/checkerLocation';
+import { formatCheckerName } from '@/components/Vendor/Steps/fieldHelpers';
+import qcCheckerService from '@/services/qcCheckerService';
+import * as DocumentPicker from 'expo-document-picker';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import type { ScrollNavHandlers } from '@/components/General/ScrollNav';
 
@@ -56,9 +60,36 @@ export default function Documentation({ formData, setFormData, errors = {}, scro
   const [confirmRemoveDoc, setConfirmRemoveDoc] = useState(false);
   const [confirmRemoveReport, setConfirmRemoveReport] = useState(false);
   const [previewReport, setPreviewReport] = useState(false);
+  // Uploaded scan preview — the manual path's twin of previewReport.
+  const [previewDoc, setPreviewDoc] = useState(false);
   // Canonical (unsigned) report preview, opened from the Document Center.
   const [previewCanonical, setPreviewCanonical] = useState(false);
   const [drawnSignature, setDrawnSignature] = useState<string | null>(null);
+  // Position for the report's Location row. Best-effort — a failure must never
+  // block report generation; the submit path captures its own reading and is
+  // what actually enforces the geofence.
+  const [coords, setCoords] = useState<CheckerCoords | null>(null);
+  // Cached checker record, for the report's inspector identity rows. Read once
+  // — AsyncStorage is async, unlike the web's synchronous localStorage.
+  const [cachedChecker, setCachedChecker] = useState<any>(null);
+
+  useEffect(() => {
+    if (GEOFENCE_DISABLED) return;
+    let active = true;
+    getCurrentCoords()
+      .then((c) => { if (active) setCoords(c); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    qcCheckerService
+      .getCheckerData()
+      .then((d) => { if (active && d) setCachedChecker(d); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   const signedDocs: Photo[] = formData.signedDocuments || [];
   const signedReport: any[] = formData.signedReport || [];
@@ -78,11 +109,23 @@ export default function Documentation({ formData, setFormData, errors = {}, scro
       },
       now,
     );
+    // Prefer the live assignedQc from the product API response (always current
+    // from the DB); fall back to the cached login record.
+    const liveQc = formData?.productData?.assignedQc || null;
+    const checker = liveQc || cachedChecker;
     return {
       productName: formData?.productData?.name || formData?.items?.[0]?.itemName || formData?.vendor || 'Product',
       vendorName: formData?.vendorData?.companyName || formData?.vendor || '',
       inspectorName: formData?.inspectorSignature || '',
-      location: null,
+      checker: checker
+        ? {
+            name: formatCheckerName(checker) || checker.name,
+            checkerId: checker.checkerId,
+            email: checker.email,
+            phone: checker.phone || checker.mobile || checker.businessPhone,
+          }
+        : null,
+      location: coords,
       inspectionStartedAt: formData?.inspectionStartedAt,
       inspectionCompletedAt: now.toISOString(),
       generatedAt: now,
@@ -121,31 +164,53 @@ export default function Documentation({ formData, setFormData, errors = {}, scro
     }
   };
 
+  const attachSignedDoc = (doc: { name: string; data: string; isPdf?: boolean }) => {
+    setFormData({ ...formData, signedDocuments: [doc] });
+    setShowDocModal(false);
+    setHasDownloaded(false);
+    showSuccessToast('Uploaded', 'Signed document uploaded successfully.');
+  };
+
   const handleUploadSignedCopy = () => {
     pickPhotos((photos) => {
       if (photos.length === 0) return;
-      setFormData({
-        ...formData,
-        signedDocuments: [{ name: photos[0].name, data: photos[0].data }],
-      });
-      setShowDocModal(false);
-      setHasDownloaded(false);
-      showSuccessToast('Uploaded', 'Signed document uploaded successfully.');
+      attachSignedDoc({ name: photos[0].name, data: photos[0].data });
     }, false, { allowGallery: inspectionType === 'VIRTUAL' });
   };
 
-  const viewManualDoc = async () => {
-    const doc = signedDocs[0] as any;
-    if (!doc?.data) return;
-    // Scanned signed copies are images — share so the user can view them.
+  /**
+   * Attach a scanned PDF. Web accepts PDF/PNG/JPG on this upload; the app only
+   * offered the camera roll, so a checker who scanned the signed copy to PDF —
+   * what most scanner apps produce — had no way to attach it.
+   */
+  const handleUploadSignedPdf = async () => {
     try {
-      const base64 = doc.data.split(',')[1];
-      const path = `${FileSystem.cacheDirectory}${doc.name || 'signed-doc.jpg'}`;
-      await FileSystem.writeAsStringAsync(path, base64, { encoding: FileSystem.EncodingType.Base64 });
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(path);
-    } catch {
-      /* ignore */
+      const res = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (res.canceled || !res.assets?.[0]) return;
+      const asset = res.assets[0];
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      attachSignedDoc({
+        name: asset.name || 'signed-document.pdf',
+        data: `data:application/pdf;base64,${base64}`,
+        isPdf: true,
+      });
+    } catch (e: any) {
+      showErrorToast('Upload Failed', e?.message || 'Could not attach that PDF.');
     }
+  };
+
+  // Both sign-off paths preview in-app. This one used to write the file to
+  // cache and hand it to the OS share sheet — a "View" that asked where to send
+  // the document, while the digital path opened a preview right here.
+  const viewManualDoc = () => {
+    if (!hasSignedDoc) return;
+    setPreviewDoc(true);
   };
 
   const removeManualDoc = () => {
@@ -324,6 +389,51 @@ export default function Documentation({ formData, setFormData, errors = {}, scro
 
       <View className="h-6" />
 
+      {/* ── Preview: uploaded signed document (manual path) ──
+          Same shell as the signed-report preview so both paths look identical.
+          A scanned image renders directly; a PDF goes to the WebView, which
+          renders it on iOS and falls back to the platform handling on Android. */}
+      <Modal visible={previewDoc && hasSignedDoc} animationType="slide" onRequestClose={() => setPreviewDoc(false)}>
+        <View className="flex-1 bg-slate-900">
+          <View className="flex-row items-center justify-between px-4 pt-14 pb-3">
+            <Text className="text-white text-sm font-semibold flex-1 mr-3" numberOfLines={1}>
+              {(signedDocs[0] as any)?.name || 'Signed Document'}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setPreviewDoc(false)}
+              hitSlop={12}
+              accessibilityLabel="Close preview"
+              className="w-9 h-9 rounded-full bg-white/10 items-center justify-center"
+            >
+              <X size={20} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+          <View className="flex-1 bg-white">
+            {(() => {
+              const doc: any = signedDocs[0];
+              if (!doc?.data) return null;
+              const isPdf = doc.isPdf || String(doc.name || '').toLowerCase().endsWith('.pdf')
+                || String(doc.data).startsWith('data:application/pdf');
+              return isPdf ? (
+                <WebView
+                  source={{ uri: doc.data }}
+                  originWhitelist={['*']}
+                  style={{ flex: 1 }}
+                  startInLoadingState
+                  renderLoading={() => (
+                    <View className="absolute inset-0 items-center justify-center bg-white">
+                      <ActivityIndicator size="large" color="#e01a1b" />
+                    </View>
+                  )}
+                />
+              ) : (
+                <Image source={{ uri: doc.data }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
+
       {/* ── Preview: canonical (unsigned) report, opened from "View Report" ── */}
       <Modal visible={previewCanonical} animationType="slide" onRequestClose={() => setPreviewCanonical(false)}>
         <View className="flex-1 bg-slate-900">
@@ -448,18 +558,25 @@ export default function Documentation({ formData, setFormData, errors = {}, scro
                     <Text className="text-sm font-bold text-slate-800">Upload Signed Copy</Text>
                   </View>
                   <Text className="text-xs text-slate-500 mb-2 ml-8">
-                    Upload a photo / scan of the signed copy.
+                    Upload the scanned, signed copy. Accepted formats: PDF, PNG, JPG.
                   </Text>
                   <TouchableOpacity
                     onPress={handleUploadSignedCopy}
                     className="ml-8 border-2 border-dashed border-brand-200 rounded-xl p-5 items-center"
                   >
                     <Upload size={22} color="#f24344" />
-                    <Text className="text-slate-700 font-medium text-sm mt-1.5">Tap to upload signed copy</Text>
-                    {/* Web accepts PDF/PNG/JPG. A true PDF picker needs
-                        expo-document-picker (not installed); the current image
-                        picker still covers photo/scan uploads — label matches web. */}
-                    <Text className="text-slate-400 text-xs mt-0.5">PDF, PNG, JPG</Text>
+                    <Text className="text-slate-700 font-medium text-sm mt-1.5">Tap to upload photo / scan</Text>
+                    <Text className="text-slate-400 text-xs mt-0.5">PNG, JPG</Text>
+                  </TouchableOpacity>
+                  {/* Scanner apps produce PDFs — the image picker can't see them,
+                      so the PDF path gets its own action. */}
+                  <TouchableOpacity
+                    onPress={handleUploadSignedPdf}
+                    className="ml-8 mt-2 flex-row items-center justify-center rounded-xl border border-slate-200 bg-white py-2.5"
+                    style={{ columnGap: 6 }}
+                  >
+                    <FileText size={16} color="#475569" />
+                    <Text className="text-slate-700 font-semibold text-sm">Upload a PDF instead</Text>
                   </TouchableOpacity>
                 </View>
               )}

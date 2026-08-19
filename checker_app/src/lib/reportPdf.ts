@@ -217,30 +217,6 @@ function stepForKey(key: string): string {
   return 'Other';
 }
 
-/**
- * Verification key → the field name the checker saw ("c_gstNumber" → "GST
- * Number"). Mirrors the on-screen report's helper so the Issues table names the
- * field in both places instead of only naming its step.
- */
-function fieldLabelForKey(key: string): string {
-  const rest = key.replace(/^(certDoc_|cert_|vt_|mf_|ct_|c_|w_|o_)/, '');
-  const spaced = rest.replace(/_/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2');
-  const WORD: Record<string, string> = {
-    wh: 'Warehouse', legal: 'Legal', prod: 'Product', img: 'Image',
-    cat: 'Category', photo: 'Photo', spec: 'Spec', var: 'Variant',
-    std: 'Standard', dims: 'Dimensions', sku: 'SKU', uom: 'UOM',
-    gst: 'GST', id: 'ID', qc: 'QC',
-  };
-  const words = spaced.split(/\s+/).filter(Boolean).map((w) => {
-    const lower = w.toLowerCase();
-    if (WORD[lower]) return WORD[lower];
-    if (/^\d+$/.test(w)) return String(Number(w) + 1);
-    return w.charAt(0).toUpperCase() + w.slice(1);
-  });
-  const deduped = words.filter((w, i) => i === 0 || w.toLowerCase() !== words[i - 1].toLowerCase());
-  return deduped.join(' ') || key;
-}
-
 type VF = Record<string, { ok: boolean | null; remarks?: string }>;
 
 function sectionStatus(vf: VF, prefixes: string[]): string {
@@ -252,50 +228,66 @@ function sectionStatus(vf: VF, prefixes: string[]): string {
 }
 
 // ── Shared HTML fragments ───────────────────────────────────────────────────
-/**
- * Report stylesheet — red masthead, red section rules, red-headed grid tables.
- *
- * Was defined inside the product builder while the factory report kept an older
- * look (dark banner, grey card per section, header-less two-column tables). Both
- * reports go to the same client, so they now share one stylesheet.
- */
-const REPORT_STYLES = `
-  * { box-sizing: border-box; }
-  body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 0; padding: 40px; color: #334155; font-size: 11px; }
-  .pdf-head { background:#fff5f5; border-bottom:2px solid #e01a1b; padding:16px 40px; margin:-40px -40px 20px; display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; }
-  .pdf-head h1 { color:#e01a1b; font-size:20px; font-weight:700; margin:0; }
-  .pdf-head .sub { color:#334155; font-size:11px; margin-top:5px; }
-  .pdf-head .gen { color:#64748b; font-size:9px; white-space:nowrap; padding-top:4px; }
-  .sec-title { color:#e01a1b; font-weight:700; font-size:12px; border-bottom:1.2px solid #e01a1b; padding-bottom:5px; margin:18px 0 8px; display:flex; align-items:baseline; justify-content:space-between; }
-  .sec-title .status { font-size:9px; font-weight:700; }
-  .wtab { width:100%; border-collapse:collapse; margin-bottom:6px; }
-  .wtab th { background:#fff5f5; color:#e01a1b; border:0.7px solid #e01a1b; font-size:9px; font-weight:700; text-align:left; padding:5px 6px; text-transform:uppercase; }
-  .wtab td { border:0.5px solid #e2e8f0; color:#334155; font-size:9.5px; padding:5px 6px; vertical-align:top; }
-  .wtab tbody tr:nth-child(even) td { background:#f8fafc; }
-  .note { color:#64748b; font-size:9px; margin:4px 0 10px; }
-  .grp { font-size:10px; font-weight:700; color:#334155; margin:10px 0 4px; }
-  .subhead { font-size:9px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; margin:12px 0 4px; }
-  .inline-photo { display:flex; align-items:center; gap:12px; margin:10px 0; }
-  .inline-photo img { width:90px; height:90px; object-fit:cover; border-radius:4px; border:0.5px solid #e2e8f0; }
-  .inline-photo span { font-size:9px; color:#64748b; font-style:italic; }
-  .thumbs { display:flex; flex-wrap:wrap; gap:10px; }
-  .thumb { width:31%; }
-  .thumb img { width:100%; height:110px; object-fit:cover; border:0.5px solid #e2e8f0; border-radius:4px; }
-  .thumb .cap { font-size:7px; color:#64748b; margin-top:2px; word-break:break-all; }
-  .sigwrap { margin-top:26px; border-top:0.7px solid #e01a1b; padding-top:16px; display:flex; gap:24px; }
-  .sigcol { flex:1; }
-  .sigrow { font-size:10px; margin-bottom:8px; color:#334155; }
-  .wfoot { margin-top:30px; padding-top:8px; border-top:0.5px solid #eee; font-size:8px; color:#64748b; }
+const STYLES = `
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 0; padding: 24px; color: #1e293b; font-size: 13px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .m2c-head { display:flex; align-items:center; margin-bottom:8px; }
+  .m2c-logo { width:36px; height:36px; background:#222; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-right:10px; }
+  .m2c-logo span { color:#fff; font-weight:900; font-size:14px; letter-spacing:1px; }
+  .m2c-name { font-size:11px; font-weight:700; color:#222; margin:0; letter-spacing:0.5px; }
+  .m2c-sub { font-size:8px; color:#888; margin:2px 0 0; }
+  .head-rule { border:none; border-top:1.5px solid #222; margin:0 0 16px; }
+  .banner { background:#222; color:#fff; border-radius:12px; padding:20px; margin-bottom:20px; display:flex; flex-wrap:wrap; }
+  .banner-item { width:50%; margin-bottom:12px; }
+  .banner-label { font-size:10px; color:#9ca3af; text-transform:uppercase; font-weight:600; margin-bottom:2px; }
+  .banner-value { font-size:13px; font-weight:600; }
+  .section { border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; margin-bottom:16px; }
+  .sh { background:#f8fafc; padding:10px 16px; border-bottom:1px solid #e2e8f0; font-weight:700; font-size:13px; color:#1e293b; display:flex; align-items:center; justify-content:space-between; }
+  .sh .status { font-size:10px; font-weight:700; }
+  .subhead { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; padding:12px 16px 4px; }
+  table { width:100%; border-collapse:collapse; }
+  tr { border-bottom:1px solid #f1f5f9; }
+  td.k { color:#6b7280; font-size:11px; padding:6px 12px; text-transform:uppercase; font-weight:600; width:40%; }
+  td.v { font-size:13px; padding:6px 12px; font-weight:600; }
+  .grid-table th { text-align:left; padding:6px 8px; font-size:10px; font-weight:600; color:#fff; background:#222; text-transform:uppercase; }
+  .grid-table td { padding:6px 8px; font-size:12px; border-bottom:1px solid #f1f5f9; }
+  .result { display:inline-block; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:700; color:#fff; }
+  .photos { display:flex; flex-wrap:wrap; gap:8px; padding:12px; }
+  .photos img { width:120px; height:120px; object-fit:cover; border-radius:8px; border:1px solid #e2e8f0; }
+  .issue { display:flex; gap:8px; padding:10px 16px; border-bottom:1px solid #f1f5f9; }
+  .issue-step { font-size:11px; font-weight:700; color:#b91c1c; }
+  .issue-remark { font-size:12px; color:#7f1d1d; margin-top:2px; }
+  .foot { text-align:center; font-size:9px; color:#bbb; margin-top:30px; padding-top:10px; border-top:1px solid #eee; }
 `;
 
+function m2cHeader(): string {
+  return `
+  <div class="m2c-head">
+    <div class="m2c-logo"><span>M2C</span></div>
+    <div>
+      <p class="m2c-name">M 2 C MarkDowns Private Limited</p>
+      <p class="m2c-sub">Quality Control Division</p>
+    </div>
+  </div>
+  <hr class="head-rule" />`;
+}
+
+function m2cFooter(): string {
+  return `<div class="foot">Confidential — M2C MarkDowns Pvt. Ltd.</div>`;
+}
 
 const kvRow = (label: string, value?: unknown) =>
-  `<tr><td>${esc(label)}</td><td>${esc(val(value))}</td></tr>`;
+  `<tr><td class="k">${esc(label)}</td><td class="v">${esc(val(value))}</td></tr>`;
 
 function kvSection(title: string, rows: [string, unknown][], status?: string, subheads?: string): string {
-  const table = kvTable(rows);
-  if (!table && !subheads) return '';
-  return sectionHtml(title, status, (subheads || '') + table);
+  const body = rows.filter(([, v]) => v !== undefined).map(([l, v]) => kvRow(l, v)).join('');
+  if (!body && !subheads) return '';
+  const statusHtml = status
+    ? `<span class="status" style="color:${statusColor(status)}">${status}</span>`
+    : '';
+  return `<div class="section"><div class="sh"><span>${esc(title)}</span>${statusHtml}</div>${
+    subheads || ''
+  }<table>${body}</table></div>`;
 }
 
 function statusColor(status: string): string {
@@ -305,12 +297,9 @@ function statusColor(status: string): string {
 // ── Section composition ─────────────────────────────────────────────────────
 // kvSection covers "heading + one table". Sections that interleave sub-headings,
 // tables and photos (A, B, C, H in the web report) compose these three instead.
-// Grid table with a red header row, matching the product report's `wtab`.
-const kvTable = (rows: [string, unknown][], heads: [string, string] = ['Field', 'Value']): string => {
+const kvTable = (rows: [string, unknown][]): string => {
   const body = rows.filter(([, v]) => v !== undefined).map(([l, v]) => kvRow(l, v)).join('');
-  return body
-    ? `<table class="wtab"><thead><tr><th>${esc(heads[0])}</th><th>${esc(heads[1])}</th></tr></thead><tbody>${body}</tbody></table>`
-    : '';
+  return body ? `<table>${body}</table>` : '';
 };
 
 const subhead = (title: string): string => `<div class="subhead">${esc(title)}</div>`;
@@ -318,9 +307,9 @@ const subhead = (title: string): string => `<div class="subhead">${esc(title)}</
 function sectionHtml(title: string, status: string | undefined, inner: string): string {
   if (!inner) return '';
   const statusHtml = status
-    ? `<span class="status" style="color:${statusColor(status)}">${esc(status)}</span>`
+    ? `<span class="status" style="color:${statusColor(status)}">${status}</span>`
     : '';
-  return `<div class="sec-title"><span>${esc(title)}</span>${statusHtml}</div>${inner}`;
+  return `<div class="section"><div class="sh"><span>${esc(title)}</span>${statusHtml}</div>${inner}</div>`;
 }
 
 // A single inline photo with its caption beside it — the report's Company Logo,
@@ -328,7 +317,10 @@ function sectionHtml(title: string, status: string | undefined, inner: string): 
 function inlinePhoto(src: unknown, caption: string): string {
   if (!src || typeof src !== 'string') return '';
   if (!(src.startsWith('http') || src.startsWith('data:image'))) return '';
-  return `<div class="inline-photo"><img src="${src}" alt="${esc(caption)}"/><span>${esc(caption)}</span></div>`;
+  return `<div style="display:flex;align-items:center;gap:12px;margin:10px 0">
+    <img src="${src}" alt="${esc(caption)}" style="width:90px;height:90px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0"/>
+    <span style="font-size:11px;color:#64748b;font-style:italic">${esc(caption)}</span>
+  </div>`;
 }
 
 function photoBlock(photos: any[] | undefined | null, label: string): string {
@@ -338,13 +330,12 @@ function photoBlock(photos: any[] | undefined | null, label: string): string {
       const src = typeof p === 'string' ? p : p?.data || p?.url;
       const isImg = src && typeof src === 'string' && (src.startsWith('http') || src.startsWith('data:image'));
       const caption = (typeof p !== 'string' && (p?.label || p?.name)) || `${label} ${i + 1}`;
-      // Caption under each thumbnail, as the report prints them.
       return isImg
-        ? `<div class="thumb"><img src="${src}" alt="${esc(caption)}"/><div class="cap">${esc(caption)}</div></div>`
-        : `<div class="thumb"><div style="height:110px;background:#f8fafc;border:0.5px dashed #cbd5e1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#94a3b8;text-align:center;padding:4px">${esc(caption)}</div></div>`;
+        ? `<img src="${src}" alt="${esc(caption)}"/>`
+        : `<div style="width:120px;height:120px;background:#f1f5f9;border-radius:8px;border:1px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:10px;color:#94a3b8;text-align:center;padding:4px">${esc(caption)}</div>`;
     })
     .join('');
-  return `<div class="subhead">${esc(label)} (${photos.length})</div><div class="thumbs">${imgs}</div>`;
+  return `<div class="subhead">${esc(label)} (${photos.length})</div><div class="photos">${imgs}</div>`;
 }
 
 // ── Canonical signature page / internal banner ──────────────────────────────
@@ -402,7 +393,11 @@ export function buildFactoryHtml(report: any, variant: ReportVariant, checkerNam
   const isNewFormat = fd && typeof fd.verifications === 'object' && fd.verifications !== null;
   const vf: VF = isNewFormat ? (fd.verifications as VF) : {};
   const v: Record<string, any> = report?.vendor || {};
+  const reportId: string = report?.id || '';
+  const ref = reportId ? reportId.slice(-8).toUpperCase() : '—';
   const vendorName = v.companyName || fd.vendorName || 'Report';
+  const resultColor =
+    report?.result === 'PASSED' ? '#059669' : report?.result === 'FAILED' ? '#dc2626' : '#6b7280';
 
   let sections = '';
 
@@ -571,16 +566,17 @@ export function buildFactoryHtml(report: any, variant: ReportVariant, checkerNam
     if (certifications.length > 0 || !blank(v.complianceStandards) || !blank(v.packagingCapabilities)) {
       let certHtml = '';
       if (certifications.length > 0) {
-        certHtml += `${subhead('Quality Certifications')}<table class="wtab"><thead><tr><th>Certificate Name</th><th>Expiry Date</th><th>Description</th></tr></thead><tbody>${certifications
+        certHtml += `<div class="subhead">Quality Certifications</div><table class="grid-table"><tr><th>Certificate Name</th><th>Expiry Date</th><th>Description</th></tr>${certifications
           .map((c: any) => `<tr><td>${esc(val(c.name))}</td><td>${esc(fmtDate(c.expiryDate))}</td><td>${esc(val(c.description))}</td></tr>`)
-          .join('')}</tbody></table>`;
+          .join('')}</table>`;
       }
-      const stdTable = kvTable([
-        ['Compliance Standards', blank(v.complianceStandards) ? undefined : v.complianceStandards],
-        ['Packaging Capabilities', blank(v.packagingCapabilities) ? undefined : v.packagingCapabilities],
-      ]);
-      if (stdTable) certHtml += subhead('Standards & Packaging') + stdTable;
-      sections += sectionHtml('G. Certifications & Quality Control', sectionStatus(vf, ['cert_', 'certDoc_']), certHtml);
+      const stdRows =
+        (!blank(v.complianceStandards) ? kvRow('Compliance Standards', v.complianceStandards) : '') +
+        (!blank(v.packagingCapabilities) ? kvRow('Packaging Capabilities', v.packagingCapabilities) : '');
+      if (stdRows) certHtml += `<div class="subhead">Standards & Packaging</div><table>${stdRows}</table>`;
+      sections += `<div class="section"><div class="sh"><span>G. Certifications & Quality Control</span><span class="status" style="color:${statusColor(
+        sectionStatus(vf, ['cert_', 'certDoc_']),
+      )}">${sectionStatus(vf, ['cert_', 'certDoc_'])}</span></div>${certHtml}</div>`;
     }
 
     // H. Contact & Trade Information — the named contact person, their photo,
@@ -654,17 +650,15 @@ export function buildFactoryHtml(report: any, variant: ReportVariant, checkerNam
     // J. Issues Found
     const issues = allEntries.filter(([, e]) => e.ok === false);
     if (issues.length > 0) {
-      // Step | Field | Remarks, as the report prints it — the field name was
-      // previously folded into the step line and effectively lost.
-      const issueHtml = `<table class="wtab"><thead><tr><th>Step</th><th>Field</th><th>Remarks</th></tr></thead><tbody>${issues
+      const issueHtml = issues
         .map(
           ([k, e]) =>
-            `<tr><td>${esc(stepForKey(k))}</td><td>${esc(fieldLabelForKey(k))}</td><td>${
-              e.remarks ? esc(e.remarks) : '—'
-            }</td></tr>`,
+            `<div class="issue"><div><div class="issue-step">${esc(stepForKey(k))}</div><div class="issue-remark">${
+              e.remarks ? esc(e.remarks) : '<i>No remarks provided.</i>'
+            }</div></div></div>`,
         )
-        .join('')}</tbody></table>`;
-      sections += sectionHtml('J. Issues Found', undefined, issueHtml);
+        .join('');
+      sections += `<div class="section"><div class="sh"><span>J. Issues Found</span></div>${issueHtml}</div>`;
     }
 
     // K. Inspection Details
@@ -779,22 +773,27 @@ export function buildFactoryHtml(report: any, variant: ReportVariant, checkerNam
       ? signaturePage('Factory Inspection Report', dateStr, checkerName || fd.inspectorName || report?.checker?.name)
       : internalBanner(checkerName);
 
-  // Same masthead the product report uses: red title band, "<vendor> ·
-  // Inspector: <name>", generated timestamp on the right. The dark summary
-  // banner is gone — its four values already appear in the sections below.
-  const inspectorName = checkerName || fd.inspectorName || report?.checker?.name || '';
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${REPORT_STYLES}</style></head><body>
-  <div class="pdf-head">
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${STYLES}</style></head><body>
+  ${m2cHeader()}
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
     <div>
       <h1>Factory Inspection Report</h1>
-      <div class="sub">${esc(vendorName)}${inspectorName ? `  &middot;  Inspector: ${esc(inspectorName)}` : ''}</div>
+      <p style="font-size:12px;color:#6b7280;margin:0">${esc(vendorName)} &bull; REF: ${ref}</p>
     </div>
-    <div class="gen">Generated: ${esc(fmtDateTime(new Date()))}</div>
+    ${report?.result ? `<span class="result" style="background:${resultColor}">${esc(report.result)}</span>` : ''}
+  </div>
+  <div class="banner">
+    <div class="banner-item"><div class="banner-label">Vendor</div><div class="banner-value">${esc(vendorName)}</div></div>
+    <div class="banner-item"><div class="banner-label">Client</div><div class="banner-value">${esc(report?.clientName)}</div></div>
+    <div class="banner-item"><div class="banner-label">Completed On</div><div class="banner-value">${
+      report?.completedAt ? esc(new Date(report.completedAt).toLocaleDateString('en-IN')) : '—'
+    }</div></div>
+    <div class="banner-item"><div class="banner-label">Priority</div><div class="banner-value">${esc(report?.priority)}</div></div>
   </div>
   ${sections}
   ${selfieHtml}
   ${closing}
-  <div class="wfoot">M2C — Confidential Factory Inspection Report</div>
+  ${m2cFooter()}
   </body></html>`;
 }
 
@@ -822,7 +821,15 @@ function buildSelfieHtml(fd: any): string {
 // Mirrors frontend/src/lib/productInspectionReportPdf.ts (sections A–J, light-
 // red header band, photo counts as text, attached-document thumbnails, inline
 // signature block) so the mobile download matches the web download.
-function buildProductHtml(report: any, variant: ReportVariant, checkerName?: string): string {
+/**
+ * The product inspection document — lettered sections A–H, red masthead, red
+ * grid tables, signature block, page footer.
+ *
+ * Exported so the inspection form's Documentation step renders the SAME
+ * document instead of its own layout: the checker previews, signs and hands
+ * over one report, not three that drifted apart.
+ */
+export function buildProductHtml(report: any, variant: ReportVariant, checkerName?: string): string {
   const fd: Record<string, any> = (report?.qcInspectionData || {}) as Record<string, any>;
   const v: Record<string, any> = fd.vendorData && typeof fd.vendorData === 'object' ? fd.vendorData : {};
   const p: Record<string, any> = fd.productData && typeof fd.productData === 'object' ? fd.productData : {};
@@ -1032,7 +1039,10 @@ function buildProductHtml(report: any, variant: ReportVariant, checkerName?: str
     Approved: '#16a34a', Rejected: '#dc2626', 'On Hold': '#ca8a04', 'Re-Inspection': '#ea580c',
   };
   const status = fd.inspectionStatus;
-  const sig = fd.clientSignature && String(fd.clientSignature).startsWith('http') ? fd.clientSignature : null;
+  // A signature drawn on the device is a data: URI, not a URL — accepting only
+  // http left the signed report with an empty signature line.
+  const sigSrc = String(fd.clientSignature || '');
+  const sig = sigSrc.startsWith('http') || sigSrc.startsWith('data:image') ? sigSrc : null;
   const sigBlock = `
   <div class="sigwrap">
     <div class="sigcol">
@@ -1053,8 +1063,29 @@ function buildProductHtml(report: any, variant: ReportVariant, checkerName?: str
 
   const internal = variant === 'internal' ? internalBanner(checkerName) : '';
 
-  // Shared with the factory report — see REPORT_STYLES.
-  const STYLES_PRODUCT = REPORT_STYLES;
+  const STYLES_PRODUCT = `
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 0; padding: 40px; color: #334155; font-size: 11px; }
+    .pdf-head { background:#fff5f5; border-bottom:2px solid #e01a1b; padding:16px 40px; margin:-40px -40px 20px; display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; }
+    .pdf-head h1 { color:#e01a1b; font-size:20px; font-weight:700; margin:0; }
+    .pdf-head .sub { color:#334155; font-size:11px; margin-top:5px; }
+    .pdf-head .gen { color:#64748b; font-size:9px; white-space:nowrap; padding-top:4px; }
+    .sec-title { color:#e01a1b; font-weight:700; font-size:12px; border-bottom:1.2px solid #e01a1b; padding-bottom:5px; margin:18px 0 8px; }
+    .wtab { width:100%; border-collapse:collapse; margin-bottom:6px; }
+    .wtab th { background:#fff5f5; color:#e01a1b; border:0.7px solid #e01a1b; font-size:9px; font-weight:700; text-align:left; padding:5px 6px; text-transform:uppercase; }
+    .wtab td { border:0.5px solid #e2e8f0; color:#334155; font-size:9.5px; padding:5px 6px; vertical-align:top; }
+    .wtab tbody tr:nth-child(even) td { background:#f8fafc; }
+    .note { color:#64748b; font-size:9px; margin:4px 0 10px; }
+    .grp { font-size:10px; font-weight:700; color:#334155; margin:10px 0 4px; }
+    .thumbs { display:flex; flex-wrap:wrap; gap:10px; }
+    .thumb { width:31%; }
+    .thumb img { width:100%; height:110px; object-fit:cover; border:0.5px solid #e2e8f0; border-radius:4px; }
+    .thumb .cap { font-size:7px; color:#64748b; margin-top:2px; word-break:break-all; }
+    .sigwrap { margin-top:26px; border-top:0.7px solid #e01a1b; padding-top:16px; display:flex; gap:24px; }
+    .sigcol { flex:1; }
+    .sigrow { font-size:10px; margin-bottom:8px; color:#334155; }
+    .wfoot { margin-top:30px; padding-top:8px; border-top:0.5px solid #eee; font-size:8px; color:#64748b; }
+  `;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${STYLES_PRODUCT}</style></head><body>
   <div class="pdf-head">

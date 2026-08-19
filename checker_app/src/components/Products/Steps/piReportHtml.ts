@@ -12,6 +12,7 @@ import * as Print from 'expo-print';
 import * as FileSystem from 'expo-file-system/legacy';
 import { CODE_LABELS, verificationLabel, isTestOptional } from '../PI_data';
 import { formatDuration } from '@/lib/inspectionDuration';
+import { buildProductHtml } from '@/lib/reportPdf';
 
 const esc = (s?: unknown): string => {
   if (s === null || s === undefined) return '—';
@@ -37,6 +38,11 @@ export interface ReportMeta {
   productName: string;
   vendorName: string;
   inspectorName?: string;
+  /**
+   * Who ran the inspection. The web report prints the checker's ID, email and
+   * phone beneath their name; without this the app could only print a name.
+   */
+  checker?: { name?: string; checkerId?: string; email?: string; phone?: string } | null;
   location?: { latitude: number; longitude: number } | null;
   generatedAt: Date;
   /** ISO string for when the inspection was opened. */
@@ -52,18 +58,41 @@ export interface ReportMeta {
   exceededSchedule?: boolean;
 }
 
-// Exported so the Documentation step can preview the report in a WebView.
-//
-// The preview renders THIS markup rather than the generated PDF: Android's
-// WebView has no PDF renderer, so a data:application/pdf source shows a blank
-// page there. Since the PDF is printed from exactly this HTML, previewing the
-// source keeps the two identical instead of maintaining a second layout.
+/**
+ * The report the Documentation step previews, prints and gets signed.
+ *
+ * It delegates to the same builder the Reports page uses, so the checker sees
+ * one document everywhere — lettered sections A–H, red masthead, red grid
+ * tables, signature block and page footer. It used to render its own simpler
+ * layout here, which meant the report you signed in the form and the report you
+ * downloaded afterwards looked nothing alike.
+ *
+ * (The preview renders this markup rather than the generated PDF because
+ * Android's WebView has no PDF renderer — a data:application/pdf source is
+ * blank there. Printing from the same HTML keeps preview and PDF identical.)
+ */
 export function buildReportHtml(
   formData: any,
   meta: ReportMeta,
   clientSignatureDataUrl?: string | null,
 ): string {
-  return buildHtml(formData, meta, clientSignatureDataUrl);
+  // Shape the in-progress form data like the product record buildProductHtml
+  // expects. The signature passed in wins over anything already on the form, so
+  // the preview shows the stroke the checker just drew.
+  const pseudoReport = {
+    name: meta.productName,
+    vendor: { companyName: meta.vendorName },
+    assignedQc: meta.checker || undefined,
+    qcAssignment: formData?.productData?.qcAssignment,
+    qcInspectionData: {
+      ...(formData || {}),
+      ...(clientSignatureDataUrl ? { clientSignature: clientSignatureDataUrl } : {}),
+      inspectionStartedAt: meta.inspectionStartedAt ?? formData?.inspectionStartedAt,
+      inspectionCompletedAt: meta.inspectionCompletedAt ?? formData?.inspectionCompletedAt,
+      checkerLocation: meta.location ?? formData?.checkerLocation ?? null,
+    },
+  };
+  return buildProductHtml(pseudoReport, 'canonical', meta.checker?.name || meta.inspectorName);
 }
 
 // A photo entry is stored as { name, data } (base64 data URL) or { url }. PDFs are
@@ -94,6 +123,12 @@ const photoBlock = (heading: string, photos: any[] | undefined): string => {
 const humanizeEvidenceKey = (key: string): string =>
   key.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\b\w/g, (c) => c.toUpperCase());
 
+/**
+ * SUPERSEDED — the step's own report layout, kept only until the delegated
+ * document above has been checked on a real inspection. Nothing calls it; if
+ * the A–H document looks right, delete this function and its private helpers.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildHtml(formData: any, meta: ReportMeta, clientSignatureDataUrl?: string | null): string {
   const d = formData || {};
   const verEntries = Object.entries(d.productVerifications || {}) as [string, any][];
@@ -161,31 +196,39 @@ function buildHtml(formData: any, meta: ReportMeta, clientSignatureDataUrl?: str
 
   return `<!doctype html><html><head><meta charset="utf-8"/>
   <style>
-    body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a;font-size:12px;padding:24px;}
-    h1{font-size:20px;margin:0 0 4px;}
-    h2{font-size:14px;margin:20px 0 8px;border-bottom:2px solid #2563eb;padding-bottom:4px;color:#1e40af;}
+    /* Brand red, matching the web report and the app's other PDFs. This sheet
+       was the only one still on blue headings and grey table headers, so the
+       same inspection produced two differently-coloured documents. */
+    body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#334155;font-size:12px;padding:24px;}
+    h1{font-size:20px;margin:0 0 4px;color:#e01a1b;}
+    h2{font-size:14px;margin:20px 0 8px;border-bottom:1.2px solid #e01a1b;padding-bottom:4px;color:#e01a1b;}
     .meta{color:#475569;font-size:11px;margin-bottom:4px;}
     table{width:100%;border-collapse:collapse;margin-top:6px;}
-    th,td{border:1px solid #cbd5e1;padding:5px 7px;text-align:left;font-size:11px;vertical-align:top;}
-    th{background:#f1f5f9;}
+    th,td{padding:5px 7px;text-align:left;font-size:11px;vertical-align:top;}
+    th{background:#fff5f5;color:#e01a1b;border:0.7px solid #e01a1b;font-weight:700;text-transform:uppercase;font-size:9.5px;}
+    td{border:0.5px solid #e2e8f0;color:#334155;}
+    tbody tr:nth-child(even) td{background:#f8fafc;}
     .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-weight:700;}
     .pass{background:#dcfce7;color:#166534;}
     .fail{background:#fee2e2;color:#991b1b;}
-    .sig{margin-top:8px;border:1px solid #cbd5e1;border-radius:8px;padding:8px;width:260px;}
+    .sig{margin-top:8px;border:0.5px solid #e2e8f0;border-radius:8px;padding:8px;width:260px;}
     .sig img{max-width:240px;max-height:110px;}
     /* Evidence photos. page-break-inside keeps a photo whole across page breaks —
        expo-print splits on CSS page boxes, so a grid cell would otherwise be cut. */
     .grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
-    .grid img{width:104px;height:78px;object-fit:cover;border:1px solid #cbd5e1;border-radius:4px;page-break-inside:avoid;}
+    .grid img{width:104px;height:78px;object-fit:cover;border:0.5px solid #e2e8f0;border-radius:4px;page-break-inside:avoid;}
     .thumbs{display:flex;flex-wrap:wrap;gap:3px;}
-    .thumbs img{width:34px;height:26px;object-fit:cover;border:1px solid #cbd5e1;border-radius:3px;}
+    .thumbs img{width:34px;height:26px;object-fit:cover;border:0.5px solid #e2e8f0;border-radius:3px;}
     .opt{display:inline-block;background:#f1f5f9;color:#64748b;font-size:8px;font-weight:700;
          text-transform:uppercase;letter-spacing:.4px;padding:1px 4px;border-radius:3px;margin-left:4px;}
   </style></head><body>
     <h1>Product Inspection Report</h1>
     <div class="meta">Product: <b>${esc(meta.productName)}</b></div>
     <div class="meta">Vendor: <b>${esc(meta.vendorName)}</b></div>
-    <div class="meta">Inspector: ${esc(meta.inspectorName)}</div>
+    <div class="meta">Inspector: ${esc(meta.checker?.name || meta.inspectorName)}</div>
+    ${meta.checker?.checkerId ? `<div class="meta">Checker ID: ${esc(meta.checker.checkerId)}</div>` : ''}
+    ${meta.checker?.email ? `<div class="meta">Inspector Email: ${esc(meta.checker.email)}</div>` : ''}
+    ${meta.checker?.phone ? `<div class="meta">Inspector Phone: ${esc(meta.checker.phone)}</div>` : ''}
     <div class="meta">Service Type: ${esc(d.serviceType)}</div>
     <div class="meta">Inspection Date: ${esc(fmtDMY(d.serviceStartDate))}</div>
     <div class="meta">Status: ${esc(d.inspectionStatus)}</div>
@@ -246,7 +289,9 @@ export async function generateReportPdfDataUri(
   meta: ReportMeta,
   clientSignatureDataUrl?: string | null,
 ): Promise<string> {
-  const html = buildHtml(formData, meta, clientSignatureDataUrl);
+  // Same markup the preview shows, so the signed PDF and what the checker
+  // approved on screen are the same document.
+  const html = buildReportHtml(formData, meta, clientSignatureDataUrl);
   const { uri } = await Print.printToFileAsync({ html, base64: false });
   const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
   FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
