@@ -4,16 +4,37 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Swiper, SwiperSlide } from 'swiper/react';
-import { Pagination, FreeMode, Mousewheel } from 'swiper/modules';
+import { FreeMode, Mousewheel } from 'swiper/modules';
 import type { Swiper as SwiperType } from 'swiper';
 import { categoryService } from '@/services/categoryService';
-import { Package } from 'lucide-react';
+import { Package, ChevronLeft, ChevronRight } from 'lucide-react';
 import Reveal from '@/components/WebSite/Shared/Reveal';
 
 // Import Swiper styles
 import 'swiper/css';
-import 'swiper/css/pagination';
 import 'swiper/css/free-mode';
+
+/**
+ * One definition for both arrows.
+ *
+ * `disabled:opacity-0` rather than a greyed-out state: an arrow at the end of
+ * the row has nothing to do, and a dimmed control that still looks like a
+ * control invites the click anyway.
+ */
+const ARROW =
+  'absolute z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full ' +
+  'bg-white/95 text-[#1a1a1a] ring-1 ring-black/10 shadow-[0_6px_20px_rgba(0,0,0,0.14)] backdrop-blur ' +
+  'transition-all duration-300 hover:bg-[#e01a1b] hover:text-white hover:ring-[#e01a1b] ' +
+  'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e01a1b]/50 ' +
+  'disabled:pointer-events-none disabled:opacity-0 sm:flex';
+
+/**
+ * Centred on the IMAGE, not on the slide. Each slide is a square picture plus
+ * a caption beneath it, so a plain top-1/2 would sit the arrows low, floating
+ * over the words. Subtract the caption block — its margin plus one line — then
+ * halve what is left.
+ */
+const ARROW_TOP = { top: 'calc((100% - 2.75rem) / 2)' } as const;
 
 // Type definitions
 interface Category {
@@ -27,7 +48,9 @@ export default function Category() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
-  const [currentSlide, setCurrentSlide] = useState(0);
+  /** Whether the row has anywhere left to go, which is all the arrows need. */
+  const [atStart, setAtStart] = useState(true);
+  const [atEnd, setAtEnd] = useState(false);
   const swiperRef = useRef<SwiperType | null>(null);
 
   // Fetch categories from backend
@@ -60,8 +83,12 @@ export default function Category() {
   };
 
   // Handle swiper events
+  const goPrev = () => swiperRef.current?.slidePrev();
+  const goNext = () => swiperRef.current?.slideNext();
+
   const handleSlideChange = (swiper: SwiperType) => {
-    setCurrentSlide(swiper.realIndex);
+    setAtStart(swiper.isBeginning);
+    setAtEnd(swiper.isEnd);
   };
 
   // Keyboard navigation
@@ -163,9 +190,58 @@ export default function Category() {
         </Reveal>
 
         {/* Categories Swiper */}
-        <div className="relative" onKeyDown={handleKeyDown} tabIndex={0} role="region" aria-label="Categories navigation">
+        {/* The padding IS the arrows' lane. They used to sit at left-1/right-1,
+            which put them on top of the first and last photograph.
+
+            Pulling them outward instead was the obvious move and does not work:
+            this section is overflow-hidden, and between roughly 1024px and
+            1230px the container is nearly as wide as the viewport, so an arrow
+            hung off the edge gets its outer rim sliced off. Insetting the row
+            by 3rem gives them somewhere to stand that exists at every width. */}
+        <div
+          className="relative sm:px-12"
+          onKeyDown={handleKeyDown}
+          tabIndex={0}
+          role="region"
+          aria-label="Categories navigation"
+        >
+          {/* ── Arrows ────────────────────────────────────────────────────
+              Replacing the pagination dots. Two 8px dots at the foot of the
+              row were the only visible control, they said nothing about which
+              direction they moved, and clicking one jumped a whole screen of
+              cards.
+
+              Centred on the IMAGE, not on the slide: each slide is a square
+              picture plus a caption underneath, so `top-1/2` would have set
+              them low, floating over the words. The offset subtracts the
+              caption block — its margin plus one line — before halving.
+
+              Kept inside the row rather than hung off its edges, because the
+              section is overflow-hidden and anything sticking out would simply
+              be cut off. */}
+          <button
+            type="button"
+            onClick={goPrev}
+            disabled={atStart}
+            aria-label="Previous categories"
+            className={`${ARROW} left-0`}
+            style={ARROW_TOP}
+          >
+            <ChevronLeft className="h-5 w-5" strokeWidth={2.2} />
+          </button>
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={atEnd}
+            aria-label="Next categories"
+            className={`${ARROW} right-0`}
+            style={ARROW_TOP}
+          >
+            <ChevronRight className="h-5 w-5" strokeWidth={2.2} />
+          </button>
+
           <Swiper
-            modules={[Pagination, FreeMode, Mousewheel]}
+            modules={[FreeMode, Mousewheel]}
             spaceBetween={16}
             slidesPerView={2}
             /**
@@ -195,13 +271,10 @@ export default function Category() {
               swiperRef.current = swiper;
             }}
             onSlideChange={handleSlideChange}
-            pagination={{
-              clickable: true,
-              dynamicBullets: true,
-              renderBullet: (index, className) => {
-                return `<span class="${className}" data-index="${index}" aria-label="Go to slide ${index + 1}"></span>`;
-              },
-            }}
+            /* freeMode moves without firing slideChange for every pixel, so the
+               arrows would stay lit past the end without this. */
+            onProgress={handleSlideChange}
+            onResize={handleSlideChange}
             loop={false}
             watchSlidesProgress={true}
             breakpoints={{
@@ -234,7 +307,7 @@ export default function Category() {
                 spaceBetween: 36,
               },
             }}
-            className="categories-swiper pb-4! sm:pb-6!"
+            className="categories-swiper"
             aria-label="Product categories carousel"
           >
             {categories.map((category, index) => (
@@ -294,32 +367,6 @@ export default function Category() {
 
       {/* Custom Styles */}
       <style jsx global>{`
-        .categories-swiper .swiper-pagination {
-          bottom: 0 !important;
-          position: absolute !important;
-        }
-        
-        .categories-swiper .swiper-pagination-bullet {
-          width: 8px !important;
-          height: 8px !important;
-          margin: 0 4px !important;
-          transition: all 0.3s ease !important;
-          cursor: pointer !important;
-          background-color: rgb(209, 213, 219) !important;
-          opacity: 0.5 !important;
-        }
-        
-        .categories-swiper .swiper-pagination-bullet:hover {
-          opacity: 0.8 !important;
-          transform: scale(1.1) !important;
-        }
-        
-        .categories-swiper .swiper-pagination-bullet-active {
-          transform: scale(1.2) !important;
-          background-color: #e01a1b !important;
-          opacity: 1 !important;
-        }
-        
         .line-clamp-2 {
           display: -webkit-box;
           -webkit-line-clamp: 2;
