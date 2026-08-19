@@ -313,7 +313,7 @@ const Header = () => {
             {/* Prominent inline search — the primary way to find products
                 (Amazon/Flipkart/Myntra pattern). Fills the header on md+; on
                 mobile the compact search icon in the actions opens the modal. */}
-            <form onSubmit={handleSearchSubmit} className="hidden md:flex flex-1 min-w-0 max-w-lg lg:max-w-xl mx-4 lg:mx-6">
+            <form onSubmit={handleSearchSubmit} className="hidden md:flex flex-1 min-w-0 max-w-md lg:max-w-lg mx-4 lg:mx-6">
               <div className="relative w-full">
                 <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
