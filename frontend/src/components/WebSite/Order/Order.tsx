@@ -17,12 +17,18 @@ import {
   Plus,
   ShoppingCart,
   AlertCircle,
-  ChevronLeft
+  ChevronLeft,
+  ExternalLink,
+  Copy,
+  X
 } from "lucide-react"
 import Dropdown from "@/components/UI/Dropdown"
 import Reveal from "@/components/WebSite/Shared/Reveal"
 import orderService, { Order as APIOrder } from "@/services/orderService"
 import productService from "@/services/productService"
+import { courierService } from "@/services/courierService"
+import { courierName, courierTrackingUrl } from "@/lib/couriers"
+import { showSuccessToast } from "@/lib/toast-utils"
 import ReviewModal from "./ReviewModal"
 
 /**
@@ -73,6 +79,8 @@ interface Order {
   currency?: 'INR' | 'USD'
   items: OrderItem[]
   trackingNumber?: string
+  /** Courier partner id chosen at ship-to-customer (resolve via lib/couriers). */
+  courier?: string | null
   estimatedDelivery?: string
   paymentStatus?: string
 }
@@ -87,6 +95,14 @@ export default function OrderList() {
   const [reviewModalState, setReviewModalState] = useState<{ isOpen: boolean, orderId: string, items: any[] }>({ isOpen: false, orderId: '', items: [] })
   const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set())
   const [currentPage, setCurrentPage] = useState(1)
+  // Order whose tracking modal is open (null = closed).
+  const [trackOrder, setTrackOrder] = useState<Order | null>(null)
+
+  // Prime the admin-managed courier registry so courierName()/courierTrackingUrl()
+  // can resolve the order's courier id to its name + tracking website.
+  useEffect(() => {
+    courierService.getActiveCouriers().catch(() => {})
+  }, [])
   const [pastPage, setPastPage] = useState(1)
 
   const [orders, setOrders] = useState<Order[]>([])
@@ -135,6 +151,7 @@ export default function OrderList() {
             color: item.color
           })),
           trackingNumber: apiOrder.trackingReference,
+          courier: apiOrder.courier,
           estimatedDelivery: apiOrder.estimatedDelivery,
         }))
         setOrders(transformedOrders)
@@ -471,7 +488,10 @@ export default function OrderList() {
                             </button>
                           </Link>
                           {order.trackingNumber && (
-                            <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-[#e01a1b] text-[#e01a1b] rounded-full hover:bg-[#e01a1b] hover:text-white transition-colors">
+                            <button
+                              onClick={() => setTrackOrder(order)}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-[#e01a1b] text-[#e01a1b] rounded-full hover:bg-[#e01a1b] hover:text-white transition-colors"
+                            >
                               <Truck className="w-4 h-4" />
                               Track Order
                             </button>
@@ -654,7 +674,10 @@ export default function OrderList() {
                             )
                           )}
                           {order.trackingNumber && (
-                            <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-[#e01a1b] text-[#e01a1b] rounded-full hover:bg-[#e01a1b] hover:text-white transition-colors">
+                            <button
+                              onClick={() => setTrackOrder(order)}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-[#e01a1b] text-[#e01a1b] rounded-full hover:bg-[#e01a1b] hover:text-white transition-colors"
+                            >
                               <Truck className="w-4 h-4" />
                               Track Order
                             </button>
@@ -817,6 +840,68 @@ export default function OrderList() {
         orderId={reviewModalState.orderId}
         items={reviewModalState.items}
       />
+
+      {/* Track-order modal — courier partner + tracking ID + courier website link */}
+      {trackOrder && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]" onClick={() => setTrackOrder(null)}>
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5" onClick={(e) => e.stopPropagation()}>
+            <div className="h-1 w-full bg-gradient-to-r from-[#e01a1b] via-[#ff5a36] to-[#e01a1b]" />
+            <div className="flex items-center gap-3 px-6 py-4">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e01a1b]/10 text-[#e01a1b]">
+                <Truck className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-[16px] font-bold text-slate-900">Track Order</h3>
+                <p className="text-[12.5px] text-slate-500">#{trackOrder.orderNumber}</p>
+              </div>
+              <button onClick={() => setTrackOrder(null)} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-6 pb-6">
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Courier Partner</p>
+                <p className="mt-1 text-base font-semibold text-slate-900">
+                  {trackOrder.courier ? courierName(trackOrder.courier) : 'Courier'}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Tracking ID</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <p className="min-w-0 flex-1 break-all font-mono text-sm font-semibold text-slate-900">{trackOrder.trackingNumber}</p>
+                  <button
+                    onClick={() => { navigator.clipboard?.writeText(trackOrder.trackingNumber || ''); showSuccessToast('Copied', 'Tracking ID copied'); }}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-white"
+                  >
+                    <Copy className="h-3.5 w-3.5" /> Copy
+                  </button>
+                </div>
+              </div>
+
+              {(() => {
+                const url = courierTrackingUrl(trackOrder.courier, trackOrder.trackingNumber);
+                return url ? (
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-center gap-2 rounded-full bg-[#e01a1b] px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#c41617]"
+                  >
+                    Track on {trackOrder.courier ? courierName(trackOrder.courier) : 'courier'} website
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                ) : (
+                  <p className="text-center text-xs text-slate-500">
+                    Use the tracking ID on {trackOrder.courier ? courierName(trackOrder.courier) : 'the courier'}&apos;s website to see live status.
+                  </p>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

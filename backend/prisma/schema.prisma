@@ -53,6 +53,7 @@ model Admin {
   zipCode      String?
   country      String?
   dateOfBirth  DateTime?
+  gender       String? // "male" | "female" | "other"
   currency     String?   @default("INR") // Admin's preferred currency
 
   // Business Information
@@ -131,6 +132,7 @@ model User {
   zipCode      String?
   country      String?
   dateOfBirth  DateTime?
+  gender       String? // "male" | "female" | "other"
 
   // Multiple addresses support
   addresses Address[]
@@ -1100,7 +1102,9 @@ model Order {
   // NOTE: status is now a computed aggregate of all VendorShipment statuses.
   // It is persisted for backward compatibility and efficient queries.
   status            OrderStatus @default(ORDER_CREATED)
-  trackingReference String? // Internal tracking reference
+  trackingReference String? // Customer-facing tracking ID entered at ship-to-customer time
+  // Courier partner (DB Courier id) chosen for the final hub→customer leg.
+  courier           String?
 
   // DEPRECATED: Vendor shipping details now live on VendorShipment.
   // Retained for backward compatibility with pre-migration orders.
@@ -1170,6 +1174,13 @@ model OrderItem {
   // snapshotted from the cart so fulfilment/admin dispatches with the carrier the
   // customer selected. See utils/couriers.js for the label.
   courier String?
+
+  // Full logistics snapshot for this line, frozen at order time so the admin sees
+  // exactly what the customer selected/was quoted (couldn't change if the product's
+  // config changes later). Shape:
+  //   { transportType, courier, totalWeightKg, shippingCostInr, deliveryDays,
+  //     dimensions: { length, width, height, unit }, cbmPerUnit, cbmTotal }
+  logistics Json?
 
   // ── Offer snapshot (customer-side only) ─────────────────────────────────────
   // When an automatic Offer reduced this line's selling price, these freeze what the
@@ -1457,6 +1468,10 @@ model Courier {
   modes     String[] @default([]) // which transport lanes: 'AIR' and/or 'SHIP'
   isActive  Boolean  @default(true)
   sortOrder Int      @default(0)
+  // Public tracking-website URL for this courier. May contain a `{tracking}`
+  // placeholder that's replaced with the order's tracking ID; otherwise it links
+  // to the courier's tracking page (customer pastes the ID there).
+  trackingUrl String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

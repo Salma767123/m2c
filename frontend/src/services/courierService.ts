@@ -4,7 +4,7 @@ import { registerCouriers, type Courier } from '@/lib/couriers'
 export type { Courier }
 
 export type CourierInput = Partial<
-  Pick<Courier, 'name' | 'code' | 'color' | 'logo' | 'region' | 'modes' | 'isActive' | 'sortOrder'>
+  Pick<Courier, 'name' | 'code' | 'color' | 'logo' | 'region' | 'modes' | 'isActive' | 'sortOrder' | 'trackingUrl'>
 >
 
 function errMessage(error: unknown, fallback: string): string {

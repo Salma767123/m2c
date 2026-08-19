@@ -7,6 +7,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order } from "@/services/orderService";
 import { formatPrice } from "@/lib/currency";
 import { courierName, transportModeLabel } from "@/lib/couriers";
+import { courierService } from "@/services/courierService";
 import { hubService, Hub } from "@/services/hubService";
 import { MapPin as HubIcon } from "lucide-react";
 import axiosInstance from "@/lib/axios";
@@ -25,6 +26,13 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
     const [hubs, setHubs] = useState<Hub[]>([]);
     const [isAssigningHub, setIsAssigningHub] = useState(false);
     const [selectedHubId, setSelectedHubId] = useState<string>("");
+
+    // Prime the admin-managed courier catalogue so courierName() resolves DB
+    // courier ids (stored on order items) to their display names.
+    const [, setCourierTick] = useState(0);
+    useEffect(() => {
+        courierService.getActiveCouriers().then(() => setCourierTick((t) => t + 1)).catch(() => {});
+    }, []);
 
     useEffect(() => {
         fetchOrderDetails();
@@ -233,6 +241,65 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* Full logistics snapshot the customer selected at checkout */}
+                                        {item.logistics && (
+                                            <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                                                <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    <Truck className="h-3.5 w-3.5" /> Selected Logistics
+                                                </p>
+                                                <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+                                                    <div>
+                                                        <p className="text-xs text-slate-500">Transport</p>
+                                                        <p className="text-sm font-medium text-slate-900">
+                                                            {item.logistics.transportType ? transportModeLabel(item.logistics.transportType, order.currency) : '—'}
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-slate-500">Courier Partner</p>
+                                                        <p className="text-sm font-medium text-slate-900">
+                                                            {item.logistics.courier ? courierName(item.logistics.courier) : '—'}
+                                                        </p>
+                                                    </div>
+                                                    {typeof item.logistics.deliveryDays === 'number' && (
+                                                        <div>
+                                                            <p className="text-xs text-slate-500">Delivery</p>
+                                                            <p className="text-sm font-medium text-slate-900">{item.logistics.deliveryDays} days</p>
+                                                        </div>
+                                                    )}
+                                                    {typeof item.logistics.totalWeightKg === 'number' && (
+                                                        <div>
+                                                            <p className="text-xs text-slate-500">Total Weight</p>
+                                                            <p className="text-sm font-medium text-slate-900">{item.logistics.totalWeightKg} KG</p>
+                                                        </div>
+                                                    )}
+                                                    {typeof item.logistics.cbmTotal === 'number' && (
+                                                        <div>
+                                                            <p className="text-xs text-slate-500">CBM (Volumetric)</p>
+                                                            <p className="text-sm font-medium text-slate-900">{item.logistics.cbmTotal} m³</p>
+                                                        </div>
+                                                    )}
+                                                    {item.logistics.dimensions && (
+                                                        <div>
+                                                            <p className="text-xs text-slate-500">Dimensions</p>
+                                                            <p className="text-sm font-medium text-slate-900">
+                                                                {item.logistics.dimensions.length} × {item.logistics.dimensions.width} × {item.logistics.dimensions.height} {item.logistics.dimensions.unit}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                    {typeof item.logistics.shippingCostInr === 'number' && (
+                                                        <div>
+                                                            <p className="text-xs text-slate-500">Line Shipping</p>
+                                                            <p className="text-sm font-medium text-slate-900">
+                                                                {order.currency === 'USD' && order.exchangeRate
+                                                                    ? money(item.logistics.shippingCostInr / order.exchangeRate)
+                                                                    : money(item.logistics.shippingCostInr)}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}

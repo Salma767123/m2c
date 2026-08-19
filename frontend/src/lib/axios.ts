@@ -105,6 +105,12 @@ axiosInstance.interceptors.response.use(
       const { status, data } = error.response;
       const quiet = error.config?.skipErrorToast === true;
 
+      // Callers that surface their own error UI can opt out of the global toast
+      // (via `{ suppressErrorToast: true }` on the request config) so the user
+      // isn't shown two toasts for the same failure. Redirect/token logic below
+      // still runs — only the toast is suppressed.
+      const suppressToast = (error.config as { suppressErrorToast?: boolean } | undefined)?.suppressErrorToast === true;
+
       switch (status) {
         case 401:
           // Check if this is a login attempt - don't redirect for login failures
@@ -148,7 +154,7 @@ axiosInstance.interceptors.response.use(
         case 403:
           // Geofence blocks ("Location mismatch") are handled by the inspection UI's
           // own warning card — don't double-toast them here as "Access Denied".
-          if (!quiet && data?.error !== 'Location mismatch' && data?.error !== 'Location required') {
+          if (!quiet && !suppressToast && data?.error !== 'Location mismatch' && data?.error !== 'Location required') {
             showErrorToast('Access Denied', data?.error || 'You do not have permission to perform this action');
           }
           break;
@@ -156,7 +162,7 @@ axiosInstance.interceptors.response.use(
           // Not found — let the caller decide whether to surface
           break;
         case 500:
-          if (!quiet) {
+          if (!quiet && !suppressToast) {
             showErrorToast('Server Error', data?.error || 'Internal server error. Please try again.');
           }
           break;
@@ -169,7 +175,9 @@ axiosInstance.interceptors.response.use(
       return Promise.reject({ message: errorMessage, status, data });
     } else if (error.request) {
       // Network error
-      if (error.config?.skipErrorToast !== true) {
+      const skipToast = error.config?.skipErrorToast === true;
+      const suppressToast = (error.config as { suppressErrorToast?: boolean } | undefined)?.suppressErrorToast === true;
+      if (!skipToast && !suppressToast) {
         showErrorToast('Network Error', 'Please check your internet connection.');
       }
       return Promise.reject({ message: 'Network error. Please check your connection.', status: 0, data: null });

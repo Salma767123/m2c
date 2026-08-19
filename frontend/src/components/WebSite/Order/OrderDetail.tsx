@@ -19,9 +19,12 @@ import {
   Download,
   MessageCircle,
   AlertCircle,
-  Clock
+  Clock,
+  ExternalLink
 } from "lucide-react"
 import { formatPrice } from '@/lib/currency'
+import { courierService } from "@/services/courierService"
+import { courierName, courierTrackingUrl } from "@/lib/couriers"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import Reveal from "@/components/WebSite/Shared/Reveal"
 import orderService, { Order as APIOrder } from "@/services/orderService"
@@ -79,6 +82,32 @@ const isStatusCurrent = (orderStatus: string, step: string) => {
   return getNormalizedStatus(orderStatus) === step
 }
 
+// "2026-08-17T14:09:00Z" → "17 Aug 2026, 2:09 PM". Returns null on bad input.
+const formatDateTime = (iso?: string | null): string | null => {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return null
+  return d.toLocaleString(undefined, {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  })
+}
+
+// When a timeline step was reached: the earliest status-history entry that maps
+// to that step. (We intentionally ignore the entries' internal `comment` text —
+// those are system notes like "auto-computed to APPROVED_BY_ADMIN_HUB", not
+// customer-facing places.)
+const historyForStep = (
+  history: any[] | undefined,
+  step: 'processing' | 'shipped' | 'received',
+): { reachedAt?: string } => {
+  const matches = (history || [])
+    .filter((h) => h?.status && getNormalizedStatus(String(h.status)) === step)
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  if (matches.length === 0) return {}
+  return { reachedAt: matches[0].timestamp }
+}
+
 export default function OrderDetail({ orderId }: OrderDetailProps) {
   const [quantities, setQuantities] = useState<{ [key: number]: number }>({})
   const [orderDetails, setOrderDetails] = useState<APIOrder | null>(null)
@@ -120,6 +149,21 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
       [productId]: Math.max(1, (prev[productId] || 1) + change)
     }))
   }
+
+  // Prime the courier registry so courierName()/courierTrackingUrl() resolve the
+  // order's courier id to its name + tracking website.
+  useEffect(() => {
+    courierService.getActiveCouriers().catch(() => {})
+  }, [])
+
+  // "Track Order" deep-links to #order-status; the data loads async, so scroll to
+  // the status timeline once it exists in the DOM.
+  useEffect(() => {
+    if (!orderDetails?.id || typeof window === 'undefined' || window.location.hash !== '#order-status') return;
+    requestAnimationFrame(() => {
+      document.getElementById('order-status')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [orderDetails?.id])
 
   const getQuantity = (productId: number) => quantities[productId] || 1
 
@@ -239,6 +283,54 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
 
   const normalizedStatus = getNormalizedStatus(orderDetails.status)
   const shippingAddr = orderDetails.shippingAddress || {}
+  const cityState = (loc?: { city?: string | null; state?: string | null } | null) =>
+    [loc?.city, loc?.state].filter(Boolean).join(', ')
+  // Processing → vendor warehouse/factory; Shipped → admin hub; Received → customer address.
+  const vendorPlace = cityState(orderDetails.vendorLocation)
+  const hubPlace = cityState(orderDetails.hubLocation)
+  const destination = [shippingAddr.city, shippingAddr.state].filter(Boolean).join(', ')
+
+  // Build the 3-step timeline with a real date/time and a location/detail line
+  // for each step, sourced from the order's status history.
+  const timelineSteps = (() => {
+    const proc = historyForStep(orderDetails.statusHistory, 'processing')
+    const ship = historyForStep(orderDetails.statusHistory, 'shipped')
+    const recv = historyForStep(orderDetails.statusHistory, 'received')
+    return [
+      {
+        key: 'processing' as const,
+        label: 'Processing',
+        Icon: Package,
+        activeBg: 'bg-yellow-500',
+        activeText: 'text-yellow-600',
+        lineNext: 'shipped',
+        at: formatDateTime(proc.reachedAt || orderDetails.createdAt),
+        detail: vendorPlace ? `Preparing at ${vendorPlace}.` : 'Order confirmed and being prepared.',
+      },
+      {
+        key: 'shipped' as const,
+        label: 'Shipped',
+        Icon: Truck,
+        activeBg: 'bg-[#e01a1b]',
+        activeText: 'text-[#e01a1b]',
+        lineNext: 'received',
+        at: formatDateTime(ship.reachedAt || orderDetails.vendorShippedAt),
+        detail: hubPlace ? `Shipped from ${hubPlace} hub.` : 'Your order is on the way.',
+      },
+      {
+        key: 'received' as const,
+        label: 'Received',
+        Icon: CheckCircle,
+        activeBg: 'bg-green-500',
+        activeText: 'text-green-600',
+        lineNext: null,
+        at: formatDateTime(recv.reachedAt || orderDetails.actualDelivery),
+        detail: isStatusReached(orderDetails.status, 'received')
+          ? (destination ? `Delivered to ${destination}.` : 'Delivered.')
+          : (destination ? `Deliver to ${destination}.` : 'Awaiting delivery.'),
+      },
+    ]
+  })()
 
   return (
     <div className="min-h-screen bg-white py-4 sm:py-6 lg:py-8 font-sans">
@@ -272,8 +364,44 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
           {/* Order Items */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Order Status Timeline */}
-            <Card className="border">
+            {/* Courier & Tracking — the dispatch details the admin entered */}
+            {(orderDetails.courier || orderDetails.trackingReference) && (
+              <Card className="border">
+                <CardHeader>
+                  <CardTitle className="text-lg sm:text-xl">Shipping & Tracking</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Courier Partner</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                        {orderDetails.courier ? courierName(orderDetails.courier) : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Tracking ID</p>
+                      <p className="mt-1 break-all font-mono text-sm font-semibold text-slate-900">
+                        {orderDetails.trackingReference || '—'}
+                      </p>
+                    </div>
+                  </div>
+                  {courierTrackingUrl(orderDetails.courier, orderDetails.trackingReference) && (
+                    <a
+                      href={courierTrackingUrl(orderDetails.courier, orderDetails.trackingReference) as string}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#e01a1b] hover:underline"
+                    >
+                      Track on {orderDetails.courier ? courierName(orderDetails.courier) : 'courier'} website
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Order Status Timeline — "Track Order" deep-links here (#order-status) */}
+            <Card className="border scroll-mt-28" id="order-status">
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl">Order Status</CardTitle>
               </CardHeader>
@@ -285,45 +413,63 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                     <span className="text-xs sm:text-sm text-slate-500">{new Date(orderDetails.createdAt).toLocaleDateString()}</span>
                   </div>
                 ) : (
-                  <div className="flex items-start justify-between">
-                    <div className="flex flex-col items-center min-w-0 shrink-0">
-                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-1.5 sm:mb-2 ${isStatusReached(orderDetails.status, 'processing') ? "bg-yellow-500" : "bg-slate-300"
-                        }`}>
-                        <Package className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                      </div>
-                      <span className={`text-xs sm:text-sm font-medium text-center ${isStatusReached(orderDetails.status, 'processing') ? "text-yellow-600" : "text-slate-500"
-                        }`}>Processing</span>
-                      <span className="text-[10px] sm:text-xs text-slate-500">
-                        {isStatusCurrent(orderDetails.status, 'processing') ? "Current" : isStatusReached(orderDetails.status, 'shipped') ? "Complete" : "Pending"}
-                      </span>
-                    </div>
-                    <div className={`flex-1 h-0.5 mt-4 sm:mt-5 mx-1 sm:mx-4 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-[#e01a1b]/40" : "bg-slate-300"
-                      }`}></div>
-                    <div className="flex flex-col items-center min-w-0 shrink-0">
-                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-1.5 sm:mb-2 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-[#e01a1b]" : "bg-slate-300"
-                        }`}>
-                        <Truck className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                      </div>
-                      <span className={`text-xs sm:text-sm font-medium text-center ${isStatusReached(orderDetails.status, 'shipped') ? "text-[#e01a1b]" : "text-slate-500"
-                        }`}>Shipped</span>
-                      <span className="text-[10px] sm:text-xs text-slate-500">
-                        {isStatusCurrent(orderDetails.status, 'shipped') ? "Current" : isStatusReached(orderDetails.status, 'received') ? "Complete" : "Pending"}
-                      </span>
-                    </div>
-                    <div className={`flex-1 h-0.5 mt-4 sm:mt-5 mx-1 sm:mx-4 ${isStatusReached(orderDetails.status, 'received') ? "bg-green-300" : "bg-slate-300"
-                      }`}></div>
-                    <div className="flex flex-col items-center min-w-0 shrink-0">
-                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-1.5 sm:mb-2 ${isStatusReached(orderDetails.status, 'received') ? "bg-green-500" : "bg-slate-300"
-                        }`}>
-                        <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                      </div>
-                      <span className={`text-xs sm:text-sm font-medium text-center ${isStatusReached(orderDetails.status, 'received') ? "text-green-600" : "text-slate-500"
-                        }`}>Received</span>
-                      <span className="text-[10px] sm:text-xs text-slate-500">
-                        {isStatusCurrent(orderDetails.status, 'received') ? "Complete" : "Pending"}
-                      </span>
-                    </div>
-                  </div>
+                  <ol className="relative">
+                    {timelineSteps.map((step, idx) => {
+                      const reached = isStatusReached(orderDetails.status, step.key)
+                      const current = isStatusCurrent(orderDetails.status, step.key)
+                      const nextReached = step.lineNext
+                        ? isStatusReached(orderDetails.status, step.lineNext)
+                        : false
+                      const stateLabel = step.key === 'received'
+                        ? (reached ? 'Complete' : 'Pending')
+                        : (current ? 'Current' : reached ? 'Complete' : 'Pending')
+                      const stateCls = current
+                        ? 'bg-[#e01a1b]/10 text-[#e01a1b]'
+                        : reached
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-slate-100 text-slate-500'
+                      const isLast = idx === timelineSteps.length - 1
+                      return (
+                        <li key={step.key} className="relative flex gap-3 sm:gap-4">
+                          {/* Rail: icon + connecting line */}
+                          <div className="flex flex-col items-center">
+                            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${reached ? step.activeBg : 'bg-slate-300'}`}>
+                              <step.Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                            </div>
+                            {!isLast && (
+                              <div className={`w-0.5 flex-1 my-1 rounded-full ${nextReached ? 'bg-green-300' : 'bg-slate-200'}`} />
+                            )}
+                          </div>
+
+                          {/* Details */}
+                          <div className={`min-w-0 flex-1 ${isLast ? 'pb-0' : 'pb-5 sm:pb-6'}`}>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className={`text-sm sm:text-base font-semibold ${reached ? step.activeText : 'text-slate-500'}`}>
+                                {step.label}
+                              </span>
+                              <span className={`text-[10px] sm:text-[11px] font-medium px-2 py-0.5 rounded-full ${stateCls}`}>
+                                {stateLabel}
+                              </span>
+                            </div>
+
+                            {reached && step.at && (
+                              <p className="mt-1 flex items-center gap-1.5 text-xs sm:text-sm text-slate-500">
+                                <Clock className="w-3.5 h-3.5 shrink-0" />
+                                {step.at}
+                              </p>
+                            )}
+
+                            {step.detail && (
+                              <p className={`mt-1 flex items-start gap-1.5 text-xs sm:text-sm ${reached ? 'text-slate-600' : 'text-slate-400'}`}>
+                                <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                <span className="min-w-0">{step.detail}</span>
+                              </p>
+                            )}
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ol>
                 )}
               </CardContent>
             </Card>

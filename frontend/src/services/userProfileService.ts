@@ -41,6 +41,8 @@ export interface UserStatsResponse {
 
 export interface UpdateUserProfileData {
   name: string;
+  email?: string;
+  gender?: string;
   title?: string;
   middleName?: string;
   whatsappNumber?: string;
@@ -66,6 +68,7 @@ export interface UserProfileResponse {
   data?: {
     id: string;
     email: string;
+    gender?: string;
     name: string;
     title?: string;
     middleName?: string;
@@ -90,7 +93,9 @@ class UserProfileService {
   // Get current user profile
   async getProfile(): Promise<UserProfileResponse> {
     try {
-      const response = await axios.get('/auth/me');
+      // The Profile page shows its own "Load Failed" toast, so opt out of the
+      // global interceptor toast to avoid double-toasting the same error.
+      const response = await axios.get('/auth/me', { suppressErrorToast: true } as Record<string, unknown>);
       return response.data;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to fetch profile');

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 
-import { ArrowLeft, Printer, RefreshCw, FileText } from "lucide-react";
+import { ArrowLeft, Printer, RefreshCw, FileText, CreditCard, CheckCircle2, Clock, Hash, Wallet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order } from "@/services/orderService";
@@ -18,12 +18,10 @@ interface InvoiceDetailProps {
 const fmtDate = (d?: string) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
-const payStatusColor = (s?: string) => {
-  if (!s) return "text-yellow-600";
-  const p = s.toUpperCase();
-  if (p === "PAID" || p === "SUCCESS" || p === "CAPTURED") return "text-green-600";
-  return "text-yellow-600";
-};
+const fmtDateTime = (d?: string) =>
+  d ? new Date(d).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }) : "—";
+
+const isPaid = (s?: string) => ["PAID", "SUCCESS", "CAPTURED"].includes((s || "").toUpperCase());
 
 export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
   const router = useRouter();
@@ -170,39 +168,98 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
         )}
       </div>
 
-      {/* ── Invoice Document ── */}
-      <div ref={invoiceRef} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* ── Payment Details (admin view — individual section) ── */}
+      <div className="print:hidden">
+        <div className="mb-3 flex items-center gap-2">
+          <CreditCard className="h-4 w-4 text-brand-500" />
+          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">Payment Details</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {/* Amount */}
+          <div className="rounded-xl border border-brand-100 bg-brand-50/60 p-4">
+            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-500">
+              <Wallet className="h-3.5 w-3.5" /> Amount Paid
+            </div>
+            <p className="text-xl font-bold text-slate-900 tabular-nums">{money(order.totalAmount)}</p>
+          </div>
+          {/* Status */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Status
+            </div>
+            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${
+              isPaid(order.paymentStatus)
+                ? "bg-green-100 text-green-700"
+                : "bg-yellow-100 text-yellow-700"
+            }`}>
+              {order.paymentStatus || "PENDING"}
+            </span>
+          </div>
+          {/* Method */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              <CreditCard className="h-3.5 w-3.5" /> Payment Method
+            </div>
+            <p className="text-sm font-semibold capitalize text-slate-900">{order.paymentMethod || "—"}</p>
+          </div>
+          {/* Time */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              <Clock className="h-3.5 w-3.5" /> Payment Time
+            </div>
+            <p className="text-sm font-semibold text-slate-900">{fmtDateTime(order.orderDate || order.createdAt)}</p>
+          </div>
+          {/* Txn ID */}
+          <div className="col-span-2 rounded-xl border border-slate-200 bg-white p-4 sm:col-span-3 lg:col-span-1">
+            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              <Hash className="h-3.5 w-3.5" /> Transaction ID
+            </div>
+            <p className="break-all font-mono text-xs font-semibold text-slate-900">{order.paymentId || "—"}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Invoice Document — A4 proportions (210×297mm ≈ 794×1123px @96dpi),
+          centred so it reads like a sheet instead of stretching full width. ── */}
+      <div ref={invoiceRef} className="mx-auto flex w-full max-w-[794px] min-h-[1123px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_40px_-20px_rgba(0,0,0,0.25)]">
 
         {/* Header */}
-        <div className="bg-brand-500 px-8 py-6 flex justify-between items-start">
-          <div className="flex items-center gap-4">
+        <div className="relative overflow-hidden bg-gradient-to-r from-brand-600 via-brand-500 to-[#ff6a3d] px-8 py-7 flex justify-between items-start">
+          {/* Soft decorative rings */}
+          <span aria-hidden className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/10" />
+          <span aria-hidden className="pointer-events-none absolute -left-10 -bottom-24 h-52 w-52 rounded-full bg-black/10" />
+
+          <div className="relative flex items-center gap-4">
             {companyLogo && (
               <img
                 src={companyLogo}
                 alt={`${companyName} logo`}
-                className="h-16 w-auto object-contain rounded-lg"
+                className="h-16 w-auto object-contain rounded-lg bg-white/95 p-1.5 shadow-sm"
               />
             )}
             <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/80">Invoice</p>
               {(companyName !== "M2C Store" && companyName !== "M2C Marketplace Pvt Ltd") && (
-                <p className="text-2xl font-bold text-white mb-1">{companyName}</p>
+                <p className="mt-0.5 text-xl font-bold text-white">{companyName}</p>
               )}
-              <p className="text-indigo-400 font-mono font-semibold text-lg">{order.invoiceNo || order.orderId}</p>
+              <p className="mt-1 inline-flex items-center rounded-md bg-white/20 px-2.5 py-1 font-mono text-sm font-bold tracking-wide text-white ring-1 ring-white/30">
+                {order.invoiceNo || order.orderId}
+              </p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Date</p>
+          <div className="relative text-right">
+            <p className="text-[11px] uppercase tracking-wider text-white/70 mb-1">Date</p>
             <p className="text-white font-semibold">{fmtDate(order.orderDate || order.createdAt)}</p>
-            <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold ${(order.paymentStatus || "").toUpperCase() === "PAID" || (order.paymentStatus || "").toUpperCase() === "SUCCESS"
-              ? "bg-green-500 text-white"
-              : "bg-yellow-400 text-slate-900"
-              }`}>
+            <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold shadow-sm ${
+              isPaid(order.paymentStatus) ? "bg-green-500 text-white" : "bg-yellow-400 text-slate-900"
+            }`}>
+              {isPaid(order.paymentStatus) && <CheckCircle2 className="h-3.5 w-3.5" />}
               {order.paymentStatus || "PENDING"}
             </span>
           </div>
         </div>
 
-        <div className="p-8">
+        <div className="flex flex-1 flex-col p-8">
           {/* Bill To + Ship To + Order Info — standard 3-column invoice header.
               BILL TO = account holder (payer). SHIP TO = recipient + address. */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 pb-8 border-b border-slate-100">
@@ -251,32 +308,32 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
           </div>
 
           {/* Items Table */}
-          <div className="mb-8">
+          <div className="mb-8 overflow-hidden rounded-xl border border-slate-200">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-slate-50">
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">#</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Item</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">SKU</th>
-                  <th className="text-center px-4 py-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Qty</th>
-                  <th className="text-right px-4 py-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Unit Price</th>
-                  <th className="text-right px-4 py-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Total</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wide">#</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wide">Item</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wide">SKU</th>
+                  <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wide">Qty</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wide">Unit Price</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wide">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {(order.items || []).map((item: any, i: number) => (
-                  <tr key={item.id} className="border-b border-slate-100">
-                    <td className="px-4 py-3 text-slate-400">{i + 1}</td>
-                    <td className="px-4 py-3">
+                  <tr key={item.id} className="border-t border-slate-100 odd:bg-white even:bg-slate-50/40">
+                    <td className="px-4 py-3.5 text-slate-400 tabular-nums">{i + 1}</td>
+                    <td className="px-4 py-3.5">
                       <div className="font-semibold text-slate-900">{item.productName}</div>
                       {item.vendorName && <div className="text-xs text-slate-500">Vendor: {item.vendorName}</div>}
                       {item.size && <div className="text-xs text-slate-500">Size: {item.size}</div>}
                       {item.color && <div className="text-xs text-slate-500">Color: {item.color}</div>}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-500">{item.sku || "—"}</td>
-                    <td className="px-4 py-3 text-center">{item.quantity}</td>
-                    <td className="px-4 py-3 text-right">{money(item.unitPrice)}</td>
-                    <td className="px-4 py-3 text-right font-semibold">{money(item.totalPrice)}</td>
+                    <td className="px-4 py-3.5 font-mono text-xs text-slate-500">{item.sku || "—"}</td>
+                    <td className="px-4 py-3.5 text-center tabular-nums">{item.quantity}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums">{money(item.unitPrice)}</td>
+                    <td className="px-4 py-3.5 text-right font-semibold tabular-nums">{money(item.totalPrice)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -308,15 +365,15 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
                   <span className="font-medium text-green-600">− {money(order.discount)}</span>
                 </div>
               )}
-              <div className="flex justify-between py-3 px-4 bg-brand-500 text-white rounded-lg mt-2">
-                <span className="font-bold text-base">Grand Total</span>
-                <span className="font-bold text-base">{money(order.totalAmount)}</span>
+              <div className="mt-3 flex items-center justify-between rounded-xl bg-gradient-to-r from-brand-600 to-[#ff6a3d] px-4 py-3.5 text-white shadow-[0_8px_24px_-10px_rgba(224,26,27,0.6)]">
+                <span className="text-base font-bold">Grand Total</span>
+                <span className="text-lg font-extrabold tabular-nums">{money(order.totalAmount)}</span>
               </div>
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="mt-10 pt-6 border-t border-slate-100 text-center">
+          {/* Footer — pinned to the bottom of the A4 sheet */}
+          <div className="mt-auto pt-6 border-t border-slate-100 text-center">
             <p className="text-sm text-slate-500">Thank you for your purchase!</p>
             <p className="text-xs text-slate-400 mt-1">This is a computer-generated invoice and does not require a signature.</p>
             <a

@@ -1088,6 +1088,7 @@ const getCurrentUser = async (req, res) => {
         zipCode: true,
         country: true,
         dateOfBirth: true,
+        gender: true,
       },
     });
     let userType = "user";
@@ -1234,6 +1235,8 @@ const updateProfile = async (req, res) => {
   try {
     const {
       name,
+      email,
+      gender,
       title,
       middleName,
       whatsappNumber,
@@ -1260,6 +1263,31 @@ const updateProfile = async (req, res) => {
       });
     }
 
+    // Email is editable — validate format and enforce uniqueness across users
+    // (excluding the current account) before we allow the change.
+    let normalizedEmail;
+    if (email !== undefined && email !== null && String(email).trim() !== "") {
+      normalizedEmail = String(email).trim().toLowerCase();
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+      if (!EMAIL_RE.test(normalizedEmail)) {
+        return res.status(400).json({ success: false, error: "Enter a valid email address" });
+      }
+      const taken = await prisma.user.findFirst({
+        where: { email: normalizedEmail, NOT: { id: userId } },
+        select: { id: true },
+      });
+      if (taken) {
+        return res.status(400).json({ success: false, error: "This email is already in use" });
+      }
+    }
+
+    // Gender is optional; only accept the known values.
+    let normalizedGender;
+    if (gender !== undefined) {
+      const g = String(gender).trim().toLowerCase();
+      normalizedGender = ["male", "female", "other"].includes(g) ? g : null;
+    }
+
     // Profile photos arrive as base64 data URIs from the browser — upload them
     // to Cloudinary and store the resulting URL (never the raw base64 in the DB).
     const resolvedImage =
@@ -1270,6 +1298,8 @@ const updateProfile = async (req, res) => {
     // Prepare update data
     const updateData = {
       name,
+      ...(normalizedEmail !== undefined && { email: normalizedEmail }),
+      ...(normalizedGender !== undefined && { gender: normalizedGender }),
       ...(title !== undefined && { title }),
       ...(middleName !== undefined && { middleName }),
       ...(whatsappNumber !== undefined && { whatsappNumber }),
@@ -1314,6 +1344,7 @@ const updateProfile = async (req, res) => {
           zipCode: true,
           country: true,
           dateOfBirth: true,
+          gender: true,
           createdAt: true,
         },
       });
