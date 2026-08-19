@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Swiper, SwiperSlide } from 'swiper/react';
-import { Pagination } from 'swiper/modules';
+import { Pagination, FreeMode, Mousewheel } from 'swiper/modules';
 import type { Swiper as SwiperType } from 'swiper';
 import { categoryService } from '@/services/categoryService';
 import { Package } from 'lucide-react';
@@ -13,6 +13,7 @@ import Reveal from '@/components/WebSite/Shared/Reveal';
 // Import Swiper styles
 import 'swiper/css';
 import 'swiper/css/pagination';
+import 'swiper/css/free-mode';
 
 // Type definitions
 interface Category {
@@ -164,9 +165,32 @@ export default function Category() {
         {/* Categories Swiper */}
         <div className="relative" onKeyDown={handleKeyDown} tabIndex={0} role="region" aria-label="Categories navigation">
           <Swiper
-            modules={[Pagination]}
+            modules={[Pagination, FreeMode, Mousewheel]}
             spaceBetween={16}
             slidesPerView={2}
+            /**
+             * The dots used to be the only way through this row.
+             *
+             * Only Pagination was registered, so the mouse wheel and trackpad
+             * did nothing at all — that needs the Mousewheel module — and while
+             * Swiper's core drag was technically live, without grabCursor
+             * nothing on screen said so. What was left was a pair of dots that
+             * jumped eight cards at a time.
+             *
+             * freeMode lets it move with the gesture instead of by the page,
+             * and `sticky` settles it flush against a card when you let go, so
+             * it stays neat rather than stopping mid-tile.
+             */
+            grabCursor
+            freeMode={{ enabled: true, sticky: true, momentum: true, momentumRatio: 0.55 }}
+            /**
+             * forceToAxis so only a genuinely horizontal gesture moves the row —
+             * otherwise scrolling down the page would be swallowed by whatever
+             * carousel the pointer happened to be over. releaseOnEdges hands the
+             * scroll back to the page once the row has nowhere left to go.
+             */
+            mousewheel={{ forceToAxis: true, releaseOnEdges: true, sensitivity: 0.7 }}
+            speed={450}
             onSwiper={(swiper) => {
               swiperRef.current = swiper;
             }}
