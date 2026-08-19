@@ -549,7 +549,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import SignaturePad from '@/components/General/SignaturePad';
 import { showImagePickerOptions, ImagePickerResult } from '@/utils/imagePicker';
 import { compressImage } from '@/utils/imageCompress';
-import { downloadFactoryReportPdf } from '@/lib/reportPdf';
+import { downloadFactoryReportPdf, buildFactoryHtml } from '@/lib/reportPdf';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import type { Verifications } from './VI_VerifyField';
 import type { InspectorMeta } from './VI_Step8_FinalReview';
@@ -569,6 +569,15 @@ interface Props {
   checkerName?: string;
   errors?: Record<string, string>;
   factoryEvidence?: any;
+  /** Full inspection row — drives the report's active/paused/total duration. */
+  inspection?: any;
+  /**
+   * When the inspection actually started. The backend only stamps startedAt on
+   * the SCHEDULED→IN_PROGRESS transition, so it can be null; the form passes the
+   * time it opened as a fallback so the report always shows a start time.
+   */
+  inspectionStartedAt?: string | null;
+  inspectionType?: 'PHYSICAL' | 'VIRTUAL' | null;
 }
 
 // Modal footers pair a secondary and a primary action. The primary label is
@@ -603,30 +612,51 @@ function buildSignedReportHtml(vendorName: string, meta: InspectorMeta, signatur
 // Assemble the report object the way completeInspection persists it, so the
 // generated PDF matches the submitted record (reportPdf reads report.vendor +
 // report.itemsToInspect.{verifications,inspectorName,...}).
-function buildReport(vendor: any, verifications: Verifications, meta: InspectorMeta) {
+function buildReport(
+  vendor: any,
+  verifications: Verifications,
+  meta: InspectorMeta,
+  timing: {
+    inspection?: any;
+    inspectionStartedAt?: string | null;
+    inspectionType?: string | null;
+  } = {},
+) {
+  // Live report: the inspection isn't submitted yet, so "now" is the end anchor.
+  const now = new Date();
   return {
     vendor,
     result: meta.overallResult === 'Approved' ? 'PASSED' : meta.overallResult === 'Rejected' ? 'FAILED' : undefined,
+    estimatedDuration: timing.inspection?.estimatedDuration,
     itemsToInspect: {
       verifications,
       inspectorName: meta.inspectorName,
       inspectionDate: meta.inspectionDate,
       inspectionStatus: meta.overallResult,
       inspectorRemarks: meta.inspectorRemarks,
+      // Timing + type feed section K of the generated PDF (Inspection Type,
+      // start/complete times, and the active/paused/total duration breakdown).
+      inspectionType: timing.inspectionType,
+      inspectionStartedAt: timing.inspectionStartedAt ?? timing.inspection?.startedAt ?? undefined,
+      inspectionCompletedAt: now.toISOString(),
+      totalPausedMs: timing.inspection?.totalPausedMs ?? 0,
     },
   };
 }
 
-// Shared shell for the two preview surfaces.
+// Shared shell for the preview surfaces.
 function PreviewModal({
   visible,
   title,
   onClose,
+  action,
   children,
 }: {
   visible: boolean;
   title: string;
   onClose: () => void;
+  /** Optional header action (e.g. save the previewed report as a PDF). */
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -636,6 +666,7 @@ function PreviewModal({
           <Text className="text-white text-sm font-semibold flex-1 mr-3" numberOfLines={1}>
             {title}
           </Text>
+          {action}
           <TouchableOpacity
             onPress={onClose}
             hitSlop={12}
@@ -659,11 +690,18 @@ export default function VI_Step9_Documentation({
   onDocDataChange,
   checkerName,
   errors = {},
+  inspection,
+  inspectionStartedAt,
+  inspectionType,
 }: Props) {
   const [showDocModal, setShowDocModal] = useState(false);
   const [showSignModal, setShowSignModal] = useState(false);
   const [previewReport, setPreviewReport] = useState(false);
   const [previewDoc, setPreviewDoc] = useState(false);
+  // Canonical (unsigned) report preview — built on demand from the same HTML the
+  // PDF is printed from, and held so the WebView isn't rebuilt on every render.
+  const [previewCanonical, setPreviewCanonical] = useState(false);
+  const [canonicalHtml, setCanonicalHtml] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [hasDownloaded, setHasDownloaded] = useState(false);
@@ -676,14 +714,33 @@ export default function VI_Step9_Documentation({
   const hasSignedDoc = signedDocs.length > 0;
   const hasSignedReport = signedReport.length > 0;
   const vendorName = vendor?.companyName || 'Report';
+  // A virtual inspection is done remotely, so the client can't sign on the
+  // checker's screen — the digital path is closed and only a scanned, signed
+  // copy uploaded through the Manual Document path counts.
+  const isVirtual = String(inspectionType || '').toUpperCase() === 'VIRTUAL';
 
   // ── Manual Document path ───────────────────────────────────────────────────
-  const handleDownloadReport = async () => {
+  // Tapping the report shows it inside the app first, rather than pushing a PDF
+  // straight to the OS share sheet — the checker can read what they are about to
+  // print. Saving/printing the PDF is the action inside that preview.
+  const handleDownloadReport = () => {
+    try {
+      const report = buildReport(vendor, verifications, meta, { inspection, inspectionStartedAt, inspectionType });
+      setCanonicalHtml(buildFactoryHtml(report, 'canonical', checkerName));
+      setPreviewCanonical(true);
+      // The upload step below unlocks once the checker has seen the report.
+      setHasDownloaded(true);
+    } catch (e: any) {
+      showErrorToast('Report Error', e?.message || 'Failed to generate report.');
+    }
+  };
+
+  // Save / print the previewed report as a PDF (the original share-sheet path).
+  const handleSaveReportPdf = async () => {
     setDownloading(true);
     try {
-      const report = buildReport(vendor, verifications, meta);
+      const report = buildReport(vendor, verifications, meta, { inspection, inspectionStartedAt, inspectionType });
       await downloadFactoryReportPdf(report, { variant: 'canonical', checkerName });
-      setHasDownloaded(true);
     } catch (e: any) {
       showErrorToast('Report Error', e?.message || 'Failed to generate report.');
     } finally {
@@ -832,8 +889,8 @@ export default function VI_Step9_Documentation({
 
       {/* ── Digital Signed Report ── */}
       <View
-        className={`rounded-2xl border border-slate-200 bg-white p-4 mb-4 ${hasSignedDoc ? 'opacity-40' : ''}`}
-        pointerEvents={hasSignedDoc ? 'none' : 'auto'}
+        className={`rounded-2xl border border-slate-200 bg-white p-4 mb-4 ${hasSignedDoc || isVirtual ? 'opacity-40' : ''}`}
+        pointerEvents={hasSignedDoc || isVirtual ? 'none' : 'auto'}
       >
         <View className="flex-row items-start mb-3">
           <View className="w-10 h-10 rounded-xl bg-brand-50 items-center justify-center mr-3">
@@ -845,7 +902,13 @@ export default function VI_Step9_Documentation({
           </View>
         </View>
 
-        {hasSignedReport ? (
+        {isVirtual ? (
+          <View className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <Text className="text-sm font-medium text-slate-500">
+              Not available for virtual inspections — use the Manual Document path to upload a signed copy.
+            </Text>
+          </View>
+        ) : hasSignedReport ? (
           <View>
             <View className="flex-row items-center mb-3">
               <CheckCircle2 size={16} color="#059669" />
@@ -924,7 +987,9 @@ export default function VI_Step9_Documentation({
           {hasSignedDoc || hasSignedReport
             ? 'A signed document is attached. You can submit the inspection.'
             : errors.signedDocuments ||
-              'At least one signed document is required — upload a signed copy or generate the digitally-signed report.'}
+              (isVirtual
+                ? 'A signed document is required — upload a signed copy via the Manual Document path.'
+                : 'At least one signed document is required — upload a signed copy or generate the digitally-signed report.')}
         </Text>
       </View>
 
@@ -949,6 +1014,38 @@ export default function VI_Step9_Documentation({
             )}
           />
         ) : null}
+      </PreviewModal>
+
+      {/* ── Preview: canonical (unsigned) report, opened from "View Report" ── */}
+      <PreviewModal
+        visible={previewCanonical && !!canonicalHtml}
+        title={`Inspection Report — ${vendorName}`}
+        onClose={() => setPreviewCanonical(false)}
+        action={
+          <TouchableOpacity
+            onPress={handleSaveReportPdf}
+            disabled={downloading}
+            hitSlop={8}
+            accessibilityLabel="Save report as PDF"
+            className="flex-row items-center rounded-full bg-white/10 px-3 mr-2"
+            style={{ height: 36, columnGap: 6, opacity: downloading ? 0.6 : 1 }}
+          >
+            {downloading ? <ActivityIndicator size="small" color="#ffffff" /> : <Download size={16} color="#ffffff" />}
+            <Text className="text-white text-xs font-bold">{downloading ? 'Saving…' : 'Save PDF'}</Text>
+          </TouchableOpacity>
+        }
+      >
+        <WebView
+          source={{ html: canonicalHtml || '' }}
+          originWhitelist={['*']}
+          style={{ flex: 1 }}
+          startInLoadingState
+          renderLoading={() => (
+            <View className="absolute inset-0 items-center justify-center bg-white">
+              <ActivityIndicator size="large" color="#e01a1b" />
+            </View>
+          )}
+        />
       </PreviewModal>
 
       {/* ── Preview: digitally-signed report ──
@@ -988,27 +1085,26 @@ export default function VI_Step9_Documentation({
                 <View className="w-6 h-6 rounded-full bg-brand-500 items-center justify-center mr-2">
                   <Text className="text-white text-xs font-bold">1</Text>
                 </View>
-                <Text className="text-sm font-bold text-slate-800 flex-1">Download Inspection Report</Text>
+                <Text className="text-sm font-bold text-slate-800 flex-1">View Inspection Report</Text>
               </View>
               <Text className="text-xs text-slate-500 mb-2 ml-8">
-                Download the generated report, print it, have it signed by the client and stamped with their seal, then scan it.
+                Read the generated report, then save it as a PDF to print, have it signed by the client and stamped with their seal, and scan it.
               </Text>
               <View className="ml-8 mb-4">
                 <TouchableOpacity
                   onPress={handleDownloadReport}
-                  disabled={downloading}
                   className="flex-row items-center justify-center self-stretch rounded-xl bg-brand-500 px-4"
-                  style={{ minHeight: 44, columnGap: 6, opacity: downloading ? 0.6 : 1 }}
+                  style={{ minHeight: 44, columnGap: 6 }}
                 >
-                  {downloading ? <ActivityIndicator size="small" color="#fff" /> : <Download size={16} color="#fff" />}
+                  <Eye size={16} color="#fff" />
                   <Text className="text-white font-semibold text-sm" numberOfLines={1}>
-                    {downloading ? 'Preparing…' : 'Download Report'}
+                    View Report
                   </Text>
                 </TouchableOpacity>
                 {hasDownloaded && (
                   <View className="flex-row items-center mt-2">
                     <CheckCircle2 size={13} color="#059669" />
-                    <Text className="text-xs text-emerald-600 font-semibold ml-1">Report downloaded</Text>
+                    <Text className="text-xs text-emerald-600 font-semibold ml-1">Report viewed</Text>
                   </View>
                 )}
               </View>

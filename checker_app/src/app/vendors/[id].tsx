@@ -2046,6 +2046,7 @@ import {
   getOwnershipTypeLabel,
   FACILITY_META,
   withUnit,
+  resolveCountryIso,
 } from '../../components/Vendor/Steps/fieldHelpers';
 import { AppText, SectionCard, Button } from '@/components/UI';
 import { brand, colors, elevation } from '@/constants/design';
@@ -2358,22 +2359,15 @@ const FACILITY_CHIP: Record<string, string> = {
   finishing: 'Finishing',
 };
 
-// Country name → ISO2 for common countries so we can render a flag image via
-// flagcdn. Unmappable names fall back to a plain (flag-less) chip.
-const COUNTRY_ISO: Record<string, string> = {
-  India: 'IN', 'United States': 'US', 'United States of America': 'US',
-  'United Kingdom': 'GB', China: 'CN', Germany: 'DE', France: 'FR', Italy: 'IT',
-  Spain: 'ES', Canada: 'CA', Australia: 'AU', Japan: 'JP', Bangladesh: 'BD',
-  Pakistan: 'PK', 'Sri Lanka': 'LK', Nepal: 'NP', 'United Arab Emirates': 'AE',
-  'Saudi Arabia': 'SA', Singapore: 'SG', Malaysia: 'MY', Thailand: 'TH',
-  Vietnam: 'VN', Indonesia: 'ID', Netherlands: 'NL', Belgium: 'BE',
-  Switzerland: 'CH', Sweden: 'SE', Norway: 'NO', Denmark: 'DK', Poland: 'PL',
-  Turkey: 'TR', Russia: 'RU', Brazil: 'BR', Mexico: 'MX', 'South Africa': 'ZA',
-  Egypt: 'EG', Nigeria: 'NG', Kenya: 'KE', 'South Korea': 'KR',
-  'New Zealand': 'NZ', Ireland: 'IE', Portugal: 'PT', Austria: 'AT',
-  Greece: 'GR', Israel: 'IL', Qatar: 'QA', Kuwait: 'KW', Bahrain: 'BH',
-  Oman: 'OM', 'Hong Kong': 'HK', Taiwan: 'TW', Philippines: 'PH',
-};
+// Country name (or ISO2 code) → ISO2, or '' when unrecognised.
+//
+// This used to carry its own ~50-entry name→ISO table, which is why most chips
+// showed no flag: anything outside that short list ("UAE", "Türkiye", "USA",
+// every country past the fiftieth) fell through to the flag-less branch. The
+// shared resolver in fieldHelpers covers the full ISO list plus the common
+// aliases and is already what the inspection form uses, so both screens now
+// agree on what a given country is called.
+const countryIso = (name: string): string => resolveCountryIso(name);
 
 // Non-empty check for scalars/arrays (mirrors web hasData).
 const hasVal = (v: any): boolean => {
@@ -2558,8 +2552,26 @@ export default function VendorDetailScreen() {
   }
 
   const companyName = fullVendor?.companyName || name || 'Vendor';
+  // Summary-card address, one entry per rendered line (mirrors web
+  // locationLines): street lines and landmark stand alone, city/state/ZIP share
+  // a line, country closes it. `location` keeps the flat form for the compact
+  // completed-assignment view, which has room for a single line only.
+  const locationLines: string[] = fullVendor
+    ? ([
+        fullVendor.warehouseAddress,
+        fullVendor.warehouseAddressLine2,
+        fullVendor.warehouseAddressLine3,
+        fullVendor.warehouseLandmark,
+        [fullVendor.warehouseCity, fullVendor.warehouseState, fullVendor.warehouseZipCode]
+          .filter(Boolean)
+          .join(', '),
+        fullVendor.warehouseCountry,
+      ].filter(Boolean) as string[])
+    : [];
   const location =
-    formatAddress(fullVendor?.factoryCity, fullVendor?.factoryState) || 'Location not provided';
+    locationLines.join(', ') ||
+    formatAddress(fullVendor?.factoryCity, fullVendor?.factoryState) ||
+    'Location not provided';
   const productCategories: string[] = fullVendor?.productCategories || [];
   const certifications: any[] = fullVendor?.certifications || [];
   const additionalOwners: any[] = Array.isArray(fullVendor?.additionalOwners)
@@ -2630,7 +2642,7 @@ export default function VendorDetailScreen() {
   const countryChips = (list: string[]) => (
     <View className="flex-row flex-wrap" style={{ rowGap: 6, columnGap: 6 }}>
       {list.map((nm, i) => {
-        const iso = COUNTRY_ISO[nm];
+        const iso = countryIso(nm);
         return (
           <View
             key={i}
@@ -2639,7 +2651,10 @@ export default function VendorDetailScreen() {
           >
             {iso ? (
               <Image
-                source={{ uri: `https://flagcdn.com/24x18/${iso.toLowerCase()}.png` }}
+                // w40 rather than the 24x18 fixed size: the chip renders it at
+                // 16pt, which is soft on 2x/3x screens (same reasoning as
+                // VI_VerifyField).
+                source={{ uri: `https://flagcdn.com/w40/${iso.toLowerCase()}.png` }}
                 style={{ width: 16, height: 12, marginRight: 6, borderRadius: 2 }}
                 resizeMode="cover"
               />
@@ -2774,6 +2789,9 @@ export default function VendorDetailScreen() {
               <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 8 }}>
                 Registration Documents ({companyDocs.length})
               </AppText>
+              {/* Display only — no onOpen, so these tiles are not tappable.
+                  The checker sees which papers are on file; opening them is not
+                  part of the mobile flow. */}
               <View className="flex-row flex-wrap" style={{ columnGap: 10, rowGap: 12 }}>
                 {companyDocs.map((doc: any, idx: number) => (
                   <DocTile
@@ -2781,7 +2799,6 @@ export default function VendorDetailScreen() {
                     url={doc.documentUrl}
                     name={doc.name || DOC_TYPE_LABELS[doc.type] || 'Document'}
                     typeLabel={DOC_TYPE_LABELS[doc.type] || doc.type}
-                    onOpen={() => openDoc(doc.documentUrl, doc.name)}
                   />
                 ))}
               </View>
@@ -2815,7 +2832,12 @@ export default function VendorDetailScreen() {
         {/* ── SECTION 3 · Owner Profile ───────────────────────────── */}
         {s3Fields || s3Custom ? (
           <SectionCard icon={UserCircle} title="Owner Profile">
-            <View className="flex-row items-start mb-1">
+            {/* Photo gets its own row. Beside the fields it stole ~92px, which
+                squeezed the first four rows into a narrow column — their labels
+                wrapped and their divider lines started further right than the
+                rows below, so nothing lined up. Stacked, every label and every
+                hairline shares one left edge. */}
+            <View className="self-start mb-3">
               {fv.ownerPhoto ? (
                 <TouchableOpacity onPress={() => openDoc(fv.ownerPhoto, 'Owner Photo')} activeOpacity={0.85}>
                   <Image
@@ -2829,13 +2851,11 @@ export default function VendorDetailScreen() {
                   <UserCircle size={40} color="#cbd5e1" />
                 </View>
               )}
-              <View className="flex-1 ml-3">
-                <InfoRow label="Owner Full Name" value={ownerFullName} />
-                <InfoRow label="Designation" value={fv.designation} />
-                <InfoRow label="Primary Phone" value={fv.ownerPhone} />
-                <InfoRow label="Secondary Phone" value={fv.ownerPhone2} />
-              </View>
             </View>
+            <InfoRow label="Owner Full Name" value={ownerFullName} />
+            <InfoRow label="Designation" value={fv.designation} />
+            <InfoRow label="Primary Phone" value={fv.ownerPhone} />
+            <InfoRow label="Secondary Phone" value={fv.ownerPhone2} />
             <InfoRow label="Primary Email" value={fv.ownerEmail} />
             <InfoRow label="Secondary Email" value={fv.ownerEmail2} />
             <InfoRow label="Local Landline" value={ownerLocalLL} />
@@ -2925,6 +2945,22 @@ export default function VendorDetailScreen() {
                   Factory Site Images ({legalSiteImages.length})
                 </AppText>
                 {imageStrip(legalSiteImages)}
+              </View>
+            ) : null}
+
+            {/* Which of the two addresses a PRODUCT inspection is geofenced against —
+                the vendor picks this at registration. Vendor inspections still check
+                both, so this only governs product checks. */}
+            {(fv as any).productInspectionSite ? (
+              <View className="pt-4 mt-2 border-t border-slate-100">
+                <AppText variant="labelMd" color={colors.textMuted} style={{ marginBottom: 4 }}>
+                  Product Inspection Site
+                </AppText>
+                <AppText variant="bodyMd" color={brand[600]} style={{ fontWeight: '700' }}>
+                  {String((fv as any).productInspectionSite).toUpperCase() === 'WAREHOUSE'
+                    ? 'Warehouse address'
+                    : 'Legal / Factory address'}
+                </AppText>
               </View>
             ) : null}
 
@@ -3069,20 +3105,13 @@ export default function VendorDetailScreen() {
                         className="border border-slate-200 rounded-xl p-3"
                         style={{ backgroundColor: '#f8fafc' }}
                       >
-                        <View className="flex-row items-center justify-between mb-1">
+                        {/* Name only — this screen is the read-only vendor record.
+                            Opening the certificate belongs to the inspection form,
+                            where viewing it is what unlocks the verification. */}
+                        <View className="flex-row items-center mb-1">
                           <View className="rounded px-2.5 py-0.5" style={{ backgroundColor: brand[50], flexShrink: 1 }}>
                             <AppText variant="labelSm" color={brand[600]} numberOfLines={1}>{cert.name}</AppText>
                           </View>
-                          {cert.documentUrl ? (
-                            <TouchableOpacity
-                              onPress={() => openDoc(cert.documentUrl, cert.name)}
-                              className="flex-row items-center rounded-lg px-2.5 py-1"
-                              style={{ backgroundColor: brand[50], flexShrink: 0, marginLeft: 8 }}
-                            >
-                              <Eye size={13} color={brand[600]} />
-                              <AppText variant="labelSm" color={brand[600]} style={{ marginLeft: 4 }} numberOfLines={1}>View</AppText>
-                            </TouchableOpacity>
-                          ) : null}
                         </View>
                         <InfoRow label="Issued By" value={cert.issuedBy} />
                         <InfoRow label="Certificate #" value={cert.certificateNumber} />
@@ -3357,25 +3386,30 @@ export default function VendorDetailScreen() {
           </View>
         ) : (
         <>
-        {/* Brand summary card */}
-        <View className="mx-4 mt-4 rounded-2xl p-5" style={{ backgroundColor: brand[500] }}>
+        {/* Vendor summary card — brand-50 tint with a brand-100 hairline,
+            matching web's `bg-brand-50/40 border border-brand-100/60`. */}
+        <View
+          className="mx-4 mt-4 rounded-2xl border p-5"
+          style={{ backgroundColor: brand[50], borderColor: brand[100] }}
+        >
           <SummaryRow
-            icon={<Factory size={18} color="#ffffff" />}
+            icon={<Factory size={18} color={brand[700]} />}
             label="Vendor"
             value={companyName}
           />
           <SummaryRow
-            icon={<MapPin size={18} color="#ffffff" />}
+            icon={<MapPin size={18} color={brand[700]} />}
             label="Location"
+            lines={locationLines}
             value={location}
           />
           <SummaryRow
-            icon={<Calendar size={18} color="#ffffff" />}
+            icon={<Calendar size={18} color={brand[700]} />}
             label="Last Inspection"
             value={stats?.lastInspectionDate ? formatDate(stats.lastInspectionDate) : 'No inspections yet'}
           />
           <SummaryRow
-            icon={<BarChart3 size={18} color="#ffffff" />}
+            icon={<BarChart3 size={18} color={brand[700]} />}
             label="Total Inspections"
             value={String(stats?.totalInspections ?? 0)}
             isLast
@@ -3771,6 +3805,11 @@ export default function VendorDetailScreen() {
 
 // ─── Reusable bits ───────────────────────────────────────────────────────────
 
+// A document / photo thumbnail.
+//
+// `onOpen` is optional: omit it and the tile renders as a plain, non-interactive
+// View with no open affordance. Registration Documents use that form — the
+// checker sees which papers are on file without being able to open them.
 function DocTile({
   url,
   name,
@@ -3780,16 +3819,11 @@ function DocTile({
   url?: string | null;
   name: string;
   typeLabel?: string;
-  onOpen: () => void;
+  onOpen?: () => void;
 }) {
   const isImg = isImageDoc(url, name);
-  return (
-    <TouchableOpacity
-      onPress={onOpen}
-      activeOpacity={0.85}
-      className="rounded-xl border border-slate-200 bg-slate-50 p-2"
-      style={{ width: 112 }}
-    >
+  const body = (
+    <>
       <View
         className="rounded-lg overflow-hidden items-center justify-center bg-white border border-slate-200"
         style={{ width: 96, height: 96 }}
@@ -3806,11 +3840,36 @@ function DocTile({
         </AppText>
       ) : null}
       <View className="flex-row items-center mt-0.5">
-        {isImg ? <Eye size={11} color={brand[500]} /> : <ExternalLink size={11} color={brand[500]} />}
-        <AppText variant="labelSm" color={colors.textSecondary} style={{ marginLeft: 4, flex: 1 }} numberOfLines={1}>
+        {/* The eye / external-link glyph promises the tile opens — only show it
+            when it actually does. */}
+        {onOpen ? (
+          isImg ? <Eye size={11} color={brand[500]} /> : <ExternalLink size={11} color={brand[500]} />
+        ) : null}
+        <AppText
+          variant="labelSm"
+          color={colors.textSecondary}
+          style={{ marginLeft: onOpen ? 4 : 0, flex: 1 }}
+          numberOfLines={1}
+        >
           {name}
         </AppText>
       </View>
+    </>
+  );
+
+  const tileClass = 'rounded-xl border border-slate-200 bg-slate-50 p-2';
+
+  if (!onOpen) {
+    return (
+      <View className={tileClass} style={{ width: 112 }}>
+        {body}
+      </View>
+    );
+  }
+
+  return (
+    <TouchableOpacity onPress={onOpen} activeOpacity={0.85} className={tileClass} style={{ width: 112 }}>
+      {body}
     </TouchableOpacity>
   );
 }
@@ -3929,32 +3988,49 @@ function ChipGroup({
   );
 }
 
+// A row in the vendor summary card. Mirrors web: a brand-100 icon tile with a
+// brand-700 glyph, an uppercase slate-500 label, and a slate-900 value.
+//
+// `lines` renders a multi-line value (the Location block splits the warehouse
+// address across rows on web); `value` is the single-line form.
 function SummaryRow({
   icon,
   label,
   value,
+  lines,
   isLast,
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  value?: string;
+  lines?: string[];
   isLast?: boolean;
 }) {
   return (
-    <View className={`flex-row items-center ${isLast ? '' : 'mb-3'}`}>
+    <View className={`flex-row items-start ${isLast ? '' : 'mb-4'}`}>
       <View
         className="w-9 h-9 items-center justify-center rounded-lg mr-3"
-        style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+        style={{ backgroundColor: brand[100] }}
       >
         {icon}
       </View>
       <View className="flex-1">
-        <AppText variant="bodySm" color={brand[100]}>
+        <AppText
+          variant="labelSm"
+          color={colors.textMuted}
+          style={{ textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}
+        >
           {label}
         </AppText>
-        <AppText variant="titleMd" color={colors.white} numberOfLines={2}>
-          {value}
-        </AppText>
+        {lines && lines.length > 0 ? (
+          lines.map((line, i) => (
+            <AppText key={i} variant="titleMd" color={colors.text} style={{ lineHeight: 20 }}>
+              {line}
+            </AppText>
+          ))
+        ) : (
+          <AppText variant="titleMd" color={colors.text}>{value || '—'}</AppText>
+        )}
       </View>
     </View>
   );

@@ -17,7 +17,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Warehouse, MapPin, Image as ImageIcon, Camera, X, Trash2, AlertTriangle } from 'lucide-react-native';
 import VerifyField, { SectionBlock, Verifications, ViewButton } from './VI_VerifyField';
-import { getOwnershipTypeLabel } from './fieldHelpers';
+import { getOwnershipTypeLabel, formatSqFt } from './fieldHelpers';
 import { compressImage } from '../../../utils/imageCompress';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { PhotoConfirmCrop, Prepared } from '@/components/General/PhotoCrop';
@@ -226,7 +226,7 @@ function EvidenceUpload({
           style={{ columnGap: 8, opacity: busy ? 0.6 : 1 }}
         >
           {busy ? <ActivityIndicator size="small" color="#e01a1b" /> : <Camera size={16} color="#475569" />}
-          <Text className="text-slate-600 text-sm font-medium">{busy ? 'Processing…' : 'Take Evidence Photo'}</Text>
+          <Text className="text-slate-600 text-sm font-medium">{busy ? 'Processing…' : 'Upload Evidence Photo'}</Text>
         </TouchableOpacity>
       )}
 
@@ -265,7 +265,9 @@ const eq = (a: any, b: any) => (a || '').trim() === (b || '').trim();
  * and hard right with a hole between. Only matters once the column count can
  * exceed two, which is why it arrived with the responsive grid.
  */
-function GridSpacers({ count, cols, width }: { count: number; cols: number; width: `${number}%` }) {
+// Exported so the other photo grids (Step 4's product photos) keep the same
+// last-row behaviour instead of re-implementing it.
+export function GridSpacers({ count, cols, width }: { count: number; cols: number; width: `${number}%` }) {
   const missing = (cols - (count % cols)) % cols;
   if (missing === 0) return null;
   return (
@@ -396,7 +398,7 @@ export default function VI_Step2_WarehouseFactory({
       <SectionBlock title="Legal Address & Factory Site" icon={<Warehouse size={16} color="#e01a1b" />}>
         <View style={{ rowGap: 16 }}>
           {vf('w_legalOwnershipType', 'Ownership Type', getOwnershipTypeLabel(v.factoryOwnershipType))}
-          {vf('w_legalCapacity', 'Warehousing Capacity', v.factorySize)}
+          {vf('w_legalCapacity', 'Warehousing Capacity', formatSqFt(v.factorySize))}
           {v.factoryAddress && vf('w_legalAddress', 'Address Line 1', v.factoryAddress)}
           {v.addressLine2 && vf('w_legalAddressLine2', 'Address Line 2', v.addressLine2)}
           {v.addressLine3 && vf('w_legalAddressLine3', 'Address Line 3', v.addressLine3)}
@@ -456,7 +458,7 @@ export default function VI_Step2_WarehouseFactory({
         ) : (
           <View style={{ rowGap: 16 }}>
             {vf('w_whOwnershipType', 'Ownership Type', getOwnershipTypeLabel(v.ownershipType))}
-            {vf('w_whCapacity', 'Warehousing Capacity', v.warehouseSize)}
+            {vf('w_whCapacity', 'Warehousing Capacity', formatSqFt(v.warehouseSize))}
             {v.warehouseAddress && vf('w_whAddress', 'Address Line 1', v.warehouseAddress)}
             {v.warehouseAddressLine2 && vf('w_whAddressLine2', 'Address Line 2', v.warehouseAddressLine2)}
             {v.warehouseAddressLine3 && vf('w_whAddressLine3', 'Address Line 3', v.warehouseAddressLine3)}

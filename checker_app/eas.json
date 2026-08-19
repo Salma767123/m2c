@@ -9,7 +9,14 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://backend-sigma-nine-jx4v8tvnai.vercel.app/api",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "261327293139-q1ki87p3i2bta3rsiqkj4vd72258l634.apps.googleusercontent.com"
+      }
     },
     "production": {
       "autoIncrement": true

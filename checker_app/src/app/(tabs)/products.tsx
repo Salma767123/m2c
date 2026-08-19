@@ -598,6 +598,7 @@ const STATUS_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'PENDING', label: 'Pending' },
   { value: 'REINSPECTION', label: 'Reinspection' },
+  { value: 'QC_SUBMITTED', label: 'Submitted' },
   { value: 'QC_APPROVED', label: 'Approved by QC' },
   { value: 'APPROVED', label: 'Approved by Admin' },
   { value: 'REJECTED', label: 'Rejected' },
@@ -613,6 +614,7 @@ const SORT_OPTIONS = [
 const APPROVAL_STYLE: Record<string, { bg: string; text: string }> = {
   PENDING: { bg: 'bg-amber-100', text: 'text-amber-800' },
   REINSPECTION: { bg: 'bg-purple-100', text: 'text-purple-800' },
+  QC_SUBMITTED: { bg: 'bg-blue-100', text: 'text-blue-800' },
   QC_APPROVED: { bg: 'bg-brand-100', text: 'text-brand-700' },
   APPROVED: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
   REJECTED: { bg: 'bg-red-100', text: 'text-red-800' },
@@ -621,6 +623,7 @@ const APPROVAL_STYLE: Record<string, { bg: string; text: string }> = {
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pending',
   REINSPECTION: 'Reinspection',
+  QC_SUBMITTED: 'Submitted',
   QC_APPROVED: 'Approved by QC',
   APPROVED: 'Approved by Admin',
   REJECTED: 'Rejected',
@@ -866,13 +869,15 @@ export default function ProductsTab() {
           onPress={openFilterSheet}
           accessibilityRole="button"
           accessibilityLabel="Open filters"
-          className="w-12 h-12 rounded-xl bg-slate-900 items-center justify-center"
+          className="w-12 h-12 rounded-xl bg-brand-500 items-center justify-center"
           style={elevation.card}
         >
           <SlidersHorizontal size={18} color="#ffffff" />
           {activeFilterCount > 0 ? (
-            <View className="absolute -top-1 -right-1 w-4.5 h-4.5 min-w-[18px] min-h-[18px] px-1 rounded-full bg-red-500 items-center justify-center">
-              <Text className="text-[10px] font-bold text-white">{activeFilterCount}</Text>
+            // White-on-red now that the button itself is brand red — a red
+            // badge on a red button reads as one solid blob.
+            <View className="absolute -top-1 -right-1 w-4.5 h-4.5 min-w-[18px] min-h-[18px] px-1 rounded-full bg-white border border-brand-600 items-center justify-center">
+              <Text className="text-[10px] font-bold text-brand-600">{activeFilterCount}</Text>
             </View>
           ) : null}
         </TouchableOpacity>
@@ -1085,7 +1090,7 @@ export default function ProductsTab() {
                       onPress={() => setDraftStatus(opt.value)}
                       activeOpacity={0.85}
                       className={`flex-row items-center px-4 py-2.5 rounded-full border ${
-                        active ? 'bg-slate-900 border-slate-900' : 'bg-white border-slate-200'
+                        active ? 'bg-brand-500 border-brand-500' : 'bg-white border-slate-200'
                       }`}
                     >
                       {active ? <Check size={13} color="#ffffff" style={{ marginRight: 6 }} /> : null}
@@ -1108,7 +1113,7 @@ export default function ProductsTab() {
                       onPress={() => setDraftSort(opt.value)}
                       activeOpacity={0.85}
                       className={`flex-row items-center px-4 py-2.5 rounded-full border ${
-                        active ? 'bg-slate-900 border-slate-900' : 'bg-white border-slate-200'
+                        active ? 'bg-brand-500 border-brand-500' : 'bg-white border-slate-200'
                       }`}
                     >
                       {active ? <Check size={13} color="#ffffff" style={{ marginRight: 6 }} /> : null}
@@ -1133,7 +1138,7 @@ export default function ProductsTab() {
               <TouchableOpacity
                 onPress={applyFilters}
                 activeOpacity={0.9}
-                className="w-full items-center justify-center bg-slate-900 rounded-xl py-3.5"
+                className="w-full items-center justify-center bg-brand-500 rounded-xl py-3.5"
               >
                 <Text className="text-sm font-extrabold text-white">
                   Apply{draftActiveCount > 0 ? ` (${draftActiveCount})` : ''}

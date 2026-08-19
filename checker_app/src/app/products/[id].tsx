@@ -45,6 +45,7 @@ import {
   CalendarClock,
   AlertCircle,
 } from 'lucide-react-native';
+import { formatDateDMY } from '@/components/Products/Steps/piShared';
 import qcCheckerService from '../../services/qcCheckerService';
 import { Button } from '@/components/UI';
 import { brand, colors, elevation, fonts, radius, slate } from '@/constants/design';
@@ -67,6 +68,7 @@ const TAB_LABELS: Record<Tab, string> = {
 const APPROVAL_STYLE: Record<string, { bg: string; text: string; border: string }> = {
   PENDING: { bg: '#fffbeb', text: '#b45309', border: '#fde68a' },
   REINSPECTION: { bg: '#f5f3ff', text: '#7e22ce', border: '#ddd6fe' },
+  QC_SUBMITTED: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
   QC_APPROVED: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
   APPROVED: { bg: '#ecfdf5', text: '#047857', border: '#a7f3d0' },
   REJECTED: { bg: '#fef2f2', text: '#b91c1c', border: '#fecaca' },
@@ -75,6 +77,7 @@ const APPROVAL_STYLE: Record<string, { bg: string; text: string; border: string 
 const APPROVAL_LABELS: Record<string, string> = {
   PENDING: 'Pending',
   REINSPECTION: 'Reinspection',
+  QC_SUBMITTED: 'Submitted',
   QC_APPROVED: 'Approved by QC',
   APPROVED: 'Approved by Admin',
   REJECTED: 'Rejected',
@@ -479,44 +482,43 @@ function OverviewTab({ product, primaryImage, onOpenLightbox }: { product: any; 
 
   return (
     <View>
-      {/* Compact image + Product section side-by-side */}
-      <View style={{ flexDirection: 'row', gap: compact ? 12 : 14 }}>
-        <TouchableOpacity
-          onPress={() => primaryImage && onOpenLightbox(primaryImage, product.name)}
-          activeOpacity={primaryImage ? 0.85 : 1}
-          style={{ width: imgSize, height: imgSize, borderRadius: 12, overflow: 'hidden', backgroundColor: slate[100], borderWidth: 1, borderColor: slate[200], alignItems: 'center', justifyContent: 'center' }}
-        >
-          {primaryImage ? (
-            <Image source={{ uri: primaryImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-          ) : (
-            <Package size={32} color="#cbd5e1" />
-          )}
-        </TouchableOpacity>
+      {/* The image gets its own row. Beside the fields it stole ~110px, so the
+          Product section's labels, values and title underline all started
+          further right than every section below it — nothing on the screen
+          lined up. Stacked, every section shares one left edge and one width. */}
+      <TouchableOpacity
+        onPress={() => primaryImage && onOpenLightbox(primaryImage, product.name)}
+        activeOpacity={primaryImage ? 0.85 : 1}
+        style={{ width: imgSize, height: imgSize, borderRadius: 12, overflow: 'hidden', backgroundColor: slate[100], borderWidth: 1, borderColor: slate[200], alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' }}
+      >
+        {primaryImage ? (
+          <Image source={{ uri: primaryImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        ) : (
+          <Package size={32} color="#cbd5e1" />
+        )}
+      </TouchableOpacity>
 
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Section title="Product">
-            <Row icon={Package} label="Product Name" value={product.name} />
-            <Row icon={Package} label="Category" value={product.category} />
-            <Row icon={Package} label="Total Stock" value={String(product.totalStock ?? 0)} />
-            {product.singleUnitColor ? (
-              <Row icon={Package} label="Base Color">
-                <ColorValue name={product.singleUnitColor} hex={product.singleUnitColorHex} />
-              </Row>
-            ) : null}
-            {product.uom ? <Row icon={Package} label="Selling Unit (UOM)" value={uomLabel(product.uom)} /> : null}
-            {product.description ? (
-              <Row icon={FileText} label="Description">
-                <Text style={{ fontSize: 13, color: slate[700], lineHeight: 20, marginTop: 1 }}>{product.description}</Text>
-              </Row>
-            ) : null}
-            {Array.isArray(product.tags) && product.tags.length > 0 ? (
-              <Row icon={Tag} label="Tags">
-                <TagChips tags={product.tags} />
-              </Row>
-            ) : null}
-          </Section>
-        </View>
-      </View>
+      <Section title="Product">
+        <Row icon={Package} label="Product Name" value={product.name} />
+        <Row icon={Package} label="Category" value={product.category} />
+        <Row icon={Package} label="Total Stock" value={String(product.totalStock ?? 0)} />
+        {product.singleUnitColor ? (
+          <Row icon={Package} label="Base Color">
+            <ColorValue name={product.singleUnitColor} hex={product.singleUnitColorHex} />
+          </Row>
+        ) : null}
+        {product.uom ? <Row icon={Package} label="Selling Unit (UOM)" value={uomLabel(product.uom)} /> : null}
+        {product.description ? (
+          <Row icon={FileText} label="Description">
+            <Text style={{ fontSize: 13, color: slate[700], lineHeight: 20, marginTop: 1 }}>{product.description}</Text>
+          </Row>
+        ) : null}
+        {Array.isArray(product.tags) && product.tags.length > 0 ? (
+          <Row icon={Tag} label="Tags">
+            <TagChips tags={product.tags} />
+          </Row>
+        ) : null}
+      </Section>
 
       <Section title="Vendor">
         <Row icon={Factory} label="Company" value={v.companyName} />
@@ -858,7 +860,7 @@ function QcActivityTab({ product }: { product: any }) {
 
           <Row icon={ClipboardCheck} label="Inspection Type" value={qcVal('serviceType')} />
           <Row icon={Layers} label="Variants" value={`${variantCount} variant${variantCount === 1 ? '' : 's'}`} />
-          <Row icon={Clock} label="Inspection Start Date" value={qcVal('serviceStartDate')} />
+          <Row icon={Clock} label="Inspection Start Date" value={formatDateDMY(qcVal('serviceStartDate'))} />
           <Row icon={Clock} label="Inspection Started At" value={fmtDateTime(qcVal('inspectionStartedAt'))} />
           <Row icon={CheckCircle} label="Final Decision" value={qcVal('finalDecision')} />
           <Row icon={ClipboardCheck} label="Inspection Status" value={qcVal('inspectionStatus')} />

@@ -10,7 +10,7 @@
 
 import * as Print from 'expo-print';
 import * as FileSystem from 'expo-file-system/legacy';
-import { CODE_LABELS } from '../PI_data';
+import { CODE_LABELS, verificationLabel, isTestOptional } from '../PI_data';
 import { formatDuration } from '@/lib/inspectionDuration';
 
 const esc = (s?: unknown): string => {
@@ -66,6 +66,34 @@ export function buildReportHtml(
   return buildHtml(formData, meta, clientSignatureDataUrl);
 }
 
+// A photo entry is stored as { name, data } (base64 data URL) or { url }. PDFs are
+// skipped — they cannot be shown as an <img>.
+const photoSrc = (p: any): string | null => {
+  const src = p?.data || p?.url;
+  if (!src || p?.isPdf) return null;
+  return typeof src === 'string' ? src : null;
+};
+
+// Small inline thumbnails, for the pass/fail columns of the test table.
+const thumbs = (photos: any[] | undefined): string => {
+  const list = (Array.isArray(photos) ? photos : []).map(photoSrc).filter(Boolean) as string[];
+  if (list.length === 0) return '—';
+  return `<div class="thumbs">${list.map((s) => `<img src="${s}"/>`).join('')}</div>`;
+};
+
+// A titled grid of evidence photos. Returns '' when the set is empty so the caller
+// can drop the whole section rather than print an empty heading.
+const photoBlock = (heading: string, photos: any[] | undefined): string => {
+  const list = (Array.isArray(photos) ? photos : []).map(photoSrc).filter(Boolean) as string[];
+  if (list.length === 0) return '';
+  return `<h2>${esc(heading)}</h2>
+    <div class="grid">${list.map((s) => `<img src="${s}"/>`).join('')}</div>`;
+};
+
+// camelCase / snake_case evidence key → Title Case ("factoryFrontView" → "Factory Front View").
+const humanizeEvidenceKey = (key: string): string =>
+  key.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\b\w/g, (c) => c.toUpperCase());
+
 function buildHtml(formData: any, meta: ReportMeta, clientSignatureDataUrl?: string | null): string {
   const d = formData || {};
   const verEntries = Object.entries(d.productVerifications || {}) as [string, any][];
@@ -73,7 +101,7 @@ function buildHtml(formData: any, meta: ReportMeta, clientSignatureDataUrl?: str
     .map(
       ([key, val]) => `
       <tr>
-        <td>${esc(key.replace(/^pv_/, '').replace(/_/g, ' '))}</td>
+        <td>${esc(verificationLabel(key))}</td>
         <td>${val.ok === true ? 'Yes' : val.ok === false ? 'No' : '—'}</td>
         <td>${esc(val.remarks)}</td>
       </tr>`,
@@ -94,16 +122,36 @@ function buildHtml(formData: any, meta: ReportMeta, clientSignatureDataUrl?: str
 
   const testRows = (d.testGroups || [])
     .flatMap((g: any) =>
-      (g.tests || []).map(
-        (t: any) => `
+      (g.tests || []).map((t: any) => {
+        const optional = !t.isOther && isTestOptional(t.id, g.packagingType);
+        const result = t.pass ? 'Pass' : t.fail ? 'Fail' : optional ? 'Optional — not tested' : '—';
+        return `
       <tr>
         <td>${esc(g.label)}</td>
-        <td>${esc(t.label)}</td>
-        <td>${t.pass ? 'Pass' : t.fail ? 'Fail' : '—'}</td>
+        <td>${esc(t.label)}${optional ? ' <span class="opt">Optional</span>' : ''}</td>
+        <td>${result}</td>
         <td>${esc(t.remarks)}</td>
-      </tr>`,
-      ),
+        <td>${thumbs(t.rightPhotos)}</td>
+        <td>${thumbs(t.wrongPhotos)}</td>
+      </tr>`;
+      }),
     )
+    .join('');
+
+  // Evidence sections — the checker's uploaded photos, embedded rather than counted.
+  // They are base64 data URLs already, so no fetching is involved.
+  const evidenceSections = [
+    photoBlock('Product Evidence', d.productEvidencePhotos),
+    photoBlock('Packaging Photos', d.packagingPhotos),
+    photoBlock('Defect Photos', d.defectPhotos),
+    ...Object.entries(d.additionalEvidence || {}).map(([key, list]) =>
+      photoBlock(humanizeEvidenceKey(key), list as any[]),
+    ),
+    photoBlock('Documentation Photos', d.documentationPhotos),
+    photoBlock('Photocopy Documents', d.photocopyDocuments),
+    photoBlock('Company ID Cards', d.companyIdCards),
+  ]
+    .filter(Boolean)
     .join('');
 
   const aqlPass =
@@ -125,6 +173,14 @@ function buildHtml(formData: any, meta: ReportMeta, clientSignatureDataUrl?: str
     .fail{background:#fee2e2;color:#991b1b;}
     .sig{margin-top:8px;border:1px solid #cbd5e1;border-radius:8px;padding:8px;width:260px;}
     .sig img{max-width:240px;max-height:110px;}
+    /* Evidence photos. page-break-inside keeps a photo whole across page breaks —
+       expo-print splits on CSS page boxes, so a grid cell would otherwise be cut. */
+    .grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+    .grid img{width:104px;height:78px;object-fit:cover;border:1px solid #cbd5e1;border-radius:4px;page-break-inside:avoid;}
+    .thumbs{display:flex;flex-wrap:wrap;gap:3px;}
+    .thumbs img{width:34px;height:26px;object-fit:cover;border:1px solid #cbd5e1;border-radius:3px;}
+    .opt{display:inline-block;background:#f1f5f9;color:#64748b;font-size:8px;font-weight:700;
+         text-transform:uppercase;letter-spacing:.4px;padding:1px 4px;border-radius:3px;margin-left:4px;}
   </style></head><body>
     <h1>Product Inspection Report</h1>
     <div class="meta">Product: <b>${esc(meta.productName)}</b></div>
@@ -168,8 +224,10 @@ function buildHtml(formData: any, meta: ReportMeta, clientSignatureDataUrl?: str
     <div style="margin-top:6px;"><span class="badge ${aqlPass ? 'pass' : 'fail'}">AQL Status: ${aqlPass ? 'PASS' : 'FAIL'}</span></div>
 
     <h2>Testing</h2>
-    <table><thead><tr><th>Group</th><th>Test</th><th>Result</th><th>Remarks</th></tr></thead>
-    <tbody>${testRows || '<tr><td colspan="4">—</td></tr>'}</tbody></table>
+    <table><thead><tr><th>Group</th><th>Test</th><th>Result</th><th>Remarks</th><th>Pass Photos</th><th>Fail Photos</th></tr></thead>
+    <tbody>${testRows || '<tr><td colspan="6">—</td></tr>'}</tbody></table>
+
+    ${evidenceSections}
 
     ${
       clientSignatureDataUrl

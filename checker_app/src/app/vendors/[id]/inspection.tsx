@@ -22,6 +22,8 @@ import {
   AlertTriangle,
   ShieldAlert,
   Clock,
+  AlarmClockOff,
+  MapPin,
 } from 'lucide-react-native';
 import qcCheckerService from '../../../services/qcCheckerService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
@@ -38,6 +40,9 @@ import VI_Step8_FinalReview, { InspectorMeta } from '../../../components/Vendor/
 import VI_Step9_Documentation, { VendorDocData } from '../../../components/Vendor/Steps/VI_Step9_Documentation';
 import { validateStep, validateForSubmit } from '../../../components/Vendor/validation';
 import { formatCheckerName } from '../../../components/Vendor/Steps/fieldHelpers';
+import InspectionTypeDialog, { type InspectionType } from '@/components/Products/InspectionTypeDialog';
+import { isInspectionWindowElapsed } from '@/lib/inspectionSchedule';
+import { GEOFENCE_DISABLED, getCurrentCoords, captureCoordsForSubmit, type CheckerCoords } from '@/lib/checkerLocation';
 
 const STEPS = [
   { id: 1, label: 'Company Info' },
@@ -61,25 +66,71 @@ export default function VendorInspectionScreen() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [loadError, setLoadError] = useState<{ type: 'not_assigned' | 'submitted' | 'unknown'; message: string } | null>(null);
+  const [loadError, setLoadError] = useState<{
+    type: 'not_assigned' | 'submitted' | 'unknown' | 'expired' | 'location';
+    message: string;
+    scheduledDate?: string | null;
+    scheduledTime?: string | null;
+    distanceMeters?: number | null;
+    thresholdMeters?: number | null;
+  } | null>(null);
+
+  // Physical vs virtual — chosen in the mandatory dialog before the form is usable,
+  // or read back from an inspection that was already started. The backend skips the
+  // geofence for VIRTUAL, so this is what lets an off-site inspection submit at all.
+  const [inspectionType, setInspectionType] = useState<InspectionType | null>(null);
+  // Inspection id awaiting a type choice → drives the mandatory dialog. Set for a
+  // SCHEDULED (never-started) inspection AND when resuming an IN_PROGRESS one.
+  //
+  // This must NOT be derived from `inspection.inspectionType`: that column defaults
+  // to PHYSICAL in the schema, so a never-started inspection already reads
+  // 'PHYSICAL' and the dialog would never open — the checker could never choose
+  // Virtual. Web keys off the STATUS for exactly this reason.
+  const [typeDialogFor, setTypeDialogFor] = useState<string | null>(null);
+  // Resume/draft state. Re-entering an already-started inspection re-asks the type:
+  // the same type resumes the saved draft, a different one discards it and restarts.
+  const [isResume, setIsResume] = useState(false);
+  const [draftInspectionType, setDraftInspectionType] = useState<InspectionType | null>(null);
+  const [discardConfirm, setDiscardConfirm] = useState<{ inspId: string; type: InspectionType } | null>(null);
+  // GPS captured at start, reused at submit so the checker is prompted once.
+  const [checkerCoords, setCheckerCoords] = useState<CheckerCoords | null>(null);
+  // Remember the last start attempt so the location card can offer a retry once the
+  // checker has moved closer to the site.
+  const lastStartRef = useRef<{ inspId: string; type: InspectionType; discardDraft: boolean } | null>(null);
 
   const [vendor, setVendor] = useState<any>(null);
   const [inspection, setInspection] = useState<any>(null);
   const [inspectionId, setInspectionId] = useState<string | null>(null);
+  // Ref mirror: the exit guards are registered once and would otherwise close
+  // over the id from the first render, when it is still null.
+  const inspectionIdRef = useRef<string | null>(null);
   const [cycleNumber, setCycleNumber] = useState(1);
   const [previousRejectionReason, setPreviousRejectionReason] = useState<string | null>(null);
+
+  // Client-side fallback for the report's "Inspection Start Time": the backend
+  // only stamps inspection.startedAt on the SCHEDULED→IN_PROGRESS transition, so
+  // it can be null. Capture when the checker opened this form so the time always
+  // shows on the generated report.
+  const formOpenedAtRef = useRef<string>(new Date().toISOString());
 
   const [verifications, setVerifications] = useState<Verifications>({});
   const [meta, setMeta] = useState<InspectorMeta>({
     inspectorName: '',
-    inspectionDate: new Date().toISOString().split('T')[0],
+    // Local date, not UTC (F-09) — toISOString() rolls back a day for IST
+    // before 05:30, dating the inspection to yesterday.
+    inspectionDate: new Date().toLocaleDateString('en-CA'),
     overallResult: '',
     inspectorRemarks: '',
   });
+  // Six slots, not three: the Warehouse trio is required whenever the warehouse
+  // address differs from the Legal Address & Factory Site (mirrors web).
   const [factoryEvidence, setFactoryEvidence] = useState<FactoryEvidenceState>({
     frontView: null,
     nameBoard: null,
     routeMap: null,
+    warehouseFrontView: null,
+    warehouseNameBoard: null,
+    warehouseRouteMap: null,
   });
   const [evidenceError, setEvidenceError] = useState(false);
   const [docData, setDocData] = useState<VendorDocData>({
@@ -92,9 +143,8 @@ export default function VendorInspectionScreen() {
   const registeredFieldsRef = useRef<string[]>([]);
   const [highlightedKeys, setHighlightedKeys] = useState<Set<string>>(new Set());
 
-  // No selfie / GPS gate — matches the web QC checker (selfie removed,
-  // geofence disabled by default). The inspection auto-starts on mount and
-  // submit goes straight through.
+  // Set once the chosen type has been sent to the server, so a re-render can't
+  // fire a second start for the same inspection.
   const startedRef = useRef(false);
 
   // ── Exit guard state ────────────────────────────────────────────────
@@ -174,9 +224,40 @@ export default function VendorInspectionScreen() {
         if (insp && !cancelled) {
           setInspection(insp);
           setInspectionId(insp.id);
+          inspectionIdRef.current = insp.id;
+          // Client-side deadline check, so a lapsed window blocks before the
+          // checker fills nine steps and the submit is refused.
+          if (isInspectionWindowElapsed(insp.scheduledDate, insp.scheduledTime, insp.estimatedDuration)) {
+            setLoadError({
+              type: 'expired',
+              message:
+                'This inspection can no longer be started because its scheduled date and time have already passed.',
+              scheduledDate: insp.scheduledDate,
+              scheduledTime: insp.scheduledTime,
+            });
+            return;
+          }
           if (insp.cycleNumber > 1) setCycleNumber(insp.cycleNumber);
           if ((inspRes as any)?.previousRejectionReason) setPreviousRejectionReason((inspRes as any).previousRejectionReason);
           else if (insp.rejectionReason) setPreviousRejectionReason(insp.rejectionReason);
+
+          // Ask (or re-ask) how this inspection is being carried out. A SCHEDULED
+          // row has never been started, so its stored type is just the schema
+          // default and the checker still has the choice. An IN_PROGRESS row is a
+          // resume: re-ask, and remember what the draft was saved under so a
+          // change of mind can offer to discard it.
+          const storedType: InspectionType = insp.inspectionType === 'VIRTUAL' ? 'VIRTUAL' : 'PHYSICAL';
+          if (insp.status === 'SCHEDULED') {
+            setIsResume(false);
+            setTypeDialogFor(insp.id);
+          } else {
+            setInspectionType(storedType);
+            if (insp.status === 'IN_PROGRESS') {
+              setDraftInspectionType(storedType);
+              setIsResume(true);
+              setTypeDialogFor(insp.id);
+            }
+          }
 
           // Restore a saved draft. The on-device copy wins because it is written
           // continuously and is therefore never older than the server's, which is
@@ -223,18 +304,130 @@ export default function VendorInspectionScreen() {
     };
   }, [id]);
 
-  // Auto-start the inspection once loaded — no selfie/location gate (geofence
-  // disabled, matching web). Idempotent: ignore errors if already started.
-  useEffect(() => {
-    if (!inspectionId || startedRef.current) return;
+  // Wipe the form back to a blank inspection — used when a different type is
+  // chosen on resume, so the saved draft is discarded and we start fresh.
+  const resetForm = useCallback(
+    (inspId: string) => {
+      setVerifications({});
+      setMeta((prev) => ({ ...prev, overallResult: '', inspectorRemarks: '' }));
+      setFactoryEvidence({
+        frontView: null, nameBoard: null, routeMap: null,
+        warehouseFrontView: null, warehouseNameBoard: null, warehouseRouteMap: null,
+      });
+      setDocData({ signedDocuments: [], signedReport: [], clientSignature: '' });
+      setStep(1);
+      AsyncStorage.removeItem(draftKey(inspId)).catch(() => {});
+    },
+    [],
+  );
+
+  // Start the inspection with the chosen type. PHYSICAL captures the device
+  // position first — the backend geofences it and answers 400 "Location required"
+  // when nothing is sent, so a physical inspection genuinely cannot start without
+  // it. VIRTUAL (and the geofence escape hatch) sends explicit nulls. Failures are
+  // not swallowed: an expired window or a geofence rejection blocks here rather
+  // than at submit, after nine steps of work.
+  const startInspection = useCallback(
+    async (inspId: string, type: InspectionType, discardDraft = false) => {
+      if (!inspId) return;
+      lastStartRef.current = { inspId, type, discardDraft };
+      try {
+        let coords: CheckerCoords | null = null;
+        if (type !== 'VIRTUAL' && !GEOFENCE_DISABLED) {
+          coords = await getCurrentCoords();
+          setCheckerCoords(coords);
+        }
+        const res = await qcCheckerService.startInspection(inspId, coords, type, discardDraft);
+        if (res?.inspection) setInspection(res.inspection);
+      } catch (err: any) {
+        const msg: string = err?.message || '';
+        if (err?.code === 'INSPECTION_EXPIRED' || err?.status === 409) {
+          setLoadError({
+            type: 'expired',
+            message: msg || 'This inspection can no longer be started.',
+            scheduledDate: inspection?.scheduledDate,
+            scheduledTime: inspection?.scheduledTime,
+          });
+          return;
+        }
+        if (err?.status === 400 && /already/i.test(msg)) return; // already started
+        // Geofence block — outside the radius of BOTH registered addresses (403),
+        // or no GPS reached the server (400). Both get the persistent card with a
+        // retry, not a toast that scrolls away.
+        const isLocationBlock =
+          (err?.status === 403 && /location|within\s*\d+\s*m|registered locations|nearest/i.test(msg)) ||
+          (err?.status === 400 && /location/i.test(msg)) ||
+          err?.data?.error === 'Location required';
+        if (isLocationBlock) {
+          setLoadError({
+            type: 'location',
+            message: msg || "Your current location could not be verified against the vendor's registered locations.",
+            distanceMeters: err?.distanceMeters ?? null,
+            thresholdMeters: err?.thresholdMeters ?? null,
+          });
+          return;
+        }
+        // Device-side GPS failures (permission denied, services off, timeout) carry
+        // no HTTP status — they are actionable, so say so instead of failing mute.
+        if (!err?.status) {
+          showErrorToast('Could not start inspection', msg || 'Please enable location services and try again.');
+          return;
+        }
+        showErrorToast('Could not start inspection', msg || 'Please try again.');
+      }
+    },
+    [inspection],
+  );
+
+  // Entry point from the type dialog. A fresh inspection starts immediately; a
+  // resume continues the draft when the type matches, or asks to discard it.
+  const handleTypeChosen = (inspId: string, type: InspectionType) => {
+    if (isResume) {
+      const draftType = draftInspectionType || inspectionType;
+      if (type === draftType) {
+        setTypeDialogFor(null);
+        setIsResume(false);
+        setInspectionType(type);
+        startedRef.current = true;
+        startInspection(inspId, type, false);
+      } else {
+        // Different type — confirm discarding the saved draft first.
+        setDiscardConfirm({ inspId, type });
+      }
+      return;
+    }
+    setTypeDialogFor(null);
+    setInspectionType(type);
     startedRef.current = true;
-    qcCheckerService.startInspection(inspectionId, null).catch(() => {});
-  }, [inspectionId]);
+    startInspection(inspId, type, false);
+  };
+
+  const confirmDiscardDraft = () => {
+    if (!discardConfirm) return;
+    const { inspId, type } = discardConfirm;
+    setDiscardConfirm(null);
+    setTypeDialogFor(null);
+    resetForm(inspId);
+    setIsResume(false);
+    setInspectionType(type);
+    startedRef.current = true;
+    startInspection(inspId, type, true);
+  };
+
+  // Retry the last start attempt after the checker moves closer to the site.
+  const retryLocationStart = () => {
+    const attempt = lastStartRef.current;
+    setLoadError(null);
+    if (attempt) startInspection(attempt.inspId, attempt.type, attempt.discardDraft);
+  };
 
   // ── Draft persistence — debounced write on every change ─────────────
   useEffect(() => {
     if (!inspectionId || loading || allowLeaveRef.current) return;
     const t = setTimeout(() => {
+      // Re-check on fire: "Exit without saving" deletes the draft and leaves, and a
+      // timer scheduled just before that would otherwise write it straight back.
+      if (allowLeaveRef.current) return;
       AsyncStorage.setItem(
         draftKey(inspectionId),
         JSON.stringify({ verifications, meta, factoryEvidence, docData, step }),
@@ -244,9 +437,16 @@ export default function VendorInspectionScreen() {
   }, [inspectionId, verifications, meta, factoryEvidence, docData, step, loading]);
 
   // ── Exit guard — navigation-away (beforeRemove) + Android hardware back ──
+  // Prompt whenever an inspection is open — not only once a field has been
+  // touched, which is what `dirtyRef` used to gate this on. Leaving early still
+  // matters: the clock is already running server-side, and only "Save draft &
+  // exit" stamps `pausedAt`, so a silent exit counts the break as working time.
+  // Web guards the same way (any exit goes through the dialog).
+  const shouldGuardExit = () => !allowLeaveRef.current && !!inspectionIdRef.current;
+
   useEffect(() => {
     const sub = (navigation as any).addListener?.('beforeRemove', (e: any) => {
-      if (allowLeaveRef.current || !dirtyRef.current) return;
+      if (!shouldGuardExit()) return;
       e.preventDefault();
       pendingNavActionRef.current = () => (navigation as any).dispatch(e.data.action);
       setShowExitConfirm(true);
@@ -256,7 +456,7 @@ export default function VendorInspectionScreen() {
 
   useEffect(() => {
     const onBack = () => {
-      if (allowLeaveRef.current || !dirtyRef.current) return false;
+      if (!shouldGuardExit()) return false;
       pendingNavActionRef.current = () => router.back();
       setShowExitConfirm(true);
       return true;
@@ -306,6 +506,25 @@ export default function VendorInspectionScreen() {
     }
   };
 
+  /**
+   * Leave and keep nothing from this sitting.
+   *
+   * Unlike web — where exiting without saving simply drops in-memory state — this
+   * screen writes a local draft on every change, so the on-device copy has to be
+   * deleted too. Otherwise the next open would silently restore the work the
+   * checker just chose to throw away. Any draft they saved to the server earlier
+   * is left alone: that was an explicit save, and it becomes what resumes.
+   */
+  const exitWithoutSaving = async () => {
+    if (savingDraft) return;
+    allowLeaveRef.current = true; // stop the debounced writer before we delete
+    if (inspectionId) {
+      await AsyncStorage.removeItem(draftKey(inspectionId)).catch(() => {});
+    }
+    dirtyRef.current = false;
+    leaveNow();
+  };
+
   const cancelExit = () => {
     setShowExitConfirm(false);
     pendingNavActionRef.current = null;
@@ -313,7 +532,10 @@ export default function VendorInspectionScreen() {
 
   // ── Navigation between steps ────────────────────────────────────────
   const goNext = () => {
-    const result = validateStep(step, registeredFieldsRef.current, verifications, factoryEvidence);
+    // `vendor` is what tells validateStep whether the warehouse address differs
+    // from the factory — omitting it silently skipped the three Warehouse evidence
+    // photos the web form requires in that case.
+    const result = validateStep(step, registeredFieldsRef.current, verifications, factoryEvidence, vendor);
     if (!result.ok) {
       if (result.missingEvidence) {
         setEvidenceError(true);
@@ -384,9 +606,27 @@ export default function VendorInspectionScreen() {
     }
 
     setSubmitting(true);
+
+    // The submit is geofenced too, so the checker has to still be on-site — not
+    // just at start. Reuse the fix captured then; only re-read if it was lost.
+    // captureCoordsForSubmit returns null for VIRTUAL (and when the geofence is
+    // off), so those post explicit nulls.
+    const effectiveType: InspectionType =
+      inspectionType ?? (inspection?.inspectionType as InspectionType) ?? 'PHYSICAL';
+    let submitLoc: CheckerCoords | null = checkerCoords;
+    if (!submitLoc) {
+      try {
+        submitLoc = await captureCoordsForSubmit(effectiveType);
+        if (submitLoc) setCheckerCoords(submitLoc);
+      } catch (gpsErr: any) {
+        Alert.alert('Location Required', gpsErr?.message || 'Please enable location services and try again.');
+        setSubmitting(false);
+        return;
+      }
+    }
+
     try {
-      // Payload keys EXACTLY match the web VendorInspectionForm submit
-      // (no selfie / GPS — geofence disabled by default, same as web).
+      // Payload keys EXACTLY match the web VendorInspectionForm submit.
       const payload: any = {
         verifications,
         inspectorName: meta.inspectorName,
@@ -402,9 +642,12 @@ export default function VendorInspectionScreen() {
         factoryEvidence,
       };
 
-      const submitLoc = null;
-
-      const res = await qcCheckerService.completeInspection(inspectionId, payload, submitLoc);
+      const res = await qcCheckerService.completeInspection(
+        inspectionId,
+        payload,
+        submitLoc,
+        effectiveType,
+      );
       if (res.success) {
         allowLeaveRef.current = true;
         dirtyRef.current = false;
@@ -499,6 +742,9 @@ export default function VendorInspectionScreen() {
               setDocData((prev) => ({ ...prev, ...patch }));
             }}
             factoryEvidence={factoryEvidence}
+            inspection={inspection}
+            inspectionStartedAt={inspection?.startedAt ?? formOpenedAtRef.current}
+            inspectionType={inspectionType ?? (inspection?.inspectionType as InspectionType) ?? 'PHYSICAL'}
           />
         );
       default:
@@ -518,20 +764,142 @@ export default function VendorInspectionScreen() {
 
   if (loadError) {
     const isSubmitted = loadError.type === 'submitted';
+    const isExpired = loadError.type === 'expired';
+    const isLocation = loadError.type === 'location';
+    const amber = isSubmitted || isExpired || isLocation;
     return (
       <View className="flex-1 bg-slate-50">
         <Header onBack={() => router.back()} />
         <View className="flex-1 items-center justify-center px-8">
-          <View className={`w-14 h-14 rounded-full items-center justify-center mb-4 ${isSubmitted ? 'bg-amber-50' : 'bg-red-50'}`}>
-            {isSubmitted ? <Clock size={28} color="#f59e0b" /> : <ShieldAlert size={28} color="#ef4444" />}
+          <View className={`w-14 h-14 rounded-full items-center justify-center mb-4 ${amber ? 'bg-amber-50' : 'bg-red-50'}`}>
+            {isSubmitted ? (
+              <Clock size={28} color="#f59e0b" />
+            ) : isExpired ? (
+              <AlarmClockOff size={28} color="#f59e0b" />
+            ) : isLocation ? (
+              <MapPin size={28} color="#f59e0b" />
+            ) : (
+              <ShieldAlert size={28} color="#ef4444" />
+            )}
           </View>
           <Text className="text-xl font-bold text-slate-900 mb-1 text-center">
-            {isSubmitted ? 'Inspection Submitted' : loadError.type === 'not_assigned' ? 'Access Denied' : 'Unable to Start Inspection'}
+            {isSubmitted
+              ? 'Inspection Submitted'
+              : loadError.type === 'not_assigned'
+                ? 'Access Denied'
+                : isExpired
+                  ? 'Inspection Window Expired'
+                  : isLocation
+                    ? "You're Not at the Vendor Location"
+                    : 'Unable to Start Inspection'}
           </Text>
           <Text className="text-slate-600 text-sm text-center leading-relaxed">{loadError.message}</Text>
-          <TouchableOpacity onPress={() => router.back()} className="mt-6 bg-brand-500 rounded-xl px-6 py-3">
-            <Text className="text-white font-bold">Back to Vendor List</Text>
-          </TouchableOpacity>
+
+          {isExpired && (loadError.scheduledDate || loadError.scheduledTime) && (
+            <View className="mt-3 flex-row items-center rounded-lg bg-amber-50 border border-amber-200 px-3 py-2" style={{ columnGap: 6 }}>
+              <AlarmClockOff size={14} color="#b45309" />
+              <Text className="text-xs font-semibold text-amber-800">
+                Scheduled: {[loadError.scheduledDate, loadError.scheduledTime].filter(Boolean).join(' · ')}
+              </Text>
+            </View>
+          )}
+
+          {isLocation && loadError.distanceMeters != null && (
+            <View className="mt-3 flex-row items-center rounded-lg bg-amber-50 border border-amber-200 px-3 py-2" style={{ columnGap: 6 }}>
+              <MapPin size={14} color="#b45309" />
+              <Text className="text-xs font-semibold text-amber-800">
+                You are {Math.round(loadError.distanceMeters)}m away · must be within{' '}
+                {loadError.thresholdMeters ?? 1000}m
+              </Text>
+            </View>
+          )}
+          {isLocation && (
+            <Text className="text-slate-500 text-xs text-center leading-relaxed mt-3">
+              Move to the vendor&apos;s legal / factory site or warehouse, then check again. A physical
+              inspection can only be started on-site.
+            </Text>
+          )}
+
+          {isLocation ? (
+            <View className="mt-6 self-stretch" style={{ rowGap: 10 }}>
+              <TouchableOpacity
+                onPress={retryLocationStart}
+                className="flex-row bg-brand-500 rounded-xl px-6 py-3 items-center justify-center"
+                style={{ columnGap: 8 }}
+              >
+                <MapPin size={16} color="#ffffff" />
+                <Text className="text-white font-bold">Check My Location Again</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.back()}
+                className="rounded-xl px-6 py-3 border border-slate-200 bg-white items-center"
+              >
+                <Text className="text-slate-700 font-bold">Back to Vendor List</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={() => router.back()} className="mt-6 bg-brand-500 rounded-xl px-6 py-3">
+              <Text className="text-white font-bold">Back to Vendor List</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  // Mandatory type selection — the form stays behind it. Shown for a fresh
+  // (SCHEDULED) inspection and re-asked when resuming an IN_PROGRESS one, so a
+  // draft saved as physical can be switched to virtual (and vice versa).
+  // Cancelling backs out of the inspection.
+  if (typeDialogFor && !discardConfirm) {
+    return (
+      <View className="flex-1 bg-slate-50">
+        <InspectionTypeDialog
+          subjectName={vendor?.companyName || name || 'this vendor'}
+          onSelect={(type) => handleTypeChosen(typeDialogFor, type)}
+          onCancel={() => {
+            allowLeaveRef.current = true;
+            router.back();
+          }}
+        />
+      </View>
+    );
+  }
+
+  // Switching type on resume cannot carry the saved draft over — confirm first.
+  if (discardConfirm) {
+    return (
+      <View className="flex-1 bg-slate-50 items-center justify-center px-6">
+        <View className="bg-white rounded-2xl w-full max-w-md overflow-hidden border border-slate-200">
+          <View className="p-6 flex-row items-start" style={{ columnGap: 16 }}>
+            <View className="w-12 h-12 rounded-full bg-amber-50 items-center justify-center">
+              <AlertTriangle size={24} color="#f59e0b" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-lg font-bold text-slate-900">Discard saved draft?</Text>
+              <Text className="mt-1 text-sm text-slate-600">
+                You saved this inspection as a{' '}
+                <Text className="font-bold">{(draftInspectionType || '').toLowerCase()}</Text> inspection.
+                Switching to <Text className="font-bold">{discardConfirm.type.toLowerCase()}</Text> will
+                <Text className="font-bold text-amber-700"> discard the saved draft</Text> and start a fresh
+                inspection at the current time.
+              </Text>
+            </View>
+          </View>
+          <View className="flex-row px-6 py-4 bg-slate-50 border-t border-slate-100" style={{ columnGap: 12 }}>
+            <TouchableOpacity
+              onPress={() => setDiscardConfirm(null)}
+              className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-white items-center"
+            >
+              <Text className="font-semibold text-slate-700">Go back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={confirmDiscardDraft}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-amber-500 items-center"
+            >
+              <Text className="font-semibold text-white">Discard & start fresh</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -637,31 +1005,43 @@ export default function VendorInspectionScreen() {
                 <AlertTriangle size={24} color="#e01a1b" />
               </View>
               <View className="flex-1">
-                <Text className="text-lg font-bold text-slate-900">Save and exit?</Text>
+                <Text className="text-lg font-bold text-slate-900">Exit inspection?</Text>
                 <Text className="mt-1 text-sm text-slate-600">
-                  Your progress is saved as a draft — you can pick this inspection up
-                  where you left off.
+                  You can save your progress as a draft and resume this inspection later,
+                  or exit without saving.
                 </Text>
               </View>
             </View>
-            <View className="flex-row px-6 py-4 bg-slate-50 border-t border-slate-100" style={{ columnGap: 12 }}>
-              <TouchableOpacity
-                onPress={cancelExit}
-                disabled={savingDraft}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-white items-center"
-                style={{ opacity: savingDraft ? 0.5 : 1 }}
-              >
-                <Text className="font-semibold text-slate-700">Keep editing</Text>
-              </TouchableOpacity>
+            {/* Three ways out, same as web: save the draft, stay, or drop the work.
+                Save is the full-width primary; the other two share the row below. */}
+            <View className="px-6 py-4 bg-slate-50 border-t border-slate-100" style={{ rowGap: 12 }}>
               <TouchableOpacity
                 onPress={saveDraftAndExit}
                 disabled={savingDraft}
-                className="flex-1 flex-row px-4 py-2.5 rounded-xl bg-brand-500 items-center justify-center"
-                style={{ columnGap: 6, opacity: savingDraft ? 0.7 : 1 }}
+                className="flex-row w-full px-4 py-3 rounded-xl bg-brand-500 items-center justify-center"
+                style={{ columnGap: 8, opacity: savingDraft ? 0.7 : 1 }}
               >
-                {savingDraft ? <ActivityIndicator size="small" color="#ffffff" /> : null}
-                <Text className="font-semibold text-white">{savingDraft ? 'Saving…' : 'Save & exit'}</Text>
+                {savingDraft ? <ActivityIndicator size="small" color="#ffffff" /> : <Save size={16} color="#ffffff" />}
+                <Text className="font-bold text-white">{savingDraft ? 'Saving draft…' : 'Save draft & exit'}</Text>
               </TouchableOpacity>
+              <View className="flex-row" style={{ columnGap: 12 }}>
+                <TouchableOpacity
+                  onPress={cancelExit}
+                  disabled={savingDraft}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-white items-center"
+                  style={{ opacity: savingDraft ? 0.5 : 1 }}
+                >
+                  <Text className="font-semibold text-slate-700">Keep editing</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={exitWithoutSaving}
+                  disabled={savingDraft}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-red-200 bg-white items-center"
+                  style={{ opacity: savingDraft ? 0.5 : 1 }}
+                >
+                  <Text className="font-semibold text-red-600">Exit without saving</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>

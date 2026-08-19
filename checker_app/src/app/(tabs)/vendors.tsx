@@ -465,13 +465,15 @@ export default function VendorsTab() {
           onPress={openFilterSheet}
           accessibilityRole="button"
           accessibilityLabel="Open filters"
-          className="w-12 h-12 rounded-xl bg-slate-900 items-center justify-center"
+          className="w-12 h-12 rounded-xl bg-brand-500 items-center justify-center"
           style={elevation.card}
         >
           <SlidersHorizontal size={18} color="#ffffff" />
           {activeFilterCount > 0 ? (
-            <View className="absolute -top-1 -right-1 min-w-[18px] min-h-[18px] px-1 rounded-full bg-red-500 items-center justify-center">
-              <Text className="text-[10px] font-bold text-white">{activeFilterCount}</Text>
+            // White-on-red now that the button itself is brand red — a red
+            // badge on a red button reads as one solid blob.
+            <View className="absolute -top-1 -right-1 min-w-[18px] min-h-[18px] px-1 rounded-full bg-white border border-brand-600 items-center justify-center">
+              <Text className="text-[10px] font-bold text-brand-600">{activeFilterCount}</Text>
             </View>
           ) : null}
         </TouchableOpacity>
@@ -752,7 +754,7 @@ export default function VendorsTab() {
               <TouchableOpacity
                 onPress={applyFilters}
                 activeOpacity={0.9}
-                className="w-full items-center justify-center bg-slate-900 rounded-xl py-3.5"
+                className="w-full items-center justify-center bg-brand-500 rounded-xl py-3.5"
               >
                 <Text className="text-sm font-extrabold text-white">
                   Apply{draftActiveCount > 0 ? ` (${draftActiveCount})` : ''}
@@ -794,7 +796,7 @@ function FilterChips({
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             className={`flex-row items-center px-4 py-2.5 rounded-full border ${
-              active ? 'bg-slate-900 border-slate-900' : 'bg-white border-slate-200'
+              active ? 'bg-brand-500 border-brand-500' : 'bg-white border-slate-200'
             }`}
           >
             {active ? <Check size={13} color="#ffffff" style={{ marginRight: 6 }} /> : null}

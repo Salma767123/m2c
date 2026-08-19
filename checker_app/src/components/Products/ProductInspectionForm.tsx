@@ -152,8 +152,8 @@ const STEPS: { id: Step; label: string; description: string }[] = [
   { id: 'generalInformation', label: 'General Info', description: 'Vendor registration data and inspection context' },
   { id: 'productVerification', label: 'Product Verification', description: 'Field-level verification of all product data' },
   { id: 'packagingInspection', label: 'Packaging', description: 'Carton, retail packaging and product type' },
-  { id: 'defects', label: 'Defects', description: 'AQL sampling and defect counts' },
   { id: 'testing', label: 'Testing', description: 'Comprehensive on-site test battery' },
+  { id: 'defects', label: 'Defects', description: 'AQL sampling and defect counts' },
   { id: 'review', label: 'Review', description: 'Full summary and final decision' },
   { id: 'documentation', label: 'Documentation', description: 'Report, signatures and final submit' },
 ];
@@ -203,9 +203,18 @@ export default function ProductInspectionForm({
     pendingNavRef.current = action;
     setShowExitConfirm(true);
   };
+  /**
+   * "Exit without saving" — leave and keep nothing from this sitting.
+   *
+   * The draft is written to AsyncStorage on every change, so simply navigating
+   * away would restore the work on the next open and make this button a lie. Set
+   * the leave flag first (it also stops the debounced writer), then delete the
+   * on-device copy.
+   */
   const confirmExit = () => {
     setShowExitConfirm(false);
     allowLeaveRef.current = true;
+    if (productId) AsyncStorage.removeItem(draftKeyFor(productId)).catch(() => {});
     const action = pendingNavRef.current;
     pendingNavRef.current = null;
     action?.();
@@ -372,11 +381,13 @@ export default function ProductInspectionForm({
         if (draft) setFormData((prev: any) => ({ ...prev, ...draft }));
 
         setDraftInspectionType(savedType);
-        // A draft the checker explicitly paused re-asks the type on resume; a
-        // plain reopen keeps the saved choice silently.
-        const paused = !!draft?.pausedAt;
-        setIsResume(paused);
-        setInspectionType(paused ? null : savedType);
+        // A resumable draft = a saved draft for an inspection whose type was already
+        // chosen. Re-entering one ALWAYS re-asks the type — same as the factory
+        // inspection flow, which re-prompts on every resume. (The first-ever entry
+        // has no saved type, so the dialog still shows, as the initial choice.)
+        const hasResumableDraft = !!draft && !!savedType;
+        setIsResume(hasResumableDraft);
+        setInspectionType(hasResumableDraft ? null : savedType);
       } finally {
         if (!cancelled) setHydrating(false);
       }

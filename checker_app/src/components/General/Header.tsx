@@ -1,7 +1,6 @@
 import { View, Image, TouchableOpacity, Modal, StyleSheet } from "react-native";
 import { useState, useEffect } from "react";
 import { Bell, User, LogOut, UserCircle, ChevronDown } from "lucide-react-native";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { ViewProfile } from './ViewProfile';
 import {
@@ -12,7 +11,8 @@ import {
 import qcCheckerService from '../../services/qcCheckerService';
 import NotificationsModal from './NotificationsModal';
 import { AppText } from '@/components/UI/AppText';
-import { brand, colors, radius, space, elevation, danger, info } from '@/constants/design';
+import { formatCheckerName } from '@/components/Vendor/Steps/fieldHelpers';
+import { brand, colors, radius, space, elevation, danger } from '@/constants/design';
 
 const UNREAD_POLL_MS = 30000;
 
@@ -22,6 +22,9 @@ export default function Header() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+  // Falls back to the role until the cached login payload is read — the menu
+  // should never open with an empty name where the identity is meant to be.
+  const [checkerName, setCheckerName] = useState('Quality Inspector');
 
   useEffect(() => {
     let active = true;
@@ -39,20 +42,31 @@ export default function Header() {
     };
   }, []);
 
-  // Profile photo for the avatar — fetched once on mount.
+  // Identity for the avatar + menu. The cached login payload paints immediately;
+  // the profile fetch then overwrites it, so an admin's edit to the name, title
+  // or photo shows up without the checker having to sign out and back in.
   useEffect(() => {
     let active = true;
-    const loadPhoto = async () => {
+    const loadIdentity = async () => {
       try {
-        const res = await qcCheckerService.getCheckerProfile();
-        if (active && res.success && res.data?.profilePhoto) {
-          setProfilePhoto(res.data.profilePhoto);
+        const cached = await qcCheckerService.getCheckerData();
+        if (active && cached) {
+          const cachedName = formatCheckerName(cached);
+          if (cachedName) setCheckerName(cachedName);
+          if (cached.profilePhoto) setProfilePhoto(cached.profilePhoto);
         }
+
+        const res = await qcCheckerService.getCheckerProfile();
+        if (!active || !res.success || !res.data) return;
+        const fresh = res.data;
+        const freshName = formatCheckerName(fresh);
+        if (freshName) setCheckerName(freshName);
+        if (fresh.profilePhoto) setProfilePhoto(fresh.profilePhoto);
       } catch (error) {
-        console.error('Error loading profile photo:', error);
+        console.error('Error loading checker profile:', error);
       }
     };
-    loadPhoto();
+    loadIdentity();
     return () => {
       active = false;
     };
@@ -61,7 +75,10 @@ export default function Header() {
   const handleSignOut = async () => {
     try {
       await unregisterPushNotifications();
-      await AsyncStorage.removeItem('checkerID');
+      // Clear the token and cached checker record too, not just the ID — the
+      // menu now shows the cached name and photo, and leaving them behind means
+      // the next person to sign in on this device sees the previous checker.
+      await qcCheckerService.clearCheckerAuth();
       setShowProfileMenu(false);
       router.replace('/Login');
     } catch (error) {
@@ -184,12 +201,17 @@ export default function Header() {
               elevation.dropdown,
             ]}
           >
+            {/* Who is signed in — the menu opens on the account it belongs to,
+                the way web does, instead of a generic "View Profile" label.
+                Still the way into the profile screen. */}
             <TouchableOpacity
               onPress={handleViewProfile}
               activeOpacity={0.7}
-              style={styles.menuRow}
+              accessibilityRole="button"
+              accessibilityLabel={`View profile for ${checkerName}`}
+              style={styles.identityRow}
             >
-              <View style={[styles.menuIcon, { backgroundColor: info[100], overflow: 'hidden' }]}>
+              <View style={styles.identityAvatar}>
                 {profilePhoto ? (
                   <Image
                     source={{ uri: profilePhoto }}
@@ -197,27 +219,23 @@ export default function Header() {
                     resizeMode="cover"
                   />
                 ) : (
-                  <UserCircle size={20} color={info[500]} />
+                  <UserCircle size={20} color={colors.textMuted} />
                 )}
               </View>
               <View style={{ flex: 1 }}>
-                <AppText variant="titleMd">View Profile</AppText>
-                <AppText variant="bodySm" color={colors.textMuted}>Account settings</AppText>
+                <AppText variant="titleMd" numberOfLines={1}>{checkerName}</AppText>
+                <AppText variant="bodySm" color={colors.textMuted}>QC Checker</AppText>
               </View>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleSignOut}
               activeOpacity={0.7}
-              style={[styles.menuRow, { borderBottomWidth: 0 }]}
+              accessibilityRole="button"
+              style={styles.signOutRow}
             >
-              <View style={[styles.menuIcon, { backgroundColor: danger[50] }]}>
-                <LogOut size={20} color={danger[500]} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <AppText variant="titleMd" color={danger[500]}>Sign Out</AppText>
-                <AppText variant="bodySm" color={colors.textMuted}>Logout from account</AppText>
-              </View>
+              <LogOut size={16} color={colors.textMuted} />
+              <AppText variant="titleMd">Sign out</AppText>
             </TouchableOpacity>
           </View>
         </>
@@ -285,20 +303,34 @@ avatar: {
   justifyContent: 'center',
   backgroundColor: 'rgba(255,255,255,0.2)',
 },
-  menuRow: {
+  // Identity block sits on a tinted strip so it reads as a header for the menu
+  // rather than as another action (mirrors web's bg-slate-50/50 row).
+  identityRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.md,
-    paddingHorizontal: space.lg,
+    gap: 10,
+    paddingHorizontal: space.md,
     paddingVertical: space.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
   },
-  menuIcon: {
-    width: 38,
-    height: 38,
+  identityAvatar: {
+    width: 36,
+    height: 36,
     borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: '#f1f5f9',
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  signOutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: space.md,
+    paddingVertical: space.md,
   },
 });

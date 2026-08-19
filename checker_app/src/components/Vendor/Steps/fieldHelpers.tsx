@@ -581,6 +581,24 @@ export function withUnit(val: any, unit?: string): any {
   return `${s} ${unit}`;
 }
 
+/**
+ * Area / capacity formatting — port of the web `formatSqFt` (frontend/src/lib/units.ts).
+ *
+ * `factorySize` / `warehouseSize` are stored WITH the unit baked in ("3000 sq ft"),
+ * but legacy rows hold a bare number and vendors type the unit every which way
+ * ("3000sqft", "3000 SQ.FT."). Appending blindly produced "3000 sq ft sq ft";
+ * `withUnit` avoids that but leaves the odd spellings untouched. This strips any
+ * existing suffix and re-appends exactly one "sq ft", so every row reads the same.
+ */
+export function formatSqFt(value?: string | number | null): string {
+  if (value === null || value === undefined) return '';
+  const s = String(value).trim();
+  if (!s) return '';
+  const num = s.replace(/\s*sq\.?\s*ft\.?\s*$/i, '').trim();
+  if (!num) return '';
+  return `${num} sq ft`;
+}
+
 // Manufacturing facility metadata — mirrors VI_Step5_Manufacturing FACILITY_META.
 export const FACILITY_META: Record<
   string,

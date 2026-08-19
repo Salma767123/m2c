@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { CheckCircle2, XCircle, Minus, Pencil, ClipboardList, Package, Box, AlertTriangle, FlaskConical, UserCheck } from 'lucide-react-native';
 import type { PackagingItem, TestGroup } from '../PI_data';
-import { ADDITIONAL_EVIDENCE_DEFS, CODE_LABELS, INSPECTION_STATUS_OPTIONS } from '../PI_data';
+import { ADDITIONAL_EVIDENCE_DEFS, CODE_LABELS, INSPECTION_STATUS_OPTIONS, verificationLabel } from '../PI_data';
 import { getBusinessTypeLabel } from '@/components/Vendor/Steps/fieldHelpers';
 import { RemarkInput, formatDateDMY, Dropdown } from './piShared';
 import type { DropdownOption } from './piShared';
@@ -191,7 +191,7 @@ export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, 
                   .filter(([, val]) => val.ok === false)
                   .map(([key, val]) => (
                     <View key={key} className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-1">
-                      <Text className="text-xs font-bold text-slate-700">{key.replace(/^pv_/, '').replace(/_/g, ' ')}</Text>
+                      <Text className="text-xs font-bold text-slate-700">{verificationLabel(key)}</Text>
                       {!!val.remarks && <Text className="text-xs text-red-700 italic">{val.remarks}</Text>}
                     </View>
                   ))}

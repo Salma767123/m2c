@@ -3,22 +3,21 @@
 import React, { useEffect } from 'react';
 import { View, Text } from 'react-native';
 import { Briefcase, FileText, Image as ImageIcon, Phone } from 'lucide-react-native';
-import VerifyField, { SectionBlock, DocCard, ViewButton, Verifications } from './VI_VerifyField';
+import VerifyField, { SectionBlock, DocCard, Verifications } from './VI_VerifyField';
 import {
   formatLocalLandline,
   formatIntlLandline,
   getBusinessTypeLabel,
   getCompanyIdLabel,
-  isImageUrl,
 } from './fieldHelpers';
 
-// "View" header action for a regulatory-ID card whose certificate was
-// uploaded — opens the same read-only viewer/lightbox DocCard uses.
-function DocViewAction({ doc }: { doc: any }) {
-  const url = doc?.documentUrl || '';
-  if (!url) return null;
-  return <ViewButton url={url} name={doc.name || doc.type || 'Document'} isImage={isImageUrl(url, doc.name)} />;
-}
+// A regulatory-ID card's attached certificate, in the shape VerifyField's
+// view-gate expects. Returns undefined when nothing was uploaded, which leaves
+// that card ungated — there is no document to insist on.
+const docGate = (doc: any) =>
+  doc?.documentUrl
+    ? { url: doc.documentUrl as string, name: (doc.name || doc.type || 'Document') as string }
+    : undefined;
 
 const COMPANY_DOC_TYPES = ['GST_CERTIFICATE', 'PAN_CARD', 'COMPANY_REGISTRATION', 'AADHAAR_CARD', 'TRADE_LICENSE', 'EXPORT_LICENSE'];
 
@@ -30,8 +29,20 @@ interface Props {
 }
 
 export default function VI_Step1_CompanyInfo({ vendor: v, verifications, onChange, onRegisterFields }: Props) {
-  const vf = (key: string, label: string, value: any, type?: any, headerAction?: React.ReactNode) => (
-    <VerifyField key={key} fieldKey={key} label={label} value={value} type={type} verifications={verifications} onChange={onChange} headerAction={headerAction} />
+  // `doc` attaches the uploaded certificate to the card AND locks its Yes/No
+  // until the checker has opened it — an ID number can't be verified against a
+  // document nobody looked at.
+  const vf = (key: string, label: string, value: any, type?: any, doc?: any) => (
+    <VerifyField
+      key={key}
+      fieldKey={key}
+      label={label}
+      value={value}
+      type={type}
+      verifications={verifications}
+      onChange={onChange}
+      requireDocView={docGate(doc)}
+    />
   );
 
   const companyDocs = Array.isArray(v.documents)
@@ -120,13 +131,13 @@ export default function VI_Step1_CompanyInfo({ vendor: v, verifications, onChang
       <SectionBlock title="Regulatory IDs & Documents" icon={<FileText size={16} color="#e01a1b" />}>
         <View style={{ rowGap: 16 }}>
           {v.gstNumber
-            ? vf('c_gstNumber', 'GST Number', v.gstNumber, undefined, <DocViewAction doc={gstDoc} />)
+            ? vf('c_gstNumber', 'GST Number', v.gstNumber, undefined, gstDoc)
             : vf('c_unregistered', 'GST Status', 'Unregistered — no GST number')}
-          {v.panNumber && vf('c_panNumber', v.businessType === 'proprietorship' ? 'Proprietor PAN' : 'Company PAN', v.panNumber, undefined, <DocViewAction doc={panDoc} />)}
-          {v.companyIdNumber && vf('c_companyIdNumber', getCompanyIdLabel(v.businessType), v.companyIdNumber, undefined, <DocViewAction doc={companyIdDoc} />)}
+          {v.panNumber && vf('c_panNumber', v.businessType === 'proprietorship' ? 'Proprietor PAN' : 'Company PAN', v.panNumber, undefined, panDoc)}
+          {v.companyIdNumber && vf('c_companyIdNumber', getCompanyIdLabel(v.businessType), v.companyIdNumber, undefined, companyIdDoc)}
           {v.hasImportExport && vf('c_hasImportExport', 'Import/Export Activities', v.hasImportExport === 'yes' ? 'Yes' : v.hasImportExport === 'no' ? 'No' : v.hasImportExport)}
-          {v.iecCode && vf('c_iecCode', 'IEC Code', v.iecCode, undefined, <DocViewAction doc={iecDoc} />)}
-          {v.aadhaarNumber && vf('c_aadhaarNumber', 'Aadhaar Number', v.aadhaarNumber, undefined, <DocViewAction doc={aadhaarDoc} />)}
+          {v.iecCode && vf('c_iecCode', 'IEC Code', v.iecCode, undefined, iecDoc)}
+          {v.aadhaarNumber && vf('c_aadhaarNumber', 'Aadhaar Number', v.aadhaarNumber, undefined, aadhaarDoc)}
           {v.website && vf('c_website', 'Website', v.website, 'url')}
           {/* Docs with no owning ID card on this vendor (e.g. trade license) */}
           {unmatchedDocs.map((doc: any, idx: number) => (

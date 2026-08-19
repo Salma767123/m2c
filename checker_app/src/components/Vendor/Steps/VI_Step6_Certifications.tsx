@@ -3,8 +3,7 @@
 import React, { useEffect } from 'react';
 import { View, Text } from 'react-native';
 import { Award, ShieldCheck } from 'lucide-react-native';
-import VerifyField, { SectionBlock, Verifications, ViewButton } from './VI_VerifyField';
-import { isImageUrl } from './fieldHelpers';
+import VerifyField, { SectionBlock, Verifications } from './VI_VerifyField';
 
 interface Props {
   vendor: any;
@@ -51,16 +50,18 @@ export default function VI_Step6_Certifications({ vendor: v, verifications, onCh
               return (
                 <View key={cert.id || idx} className="bg-slate-50 border border-slate-200 rounded-xl p-4" style={{ rowGap: 16 }}>
                   <Text className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Certificate #{idx + 1}</Text>
+                  {/* Yes/No stays locked until the certificate itself has been
+                      opened — a certificate can't be verified from its name. */}
                   <VerifyField
                     fieldKey={`${prefix}_name`}
                     label="Certificate Name"
                     value={cert.name}
                     verifications={verifications}
                     onChange={onChange}
-                    headerAction={
-                      cert.documentUrl ? (
-                        <ViewButton url={cert.documentUrl} name={cert.name || 'Certificate'} isImage={isImageUrl(cert.documentUrl, cert.name)} />
-                      ) : undefined
+                    requireDocView={
+                      cert.documentUrl
+                        ? { url: cert.documentUrl, name: cert.name || 'Certificate' }
+                        : undefined
                     }
                   />
                   {cert.expiryDate && vf(`${prefix}_expiryDate`, 'Expiry Date', cert.expiryDate, 'date')}

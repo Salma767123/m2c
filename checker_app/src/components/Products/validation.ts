@@ -4,6 +4,8 @@
 // Step IDs: generalInformation, productVerification, packagingInspection,
 // defects, testing, review, documentation.
 
+import { isTestOptional } from './PI_data';
+
 export type Step =
   | 'generalInformation'
   | 'productVerification'
@@ -164,7 +166,11 @@ function validateTesting(d: any): StepErrors {
         e.testGroups = `Fill in Test Subject and Test Name for the custom test in "${group.label}"`;
         return e;
       }
+      // Optional checks may be left unanswered. Carton Drop Test is optional only
+      // when the group is packed as Bale (mandatory for Carton).
+      const optional = !t.isOther && isTestOptional(t.id, group.packagingType);
       if (t.pass !== true && t.fail !== true) {
+        if (optional) continue;
         e.testGroups = `"${displayName}" — select Pass or Fail before continuing`;
         return e;
       }

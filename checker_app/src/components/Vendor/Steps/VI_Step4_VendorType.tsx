@@ -102,10 +102,12 @@
 
 // RN port of VI_Step4_VendorType.tsx — Vendor Type & Products verification.
 
-import React, { useEffect } from 'react';
-import { View, Text } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, useWindowDimensions } from 'react-native';
 import { Tags, Globe, Image as ImageIcon } from 'lucide-react-native';
-import VerifyField, { SectionBlock, Verifications, ListTone } from './VI_VerifyField';
+import VerifyField, { SectionBlock, Verifications, ListTone, ViewButton } from './VI_VerifyField';
+import { GridSpacers } from './VI_Step2_WarehouseFactory';
+import qcCheckerService from '../../../services/qcCheckerService';
 
 interface Props {
   vendor: any;
@@ -114,7 +116,35 @@ interface Props {
   onRegisterFields: (keys: string[]) => void;
 }
 
+// Flatten the category tree into { id: name }. Web only maps the top level and
+// shows "Category" for anything nested; walking children costs nothing and
+// gives a real name for sub-categories too.
+function buildCategoryNameMap(nodes: any[], map: Record<string, string> = {}): Record<string, string> {
+  (Array.isArray(nodes) ? nodes : []).forEach((cat: any) => {
+    if (cat?.id) map[cat.id] = cat.name;
+    if (Array.isArray(cat?.children)) buildCategoryNameMap(cat.children, map);
+  });
+  return map;
+}
+
 export default function VI_Step4_VendorType({ vendor: v, verifications, onChange, onRegisterFields }: Props) {
+  // categoryProducts is keyed by category ID, so the raw key is a Mongo
+  // ObjectId — unreadable as a photo label. Resolve it to the category name.
+  const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let active = true;
+    qcCheckerService
+      .getCategoryTree()
+      .then((tree) => {
+        if (active) setCategoryNameMap(buildCategoryNameMap(tree));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // listTone tints the chips for a list value. All three classification lists
   // use the brand red; plain text fields pass nothing and stay as-is.
   const vf = (key: string, label: string, value: any, type?: any, listTone?: ListTone) => (
@@ -133,13 +163,24 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
   const capFirst = (s: any) => (typeof s === 'string' && s.length > 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s);
   const vendorTypesDisplay = Array.isArray(v.vendorTypes) ? v.vendorTypes.map(capFirst) : v.vendorTypes;
 
+  // Product photos share Step 2's grid: full-width cards rendered one square
+  // image per screen width, which is what these used to be, made the checker
+  // scroll a screen-and-a-half per photo. Web lays them out 2-up (and 4-up on a
+  // wide screen); this is the handset-pitched equivalent.
+  const { width: screenW } = useWindowDimensions();
+  const imageCols = screenW >= 1024 ? 4 : screenW >= 768 ? 3 : 2;
+  const imageColWidth: `${number}%` = `${(100 - (imageCols - 1) * 4) / imageCols}%`;
+
   const categoryPhotos: Array<{ label: string; url: string; catKey: string; idx: number }> = [];
   if (v.categoryProducts && typeof v.categoryProducts === 'object') {
     Object.entries(v.categoryProducts as Record<string, any[]>).forEach(([cat, products]) => {
+      // `cat` is a category ID. Until the tree loads (or if it fails) fall back
+      // to "Category" — never show the raw ObjectId.
+      const catName = categoryNameMap[cat] || 'Category';
       (Array.isArray(products) ? products : []).forEach((p: any, pIdx: number) => {
         (Array.isArray(p?.photos) ? p.photos : []).forEach((ph: any) => {
           const url = ph?.url || ph?.preview;
-          if (url) categoryPhotos.push({ label: `${cat} · ${p?.name || `Product ${pIdx + 1}`}`, url, catKey: cat, idx: categoryPhotos.length });
+          if (url) categoryPhotos.push({ label: `${catName} · ${p?.name || `Product ${pIdx + 1}`}`, url, catKey: cat, idx: categoryPhotos.length });
         });
       });
     });
@@ -192,18 +233,22 @@ export default function VI_Step4_VendorType({ vendor: v, verifications, onChange
 
       {categoryPhotos.length > 0 && (
         <SectionBlock title="Product Photos (by Category)" icon={<ImageIcon size={16} color="#e01a1b" />}>
-          <View style={{ rowGap: 16 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 }}>
             {categoryPhotos.map((photo) => (
-              <VerifyField
-                key={photo.idx}
-                fieldKey={`vt_catPhoto_${photo.idx}`}
-                label={photo.label}
-                value={photo.url}
-                type="image"
-                verifications={verifications}
-                onChange={onChange}
-              />
+              <View key={photo.idx} style={{ width: imageColWidth }}>
+                <VerifyField
+                  fieldKey={`vt_catPhoto_${photo.idx}`}
+                  label={photo.label}
+                  value={photo.url}
+                  type="image"
+                  verifications={verifications}
+                  onChange={onChange}
+                  compact
+                  headerAction={photo.url ? <ViewButton url={photo.url} name={photo.label} isImage /> : undefined}
+                />
+              </View>
             ))}
+            <GridSpacers count={categoryPhotos.length} cols={imageCols} width={imageColWidth} />
           </View>
         </SectionBlock>
       )}

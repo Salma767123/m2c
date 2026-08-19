@@ -56,6 +56,8 @@ export default function Documentation({ formData, setFormData, errors = {}, scro
   const [confirmRemoveDoc, setConfirmRemoveDoc] = useState(false);
   const [confirmRemoveReport, setConfirmRemoveReport] = useState(false);
   const [previewReport, setPreviewReport] = useState(false);
+  // Canonical (unsigned) report preview, opened from the Document Center.
+  const [previewCanonical, setPreviewCanonical] = useState(false);
   const [drawnSignature, setDrawnSignature] = useState<string | null>(null);
 
   const signedDocs: Photo[] = formData.signedDocuments || [];
@@ -96,13 +98,22 @@ export default function Documentation({ formData, setFormData, errors = {}, scro
     };
   };
 
-  const handleDownloadReport = async () => {
+  // Show the report inside the app rather than pushing a PDF straight to the OS
+  // share sheet — the checker reads what they are about to print, and saving the
+  // PDF is the action inside that preview.
+  const handleDownloadReport = () => {
+    setPreviewCanonical(true);
+    // The upload step below unlocks once the checker has seen the report.
+    setHasDownloaded(true);
+  };
+
+  // Save / print the previewed report as a PDF (the original share-sheet path).
+  const handleSaveReportPdf = async () => {
     setDownloading(true);
     try {
       const meta = buildMeta();
       const dataUri = await generateReportPdfDataUri(formData, meta, null);
       await shareDataUri(dataUri, reportFileName(meta, false));
-      setHasDownloaded(true);
     } catch (e: any) {
       showErrorToast('Report Error', e?.message || 'Failed to generate report.');
     } finally {
@@ -313,6 +324,49 @@ export default function Documentation({ formData, setFormData, errors = {}, scro
 
       <View className="h-6" />
 
+      {/* ── Preview: canonical (unsigned) report, opened from "View Report" ── */}
+      <Modal visible={previewCanonical} animationType="slide" onRequestClose={() => setPreviewCanonical(false)}>
+        <View className="flex-1 bg-slate-900">
+          <View className="flex-row items-center justify-between px-4 pt-14 pb-3">
+            <Text className="text-white text-sm font-semibold flex-1 mr-3" numberOfLines={1}>
+              Inspection Report
+            </Text>
+            <TouchableOpacity
+              onPress={handleSaveReportPdf}
+              disabled={downloading}
+              hitSlop={8}
+              accessibilityLabel="Save report as PDF"
+              className="flex-row items-center rounded-full bg-white/10 px-3 mr-2"
+              style={{ height: 36, columnGap: 6, opacity: downloading ? 0.6 : 1 }}
+            >
+              {downloading ? <ActivityIndicator size="small" color="#ffffff" /> : <Download size={16} color="#ffffff" />}
+              <Text className="text-white text-xs font-bold">{downloading ? 'Saving…' : 'Save PDF'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setPreviewCanonical(false)}
+              hitSlop={12}
+              accessibilityLabel="Close preview"
+              className="w-9 h-9 rounded-full bg-white/10 items-center justify-center"
+            >
+              <X size={20} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+          <View className="flex-1 bg-white">
+            <WebView
+              source={{ html: buildReportHtml(formData, buildMeta(), null) }}
+              originWhitelist={['*']}
+              style={{ flex: 1 }}
+              startInLoadingState
+              renderLoading={() => (
+                <View className="absolute inset-0 items-center justify-center bg-white">
+                  <ActivityIndicator size="large" color="#e01a1b" />
+                </View>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
       {/* ── Preview: digitally-signed report ──
           Rendered from the report builder rather than the stored PDF, since
           Android's WebView has no PDF renderer. */}
@@ -363,31 +417,23 @@ export default function Documentation({ formData, setFormData, errors = {}, scro
                 <View className="w-6 h-6 rounded-full bg-brand-500 items-center justify-center mr-2">
                   <Text className="text-white text-xs font-bold">1</Text>
                 </View>
-                <Text className="text-sm font-bold text-slate-800">Download Inspection Report</Text>
+                <Text className="text-sm font-bold text-slate-800">View Inspection Report</Text>
               </View>
               <Text className="text-xs text-slate-500 mb-2 ml-8">
-                Download the report, print it, have it signed by the client, then scan it.
+                Read the report, then save it as a PDF to print, have it signed by the client, and scan it.
               </Text>
               <View className="ml-8 mb-4">
                 <TouchableOpacity
                   onPress={handleDownloadReport}
-                  disabled={downloading}
                   className="flex-row items-center self-start px-4 py-2.5 rounded-xl bg-brand-500"
-                  style={{ opacity: downloading ? 0.6 : 1 }}
                 >
-                  {downloading ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Download size={16} color="#fff" />
-                      <Text className="text-white font-semibold text-sm ml-1.5">Download Report</Text>
-                    </>
-                  )}
+                  <Eye size={16} color="#fff" />
+                  <Text className="text-white font-semibold text-sm ml-1.5">View Report</Text>
                 </TouchableOpacity>
                 {hasDownloaded && (
                   <View className="flex-row items-center mt-2">
                     <CheckCircle2 size={13} color="#059669" />
-                    <Text className="text-xs text-emerald-600 font-semibold ml-1">Report downloaded</Text>
+                    <Text className="text-xs text-emerald-600 font-semibold ml-1">Report viewed</Text>
                   </View>
                 )}
               </View>

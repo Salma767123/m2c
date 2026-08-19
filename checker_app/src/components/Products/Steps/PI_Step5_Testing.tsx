@@ -15,7 +15,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import type { TestGroup, TestItem } from '../PI_data';
-import { ADDITIONAL_EVIDENCE_DEFS, PACKAGING_TOGGLE_GROUPS, relabelForPackaging } from '../PI_data';
+import { ADDITIONAL_EVIDENCE_DEFS, PACKAGING_TOGGLE_GROUPS, relabelForPackaging, isTestOptional } from '../PI_data';
 import { StepHeader, Card, ErrorBanner, PhotoGrid, RemarkInput, Photo } from './piShared';
 import { InvalidAnchor } from './piValidation';
 import type { ScrollNavHandlers } from '@/components/General/ScrollNav';
@@ -46,11 +46,14 @@ function TestRow({
   onChange,
   inspectionType,
   invalid = false,
+  optional = false,
 }: {
   test: TestItem;
   onChange: (patch: Partial<TestItem>) => void;
   inspectionType?: 'PHYSICAL' | 'VIRTUAL' | null;
   invalid?: boolean;
+  /** Pass/Fail may be left unanswered — shown as a badge so the checker knows. */
+  optional?: boolean;
 }) {
   const togglePass = () => (test.pass ? onChange({ pass: null }) : onChange({ pass: true, fail: null }));
   const toggleFail = () => (test.fail ? onChange({ fail: null }) : onChange({ fail: true, pass: null }));
@@ -67,7 +70,14 @@ function TestRow({
     <InvalidAnchor errorKey="testGroups" invalid={invalid} style={{ marginBottom: 12 }} radius={12}>
     <View className={`border rounded-xl overflow-hidden ${borderCls}`}>
       <View className="px-3 py-3 flex-row items-center">
-        <Text className="text-sm font-medium text-slate-800 flex-1 pr-2">{test.label}</Text>
+        <View className="flex-1 pr-2">
+          <Text className="text-sm font-medium text-slate-800">{test.label}</Text>
+          {optional && (
+            <View className="self-start mt-1 px-1.5 py-0.5 rounded bg-slate-100">
+              <Text className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Optional</Text>
+            </View>
+          )}
+        </View>
         <View className="flex-row" style={{ columnGap: 8 }}>
           <TouchableOpacity
             onPress={togglePass}
@@ -337,7 +347,7 @@ function TestGroupCard({
             </View>
           )}
           {regularTests.map((test) => (
-            <TestRow key={test.id} test={test} invalid={test.id === invalidTestId} onChange={(patch) => onTestChange(test.id, patch)} inspectionType={inspectionType} />
+            <TestRow key={test.id} test={test} invalid={test.id === invalidTestId} optional={isTestOptional(test.id, group.packagingType)} onChange={(patch) => onTestChange(test.id, patch)} inspectionType={inspectionType} />
           ))}
           {otherTests.map((test) => (
             <OtherTestRow
@@ -451,7 +461,8 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {}, s
     for (const g of groups) {
       for (const t of g.tests || []) {
         if (t.isOther && (blank(t.subject) || blank(t.label))) return t.id;
-        if (t.pass !== true && t.fail !== true) return t.id;
+        const optional = !t.isOther && isTestOptional(t.id, g.packagingType);
+        if (t.pass !== true && t.fail !== true) { if (optional) continue; return t.id; }
         if (t.pass === true && (!Array.isArray(t.rightPhotos) || t.rightPhotos.length === 0)) return t.id;
         if (t.fail === true && (!Array.isArray(t.wrongPhotos) || t.wrongPhotos.length === 0)) return t.id;
       }

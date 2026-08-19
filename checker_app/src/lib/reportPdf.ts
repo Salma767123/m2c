@@ -19,6 +19,8 @@
 // (so the shared filename incl. the "(Internal)" suffix is preserved) -> Sharing.shareAsync.
 
 import { Alert } from 'react-native';
+import { matchedAddressLabel } from '@/lib/inspectionSchedule';
+import { computeInspectionDurations, formatDuration } from '@/lib/inspectionDuration';
 
 // Native modules are lazy-required so importing this file never crashes in
 // Expo Go / stale dev builds. Callers get a friendly rebuild prompt instead.
@@ -145,6 +147,65 @@ const fmtDateTime = (d: Date): string =>
 const fmtTime = (d: Date): string =>
   d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
+// Inspection Type + start/complete times + the duration breakdown, shared by
+// both report builders so the factory and product PDFs read the same.
+//
+// Everything comes off the stored inspection payload — the backend merges
+// inspectionType into it at submit — and the booked length off the assignment.
+// The duration rows are dropped when time tracking produced nothing (an older
+// report, or one submitted without a recorded start), rather than printing "0m"
+// and implying the inspection was instantaneous.
+function timingRows(opts: {
+  inspectionType?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  totalPausedMs?: number;
+  estimatedDuration?: string | null;
+  generatedAt: Date;
+}): { rows: [string, string][]; exceeded: boolean; scheduledMs: number; activeMs: number } {
+  const isVirtual = String(opts.inspectionType || '').toUpperCase() === 'VIRTUAL';
+  const d = computeInspectionDurations({
+    startedAt: opts.startedAt,
+    submittedAt: opts.completedAt,
+    totalPausedMs: opts.totalPausedMs || 0,
+    estimatedDuration: opts.estimatedDuration,
+  });
+  const rows: [string, string][] = [
+    ['Inspection Type', isVirtual ? 'Virtual Inspection' : 'Physical Inspection'],
+    ['Inspection Start Time', opts.startedAt ? fmtTime(new Date(opts.startedAt)) : '—'],
+    ['Inspection Complete Time', fmtTime(opts.completedAt ? new Date(opts.completedAt) : opts.generatedAt)],
+  ];
+  if (d.totalMs > 0) {
+    rows.push(
+      ['Active Duration', formatDuration(d.activeMs)],
+      ['Paused Duration', formatDuration(d.pausedMs)],
+      [
+        'Total Duration',
+        `${formatDuration(d.totalMs)}${d.exceeded ? '  (exceeded scheduled duration)' : ''}`,
+      ],
+    );
+  }
+  return { rows, exceeded: d.exceeded, scheduledMs: d.scheduledMs, activeMs: d.activeMs };
+}
+
+// Red callout printed under the details table when the inspection ran long.
+const overtimeNote = (scheduledMs: number, activeMs: number): string =>
+  `<p style="color:#c81e1e;font-weight:700;font-size:9.5px;margin:6px 0 0">${esc(
+    `⚠ Exceeded scheduled duration${
+      scheduledMs ? ` (scheduled ${formatDuration(scheduledMs)})` : ''
+    } — active work took ${formatDuration(activeMs)}.`,
+  )}</p>`;
+
+// A checkerLocation snapshot (backend buildLocationSnapshot) or an older
+// {latitude,longitude} blob → "12.971599, 77.594566", else "Not available".
+function gpsText(loc: any): string {
+  const lat = loc?.checkerLatitude ?? loc?.latitude;
+  const lng = loc?.checkerLongitude ?? loc?.longitude;
+  return lat != null && lng != null
+    ? `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`
+    : 'Not available';
+}
+
 function stepForKey(key: string): string {
   if (key.startsWith('certDoc_') || key.startsWith('cert_')) return 'Step 6 – Certifications';
   if (key.startsWith('vt_')) return 'Step 4 – Vendor & Products';
@@ -154,6 +215,30 @@ function stepForKey(key: string): string {
   if (key.startsWith('w_')) return 'Step 2 – Warehouse & Factory';
   if (key.startsWith('o_')) return 'Step 3 – Owner Profile';
   return 'Other';
+}
+
+/**
+ * Verification key → the field name the checker saw ("c_gstNumber" → "GST
+ * Number"). Mirrors the on-screen report's helper so the Issues table names the
+ * field in both places instead of only naming its step.
+ */
+function fieldLabelForKey(key: string): string {
+  const rest = key.replace(/^(certDoc_|cert_|vt_|mf_|ct_|c_|w_|o_)/, '');
+  const spaced = rest.replace(/_/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+  const WORD: Record<string, string> = {
+    wh: 'Warehouse', legal: 'Legal', prod: 'Product', img: 'Image',
+    cat: 'Category', photo: 'Photo', spec: 'Spec', var: 'Variant',
+    std: 'Standard', dims: 'Dimensions', sku: 'SKU', uom: 'UOM',
+    gst: 'GST', id: 'ID', qc: 'QC',
+  };
+  const words = spaced.split(/\s+/).filter(Boolean).map((w) => {
+    const lower = w.toLowerCase();
+    if (WORD[lower]) return WORD[lower];
+    if (/^\d+$/.test(w)) return String(Number(w) + 1);
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  });
+  const deduped = words.filter((w, i) => i === 0 || w.toLowerCase() !== words[i - 1].toLowerCase());
+  return deduped.join(' ') || key;
 }
 
 type VF = Record<string, { ok: boolean | null; remarks?: string }>;
@@ -167,70 +252,83 @@ function sectionStatus(vf: VF, prefixes: string[]): string {
 }
 
 // ── Shared HTML fragments ───────────────────────────────────────────────────
-const STYLES = `
-  body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 0; padding: 24px; color: #1e293b; font-size: 13px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .m2c-head { display:flex; align-items:center; margin-bottom:8px; }
-  .m2c-logo { width:36px; height:36px; background:#222; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-right:10px; }
-  .m2c-logo span { color:#fff; font-weight:900; font-size:14px; letter-spacing:1px; }
-  .m2c-name { font-size:11px; font-weight:700; color:#222; margin:0; letter-spacing:0.5px; }
-  .m2c-sub { font-size:8px; color:#888; margin:2px 0 0; }
-  .head-rule { border:none; border-top:1.5px solid #222; margin:0 0 16px; }
-  .banner { background:#222; color:#fff; border-radius:12px; padding:20px; margin-bottom:20px; display:flex; flex-wrap:wrap; }
-  .banner-item { width:50%; margin-bottom:12px; }
-  .banner-label { font-size:10px; color:#9ca3af; text-transform:uppercase; font-weight:600; margin-bottom:2px; }
-  .banner-value { font-size:13px; font-weight:600; }
-  .section { border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; margin-bottom:16px; }
-  .sh { background:#f8fafc; padding:10px 16px; border-bottom:1px solid #e2e8f0; font-weight:700; font-size:13px; color:#1e293b; display:flex; align-items:center; justify-content:space-between; }
-  .sh .status { font-size:10px; font-weight:700; }
-  .subhead { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; padding:12px 16px 4px; }
-  table { width:100%; border-collapse:collapse; }
-  tr { border-bottom:1px solid #f1f5f9; }
-  td.k { color:#6b7280; font-size:11px; padding:6px 12px; text-transform:uppercase; font-weight:600; width:40%; }
-  td.v { font-size:13px; padding:6px 12px; font-weight:600; }
-  .grid-table th { text-align:left; padding:6px 8px; font-size:10px; font-weight:600; color:#fff; background:#222; text-transform:uppercase; }
-  .grid-table td { padding:6px 8px; font-size:12px; border-bottom:1px solid #f1f5f9; }
-  .result { display:inline-block; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:700; color:#fff; }
-  .photos { display:flex; flex-wrap:wrap; gap:8px; padding:12px; }
-  .photos img { width:120px; height:120px; object-fit:cover; border-radius:8px; border:1px solid #e2e8f0; }
-  .issue { display:flex; gap:8px; padding:10px 16px; border-bottom:1px solid #f1f5f9; }
-  .issue-step { font-size:11px; font-weight:700; color:#b91c1c; }
-  .issue-remark { font-size:12px; color:#7f1d1d; margin-top:2px; }
-  .foot { text-align:center; font-size:9px; color:#bbb; margin-top:30px; padding-top:10px; border-top:1px solid #eee; }
+/**
+ * Report stylesheet — red masthead, red section rules, red-headed grid tables.
+ *
+ * Was defined inside the product builder while the factory report kept an older
+ * look (dark banner, grey card per section, header-less two-column tables). Both
+ * reports go to the same client, so they now share one stylesheet.
+ */
+const REPORT_STYLES = `
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 0; padding: 40px; color: #334155; font-size: 11px; }
+  .pdf-head { background:#fff5f5; border-bottom:2px solid #e01a1b; padding:16px 40px; margin:-40px -40px 20px; display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; }
+  .pdf-head h1 { color:#e01a1b; font-size:20px; font-weight:700; margin:0; }
+  .pdf-head .sub { color:#334155; font-size:11px; margin-top:5px; }
+  .pdf-head .gen { color:#64748b; font-size:9px; white-space:nowrap; padding-top:4px; }
+  .sec-title { color:#e01a1b; font-weight:700; font-size:12px; border-bottom:1.2px solid #e01a1b; padding-bottom:5px; margin:18px 0 8px; display:flex; align-items:baseline; justify-content:space-between; }
+  .sec-title .status { font-size:9px; font-weight:700; }
+  .wtab { width:100%; border-collapse:collapse; margin-bottom:6px; }
+  .wtab th { background:#fff5f5; color:#e01a1b; border:0.7px solid #e01a1b; font-size:9px; font-weight:700; text-align:left; padding:5px 6px; text-transform:uppercase; }
+  .wtab td { border:0.5px solid #e2e8f0; color:#334155; font-size:9.5px; padding:5px 6px; vertical-align:top; }
+  .wtab tbody tr:nth-child(even) td { background:#f8fafc; }
+  .note { color:#64748b; font-size:9px; margin:4px 0 10px; }
+  .grp { font-size:10px; font-weight:700; color:#334155; margin:10px 0 4px; }
+  .subhead { font-size:9px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; margin:12px 0 4px; }
+  .inline-photo { display:flex; align-items:center; gap:12px; margin:10px 0; }
+  .inline-photo img { width:90px; height:90px; object-fit:cover; border-radius:4px; border:0.5px solid #e2e8f0; }
+  .inline-photo span { font-size:9px; color:#64748b; font-style:italic; }
+  .thumbs { display:flex; flex-wrap:wrap; gap:10px; }
+  .thumb { width:31%; }
+  .thumb img { width:100%; height:110px; object-fit:cover; border:0.5px solid #e2e8f0; border-radius:4px; }
+  .thumb .cap { font-size:7px; color:#64748b; margin-top:2px; word-break:break-all; }
+  .sigwrap { margin-top:26px; border-top:0.7px solid #e01a1b; padding-top:16px; display:flex; gap:24px; }
+  .sigcol { flex:1; }
+  .sigrow { font-size:10px; margin-bottom:8px; color:#334155; }
+  .wfoot { margin-top:30px; padding-top:8px; border-top:0.5px solid #eee; font-size:8px; color:#64748b; }
 `;
 
-function m2cHeader(): string {
-  return `
-  <div class="m2c-head">
-    <div class="m2c-logo"><span>M2C</span></div>
-    <div>
-      <p class="m2c-name">M 2 C MarkDowns Private Limited</p>
-      <p class="m2c-sub">Quality Control Division</p>
-    </div>
-  </div>
-  <hr class="head-rule" />`;
-}
-
-function m2cFooter(): string {
-  return `<div class="foot">Confidential — M2C MarkDowns Pvt. Ltd.</div>`;
-}
 
 const kvRow = (label: string, value?: unknown) =>
-  `<tr><td class="k">${esc(label)}</td><td class="v">${esc(val(value))}</td></tr>`;
+  `<tr><td>${esc(label)}</td><td>${esc(val(value))}</td></tr>`;
 
 function kvSection(title: string, rows: [string, unknown][], status?: string, subheads?: string): string {
-  const body = rows.filter(([, v]) => v !== undefined).map(([l, v]) => kvRow(l, v)).join('');
-  if (!body && !subheads) return '';
-  const statusHtml = status
-    ? `<span class="status" style="color:${statusColor(status)}">${status}</span>`
-    : '';
-  return `<div class="section"><div class="sh"><span>${esc(title)}</span>${statusHtml}</div>${
-    subheads || ''
-  }<table>${body}</table></div>`;
+  const table = kvTable(rows);
+  if (!table && !subheads) return '';
+  return sectionHtml(title, status, (subheads || '') + table);
 }
 
 function statusColor(status: string): string {
   return status === 'Verified' ? '#16a34a' : status === 'Issues Found' ? '#dc2626' : '#ca8a04';
+}
+
+// ── Section composition ─────────────────────────────────────────────────────
+// kvSection covers "heading + one table". Sections that interleave sub-headings,
+// tables and photos (A, B, C, H in the web report) compose these three instead.
+// Grid table with a red header row, matching the product report's `wtab`.
+const kvTable = (rows: [string, unknown][], heads: [string, string] = ['Field', 'Value']): string => {
+  const body = rows.filter(([, v]) => v !== undefined).map(([l, v]) => kvRow(l, v)).join('');
+  return body
+    ? `<table class="wtab"><thead><tr><th>${esc(heads[0])}</th><th>${esc(heads[1])}</th></tr></thead><tbody>${body}</tbody></table>`
+    : '';
+};
+
+const subhead = (title: string): string => `<div class="subhead">${esc(title)}</div>`;
+
+function sectionHtml(title: string, status: string | undefined, inner: string): string {
+  if (!inner) return '';
+  const statusHtml = status
+    ? `<span class="status" style="color:${statusColor(status)}">${esc(status)}</span>`
+    : '';
+  return `<div class="sec-title"><span>${esc(title)}</span>${statusHtml}</div>${inner}`;
+}
+
+// A single inline photo with its caption beside it — the report's Company Logo,
+// Owner Profile Photo and Main Contact Photo all render this way.
+function inlinePhoto(src: unknown, caption: string): string {
+  if (!src || typeof src !== 'string') return '';
+  if (!(src.startsWith('http') || src.startsWith('data:image'))) return '';
+  return `<div class="inline-photo"><img src="${src}" alt="${esc(caption)}"/><span>${esc(caption)}</span></div>`;
 }
 
 function photoBlock(photos: any[] | undefined | null, label: string): string {
@@ -240,12 +338,13 @@ function photoBlock(photos: any[] | undefined | null, label: string): string {
       const src = typeof p === 'string' ? p : p?.data || p?.url;
       const isImg = src && typeof src === 'string' && (src.startsWith('http') || src.startsWith('data:image'));
       const caption = (typeof p !== 'string' && (p?.label || p?.name)) || `${label} ${i + 1}`;
+      // Caption under each thumbnail, as the report prints them.
       return isImg
-        ? `<img src="${src}" alt="${esc(caption)}"/>`
-        : `<div style="width:120px;height:120px;background:#f1f5f9;border-radius:8px;border:1px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:10px;color:#94a3b8;text-align:center;padding:4px">${esc(caption)}</div>`;
+        ? `<div class="thumb"><img src="${src}" alt="${esc(caption)}"/><div class="cap">${esc(caption)}</div></div>`
+        : `<div class="thumb"><div style="height:110px;background:#f8fafc;border:0.5px dashed #cbd5e1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#94a3b8;text-align:center;padding:4px">${esc(caption)}</div></div>`;
     })
     .join('');
-  return `<div class="subhead">${esc(label)} (${photos.length})</div><div class="photos">${imgs}</div>`;
+  return `<div class="subhead">${esc(label)} (${photos.length})</div><div class="thumbs">${imgs}</div>`;
 }
 
 // ── Canonical signature page / internal banner ──────────────────────────────
@@ -294,17 +393,16 @@ function internalBanner(checkerName?: string): string {
 }
 
 // ── Factory report HTML (sections A..L, web parity) ─────────────────────────
-function buildFactoryHtml(report: any, variant: ReportVariant, checkerName?: string): string {
+// Exported so the Documentation step can preview the report in a WebView.
+// Previewing the generated PDF instead is not an option: Android's WebView has
+// no PDF renderer, so a data:application/pdf source is simply blank there.
+export function buildFactoryHtml(report: any, variant: ReportVariant, checkerName?: string): string {
   const fd: Record<string, any> =
     report?.itemsToInspect && !Array.isArray(report.itemsToInspect) ? report.itemsToInspect : {};
   const isNewFormat = fd && typeof fd.verifications === 'object' && fd.verifications !== null;
   const vf: VF = isNewFormat ? (fd.verifications as VF) : {};
   const v: Record<string, any> = report?.vendor || {};
-  const reportId: string = report?.id || '';
-  const ref = reportId ? reportId.slice(-8).toUpperCase() : '—';
   const vendorName = v.companyName || fd.vendorName || 'Report';
-  const resultColor =
-    report?.result === 'PASSED' ? '#059669' : report?.result === 'FAILED' ? '#dc2626' : '#6b7280';
 
   let sections = '';
 
@@ -315,9 +413,16 @@ function buildFactoryHtml(report: any, variant: ReportVariant, checkerName?: str
       : v.businessType === 'unregistered'
       ? 'Unregistered — no GST number'
       : '—';
-    sections += kvSection(
+    // Registration photos live in B as "Warehouse Images", the way the web
+    // report prints them — not in a trailing section of their own.
+    const factoryImgs = Array.isArray(v.documents)
+      ? v.documents.filter((d: any) => d.type === 'OTHER' && d.documentUrl).map((d: any) => ({ url: d.documentUrl, name: d.name }))
+      : [];
+
+    sections += sectionHtml(
       'A. Company Information',
-      [
+      sectionStatus(vf, ['c_']),
+      kvTable([
         ['Company Name', v.companyName],
         ['Business Type', BUSINESS_TYPE[v.businessType] || v.businessType],
         ['GST Number', gstDisplay],
@@ -326,45 +431,86 @@ function buildFactoryHtml(report: any, variant: ReportVariant, checkerName?: str
         ['Company ID Number', blank(v.companyIdNumber) ? undefined : v.companyIdNumber],
         ['IEC Code', blank(v.iecCode) ? undefined : v.iecCode],
         ['Website', blank(v.website) ? undefined : v.website],
-      ],
-      sectionStatus(vf, ['c_']),
+      ]) +
+        inlinePhoto(v.companyLogo, 'Company Logo') +
+        // The business phone/email pair belongs to this section in the report,
+        // not to H — H carries the named contact person and the trade profile.
+        subhead('Business Contact Details') +
+        kvTable([
+          ['Primary Phone', v.businessPhone],
+          ['Secondary Phone', blank(v.phoneNumber2) ? undefined : v.phoneNumber2],
+          ['Primary Email', v.businessEmail],
+          ['Secondary Email', blank(v.businessEmail2) ? undefined : v.businessEmail2],
+          ['Local Landline', blank(v.landlineNumber) ? undefined : v.landlineNumber],
+          ['International Landline', blank(v.intlLandline) ? undefined : v.intlLandline],
+        ]),
     );
 
-    // B. Warehouse & Factory Details
-    const warehouseRows: [string, unknown][] = [
-      ['Ownership Type', OWNERSHIP_TYPE[v.ownershipType] || v.ownershipType],
-      ['Warehousing Capacity', v.warehouseSize],
-      ['Address Line 1', blank(v.warehouseAddress) ? undefined : v.warehouseAddress],
-      ['Address Line 2', blank(v.warehouseAddressLine2) ? undefined : v.warehouseAddressLine2],
-      ['Landmark', blank(v.warehouseLandmark) ? undefined : v.warehouseLandmark],
-      ['City', blank(v.warehouseCity) ? undefined : v.warehouseCity],
-      ['State', blank(v.warehouseState) ? undefined : v.warehouseState],
-      ['ZIP / Postal Code', blank(v.warehouseZipCode) ? undefined : v.warehouseZipCode],
-      ['Country', blank(v.warehouseCountry) ? undefined : v.warehouseCountry],
+    // B. Warehouse & Factory Details — legal/factory table, then the warehouse
+    // table, then the registration photos.
+    const legalRows: [string, unknown][] = [
+      ['Ownership Type', OWNERSHIP_TYPE[v.factoryOwnershipType || v.ownershipType] || v.factoryOwnershipType || v.ownershipType],
+      ['Warehousing Capacity', blank(v.factorySize) ? undefined : v.factorySize],
+      ['Address Line 1', blank(v.factoryAddress) ? undefined : v.factoryAddress],
+      ['Address Line 2', blank(v.addressLine2) ? undefined : v.addressLine2],
+      ['Landmark', blank(v.landmark) ? undefined : v.landmark],
+      ['City', blank(v.factoryCity) ? undefined : v.factoryCity],
+      ['State', blank(v.factoryState) ? undefined : v.factoryState],
+      ['ZIP / Postal Code', blank(v.factoryZipCode) ? undefined : v.factoryZipCode],
+      ['Country', blank(v.factoryCountry) ? undefined : v.factoryCountry],
+      ['Map / Location Link', blank(v.mapLink) ? undefined : v.mapLink],
     ];
-    if (!blank(v.factoryAddress) || !blank(v.factoryCity)) {
-      warehouseRows.push(['Factory Address', v.factoryAddress]);
-      warehouseRows.push(['Factory City', blank(v.factoryCity) ? undefined : v.factoryCity]);
-      warehouseRows.push(['Factory State', blank(v.factoryState) ? undefined : v.factoryState]);
-      warehouseRows.push(['Map / Location Link', blank(v.mapLink) ? undefined : v.mapLink]);
-    }
-    sections += kvSection('B. Warehouse & Factory Details', warehouseRows, sectionStatus(vf, ['w_']));
+    // Registration mirrors the legal address into the warehouse columns when the
+    // vendor ticks "same as" — print one row saying so rather than repeating it.
+    const eqAddr = (a: unknown, b: unknown) => String(a || '').trim() === String(b || '').trim();
+    const sameWarehouse =
+      (blank(v.warehouseAddress) && blank(v.warehouseCity)) ||
+      (eqAddr(v.warehouseAddress, v.factoryAddress) &&
+        eqAddr(v.warehouseCity, v.factoryCity) &&
+        eqAddr(v.warehouseState, v.factoryState) &&
+        eqAddr(v.warehouseZipCode, v.factoryZipCode) &&
+        eqAddr(v.warehouseCountry, v.factoryCountry));
+    const warehouseRows: [string, unknown][] = sameWarehouse
+      ? [['Warehouse Address', 'Same as Legal Address & Factory Site above']]
+      : [
+          ['Ownership Type', OWNERSHIP_TYPE[v.ownershipType] || v.ownershipType],
+          ['Warehousing Capacity', blank(v.warehouseSize) ? undefined : v.warehouseSize],
+          ['Address Line 1', blank(v.warehouseAddress) ? undefined : v.warehouseAddress],
+          ['Address Line 2', blank(v.warehouseAddressLine2) ? undefined : v.warehouseAddressLine2],
+          ['Landmark', blank(v.warehouseLandmark) ? undefined : v.warehouseLandmark],
+          ['City', blank(v.warehouseCity) ? undefined : v.warehouseCity],
+          ['State', blank(v.warehouseState) ? undefined : v.warehouseState],
+          ['ZIP / Postal Code', blank(v.warehouseZipCode) ? undefined : v.warehouseZipCode],
+          ['Country', blank(v.warehouseCountry) ? undefined : v.warehouseCountry],
+        ];
+    sections += sectionHtml(
+      'B. Warehouse & Factory Details',
+      sectionStatus(vf, ['w_']),
+      subhead('Legal Address & Factory Site') +
+        kvTable(legalRows) +
+        subhead('Warehouse Address') +
+        kvTable(warehouseRows) +
+        photoBlock(factoryImgs, 'Warehouse Images'),
+    );
 
     // C. Owner Profile
     const ownerName = buildName(v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName) || v.ownerName;
-    sections += kvSection(
+    sections += sectionHtml(
       'C. Owner Profile',
-      [
-        ['Owner Full Name', ownerName],
-        ['Designation', v.designation],
-        ['Primary Phone', v.ownerPhone],
-        ['Secondary Phone', blank(v.ownerPhone2) ? undefined : v.ownerPhone2],
-        ['Primary Email', v.ownerEmail],
-        ['Secondary Email', blank(v.ownerEmail2) ? undefined : v.ownerEmail2],
-        ['Business Start Date', fmtDate(v.businessStartDate)],
-        ['Number of Employees', EMPLOYEE_COUNT[v.employeeCount] || v.employeeCount],
-      ],
       sectionStatus(vf, ['o_']),
+      subhead('Owner Identity') +
+        kvTable([
+          ['Owner Full Name', ownerName],
+          ['Designation', v.designation],
+          ['Primary Phone', v.ownerPhone],
+          ['Secondary Phone', blank(v.ownerPhone2) ? undefined : v.ownerPhone2],
+          ['Primary Email', v.ownerEmail],
+          ['Secondary Email', blank(v.ownerEmail2) ? undefined : v.ownerEmail2],
+          ['International Landline', blank(v.ownerIntlLandline) ? undefined : v.ownerIntlLandline],
+          ['Business Start Date', fmtDate(v.businessStartDate)],
+          ['Number of Employees', EMPLOYEE_COUNT[v.employeeCount] || v.employeeCount],
+        ]) +
+        inlinePhoto(v.ownerPhoto, 'Owner Profile Photo'),
     );
 
     // D. Vendor Classification
@@ -425,33 +571,56 @@ function buildFactoryHtml(report: any, variant: ReportVariant, checkerName?: str
     if (certifications.length > 0 || !blank(v.complianceStandards) || !blank(v.packagingCapabilities)) {
       let certHtml = '';
       if (certifications.length > 0) {
-        certHtml += `<div class="subhead">Quality Certifications</div><table class="grid-table"><tr><th>Certificate Name</th><th>Expiry Date</th><th>Description</th></tr>${certifications
+        certHtml += `${subhead('Quality Certifications')}<table class="wtab"><thead><tr><th>Certificate Name</th><th>Expiry Date</th><th>Description</th></tr></thead><tbody>${certifications
           .map((c: any) => `<tr><td>${esc(val(c.name))}</td><td>${esc(fmtDate(c.expiryDate))}</td><td>${esc(val(c.description))}</td></tr>`)
-          .join('')}</table>`;
+          .join('')}</tbody></table>`;
       }
-      const stdRows =
-        (!blank(v.complianceStandards) ? kvRow('Compliance Standards', v.complianceStandards) : '') +
-        (!blank(v.packagingCapabilities) ? kvRow('Packaging Capabilities', v.packagingCapabilities) : '');
-      if (stdRows) certHtml += `<div class="subhead">Standards & Packaging</div><table>${stdRows}</table>`;
-      sections += `<div class="section"><div class="sh"><span>G. Certifications & Quality Control</span><span class="status" style="color:${statusColor(
-        sectionStatus(vf, ['cert_', 'certDoc_']),
-      )}">${sectionStatus(vf, ['cert_', 'certDoc_'])}</span></div>${certHtml}</div>`;
+      const stdTable = kvTable([
+        ['Compliance Standards', blank(v.complianceStandards) ? undefined : v.complianceStandards],
+        ['Packaging Capabilities', blank(v.packagingCapabilities) ? undefined : v.packagingCapabilities],
+      ]);
+      if (stdTable) certHtml += subhead('Standards & Packaging') + stdTable;
+      sections += sectionHtml('G. Certifications & Quality Control', sectionStatus(vf, ['cert_', 'certDoc_']), certHtml);
     }
 
-    // H. Contact & Trade Information
-    const contactRows: [string, unknown][] = [
-      ['Primary Phone', v.businessPhone],
-      ['Secondary Phone', blank(v.phoneNumber2) ? undefined : v.phoneNumber2],
-      ['Primary Email', v.businessEmail],
-      ['Secondary Email', blank(v.businessEmail2) ? undefined : v.businessEmail2],
+    // H. Contact & Trade Information — the named contact person, their photo,
+    // then the import/export profile (business phone/email now live in A).
+    const mc = v.mainContact && typeof v.mainContact === 'object' ? v.mainContact : null;
+    const contactPersonHtml = mc
+      ? subhead('Main Contact Person') +
+        kvTable([
+          ['Contact Name', resolveContactName(mc)],
+          ['Designation', blank(mc.designation) ? undefined : mc.designation],
+          ['Department', blank(mc.department) ? undefined : mc.department],
+          ['Primary Email', blank(mc.email1 || mc.email) ? undefined : mc.email1 || mc.email],
+          ['Secondary Email', blank(mc.email2) ? undefined : mc.email2],
+          ['Primary Phone', blank(mc.phone1 || mc.phone) ? undefined : mc.phone1 || mc.phone],
+          ['Secondary Phone', blank(mc.phone2) ? undefined : mc.phone2],
+        ]) +
+        inlinePhoto(mc.photo, 'Main Contact Photo')
+      : '';
+    const tradeRows: [string, unknown][] = [
+      ['Import Experience', v.importExperience == null ? undefined : v.importExperience ? 'Yes' : 'No'],
+      ['Import Countries', Array.isArray(v.importCountries) && v.importCountries.length ? v.importCountries : undefined],
+      ['Export Experience', v.exportExperience == null ? undefined : v.exportExperience ? 'Yes' : 'No'],
+      ['Export Countries', Array.isArray(v.exportCountries) && v.exportCountries.length ? v.exportCountries : undefined],
     ];
-    if (v.bankDetails) {
-      const b = v.bankDetails;
-      contactRows.push(['Bank Name', b.bankName]);
-      contactRows.push(['Account Type', blank(b.accountType) ? undefined : b.accountType]);
-      contactRows.push(['IFSC Code', blank(b.ifscCode) ? undefined : b.ifscCode]);
-    }
-    sections += kvSection('H. Contact & Trade Information', contactRows, sectionStatus(vf, ['ct_']));
+    const tradeHtml = tradeRows.some(([, val_]) => val_ !== undefined)
+      ? subhead('Import / Export Experience') + kvTable(tradeRows)
+      : '';
+    const bankHtml = v.bankDetails
+      ? subhead('Bank Details') +
+        kvTable([
+          ['Bank Name', v.bankDetails.bankName],
+          ['Account Type', blank(v.bankDetails.accountType) ? undefined : v.bankDetails.accountType],
+          ['IFSC Code', blank(v.bankDetails.ifscCode) ? undefined : v.bankDetails.ifscCode],
+        ])
+      : '';
+    sections += sectionHtml(
+      'H. Contact & Trade Information',
+      sectionStatus(vf, ['ct_']),
+      contactPersonHtml + tradeHtml + bankHtml,
+    );
 
     // I. Verification Summary
     const allEntries = Object.entries(vf);
@@ -466,41 +635,77 @@ function buildFactoryHtml(report: any, variant: ReportVariant, checkerName?: str
       ['Issues Found', String(failCount)],
       ['Pending', String(pendingCount)],
       ['Verification %', `${pct}%`],
+      // Which registered address the geofence matched, and the distance. Absent on
+      // a submit-time preview, which has not been verified yet.
+      ...(report?.locationVerified == null
+        ? []
+        : ([
+            [
+              'Verified Site',
+              report.locationVerified
+                ? `${matchedAddressLabel(report.locationMatchedAddress) || 'Vendor location'}${
+                    report.locationDistanceM != null ? ` — ${Math.round(report.locationDistanceM)}m away` : ''
+                  }`
+                : 'Not verified',
+            ],
+          ] as [string, string][])),
     ]);
 
     // J. Issues Found
     const issues = allEntries.filter(([, e]) => e.ok === false);
     if (issues.length > 0) {
-      const issueHtml = issues
+      // Step | Field | Remarks, as the report prints it — the field name was
+      // previously folded into the step line and effectively lost.
+      const issueHtml = `<table class="wtab"><thead><tr><th>Step</th><th>Field</th><th>Remarks</th></tr></thead><tbody>${issues
         .map(
           ([k, e]) =>
-            `<div class="issue"><div><div class="issue-step">${esc(stepForKey(k))}</div><div class="issue-remark">${
-              e.remarks ? esc(e.remarks) : '<i>No remarks provided.</i>'
-            }</div></div></div>`,
+            `<tr><td>${esc(stepForKey(k))}</td><td>${esc(fieldLabelForKey(k))}</td><td>${
+              e.remarks ? esc(e.remarks) : '—'
+            }</td></tr>`,
         )
-        .join('');
-      sections += `<div class="section"><div class="sh"><span>J. Issues Found</span></div>${issueHtml}</div>`;
+        .join('')}</tbody></table>`;
+      sections += sectionHtml('J. Issues Found', undefined, issueHtml);
     }
 
     // K. Inspection Details
+    const generatedAt = new Date();
+    const checker: Record<string, any> = report?.checker || report?.assignedQc || {};
+    const timing = timingRows({
+      inspectionType: fd.inspectionType || report?.inspectionType,
+      startedAt: fd.inspectionStartedAt || report?.startedAt,
+      completedAt: fd.inspectionCompletedAt || report?.submittedAt || report?.completedAt,
+      totalPausedMs: fd.totalPausedMs ?? report?.totalPausedMs ?? 0,
+      estimatedDuration: report?.estimatedDuration || report?.qcAssignment?.estimatedDuration,
+      generatedAt,
+    });
+    const isVirtual = String(fd.inspectionType || report?.inspectionType || '').toUpperCase() === 'VIRTUAL';
     sections += kvSection('K. Inspection Details', [
-      ['Inspector Name', fd.inspectorName || checkerName || report?.checker?.name],
+      ['Inspector Name', fd.inspectorName || checkerName || checker.name],
+      ['Checker ID', checker.checkerId],
+      ['Inspector Email', checker.email],
+      ['Inspector Phone', checker.phone || checker.mobile],
+      ...timing.rows,
       ['Inspection Date', fmtDate(fd.inspectionDate)],
       ['Overall Result', fd.inspectionStatus || report?.result],
+      // A virtual inspection is done remotely, so there are no coordinates to
+      // report — the type row above already says why.
+      ...(isVirtual
+        ? []
+        : ([['GPS Location', gpsText(fd.checkerLocation || fd.location || fd.gpsLocation)]] as [string, unknown][])),
       ['Inspector Remarks', fd.inspectorRemarks || report?.notes],
-      ['Report Generated', new Date().toLocaleString('en-IN')],
+      ['Report Generated', generatedAt.toLocaleString('en-IN')],
     ]);
+    if (timing.exceeded) sections += overtimeNote(timing.scheduledMs, timing.activeMs);
 
-    // L. Factory Images
-    const factoryImgs = Array.isArray(v.documents)
-      ? v.documents.filter((d: any) => d.type === 'OTHER' && d.documentUrl).map((d: any) => ({ url: d.documentUrl, name: d.name }))
-      : [];
+    // Inspector evidence photos. The vendor's registration photos are printed in
+    // B (Warehouse Images); these are the shots the checker took on the visit,
+    // so they stay a section of their own rather than being mixed in.
     const evidence = Array.isArray(fd.factoryPhotos) ? fd.factoryPhotos : [];
-    if (factoryImgs.length > 0 || evidence.length > 0) {
-      sections += `<div class="section"><div class="sh"><span>L. Factory Images</span></div>${photoBlock(
-        factoryImgs,
-        'Vendor Registration Photos',
-      )}${photoBlock(evidence, 'Inspector Evidence Photos')}</div>`;
+    if (evidence.length > 0) {
+      sections += `<div class="section"><div class="sh"><span>L. Inspector Evidence Photos</span></div>${photoBlock(
+        evidence,
+        'Inspector Evidence Photos',
+      )}</div>`;
     }
   } else {
     // ── Legacy 7-step form fallback (old app reports) ──
@@ -574,27 +779,22 @@ function buildFactoryHtml(report: any, variant: ReportVariant, checkerName?: str
       ? signaturePage('Factory Inspection Report', dateStr, checkerName || fd.inspectorName || report?.checker?.name)
       : internalBanner(checkerName);
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${STYLES}</style></head><body>
-  ${m2cHeader()}
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+  // Same masthead the product report uses: red title band, "<vendor> ·
+  // Inspector: <name>", generated timestamp on the right. The dark summary
+  // banner is gone — its four values already appear in the sections below.
+  const inspectorName = checkerName || fd.inspectorName || report?.checker?.name || '';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${REPORT_STYLES}</style></head><body>
+  <div class="pdf-head">
     <div>
       <h1>Factory Inspection Report</h1>
-      <p style="font-size:12px;color:#6b7280;margin:0">${esc(vendorName)} &bull; REF: ${ref}</p>
+      <div class="sub">${esc(vendorName)}${inspectorName ? `  &middot;  Inspector: ${esc(inspectorName)}` : ''}</div>
     </div>
-    ${report?.result ? `<span class="result" style="background:${resultColor}">${esc(report.result)}</span>` : ''}
-  </div>
-  <div class="banner">
-    <div class="banner-item"><div class="banner-label">Vendor</div><div class="banner-value">${esc(vendorName)}</div></div>
-    <div class="banner-item"><div class="banner-label">Client</div><div class="banner-value">${esc(report?.clientName)}</div></div>
-    <div class="banner-item"><div class="banner-label">Completed On</div><div class="banner-value">${
-      report?.completedAt ? esc(new Date(report.completedAt).toLocaleDateString('en-IN')) : '—'
-    }</div></div>
-    <div class="banner-item"><div class="banner-label">Priority</div><div class="banner-value">${esc(report?.priority)}</div></div>
+    <div class="gen">Generated: ${esc(fmtDateTime(new Date()))}</div>
   </div>
   ${sections}
   ${selfieHtml}
   ${closing}
-  ${m2cFooter()}
+  <div class="wfoot">M2C — Confidential Factory Inspection Report</div>
   </body></html>`;
 }
 
@@ -631,7 +831,9 @@ function buildProductHtml(report: any, variant: ReportVariant, checkerName?: str
   const vendorName = report?.vendor?.companyName || fd.vendor || '';
   const generatedAt = new Date();
   const startTimeStr = fd.inspectionStartedAt ? fmtTime(new Date(fd.inspectionStartedAt)) : '—';
-  const completeTimeStr = fmtTime(generatedAt);
+  // Fall back to "now" only when the inspection has no recorded completion time
+  // — a submit-time preview, where the report is generated as it finishes.
+  const completeTimeStr = fmtTime(fd.inspectionCompletedAt ? new Date(fd.inspectionCompletedAt) : generatedAt);
 
   // Local table helpers (web-like: light-red header, grid borders, zebra rows).
   const secTitle = (t: string) => `<div class="sec-title">${esc(t)}</div>`;
@@ -766,11 +968,15 @@ function buildProductHtml(report: any, variant: ReportVariant, checkerName?: str
   }
 
   // ── H. Inspector Details ──
-  const loc = fd.location || fd.gpsLocation || null;
-  const gps =
-    loc && loc.latitude != null && loc.longitude != null
-      ? `${Number(loc.latitude).toFixed(6)}, ${Number(loc.longitude).toFixed(6)}`
-      : 'Not available';
+  const timing = timingRows({
+    inspectionType: fd.inspectionType,
+    startedAt: fd.inspectionStartedAt,
+    completedAt: fd.inspectionCompletedAt,
+    totalPausedMs: fd.totalPausedMs ?? 0,
+    estimatedDuration: report?.qcAssignment?.estimatedDuration,
+    generatedAt,
+  });
+  const isVirtual = String(fd.inspectionType || '').toUpperCase() === 'VIRTUAL';
   body += secTitle('H. Inspector Details');
   body += gridTable(['Field', 'Value'], [
     ['Inspector Name', val(formatCheckerName(checker) || fd.inspectorSignature)],
@@ -778,12 +984,31 @@ function buildProductHtml(report: any, variant: ReportVariant, checkerName?: str
     ['Email', val(checker.email)],
     ['Phone', val(checker.phone)],
     ['Inspection Date', val(fd.serviceStartDate)],
-    ['Inspection Start Time', startTimeStr],
-    ['Inspection Complete Time', completeTimeStr],
+    ...timing.rows,
     ['Inspection Status', val(fd.inspectionStatus)],
-    ['GPS Location', gps],
+    // A virtual inspection is done remotely, so there are no coordinates to
+    // report — the type row above already says why.
+    ...(isVirtual
+      ? []
+      : ([['GPS Location', gpsText(fd.checkerLocation || fd.location || fd.gpsLocation)]] as [string, string][])),
+    // Which registered address the geofence matched, and how far away the checker
+    // stood. Only present on stored reports — a submit-time preview has not been
+    // verified yet, so the row is dropped rather than shown as "Not verified".
+    ...(report?.locationVerified == null
+      ? []
+      : [
+          [
+            'Verified Site',
+            report.locationVerified
+              ? `${matchedAddressLabel(report.locationMatchedAddress) || 'Vendor location'}${
+                  report.locationDistanceM != null ? ` — ${Math.round(report.locationDistanceM)}m away` : ''
+                }`
+              : 'Not verified',
+          ] as [string, string],
+        ]),
     ['Report Generated', fmtDateTime(generatedAt)],
   ]);
+  if (timing.exceeded) body += overtimeNote(timing.scheduledMs, timing.activeMs);
 
   // ── J. Attached Documents (thumbnails) ──
   const docImages: any[] = [
@@ -828,29 +1053,8 @@ function buildProductHtml(report: any, variant: ReportVariant, checkerName?: str
 
   const internal = variant === 'internal' ? internalBanner(checkerName) : '';
 
-  const STYLES_PRODUCT = `
-    * { box-sizing: border-box; }
-    body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 0; padding: 40px; color: #334155; font-size: 11px; }
-    .pdf-head { background:#fff5f5; border-bottom:2px solid #e01a1b; padding:16px 40px; margin:-40px -40px 20px; display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; }
-    .pdf-head h1 { color:#e01a1b; font-size:20px; font-weight:700; margin:0; }
-    .pdf-head .sub { color:#334155; font-size:11px; margin-top:5px; }
-    .pdf-head .gen { color:#64748b; font-size:9px; white-space:nowrap; padding-top:4px; }
-    .sec-title { color:#e01a1b; font-weight:700; font-size:12px; border-bottom:1.2px solid #e01a1b; padding-bottom:5px; margin:18px 0 8px; }
-    .wtab { width:100%; border-collapse:collapse; margin-bottom:6px; }
-    .wtab th { background:#fff5f5; color:#e01a1b; border:0.7px solid #e01a1b; font-size:9px; font-weight:700; text-align:left; padding:5px 6px; text-transform:uppercase; }
-    .wtab td { border:0.5px solid #e2e8f0; color:#334155; font-size:9.5px; padding:5px 6px; vertical-align:top; }
-    .wtab tbody tr:nth-child(even) td { background:#f8fafc; }
-    .note { color:#64748b; font-size:9px; margin:4px 0 10px; }
-    .grp { font-size:10px; font-weight:700; color:#334155; margin:10px 0 4px; }
-    .thumbs { display:flex; flex-wrap:wrap; gap:10px; }
-    .thumb { width:31%; }
-    .thumb img { width:100%; height:110px; object-fit:cover; border:0.5px solid #e2e8f0; border-radius:4px; }
-    .thumb .cap { font-size:7px; color:#64748b; margin-top:2px; word-break:break-all; }
-    .sigwrap { margin-top:26px; border-top:0.7px solid #e01a1b; padding-top:16px; display:flex; gap:24px; }
-    .sigcol { flex:1; }
-    .sigrow { font-size:10px; margin-bottom:8px; color:#334155; }
-    .wfoot { margin-top:30px; padding-top:8px; border-top:0.5px solid #eee; font-size:8px; color:#64748b; }
-  `;
+  // Shared with the factory report — see REPORT_STYLES.
+  const STYLES_PRODUCT = REPORT_STYLES;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${STYLES_PRODUCT}</style></head><body>
   <div class="pdf-head">
