@@ -1,6 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { ArrowRight } from 'lucide-react';
 import Reveal from '@/components/WebSite/Shared/Reveal';
 import { pageScroller, scrollPageToTop } from '@/lib/pageScroll';
 
@@ -21,6 +24,22 @@ import { pageScroller, scrollPageToTop } from '@/lib/pageScroll';
  * Size and colour still live here, applied to the child svg from the wrapper,
  * so a call site writes the bare icon and cannot get the styling wrong.
  */
+
+/**
+ * The three policy pages, so each one can point at the other two.
+ *
+ * Until now they were reachable from each other only through the footer: a
+ * reader on Terms who wanted the refund rule had to scroll to the bottom of the
+ * page and hunt. They are one set of documents and should read like one.
+ *
+ * Paths, not titles, decide which is current — the title prop is the page's own
+ * wording and could be edited without anyone thinking about this list.
+ */
+const POLICIES = [
+  { href: '/terms', label: 'Terms of Service' },
+  { href: '/privacy', label: 'Privacy Policy' },
+  { href: '/returns', label: 'Returns & Exchanges' },
+];
 
 export interface LegalSection {
   /** Anchor target and scroll-spy key. Stable — it ends up in the URL. */
@@ -100,6 +119,8 @@ export default function LegalPage({ icon, eyebrow, title, meta, sections }: Lega
    * constant was wrong at both ends: a wasteful gap in one case, and headings
    * landing UNDERNEATH the header in the other.
    */
+  const pathname = usePathname();
+
   const [headH, setHeadH] = useState(0);
 
   useEffect(() => {
@@ -327,7 +348,7 @@ export default function LegalPage({ icon, eyebrow, title, meta, sections }: Lega
         }
       `}</style>
 
-      <div className="mx-auto max-w-5xl px-3 py-8 sm:px-4 sm:py-10 md:px-6 lg:px-8 lg:py-12">
+      <div className="mx-auto max-w-[95rem] px-3 py-8 sm:px-4 sm:py-10 md:px-6 lg:px-8 lg:py-12">
         {/* ── Masthead ────────────────────────────────────────────────────
             The same four pieces as before — mark, caption, name, revision line
             — with the caption ruled on both sides rather than one. A single
@@ -442,7 +463,12 @@ export default function LegalPage({ icon, eyebrow, title, meta, sections }: Lega
             has nowhere to travel, so it scrolls away like any other block. The
             default `stretch` gives the aside the full height of the row (the
             document's height), which is the room the rail sticks across. */}
-        <div className="lg:grid lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:gap-x-9">
+        {/* Two columns from lg, three from xl. The third is held back to xl
+            deliberately: at 1024px a third column would squeeze the document to
+            about 470px, and the whole point of this layout is that the text
+            stays at a readable width. The prose also carries its own max-w-68ch
+            inside, so widening the page can never widen the reading line. */}
+        <div className="lg:grid lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-x-9 xl:grid-cols-[17rem_minmax(0,1fr)_20rem] xl:gap-x-10">
           {/* ── Contents, large screens ───────────────────────────────────
               Sticky, outside <Reveal> on purpose (see the note above the
               component), and offset to clear the header stack. */}
@@ -544,13 +570,73 @@ export default function LegalPage({ icon, eyebrow, title, meta, sections }: Lega
                   </div>
                 </div>
 
-                {/* ~68 characters a line. The heading above spans the full card
-                    and this does not, which is what keeps the short column
-                    reading as a choice. */}
-                <div className="max-w-[68ch] sm:pl-11">{section.body}</div>
+                {/* ~78 characters a line.
+                    This began at 68ch, which is the comfortable middle of the
+                    45-90 band, and moved out to 78 so the page could cover more
+                    of a wide screen without leaving slack inside the card — the
+                    columns and the reading line had to grow together, or the
+                    extra width would simply have become white space to the
+                    right of every paragraph. 78 is still well inside the band;
+                    the 140-character lines this redesign started from were not.
+
+                    At 95rem the numbers meet: a ~706px document column, less
+                    66px of card padding and the 40px indent, leaves ~600px of
+                    text — about 76 characters, just under the 78ch ceiling, so
+                    the line fills the column and no white space is stranded to
+                    the right of it. */}
+                <div className="max-w-[78ch] sm:pl-11">{section.body}</div>
               </section>
             ))}
           </article>
+
+          {/* ── The third column ───────────────────────────────────────────
+              What used to be blank margin. The three policies are one set of
+              documents, and until now the only way from Terms to Privacy was
+              the footer — so the space carries the set, plus the way out to a
+              human when a document does not answer the question.
+
+              Sticky like the contents rail, offset by the same measured header,
+              and outside <Reveal> for the same reason: `.reveal` keeps
+              `will-change: transform` after it finishes, which is a containing
+              block a sticky element should not be sitting in. */}
+          <aside className="legal-aside mt-8 hidden xl:mt-0 xl:block">
+            <div className="sticky" style={{ top: headH + 24 }}>
+              <p className="mb-4 inline-flex items-center gap-2.5 text-[10.5px] font-semibold uppercase tracking-[0.24em] text-[#8a807a]">
+                <span aria-hidden className="h-px w-5 bg-[#e01a1b]" />
+                More policies
+              </p>
+
+              <ul className="space-y-2">
+                {POLICIES.filter((p) => p.href !== pathname).map((policy) => (
+                  <li key={policy.href}>
+                    <Link
+                      href={policy.href}
+                      className="group flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 text-[13px] font-medium text-[#4a423c] ring-1 ring-black/5 transition-colors duration-200 hover:text-[#1a1a1a] hover:ring-[#e6dcd0]"
+                    >
+                      {policy.label}
+                      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#b3a99f] transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-[#e01a1b]" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+
+              {/* The one thing a policy page cannot do is answer a question it
+                  did not anticipate. */}
+              <div className="mt-4 rounded-xl border-l-2 border-[#e01a1b] bg-[#faf7f3] px-4 py-3.5 ring-1 ring-black/5">
+                <p className="text-[13px] font-semibold text-[#1a1a1a]">Questions?</p>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-[#5a524b]">
+                  Our team is here to help, any day of the week.
+                </p>
+                <Link
+                  href="/contact"
+                  className="group mt-2.5 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#e01a1b] transition-colors hover:text-[#c41617]"
+                >
+                  Contact us
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
+                </Link>
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
     </div>
