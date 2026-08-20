@@ -1,10 +1,13 @@
 'use client'
 
 // Home "notice board" — the second half of the banner area. A continuously scrolling
-// marquee of live, dynamic cards: a mobile-app install prompt, active Offers, promo
-// Coupons and Top-selling products. Everything is fetched live; the board simply hides
-// any source that has nothing to show, and the app-install card is always present so the
-// band is never empty. Fail-open: any fetch error just yields fewer cards.
+// board of live, dynamic cards. Four sources, and strict priority between them:
+// promo Coupons first, then active Offers, then Top sellers, then Best sellers.
+// Each source only gets a look in once the ones above it are exhausted, and if
+// all four together cannot fill the board, what there is repeats rather than
+// leaving gaps. Nothing here is hardcoded -- there used to be an app-install
+// card pinned to the front to keep the band full, and it is gone.
+// Fail-open: any fetch error just yields fewer cards.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -12,7 +15,7 @@ import Image from 'next/image'
 import { Percent, Ticket, TrendingUp, ArrowRight, Sparkles, Star } from 'lucide-react'
 import { offerService } from '@/services/offerService'
 import { couponService } from '@/services/couponService'
-import { publicProductService, type PublicProduct } from '@/services/publicProductService'
+import { publicProductService, type PublicProduct, type ProductsResponse } from '@/services/publicProductService'
 import type { PublicOffer } from '@/lib/offers'
 import { formatPrice, getRegionalPrice, getRegionalOriginalPrice } from '@/lib/currency'
 
@@ -132,30 +135,101 @@ const tileTracks = [
   '}',
 ].join('\n        ')
 
+/** Which merchandising list a product card came from. */
+type ProductLabel = 'Top seller' | 'Best seller'
+
+/** Every tile has a front and a back, so this is how many cards the board holds. */
+const SLOTS = TILES * 2
+
+/**
+ * Deal cards out so each kind is spaced evenly across the whole board rather
+ * than bunched.
+ *
+ * Every card is given a position on a 0..n line: the k-th card of a kind that
+ * has c of them sits at (k + phase) * n / c. A kind with two cards therefore
+ * lands at roughly a third and two thirds of the way along, whatever the other
+ * kinds are doing. Sorting by that position interleaves everything in one pass.
+ *
+ * The phase is what stops two kinds of equal size from stacking on the same
+ * spot: each kind is nudged by a different fraction of its own stride, so an
+ * offer and a top seller that both appear twice do not arrive as a pair twice.
+ *
+ * The obvious greedy version -- always take from the fullest bucket that is
+ * not the kind just placed -- spends the small buckets first and leaves the
+ * large one as a solid run at the end. With twelve coupons against four other
+ * cards it produced eight identical cards in a row.
+ *
+ * Top and best sellers count as separate kinds on purpose: both are product
+ * cards, but they wear different badges, so alternating them still reads as
+ * variety.
+ */
+function spreadByKind(items: Notice[]): Notice[] {
+  const buckets = new Map<string, Notice[]>()
+  for (const n of items) {
+    const key = n.kind === 'product' ? 'product:' + n.label : n.kind
+    const bucket = buckets.get(key)
+    if (bucket) bucket.push(n)
+    else buckets.set(key, [n])
+  }
+
+  const total = items.length
+  const keys = [...buckets.keys()]
+  const placed: Array<{ at: number; notice: Notice }> = []
+  keys.forEach((key, ki) => {
+    const list = buckets.get(key) as Notice[]
+    const phase = (ki + 1) / (keys.length + 1)
+    const stride = total / list.length
+    list.forEach((notice, i) => placed.push({ at: (i + phase) * stride, notice }))
+  })
+  placed.sort((x, y) => x.at - y.at)
+  return placed.map((p) => p.notice)
+}
+
 type Notice =
-  | { kind: 'app' }
   | { kind: 'offer'; offer: PublicOffer }
   | { kind: 'coupon'; message: string; image: string | null; link: string }
-  | { kind: 'product'; product: PublicProduct }
+  | { kind: 'product'; product: PublicProduct; label: ProductLabel }
 
 export default function NoticeBoard() {
   const [offers, setOffers] = useState<PublicOffer[]>([])
   const [coupons, setCoupons] = useState<Array<{ message: string; image: string | null; link: string }>>([])
-  const [products, setProducts] = useState<PublicProduct[]>([])
+  const [products, setProducts] = useState<Array<{ product: PublicProduct; label: ProductLabel }>>([])
 
   useEffect(() => {
     let active = true
     const run = async () => {
-      const [o, c, p] = await Promise.all([
+      const [o, c, top, best] = await Promise.all([
         offerService.getActiveOffers().catch(() => []),
-        couponService.getPromotionalCoupons(8).catch(() => []),
-        // Only the single top-selling product is featured on the board.
-        publicProductService.getTopSellingProducts(1).catch(() => ({ success: false } as const)),
+        // Each source is asked for a full board's worth. Priority decides who
+        // actually gets in, so anything past the deficit goes unused — but
+        // asking for less would cap the board below whatever the admin added.
+        couponService.getPromotionalCoupons(SLOTS).catch(() => []),
+        publicProductService.getTopSellingProducts(SLOTS).catch(() => ({ success: false } as const)),
+        publicProductService.getBestSellerProducts(SLOTS).catch(() => ({ success: false } as const)),
       ])
       if (!active) return
       setOffers(o)
       setCoupons(c)
-      setProducts(('data' in p && p.data?.items) ? p.data.items.slice(0, 1) : [])
+
+      // A product can carry both tags (Printed Cotton Bag currently does), and
+      // merging without a guard would put it on the board twice wearing a
+      // different badge each time. That reads as two products rather than one
+      // doing well on two counts. First list to claim it wins.
+      // The two product fetches resolve to a ProductsResponse, or to the bare
+      // { success: false } their catch returns, so data has to be probed for
+      // rather than assumed.
+      const items = (r: ProductsResponse | { success: false }): PublicProduct[] =>
+        ('data' in r && r.data?.items) ? r.data.items : []
+      const seen = new Set<string>()
+      const merged: Array<{ product: PublicProduct; label: ProductLabel }> = []
+      for (const [list, label] of [[items(top), 'Top seller'], [items(best), 'Best seller']] as const) {
+        for (const product of list) {
+          if (seen.has(product.id)) continue
+          seen.add(product.id)
+          merged.push({ product, label })
+        }
+      }
+      setProducts(merged)
     }
     run()
     return () => {
@@ -163,21 +237,47 @@ export default function NoticeBoard() {
     }
   }, [])
 
-  // Interleave the sources so the marquee mixes offers, coupons and products rather
-  // than showing them in blocks — reads as a livelier "what's happening" ticker.
+  // Everything on the board is fetched. There used to be a hardcoded app promo
+  // pinned to the front here, which meant the board was never empty but also
+  // never honest: it padded thin content with something no one could change
+  // from the admin, and shipped a 1.79MB PNG on every home page load to do it.
+  //
+  // Two separate questions now, answered in order:
+  //
+  //   WHO gets in   — strict priority. Coupons are taken first, and only once
+  //                   they run out do offers get a look, then top sellers,
+  //                   then best sellers. Enough coupons and nothing else
+  //                   appears at all; that is the intent, not a bug.
+  //   WHERE they sit — spread, so a board that is mostly coupons does not
+  //                   arrive as a wall of identical cards.
+  //
+  // No count is fixed anywhere. Whatever each source returns is what it gets
+  // to contribute, and the deficit rolls down to the next one.
   const notices = useMemo<Notice[]>(() => {
-    const offerCards: Notice[] = offers.map((offer) => ({ kind: 'offer', offer }))
-    const couponCards: Notice[] = coupons.map((c) => ({ kind: 'coupon', message: c.message, image: c.image, link: c.link }))
-    const productCards: Notice[] = products.map((product) => ({ kind: 'product', product }))
+    const byPriority: Notice[][] = [
+      coupons.map((c) => ({ kind: 'coupon', message: c.message, image: c.image, link: c.link })),
+      offers.map((offer) => ({ kind: 'offer', offer })),
+      products.filter((x) => x.label === 'Top seller').map(({ product, label }) => ({ kind: 'product', product, label })),
+      products.filter((x) => x.label === 'Best seller').map(({ product, label }) => ({ kind: 'product', product, label })),
+    ]
 
-    const mixed: Notice[] = []
-    const max = Math.max(offerCards.length, couponCards.length, productCards.length)
-    for (let i = 0; i < max; i++) {
-      if (offerCards[i]) mixed.push(offerCards[i])
-      if (productCards[i]) mixed.push(productCards[i])
-      if (couponCards[i]) mixed.push(couponCards[i])
+    const chosen: Notice[] = []
+    for (const pool of byPriority) {
+      for (const notice of pool) {
+        if (chosen.length >= SLOTS) break
+        chosen.push(notice)
+      }
     }
-    return [{ kind: 'app' }, ...mixed]
+    if (chosen.length === 0) return []
+
+    const spread = spreadByKind(chosen)
+
+    // Less than a full board between all four sources: cycle what we have
+    // rather than leaving gaps. Cycling the SPREAD sequence, not the raw one,
+    // so the repeats stay mixed too.
+    const filled: Notice[] = []
+    while (filled.length < SLOTS) filled.push(spread[filled.length % spread.length])
+    return filled
   }, [offers, coupons, products])
 
   // Eight tiles, sixteen faces, filled by walking the notice list. With fewer
@@ -185,9 +285,12 @@ export default function NoticeBoard() {
   // two different ones, which is what stops a flip landing on the same card.
   const tiles = useMemo(() => {
     if (notices.length === 0) return []
+    // No wraparound here any more. notices is either empty or exactly SLOTS
+    // long, because the cycling that used to happen at this line now happens
+    // above, where it can cycle the spread order instead of the raw one.
     return Array.from({ length: TILES }, (_, i) => ({
-      front: notices[(i * 2) % notices.length],
-      back: notices[(i * 2 + 1) % notices.length],
+      front: notices[i * 2],
+      back: notices[i * 2 + 1],
     }))
   }, [notices])
 
@@ -308,10 +411,6 @@ const CARD =
   // flip always occupy exactly the same box.
   'group relative block h-full w-full rounded-xl overflow-hidden ring-1 ring-black/5 shadow-sm'
 
-function scrollToDownloadApp() {
-  document.getElementById('download-app')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-
 // Where an offer's card should take the shopper, by scope:
 //  PRODUCT (one product) → that product's detail page
 //  CATEGORY             → that category's listing
@@ -360,7 +459,14 @@ function useImageColor(url?: string) {
 }
 
 /** Top-seller product card: ~60% image, 40% content, tinted to the image's colour. */
-function TopSellerCard({ p }: { p: PublicProduct }) {
+function TopSellerCard({ p, label }: { p: PublicProduct; label: ProductLabel }) {
+  // Two lists, so two badges: same shape and weight, far enough apart in hue
+  // that you can tell them apart without reading the words.
+  const isBest = label === 'Best seller'
+  const badgeTone = isBest
+    ? 'bg-gradient-to-r from-teal-500 via-teal-600 to-emerald-600 shadow-[0_2px_8px_-2px_rgba(13,148,136,0.6)]'
+    : 'bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 shadow-[0_2px_8px_-2px_rgba(234,88,12,0.6)]'
+
   const img = p.images?.find((i) => i.isPrimary)?.url || p.images?.[0]?.url
   const color = useImageColor(img)
   const rgb = color ? `${color.r}, ${color.g}, ${color.b}` : null
@@ -410,8 +516,8 @@ function TopSellerCard({ p }: { p: PublicProduct }) {
         {/* 40% content */}
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-3 py-3">
           {/* Top seller — vibrant gradient tag (stands out from the tinted card) */}
-          <span className="inline-flex w-fit items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_2px_8px_-2px_rgba(234,88,12,0.6)]">
-            <TrendingUp className="h-3 w-3" /> Top seller
+          <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white ${badgeTone}`}>
+            {isBest ? <Star className="h-3 w-3 fill-current" /> : <TrendingUp className="h-3 w-3" />} {label}
           </span>
 
           <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-gray-900 transition-colors group-hover:text-[#e01a1b]">{p.name}</p>
@@ -452,24 +558,6 @@ function TopSellerCard({ p }: { p: PublicProduct }) {
 }
 
 function NoticeCard({ notice }: { notice: Notice }) {
-  if (notice.kind === 'app') {
-    return (
-      <button
-        type="button"
-        onClick={scrollToDownloadApp}
-        className={CARD}
-        aria-label="Get the M2C App"
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/assets/images/hero/m2capp.png"
-          alt="Get the M2C App"
-          className="w-full h-full object-cover"
-        />
-      </button>
-    )
-  }
-
   if (notice.kind === 'offer') {
     const o = notice.offer
     const hasImg = !!o.bannerImage
@@ -530,5 +618,5 @@ function NoticeCard({ notice }: { notice: Notice }) {
   }
 
   // product (top seller) — its own component so the image-colour hook is valid.
-  return <TopSellerCard p={notice.product} />
+  return <TopSellerCard p={notice.product} label={notice.label} />
 }
