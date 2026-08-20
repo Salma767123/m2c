@@ -237,6 +237,25 @@ class QCCheckerService {
     }
   }
 
+  // Category tree — used only to resolve the category IDs stored in a vendor's
+  // categoryProducts into display names. The route is optionalAuth on the
+  // backend, but the token is sent anyway so the request is attributable.
+  //
+  // Resolves to [] on failure rather than throwing: a missing name degrades a
+  // label to "Category", which must never block the inspection form.
+  async getCategoryTree(): Promise<any[]> {
+    try {
+      const token = await this.getCheckerToken();
+      const response = await axios.get('/categories/tree', {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { status: 'ACTIVE', includeInactive: false },
+      });
+      return response.data?.data || [];
+    } catch {
+      return [];
+    }
+  }
+
   // Approve Vendor
   async approveVendor(vendorId: string): Promise<{ success: boolean; message: string; data: any }> {
     try {
@@ -440,6 +459,9 @@ class QCCheckerService {
       const err: any = new Error(errData?.message || error.message || 'Failed to start product inspection');
       err.status = error?.response?.status || error?.status;
       err.data = errData;
+      // Geofence details (403 Location mismatch) so the caller can show the gap.
+      err.distanceMeters = errData?.distanceMeters;
+      err.thresholdMeters = errData?.thresholdMeters;
       throw err;
     }
   }
@@ -554,9 +576,12 @@ class QCCheckerService {
       });
       return response.data;
     } catch (error: any) {
-      const data = error?.response?.data || {};
+      // The shared interceptor rejects with a FLAT shape ({ message, status, data })
+      // — there is no `.response`. Read that first, then fall back to a raw axios
+      // error, so the status survives for the caller.
+      const data = error?.data || error?.response?.data || {};
       const err: any = new Error(data.error || data.message || error?.message || 'Failed to send reset email');
-      err.status = error?.response?.status;
+      err.status = error?.status ?? error?.response?.status;
       throw err;
     }
   }
@@ -571,9 +596,10 @@ class QCCheckerService {
       const response = await axios.post('/auth/reset-password', { token, password });
       return response.data;
     } catch (error: any) {
-      const data = error?.response?.data || {};
+      // Flat interceptor shape first — see forgotPassword.
+      const data = error?.data || error?.response?.data || {};
       const err: any = new Error(data.error || data.message || error?.message || 'Failed to reset password');
-      err.status = error?.response?.status;
+      err.status = error?.status ?? error?.response?.status;
       throw err;
     }
   }
@@ -602,9 +628,12 @@ class QCCheckerService {
       );
       return response.data;
     } catch (error: any) {
-      const data = error?.response?.data || {};
+      // Flat interceptor shape first — see forgotPassword. Without this the status
+      // and code were dropped, so callers could not tell an expired window from a
+      // storage failure.
+      const data = error?.data || error?.response?.data || {};
       const err: any = new Error(data.message || data.error || error?.message || 'Failed to save draft');
-      err.status = error?.response?.status;
+      err.status = error?.status ?? error?.response?.status;
       err.code = data.code;
       throw err;
     }
@@ -614,12 +643,19 @@ class QCCheckerService {
   async startInspection(
     inspectionId: string,
     location?: { latitude: number; longitude: number } | null,
+    // PHYSICAL / VIRTUAL. The backend skips the geofence entirely for a VIRTUAL
+    // inspection, so omitting this made every app inspection look PHYSICAL — and
+    // therefore fail the location check it can never satisfy without GPS.
+    inspectionType?: 'PHYSICAL' | 'VIRTUAL',
+    discardDraft?: boolean,
   ): Promise<{ success: boolean; message: string; inspection: any; locationVerification?: any }> {
     try {
       const token = await this.getCheckerToken();
       const response = await axios.post(`/inspections/${inspectionId}/start`, {
         checkerLatitude: location?.latitude ?? null,
         checkerLongitude: location?.longitude ?? null,
+        inspectionType,
+        discardDraft,
       }, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -632,6 +668,10 @@ class QCCheckerService {
       const err: any = new Error(errData?.message || error.message || 'Failed to start inspection');
       err.status = error?.response?.status || error?.status;
       err.data = errData;
+      err.code = errData?.code;
+      // Geofence details (403 Location mismatch) so the caller can show the gap.
+      err.distanceMeters = errData?.distanceMeters;
+      err.thresholdMeters = errData?.thresholdMeters;
       throw err;
     }
   }
@@ -643,6 +683,7 @@ class QCCheckerService {
     inspectionId: string,
     formData: any,
     location?: { latitude: number | null; longitude: number | null } | null,
+    inspectionType?: 'PHYSICAL' | 'VIRTUAL',
   ): Promise<{ success: boolean; message: string; inspection: any }> {
     try {
       const token = await this.getCheckerToken();
@@ -652,6 +693,9 @@ class QCCheckerService {
           ...formData,
           checkerLatitude: location?.latitude ?? null,
           checkerLongitude: location?.longitude ?? null,
+          // Same reason as startInspection: without this the submit-time geofence
+          // treats every inspection as PHYSICAL and rejects it for missing GPS.
+          inspectionType,
         },
         {
           headers: { Authorization: `Bearer ${token}` },

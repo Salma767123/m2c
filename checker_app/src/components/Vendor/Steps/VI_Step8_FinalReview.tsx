@@ -187,6 +187,7 @@ import { View, Text, TextInput, TouchableOpacity, Keyboard, Platform } from 'rea
 import type { KeyboardEvent } from 'react-native';
 import { ClipboardList, User, Calendar, MessageSquare, Pencil, Check } from 'lucide-react-native';
 import { Verifications } from './VI_VerifyField';
+import { formatDateDMY } from '@/components/Products/Steps/piShared';
 
 export interface InspectorMeta {
   inspectorName: string;
@@ -361,7 +362,7 @@ export default function VI_Step8_FinalReview({ verifications, meta, onMetaChange
             </View>
             <View className="px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 min-h-[42px] justify-center">
               {meta.inspectionDate ? (
-                <Text className="text-sm text-slate-700">{meta.inspectionDate}</Text>
+                <Text className="text-sm text-slate-700">{formatDateDMY(meta.inspectionDate)}</Text>
               ) : (
                 <Text className="text-sm text-slate-400 italic">Auto-filled</Text>
               )}

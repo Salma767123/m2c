@@ -6,6 +6,20 @@
 // whole window has elapsed, it can no longer be started. Used by the product
 // inspection flow so the deadline rule is identical across web + mobile.
 
+/**
+ * Allowed distance between the checker and the vendor's site, in metres.
+ * Display only — the server owns enforcement (LOCATION_THRESHOLD_METERS in
+ * backend/utils/locationUtils.js). Keep the two in step.
+ */
+export const LOCATION_THRESHOLD_METERS = 1000;
+
+/** Human label for the address the geofence matched ('legal/factory' | 'warehouse'). */
+export function matchedAddressLabel(matched?: string | null): string | null {
+  if (matched === 'warehouse') return 'Warehouse address';
+  if (matched === 'legal/factory') return 'Legal / Factory site';
+  return null;
+}
+
 /** End of the booked window as a Date, or null if the schedule is incomplete. */
 export function getInspectionDeadline(
   scheduledDate?: string | null,

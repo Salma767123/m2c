@@ -34,7 +34,7 @@
       ],
       "package": "com.anonymous.m2c_app",
       "googleServicesFile": "./google-services.json",
-       "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "bundler": "metro",
@@ -70,15 +70,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "9ce0af85-d923-4571-8ba0-7aef197562f6"
+        "projectId": "c384ef61-cc62-46ea-b8ed-b130aa3b1957"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/a0631327-c1cb-48c8-8e54-374e9b4cf0ed"
+      "url": "https://u.expo.dev/c384ef61-cc62-46ea-b8ed-b130aa3b1957"
     },
-    "owner": "karneyar"
+    "owner": "karneyaar"
   }
 }

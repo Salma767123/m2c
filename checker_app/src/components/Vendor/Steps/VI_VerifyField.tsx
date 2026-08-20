@@ -341,6 +341,12 @@ interface VerifyFieldProps {
   type?: ValueType;
   /** Optional action rendered in the top-right (e.g. a View button). */
   headerAction?: React.ReactNode;
+  /**
+   * Attach a document to this card AND lock its Yes/No until the checker has
+   * opened it once. Renders its own View button (so the press can report back),
+   * which is why this replaces `headerAction` rather than sitting beside it.
+   */
+  requireDocView?: { url: string; name?: string };
   /** Tighter padding + stacked Yes/No — for half-width grid cells. */
   compact?: boolean;
   /** Tint the list chips. Country lists tint regardless; other lists only
@@ -356,6 +362,7 @@ export default function VerifyField({
   onChange,
   type,
   headerAction,
+  requireDocView,
   compact = false,
   listTone,
 }: VerifyFieldProps) {
@@ -378,7 +385,11 @@ export default function VerifyField({
   // Verification gate: an email's Yes/No stays LOCKED until the checker has
   // actually sent a test mail, so an unreachable address can't be rubber-stamped.
   const [emailTested, setEmailTested] = useState(false);
-  const gated = isEmailField && !emailTested;
+  // Same idea for an attached document: a certificate can't be judged without
+  // opening it, so the card stays locked until the View button has been used.
+  const [docViewed, setDocViewed] = useState(false);
+  const docGated = !!requireDocView?.url && !docViewed;
+  const gated = (isEmailField && !emailTested) || docGated;
   const [showGateHint, setShowGateHint] = useState(false);
 
   const setOk = (ok: boolean) => {
@@ -412,7 +423,16 @@ export default function VerifyField({
       <View className={pad}>
         <View className="flex-row items-center justify-between mb-1" style={{ columnGap: 8 }}>
           <Text className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide flex-1">{label}</Text>
-          {headerAction}
+          {requireDocView?.url ? (
+            <ViewButton
+              url={requireDocView.url}
+              name={requireDocView.name || label}
+              isImage={isImageUrl(requireDocView.url, requireDocView.name)}
+              onViewed={() => { setDocViewed(true); setShowGateHint(false); }}
+            />
+          ) : (
+            headerAction
+          )}
         </View>
         <View style={{ minHeight: 24 }}>
           {isEmpty ? (
@@ -430,7 +450,14 @@ export default function VerifyField({
               type={type}
               label={label}
               listTone={listTone}
-              onImagePress={(u) => setLightbox(u)}
+              // Opening the in-card preview counts as viewing the document too —
+              // gating only on the header button would tell a checker who just
+              // studied the image full-screen that they still haven't looked.
+              onImagePress={(u) => {
+                setLightbox(u);
+                setDocViewed(true);
+                setShowGateHint(false);
+              }}
             />
           )}
         </View>
@@ -440,7 +467,11 @@ export default function VerifyField({
         {!compact && (
           <Text className="text-xs font-semibold text-slate-600">
             Verification
-            {gated ? <Text className="font-normal text-amber-600"> · send a test email to unlock</Text> : null}
+            {gated ? (
+              <Text className="font-normal text-amber-600">
+                {docGated ? ' · view the document to unlock' : ' · send a test email to unlock'}
+              </Text>
+            ) : null}
           </Text>
         )}
         {/* Large segmented Yes/No — the primary action on every card, so it
@@ -489,9 +520,11 @@ export default function VerifyField({
         </View>
         {showGateHint && gated && (
           <View className="flex-row items-center bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5" style={{ columnGap: 6 }}>
-            <Send size={12} color="#b45309" />
+            {docGated ? <Eye size={12} color="#b45309" /> : <Send size={12} color="#b45309" />}
             <Text className="text-xs text-amber-700 font-medium flex-1">
-              Please send a test email first, then mark Yes or No.
+              {docGated
+                ? 'Please open the document first, then mark Yes or No.'
+                : 'Please send a test email first, then mark Yes or No.'}
             </Text>
           </View>
         )}
@@ -573,7 +606,9 @@ export function DocCard({
       verifications={verifications}
       onChange={onChange}
       compact={compact}
-      headerAction={url ? <ViewButton url={url} name={name} isImage={isImg} /> : undefined}
+      // The card IS the document, so its Yes/No stays locked until the file has
+      // actually been opened — a PDF renders here as a filename and nothing else.
+      requireDocView={url ? { url, name } : undefined}
     />
   );
 }
@@ -581,13 +616,28 @@ export function DocCard({
 // Shared icon-only "view" action for image/doc header actions inside steps.
 // The eye icon alone carries the meaning — the label is exposed to screen
 // readers instead of taking up header width.
-export function ViewButton({ url, name, isImage }: { url: string; name: string; isImage: boolean }) {
+export function ViewButton({
+  url,
+  name,
+  isImage,
+  onViewed,
+}: {
+  url: string;
+  name: string;
+  isImage: boolean;
+  /** Fired on press — lets a gated VerifyField unlock its Yes/No. */
+  onViewed?: () => void;
+}) {
   const [lightbox, setLightbox] = useState(false);
   if (!url) return null;
   return (
     <>
       <TouchableOpacity
-        onPress={() => (isImage ? setLightbox(true) : openDocument(url))}
+        onPress={() => {
+          onViewed?.();
+          if (isImage) setLightbox(true);
+          else openDocument(url);
+        }}
         activeOpacity={0.7}
         hitSlop={8}
         accessibilityRole="button"

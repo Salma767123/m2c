@@ -10,9 +10,7 @@ import {
   RefreshControl,
   Modal,
   Image,
-  LayoutAnimation,
   Platform,
-  UIManager,
 } from 'react-native';
 import {
   Search,
@@ -20,26 +18,22 @@ import {
   XCircle,
   RefreshCw,
   X,
-  ChevronDown,
-  ChevronUp,
   ChevronLeft,
   ChevronRight,
   Factory,
   Package,
   FileText,
   CalendarDays,
+  MapPin,
+  Video,
+  SlidersHorizontal,
+  Check,
 } from 'lucide-react-native';
-import { router } from 'expo-router';
 import qcCheckerService from '../../../services/qcCheckerService';
 import { useDebounce } from '../../../hooks/useDebounce';
 import DateRangeCalendar, { fmtDate } from '@/components/General/DateRangeCalendar';
 import { AppText, StatusBadge } from '@/components/UI';
 import { brand, colors, elevation } from '@/constants/design';
-
-// Enable LayoutAnimation on Android so the filter section collapses smoothly.
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 type Tab = 'factory' | 'product';
 const PAGE_SIZE = 12;
@@ -58,6 +52,8 @@ const SORT_OPTIONS = [
   { value: 'completedAt:asc', label: 'Oldest first' },
 ];
 
+const PRODUCT_DEFAULT_SORT = 'updatedAt:desc';
+
 const PRODUCT_SORT_OPTIONS = [
   { value: 'updatedAt:desc', label: 'Latest first' },
   { value: 'updatedAt:asc', label: 'Oldest first' },
@@ -73,6 +69,8 @@ const PRODUCT_STATUS_OPTIONS = [
 // Friendly product status label (mirrors web getStatusBadge).
 const productStatusLabel = (status?: string) => {
   switch (status) {
+    case 'QC_SUBMITTED':
+      return 'Submitted';
     case 'QC_APPROVED':
       return 'Approved by QC';
     case 'APPROVED':
@@ -89,36 +87,15 @@ export default function ReportsScreen() {
 
   // Collapsible search/filter section — toggled by the arrow next to the title
   // (ported from the vendor list). Shared across both tabs.
-  const [showFilters, setShowFilters] = useState(false);
-  const toggleFilters = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setShowFilters((v) => !v);
-  };
-
   return (
     <View className="flex-1 bg-gray-50">
       {/* Fixed page header + tab strip — stays put outside the scroll list */}
       <View className="bg-gray-50 border-b border-slate-200 pb-3">
-        <View className="px-4 pt-5 pb-3 flex-row items-start justify-between">
-          <View className="flex-1">
-            <AppText variant="headlineLg">Inspection Reports</AppText>
-            <AppText variant="bodySm" color={colors.textSecondary} style={{ marginTop: 2 }}>
-              Your completed quality control reports
-            </AppText>
-          </View>
-          <TouchableOpacity
-            onPress={toggleFilters}
-            accessibilityRole="button"
-            accessibilityLabel={showFilters ? 'Hide filters' : 'Show filters'}
-            className="w-9 h-9 rounded-full bg-white border border-slate-200 items-center justify-center mt-1"
-            style={elevation.card}
-          >
-            {showFilters ? (
-              <ChevronUp size={18} color={colors.textSecondary} />
-            ) : (
-              <ChevronDown size={18} color={colors.textSecondary} />
-            )}
-          </TouchableOpacity>
+        <View className="px-4 pt-5 pb-3">
+          <AppText variant="headlineLg">Inspection Reports</AppText>
+          <AppText variant="bodySm" color={colors.textSecondary} style={{ marginTop: 2 }}>
+            Your completed quality control reports
+          </AppText>
         </View>
 
         {/* Tab Bar — active = brand red */}
@@ -159,16 +136,14 @@ export default function ReportsScreen() {
         </View>
       </View>
 
-      {activeTab === 'factory'
-        ? <FactoryReportsTab showFilters={showFilters} />
-        : <ProductReportsTab showFilters={showFilters} />}
+      {activeTab === 'factory' ? <FactoryReportsTab /> : <ProductReportsTab />}
     </View>
   );
 }
 
 // ─── Factory Reports Tab ─────────────────────────────────────────────────────
 
-function FactoryReportsTab({ showFilters }: { showFilters: boolean }) {
+function FactoryReportsTab() {
   const [searchInput, setSearchInput] = useState('');
   const [resultFilter, setResultFilter] = useState('');
   const [sort, setSort] = useState(DEFAULT_SORT);
@@ -182,8 +157,57 @@ function FactoryReportsTab({ showFilters }: { showFilters: boolean }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showResultModal, setShowResultModal] = useState(false);
-  const [showSortModal, setShowSortModal] = useState(false);
+
+  // Bottom-sheet filters — same pattern as the Vendors / Products tabs: every
+  // criterion is edited as a draft and only committed on Apply, so a half-set
+  // filter never triggers a refetch.
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [draftResult, setDraftResult] = useState(resultFilter);
+  const [draftSort, setDraftSort] = useState(sort);
+  const [draftDateFrom, setDraftDateFrom] = useState(dateFrom);
+  const [draftDateTo, setDraftDateTo] = useState(dateTo);
+
+  const openFilterSheet = () => {
+    setDraftResult(resultFilter);
+    setDraftSort(sort);
+    setDraftDateFrom(dateFrom);
+    setDraftDateTo(dateTo);
+    setShowFilterSheet(true);
+  };
+
+  const resetDraft = () => {
+    setDraftResult('');
+    setDraftSort(DEFAULT_SORT);
+    setDraftDateFrom('');
+    setDraftDateTo('');
+  };
+
+  const applyFilters = () => {
+    setResultFilter(draftResult);
+    setSort(draftSort);
+    setDateFrom(draftDateFrom);
+    setDateTo(draftDateTo);
+    setPage(1);
+    setShowFilterSheet(false);
+  };
+
+  const draftActiveCount = useMemo(() => {
+    let n = 0;
+    if (draftResult) n += 1;
+    if (draftSort !== DEFAULT_SORT) n += 1;
+    if (draftDateFrom) n += 1;
+    return n;
+  }, [draftResult, draftSort, draftDateFrom]);
+
+  // Badge count covers only the sheet's own criteria — search has its own
+  // visible field and clear button, so counting it would double-report.
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (resultFilter) n += 1;
+    if (sort !== DEFAULT_SORT) n += 1;
+    if (dateFrom) n += 1;
+    return n;
+  }, [resultFilter, sort, dateFrom]);
 
   const didMountRef = useRef(false);
   useEffect(() => {
@@ -262,62 +286,21 @@ function FactoryReportsTab({ showFilters }: { showFilters: boolean }) {
       assignedDate: fmtRowDate(insp.scheduledDate),
       // Completion date, falling back to the scheduled date.
       inspectionDate: fmtRowDate(insp.completedAt || insp.scheduledDate),
+      priority: insp.priority || '',
+      inspectionType: insp.inspectionType,
       result: insp.result || '—',
     };
   };
 
-  const resultLabel = RESULT_OPTIONS.find((o) => o.value === resultFilter)?.label || 'All results';
-  const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label || 'Latest first';
-
   return (
     <View className="flex-1">
-      {/* Search + filters — collapsible via the header arrow */}
-      {showFilters ? (
-        <View className="px-5 pt-3 pb-3 bg-gray-50 border-b border-slate-200">
-          {/* Search */}
-          <View className="mb-3 flex-row items-center bg-white border border-slate-300 rounded-xl px-4 py-2.5">
-            <Search size={18} color="#94a3b8" />
-            <TextInput
-              placeholder="Search by vendor, client..."
-              value={searchInput}
-              onChangeText={setSearchInput}
-              className="flex-1 ml-3 text-sm text-slate-900"
-              placeholderTextColor="#94a3b8"
-            />
-            {searchInput ? (
-              <TouchableOpacity onPress={() => setSearchInput('')} hitSlop={8}>
-                <X size={16} color="#94a3b8" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          {/* Date range filter */}
-          <View className="mb-3">
-            <DateRangeCalendar
-              from={dateFrom}
-              to={dateTo}
-              onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
-              placeholder="Filter by date"
-            />
-          </View>
-
-          {/* Filter + Sort */}
-          <View className="flex-row" style={{ columnGap: 8 }}>
-            <TouchableOpacity onPress={() => setShowResultModal(true)}
-              className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
-            >
-              <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{resultLabel}</AppText>
-              <ChevronDown size={16} color="#64748b" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowSortModal(true)}
-              className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
-            >
-              <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{sortLabel}</AppText>
-              <ChevronDown size={16} color="#64748b" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : null}
+      <SearchFilterBar
+        placeholder="Search by vendor, client..."
+        value={searchInput}
+        onChangeText={setSearchInput}
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={openFilterSheet}
+      />
 
       <ScrollView
         className="flex-1"
@@ -373,12 +356,12 @@ function FactoryReportsTab({ showFilters }: { showFilters: boolean }) {
           <View style={{ rowGap: 12 }}>
             {filteredInspections.map((insp) => {
               const row = buildRow(insp);
+              // Factory rows are a read-only summary — nothing opens on tap.
               return (
-                <Pressable
+                <View
                   key={insp.id}
-                  onPress={() => router.push({ pathname: '/factory-report/[id]' as any, params: { id: insp.id } })}
                   className="bg-white rounded-2xl border border-slate-200 overflow-hidden p-5"
-                  style={({ pressed }) => [{ backgroundColor: pressed ? '#f8fafc' : '#ffffff' }, elevation.card]}
+                  style={[{ backgroundColor: '#ffffff' }, elevation.card]}
                 >
                   <View className="flex-row items-center" style={{ gap: 14 }}>
                     <View className="w-11 h-11 bg-brand-50 rounded-full items-center justify-center">
@@ -392,22 +375,19 @@ function FactoryReportsTab({ showFilters }: { showFilters: boolean }) {
                       <Text className="text-[11px] font-mono text-slate-400 uppercase tracking-wider" numberOfLines={1}>
                         {row.vendorId}
                       </Text>
-                      <View className="flex-row items-center flex-wrap" style={{ columnGap: 12, rowGap: 2 }}>
-                        <View className="flex-row items-center" style={{ gap: 4 }}>
-                          <CalendarDays size={11} color={colors.textFaint} />
-                          <AppText variant="labelSm" color={colors.textFaint}>Assigned {row.assignedDate}</AppText>
-                        </View>
-                        <View className="flex-row items-center" style={{ gap: 4 }}>
-                          <CalendarDays size={11} color={colors.textFaint} />
-                          <AppText variant="labelSm" color={colors.textFaint}>Completed {row.inspectionDate}</AppText>
-                        </View>
+                      {/* Type + priority — the two columns the web table carries
+                          that the card was dropping. */}
+                      <View className="flex-row items-center flex-wrap" style={{ columnGap: 6, rowGap: 4 }}>
+                        <InspectionTypeChip type={row.inspectionType} />
+                        {row.priority ? <PriorityChip priority={row.priority} /> : null}
                       </View>
+                      <DatePair assigned={row.assignedDate} completed={row.inspectionDate} />
                     </View>
                     <View style={{ flexShrink: 0 }}>
                       <ResultBadge result={row.result} />
                     </View>
                   </View>
-                </Pressable>
+                </View>
               );
             })}
           </View>
@@ -440,19 +420,38 @@ function FactoryReportsTab({ showFilters }: { showFilters: boolean }) {
         ) : null}
       </ScrollView>
 
-      <OptionModal visible={showResultModal} title="Filter by result" options={RESULT_OPTIONS} value={resultFilter}
-        onSelect={(v) => { setResultFilter(v); setShowResultModal(false); }} onClose={() => setShowResultModal(false)} />
-      <OptionModal visible={showSortModal} title="Sort by" options={SORT_OPTIONS} value={sort}
-        onSelect={(v) => { setSort(v); setShowSortModal(false); }} onClose={() => setShowSortModal(false)} />
+      <FilterSheet
+        visible={showFilterSheet}
+        onClose={() => setShowFilterSheet(false)}
+        onReset={resetDraft}
+        onApply={applyFilters}
+        applyCount={draftActiveCount}
+      >
+        <Text className="text-sm font-bold text-slate-900 mb-2">Date range</Text>
+        <View className="mb-5">
+          <DateRangeCalendar
+            from={draftDateFrom}
+            to={draftDateTo}
+            onChange={(f, t) => { setDraftDateFrom(f); setDraftDateTo(t); }}
+            placeholder="Filter by date"
+          />
+        </View>
+
+        <Text className="text-sm font-bold text-slate-900 mb-2">Result</Text>
+        <FilterChips options={RESULT_OPTIONS} value={draftResult} onSelect={setDraftResult} />
+
+        <Text className="text-sm font-bold text-slate-900 mb-2">Sort by</Text>
+        <FilterChips options={SORT_OPTIONS} value={draftSort} onSelect={setDraftSort} last />
+      </FilterSheet>
     </View>
   );
 }
 
 // ─── Product Reports Tab ─────────────────────────────────────────────────────
 
-function ProductReportsTab({ showFilters }: { showFilters: boolean }) {
+function ProductReportsTab() {
   const [searchInput, setSearchInput] = useState('');
-  const [sort, setSort] = useState('updatedAt:desc');
+  const [sort, setSort] = useState(PRODUCT_DEFAULT_SORT);
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -464,8 +463,55 @@ function ProductReportsTab({ showFilters }: { showFilters: boolean }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showSortModal, setShowSortModal] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
+
+
+  // Same draft-then-Apply sheet as the factory tab and the Vendors / Products
+  // list screens.
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [draftStatus, setDraftStatus] = useState(statusFilter);
+  const [draftSort, setDraftSort] = useState(sort);
+  const [draftDateFrom, setDraftDateFrom] = useState(dateFrom);
+  const [draftDateTo, setDraftDateTo] = useState(dateTo);
+
+  const openFilterSheet = () => {
+    setDraftStatus(statusFilter);
+    setDraftSort(sort);
+    setDraftDateFrom(dateFrom);
+    setDraftDateTo(dateTo);
+    setShowFilterSheet(true);
+  };
+
+  const resetDraft = () => {
+    setDraftStatus('');
+    setDraftSort(PRODUCT_DEFAULT_SORT);
+    setDraftDateFrom('');
+    setDraftDateTo('');
+  };
+
+  const applyFilters = () => {
+    setStatusFilter(draftStatus);
+    setSort(draftSort);
+    setDateFrom(draftDateFrom);
+    setDateTo(draftDateTo);
+    setPage(1);
+    setShowFilterSheet(false);
+  };
+
+  const draftActiveCount = useMemo(() => {
+    let n = 0;
+    if (draftStatus) n += 1;
+    if (draftSort !== PRODUCT_DEFAULT_SORT) n += 1;
+    if (draftDateFrom) n += 1;
+    return n;
+  }, [draftStatus, draftSort, draftDateFrom]);
+
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (statusFilter) n += 1;
+    if (sort !== PRODUCT_DEFAULT_SORT) n += 1;
+    if (dateFrom) n += 1;
+    return n;
+  }, [statusFilter, sort, dateFrom]);
 
   const didMountRef = useRef(false);
   useEffect(() => {
@@ -512,7 +558,14 @@ function ProductReportsTab({ showFilters }: { showFilters: boolean }) {
   const filteredProducts = useMemo(() => {
     let list = products;
     if (statusFilter === 'APPROVED') {
-      list = list.filter((p) => p.approvalStatus === 'QC_APPROVED' || p.approvalStatus === 'APPROVED');
+      // A submitted inspection is complete from the checker's side, even though the
+      // admin has not ruled on it yet — it belongs with the approved ones here.
+      list = list.filter(
+        (p) =>
+          p.approvalStatus === 'QC_SUBMITTED' ||
+          p.approvalStatus === 'QC_APPROVED' ||
+          p.approvalStatus === 'APPROVED',
+      );
     } else if (statusFilter === 'REJECTED') {
       list = list.filter((p) => p.approvalStatus === 'REJECTED');
     }
@@ -530,60 +583,18 @@ function ProductReportsTab({ showFilters }: { showFilters: boolean }) {
   }, [products, statusFilter, dateFrom, dateTo]);
 
   const isClientFiltered = Boolean(statusFilter || dateFrom);
-  const hasActiveFilters = Boolean(debouncedSearch || sort !== 'updatedAt:desc' || statusFilter || dateFrom || page !== 1);
-  const clearFilters = () => { setSearchInput(''); setSort('updatedAt:desc'); setStatusFilter(''); setDateFrom(''); setDateTo(''); setPage(1); };
-  const sortLabel = PRODUCT_SORT_OPTIONS.find((o) => o.value === sort)?.label || 'Latest first';
-  const statusLabel = PRODUCT_STATUS_OPTIONS.find((o) => o.value === statusFilter)?.label || 'All results';
+  const hasActiveFilters = Boolean(debouncedSearch || sort !== PRODUCT_DEFAULT_SORT || statusFilter || dateFrom || page !== 1);
+  const clearFilters = () => { setSearchInput(''); setSort(PRODUCT_DEFAULT_SORT); setStatusFilter(''); setDateFrom(''); setDateTo(''); setPage(1); };
 
   return (
     <View className="flex-1">
-      {/* Search + filters — collapsible via the header arrow */}
-      {showFilters ? (
-        <View className="px-5 pt-3 pb-3 bg-gray-50 border-b border-slate-200">
-          {/* Search */}
-          <View className="mb-3 flex-row items-center bg-white border border-slate-300 rounded-xl px-4 py-2.5">
-            <Search size={18} color="#94a3b8" />
-            <TextInput
-              placeholder="Search by product, or vendor..."
-              value={searchInput}
-              onChangeText={setSearchInput}
-              className="flex-1 ml-3 text-sm text-slate-900"
-              placeholderTextColor="#94a3b8"
-            />
-            {searchInput ? (
-              <TouchableOpacity onPress={() => setSearchInput('')} hitSlop={8}>
-                <X size={16} color="#94a3b8" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          {/* Date range filter */}
-          <View className="mb-3">
-            <DateRangeCalendar
-              from={dateFrom}
-              to={dateTo}
-              onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
-              placeholder="Filter by date"
-            />
-          </View>
-
-          {/* Status + Sort */}
-          <View className="flex-row" style={{ columnGap: 8 }}>
-            <TouchableOpacity onPress={() => setShowStatusModal(true)}
-              className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
-            >
-              <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{statusLabel}</AppText>
-              <ChevronDown size={16} color="#64748b" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowSortModal(true)}
-              className="flex-1 flex-row items-center justify-between bg-white border border-slate-300 rounded-xl px-4 py-2.5"
-            >
-              <AppText variant="bodySm" color={colors.text} numberOfLines={1}>{sortLabel}</AppText>
-              <ChevronDown size={16} color="#64748b" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : null}
+      <SearchFilterBar
+        placeholder="Search by product, or vendor..."
+        value={searchInput}
+        onChangeText={setSearchInput}
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={openFilterSheet}
+      />
 
       <ScrollView
         className="flex-1"
@@ -634,19 +645,26 @@ function ProductReportsTab({ showFilters }: { showFilters: boolean }) {
           <View style={{ rowGap: 12 }}>
             {filteredProducts.map((p: any) => {
               const thumb = p.images?.[0]?.url;
-              const inspectedOn = p.updatedAt
-                ? new Date(p.updatedAt).toLocaleDateString('en-IN')
+              // Assigned = the admin's QC assignment date; Completed On = the
+              // checker's own submission (lastReviewedAt, backfilled server-side
+              // from the audit trail for legacy rows). These used to be the
+              // product's createdAt / updatedAt, which meant "Submitted" was the
+              // day the vendor created the product and "Inspected" moved every
+              // time anything on the row changed.
+              const assignedOn = p.qcAssignment?.assignedAt || p.qcAssignment?.scheduledDate;
+              const assignedLabel = assignedOn
+                ? new Date(assignedOn).toLocaleDateString('en-IN')
                 : '—';
-              const submittedOn = p.createdAt
-                ? new Date(p.createdAt).toLocaleDateString('en-IN')
+              const completedLabel = p.lastReviewedAt
+                ? new Date(p.lastReviewedAt).toLocaleDateString('en-IN')
                 : '—';
               const vendorCode = p.vendor?.vendorCode;
+              // Read-only summary — the checker doesn't open reports from here.
               return (
-                <Pressable
+                <View
                   key={p.id}
-                  onPress={() => router.push({ pathname: '/product-report/[id]' as any, params: { id: p.id } })}
                   className="bg-white rounded-2xl border border-slate-200 overflow-hidden p-5"
-                  style={({ pressed }) => [{ backgroundColor: pressed ? '#f8fafc' : '#ffffff' }, elevation.card]}
+                  style={[{ backgroundColor: '#ffffff' }, elevation.card]}
                 >
                   <View className="flex-row items-center" style={{ gap: 14 }}>
                     {thumb ? (
@@ -668,16 +686,13 @@ function ProductReportsTab({ showFilters }: { showFilters: boolean }) {
                       {vendorCode ? (
                         <AppText variant="bodySm" color={colors.textMuted} numberOfLines={1}>ID: {vendorCode}</AppText>
                       ) : null}
-                      <View className="flex-row items-center flex-wrap" style={{ gap: 4 }}>
-                        <CalendarDays size={11} color={colors.textFaint} />
-                        <AppText variant="labelSm" color={colors.textFaint}>Submitted {submittedOn} · Inspected {inspectedOn}</AppText>
-                      </View>
+                      <DatePair assigned={assignedLabel} completed={completedLabel} />
                     </View>
                     <View style={{ flexShrink: 0 }}>
                       <StatusBadge status={p.approvalStatus} label={productStatusLabel(p.approvalStatus)} />
                     </View>
                   </View>
-                </Pressable>
+                </View>
               );
             })}
           </View>
@@ -688,15 +703,261 @@ function ProductReportsTab({ showFilters }: { showFilters: boolean }) {
         ) : null}
       </ScrollView>
 
-      <OptionModal visible={showStatusModal} title="Filter by result" options={PRODUCT_STATUS_OPTIONS} value={statusFilter}
-        onSelect={(v) => { setStatusFilter(v); setShowStatusModal(false); }} onClose={() => setShowStatusModal(false)} />
-      <OptionModal visible={showSortModal} title="Sort by" options={PRODUCT_SORT_OPTIONS} value={sort}
-        onSelect={(v) => { setSort(v); setShowSortModal(false); }} onClose={() => setShowSortModal(false)} />
+      <FilterSheet
+        visible={showFilterSheet}
+        onClose={() => setShowFilterSheet(false)}
+        onReset={resetDraft}
+        onApply={applyFilters}
+        applyCount={draftActiveCount}
+      >
+        <Text className="text-sm font-bold text-slate-900 mb-2">Date range</Text>
+        <View className="mb-5">
+          <DateRangeCalendar
+            from={draftDateFrom}
+            to={draftDateTo}
+            onChange={(f, t) => { setDraftDateFrom(f); setDraftDateTo(t); }}
+            placeholder="Filter by date"
+          />
+        </View>
+
+        <Text className="text-sm font-bold text-slate-900 mb-2">Result</Text>
+        <FilterChips options={PRODUCT_STATUS_OPTIONS} value={draftStatus} onSelect={setDraftStatus} />
+
+        <Text className="text-sm font-bold text-slate-900 mb-2">Sort by</Text>
+        <FilterChips options={PRODUCT_SORT_OPTIONS} value={draftSort} onSelect={setDraftSort} last />
+      </FilterSheet>
     </View>
   );
 }
 
 // ─── Shared Components ───────────────────────────────────────────────────────
+
+/**
+ * The two report dates, as a labelled pair.
+ *
+ * They used to run together in one sentence ("Assigned Date 12 Aug 2026 ·
+ * Completed On 19 Aug 2026"), which wrapped mid-date on a narrow phone and left
+ * the reader working out where one date ended and the next began. Two aligned
+ * columns — small-caps label above the value — read at a glance and never wrap.
+ */
+function DatePair({ assigned, completed }: { assigned?: string; completed?: string }) {
+  const Item = ({ label, value }: { label: string; value?: string }) => (
+    <View style={{ minWidth: 96 }}>
+      <View className="flex-row items-center" style={{ gap: 4 }}>
+        <CalendarDays size={10} color="#94a3b8" />
+        <Text className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{label}</Text>
+      </View>
+      <Text className="text-[12px] font-semibold text-slate-600 mt-0.5">{value || '—'}</Text>
+    </View>
+  );
+  return (
+    <View className="flex-row mt-1" style={{ columnGap: 18 }}>
+      <Item label="Assigned" value={assigned} />
+      <Item label="Completed" value={completed} />
+    </View>
+  );
+}
+
+/**
+ * Search field + filter trigger, identical to the Vendors and Products tabs.
+ *
+ * Reports used to hide its filters behind a chevron in the page header, which
+ * left the search box invisible until you found that toggle — a different
+ * interaction from every other list in the app.
+ */
+function SearchFilterBar({
+  placeholder,
+  value,
+  onChangeText,
+  activeFilterCount,
+  onOpenFilters,
+}: {
+  placeholder: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  activeFilterCount: number;
+  onOpenFilters: () => void;
+}) {
+  return (
+    <View className="px-4 pt-3 pb-3 bg-gray-50 flex-row items-center" style={{ columnGap: 8 }}>
+      <View className="flex-1 flex-row items-center bg-white border border-slate-200 rounded-xl px-4 py-3">
+        <Search size={18} color="#94a3b8" />
+        <TextInput
+          placeholder={placeholder}
+          value={value}
+          onChangeText={onChangeText}
+          className="flex-1 ml-3 text-sm text-slate-900"
+          placeholderTextColor="#94a3b8"
+        />
+        {value ? (
+          <TouchableOpacity onPress={() => onChangeText('')} hitSlop={8}>
+            <X size={16} color="#94a3b8" />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      <TouchableOpacity
+        onPress={onOpenFilters}
+        accessibilityRole="button"
+        accessibilityLabel="Open filters"
+        className="w-12 h-12 rounded-xl bg-brand-500 items-center justify-center"
+        style={elevation.card}
+      >
+        <SlidersHorizontal size={18} color="#ffffff" />
+        {activeFilterCount > 0 ? (
+          <View className="absolute -top-1 -right-1 min-w-[18px] min-h-[18px] px-1 rounded-full bg-white border border-brand-600 items-center justify-center">
+            <Text className="text-[10px] font-bold text-brand-600">{activeFilterCount}</Text>
+          </View>
+        ) : null}
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+/** Wrapping row of selectable pills — same markup as the Vendors filter sheet. */
+function FilterChips({
+  options,
+  value,
+  onSelect,
+  last = false,
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onSelect: (v: string) => void;
+  /** Tighter bottom margin for the final group in the sheet. */
+  last?: boolean;
+}) {
+  return (
+    <View className={`flex-row flex-wrap ${last ? 'mb-2' : 'mb-5'}`} style={{ columnGap: 8, rowGap: 8 }}>
+      {options.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <TouchableOpacity
+            key={opt.value || 'all'}
+            onPress={() => onSelect(opt.value)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            className={`flex-row items-center px-4 py-2.5 rounded-full border ${
+              active ? 'bg-brand-500 border-brand-500' : 'bg-white border-slate-200'
+            }`}
+          >
+            {active ? <Check size={13} color="#ffffff" style={{ marginRight: 6 }} /> : null}
+            <Text className={`text-xs font-semibold ${active ? 'text-white' : 'text-slate-500'}`}>
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Bottom-sheet shell: Reset / Filters / Close, scrollable body, fixed actions. */
+function FilterSheet({
+  visible,
+  onClose,
+  onReset,
+  onApply,
+  applyCount,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onReset: () => void;
+  onApply: () => void;
+  applyCount: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={onClose}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        />
+        <View className="bg-white rounded-t-3xl" style={{ maxHeight: '85%' }}>
+          <View className="items-center pt-3 pb-1">
+            <View className="w-10 h-1.5 rounded-full bg-slate-200" />
+          </View>
+
+          <View className="flex-row items-center justify-between px-5 pt-2 pb-4">
+            <TouchableOpacity onPress={onReset} hitSlop={8}>
+              <Text className="text-sm font-bold text-red-500">Reset</Text>
+            </TouchableOpacity>
+            <Text className="text-base font-extrabold text-slate-900">Filters</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={8}>
+              <X size={18} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={{ maxHeight: 420 }}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 8 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {children}
+          </ScrollView>
+
+          <View className="px-5 pt-3" style={{ paddingBottom: Platform.OS === 'ios' ? 28 : 18 }}>
+            <TouchableOpacity
+              onPress={onReset}
+              activeOpacity={0.85}
+              className="w-full items-center justify-center bg-white border border-slate-200 rounded-xl py-3.5 mb-2.5"
+            >
+              <Text className="text-sm font-bold text-slate-700">Clear all</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onApply}
+              activeOpacity={0.9}
+              className="w-full items-center justify-center bg-brand-500 rounded-xl py-3.5"
+            >
+              <Text className="text-sm font-extrabold text-white">
+                Apply{applyCount > 0 ? ` (${applyCount})` : ''}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// How the inspection was carried out. Anything not explicitly VIRTUAL is on-site
+// — the column defaults to PHYSICAL and older rows predate the choice (mirrors
+// the web Reports table's Type column).
+function InspectionTypeChip({ type }: { type?: string | null }) {
+  const isVirtual = String(type || '').toUpperCase() === 'VIRTUAL';
+  return (
+    <View
+      className="flex-row items-center rounded-md px-2 py-0.5"
+      style={{ backgroundColor: isVirtual ? '#e0f2fe' : '#f1f5f9', columnGap: 4 }}
+    >
+      {isVirtual ? <Video size={10} color="#0284c7" /> : <MapPin size={10} color="#64748b" />}
+      <Text className="text-[10px] font-bold" style={{ color: isVirtual ? '#0369a1' : '#475569' }}>
+        {isVirtual ? 'Virtual' : 'Physical'}
+      </Text>
+    </View>
+  );
+}
+
+// Priority badge — same three tiers and colours as the web table.
+const PRIORITY_STYLE: Record<string, { bg: string; fg: string }> = {
+  high: { bg: '#fef2f2', fg: '#b91c1c' },
+  medium: { bg: '#fffbeb', fg: '#b45309' },
+  low: { bg: '#ecfdf5', fg: '#047857' },
+};
+
+function PriorityChip({ priority }: { priority: string }) {
+  const style = PRIORITY_STYLE[priority.toLowerCase()] || { bg: '#f1f5f9', fg: '#475569' };
+  return (
+    <View className="rounded-md px-2 py-0.5" style={{ backgroundColor: style.bg }}>
+      <Text className="text-[10px] font-bold capitalize" style={{ color: style.fg }}>
+        {priority}
+      </Text>
+    </View>
+  );
+}
 
 // Factory result badge — mirrors the web getResultBadge exactly (finalised
 // outcome the admin sees) so nothing renders as a raw enum value.
@@ -719,6 +980,8 @@ function ResultBadge({ result }: { result: string }) {
     case 'PASSED':
     case 'APPROVED':
       return pill('bg-emerald-100', 'border-emerald-200', '#047857', 'Approved', CheckCircle, '#059669');
+    case 'QC_SUBMITTED':
+      return pill('bg-blue-50', 'border-blue-200', '#1d4ed8', 'Submitted', CheckCircle, '#2563eb');
     case 'QC_APPROVED':
       return pill('bg-emerald-50', 'border-emerald-200', '#047857', 'QC Approved', CheckCircle, '#059669');
     case 'REINSPECTION':
@@ -739,36 +1002,6 @@ function ResultBadge({ result }: { result: string }) {
     default:
       return pill('bg-slate-100', 'border-slate-200', '#334155', result || '—');
   }
-}
-
-function OptionModal({ visible, title, options, value, onSelect, onClose }: {
-  visible: boolean; title: string; options: { value: string; label: string }[];
-  value: string; onSelect: (v: string) => void; onClose: () => void;
-}) {
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity activeOpacity={1} onPress={onClose}
-        className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
-      >
-        <View className="bg-white rounded-2xl w-11/12 max-w-sm overflow-hidden">
-          <View className="px-5 py-4 border-b border-slate-100">
-            <AppText variant="titleLg">{title}</AppText>
-          </View>
-          {options.map((opt) => {
-            const active = opt.value === value;
-            return (
-              <TouchableOpacity key={opt.value} onPress={() => onSelect(opt.value)}
-                className={`px-5 py-3.5 flex-row items-center justify-between border-b border-slate-100 ${active ? 'bg-brand-50' : ''}`}
-              >
-                <AppText variant="bodyMd" color={active ? brand[700] : colors.textSecondary} style={active ? { fontWeight: '700' } : undefined}>{opt.label}</AppText>
-                {active ? <View className="w-2 h-2 rounded-full bg-brand-500" /> : null}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  );
 }
 
 function Pagination({ page, totalPages, onChange, disabled }: {

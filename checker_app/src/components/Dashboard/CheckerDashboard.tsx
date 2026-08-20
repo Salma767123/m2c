@@ -20,12 +20,15 @@ import {
 } from 'lucide-react-native';
 import StatCard from './StatCard';
 import qcCheckerService from '../../services/qcCheckerService';
+import { formatCheckerName } from '../Vendor/Steps/fieldHelpers';
+import { vendorInspectionStatusOf, vendorScheduledMs, formatScheduledDate } from '@/lib/checkerVendorStatus';
 import { router } from 'expo-router';
 import { brand } from '@/constants/design';
 
 // ── Product status labels + badge colours (mirrors web CheckerDashboard) ──────
 const PRODUCT_STATUS_LABELS: Record<string, string> = {
   APPROVED: 'Approved by Admin',
+  QC_SUBMITTED: 'Submitted',
   QC_APPROVED: 'Approved by QC',
   REJECTED: 'Rejected',
   REINSPECTION: 'Reinspection',
@@ -40,6 +43,7 @@ const formatProductStatus = (status: string) =>
 
 const PRODUCT_BADGE: Record<string, { bg: string; text: string; border: string }> = {
   APPROVED: { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200' },
+  QC_SUBMITTED: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
   QC_APPROVED: { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200' },
   REJECTED: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200' },
   REINSPECTION: { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' },
@@ -88,6 +92,24 @@ function getVendorMainStatus(
 
 const pl = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
+// How many rows the Recent Assignments card shows before the checker has to open
+// the full list (matches web).
+const RECENT_LIMIT = 8;
+
+// Sortable timestamp for a product's booked QC window — the product-side twin of
+// vendorScheduledMs. Falls back to the product's creation time when the admin
+// hasn't booked a slot yet, so unscheduled products still order sensibly.
+const productScheduledMs = (product: any): number => {
+  const sched = product?.qcAssignment;
+  if (sched?.scheduledDate) {
+    const t = new Date(`${sched.scheduledDate} ${sched.scheduledTime || '00:00'}`).getTime();
+    if (!isNaN(t)) return t;
+    const d = new Date(sched.scheduledDate).getTime();
+    if (!isNaN(d)) return d;
+  }
+  return new Date(product?.createdAt || 0).getTime();
+};
+
 const formattedDate = (d: Date) =>
   d.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -115,6 +137,24 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
+  // The greeting reads better with a person's name than with a login code, so
+  // pull the checker's name from the cached login payload. `checkerId` stays the
+  // fallback for the first frame and for any account with no name stored.
+  const [checkerName, setCheckerName] = useState<string | null>(null);
+  const greetingName = checkerName || checkerId;
+
+  useEffect(() => {
+    let cancelled = false;
+    qcCheckerService
+      .getCheckerData()
+      .then((data) => {
+        if (cancelled) return;
+        const name = formatCheckerName(data) || data?.name || null;
+        if (name) setCheckerName(name);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Real-time clock — tick once a second (matches web).
   useEffect(() => {
@@ -167,16 +207,26 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
   const pendingProducts = assignedProducts.filter(
     (p) => p.approvalStatus === 'PENDING' || p.approvalStatus === 'REINSPECTION',
   ).length;
+  // "Completed" from the checker's view = they finished & submitted the inspection.
+  // QC_SUBMITTED (awaiting the admin's decision) counts here, alongside the admin's
+  // later QC_APPROVED/APPROVED outcomes.
   const passedProducts = assignedProducts.filter(
-    (p) => p.approvalStatus === 'QC_APPROVED' || p.approvalStatus === 'APPROVED',
+    (p) =>
+      p.approvalStatus === 'QC_SUBMITTED' ||
+      p.approvalStatus === 'QC_APPROVED' ||
+      p.approvalStatus === 'APPROVED',
   ).length;
   const failedProducts = assignedProducts.filter((p) => p.approvalStatus === 'REJECTED').length;
 
-  const pendingVendors = assignedVendors.filter(
-    (v) => v.status === 'UNDER_REVIEW' || v.status === 'PENDING' || v.status === 'REINSPECTION',
-  ).length;
-  const passedVendors = completedInspections.filter((i) => i.result === 'PASSED').length;
-  const failedVendors = completedInspections.filter((i) => i.result === 'FAILED').length;
+  // Vendor counts come from the SAME assigned-vendor list the Vendors tab shows,
+  // through the SAME status derivation it filters on — so each card's number
+  // equals exactly the rows its filter lands on, and the three are mutually
+  // exclusive. They used to be a mix of raw DB status (which counted
+  // awaiting-admin vendors as pending) and a separate completed-inspections
+  // fetch (which counted every cycle of a re-inspected vendor).
+  const pendingVendors = assignedVendors.filter((v) => vendorInspectionStatusOf(v) === 'Pending').length;
+  const passedVendors = assignedVendors.filter((v) => vendorInspectionStatusOf(v) === 'Completed').length;
+  const failedVendors = assignedVendors.filter((v) => vendorInspectionStatusOf(v) === 'Rejected').length;
 
   const isVendor = activeTab === 'vendor';
 
@@ -218,7 +268,10 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
           icon: AlertCircle,
           trend: pl(failedVendors, 'Vendor'),
           color: 'danger' as const,
-          onPress: () => goVendors({ status: 'Rejected' }),
+          // inspectionStatus, not status: the count is an inspection-status
+          // bucket, so the filter it opens has to be the same bucket or the
+          // list won't show the rows the card just counted.
+          onPress: () => goVendors({ inspectionStatus: 'Rejected' }),
         },
       ]
     : [
@@ -236,7 +289,11 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
           icon: Clock,
           trend: pl(pendingProducts, 'Product'),
           color: 'amber' as const,
-          onPress: () => goProducts({ status: 'PENDING' }),
+          // The card counts PENDING + REINSPECTION, so the filter it opens has
+          // to carry both — sending only PENDING showed fewer rows than the
+          // number the checker just tapped. The API takes a comma-separated
+          // list (getAssignedProducts splits and validates each value).
+          onPress: () => goProducts({ status: 'PENDING,REINSPECTION' }),
         },
         {
           label: 'Completed',
@@ -244,7 +301,10 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
           icon: CheckCircle2,
           trend: pl(passedProducts, 'Product'),
           color: 'success' as const,
-          onPress: () => goProducts({ status: 'QC_APPROVED' }),
+          // Same three statuses the count uses: submitted-awaiting-admin counts
+          // as done from the checker's side, alongside the admin's later
+          // QC_APPROVED / APPROVED outcomes.
+          onPress: () => goProducts({ status: 'QC_SUBMITTED,QC_APPROVED,APPROVED' }),
         },
         {
           label: 'Rejected',
@@ -259,7 +319,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
   const recentCount = isVendor ? assignedVendors.length : assignedProducts.length;
 
   if (loading) {
-    return <DashboardSkeleton checkerId={checkerId} />;
+    return <DashboardSkeleton greetingName={greetingName} />;
   }
 
   if (error) {
@@ -300,7 +360,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
       <View className="px-4 pt-4 pb-3 bg-gray-50 border-b border-slate-200">
         <Text className="text-3xl font-extrabold text-slate-900 mb-1">Dashboard</Text>
         <Text className="text-slate-600 text-sm mb-2">
-          Welcome back, <Text className="font-bold text-brand-600">{checkerId}</Text>
+          Welcome back, <Text className="font-bold text-brand-600">{greetingName}</Text>
         </Text>
         <View className="flex-row items-center flex-wrap" style={{ columnGap: 8, rowGap: 4 }}>
           <View className="flex-row items-center">
@@ -403,15 +463,18 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
           ) : isVendor ? (
             <View style={{ gap: 10 }}>
               {[...assignedVendors]
-                .sort(
-                  (a, b) =>
-                    new Date(b.createdAt || b.submittedAt || 0).getTime() -
-                    new Date(a.createdAt || a.submittedAt || 0).getTime(),
-                )
+                // Ordered by the booked inspection window (scheduledDate +
+                // scheduledTime), not the vendor's join date — what the checker
+                // needs first is what is scheduled next. Capped at 8; the "N
+                // total" badge above carries the full count.
+                .sort((a, b) => vendorScheduledMs(b) - vendorScheduledMs(a))
+                .slice(0, RECENT_LIMIT)
                 .map((vendor) => {
                   const vendorStatus = getVendorMainStatus(vendor.status, vendor.inspections?.[0] ?? null);
                   const badge = vendorBadge(vendorStatus);
-                  const assignedDate = vendor.createdAt || vendor.submittedAt;
+                  const latestInsp = vendor.inspections?.[0];
+                  const schedDate = latestInsp?.scheduledDate as string | undefined;
+                  const schedTime = latestInsp?.scheduledTime as string | undefined;
                   return (
                     <Pressable
                       key={`v-${vendor.id}`}
@@ -437,18 +500,17 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
                             {vendor.companyName}
                           </Text>
                           <Text className="text-xs text-slate-500">Factory Onboarding</Text>
-                          {assignedDate ? (
-                            <View className="flex-row items-center" style={{ gap: 4 }}>
-                              <CalendarDays size={11} color="#94a3b8" />
-                              <Text className="text-[11px] text-slate-400">
-                                {new Date(assignedDate).toLocaleDateString('en-IN', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                })}
-                              </Text>
-                            </View>
-                          ) : null}
+                          {/* The booked window, or an explicit "not scheduled yet" —
+                              a bare assignment date told the checker nothing about
+                              when they are due on site. */}
+                          <View className="flex-row items-center" style={{ gap: 4 }}>
+                            <CalendarDays size={11} color="#94a3b8" />
+                            <Text className="text-[11px] text-slate-400" numberOfLines={1}>
+                              {schedDate
+                                ? `Scheduled ${formatScheduledDate(schedDate)}${schedTime ? ` · ${schedTime}` : ''}`
+                                : 'Not scheduled yet'}
+                            </Text>
+                          </View>
                         </View>
                         <View className={`px-2.5 py-1 rounded-full border ${badge.bg} ${badge.border}`}>
                           <Text className={`text-[10px] font-bold ${badge.text}`} numberOfLines={1}>
@@ -463,9 +525,16 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
           ) : (
             <View style={{ gap: 10 }}>
               {[...assignedProducts]
-                .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+                // Ordered by the booked QC window, like the vendor list — what is
+                // scheduled next matters more than when the product was created.
+                // Products with no slot yet fall back to createdAt so they still sort.
+                .sort((a, b) => productScheduledMs(b) - productScheduledMs(a))
+                .slice(0, RECENT_LIMIT)
                 .map((product) => {
                   const badge = productBadge(product.approvalStatus);
+                  const sched = product.qcAssignment || {};
+                  const schedDate = sched.scheduledDate as string | undefined;
+                  const schedTime = sched.scheduledTime as string | undefined;
                   return (
                     <Pressable
                       key={`p-${product.id}`}
@@ -496,18 +565,16 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
                           {product.vendor?.companyName ? (
                             <Text className="text-xs text-slate-500" numberOfLines={1}>{product.vendor.companyName}</Text>
                           ) : null}
-                          {product.createdAt ? (
-                            <View className="flex-row items-center" style={{ gap: 4 }}>
-                              <CalendarDays size={11} color="#94a3b8" />
-                              <Text className="text-[11px] text-slate-400">
-                                {new Date(product.createdAt).toLocaleDateString('en-IN', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                })}
-                              </Text>
-                            </View>
-                          ) : null}
+                          {/* Same line as the vendor card: the booked window, or an
+                              explicit "not scheduled yet". */}
+                          <View className="flex-row items-center" style={{ gap: 4 }}>
+                            <CalendarDays size={11} color="#94a3b8" />
+                            <Text className="text-[11px] text-slate-400" numberOfLines={1}>
+                              {schedDate
+                                ? `Scheduled ${formatScheduledDate(schedDate)}${schedTime ? ` · ${schedTime}` : ''}`
+                                : 'Not scheduled yet'}
+                            </Text>
+                          </View>
                         </View>
                         <View className={`px-2.5 py-1 rounded-full border ${badge.bg} ${badge.border}`}>
                           <Text className={`text-[10px] font-bold ${badge.text}`} numberOfLines={1}>
@@ -581,7 +648,7 @@ function SkeletonAssignmentCard() {
   );
 }
 
-function DashboardSkeleton({ checkerId }: { checkerId: string | null }) {
+function DashboardSkeleton({ greetingName }: { greetingName: string | null }) {
   return (
     <ScrollView
       className="flex-1 bg-gray-50"
@@ -592,7 +659,7 @@ function DashboardSkeleton({ checkerId }: { checkerId: string | null }) {
       <View className="mb-6">
         <Text className="text-3xl font-extrabold text-slate-900 mb-1">Dashboard</Text>
         <Text className="text-slate-600 text-sm mb-3">
-          Welcome back, <Text className="font-bold text-brand-600">{checkerId || '...'}</Text>
+          Welcome back, <Text className="font-bold text-brand-600">{greetingName || '...'}</Text>
         </Text>
         <SkeletonBlock width={220} height={14} rounded="md" />
       </View>

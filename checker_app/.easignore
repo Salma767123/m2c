@@ -1,13 +1,10 @@
-# Sibling apps / services in the monorepo — `../` is required because
-# .easignore patterns resolve relative to the file's own directory (same
-# convention `mobile/.easignore` uses). Without the `../` these were silent
-# no-ops and the EAS archive ended up containing siblings instead of
-# checker_app/.
-../backend/
-../frontend/
-../mobile/
-../docs/
-../.agents/
+# NOTE: EAS archives the git root, and it reads the `.easignore` there — not
+# this one. Sibling apps (backend/, frontend/, mobile/) must be excluded from
+# the ROOT .easignore; `../mobile/` here was a silent no-op that let 43 MB of
+# mobile/ into every build. Keep this file for checker_app-local patterns only.
+#
+# Verify with:
+#   npx eas-cli build:inspect --platform android --stage archive --output <dir>
 
 # Editor / OS
 .vscode/

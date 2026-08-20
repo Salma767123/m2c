@@ -15,7 +15,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import type { TestGroup, TestItem } from '../PI_data';
-import { ADDITIONAL_EVIDENCE_DEFS } from '../PI_data';
+import { ADDITIONAL_EVIDENCE_DEFS, PACKAGING_TOGGLE_GROUPS, relabelForPackaging, isTestOptional } from '../PI_data';
 import { StepHeader, Card, ErrorBanner, PhotoGrid, RemarkInput, Photo } from './piShared';
 import { InvalidAnchor } from './piValidation';
 import type { ScrollNavHandlers } from '@/components/General/ScrollNav';
@@ -46,11 +46,14 @@ function TestRow({
   onChange,
   inspectionType,
   invalid = false,
+  optional = false,
 }: {
   test: TestItem;
   onChange: (patch: Partial<TestItem>) => void;
   inspectionType?: 'PHYSICAL' | 'VIRTUAL' | null;
   invalid?: boolean;
+  /** Pass/Fail may be left unanswered — shown as a badge so the checker knows. */
+  optional?: boolean;
 }) {
   const togglePass = () => (test.pass ? onChange({ pass: null }) : onChange({ pass: true, fail: null }));
   const toggleFail = () => (test.fail ? onChange({ fail: null }) : onChange({ fail: true, pass: null }));
@@ -67,7 +70,14 @@ function TestRow({
     <InvalidAnchor errorKey="testGroups" invalid={invalid} style={{ marginBottom: 12 }} radius={12}>
     <View className={`border rounded-xl overflow-hidden ${borderCls}`}>
       <View className="px-3 py-3 flex-row items-center">
-        <Text className="text-sm font-medium text-slate-800 flex-1 pr-2">{test.label}</Text>
+        <View className="flex-1 pr-2">
+          <Text className="text-sm font-medium text-slate-800">{test.label}</Text>
+          {optional && (
+            <View className="self-start mt-1 px-1.5 py-0.5 rounded bg-slate-100">
+              <Text className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Optional</Text>
+            </View>
+          )}
+        </View>
         <View className="flex-row" style={{ columnGap: 8 }}>
           <TouchableOpacity
             onPress={togglePass}
@@ -253,6 +263,7 @@ function TestGroupCard({
   onTestChange,
   onAddOther,
   onRemoveOther,
+  onPackagingTypeChange,
   inspectionType,
 }: {
   group: TestGroup;
@@ -261,8 +272,12 @@ function TestGroupCard({
   onTestChange: (testId: string, patch: Partial<TestItem>) => void;
   onAddOther: () => void;
   onRemoveOther: (testId: string) => void;
+  onPackagingTypeChange: (type: 'Carton' | 'Bale') => void;
   inspectionType?: 'PHYSICAL' | 'VIRTUAL' | null;
 }) {
+  // Only the measurement & functional groups carry the Carton/Bale packaging toggle.
+  const showPackagingToggle = (PACKAGING_TOGGLE_GROUPS as readonly string[]).includes(group.id);
+  const packagingType = group.packagingType || 'Carton';
   const regularTests = group.tests.filter((t) => !t.isOther);
   const otherTests = group.tests.filter((t) => t.isOther);
   const passed = group.tests.filter((t) => t.pass).length;
@@ -305,8 +320,34 @@ function TestGroupCard({
 
       {showTests && (
         <View className="p-3">
+          {showPackagingToggle && (
+            <View className="flex-row items-center mb-3" style={{ columnGap: 10 }}>
+              <Text className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                Packaging Type
+              </Text>
+              <View className="flex-row rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                {(['Carton', 'Bale'] as const).map((type) => {
+                  const active = type === packagingType;
+                  return (
+                    <TouchableOpacity
+                      key={type}
+                      onPress={() => { if (!active) onPackagingTypeChange(type); }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      className={`px-4 py-1.5 rounded-md ${active ? 'bg-brand-500' : ''}`}
+                      activeOpacity={0.8}
+                    >
+                      <Text className={`text-sm font-bold ${active ? 'text-white' : 'text-slate-600'}`}>
+                        {type}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
           {regularTests.map((test) => (
-            <TestRow key={test.id} test={test} invalid={test.id === invalidTestId} onChange={(patch) => onTestChange(test.id, patch)} inspectionType={inspectionType} />
+            <TestRow key={test.id} test={test} invalid={test.id === invalidTestId} optional={isTestOptional(test.id, group.packagingType)} onChange={(patch) => onTestChange(test.id, patch)} inspectionType={inspectionType} />
           ))}
           {otherTests.map((test) => (
             <OtherTestRow
@@ -339,6 +380,24 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {}, s
     setFormData({
       ...formData,
       testGroups: groups.map((g) => (g.id === groupId ? { ...g, collapsed: !g.collapsed } : g)),
+    });
+  };
+
+  // Carton/Bale toggle for the measurement & functional groups: store the choice and
+  // relabel that group's predefined test names accordingly (custom "Other" rows keep
+  // whatever the checker typed).
+  const setPackagingType = (groupId: string, type: 'Carton' | 'Bale') => {
+    setFormData({
+      ...formData,
+      testGroups: groups.map((g) =>
+        g.id === groupId
+          ? {
+              ...g,
+              packagingType: type,
+              tests: g.tests.map((t) => (t.isOther ? t : { ...t, label: relabelForPackaging(t.label, type) })),
+            }
+          : g,
+      ),
     });
   };
 
@@ -402,7 +461,8 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {}, s
     for (const g of groups) {
       for (const t of g.tests || []) {
         if (t.isOther && (blank(t.subject) || blank(t.label))) return t.id;
-        if (t.pass !== true && t.fail !== true) return t.id;
+        const optional = !t.isOther && isTestOptional(t.id, g.packagingType);
+        if (t.pass !== true && t.fail !== true) { if (optional) continue; return t.id; }
         if (t.pass === true && (!Array.isArray(t.rightPhotos) || t.rightPhotos.length === 0)) return t.id;
         if (t.fail === true && (!Array.isArray(t.wrongPhotos) || t.wrongPhotos.length === 0)) return t.id;
       }
@@ -442,6 +502,7 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {}, s
           onTestChange={(testId, patch) => updateTest(group.id, testId, patch)}
           onAddOther={() => addOtherTest(group.id)}
           onRemoveOther={(testId) => removeOtherTest(group.id, testId)}
+          onPackagingTypeChange={(type) => setPackagingType(group.id, type)}
           inspectionType={inspectionType}
         />
       ))}

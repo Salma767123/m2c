@@ -567,6 +567,7 @@ import {
   Modal,
   Image,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import {
   Search,
@@ -587,6 +588,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import DateRangeCalendar, { fmtDate } from '../../components/General/DateRangeCalendar';
 import { AppText, Button } from '@/components/UI';
 import { brand, colors, elevation } from '@/constants/design';
+import { isInspectionWindowElapsed, formatAssignmentWindow } from '@/lib/inspectionSchedule';
+import { showErrorToast } from '@/lib/toast-utils';
 
 const PAGE_SIZE = 12;
 const DEFAULT_SORT = 'createdAt:desc';
@@ -595,6 +598,7 @@ const STATUS_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'PENDING', label: 'Pending' },
   { value: 'REINSPECTION', label: 'Reinspection' },
+  { value: 'QC_SUBMITTED', label: 'Submitted' },
   { value: 'QC_APPROVED', label: 'Approved by QC' },
   { value: 'APPROVED', label: 'Approved by Admin' },
   { value: 'REJECTED', label: 'Rejected' },
@@ -610,6 +614,7 @@ const SORT_OPTIONS = [
 const APPROVAL_STYLE: Record<string, { bg: string; text: string }> = {
   PENDING: { bg: 'bg-amber-100', text: 'text-amber-800' },
   REINSPECTION: { bg: 'bg-purple-100', text: 'text-purple-800' },
+  QC_SUBMITTED: { bg: 'bg-blue-100', text: 'text-blue-800' },
   QC_APPROVED: { bg: 'bg-brand-100', text: 'text-brand-700' },
   APPROVED: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
   REJECTED: { bg: 'bg-red-100', text: 'text-red-800' },
@@ -618,6 +623,7 @@ const APPROVAL_STYLE: Record<string, { bg: string; text: string }> = {
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pending',
   REINSPECTION: 'Reinspection',
+  QC_SUBMITTED: 'Submitted',
   QC_APPROVED: 'Approved by QC',
   APPROVED: 'Approved by Admin',
   REJECTED: 'Rejected',
@@ -654,6 +660,8 @@ export default function ProductsTab() {
   const [dateFrom, setDateFrom] = useState(incoming.dateFrom ?? '');
   const [dateTo, setDateTo] = useState(incoming.dateTo ?? '');
   const [page, setPage] = useState(1);
+  // Product whose booked window is being looked up before its form is opened.
+  const [checkingSchedule, setCheckingSchedule] = useState<string | null>(null);
   const debouncedSearch = useDebounce(searchInput, 300);
 
   useEffect(() => {
@@ -795,11 +803,39 @@ export default function ProductsTab() {
     router.push({ pathname: '/products/[id]' as any, params: { id: p.id, name: p.name } });
   };
 
-  const handleStartInspection = (p: Product) => {
-    router.push({
-      pathname: '/product-inspection' as any,
-      params: { productId: p.id, productName: p.name, vendorName: p.vendor.companyName },
-    });
+  // Opening the form for an expired assignment wastes the checker's time: the
+  // server refuses both the start and the submit. The product detail screen
+  // already gates on this, but this list can push straight past it — and its own
+  // endpoint does not return qcAssignment, so the schedule has to be fetched
+  // before deciding. A failed lookup falls through and lets the form open, where
+  // the same check runs again against the detail response.
+  const handleStartInspection = async (p: Product) => {
+    const go = () =>
+      router.push({
+        pathname: '/product-inspection' as any,
+        params: { productId: p.id, productName: p.name, vendorName: p.vendor.companyName },
+      });
+    setCheckingSchedule(p.id);
+    try {
+      const res = await qcCheckerService.getProductDetails(p.id);
+      const sched = res?.data?.product?.qcAssignment || {};
+      if (isInspectionWindowElapsed(sched.scheduledDate, sched.scheduledTime, sched.estimatedDuration)) {
+        showErrorToast(
+          'Inspection Window Expired',
+          `The booked window (${formatAssignmentWindow(
+            sched.scheduledDate,
+            sched.scheduledTime,
+            sched.estimatedDuration,
+          )}) has already ended. Ask the admin to schedule a new assignment.`,
+        );
+        return;
+      }
+    } catch {
+      /* schedule unknown — let the form open and re-check there */
+    } finally {
+      setCheckingSchedule(null);
+    }
+    go();
   };
 
   return (
@@ -833,13 +869,15 @@ export default function ProductsTab() {
           onPress={openFilterSheet}
           accessibilityRole="button"
           accessibilityLabel="Open filters"
-          className="w-12 h-12 rounded-xl bg-slate-900 items-center justify-center"
+          className="w-12 h-12 rounded-xl bg-brand-500 items-center justify-center"
           style={elevation.card}
         >
           <SlidersHorizontal size={18} color="#ffffff" />
           {activeFilterCount > 0 ? (
-            <View className="absolute -top-1 -right-1 w-4.5 h-4.5 min-w-[18px] min-h-[18px] px-1 rounded-full bg-red-500 items-center justify-center">
-              <Text className="text-[10px] font-bold text-white">{activeFilterCount}</Text>
+            // White-on-red now that the button itself is brand red — a red
+            // badge on a red button reads as one solid blob.
+            <View className="absolute -top-1 -right-1 w-4.5 h-4.5 min-w-[18px] min-h-[18px] px-1 rounded-full bg-white border border-brand-600 items-center justify-center">
+              <Text className="text-[10px] font-bold text-brand-600">{activeFilterCount}</Text>
             </View>
           ) : null}
         </TouchableOpacity>
@@ -954,11 +992,19 @@ export default function ProductsTab() {
                     {canInspect ? (
                       <TouchableOpacity
                         onPress={() => handleStartInspection(p)}
+                        disabled={checkingSchedule === p.id}
                         activeOpacity={0.85}
                         className="flex-1 flex-row items-center justify-center bg-brand-500 rounded-lg py-2.5"
+                        style={{ opacity: checkingSchedule === p.id ? 0.7 : 1 }}
                       >
-                        <ArrowRight size={14} color="#ffffff" />
-                        <Text className="ml-1.5 text-sm font-bold text-white">Start Inspect</Text>
+                        {checkingSchedule === p.id ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <>
+                            <ArrowRight size={14} color="#ffffff" />
+                            <Text className="ml-1.5 text-sm font-bold text-white">Start Inspect</Text>
+                          </>
+                        )}
                       </TouchableOpacity>
                     ) : null}
                   </View>
@@ -1044,7 +1090,7 @@ export default function ProductsTab() {
                       onPress={() => setDraftStatus(opt.value)}
                       activeOpacity={0.85}
                       className={`flex-row items-center px-4 py-2.5 rounded-full border ${
-                        active ? 'bg-slate-900 border-slate-900' : 'bg-white border-slate-200'
+                        active ? 'bg-brand-500 border-brand-500' : 'bg-white border-slate-200'
                       }`}
                     >
                       {active ? <Check size={13} color="#ffffff" style={{ marginRight: 6 }} /> : null}
@@ -1067,7 +1113,7 @@ export default function ProductsTab() {
                       onPress={() => setDraftSort(opt.value)}
                       activeOpacity={0.85}
                       className={`flex-row items-center px-4 py-2.5 rounded-full border ${
-                        active ? 'bg-slate-900 border-slate-900' : 'bg-white border-slate-200'
+                        active ? 'bg-brand-500 border-brand-500' : 'bg-white border-slate-200'
                       }`}
                     >
                       {active ? <Check size={13} color="#ffffff" style={{ marginRight: 6 }} /> : null}
@@ -1092,7 +1138,7 @@ export default function ProductsTab() {
               <TouchableOpacity
                 onPress={applyFilters}
                 activeOpacity={0.9}
-                className="w-full items-center justify-center bg-slate-900 rounded-xl py-3.5"
+                className="w-full items-center justify-center bg-brand-500 rounded-xl py-3.5"
               >
                 <Text className="text-sm font-extrabold text-white">
                   Apply{draftActiveCount > 0 ? ` (${draftActiveCount})` : ''}

@@ -8,10 +8,14 @@ import { useLocalSearchParams, router } from 'expo-router';
 import {
   ArrowLeft, CheckCircle, XCircle, AlertCircle, AlertTriangle, Eye,
   Download, Clock, ClipboardList, Box, Bug, FlaskConical, Star,
-  FileText, Camera,
+  FileText, Camera, AlarmClockOff,
 } from 'lucide-react-native';
 import qcCheckerService from '../../services/qcCheckerService';
 import { downloadProductReportPdf } from '@/lib/reportPdf';
+import { computeInspectionDurations } from '@/lib/inspectionDuration';
+import { verificationLabel, isTestOptional } from '@/components/Products/PI_data';
+import { formatDateDMY } from '@/components/Products/Steps/piShared';
+import { ManufacturerInfoCard, hasManufacturerInfo } from '@/components/Products/ManufacturerInfoCard';
 import { AppText, SectionCard, StatusBadge, Button } from '@/components/UI';
 import { brand, colors, success, danger, amber, slate } from '@/constants/design';
 
@@ -24,21 +28,13 @@ const REMARK_LABELS: Record<number, string> = {
 
 // Friendly status labels — mirror the web checker portal.
 const STATUS_LABELS: Record<string, string> = {
+  QC_SUBMITTED: 'Submitted',
   QC_APPROVED: 'Approved by QC',
   APPROVED: 'Approved by Admin',
   REJECTED: 'Rejected',
   REINSPECTION: 'Reinspection',
   PENDING: 'Pending',
 };
-
-// Humanize a productVerifications key (e.g. "pvFrontView" → "Pv Front View").
-function humanizeVerKey(key: string): string {
-  return key
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, (c) => c.toUpperCase())
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 // Humanize an additional-evidence key (camelCase / snake_case → Title Case),
 // mirroring web's humanizeEvidenceKey (e.g. "factoryFrontView" → "Factory Front View").
@@ -173,6 +169,15 @@ export default function ProductReportDetailScreen() {
   const status = product.approvalStatus || 'PENDING';
   const statusLabel = STATUS_LABELS[status] || status;
 
+  // Did the active work run past the booked window? The timestamps live on the
+  // stored inspection payload, the scheduled length on the assignment.
+  const overtime = computeInspectionDurations({
+    startedAt: fd.inspectionStartedAt,
+    submittedAt: fd.inspectionCompletedAt,
+    totalPausedMs: fd.totalPausedMs || 0,
+    estimatedDuration: product.qcAssignment?.estimatedDuration,
+  }).exceeded;
+
   // ── New-schema inspection data (matches the 7-step form + PDF generator) ────
   const productVerifications: [string, any][] = Object.entries(fd.productVerifications || {});
   const packagingItems: any[] = Array.isArray(fd.packagingItems) ? fd.packagingItems : [];
@@ -228,6 +233,21 @@ export default function ProductReportDetailScreen() {
         <AppText variant="bodySm" color={colors.textMuted} style={{ marginBottom: 16, marginTop: 2 }}>
           {product.name}
         </AppText>
+
+        {/* Overtime flag. Web shows this beside the status badge in the header
+            row; on a phone that row has no space left, so it sits under the
+            title instead. */}
+        {overtime ? (
+          <View
+            className="flex-row items-center self-start rounded-full border px-2.5 py-1 mb-3"
+            style={{ backgroundColor: danger[50], borderColor: danger[100] }}
+          >
+            <AlarmClockOff size={13} color={danger[700]} />
+            <AppText variant="labelSm" color={danger[700]} style={{ marginLeft: 5 }}>
+              Exceeded schedule
+            </AppText>
+          </View>
+        ) : null}
 
         {/* Preview + Download PDF */}
         <View className="flex-row mb-4" style={{ columnGap: 8 }}>
@@ -285,9 +305,17 @@ export default function ProductReportDetailScreen() {
             <InfoRow label="Vendor" value={fd.vendor} />
             <InfoRow label="Factory" value={fd.factory} />
             <InfoRow label="Service Location" value={fd.serviceLocation} />
-            <InfoRow label="Service Start Date" value={fd.serviceStartDate} />
+            <InfoRow label="Service Start Date" value={formatDateDMY(fd.serviceStartDate)} />
             <InfoRow label="Service Type" value={fd.serviceType} />
           </SectionCard>
+
+          {/* Manufacturer — from the product snapshot captured at inspection time,
+              falling back to the live product record for older reports. */}
+          {hasManufacturerInfo(fd.productData?.manufacturerInfo || product.manufacturerInfo) ? (
+            <SectionCard icon={ClipboardList} title="Manufacturer Information">
+              <ManufacturerInfoCard info={fd.productData?.manufacturerInfo || product.manufacturerInfo} />
+            </SectionCard>
+          ) : null}
 
           {/* S2: Product Verification */}
           <SectionCard icon={ClipboardList} title="Section 2 — Product Verification">
@@ -301,7 +329,7 @@ export default function ProductReportDetailScreen() {
                 {productVerifications.map(([key, entry]) => (
                   <View key={key} className="py-2.5 border-b border-slate-100">
                     <View className="flex-row items-center">
-                      <AppText variant="titleMd" color={colors.text} style={{ flex: 2 }}>{humanizeVerKey(key)}</AppText>
+                      <AppText variant="titleMd" color={colors.text} style={{ flex: 2 }}>{verificationLabel(key)}</AppText>
                       <View style={{ width: 92 }}>
                         <OkPill ok={entry?.ok} yesLabel="Verified" noLabel="Not Verified" nullLabel="Not Checked" />
                       </View>
@@ -442,6 +470,9 @@ export default function ProductReportDetailScreen() {
                         {groupTests.map((test: any, i: number) => {
                           const passed = test.pass === true;
                           const failed = test.fail === true;
+                          // Optional tests may be left undecided — say so, rather
+                          // than reading as an omission the checker forgot.
+                          const optional = !test.isOther && isTestOptional(test.id, group.packagingType);
                           return (
                             <View key={test.id || i} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
                               <View className="flex-row items-center justify-between">
@@ -453,6 +484,11 @@ export default function ProductReportDetailScreen() {
                                     {test.isOther ? (
                                       <View className="rounded border border-brand-100 bg-brand-50 px-1.5 py-0.5">
                                         <AppText variant="labelSm" color={brand[600]} style={{ fontSize: 10, letterSpacing: 0.5 }}>CUSTOM</AppText>
+                                      </View>
+                                    ) : null}
+                                    {optional ? (
+                                      <View className="rounded bg-slate-100 px-1.5 py-0.5">
+                                        <AppText variant="labelSm" color={colors.textMuted} style={{ fontSize: 10, letterSpacing: 0.5 }}>OPTIONAL</AppText>
                                       </View>
                                     ) : null}
                                   </View>
@@ -474,7 +510,9 @@ export default function ProductReportDetailScreen() {
                                     <AppText variant="labelSm" color={danger[500]} style={{ marginLeft: 4 }}>FAIL</AppText>
                                   </View>
                                 ) : (
-                                  <AppText variant="labelSm" color={colors.textFaint}>No decision</AppText>
+                                  <AppText variant="labelSm" color={colors.textFaint}>
+                                    {optional ? 'Optional — not tested' : 'No decision'}
+                                  </AppText>
                                 )}
                               </View>
                               <PhotoGrid photos={test.rightPhotos} label="Right/Correct Photos" onTap={setLightboxUri} />

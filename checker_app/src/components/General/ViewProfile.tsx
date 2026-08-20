@@ -30,6 +30,16 @@ import { API_BASE_URL } from '../../lib/apiBase';
 import { AppText, SectionCard } from '@/components/UI';
 import { brand, colors, space } from '@/constants/design';
 
+// PDF renderer for the in-app preview. Lazily required so this screen still
+// loads on a build that predates the dependency (Expo Go, stale dev client) —
+// there we fall back to the OS handler instead of crashing on import.
+let PdfView: any = null;
+try {
+  PdfView = require('react-native-pdf').default;
+} catch {
+  /* handled at call time */
+}
+
 // Decide whether an ID-proof reference is a PDF (mirrors web CheckerSettings).
 const isPdfIdProof = (v?: string | null) =>
   !!v && (v.startsWith('data:application/pdf') || v.toLowerCase().endsWith('.pdf'));
@@ -119,6 +129,9 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
   // ID proof blob is fetched on demand (kept out of the initial profile load).
   const [idProofData, setIdProofData] = useState<string | null>(null);
   const [idProofLoading, setIdProofLoading] = useState(false);
+  // Resolved file/remote URI for the PDF preview — non-null while it is open.
+  const [pdfUri, setPdfUri] = useState<string | null>(null);
+  const [pdfFailed, setPdfFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -150,8 +163,9 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
     return val;
   };
 
-  // Open the ID proof: images go to an in-app lightbox, PDFs open in the
-  // system browser (mirrors web's viewer behaviour).
+  // Open the ID proof: images go to the in-app lightbox, PDFs to the in-app PDF
+  // preview. Nothing is handed to the share sheet — the checker is reading their
+  // own document, not sending it somewhere.
   const openIdProof = async () => {
     if (!profile?.hasIdProof || idProofLoading) return;
     setIdProofLoading(true);
@@ -166,22 +180,30 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
         setIdProofLightbox(true);
         return;
       }
+
+      // The renderer takes a URI, so a base64 data-URI PDF is materialised in
+      // the cache directory first; a remote one goes through the document-proxy.
+      let uri: string;
       if (idProof.startsWith('data:')) {
-        // base64 data-URI PDF — WebBrowser can't open data: URIs, so write it
-        // to a cache file and hand it to the OS share/open sheet.
         const base64 = idProof.substring(idProof.indexOf(',') + 1);
-        const fileUri = `${FileSystem.cacheDirectory}id-proof-${Date.now()}.pdf`;
-        await FileSystem.writeAsStringAsync(fileUri, base64, {
+        uri = `${FileSystem.cacheDirectory}id-proof-${Date.now()}.pdf`;
+        await FileSystem.writeAsStringAsync(uri, base64, {
           encoding: FileSystem.EncodingType.Base64,
         });
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'ID Proof' });
-        } else {
-          await WebBrowser.openBrowserAsync(fileUri);
-        }
       } else {
-        // remote PDF (e.g. Cloudinary) — open through the backend document-proxy.
-        await WebBrowser.openBrowserAsync(proxiedDocUrl(idProof));
+        uri = proxiedDocUrl(idProof);
+      }
+
+      if (PdfView) {
+        setPdfUri(uri);
+        return;
+      }
+      // Build without the PDF renderer — keep the old behaviour rather than
+      // leaving the button dead.
+      if (idProof.startsWith('data:') && (await Sharing.isAvailableAsync())) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'ID Proof' });
+      } else {
+        await WebBrowser.openBrowserAsync(uri);
       }
     } catch (err: any) {
       Alert.alert('Unable to open', err?.message || 'Could not open the ID proof.');
@@ -266,11 +288,13 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
             {/* 2. Contact Information */}
             <SectionCard icon={Mail} title="Contact Information" subtitle="How we reach you">
               <View style={{ gap: space.xl }}>
+                {/* Grouped by channel — both emails, then both phones — so the
+                    secondary sits directly under the primary it belongs to. */}
                 <Field label="Primary Email" value={profile?.email} />
-                <Field label="Primary Phone" value={profile?.phone} />
                 {hasSecondaryEmail ? (
                   <Field label="Secondary Email" value={profile?.alternateEmail} />
                 ) : null}
+                <Field label="Primary Phone" value={profile?.phone} />
                 {hasSecondaryPhone ? (
                   <Field label="Secondary Phone" value={profile?.alternatePhone} />
                 ) : null}
@@ -377,6 +401,63 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
                   resizeMode="contain"
                 />
               ) : null}
+            </View>
+          </View>
+        </Modal>
+
+        {/* ── PDF ID proof preview ── */}
+        <Modal
+          visible={!!pdfUri}
+          animationType="slide"
+          onRequestClose={() => {
+            setPdfUri(null);
+            setPdfFailed(false);
+          }}
+        >
+          <View className="flex-1" style={{ backgroundColor: '#0f172a' }}>
+            <View
+              className="flex-row items-center justify-between px-4"
+              style={{ paddingTop: insets.top + 8, paddingBottom: 8 }}
+            >
+              <AppText variant="titleMd" color={colors.white} style={{ flex: 1, marginRight: 12 }} numberOfLines={1}>
+                ID Proof
+              </AppText>
+              <TouchableOpacity
+                onPress={() => {
+                  setPdfUri(null);
+                  setPdfFailed(false);
+                }}
+                hitSlop={10}
+                accessibilityLabel="Close preview"
+                className="w-9 h-9 items-center justify-center rounded-full bg-white/15"
+              >
+                <XIcon size={20} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+            <View className="flex-1">
+              {pdfUri && PdfView && !pdfFailed ? (
+                <PdfView
+                  source={{ uri: pdfUri, cache: true }}
+                  style={{ flex: 1, backgroundColor: '#0f172a' }}
+                  onError={() => setPdfFailed(true)}
+                />
+              ) : (
+                /* A failed render is not a blank screen — offer the OS handler. */
+                <View className="flex-1 items-center justify-center px-8" style={{ rowGap: 12 }}>
+                  <FileText size={40} color="#64748b" />
+                  <AppText variant="bodyMd" color={colors.white} style={{ textAlign: 'center' }}>
+                    This document could not be previewed.
+                  </AppText>
+                  <TouchableOpacity
+                    onPress={() => pdfUri && WebBrowser.openBrowserAsync(pdfUri).catch(() => {})}
+                    className="flex-row items-center bg-brand-500 rounded-xl px-5 py-2.5"
+                    style={{ columnGap: 8 }}
+                  >
+                    <ExternalLink size={16} color="#ffffff" />
+                    <AppText variant="titleMd" color={colors.white}>Open in browser</AppText>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         </Modal>

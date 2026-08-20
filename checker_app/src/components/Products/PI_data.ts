@@ -111,7 +111,76 @@ export type TestGroup = {
   label: string;
   collapsed: boolean;
   tests: TestItem[];
+  // For the Measurement Inspection & Functional Tests groups: whether the goods are
+  // packed as 'Carton' or 'Bale'. Selecting it relabels the group's test names
+  // (e.g. "Carton Drop Test" ⇄ "Bale Drop Test"). Undefined = Carton (the default).
+  packagingType?: 'Carton' | 'Bale';
 };
+
+// Groups that expose the Carton/Bale packaging toggle (their test names carry the word).
+export const PACKAGING_TOGGLE_GROUPS = ['measurementInspection', 'functionalTests'] as const;
+
+// Testing-step checks that the checker MAY leave unanswered (no Pass/Fail required).
+// If they DO answer, the normal photo rule still applies.
+export const OPTIONAL_TEST_IDS = new Set<string>([
+  'pvBrandStickerVerification', // Brand Sticker Verification
+  'pvSilicaGelCheck',           // Silica Gel Check
+  'miBrandStickerDimensions',   // Brand Sticker Dimensions
+  'ftBarcodeCheck',             // Barcode Check
+]);
+
+// Whether a test is optional. Carton Drop Test is a special case: optional only when
+// the goods are packed as Bale, but mandatory for Carton (its default).
+export function isTestOptional(testId: string, packagingType?: 'Carton' | 'Bale'): boolean {
+  if (OPTIONAL_TEST_IDS.has(testId)) return true;
+  if (testId === 'ftCartonDropTest') return (packagingType || 'Carton') === 'Bale';
+  return false;
+}
+
+// Canonical display labels for the Product Verification (Step 2) fields. Single source
+// used by the form's summary AND the report view so they never drift — e.g.
+// pv_baseColor reads "Product Color" everywhere, pv_uom reads "Unit (UOM)".
+const VERIFICATION_FIELD_LABELS: Record<string, string> = {
+  pv_category: 'Category',
+  pv_name: 'Product Name',
+  pv_baseColor: 'Product Color',
+  pv_uom: 'Unit (UOM)',
+  pv_brand: 'Brand',
+  pv_description: 'Product Description',
+  pv_fabricType: 'Fabric Type',
+  pv_material: 'Material Description',
+  pv_careLabel: 'Care Label',
+  pv_countryOfOrigin: 'Country of Origin',
+  pv_labelInfo: 'Label Information',
+  pv_construction: 'Construction',
+  pv_weight: 'Shipping Weight',
+  pv_processingDays: 'Processing Days',
+  pv_shippingDays: 'Shipping Days',
+};
+
+const VERIFICATION_SPEC_LABELS: Record<string, string> = {
+  weightValue: 'Weight', weave: 'Weave Type', gsm: 'GSM', length: 'Length', breadth: 'Breadth',
+  careInstructions: 'Care Instructions',
+};
+
+/** Human label for a productVerifications key (form summary + report share this). */
+export function verificationLabel(key: string): string {
+  if (VERIFICATION_FIELD_LABELS[key]) return VERIFICATION_FIELD_LABELS[key];
+  const spec = key.match(/^pv_spec_(.+)$/);
+  if (spec) return VERIFICATION_SPEC_LABELS[spec[1]] || spec[1].replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+  const variant = key.match(/^pv_var(\d+)_(.+)$/);
+  if (variant) return `Variant ${Number(variant[1]) + 1} ${variant[2].replace(/^./, (c) => c.toUpperCase())}`;
+  const img = key.match(/^pv_img_(\d+)$/);
+  if (img) return `Product Image ${Number(img[1]) + 1}`;
+  return key.replace(/^pv_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Swap the packaging word in a test label to the chosen type — "Carton Drop Test"
+// ⇄ "Bale Drop Test". Whole-word, case-insensitive; labels without the word are
+// returned unchanged.
+export function relabelForPackaging(label: string, type: 'Carton' | 'Bale'): string {
+  return label.replace(/\b(carton|bale)\b/gi, type);
+}
 
 export function makeDefaultPackagingItems(): PackagingItem[] {
   return PACKAGING_ITEM_DEFS.map((d) => ({
@@ -129,6 +198,9 @@ export function makeDefaultTestGroups(): TestGroup[] {
     id: g.id,
     label: g.label,
     collapsed: false,
+    ...((PACKAGING_TOGGLE_GROUPS as readonly string[]).includes(g.id)
+      ? { packagingType: 'Carton' as const }
+      : {}),
     tests: g.tests.map((t) => ({
       id: t.id,
       label: t.label,

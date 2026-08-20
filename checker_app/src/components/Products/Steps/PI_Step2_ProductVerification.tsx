@@ -306,25 +306,25 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
 
       {/* 1. Basic Product Information */}
       <Card title="Basic Product Information" icon={<Package size={16} color="#e01a1b" />}>
-        {notEmpty(p.name) && (
-          <VerifyField fieldKey="pv_name" label="Product Name" value={p.name}
-            verification={vf('pv_name')} onChange={(ok, r) => onVerify('pv_name', ok, r)}
-            highlight={highlightKeys.has('pv_name')} />
-        )}
         {notEmpty(p.category) && (
           <VerifyField fieldKey="pv_category" label="Category" value={p.category}
             verification={vf('pv_category')} onChange={(ok, r) => onVerify('pv_category', ok, r)}
             highlight={highlightKeys.has('pv_category')} />
         )}
+        {notEmpty(p.name) && (
+          <VerifyField fieldKey="pv_name" label="Product Name" value={p.name}
+            verification={vf('pv_name')} onChange={(ok, r) => onVerify('pv_name', ok, r)}
+            highlight={highlightKeys.has('pv_name')} />
+        )}
         {notEmpty(p.singleUnitColor) && (
-          <VerifyField fieldKey="pv_baseColor" label="Base Color"
+          <VerifyField fieldKey="pv_baseColor" label="Product Color"
             value={colorValue(p.singleUnitColor, p.singleUnitColorHex)}
             headerAction={colorSwatch(p.singleUnitColor, p.singleUnitColorHex)}
             verification={vf('pv_baseColor')} onChange={(ok, r) => onVerify('pv_baseColor', ok, r)}
             highlight={highlightKeys.has('pv_baseColor')} />
         )}
         {notEmpty(p.uom) && (
-          <VerifyField fieldKey="pv_uom" label="Selling Unit (UOM)" value={UOM_LABELS[p.uom] || p.uom}
+          <VerifyField fieldKey="pv_uom" label="Unit (UOM)" value={UOM_LABELS[p.uom] || p.uom}
             verification={vf('pv_uom')} onChange={(ok, r) => onVerify('pv_uom', ok, r)}
             highlight={highlightKeys.has('pv_uom')} />
         )}
@@ -363,7 +363,56 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
         </Card>
       )}
 
-      {/* 3. Measurements & Specifications */}
+      {/* 3. Variants (no pricing) — shown before measurements */}
+      {variants.length > 0 && (
+        <Card title="Product Variants" icon={<Layers size={16} color="#e01a1b" />}>
+          {variants.map((variant: any, vi: number) => {
+            const varLabel =
+              [variant.color, variant.size, variant.material].filter(Boolean).join(' / ') || `Variant ${vi + 1}`;
+            const varImg = Array.isArray(variant.images) ? variant.images[0] : undefined;
+            return (
+              <View key={vi} className="border border-slate-200 rounded-xl overflow-hidden mb-3">
+                <View className="bg-slate-50 border-b border-slate-200 px-3 py-2">
+                  <Text className="text-sm font-bold text-slate-700">Variant {vi + 1}: {varLabel}</Text>
+                </View>
+                <View className="p-3">
+                  {notEmpty(variant.color) && (
+                    <VerifyField fieldKey={`pv_var${vi}_color`} label="Color"
+                      value={colorValue(variant.color, variant.colorHex)}
+                      headerAction={colorSwatch(variant.color, variant.colorHex)}
+                      verification={vf(`pv_var${vi}_color`)} onChange={(ok, r) => onVerify(`pv_var${vi}_color`, ok, r)}
+                      highlight={highlightKeys.has(`pv_var${vi}_color`)} />
+                  )}
+                  {notEmpty(variant.size) && (
+                    <VerifyField fieldKey={`pv_var${vi}_size`} label="Size" value={variant.size}
+                      verification={vf(`pv_var${vi}_size`)} onChange={(ok, r) => onVerify(`pv_var${vi}_size`, ok, r)}
+                      highlight={highlightKeys.has(`pv_var${vi}_size`)} />
+                  )}
+                  {notEmpty(variant.material) && (
+                    <VerifyField fieldKey={`pv_var${vi}_material`} label="Material" value={variant.material}
+                      verification={vf(`pv_var${vi}_material`)} onChange={(ok, r) => onVerify(`pv_var${vi}_material`, ok, r)}
+                      highlight={highlightKeys.has(`pv_var${vi}_material`)} />
+                  )}
+                  {notEmpty(variant.variantName) && (
+                    <VerifyField fieldKey={`pv_var${vi}_variantName`} label="Variant Name" value={variant.variantName}
+                      verification={vf(`pv_var${vi}_variantName`)} onChange={(ok, r) => onVerify(`pv_var${vi}_variantName`, ok, r)}
+                      highlight={highlightKeys.has(`pv_var${vi}_variantName`)} />
+                  )}
+                  {varImg && (
+                    <VerifyField fieldKey={`pv_var${vi}_image`} label="Variant Image"
+                      imageUrl={varImg}
+                      verification={vf(`pv_var${vi}_image`)} onChange={(ok, r) => onVerify(`pv_var${vi}_image`, ok, r)}
+                      highlight={highlightKeys.has(`pv_var${vi}_image`)}
+                      onView={() => setLightbox({ url: varImg, label: `Variant ${vi + 1} Image` })} />
+                  )}
+                </View>
+              </View>
+            );
+          })}
+        </Card>
+      )}
+
+      {/* 4. Measurements & Specifications */}
       {(notEmpty(p.fabricType) || notEmpty(p.material) || notEmpty(p.fabricSpecifications)) && (
         <Card title="Measurements & Specifications" icon={<Ruler size={16} color="#e01a1b" />}>
           {notEmpty(p.fabricType) && (
@@ -424,55 +473,6 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
                 needsHighlight={highlightKeys.has('pv_spec_careInstructions')}
               />
             )}
-        </Card>
-      )}
-
-      {/* 4. Product Variants (no pricing) */}
-      {variants.length > 0 && (
-        <Card title="Product Variants" icon={<Layers size={16} color="#e01a1b" />}>
-          {variants.map((variant: any, vi: number) => {
-            const varLabel =
-              [variant.color, variant.size, variant.material].filter(Boolean).join(' / ') || `Variant ${vi + 1}`;
-            const varImg = Array.isArray(variant.images) ? variant.images[0] : undefined;
-            return (
-              <View key={vi} className="border border-slate-200 rounded-xl overflow-hidden mb-3">
-                <View className="bg-slate-50 border-b border-slate-200 px-3 py-2">
-                  <Text className="text-sm font-bold text-slate-700">Variant {vi + 1}: {varLabel}</Text>
-                </View>
-                <View className="p-3">
-                  {notEmpty(variant.color) && (
-                    <VerifyField fieldKey={`pv_var${vi}_color`} label="Color"
-                      value={colorValue(variant.color, variant.colorHex)}
-                      headerAction={colorSwatch(variant.color, variant.colorHex)}
-                      verification={vf(`pv_var${vi}_color`)} onChange={(ok, r) => onVerify(`pv_var${vi}_color`, ok, r)}
-                      highlight={highlightKeys.has(`pv_var${vi}_color`)} />
-                  )}
-                  {notEmpty(variant.size) && (
-                    <VerifyField fieldKey={`pv_var${vi}_size`} label="Size" value={variant.size}
-                      verification={vf(`pv_var${vi}_size`)} onChange={(ok, r) => onVerify(`pv_var${vi}_size`, ok, r)}
-                      highlight={highlightKeys.has(`pv_var${vi}_size`)} />
-                  )}
-                  {notEmpty(variant.material) && (
-                    <VerifyField fieldKey={`pv_var${vi}_material`} label="Material" value={variant.material}
-                      verification={vf(`pv_var${vi}_material`)} onChange={(ok, r) => onVerify(`pv_var${vi}_material`, ok, r)}
-                      highlight={highlightKeys.has(`pv_var${vi}_material`)} />
-                  )}
-                  {notEmpty(variant.variantName) && (
-                    <VerifyField fieldKey={`pv_var${vi}_variantName`} label="Variant Name" value={variant.variantName}
-                      verification={vf(`pv_var${vi}_variantName`)} onChange={(ok, r) => onVerify(`pv_var${vi}_variantName`, ok, r)}
-                      highlight={highlightKeys.has(`pv_var${vi}_variantName`)} />
-                  )}
-                  {varImg && (
-                    <VerifyField fieldKey={`pv_var${vi}_image`} label="Variant Image"
-                      imageUrl={varImg}
-                      verification={vf(`pv_var${vi}_image`)} onChange={(ok, r) => onVerify(`pv_var${vi}_image`, ok, r)}
-                      highlight={highlightKeys.has(`pv_var${vi}_image`)}
-                      onView={() => setLightbox({ url: varImg, label: `Variant ${vi + 1} Image` })} />
-                  )}
-                </View>
-              </View>
-            );
-          })}
         </Card>
       )}
 
