@@ -289,7 +289,11 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
           icon: Clock,
           trend: pl(pendingProducts, 'Product'),
           color: 'amber' as const,
-          onPress: () => goProducts({ status: 'PENDING' }),
+          // The card counts PENDING + REINSPECTION, so the filter it opens has
+          // to carry both — sending only PENDING showed fewer rows than the
+          // number the checker just tapped. The API takes a comma-separated
+          // list (getAssignedProducts splits and validates each value).
+          onPress: () => goProducts({ status: 'PENDING,REINSPECTION' }),
         },
         {
           label: 'Completed',
@@ -297,7 +301,10 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
           icon: CheckCircle2,
           trend: pl(passedProducts, 'Product'),
           color: 'success' as const,
-          onPress: () => goProducts({ status: 'QC_APPROVED' }),
+          // Same three statuses the count uses: submitted-awaiting-admin counts
+          // as done from the checker's side, alongside the admin's later
+          // QC_APPROVED / APPROVED outcomes.
+          onPress: () => goProducts({ status: 'QC_SUBMITTED,QC_APPROVED,APPROVED' }),
         },
         {
           label: 'Rejected',
