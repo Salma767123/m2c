@@ -34,6 +34,9 @@ import FeaturedProducts from '@/components/WebSite/Featured/Products';
 // storefront shows the exact icons they selected.
 import { CARE_INSTRUCTIONS, CareIcon, CATEGORY_COLORS } from '@/components/VendorDashboard/Products/CareInstructionModal';
 
+/** How many specification rows the hero shows before "Show all". */
+const SPEC_PREVIEW = 6;
+
 interface ProductDetailProps {
   productSlug: string;
 }
@@ -46,11 +49,20 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
   const [promoOffers, setPromoOffers] = useState<PublicOffer[]>([]);
   // A category coupon (highest-priority promo in the sticky rail's Offers card).
   const [categoryCoupon, setCategoryCoupon] = useState<PopupCoupon | null>(null);
+  /**
+   * The store's live coupons, used only when this product's category has no
+   * coupon of its own. Checked against the running backend: no coupon in the
+   * database is flagged "show as popup" for any category, so `categoryCoupon`
+   * is null on every product and the panel was showing the offer alone.
+   */
+  const [promoCoupons, setPromoCoupons] = useState<Array<{ message: string; image: string | null; link: string }>>([]);
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showAllDetails, setShowAllDetails] = useState(false);
+  /** The hero spec table opens short. Thirteen rows beside the price is a wall. */
+  const [showAllSpecs, setShowAllSpecs] = useState(false);
   const [isImageHovered, setIsImageHovered] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [imageRef, setImageRef] = useState<HTMLImageElement | null>(null);
@@ -84,6 +96,15 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
   const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
   const [showMakerModal, setShowMakerModal] = useState(false);
 
+  // Is the hero's description actually cut off, or is that all there is?
+  // Measured, not guessed: the 4-line clamp starts hiding text at 208
+  // characters in a 346px phone column, 314 on desktop and 414 on a tablet, so
+  // no single character count can answer it. A vendor writing two lines was
+  // still being offered "Read full description", which scrolled the best part
+  // of a thousand pixels to show the same two lines again.
+  const descRef = useRef<HTMLParagraphElement | null>(null);
+  const [descHasMore, setDescHasMore] = useState(false);
+
   // Reviews are always shown — load them automatically once the product is known.
   useEffect(() => {
     const pid = product?.id;
@@ -115,6 +136,20 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
 
   // Reset the load-more window whenever the filters change.
   useEffect(() => { setReviewShown(5); }, [reviewSort, reviewStar, reviewSearch]);
+
+  // Re-measured whenever the text or the column changes, so a phone rotating
+  // to landscape gets the right answer too.
+  const productDescription = product?.description;
+  useEffect(() => {
+    const el = descRef.current;
+    if (!el) { setDescHasMore(false); return; }
+    const measure = () => setDescHasMore(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [productDescription]);
 
   // Close the manufacturer modal on Escape.
   useEffect(() => {
@@ -180,6 +215,14 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
     offerService.getActiveOffers()
       .then((offers) => { if (!cancelled) setPromoOffers(Array.isArray(offers) ? offers.slice(0, 6) : []); })
       .catch(() => { if (!cancelled) setPromoOffers([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    couponService.getPromotionalCoupons(8)
+      .then((c) => { if (!cancelled) setPromoCoupons(Array.isArray(c) ? c : []); })
+      .catch(() => { if (!cancelled) setPromoCoupons([]); });
     return () => { cancelled = true; };
   }, []);
 
@@ -641,27 +684,82 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
   //
   // A plain const, not useMemo: this sits below the loading/not-found returns
   // above, so a hook here would be called on some renders and not others.
-  const keyFacts = (() => {
-    const out: { label: string; value: string; hex?: string | null }[] = [];
-    const add = (label: string, value?: string | null, hex?: string | null) => {
-      if (value != null && String(value).trim() !== '') out.push({ label, value: String(value), hex });
+
+  // ── The specification, built once ──────────────────────────────────────
+  // This used to be built twice: a six-row cut in the hero called "Product
+  // details", and the full table again in a "Specifications" section below.
+  // On the terry towel that meant thirteen labels -- material, fabric, weight,
+  // category, size, colour, dimensions, GSM ... -- printed twice on one page,
+  // and the hero column ending 281px short of the buy box beside it. One table,
+  // in the hero, fills that gap with the thing the reader came for.
+  const fabricSpec: Record<string, any> = (product.fabricSpecifications && typeof product.fabricSpecifications === 'object')
+    ? (product.fabricSpecifications as Record<string, any>) : {};
+  const specItems = (() => {
+    const FS_LABELS: Record<string, string> = {
+      weightValue: 'Fabric Weight', gsm: 'GSM', length: 'Length', breadth: 'Breadth',
+      weave: 'Type of Weave', composition: 'Composition',
     };
-    // Size and colour belong to the variant when there is one, and the variant
-    // picker under the gallery already says which is selected.
-    if (!product.hasVariants) {
-      add('Size', product.singleUnitSize);
-      add('Color', product.singleUnitColor, product.singleUnitColorHex);
-    }
-    add('Material', product.material);
-    add('Fabric', product.fabricType);
-    add('Dimensions', product.dimensions);
-    if (product.weight) {
-      const unit = product.weightUnit && !/[a-z]/i.test(String(product.weight)) ? ` ${product.weightUnit}` : '';
-      add('Weight', `${product.weight}${unit}`);
-    }
-    add('Sold as', product.uom);
-    return out.slice(0, 6);
+    const FS_UNITS: Record<string, string> = { weightValue: 'g', length: 'cm', breadth: 'cm', gsm: 'GSM' };
+    const out: { label: string; value: string; hex?: string | null }[] = [];
+    if (product.baseSku) out.push({ label: 'Product Code', value: product.baseSku });
+    if (product.category) out.push({ label: 'Category', value: product.category });
+    // Size and colour belong to the variant when there is one, and the picker
+    // under the gallery already says which is selected.
+    if (!product.hasVariants && product.singleUnitSize) out.push({ label: 'Size', value: product.singleUnitSize });
+    if (!product.hasVariants && product.singleUnitColor) out.push({ label: 'Color', value: product.singleUnitColor, hex: product.singleUnitColorHex });
+    if (product.material) out.push({ label: 'Material', value: product.material });
+    if (product.fabricType) out.push({ label: 'Fabric', value: product.fabricType });
+    if (product.dimensions) out.push({ label: 'Dimensions', value: product.dimensions });
+    if (product.weight) out.push({ label: 'Weight', value: `${product.weight}${product.weightUnit && !/[a-z]/i.test(String(product.weight)) ? ` ${product.weightUnit}` : ''}` });
+    if (product.uom) out.push({ label: 'Sold as', value: product.uom });
+    Object.entries(fabricSpec)
+      .filter(([k]) => !['careInstructions', 'weightUnit', 'basis', 'type'].includes(k))
+      .filter(([, v]) => v != null && String(v).trim() !== '')
+      .forEach(([k, v]) => {
+        const label = FS_LABELS[k] ?? k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+        const unit = FS_UNITS[k];
+        const raw = Array.isArray(v) ? v.join(', ') : String(v);
+        const value = unit && /^[\d.,\s]+$/.test(raw.trim()) ? `${raw} ${unit}` : raw;
+        out.push({ label, value });
+      });
+    if (product.hasVariants) out.push({ label: 'Variants', value: String(visibleVariants.length) });
+    out.push({ label: 'Availability', value: availableStock > 0 ? `In stock (${availableStock})` : 'Out of stock' });
+    return out;
   })();
+  const careList: string[] = Array.isArray(fabricSpec.careInstructions) ? fabricSpec.careInstructions : [];
+
+  // ── The cloth ──────────────────────────────────────────────────────────
+  // Three figures, set large, under the gallery. A marketplace page describes
+  // a towel the way it would describe a phone case; a mill describes it by
+  // GSM, weight and size, and those are already on the product. The unit is
+  // split off the number so the figure can be set big and the unit small,
+  // which is what makes it read as a spec sheet rather than another table.
+  const clothFigures = (() => {
+    const out: { value: string; unit?: string; label: string }[] = [];
+    const num = (v: unknown) => String(v).trim();
+    const split = (raw: string) => {
+      const m = raw.match(/^([\d.,]+)\s*(.*)$/);
+      return m ? { value: m[1], unit: m[2] || undefined } : { value: raw };
+    };
+    if (fabricSpec.gsm != null && num(fabricSpec.gsm) !== '') {
+      out.push({ ...split(num(fabricSpec.gsm).replace(/gsm/i, '').trim()), unit: 'gsm', label: 'Density' });
+    }
+    if (product.weight) {
+      const unit = product.weightUnit && !/[a-z]/i.test(String(product.weight)) ? String(product.weightUnit) : '';
+      out.push({ ...split(`${product.weight}${unit ? ` ${unit}` : ''}`), label: 'Weight' });
+    }
+    const size = product.dimensions
+      || (!product.hasVariants && product.singleUnitSize)
+      || (fabricSpec.length && fabricSpec.breadth ? `${fabricSpec.length} \u00d7 ${fabricSpec.breadth} cm` : '');
+    if (size) out.push({ value: String(size), label: 'Size' });
+    if (out.length < 3 && fabricSpec.composition) {
+      out.push({ ...split(num(fabricSpec.composition)), label: 'Composition' });
+    }
+    return out.slice(0, 3);
+  })();
+  const clothLine = [product.material, product.fabricType, fabricSpec.weave ? `${fabricSpec.weave} weave` : null]
+    .filter((x) => x && String(x).trim())
+    .join(' \u00b7 ');
 
   // "Why choose this?" reasons — derived from real product/vendor data, used in the
   // hero rail (under the manufacturer card). Items with no backing data are skipped.
@@ -944,6 +1042,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     </div>
                   )}
 
+
                 </div>
               </div>
 
@@ -1011,6 +1110,44 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                         ) : null}
                       </div>
 
+                      {/* ── Who made this ────────────────────────────────
+                          The full "Meet the Maker" panel is 2,241px down the
+                          page on desktop and 3,799px down on a phone -- four
+                          screens of scrolling before anyone learns there is a
+                          person behind the product. This is the same fact at
+                          the top, where the customer meets the product, and it
+                          opens that panel's profile when tapped. */}
+                      {hasManufacturerInfo(product.manufacturerInfo) && (() => {
+                        const m = product.manufacturerInfo!;
+                        const name = manufacturerDisplayName(m);
+                        const under = [m.role, m.experience].filter((x) => x && x.trim()).join(' · ');
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setShowMakerModal(true)}
+                            className="group mb-2 flex w-full items-center gap-3 rounded-xl bg-[linear-gradient(120deg,#fdf9f5_0%,#faf7f3_60%,#f8f3ed_100%)] px-3 py-3 text-left ring-1 ring-[#efe6df] transition-all duration-300 hover:shadow-[0_6px_18px_rgba(0,0,0,0.05)] hover:ring-[#e0d2c4] sm:mb-2.5 sm:gap-4 sm:rounded-2xl sm:px-4 sm:py-4"
+                          >
+                            {m.photo ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={m.photo} alt="" loading="lazy" className="h-14 w-14 shrink-0 rounded-full object-cover shadow-[0_4px_14px_rgba(0,0,0,0.12)] ring-2 ring-white sm:h-16 sm:w-16" />
+                            ) : (
+                              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white text-[#a1948a] shadow-[0_4px_14px_rgba(0,0,0,0.08)] ring-2 ring-white sm:h-16 sm:w-16">
+                                <Award className="h-6 w-6" />
+                              </span>
+                            )}
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-[#b9a99b] sm:text-[11px]">Made by</span>
+                              <span className="block truncate text-[15px] font-bold text-[#1a1a1a] sm:text-[17px]">{name || 'Our maker'}</span>
+                              {under && <span className="mt-0.5 block truncate text-[12px] text-[#6b625b] sm:text-[13px]">{under}</span>}
+                            </span>
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-[#4a423c] ring-1 ring-[#e6dcd2] transition-colors group-hover:text-[#e01a1b] sm:text-[13px]">
+                              <span className="hidden sm:inline">View profile</span>
+                              <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                            </span>
+                          </button>
+                        );
+                      })()}
+
                       {/* Price moved into the purchase panel (below quantity / stock / dispatch) */}
                     </div>
 
@@ -1062,27 +1199,77 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       {product.description && (
                         <div>
                           <h2 className="mb-2 text-[14px] font-bold uppercase tracking-[0.08em] text-gray-900">About this item</h2>
-                          <p className="line-clamp-4 whitespace-pre-line text-[14.5px] leading-relaxed text-gray-600 sm:text-[15px]">{product.description}</p>
-                          <button
-                            type="button"
-                            onClick={() => document.getElementById('product-information')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                            className="mt-2 inline-flex items-center gap-1 text-[14px] font-semibold text-[#e01a1b] transition-colors hover:text-[#c41617]"
-                          >
-                            Read full description
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          </button>
+                          <p ref={descRef} className="line-clamp-4 whitespace-pre-line text-[14.5px] leading-relaxed text-gray-600 sm:text-[15px]">{product.description}</p>
+                          {descHasMore && (
+                            <button
+                              type="button"
+                              onClick={() => document.getElementById('product-information')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                              className="mt-2 inline-flex items-center gap-1 text-[14px] font-semibold text-[#e01a1b] transition-colors hover:text-[#c41617]"
+                            >
+                              Read full description
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {/* The tags live in the description section further
+                              down -- but that section is skipped when the hero
+                              has already shown everything, so they come up here
+                              instead of vanishing with it. */}
+                          {!descHasMore && product.tags && product.tags.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {product.tags.map((tag, i) => (
+                                <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-[#e01a1b]/[0.06] px-3 py-1.5 text-[13px] font-semibold text-[#e01a1b]">
+                                  <Check className="h-3.5 w-3.5" /> {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
 
-                      {/* The facts, as a table rather than the grey box that used to
-                          sit here. That box only appeared for products WITHOUT
-                          variants, so a product like this one -- four variants --
-                          showed no specification at all in the hero. */}
-                      {keyFacts.length > 0 && (
+                {/* ══ The cloth ══
+                    Sits in the middle column, which is where the empty space
+                    under a tall buy box actually is. In the gallery column it
+                    pushed the maker below the fold on a phone -- which was the
+                    whole point of moving the maker up. Only drawn when the
+                    vendor has entered
+                    at least two of the three figures -- one number on its own
+                    is not a spec sheet, it is a stray fact. */}
+                {clothFigures.length >= 2 && (
+                  <div className="overflow-hidden rounded-2xl bg-[linear-gradient(130deg,#fdf9f5_0%,#f8f3ec_100%)] ring-1 ring-[#efe6df]">
+                    <div className="flex items-center gap-2 px-4 pt-4 sm:px-5 sm:pt-5">
+                      <span className="h-px w-6 bg-[#d8c9b8]" />
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#b9a99b]">The cloth</span>
+                    </div>
+                    <dl className="flex divide-x divide-[#eadfd4] px-2 pb-4 pt-3 sm:pb-5">
+                      {clothFigures.map((f) => (
+                        <div key={f.label} className="min-w-0 flex-1 px-2 text-center sm:px-3">
+                          {/* The figure shrinks when it is a dimension rather
+                              than a number -- "50 × 40 cm" set at 28px wrapped
+                              onto a second line and pushed its own label out
+                              of step with the two beside it. The fixed height
+                              keeps all three labels on one line regardless. */}
+                          <dd className="flex h-8 items-center justify-center font-playfair font-semibold leading-none tracking-tight text-[#1a1a1a]">
+                            <span className={`tabular-nums ${f.value.length > 7 ? 'text-[17px] sm:text-xl' : 'text-2xl sm:text-[28px]'}`}>{f.value}</span>
+                            {f.unit && <span className="ml-1 self-end pb-0.5 font-sans text-[12px] font-semibold uppercase tracking-wide text-[#a1948a]">{f.unit}</span>}
+                          </dd>
+                          <dt className="mt-2 truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[#a1948a]">{f.label}</dt>
+                        </div>
+                      ))}
+                    </dl>
+                    {clothLine && (
+                      <p className="border-t border-[#eadfd4] px-4 py-2.5 text-center text-[12.5px] text-[#6b625b] sm:px-5">{clothLine}</p>
+                    )}
+                  </div>
+                )}
+
+                      {/* The whole specification, not a six-row taste of it.
+                          The full table used to sit in its own band lower down,
+                          repeating every row of this one. */}
+                      {specItems.length > 0 && (
                         <div>
-                          <h2 className="mb-2.5 text-[14px] font-bold uppercase tracking-[0.08em] text-gray-900">Product details</h2>
+                          <h2 className="mb-2.5 text-[14px] font-bold uppercase tracking-[0.08em] text-gray-900">Specifications</h2>
                           <dl className="divide-y divide-gray-100 overflow-hidden rounded-xl ring-1 ring-black/[0.06]">
-                            {keyFacts.map((f) => (
+                            {(showAllSpecs ? specItems : specItems.slice(0, SPEC_PREVIEW)).map((f) => (
                               <div key={f.label} className="flex items-start gap-3 bg-white px-4 py-3 text-[14.5px]">
                                 <dt className="w-24 shrink-0 text-gray-500 sm:w-28">{f.label}</dt>
                                 <dd className="flex min-w-0 flex-1 items-center gap-2 font-medium text-gray-900">
@@ -1098,8 +1285,23 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                               </div>
                             ))}
                           </dl>
+                          {/* Six rows, then the rest on request. The whole table
+                              in the hero was a wall of thirteen lines beside the
+                              price -- the top few are what anyone actually
+                              checks before deciding. */}
+                          {specItems.length > SPEC_PREVIEW && (
+                            <button
+                              type="button"
+                              onClick={() => setShowAllSpecs((v) => !v)}
+                              className="mt-2.5 inline-flex items-center gap-1 text-[14px] font-semibold text-[#e01a1b] transition-colors hover:text-[#c41617]"
+                            >
+                              {showAllSpecs ? 'Show less' : `Show all ${specItems.length} specifications`}
+                              <ChevronDown className={`h-4 w-4 transition-transform ${showAllSpecs ? 'rotate-180' : ''}`} />
+                            </button>
+                          )}
                         </div>
                       )}
+
 
                     </div>
                   </div>
@@ -1513,35 +1715,6 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
 
           {/* ══ Product information ══ */}
           {(() => {
-            const fs: Record<string, any> = (product.fabricSpecifications && typeof product.fabricSpecifications === 'object')
-              ? (product.fabricSpecifications as Record<string, any>) : {};
-            const FS_LABELS: Record<string, string> = {
-              weightValue: 'Fabric Weight', gsm: 'GSM', length: 'Length', breadth: 'Breadth',
-              weave: 'Type of Weave', composition: 'Composition',
-            };
-            const FS_UNITS: Record<string, string> = { weightValue: 'g', length: 'cm', breadth: 'cm', gsm: 'GSM' };
-            const specItems: { label: string; value: string }[] = [];
-            if (product.baseSku) specItems.push({ label: 'Product Code', value: product.baseSku });
-            if (product.category) specItems.push({ label: 'Category', value: product.category });
-            if (!product.hasVariants && product.singleUnitSize) specItems.push({ label: 'Size', value: product.singleUnitSize });
-            if (!product.hasVariants && product.singleUnitColor) specItems.push({ label: 'Color', value: product.singleUnitColor });
-            if (product.material) specItems.push({ label: 'Material', value: product.material });
-            if (product.fabricType) specItems.push({ label: 'Fabric', value: product.fabricType });
-            if (product.dimensions) specItems.push({ label: 'Dimensions', value: product.dimensions });
-            if (product.weight) specItems.push({ label: 'Weight', value: `${product.weight}${product.weightUnit && !/[a-z]/i.test(String(product.weight)) ? ` ${product.weightUnit}` : ''}` });
-            Object.entries(fs)
-              .filter(([k]) => !['careInstructions', 'weightUnit', 'basis', 'type'].includes(k))
-              .filter(([, v]) => v != null && String(v).trim() !== '')
-              .forEach(([k, v]) => {
-                const label = FS_LABELS[k] ?? k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
-                const unit = FS_UNITS[k];
-                const raw = Array.isArray(v) ? v.join(', ') : String(v);
-                const value = unit && /^[\d.,\s]+$/.test(raw.trim()) ? `${raw} ${unit}` : raw;
-                specItems.push({ label, value });
-              });
-            if (product.hasVariants) specItems.push({ label: 'Variants', value: String(visibleVariants.length) });
-            specItems.push({ label: 'Availability', value: availableStock > 0 ? `In stock (${availableStock})` : 'Out of stock' });
-            const careList: string[] = Array.isArray(fs.careInstructions) ? fs.careInstructions : [];
             // "Why choose this?" now lives in the hero rail (under the manufacturer);
             // this rail carries only the Offers card.
 
@@ -1597,7 +1770,10 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
             }
 
 
-            const hasDescription = !!(product.description || (product.tags && product.tags.length));
+            // Only when there is more of it than the hero already printed.
+            // Two lines under a large heading, repeated from a screen above,
+            // is a section that costs the reader a scroll and returns nothing.
+            const hasDescription = descHasMore;
             // Shipping tab shows admin-configured logistics only (delivery time +
             // shipping cost). The vendor's dispatch timeline is intentionally not shown.
             const hasShipping = !!(logisticsResult || product.logisticsConfig);
@@ -1605,23 +1781,41 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
             // Nothing known about this product at all: skip the band rather than
             // render an empty card. This used to be `tabs.length === 0`, back when
             // each of these sections was a tab.
-            if (!hasDescription && specItems.length === 0 && careList.length === 0 && !hasShipping) return null;
+            if (!hasDescription && careList.length === 0 && !hasShipping) return null;
+
+            // Full-width bands were measured at 1,382px wide carrying 169px of
+            // content -- 88 per cent air. These sit side by side instead, and
+            // the column count follows how many there actually are so a lone
+            // section is never stretched across the page on its own.
+            const bandCount = (hasDescription ? 1 : 0) + (careList.length > 0 ? 1 : 0) + (hasShipping ? 1 : 0);
+            // A single band was pinned to the left of a 1,382px row with the
+            // rest of it empty; centred, the same card reads as deliberate.
+            const bandCols = bandCount >= 3 ? 'lg:grid-cols-3' : bandCount === 2 ? 'lg:grid-cols-2' : 'lg:mx-auto lg:max-w-3xl';
 
             return (
               <div className="mt-4 space-y-4 sm:mt-5 sm:space-y-5">
                 {/* ══ Offers & coupons ══
-                    A savings panel, not a list. It was two flat rows repeating
-                    what the price block already said, and before that it was
-                    the same thing twice on one page. The three things a
-                    shopper actually wants here are: what is already off, what
-                    else could come off, and what would I end up paying -- so
-                    the panel leads with the last of those. */}
-                {(activeOffer || categoryCoupon) && (() => {
+                    Led by the artwork. Both the offer and the coupon carry a
+                    real banner in the database and neither was being shown --
+                    the panel was two lines of small print, which is not how
+                    anybody notices a discount. Two cards, each with its picture
+                    on top, the discount stamped on it, and the code underneath.
+
+                    The coupon falls back to a store-wide one when this
+                    product's category has none of its own, because as it
+                    stands no coupon in the database is flagged for a
+                    category and the coupon half was simply never drawn. */}
+                {(() => {
+                  const offerArt = activeOffer
+                    ? (promoOffers.find((o) => o.id === activeOffer.offerId)?.bannerImage || null)
+                    : null;
+
                   // What the coupon would take off on top of the offer price.
-                  // Deliberately labelled as a checkout estimate: this is a
-                  // CATEGORY coupon, and whether it clears its own minimum-order
-                  // and eligibility rules is decided server-side at checkout, not
-                  // here. Quoting it as a firm price would be inventing a promise.
+                  // Only ever quoted for a category coupon, where the discount
+                  // type and value are known figures rather than words parsed
+                  // out of a sentence. Deliberately labelled as an estimate:
+                  // whether it clears its own minimum-order and eligibility
+                  // rules is decided server-side at checkout, not here.
                   const withCoupon = (() => {
                     if (!categoryCoupon || !offeredPrice) return null;
                     const off = categoryCoupon.discountType === 'PERCENTAGE'
@@ -1630,14 +1824,53 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     const p = Math.round(Math.max(0, offeredPrice - off) * 100) / 100;
                     return p < offeredPrice ? p : null;
                   })();
-                  const couponBadge = categoryCoupon
-                    ? (categoryCoupon.discountType === 'PERCENTAGE'
-                        ? `${categoryCoupon.discountValue}% OFF`
-                        : `${formatPrice(categoryCoupon.discountValue)} OFF`)
-                    : null;
+
+                  const coupon = (() => {
+                    if (categoryCoupon) {
+                      return {
+                        image: categoryCoupon.popupImage,
+                        title: categoryCoupon.popupTitle || 'Coupon',
+                        message: categoryCoupon.popupMessage || categoryCoupon.description || 'Enter this code in the cart.',
+                        code: categoryCoupon.code,
+                        badge: categoryCoupon.discountType === 'PERCENTAGE'
+                          ? `${categoryCoupon.discountValue}% OFF`
+                          : `${formatPrice(categoryCoupon.discountValue)} OFF`,
+                      };
+                    }
+                    if (!promoCoupons.length) return null;
+                    // Prefer one pointed at this product's category, else any.
+                    const cat = (product.category || '').trim().toLowerCase();
+                    const forCat = cat
+                      ? promoCoupons.find((c) => {
+                          try { return decodeURIComponent(c.link || '').toLowerCase().includes(cat); }
+                          catch { return false; }
+                        })
+                      : undefined;
+                    const chosen = forCat || promoCoupons[0];
+                    if (!chosen) return null;
+                    // The promotional feed carries a sentence, not fields --
+                    // "Use code NEWFEST123 for 10% off" -- so the code and the
+                    // rate are read out of it, and anything unreadable simply
+                    // leaves that part off rather than guessing.
+                    const code = (chosen.message.match(/code\s+([A-Z0-9][A-Z0-9_-]{2,})/i) || [])[1] || null;
+                    const pct = (chosen.message.match(/(\d+)\s*%/) || [])[1] || null;
+                    return {
+                      image: chosen.image,
+                      title: 'Coupon',
+                      message: chosen.message,
+                      code,
+                      badge: pct ? `${pct}% OFF` : 'COUPON',
+                    };
+                  })();
+
+                  if (!activeOffer && !coupon) return null;
+
+                  const card = 'group relative flex flex-col overflow-hidden rounded-xl bg-white ring-1 ring-black/[0.06] transition-shadow duration-300 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] sm:rounded-2xl';
+                  const art = 'relative block aspect-[16/7] w-full overflow-hidden bg-[linear-gradient(135deg,#fff4f0_0%,#fdeeee_100%)]';
+
                   return (
-                    <div className="overflow-hidden rounded-xl bg-white ring-1 ring-black/[0.06] sm:rounded-2xl">
-                      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-[#f4dad6] bg-linear-to-r from-[#fff7f5] via-[#fffbfa] to-white px-5 py-4 sm:px-6">
+                    <div>
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:mb-4">
                         <h2 className="inline-flex items-center gap-2.5 font-playfair text-lg font-semibold tracking-tight text-[#1a1a1a] sm:text-xl">
                           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#e01a1b]/[0.09] text-[#e01a1b]">
                             <Tag className="h-4 w-4" />
@@ -1648,73 +1881,74 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                           <span className="text-right">
                             <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a1948a]">With the coupon below</span>
                             <span className="text-xl font-extrabold tabular-nums text-[#157f4a] sm:text-2xl">{formatPrice(withCoupon)}</span>
-                            <span className="block text-[12px] text-gray-400 sm:ml-1.5 sm:inline">at checkout, if it applies</span>
+                            <span className="ml-1.5 text-[12px] text-gray-400">at checkout, if it applies</span>
                           </span>
                         )}
                       </div>
-                      <div className="divide-y divide-gray-100">
+
+                      <div className={`grid grid-cols-1 gap-3 sm:gap-4 ${activeOffer && coupon ? 'md:grid-cols-2' : 'lg:max-w-2xl'}`}>
                         {activeOffer && (
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-4 sm:gap-x-4 sm:px-6">
-                            {/* ActiveOffer carries no artwork of its own -- only the
-                                store-wide PublicOffer does -- so this row wears its
-                                badge as the tile rather than an image that would
-                                have been undefined on every product. */}
-                            <span className="flex h-11 w-14 shrink-0 items-center justify-center rounded-lg bg-[#fff1f1] text-[11px] font-extrabold text-[#e01a1b] ring-1 ring-[#f4dad6] sm:h-12 sm:w-16">
-                              {activeOffer.badge}
-                            </span>
-                            {/* basis-40 is a floor, not a width. flex-1 on its own let
-                                this block be squeezed to whatever the tile and the two
-                                money spans left over -- about 30px on a phone, which is
-                                why every single word wrapped onto its own line. */}
-                            <div className="min-w-0 flex-1 basis-40">
+                          <div className={card}>
+                            <div className={art}>
+                              {offerArt ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={offerArt} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.04]" />
+                              ) : (
+                                <span className="flex h-full w-full items-center justify-center font-playfair text-3xl font-semibold text-[#e01a1b]/70">
+                                  {activeOffer.title}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-1 flex-col gap-1 p-4 sm:p-5">
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <span className="rounded-md bg-[#e01a1b] px-2 py-0.5 text-[11px] font-extrabold tracking-wide text-white">{activeOffer.badge}</span>
                                 <span className="text-[15px] font-bold text-[#1a1a1a] sm:text-base">{activeOffer.title}</span>
                                 <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-200">Already applied</span>
+                                {offerEnds && <span className="text-[11.5px] font-bold text-[#c41617]">{offerEnds}</span>}
                               </div>
-                              <p className="mt-0.5 text-[13.5px] leading-snug text-gray-500 sm:text-sm">
+                              <p className="text-[13.5px] leading-snug text-gray-500 sm:text-sm">
                                 {activeOffer.description || 'Included in the price shown above.'}
                               </p>
+                              {hasOfferSaving && (
+                                <p className="mt-auto pt-2 text-[15px] font-bold tabular-nums text-[#157f4a]">
+                                  &minus;{formatPrice(currentPrice - offeredPrice)}
+                                  <span className="ml-1 text-[12px] font-medium text-gray-400">/ {product?.uom || 'unit'}</span>
+                                </p>
+                              )}
                             </div>
-                            {/* The money and the deadline take a line of their own on a
-                                phone rather than competing with the copy for the same one. */}
-                            {(hasOfferSaving || offerEnds) && (
-                              <div className="flex w-full items-center justify-between gap-3 border-t border-gray-100 pt-2.5 sm:w-auto sm:justify-end sm:border-0 sm:pt-0">
-                                {hasOfferSaving ? (
-                                  <span className="text-[15px] font-bold tabular-nums text-[#157f4a]">
-                                    &minus;{formatPrice(currentPrice - offeredPrice)}
-                                    <span className="ml-1 text-[12px] font-medium text-gray-400">/ {product?.uom || 'unit'}</span>
-                                  </span>
-                                ) : <span />}
-                                {offerEnds && <span className="text-[12.5px] font-semibold text-[#e01a1b]">{offerEnds}</span>}
-                              </div>
-                            )}
                           </div>
                         )}
-                        {categoryCoupon && (
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-4 sm:gap-x-4 sm:px-6">
-                            {categoryCoupon.popupImage ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={categoryCoupon.popupImage} alt="" loading="lazy" className="h-11 w-14 shrink-0 rounded-lg object-cover ring-1 ring-black/5 sm:h-12 sm:w-16" />
-                            ) : (
-                              <span className="flex h-11 w-14 shrink-0 items-center justify-center rounded-lg bg-[#eefaf3] text-[11px] font-extrabold text-[#157f4a] ring-1 ring-emerald-200 sm:h-12 sm:w-16">
-                                {couponBadge}
-                              </span>
-                            )}
-                            <div className="min-w-0 flex-1 basis-40">
-                              <p className="text-[15px] font-bold text-[#1a1a1a] sm:text-base">{categoryCoupon.popupTitle || 'Coupon'}</p>
-                              <p className="mt-0.5 text-[13.5px] leading-snug text-gray-500 sm:text-sm">
-                                {categoryCoupon.popupMessage || categoryCoupon.description || 'Enter this code in the cart.'}
-                              </p>
+
+                        {coupon && (
+                          <div className={card}>
+                            <div className={art}>
+                              {coupon.image ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={coupon.image} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.04]" />
+                              ) : (
+                                <span className="flex h-full w-full items-center justify-center font-playfair text-3xl font-semibold text-[#157f4a]/70">
+                                  {coupon.title}
+                                </span>
+                              )}
                             </div>
-                            <div className="flex w-full items-center gap-2 border-t border-gray-100 pt-2.5 sm:w-auto sm:border-0 sm:pt-0">
-                              <code className="flex-1 rounded-lg border border-dashed border-[#e01a1b]/45 bg-[#fff7f5] px-3.5 py-2 text-center text-[14px] font-bold tracking-[0.18em] text-[#e01a1b] sm:flex-none sm:text-left">{categoryCoupon.code}</code>
-                              <button
-                                type="button"
-                                onClick={() => { try { navigator.clipboard?.writeText(categoryCoupon.code); showSuccessToast('Copied', `Coupon ${categoryCoupon.code} copied`); } catch { /* clipboard unavailable */ } }}
-                                className="rounded-lg bg-[#e01a1b] px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#c41617]"
-                              >
-                                Copy
-                              </button>
+                            <div className="flex flex-1 flex-col gap-1 p-4 sm:p-5">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <span className="rounded-md bg-[#157f4a] px-2 py-0.5 text-[11px] font-extrabold tracking-wide text-white">{coupon.badge}</span>
+                                <span className="text-[15px] font-bold text-[#1a1a1a] sm:text-base">{coupon.title}</span>
+                              </div>
+                              <p className="text-[13.5px] leading-snug text-gray-500 sm:text-sm">{coupon.message}</p>
+                              {coupon.code && (
+                                <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
+                                  <code className="rounded-lg border border-dashed border-[#e01a1b]/45 bg-[#fff7f5] px-3.5 py-2 text-[14px] font-bold tracking-[0.18em] text-[#e01a1b]">{coupon.code}</code>
+                                  <button
+                                    type="button"
+                                    onClick={() => { try { navigator.clipboard?.writeText(coupon.code!); showSuccessToast('Copied', `Coupon ${coupon.code} copied`); } catch { /* clipboard unavailable */ } }}
+                                    className="rounded-lg bg-[#e01a1b] px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#c41617]"
+                                  >
+                                    Copy
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
@@ -1730,13 +1964,13 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     page was spent on a promo card. Everything is open now, one
                     section per hairline, and the body type is a step larger --
                     13px in a 900px-wide column was hard to read. */}
-                <div id="product-information" className="scroll-mt-40 divide-y divide-gray-100 overflow-hidden rounded-xl bg-white ring-1 ring-black/[0.06] sm:rounded-2xl">
+                <div id="product-information" className={`scroll-mt-40 grid grid-cols-1 gap-4 sm:gap-5 ${bandCols}`}>
                   {hasDescription && (
-                    <section className="px-5 py-6 sm:px-6 sm:py-7 lg:px-8">
+                    <section className="rounded-xl bg-white px-5 py-6 ring-1 ring-black/[0.06] sm:rounded-2xl sm:px-6 sm:py-7">
                       <h2 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl">Product description</h2>
                       {product.description && (
                         <>
-                          <p className={`mt-3 max-w-4xl whitespace-pre-line text-[15px] leading-7 text-gray-600 sm:text-base ${showAllDetails ? '' : 'line-clamp-6'}`}>{product.description}</p>
+                          <p className={`mt-3 whitespace-pre-line text-[15px] leading-7 text-gray-600 sm:text-base ${showAllDetails ? '' : 'line-clamp-6'}`}>{product.description}</p>
                           {product.description.length > 260 && (
                             <button
                               onClick={() => setShowAllDetails(!showAllDetails)}
@@ -1760,23 +1994,8 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     </section>
                   )}
 
-                  {specItems.length > 0 && (
-                    <section className="px-5 py-6 sm:px-6 sm:py-7 lg:px-8">
-                      <h2 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl">Specifications</h2>
-                      <dl className="mt-3 grid grid-cols-1 gap-x-12 sm:grid-cols-2 lg:gap-x-16">
-                        {specItems.map((s, i) => (
-                          <div key={i} className="flex items-center gap-3 border-b border-gray-100 py-3">
-                            <dt className="whitespace-nowrap text-[14.5px] text-gray-500">{s.label}</dt>
-                            <span className="flex-1 border-b border-dotted border-gray-300/80" />
-                            <dd className="whitespace-nowrap text-right text-[14.5px] font-semibold text-gray-900">{s.value}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </section>
-                  )}
-
                   {careList.length > 0 && (
-                    <section className="px-5 py-6 sm:px-6 sm:py-7 lg:px-8">
+                    <section className="rounded-xl bg-white px-5 py-6 ring-1 ring-black/[0.06] sm:rounded-2xl sm:px-6 sm:py-7">
                       <h2 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl">Care instructions</h2>
                       <div className="mt-3 flex flex-wrap gap-2.5">
                         {careList.map((instruction, index) => {
@@ -1797,11 +2016,14 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     </section>
                   )}
 
+                  {/* Centred, unlike its neighbours: this card holds two small
+                      tiles and a line of small print, and left-aligning them in
+                      a 682px box left the whole right half of it empty. */}
                   {hasShipping && (
-                  <section className="px-5 py-6 sm:px-6 sm:py-7 lg:px-8">
+                  <section className="rounded-xl bg-white px-5 py-6 text-center ring-1 ring-black/[0.06] sm:rounded-2xl sm:px-6 sm:py-7">
                     <h2 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl">Shipping</h2>
                     {logisticsResult ? (
-                      <div className="mt-3 grid grid-cols-2 gap-3 sm:max-w-md">
+                      <div className="mx-auto mt-3 grid max-w-md grid-cols-2 gap-3">
                         <div className="rounded-xl bg-[#faf7f3] p-4 text-center ring-1 ring-[#f0e8df]">
                           <p className="text-[12.5px] text-gray-500">Delivery time</p>
                           <p className="mt-0.5 text-[17px] font-bold text-gray-900">{logisticsResult.deliveryDays} days</p>
@@ -1812,7 +2034,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                         </div>
                       </div>
                     ) : null}
-                    <p className="mt-3 max-w-4xl text-[14px] leading-relaxed text-gray-500">
+                    <p className="mx-auto mt-3 max-w-md text-[14px] leading-relaxed text-gray-500">
                       Shipping method and final delivery estimate are confirmed in the purchase panel above.
                     </p>
                   </section>
@@ -1944,8 +2166,13 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                 </div>
               ) : (
                 <>
-                  <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 lg:items-start">
-                    {/* ── Left column — rating chart ── */}
+                  {/* Summary across the top, reviews underneath -- the section
+                      used to be a tall narrow chart on the left with a single
+                      column of full-width rows beside it, so one short review
+                      sat alone on a 900px line and the chart's own column was
+                      mostly air below it. */}
+                  <div className="space-y-4 sm:space-y-5">
+                    {/* ── The summary band ── */}
                     {(() => {
                       const total = reviews.length;
                       const avg = total ? reviews.reduce((s, r) => s + (r.rating || 0), 0) / total : 0;
@@ -1965,28 +2192,29 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       const wellRated = positiveFace(avg) !== null;
                       const enough = total >= 5;
                       const showPct = wellRated && enough && loved >= 50;
-                      // Too few reviews for a percentage, but still a score worth
-                      // showing: the face says it in a word instead of a number.
-                      // No lovedN condition -- that was left over from when this hero
-                      // was a COUNT of five-star reviews. The word comes from the
-                      // average, so three reviews all at "Liked it" should say exactly
-                      // that rather than fall through to a blank card.
-                      const showWord = wellRated && !enough;
-                      const wordFace = positiveFace(avg) as FaceValue;
                       return (
-                        <div className="lg:w-64 xl:w-72 shrink-0">
-                          <div className="rounded-xl bg-[#faf7f3] ring-1 ring-[#f0e8df] p-4 sm:p-5 lg:sticky lg:top-24">
-                            {/* A big number is only earned when it says something the
-                                line under it does not. "1" over "1 rating - 1 review"
-                                printed the same digit three times and read as a score
-                                out of nothing; and the no-face case was a bare "6" over
-                                "6 ratings", which is the same problem without the face.
-                                So the hero is a percentage when there is a sample to
-                                support one, a word when there is not, and nothing at all
-                                when there is nothing worth saying -- the bars below carry
-                                it from there. */}
-                            {showPct ? (
-                              <>
+                        <div>
+                          <div className="relative overflow-hidden rounded-xl bg-[linear-gradient(120deg,#fff8f4_0%,#faf7f3_55%,#f7f2ec_100%)] p-4 ring-1 ring-[#f0e8df] sm:rounded-2xl sm:p-5 lg:p-6">
+                           {/* The top face, very faint, sitting behind the
+                               figures -- the section had no mark of its own and
+                               read as a settings panel. */}
+                           <span aria-hidden className="pointer-events-none absolute -right-6 -top-8 opacity-[0.06]">
+                             <FaceIcon value={5} className="h-40 w-40" />
+                           </span>
+                           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-8">
+                            <div className="relative lg:w-44 lg:shrink-0">
+                            {/* A fixed heading, so the top of this card is the same
+                                thing every time. It used to change shape with the data:
+                                a percentage, or a single word, or nothing at all. The
+                                word was the confusing one -- with one review the heading
+                                read "Loved it" and the very first bar underneath read
+                                "Loved it  1", so the card said the same thing twice and
+                                looked like a control rather than a summary.
+                                The percentage stays: it says something the bars do not,
+                                which is one figure for the whole product. */}
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#a1948a]">Ratings</p>
+                            {showPct && (
+                              <div className="mt-2">
                                 <div className="flex items-center gap-2.5">
                                   {/* Always the top face: the number beside it counts
                                       that face and nothing else. Taking it from the
@@ -1997,15 +2225,14 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                   </span>
                                 </div>
                                 <div className="mt-1.5 text-[13px] font-semibold text-gray-700">loved it</div>
-                              </>
-                            ) : showWord ? (
-                              <div className="flex items-center gap-2.5">
-                                <FaceIcon value={wordFace} className="h-11 w-11 shrink-0" />
-                                <span className="text-xl font-extrabold leading-tight text-gray-900 sm:text-2xl">{FACE_LABELS[wordFace]}</span>
                               </div>
-                            ) : null}
-                            <div className={`text-[12px] text-gray-500 ${showPct || showWord ? 'mt-1.5' : ''}`}>{total} rating{total === 1 ? '' : 's'}{withText > 0 ? ` • ${withText} review${withText === 1 ? '' : 's'}` : ''}</div>
-                            <div className="mt-4 space-y-1">
+                            )}
+                            <div className="mt-1.5 text-[12px] text-gray-500">{total} rating{total === 1 ? '' : 's'}{withText > 0 ? ` • ${withText} review${withText === 1 ? '' : 's'}` : ''}</div>
+                            </div>
+
+                            {/* The breakdown, capped so the bars do not run the
+                                width of the page on a wide screen. */}
+                            <div className="relative w-full space-y-1 lg:max-w-sm lg:flex-1">
                               {dist.map(({ star, count }) => {
                                 const active = reviewStar === star;
                                 return (
@@ -2024,38 +2251,73 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                 );
                               })}
                             </div>
+
+                            {/* Search and sort move up here from above the list:
+                                they are how you interrogate the summary, and it
+                                is the third thing this band has room for. */}
+                            <div className="relative flex w-full flex-col gap-2.5 sm:flex-row lg:ml-auto lg:w-72 lg:shrink-0 lg:flex-col">
+                              <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                <input
+                                  value={reviewSearch}
+                                  onChange={(e) => setReviewSearch(e.target.value)}
+                                  placeholder="Search reviews..."
+                                  className="w-full rounded-full border border-[#eadfd4] bg-white py-2 pl-9 pr-3 text-sm text-gray-700 transition placeholder:text-gray-400 focus:border-[#e01a1b]/40 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/15"
+                                />
+                              </div>
+                              <select
+                                value={reviewSort}
+                                onChange={(e) => setReviewSort(e.target.value as typeof reviewSort)}
+                                className="cursor-pointer rounded-full border border-[#eadfd4] bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition focus:border-[#e01a1b]/40 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/15"
+                              >
+                                <option value="newest">Newest first</option>
+                                <option value="oldest">Oldest first</option>
+                                <option value="highest">Most loved</option>
+                                <option value="lowest">Least loved</option>
+                              </select>
+                            </div>
+                           </div>
                           </div>
                         </div>
                       );
                     })()}
 
-                    {/* ── Right column — reviews (scrollable) ── */}
-                    <div className="flex-1 min-w-0">
-                      {/* Toolbar — search + sort */}
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 mb-3">
-                        <div className="relative flex-1">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                          <input
-                            value={reviewSearch}
-                            onChange={(e) => setReviewSearch(e.target.value)}
-                            placeholder="Search reviews..."
-                            className="w-full rounded-full border border-gray-200 bg-gray-50 pl-9 pr-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/15 focus:border-[#e01a1b]/40 transition"
-                          />
+                    {/* ── Photographs from customers ──────────────────────
+                        Every review's pictures, gathered into one strip. They
+                        were only visible by scrolling to the review that
+                        happened to carry them, which is the least likely way
+                        anyone finds a photograph of the thing they are about
+                        to buy. Real data: nothing is drawn when nobody has
+                        sent a picture. */}
+                    {(() => {
+                      const shots = reviews.flatMap((r) => (r.images || []).filter(Boolean).map((src) => ({ src, id: r.id })));
+                      if (shots.length === 0) return null;
+                      const all = shots.map((x) => x.src);
+                      return (
+                        <div className="rounded-xl bg-white p-4 ring-1 ring-black/[0.06] sm:rounded-2xl sm:p-5">
+                          <div className="mb-3 flex items-baseline gap-2">
+                            <h4 className="text-[13px] font-bold uppercase tracking-[0.12em] text-[#a1948a]">Photos from customers</h4>
+                            <span className="text-[12px] tabular-nums text-gray-400">{shots.length}</span>
+                          </div>
+                          <div className="scrollbar-hide -mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1">
+                            {shots.slice(0, 12).map((shot, i) => (
+                              <button
+                                key={shot.id + '-' + i}
+                                onClick={() => setLightbox({ images: all, index: i })}
+                                className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-xl ring-1 ring-gray-200 transition-all hover:ring-[#e01a1b]/50 sm:h-24 sm:w-24"
+                              >
+                                <Image src={shot.src} alt="" fill sizes="96px" className="object-cover transition-transform duration-500 group-hover:scale-110" />
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <select
-                          value={reviewSort}
-                          onChange={(e) => setReviewSort(e.target.value as typeof reviewSort)}
-                          className="rounded-full border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/15 focus:border-[#e01a1b]/40 transition cursor-pointer"
-                        >
-                          <option value="newest">Newest first</option>
-                          <option value="oldest">Oldest first</option>
-                          <option value="highest">Most loved</option>
-                          <option value="lowest">Least loved</option>
-                        </select>
-                      </div>
+                      );
+                    })()}
 
-                      {/* Star filter chips */}
-                      <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                    {/* ── The reviews themselves ── */}
+                    <div className="min-w-0">
+                      {/* The face filters, on their own line under the band */}
+                      <div className="mb-3 flex flex-wrap items-center gap-1.5 sm:mb-4">
                         {[0, 5, 4, 3, 2, 1].map((s) => {
                           const active = reviewStar === s;
                           return (
@@ -2083,14 +2345,19 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       {filteredReviews.length === 0 ? (
                         <p className="text-sm text-gray-400 text-center py-8">No reviews match your filters.</p>
                       ) : (
-                        <div className="max-h-[30rem] overflow-y-auto pr-2 -mr-2 divide-y divide-gray-100">
+                        <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-[repeat(auto-fit,minmax(24rem,1fr))]">
                           {filteredReviews.slice(0, reviewShown).map((review) => {
                             const countryName = getCountryName(review.user?.country);
                             const flag = countryName ? getCountryFlag(review.user?.country) : '';
                             const imgs = (review.images || []).filter(Boolean);
                             const helped = helpfulIds.has(review.id);
                             return (
-                              <div key={review.id} className="py-4 first:pt-0">
+                              <div key={review.id} className="relative overflow-hidden rounded-xl bg-white p-4 ring-1 ring-black/[0.06] transition-shadow duration-300 hover:shadow-[0_10px_28px_rgba(0,0,0,0.07)] sm:p-5">
+                                {/* A band of colour down the edge, warm for the
+                                    faces we advertise and grey for the rest, so
+                                    a wall of cards is scannable before a word
+                                    of it is read. */}
+                                <span aria-hidden className={`absolute inset-y-0 left-0 w-1 ${Math.round(review.rating) >= 4 ? 'bg-[#FFD130]' : Math.round(review.rating) === 3 ? 'bg-[#e0d2c4]' : 'bg-[#d8cec4]'}`} />
                                 <div className="flex items-start gap-3">
                                   {review.user?.image ? (
                                     <Image src={review.user.image} alt="" width={36} height={36} className="w-9 h-9 rounded-full object-cover ring-1 ring-black/5 shrink-0" />
