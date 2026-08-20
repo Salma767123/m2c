@@ -16,7 +16,11 @@ const ProductDetailPage = ({ params }: ProductDetailPageProps) => {
   const { slug } = use(params);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    // Warm ground, matching the cart and the rest of the storefront. This
+    // wrapper sits ABOVE ProductDetail's own, so leaving it on the cool
+    // bg-gray-50 kept a blue-grey band showing around the header and footer
+    // however warm the component underneath was.
+    <div className="min-h-screen bg-[#f9f5f2]">
       <Header />
       {/* ProductDetail reads useSearchParams (?selectShipping) — Suspense keeps a
           `next build` prerender from erroring, matching the products listing page. */}
