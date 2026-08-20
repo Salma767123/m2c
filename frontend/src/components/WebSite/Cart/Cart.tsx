@@ -749,31 +749,38 @@ export default function Order() {
           {/* Cart Items — Order-page style: each item its own card with gaps between */}
           <div className="lg:col-span-2">
             {cartItems.length > 0 && (
-              <div className="space-y-3 sm:space-y-4 lg:space-y-6">
+              <div className="grid grid-cols-1 gap-2.5 sm:gap-3 lg:gap-4">
                 {cartItems.map((item) => (
-                  <div key={item.id} className="group rounded-xl bg-white p-4 shadow-[0_1px_2px_rgba(90,60,40,0.05)] ring-1 ring-[#efe6df] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-18px_rgba(110,75,45,0.32)] hover:ring-[#e5d8cd] sm:rounded-2xl sm:p-5 lg:p-6">
-                    {/* Three columns from lg: picture, description, money.
-                        It was a two-column flex, and everything about money sat
-                        at the BOTTOM of the description column — so the unit
-                        price finished at the far left of the card and the
-                        stepper at the far right, roughly 700px apart, while the
-                        right ~40% of every card stayed empty. Reading "how many
-                        of these am I buying" meant crossing the whole card.
+                  <div key={item.id} className="group @container rounded-xl bg-white p-3.5 shadow-[0_1px_2px_rgba(90,60,40,0.05)] ring-1 ring-[#efe6df] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-18px_rgba(110,75,45,0.32)] hover:ring-[#e5d8cd] sm:rounded-2xl sm:p-4">
+                    {/* One row, five things: picture, description, actions,
+                          quantity, money.
 
-                        Now money is one right-hand column: unit price, the
-                        stepper that changes it, and the line total, stacked in
-                        the order you ask the questions. Below lg it drops under
-                        the description as a full-width row, because at phone
-                        widths a third column is a third of nothing. */}
-                    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 sm:gap-4 lg:grid-cols-[auto_minmax(0,1fr)_11rem] lg:gap-6">
-                      {/* Product Image */}
+                          Flex rather than grid, because the honest answer
+                          changes with the room available and flex-wrap says so
+                          without me naming every width. Given about 800px of
+                          card the five sit on one line and the description
+                          absorbs the slack, so the buttons, the stepper and the
+                          figures land at the same x on every card and the eye
+                          reads straight down each one. Below that the quantity
+                          and money pair drops to a second line rather than
+                          crushing the name.
+
+                          What this replaced pooled ALL the slack in one place:
+                          the description column ran 672px holding about 250px
+                          of text, so a 330px hole opened between "Size: 38 x 42
+                          cm" and the buttons, while the stepper sat stacked
+                          under the price instead of beside it. The same content
+                          over five columns spends that width instead of leaving
+                          it lying there. */}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 sm:gap-x-5">
+                        {/* Product Image */}
                       <div className="shrink-0">
                         {item.images && item.images.length > 0 ? (
                           /* The frame crops and the picture moves inside it, so
                              the card's own geometry never changes on hover —
                              a photo that grew the box would nudge every line
                              below it. */
-                          <div className="h-16 w-16 overflow-hidden rounded-lg ring-1 ring-[#efe6df] sm:h-20 sm:w-20 sm:rounded-xl md:h-24 md:w-24">
+                          <div className="h-14 w-14 overflow-hidden rounded-lg ring-1 ring-[#efe6df] sm:h-16 sm:w-16 sm:rounded-xl md:h-20 md:w-20">
                             <Image
                               src={item.images[0]}
                               alt={item.name}
@@ -783,14 +790,17 @@ export default function Order() {
                             />
                           </div>
                         ) : (
-                          <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-[#f6f1ea] ring-1 ring-[#efe6df] sm:h-20 sm:w-20 sm:rounded-xl md:h-24 md:w-24">
-                            <Package className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-[#c9aeab]" />
+                          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-[#f6f1ea] ring-1 ring-[#efe6df] sm:h-16 sm:w-16 sm:rounded-xl md:h-20 md:w-20">
+                            <Package className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 text-[#c9aeab]" />
                           </div>
                         )}
                       </div>
 
-                      {/* Product Details */}
-                      <div className="min-w-0">
+                      {/* Product Details — the one flexible column. Everything after
+                          it is sized to its content, so all the slack in the
+                          row collects here and the columns to the right stay
+                          put from card to card. */}
+                      <div className="min-w-0 flex-1 basis-[13rem] @min-[36rem]:grow-2">
                         {/* Stock/price warnings */}
                         {!item.inStock ? (
                           <div className="flex items-center gap-1.5 mb-2 px-2.5 py-1.5 bg-red-50 rounded-lg w-fit">
@@ -804,129 +814,181 @@ export default function Order() {
                           </div>
                         ) : null}
 
-                        <div className="mb-2">
-                          <div className="min-w-0">
-                            <h3 className="text-base sm:text-lg font-semibold text-[#1a1a1a] mb-1 break-words">{item.name}</h3>
-                            <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mb-2">
-                              {/* Nothing at all until a product has been rated,
-                                  and the chip appears on its own the moment one
-                                  is — the condition is the live review count,
-                                  so no edit here is ever needed.
+                        {/* Name, chips, then one strip that carries the
+                            variants and the buttons together.
 
-                                  What this replaced showed a filled star beside
-                                  "(0)" on everything, because rating comes back
-                                  null for all but one product in the catalogue
-                                  and `{item.rating}` rendered as nothing. That
-                                  reads as a score of nought rather than as an
-                                  absence of one, which is the worse of the two
-                                  lies. Saying nothing is the honest third
-                                  option, and it keeps the card quiet until
-                                  there is something worth saying. */}
-                              {(item.reviews ?? 0) > 0 && item.rating ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-[#fdf8ee] px-2 py-0.5 text-xs font-semibold text-[#8a6a2f] ring-1 ring-[#f0e3c8]">
-                                  <Star className="h-3 w-3 fill-current text-[#e8a33d]" />
-                                  {item.rating}
-                                  <span className="font-medium text-[#b0a087]">({item.reviews})</span>
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="flex items-center flex-wrap gap-1.5 sm:gap-2">
-                              {item.discount != null && item.discount > 0 ? (
-                                <span className="inline-flex items-center rounded-full bg-[#fdf1ef] px-2 py-0.5 text-xs font-semibold text-[#c41617] ring-1 ring-[#f4dcd7] sm:py-1">
-                                  Save {item.discount}%
-                                </span>
-                              ) : null}
-                            </div>
-                            {/* flex-wrap + nowrap per pair. This was a plain
-                                `flex gap-4`, so on a phone the label and the
-                                value competed for one cramped row and the
-                                VALUE lost: "Size: Set of 8" came out as three
-                                stacked lines, "38 x 42 cm" as four. Wrapping
-                                between pairs and never inside one keeps each
-                                fact on a single line. The old border-top is
-                                gone with it — it drew a rule across part of
-                                the card and stopped, which read as a mistake. */}
-                            {item.variantDetails && (item.variantDetails.color || item.variantDetails.size) && (
-                              <div className="mt-2 mb-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-[#4a423c]">
-                                {item.variantDetails.color && (
-                                  <div className="flex items-center gap-2 whitespace-nowrap">
-                                    <span className="text-[#8a807a]">Color:</span>
-                                    <div className="flex items-center gap-1">
-                                      {item.variantDetails.colorHex && (
-                                        <div
-                                          className="w-3 h-3 rounded-full border border-[#e3dbd1]"
-                                          style={{ backgroundColor: item.variantDetails.colorHex }}
-                                        />
-                                      )}
-                                      <span>{item.variantDetails.color}</span>
-                                    </div>
-                                  </div>
-                                )}
-                                {item.variantDetails.size && (
-                                  <div className="flex items-center gap-2 whitespace-nowrap">
-                                    <span className="text-[#8a807a]">Size:</span>
-                                    <span>{item.variantDetails.size}</span>
-                                  </div>
-                                )}
+                            It was five stacked bands: the name, a row that
+                            only ever held a rating, the discount badge on a
+                            row of its own, the variants, and the buttons under
+                            those — in a card whose right half was empty. The
+                            chips share a row now and colour/size sit beside
+                            the actions rather than above them, which takes
+                            roughly a third of the height out of every line
+                            without dropping a single word. */}
+                        <h3 className="text-sm font-semibold text-[#1a1a1a] break-words sm:text-base">{item.name}</h3>
+
+                        {/* The rating chip appears on its own the moment a
+                            product is reviewed — the condition is the live
+                            review count, so no edit here is ever needed.
+
+                            What this replaced showed a filled star beside
+                            "(0)" on everything, because rating comes back null
+                            for all but one product in the catalogue and
+                            {item.rating} rendered as nothing. That reads as a
+                            score of nought rather than as an absence of one,
+                            which is the worse of the two lies.
+
+                            Guarded as a whole row, not chip by chip: an empty
+                            flex box still carries its top margin, which is a
+                            gap under the name of every unrated line. */}
+                        {(((item.reviews ?? 0) > 0 && item.rating) || (item.discount != null && item.discount > 0)) && (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                            {(item.reviews ?? 0) > 0 && item.rating ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[#fdf8ee] px-2 py-0.5 text-xs font-semibold text-[#8a6a2f] ring-1 ring-[#f0e3c8]">
+                                <Star className="h-3 w-3 fill-current text-[#e8a33d]" />
+                                {item.rating}
+                                <span className="font-medium text-[#b0a087]">({item.reviews})</span>
+                              </span>
+                            ) : null}
+                            {item.discount != null && item.discount > 0 ? (
+                              <span className="inline-flex items-center rounded-full bg-[#fdf1ef] px-2 py-0.5 text-xs font-semibold text-[#c41617] ring-1 ring-[#f4dcd7]">
+                                Save {item.discount}%
+                              </span>
+                            ) : null}
+                          </div>
+                        )}
+
+                        {/* Colour and size. flex-wrap with nowrap per pair: as a
+                            plain flex row the label and the value competed for
+                            one cramped line on a phone and the VALUE lost —
+                            "Size: Set of 8" came out as three stacked lines.
+                            Wrapping between pairs and never inside one keeps
+                            each fact whole. */}
+                        {item.variantDetails && (item.variantDetails.color || item.variantDetails.size) && (
+                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium text-[#4a423c] sm:text-sm">
+                            {item.variantDetails.color && (
+                              <div className="flex items-center gap-2 whitespace-nowrap">
+                                <span className="text-[#8a807a]">Color:</span>
+                                <div className="flex items-center gap-1">
+                                  {item.variantDetails.colorHex && (
+                                    <div
+                                      className="w-3 h-3 rounded-full border border-[#e3dbd1]"
+                                      style={{ backgroundColor: item.variantDetails.colorHex }}
+                                    />
+                                  )}
+                                  <span>{item.variantDetails.color}</span>
+                                </div>
+                              </div>
+                            )}
+                            {item.variantDetails.size && (
+                              <div className="flex items-center gap-2 whitespace-nowrap">
+                                <span className="text-[#8a807a]">Size:</span>
+                                <span>{item.variantDetails.size}</span>
                               </div>
                             )}
                           </div>
-                        </div>
-
-                        {/* Item actions. In the description column rather than
-                            on a row of their own: a separate row is placed
-                            below the tallest column, so a line with a quantity
-                            above one pushed these down and left a void under
-                            the colour and size. */}
-                        <div className="mt-2 flex items-center gap-2">
-                            <button
-                              onClick={() => moveToWishlist(item)}
-                              aria-label="Move to wishlist"
-                              title="Move this item to your wishlist and remove it from the cart"
-                              className="inline-flex items-center gap-1.5 rounded-full ring-1 ring-[#efe6df] px-2.5 py-1.5 text-xs font-semibold text-[#6b625b] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] hover:ring-[#f4dcd7]"
-                            >
-                              <Heart className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">Move to Wishlist</span>
-                              <span className="sm:hidden">Wishlist</span>
-                            </button>
-                            <button
-                              onClick={() => removeItem(item.id)}
-                              aria-label="Remove item"
-                              title="Remove from cart"
-                              className="rounded-full p-1.5 text-[#b3a99f] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] sm:p-2"
-                            >
-                              <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                            </button>
-                        </div>
+                        )}
                       </div>
 
-                      {/* ── Money ────────────────────────────────────────
-                          Unit price, the control that changes it, and what
-                          the line actually costs — in the order the questions
-                          get asked, and all within one glance of each other.
+                      {/* ── Actions ──────────────────────────────────────
+                          A column of their own now rather than a tail on the
+                          end of the variants line. Because the description
+                          absorbs the slack these land at the same x on every
+                          card, instead of wherever that card's size text
+                          happened to stop. */}
+                      <div className="flex shrink-0 items-center gap-1.5 @min-[36rem]:grow">
+                        <button
+                          onClick={() => moveToWishlist(item)}
+                          aria-label="Move to wishlist"
+                          title="Move this item to your wishlist and remove it from the cart"
+                          className="inline-flex items-center gap-1.5 rounded-full ring-1 ring-[#efe6df] px-2.5 py-1.5 text-xs font-semibold text-[#6b625b] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] hover:ring-[#f4dcd7]"
+                        >
+                          <Heart className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Move to Wishlist</span>
+                          <span className="sm:hidden">Wishlist</span>
+                        </button>
+                        <button
+                          onClick={() => removeItem(item.id)}
+                          aria-label="Remove item"
+                          title="Remove from cart"
+                          className="rounded-full p-1.5 text-[#b3a99f] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617]"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
 
-                          A row under the description below lg, its own column
-                          from lg. Right-aligned there so the figures form a
-                          column the eye can run down across items, which is
-                          the only way to compare them without arithmetic. */}
-                      <div className="col-span-2 mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#f0e8df] pt-3 sm:mt-4 lg:col-span-1 lg:mt-0 lg:flex-col lg:items-end lg:justify-start lg:gap-2.5 lg:border-0 lg:pt-0 lg:text-right">
-                          {/* The big figure is what this LINE costs, not what one
-                              of them costs.
+                      {/* ── Quantity and money ─────────────────────────────
+                          The stepper beside the figures rather than stacked
+                          above them. Two questions — how many, and how much —
+                          asked together, and side by side they cost one row
+                          instead of two.
 
-                              It was the unit price, with the line total added
-                              underneath behind a "LINE TOTAL" label — which
-                              meant the largest number on the card was never the
-                              number the customer was checking, and the one that
-                              was arrived wearing a caption explaining itself.
-                              Promoting the total removes both problems: the
-                              label goes, and the unit price becomes the small
-                              print it always was.
+                          They travel as a pair: when the card is too narrow for
+                          five columns this is the piece that drops to a second
+                          line, and it takes its rule with it, so a phone still
+                          gets the money set apart from the description exactly
+                          as it was. Reversed there, because the total belongs
+                          on the left under the name it refers to.
 
-                              The struck price scales with it, or the comparison
-                              would be a line total against a single unit's
-                              original — a discount several times larger than
-                              the real one. */}
-                          <div className="flex items-center gap-2 flex-wrap">
+                          Two thresholds, not one. At 36rem of card the pair
+                          stops being a full-width footer and tucks to the
+                          right. It only starts taking a share of the leftover
+                          width at 54rem — the point past which it is certain
+                          of a place on the first line. Growing it any earlier
+                          would fling the stepper and the price to opposite
+                          edges of a line they had been pushed down onto, with
+                          the stepper stranded under the photograph. */}
+                      <div className="flex basis-full flex-row-reverse flex-wrap items-center justify-between gap-3 border-t border-[#f0e8df] pt-2.5 @min-[36rem]:ml-auto @min-[36rem]:basis-auto @min-[36rem]:flex-row @min-[36rem]:gap-4 @min-[54rem]:grow @min-[36rem]:border-0 @min-[36rem]:pt-0">
+                        {/* How many */}
+                        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
+                          {!item.inStock ? (
+                            <span className="text-xs sm:text-sm text-red-600 font-medium bg-red-50 px-2 py-1 rounded">Out of Stock</span>
+                          ) : (item.availableStock !== undefined && item.quantity > item.availableStock) ? (
+                            <span className="text-xs sm:text-sm text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded">
+                              Only {item.availableStock} in stock
+                            </span>
+                          ) : null}
+                          <div className="flex items-center overflow-hidden rounded-full ring-1 ring-[#e9ded2]">
+                            <button
+                              onClick={() => updateQuantity(item.id, item.productId, item.quantity - 1)}
+                              aria-label="Decrease quantity"
+                              className="p-1.5 text-[#6b625b] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] disabled:cursor-not-allowed disabled:opacity-30"
+                              disabled={!item.inStock || item.quantity <= 1}
+                            >
+                              <Minus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            </button>
+                            <span className="px-3 py-1 text-sm font-semibold tabular-nums text-[#1a1a1a] sm:px-3.5 sm:text-base">{item.quantity}</span>
+                            <button
+                              onClick={() => updateQuantity(item.id, item.productId, item.quantity + 1)}
+                              aria-label="Increase quantity"
+                              className="p-1.5 text-[#6b625b] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] disabled:cursor-not-allowed disabled:opacity-30"
+                              disabled={!item.inStock || (item.availableStock != null && item.quantity >= item.availableStock)}
+                            >
+                              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* How much.
+
+                            The big figure is what this LINE costs, not what one
+                            of them costs. It was the unit price, with the line
+                            total underneath behind a "LINE TOTAL" label — so
+                            the largest number on the card was never the number
+                            the customer was checking, and the one that was
+                            arrived wearing a caption explaining itself.
+                            Promoting the total removes both problems.
+
+                            The struck price scales with it, or the comparison
+                            would be a line total against a single unit's
+                            original — a discount several times larger than the
+                            real one.
+
+                            A floor on the width so the steppers to its left
+                            line up as well, rather than shifting a few px per
+                            card with the number of digits in the price. */}
+                        <div className="flex shrink-0 flex-col items-start gap-0.5 @min-[36rem]:min-w-[8.5rem] @min-[36rem]:items-end @min-[36rem]:text-right">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xl font-bold tabular-nums text-[#1a1a1a] sm:text-[22px]">{formatPrice(item.price * item.quantity)}</span>
                             {item.offerStrikePrice ? (
                               <span className="text-xs sm:text-sm text-[#8a807a] line-through tabular-nums">{formatPrice(item.offerStrikePrice * item.quantity)}</span>
@@ -940,58 +1002,28 @@ export default function Order() {
                             )}
                           </div>
 
-                          <div className="flex items-center flex-wrap gap-2 sm:gap-3">
-                            {!item.inStock ? (
-                              <span className="text-xs sm:text-sm text-red-600 font-medium bg-red-50 px-2 py-1 rounded">Out of Stock</span>
-                            ) : (item.availableStock !== undefined && item.quantity > item.availableStock) ? (
-                              <span className="text-xs sm:text-sm text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded">
-                                Only {item.availableStock} in stock
-                              </span>
-                            ) : null}
-                            <div className="flex items-center overflow-hidden rounded-full ring-1 ring-[#e9ded2]">
-                              <button
-                                onClick={() => updateQuantity(item.id, item.productId, item.quantity - 1)}
-                                aria-label="Decrease quantity"
-                                className="p-1.5 text-[#6b625b] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] disabled:cursor-not-allowed disabled:opacity-30 sm:p-2"
-                                disabled={!item.inStock || item.quantity <= 1}
-                              >
-                                <Minus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                              </button>
-                              <span className="px-3 py-1 text-sm font-semibold tabular-nums text-[#1a1a1a] sm:px-4 sm:py-2 sm:text-base">{item.quantity}</span>
-                              <button
-                                onClick={() => updateQuantity(item.id, item.productId, item.quantity + 1)}
-                                aria-label="Increase quantity"
-                                className="p-1.5 text-[#6b625b] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] disabled:cursor-not-allowed disabled:opacity-30 sm:p-2"
-                                disabled={!item.inStock || (item.availableStock != null && item.quantity >= item.availableStock)}
-                              >
-                                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* The unit price, now the small print.
-                              Only where there is more than one — at a quantity
-                              of one it would sit directly beneath an identical
-                              figure and say the same thing twice. */}
+                          {/* The unit price, now the small print. Only where
+                              there is more than one — at a quantity of one it
+                              would sit directly beneath an identical figure and
+                              say the same thing twice. */}
                           {item.quantity > 1 && (
                             <span className="text-xs font-medium tabular-nums text-[#8a807a]">
                               {formatPrice(item.price)} each
                             </span>
                           )}
-
+                        </div>
                       </div>
 
                       {/* ── Shipping ─────────────────────────────────────
-                          Its own row spanning the description and money
-                          columns, since it is about the line as a whole and is
-                          wider than an 11rem column can hold.
+                          Its own full-width line, since it is about the line as a
+                          whole and is wider than any one column holds.
 
                           Guarded on the wrapper, not just inside it: rendered
                           unconditionally it left an empty box carrying a top
                           margin under every line that has no shipping choice —
                           which, in the current catalogue, is all of them. */}
                       {transportOptionsFor(item).length >= 1 && (
-                      <div className="col-span-2 mt-3 lg:col-span-3 lg:col-start-2">
+                      <div className="basis-full">
                           {/* Shipping method — only when the product actually offers a
                               choice. AIR and SHIP carry different rates and delivery
                               windows, so this changes what the customer pays. */}
@@ -1179,6 +1211,43 @@ export default function Order() {
                       </button>
                     </Link>
                   )}
+
+                  {/* What this basket saved, as one figure.
+
+                      Every line already shows its own struck price, but nobody
+                      adds six of them up in their head — so the total is the
+                      one piece of arithmetic worth doing for the customer, and
+                      it is the last thing they read before the button.
+
+                      It is measured against what each line is struck through
+                      at, which is exactly the number printed beside it, plus
+                      whatever a promo code took off. Nothing is asserted here
+                      that is not already visible further up the page, which is
+                      why it needs no policy behind it to stay true — unlike a
+                      shipping or returns claim, it cannot quietly go stale.
+
+                      Hidden entirely at zero rather than announcing a saving
+                      of nothing: a full-price basket should say nothing at
+                      all. */}
+                  {(() => {
+                    const listTotal = cartItems.reduce((sum, item) => {
+                      const list = item.offerStrikePrice ?? item.originalPrice ?? item.price
+                      return sum + (list > item.price ? list : item.price) * item.quantity
+                    }, 0)
+                    const saved = (listTotal - summary.subtotal) + summary.discount
+                    if (listTotal <= 0 || saved < 0.01) return null
+                    const pct = Math.round((saved / listTotal) * 100)
+                    return (
+                      <div className="mt-1 border-t border-[#f0e8df] pt-4 text-center">
+                        <p className="text-xs font-medium text-[#6b625b] sm:text-[13px]">
+                          You&apos;re saving{' '}
+                          <span className="font-bold tabular-nums text-green-700">{formatPrice(saved)}</span>
+                          {pct > 0 ? <span className="tabular-nums text-[#8a807a]"> ({pct}%)</span> : null}
+                          {' '}on this order
+                        </p>
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
 
