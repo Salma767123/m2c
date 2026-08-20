@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { Product as ServiceProduct } from '@/services/productService';
 import { PublicProduct } from '@/services/publicProductService';
 import { Product as MockProduct } from '@/components/mockData/products';
-import { Sparkles, ShoppingCart, Heart } from 'lucide-react';
+import { ShoppingCart, Heart } from 'lucide-react';
+import { FaceIcon, positiveFace } from '@/components/WebSite/Shared/FaceRating';
 import { cartService } from '@/services/cartService';
 import { wishlistService } from '@/services/wishlistService';
 import { userAuthService } from '@/services/userAuthService';
@@ -223,6 +224,9 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
     : null;
 
   const ratingValue = Number(product.rating) || 0;
+  // null when the score is not one worth advertising; the badge then shows
+  // the plain review count instead of a face.
+  const badgeFace = positiveFace(ratingValue);
   const reviewCount = Number(product.reviews) || 0;
   const hasReviews = reviewCount > 0;
 
@@ -274,14 +278,25 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
 
           {/* Rating — compact metric pinned to the image's bottom-left corner */}
           <div className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 rounded-md bg-white/80 px-1.5 py-0.5 text-[11px] leading-none shadow-sm ring-1 ring-black/[0.06] backdrop-blur-sm">
-            {hasReviews ? (
+            {/* A count, never a percentage. "100% loved it" off two reviews
+                reads as invented and "67%" off three reads as bad, while a
+                count is honest at any size and only ever grows. The face is
+                shown only when the score is one we are happy to advertise --
+                below that the badge falls back to the bare number of reviews
+                and the detail stays in the reviews section. */}
+            {!hasReviews ? (
+              <span className="font-semibold text-gray-600">New</span>
+            ) : badgeFace ? (
               <>
-                <span className="font-bold tabular-nums text-[#1a1a1a]">{ratingValue.toFixed(1)}</span>
-                <Sparkles className="h-3 w-3 text-[#C7A66A] fill-[#C7A66A]" strokeWidth={1.5} />
-                <span className="tabular-nums text-gray-500">{reviewCount}</span>
+                <FaceIcon value={badgeFace} className="h-3.5 w-3.5" />
+                <span className="font-semibold text-[#1a1a1a]">
+                  <span className="tabular-nums">{reviewCount}</span> loved this
+                </span>
               </>
             ) : (
-              <span className="font-semibold text-gray-600">New</span>
+              <span className="font-semibold text-gray-600">
+                <span className="tabular-nums">{reviewCount}</span> reviews
+              </span>
             )}
           </div>
 

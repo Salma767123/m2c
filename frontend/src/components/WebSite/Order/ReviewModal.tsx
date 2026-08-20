@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { X, Star, Package, Send, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Package, Send, CheckCircle, AlertCircle } from 'lucide-react';
+import { FacePicker, type FaceValue } from '@/components/WebSite/Shared/FaceRating';
 import reviewService from '@/services/reviewService';
 import Image from 'next/image';
 
@@ -21,14 +22,11 @@ interface ReviewModalProps {
     items: ReviewItem[];
 }
 
-const RATING_LABELS = ['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'];
-
 export default function ReviewModal({ isOpen, onClose, orderId, items }: ReviewModalProps) {
     const [selectedProduct, setSelectedProduct] = useState<string | null>(
         items.length === 1 ? items[0].productId : null
     );
     const [rating, setRating] = useState(0);
-    const [hoveredRating, setHoveredRating] = useState(0);
     const [comment, setComment] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -39,7 +37,6 @@ export default function ReviewModal({ isOpen, onClose, orderId, items }: ReviewM
         if (isOpen) {
             setSelectedProduct(items.length === 1 ? items[0].productId : null);
             setRating(0);
-            setHoveredRating(0);
             setComment('');
             setError(null);
             setSuccess(false);
@@ -48,7 +45,6 @@ export default function ReviewModal({ isOpen, onClose, orderId, items }: ReviewM
 
     if (!isOpen) return null;
 
-    const activeRating = hoveredRating || rating;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -57,7 +53,7 @@ export default function ReviewModal({ isOpen, onClose, orderId, items }: ReviewM
             return;
         }
         if (rating === 0) {
-            setError('Please select a star rating');
+            setError('Please tell us how it was');
             return;
         }
         setError(null);
@@ -166,36 +162,20 @@ export default function ReviewModal({ isOpen, onClose, orderId, items }: ReviewM
                                 </div>
                             </div>
 
-                            {/* Star Rating */}
+                            {/* How was it? One tap.
+                                It was five stars, which asks the customer to score
+                                a product out of five before they can say anything
+                                at all -- a judgement most people skip. A face is
+                                one decision, and it stores exactly the same 1-5
+                                value underneath, so averages, filters, sorting and
+                                the admin reports are all unaffected. */}
                             <div>
                                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                                    Your Rating
+                                    How was it?
                                 </label>
-                                <div className="flex items-center gap-1 justify-center py-2">
-                                    {[1, 2, 3, 4, 5].map((star) => (
-                                        <button
-                                            key={star}
-                                            type="button"
-                                            onClick={() => setRating(star)}
-                                            onMouseEnter={() => setHoveredRating(star)}
-                                            onMouseLeave={() => setHoveredRating(0)}
-                                            className="p-1 focus:outline-none transition-transform hover:scale-110 active:scale-95"
-                                        >
-                                            <Star
-                                                className={`w-9 h-9 transition-colors ${
-                                                    star <= activeRating
-                                                        ? 'text-amber-400 fill-amber-400'
-                                                        : 'text-gray-200'
-                                                }`}
-                                            />
-                                        </button>
-                                    ))}
+                                <div className="py-2">
+                                    <FacePicker value={rating} onChange={(v: FaceValue) => setRating(v)} />
                                 </div>
-                                {activeRating > 0 && (
-                                    <p className="text-center text-sm font-semibold text-amber-500 mt-1">
-                                        {RATING_LABELS[activeRating]}
-                                    </p>
-                                )}
                             </div>
 
                             {/* Comment */}
