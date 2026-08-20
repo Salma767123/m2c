@@ -9,7 +9,7 @@ export default function WishlistPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f9f5f2]">
       <Header />
       <Breadcrumb items={breadcrumbItems} />
       <Wishlist />
