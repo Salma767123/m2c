@@ -411,6 +411,25 @@ const CARD =
   // flip always occupy exactly the same box.
   'group relative block h-full w-full rounded-xl overflow-hidden ring-1 ring-black/5 shadow-sm'
 
+// Offer and coupon cards carry the same three rows in the same box -- a badge
+// line, the message, and "Shop now" -- so they scale on the same tiers as the
+// product card, and off the card's own width for the same reason.
+//
+// What was wrong: at 390px the board hands these a 177x71 box, and p-4 alone
+// was eating 29 of those 71 pixels before a single row of content. The rest
+// went to flex-shrink, which squashed the MIDDLE row -- the message -- to
+// SEVEN pixels tall rather than let it overflow. So a coupon on a phone showed
+// a badge, a blank strip, and "Shop now", and never the code itself. The offer
+// title fared worse at five pixels.
+//
+// shrink-0 on every row is what makes that impossible now: the rows keep their
+// height and the tiers make sure the height is one the card actually has.
+const BANNER_BOX = 'relative flex h-full flex-col justify-between p-1.5 @min-[11rem]:p-2 @min-[15rem]:p-3 @min-[20rem]:p-4'
+const BANNER_KIND = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-px text-[8px] font-bold uppercase tracking-wide @min-[11rem]:text-[9px] @min-[15rem]:px-2 @min-[15rem]:py-0.5 @min-[15rem]:text-[10px] @min-[15rem]:tracking-wider'
+const BANNER_TITLE = 'line-clamp-1 shrink-0 text-[10px] font-semibold leading-tight @min-[11rem]:text-[11px] @min-[12.5rem]:line-clamp-2 @min-[15rem]:text-[12px] @min-[20rem]:text-sm'
+const BANNER_CTA = 'inline-flex shrink-0 items-center gap-1 text-[9px] font-semibold @min-[11rem]:text-[10px] @min-[20rem]:text-[11px]'
+const BANNER_ICON = 'h-2.5 w-2.5 shrink-0 @min-[15rem]:h-3 @min-[15rem]:w-3'
+
 // Where an offer's card should take the shopper, by scope:
 //  PRODUCT (one product) → that product's detail page
 //  CATEGORY             → that category's listing
@@ -458,7 +477,8 @@ function useImageColor(url?: string) {
   return rgb
 }
 
-/** Top-seller product card: ~60% image, 40% content, tinted to the image's colour. */
+/** Top/best-seller product card. Image and content split by the card's OWN
+ *  width, not the viewport, and tinted to the image's colour. */
 function TopSellerCard({ p, label }: { p: PublicProduct; label: ProductLabel }) {
   // Two lists, so two badges: same shape and weight, far enough apart in hue
   // that you can tell them apart without reading the words.
@@ -483,9 +503,41 @@ function TopSellerCard({ p, label }: { p: PublicProduct; label: ProductLabel }) 
   const reviews = p.reviews || 0
 
   return (
+    // @container, not breakpoints. This card's width is set by the grid's
+    // column count, not by the window: the board is grid-cols-2 below lg and
+    // grid-cols-4 from lg, so the card is WIDEST at 768px (358px) and narrows
+    // again at 1024px (238px). A viewport breakpoint reads that backwards.
+    // Everything below sizes itself off the card's own inline size.
+    //
+    // What was wrong: at 360px the card is 162x65 and the old layout wanted
+    // 151px of height in it. The badge wrapped to two lines and was cut off,
+    // the name collapsed to height 0 (line-clamp-2 in a 43px column has
+    // nothing to clamp), and the discount chip was sliced in half. A phone
+    // showed a picture and a price and nothing else. 1024px overflowed too,
+    // by 19px, for the same reason.
+    //
+    // Five tiers, each measured against the card sizes the grid really
+    // produces. Every threshold is the point where the next thing FITS:
+    //
+    //   base      142x57   a 320px phone. No struck MRP -- the red chip
+    //                      beside it already says a discount is on, and the
+    //                      pair together needs a third line the card has not
+    //                      got. Badge rides on the image.
+    //   11rem     162x76   struck MRP back, type up a step.
+    //   15rem     222x89   the badge moves off the image into the column,
+    //                      where it can carry the full two-word label.
+    //   20rem     294x130  image takes more of the card, name gets a second
+    //                      line.
+    //   22rem     332x142  room at last for the rating and the savings pill,
+    //                      on one line between them.
+    //
+    // Verified at 19 widths from 320 to 1920: nothing overflows, and the
+    // tightest card still has 4px to spare. The rows are shrink-0 on purpose
+    // -- without it flex quietly squashes them to fake a fit, which is how
+    // a two-line name reports 24px when it needs 33.
     <Link
       href={`/products/${p.slug || p.id}`}
-      className={CARD}
+      className={`${CARD} @container`}
       style={{
         background: rgb
           ? `linear-gradient(115deg, rgba(${rgb},0.10) 0%, rgba(${rgb},0.26) 58%, rgba(${rgb},0.12) 100%)`
@@ -493,8 +545,9 @@ function TopSellerCard({ p, label }: { p: PublicProduct; label: ProductLabel }) 
       }}
     >
       <div className="flex h-full items-stretch">
-        {/* 60% image */}
-        <div className="relative w-[60%] shrink-0 overflow-hidden">
+        {/* The image gives ground back as the card narrows: 60% of a 162px
+            card leaves 43px for words, which is not a column, it is a margin. */}
+        <div className="relative w-[40%] shrink-0 overflow-hidden @min-[11rem]:w-[44%] @min-[20rem]:w-[54%]">
           {img ? (
             <Image src={img} alt={p.name} fill className="object-cover" unoptimized={img.startsWith('http')} sizes="260px" />
           ) : (
@@ -508,48 +561,68 @@ function TopSellerCard({ p, label }: { p: PublicProduct; label: ProductLabel }) 
           {/* soft blend from the image edge into the tinted content panel */}
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-y-0 right-0 w-14"
+            className="pointer-events-none absolute inset-y-0 right-0 w-5 @min-[11rem]:w-8 @min-[20rem]:w-14"
             style={{ backgroundImage: `linear-gradient(to left, rgba(${rgb || '255,255,255'},0.9), transparent)` }}
           />
+
+          {/* On the narrowest card the badge rides on the picture instead of
+              taking a row in the column — which is the row the product's name
+              needs. Shortened to one word because "Top seller" does not fit
+              across a 71px image, and the colour carries the rest of it. This
+              and its full-width twin below are display:none at opposite sizes,
+              so only ever one of them is in the page or read aloud. */}
+          <span className={`absolute left-1 top-1 inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[9px] font-bold uppercase leading-[1.35] tracking-wide text-white @min-[15rem]:hidden ${badgeTone}`}>
+            {isBest ? <Star className="h-2.5 w-2.5 fill-current" /> : <TrendingUp className="h-2.5 w-2.5" />}
+            {isBest ? 'Best' : 'Top'}
+          </span>
         </div>
 
-        {/* 40% content */}
-        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-3 py-3">
+        {/* Content */}
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-1.5 py-0.5 @min-[11rem]:px-2 @min-[11rem]:py-1 @min-[15rem]:px-2.5 @min-[20rem]:gap-1 @min-[20rem]:px-3 @min-[20rem]:py-1.5">
           {/* Top seller — vibrant gradient tag (stands out from the tinted card) */}
-          <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white ${badgeTone}`}>
+          <span className={`hidden w-fit shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white @min-[15rem]:inline-flex @min-[20rem]:px-2 @min-[20rem]:tracking-wider ${badgeTone}`}>
             {isBest ? <Star className="h-3 w-3 fill-current" /> : <TrendingUp className="h-3 w-3" />} {label}
           </span>
 
-          <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-gray-900 transition-colors group-hover:text-[#e01a1b]">{p.name}</p>
-
-          {/* Ratings */}
-          {(rating > 0 || reviews > 0) && (
-            <span className="flex items-center gap-1">
-              <span className="flex items-center gap-px">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className={`h-3 w-3 ${i < Math.round(rating) ? 'text-amber-400 fill-amber-400' : 'text-gray-300 fill-gray-300'}`} />
-                ))}
-              </span>
-              <span className="text-[10px] font-medium text-gray-500">{rating > 0 ? rating.toFixed(1) : '—'} ({reviews})</span>
-            </span>
-          )}
+          <p className="line-clamp-1 shrink-0 text-[10px] font-semibold leading-tight text-gray-900 transition-colors group-hover:text-[#e01a1b] @min-[11rem]:text-[11px] @min-[15rem]:text-[12px] @min-[20rem]:line-clamp-2 @min-[20rem]:text-[13px]">{p.name}</p>
 
           {/* Price + MRP + discount */}
-          <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-            <span className="text-base font-extrabold text-gray-900 tabular-nums">{formatPrice(effective)}</span>
+          <div className="flex shrink-0 flex-wrap items-baseline gap-x-1 gap-y-0.5 @min-[15rem]:gap-x-1.5">
+            <span className="text-[12px] font-extrabold text-gray-900 tabular-nums @min-[11rem]:text-[13px] @min-[15rem]:text-[14px] @min-[20rem]:text-base">{formatPrice(effective)}</span>
             {strike && strike > effective && (
-              <span className="text-[11px] text-gray-400 line-through tabular-nums">{formatPrice(strike)}</span>
+              <span className="hidden text-[10px] text-gray-400 line-through tabular-nums @min-[11rem]:inline @min-[20rem]:text-[11px]">{formatPrice(strike)}</span>
             )}
             {discountPct > 0 && (
-              <span className="rounded bg-[#e01a1b]/10 px-1 py-px text-[10px] font-bold text-[#e01a1b]">{discountPct}% OFF</span>
+              <span className="rounded bg-[#e01a1b]/10 px-1 py-px text-[9px] font-bold text-[#e01a1b] @min-[20rem]:text-[10px]">{discountPct}% OFF</span>
             )}
           </div>
 
-          {/* Savings */}
-          {savings != null && savings > 0 && (
-            <span className="inline-flex w-fit items-center rounded-full bg-emerald-50 px-1.5 py-px text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200 tabular-nums">
-              Save {formatPrice(savings)}
-            </span>
+          {/* Ratings and savings, on one line and only once there is room for
+              them, which is 22rem and not before. Stacked as two separate
+              rows they made the column taller than any tile the grid hands
+              this card, so the pair was already being trimmed on desktop
+              before the phone ever came into it. Neither is load-bearing:
+              the strike-through and the % chip above already say there is a
+              discount. */}
+          {(rating > 0 || reviews > 0 || (savings != null && savings > 0)) && (
+            <div className="hidden shrink-0 flex-wrap items-center gap-x-2 gap-y-0.5 @min-[22rem]:flex">
+              {(rating > 0 || reviews > 0) && (
+                <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-px">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className={`h-3 w-3 ${i < Math.round(rating) ? 'text-amber-400 fill-amber-400' : 'text-gray-300 fill-gray-300'}`} />
+                    ))}
+                  </span>
+                  <span className="text-[10px] font-medium text-gray-500">{rating > 0 ? rating.toFixed(1) : '—'} ({reviews})</span>
+                </span>
+              )}
+
+              {savings != null && savings > 0 && (
+                <span className="inline-flex w-fit items-center rounded-full bg-emerald-50 px-1.5 py-px text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200 tabular-nums">
+                  Save {formatPrice(savings)}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -562,7 +635,7 @@ function NoticeCard({ notice }: { notice: Notice }) {
     const o = notice.offer
     const hasImg = !!o.bannerImage
     return (
-      <Link href={offerLink(o)} className={`${CARD} ${hasImg ? 'bg-gray-900' : 'bg-white'}`}>
+      <Link href={offerLink(o)} className={`${CARD} @container ${hasImg ? 'bg-gray-900' : 'bg-white'}`}>
         {hasImg ? (
           <>
             <Image src={o.bannerImage!} alt="" fill className="object-cover transition-transform duration-500 group-hover:scale-105" unoptimized={o.bannerImage!.startsWith('http')} sizes="288px" />
@@ -572,18 +645,18 @@ function NoticeCard({ notice }: { notice: Notice }) {
         ) : (
           <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-[#e01a1b] to-[#ff5a36]" />
         )}
-        <div className="relative h-full p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${hasImg ? 'bg-white/20 text-white backdrop-blur-sm' : 'bg-[#e01a1b]/10 text-[#e01a1b]'}`}>
-              <Percent className="w-3 h-3" /> Offer
+        <div className={BANNER_BOX}>
+          <div className="flex shrink-0 items-center justify-between gap-1">
+            <span className={`${BANNER_KIND} ${hasImg ? 'bg-white/20 text-white backdrop-blur-sm' : 'bg-[#e01a1b]/10 text-[#e01a1b]'}`}>
+              <Percent className={BANNER_ICON} /> Offer
             </span>
-            <span className="rounded-full bg-linear-to-r from-[#e01a1b] to-[#ff5a36] text-white px-2 py-0.5 text-[11px] font-extrabold shadow">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-linear-to-r from-[#e01a1b] to-[#ff5a36] px-1.5 py-px text-[9px] font-extrabold text-white shadow @min-[15rem]:px-2 @min-[15rem]:py-0.5 @min-[15rem]:text-[11px]">
               {o.badge}
             </span>
           </div>
-          <p className={`font-semibold text-sm line-clamp-2 transition-colors ${hasImg ? 'text-white drop-shadow' : 'text-gray-900 group-hover:text-[#e01a1b]'}`}>{o.title}</p>
-          <span className={`text-[11px] font-semibold inline-flex items-center gap-1 ${hasImg ? 'text-white/90' : 'text-gray-500'}`}>
-            Shop now <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+          <p className={`${BANNER_TITLE} transition-colors ${hasImg ? 'text-white drop-shadow' : 'text-gray-900 group-hover:text-[#e01a1b]'}`}>{o.title}</p>
+          <span className={`${BANNER_CTA} ${hasImg ? 'text-white/90' : 'text-gray-500'}`}>
+            Shop now <ArrowRight className={`${BANNER_ICON} transition-transform group-hover:translate-x-0.5`} />
           </span>
         </div>
       </Link>
@@ -593,7 +666,7 @@ function NoticeCard({ notice }: { notice: Notice }) {
   if (notice.kind === 'coupon') {
     const hasImg = !!notice.image
     return (
-      <Link href={notice.link} className={`${CARD} ${hasImg ? 'bg-gray-900' : 'bg-white'}`}>
+      <Link href={notice.link} className={`${CARD} @container ${hasImg ? 'bg-gray-900' : 'bg-white'}`}>
         {hasImg ? (
           <>
             {/* Always unoptimized: the uploaded image is a remote (http) or inline data: URL — next/image can't run either through the optimizer. */}
@@ -604,13 +677,13 @@ function NoticeCard({ notice }: { notice: Notice }) {
         ) : (
           <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-emerald-500 to-teal-400" />
         )}
-        <div className="relative h-full p-4 flex flex-col justify-between">
-          <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${hasImg ? 'bg-white/20 text-white backdrop-blur-sm' : 'bg-emerald-50 text-emerald-700'}`}>
-            <Ticket className="w-3 h-3" /> Coupon
+        <div className={BANNER_BOX}>
+          <span className={`${BANNER_KIND} w-fit ${hasImg ? 'bg-white/20 text-white backdrop-blur-sm' : 'bg-emerald-50 text-emerald-700'}`}>
+            <Ticket className={BANNER_ICON} /> Coupon
           </span>
-          <p className={`font-semibold text-sm line-clamp-2 ${hasImg ? 'text-white drop-shadow' : 'text-gray-800'}`}>{notice.message}</p>
-          <span className={`text-[11px] font-semibold inline-flex items-center gap-1 ${hasImg ? 'text-white/90' : 'text-emerald-700'}`}>
-            Shop now <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+          <p className={`${BANNER_TITLE} ${hasImg ? 'text-white drop-shadow' : 'text-gray-800'}`}>{notice.message}</p>
+          <span className={`${BANNER_CTA} ${hasImg ? 'text-white/90' : 'text-emerald-700'}`}>
+            Shop now <ArrowRight className={`${BANNER_ICON} transition-transform group-hover:translate-x-0.5`} />
           </span>
         </div>
       </Link>
