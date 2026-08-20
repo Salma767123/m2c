@@ -28,11 +28,171 @@ import {
   Share2,
   ArrowRight,
   Package,
+  ArrowDown,
+  Landmark,
+  Lock,
+  RotateCcw,
+  ShieldCheck,
+  Check,
+  X,
   Clock,
   CheckCircle,
   Sparkles,
   TrendingUp,
 } from "lucide-react"
+
+/**
+ * A figure that runs up to its value rather than appearing at it.
+ *
+ * Eased out rather than linear: a linear count reads as a loading spinner,
+ * where a decelerating one reads as an amount arriving and settling. Anyone
+ * who has asked not to be moved is handed the final number immediately —
+ * a count-up is motion whatever the CSS says, so it has to be checked here
+ * rather than left to a media query.
+ */
+function CountUp({ value, duration = 700, delay = 0 }: { value: number; duration?: number; delay?: number }) {
+  // Reduced motion is settled in the initialiser rather than by setting state
+  // from inside the effect. Doing it in the effect costs a cascading render
+  // AND paints a frame of zero first, so someone who asked not to be moved
+  // would still see the figure flick.
+  const [shown, setShown] = useState(() =>
+    typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? value : 0)
+
+  useEffect(() => {
+    if (typeof window === 'undefined'
+        || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    let raf = 0
+    let start = 0
+    const step = (t: number) => {
+      if (!start) start = t
+      const p = Math.min(1, (t - start - delay) / duration)
+      if (p >= 0) setShown(value * (1 - Math.pow(1 - p, 3)))
+      if (p < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [value, duration, delay])
+
+  return <>{formatPrice(shown)}</>
+}
+
+/**
+ * The burst that goes off around the coupon stub.
+ *
+ * Fixed rather than random: Math.random would hand every render a different
+ * burst, and React's double-invoke in development makes that flicker visible.
+ * Angles are swept evenly with a small offset per piece so the ring does not
+ * read as a clock face, and the vertical throw is squashed and biased upward
+ * so it reads as a burst rather than a spill.
+ *
+ * No brand red in here. The seal and the figure are green because the
+ * moment is 'this worked', not 'this is M2C', and confetti in the brand
+ * colour would drag the shout back in through the side door.
+ */
+const COUPON_BURST = [
+  { tx: 132, ty: -26, r: -200, d: 0, c: '#157f4a', w: 3, h: 13, round: false },
+  { tx: 158, ty: 21, r: -103, d: 23, c: '#e8a33d', w: 4, h: 4, round: true },
+  { tx: 153, ty: 82, r: -6, d: 46, c: '#bd8023', w: 7, h: 7, round: false },
+  { tx: 102, ty: 56, r: 91, d: 69, c: '#1a8c53', w: 3, h: 13, round: false },
+  { tx: 72, ty: 106, r: 188, d: 92, c: '#f0dcc0', w: 4, h: 4, round: true },
+  { tx: 8, ty: 146, r: 285, d: 115, c: '#7c8f86', w: 7, h: 7, round: false },
+  { tx: -6, ty: 100, r: -158, d: 138, c: '#157f4a', w: 3, h: 13, round: false },
+  { tx: -78, ty: 117, r: -61, d: 161, c: '#e8a33d', w: 4, h: 4, round: true },
+  { tx: -97, ty: 53, r: 36, d: 184, c: '#bd8023', w: 7, h: 7, round: false },
+  { tx: -132, ty: 66, r: 133, d: 17, c: '#1a8c53', w: 3, h: 13, round: false },
+  { tx: -200, ty: 34, r: 230, d: 40, c: '#f0dcc0', w: 4, h: 4, round: true },
+  { tx: -155, ty: -26, r: 327, d: 63, c: '#7c8f86', w: 7, h: 7, round: false },
+  { tx: -192, ty: -36, r: -116, d: 86, c: '#157f4a', w: 3, h: 13, round: false },
+  { tx: -121, ty: -70, r: -19, d: 109, c: '#e8a33d', w: 4, h: 4, round: true },
+  { tx: -118, ty: -121, r: 78, d: 132, c: '#bd8023', w: 7, h: 7, round: false },
+  { tx: -133, ty: -150, r: 175, d: 155, c: '#1a8c53', w: 3, h: 13, round: false },
+  { tx: -48, ty: -135, r: 272, d: 178, c: '#f0dcc0', w: 4, h: 4, round: true },
+  { tx: -48, ty: -165, r: -171, d: 11, c: '#7c8f86', w: 7, h: 7, round: false },
+  { tx: 23, ty: -198, r: -74, d: 34, c: '#157f4a', w: 3, h: 13, round: false },
+  { tx: 74, ty: -139, r: 23, d: 57, c: '#e8a33d', w: 4, h: 4, round: true },
+  { tx: 103, ty: -160, r: 120, d: 80, c: '#bd8023', w: 7, h: 7, round: false },
+  { tx: 111, ty: -94, r: 217, d: 103, c: '#1a8c53', w: 3, h: 13, round: false },
+  { tx: 170, ty: -67, r: 314, d: 126, c: '#f0dcc0', w: 4, h: 4, round: true },
+  { tx: 209, ty: -64, r: -129, d: 149, c: '#7c8f86', w: 7, h: 7, round: false },
+]
+
+/**
+ * The payment marks, drawn inline.
+ *
+ * None of the official artwork is anywhere in this repository -- I looked --
+ * so these are built rather than imported. Mastercard's interlocking discs are
+ * exact: two circles at r=7 with centres 10 apart, and the lens between them is
+ * the pair of minor arcs joining their intersection points. The rest are
+ * wordmarks set in type in the brands' own colours: recognisable at this size,
+ * and honest about being type rather than a traced logo.
+ *
+ * To use the real files instead, drop the SVGs in public/assets/payments/ and
+ * swap each case for an <img>. Nothing else here needs to change.
+ */
+function PaymentMark({ id }: { id: 'visa' | 'mastercard' | 'rupay' | 'upi' | 'netbanking' }) {
+  const chip = 'inline-flex h-7 items-center justify-center gap-1 rounded-md bg-white px-2 ring-1 ring-[#e9ded2]'
+  const face = { fontFamily: 'Arial, Helvetica, sans-serif' } as React.CSSProperties
+
+  // RuPay and UPI carry the same mark: two leaning chevrons, orange then
+  // green, set AFTER the wordmark. Both are NPCI marks, which is why they
+  // share it.
+  const npciArrow = (
+    <svg viewBox="0 0 16 20" className="h-[15px] w-2.5 shrink-0" aria-hidden>
+      <path d="M1 1 8.6 10 1 19Z" fill="#F58220" />
+      <path d="M7.4 1 15 10 7.4 19Z" fill="#3EA33E" />
+    </svg>
+  )
+
+  if (id === 'visa') {
+    return (
+      <span className={chip} role="img" aria-label="Visa">
+        <span className="text-[13px] font-black italic leading-none tracking-tight text-[#1A1F71]" style={face}>VISA</span>
+      </span>
+    )
+  }
+
+  if (id === 'mastercard') {
+    return (
+      <span className={chip} role="img" aria-label="Mastercard">
+        <svg viewBox="0 0 40 24" className="h-[18px] w-7" aria-hidden>
+          <circle cx="15" cy="12" r="7" fill="#EB001B" />
+          <circle cx="25" cy="12" r="7" fill="#F79E1B" />
+          {/* where the two discs overlap */}
+          <path d="M20 7.1A7 7 0 0 1 20 16.9A7 7 0 0 1 20 7.1Z" fill="#FF5F00" />
+        </svg>
+      </span>
+    )
+  }
+
+  if (id === 'rupay') {
+    return (
+      <span className={chip} role="img" aria-label="RuPay">
+        <span className="text-[12px] font-extrabold leading-none tracking-tight text-[#2E3192]" style={face}>RuPay</span>
+        {npciArrow}
+      </span>
+    )
+  }
+
+  if (id === 'upi') {
+    return (
+      <span className={chip} role="img" aria-label="UPI">
+        <span className="text-[12px] font-extrabold leading-none tracking-tight text-[#58595B]" style={face}>UPI</span>
+        {npciArrow}
+      </span>
+    )
+  }
+
+  return (
+    <span className={chip} role="img" aria-label="Netbanking">
+      {/* Netbanking has no brand of its own, so it borrows the blue the
+          other marks already use -- grey on white read as disabled beside
+          four coloured neighbours. */}
+      <Landmark className="h-3.5 w-3.5 text-[#1B5E9E]" strokeWidth={2.2} />
+      <span className="text-[10px] font-bold uppercase tracking-wide leading-none text-[#0F2E52]">Netbanking</span>
+    </span>
+  )
+}
 
 interface OrderItem {
   id: string
@@ -378,6 +538,8 @@ export default function Order() {
 
   const [promoCode, setPromoCode] = useState("")
   const [appliedPromo, setAppliedPromo] = useState("")
+  /** Set only on a successful apply; the stub reads it and clears itself. */
+  const [couponLanded, setCouponLanded] = useState<{ code: string; amount: number } | null>(null)
   const [discountAmount, setDiscountAmount] = useState(0)
   const [freeShippingApplied, setFreeShippingApplied] = useState(false)
   const [freeShippingMessage, setFreeShippingMessage] = useState("")
@@ -429,6 +591,24 @@ export default function Order() {
       console.warn('Free shipping check failed:', error)
     }
   }
+
+  // Above the loading early-return below, not beside the coupon handlers:
+  // everything under that return is skipped while the skeleton is showing,
+  // so a hook placed there is called on some renders and not others and
+  // React tears the page down with "rendered more hooks than during the
+  // previous render".
+  //
+  // The stub is a notice, not a dialogue: it leaves on its own, and either
+  // Escape or a click anywhere sends it early. No focus trap — trapping focus
+  // in something that vanishes after two seconds strands the keyboard.
+  useEffect(() => {
+    if (!couponLanded) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCouponLanded(null) }
+    const timer = setTimeout(() => setCouponLanded(null), reduce ? 1900 : 3600)
+    window.addEventListener('keydown', onKey)
+    return () => { clearTimeout(timer); window.removeEventListener('keydown', onKey) }
+  }, [couponLanded])
 
   if (!isHydrated || loading) {
     return (
@@ -578,7 +758,21 @@ export default function Order() {
         // Ensure discount doesn't exceed total (though backend handles this, good to be safe)
         setDiscountAmount(response.data.discountAmount)
         setPromoCode("") // Clear input field
-        showSuccessToast("Success", `Coupon "${response.data.code}" applied! You saved ${formatPrice(response.data.discountAmount)}`)
+        // The centre stub says this, louder. Firing a toast as well would
+        // announce one action twice, which reads as a bug rather than as
+        // emphasis. Every other toast on the page is untouched.
+        //
+        // Only when the cart had no coupon on it a moment ago. Nothing stops
+        // Apply being pressed again -- the button is live either way -- and
+        // without this guard the same coupon threw its confetti on every
+        // press. appliedPromo still holds the PREVIOUS value here, which is
+        // exactly the question being asked: was anything already applied when
+        // this press happened.
+        //
+        // Removing the coupon clears it, so a genuine re-add celebrates again.
+        if (!appliedPromo) {
+          setCouponLanded({ code: response.data.code, amount: response.data.discountAmount })
+        }
 
         // Save to local storage for Checkout page to retrieve
         localStorage.setItem('appliedCoupon', JSON.stringify({
@@ -691,6 +885,60 @@ export default function Order() {
           animation: countOut 520ms 90ms cubic-bezier(0.22, 1, 0.36, 1) both;
         }
 
+        /* ── The coupon landing ────────────────────────────────────────
+           A stub that arrives small and a little off-square, settles level,
+           and is stamped a beat later.
+
+           The delay between the two is the whole trick: the card has to look
+           like it has come to rest before anything can be pressed onto it.
+           Landing and stamp together would read as one flat pop.
+
+           The overshoots are deliberate. 1.02 at 60 per cent and back reads
+           as weight settling; travelling straight to 1 reads as a fade. The
+           stamp arrives oversized and crooked, as though swung down onto the
+           paper, and overshoots small before it comes to rest.
+           (No backticks in here — this is a JS template literal.) */
+        @keyframes couponScrim {
+          from { opacity: 0 }
+          to   { opacity: 1 }
+        }
+        .coupon-scrim { animation: couponScrim 200ms ease-out both }
+
+        @keyframes couponIn {
+          0%   { opacity: 0; transform: translateY(14px) scale(0.86) rotate(-2.5deg) }
+          60%  { opacity: 1; transform: translateY(0) scale(1.02) rotate(0.6deg) }
+          100% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg) }
+        }
+        .coupon-card { animation: couponIn 460ms cubic-bezier(0.22, 1, 0.36, 1) both }
+
+        @keyframes couponStamp {
+          0%   { opacity: 0; transform: scale(2.3) rotate(-26deg) }
+          55%  { opacity: 1; transform: scale(0.9) rotate(-5deg) }
+          78%  { transform: scale(1.07) rotate(-10deg) }
+          100% { opacity: 1; transform: scale(1) rotate(-8deg) }
+        }
+        .coupon-stamp { animation: couponStamp 540ms 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both }
+
+        /* Out, then down. The 45 per cent stop is most of the throw, so the
+           pieces decelerate on the way out and then fall away — one keyframe
+           doing an arc rather than a straight line, which is the difference
+           between confetti and a starburst clipart. */
+        @keyframes couponBurst {
+          0%   { opacity: 0; transform: translate(0, 0) scale(0.4) rotate(0deg) }
+          12%  { opacity: 1 }
+          45%  { transform: translate(calc(var(--tx) * 0.86), calc(var(--ty) * 0.82)) scale(1) rotate(calc(var(--r) * 0.55)) }
+          70%  { opacity: 1 }
+          100% { opacity: 0; transform: translate(var(--tx), calc(var(--ty) + 150px)) scale(0.85) rotate(var(--r)) }
+        }
+        .coupon-piece { animation: couponBurst 1500ms cubic-bezier(0.16, 0.72, 0.3, 1) both }
+
+        /* One pass of light across the paper once the stamp is down. */
+        @keyframes couponSheen {
+          from { transform: translateX(-140%) skewX(-18deg) }
+          to   { transform: translateX(420%) skewX(-18deg) }
+        }
+        .coupon-sheen { animation: couponSheen 950ms 460ms ease-in-out both }
+
         /* Anyone who has asked not to be moved gets both, instantly and
            in place. The fill mode is "both", so the resting frame is the one
            that sticks and nothing is left mid-rock or invisible.
@@ -698,6 +946,8 @@ export default function Order() {
            template literal, which is exactly how this block broke once.) */
         @media (prefers-reduced-motion: reduce) {
           .cart-mark, .cart-count { animation: none }
+          .coupon-scrim, .coupon-card, .coupon-stamp { animation: none }
+          .coupon-sheen, .coupon-piece { display: none }
         }
       `}</style>
 
@@ -748,327 +998,243 @@ export default function Order() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
           {/* Cart Items — Order-page style: each item its own card with gaps between */}
           <div className="lg:col-span-2">
+            {/* One panel, rows divided by a hairline. It was a card per
+                item -- eight floating boxes each with its own ring, shadow
+                and gap, which made a six-line cart read as six separate
+                things rather than one list. Both references your senior
+                named do the same thing: Amazon and Flipkart each put the
+                whole cart on a single surface and divide it. */}
             {cartItems.length > 0 && (
-              <div className="grid grid-cols-1 gap-2.5 sm:gap-3 lg:gap-4">
-                {cartItems.map((item) => (
-                  <div key={item.id} className="group @container rounded-xl bg-white p-3.5 shadow-[0_1px_2px_rgba(90,60,40,0.05)] ring-1 ring-[#efe6df] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-18px_rgba(110,75,45,0.32)] hover:ring-[#e5d8cd] sm:rounded-2xl sm:p-4">
-                    {/* One row, five things: picture, description, actions,
-                          quantity, money.
+              <div className="overflow-hidden rounded-2xl bg-white shadow-[0_1px_2px_rgba(90,60,40,0.05)] ring-1 ring-[#efe6df]">
+                <ul className="divide-y divide-[#f2eae1]">
+                  {cartItems.map((item) => {
+                    // One percentage, measured against the highest original we
+                    // hold. The old row showed TWO: a "Save 29%" chip (base
+                    // price against MRP) and a "20% OFF" pill (the store offer
+                    // on top of it), which are different sums against different
+                    // bases and read as a contradiction. Folding them into a
+                    // single figure against the price actually struck through
+                    // is both simpler and larger -- 29 and 20 separately is 43
+                    // together, which is what the customer really saves.
+                    const unitList = Math.max(item.offerStrikePrice ?? 0, item.originalPrice ?? 0, item.price)
+                    const lineList = unitList * item.quantity
+                    const linePaid = item.price * item.quantity
+                    const offPct = lineList > linePaid ? Math.round(((lineList - linePaid) / lineList) * 100) : 0
+                    const lowStock = item.inStock && item.availableStock != null
+                      && item.availableStock > 0 && item.availableStock <= 5
 
-                          Flex rather than grid, because the honest answer
-                          changes with the room available and flex-wrap says so
-                          without me naming every width. Given about 800px of
-                          card the five sit on one line and the description
-                          absorbs the slack, so the buttons, the stepper and the
-                          figures land at the same x on every card and the eye
-                          reads straight down each one. Below that the quantity
-                          and money pair drops to a second line rather than
-                          crushing the name.
-
-                          What this replaced pooled ALL the slack in one place:
-                          the description column ran 672px holding about 250px
-                          of text, so a 330px hole opened between "Size: 38 x 42
-                          cm" and the buttons, while the stepper sat stacked
-                          under the price instead of beside it. The same content
-                          over five columns spends that width instead of leaving
-                          it lying there. */}
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 sm:gap-x-5">
+                    return (
+                    <li key={item.id} className="@container px-4 py-4 sm:px-5 sm:py-5">
+                      <div className="flex gap-3 sm:gap-4">
                         {/* Product Image */}
-                      <div className="shrink-0">
-                        {item.images && item.images.length > 0 ? (
-                          /* The frame crops and the picture moves inside it, so
-                             the card's own geometry never changes on hover —
-                             a photo that grew the box would nudge every line
-                             below it. */
-                          <div className="h-14 w-14 overflow-hidden rounded-lg ring-1 ring-[#efe6df] sm:h-16 sm:w-16 sm:rounded-xl md:h-20 md:w-20">
-                            <Image
-                              src={item.images[0]}
-                              alt={item.name}
-                              width={96}
-                              height={96}
-                              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.07]"
-                            />
-                          </div>
-                        ) : (
-                          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-[#f6f1ea] ring-1 ring-[#efe6df] sm:h-16 sm:w-16 sm:rounded-xl md:h-20 md:w-20">
-                            <Package className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 text-[#c9aeab]" />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Product Details — the one flexible column. Everything after
-                          it is sized to its content, so all the slack in the
-                          row collects here and the columns to the right stay
-                          put from card to card. */}
-                      <div className="min-w-0 flex-1 basis-[13rem] @min-[36rem]:grow-2">
-                        {/* Stock/price warnings */}
-                        {!item.inStock ? (
-                          <div className="flex items-center gap-1.5 mb-2 px-2.5 py-1.5 bg-red-50 rounded-lg w-fit">
-                            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                            <span className="text-xs font-semibold text-red-600">Out of Stock — remove to checkout</span>
-                          </div>
-                        ) : item.availableStock != null && item.availableStock > 0 && item.availableStock <= 5 ? (
-                          <div className="flex items-center gap-1.5 mb-2 px-2.5 py-1.5 bg-amber-50 rounded-lg w-fit">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                            <span className="text-xs font-semibold text-amber-700">Low stock — only {item.availableStock} left</span>
-                          </div>
-                        ) : null}
-
-                        {/* Name, chips, then one strip that carries the
-                            variants and the buttons together.
-
-                            It was five stacked bands: the name, a row that
-                            only ever held a rating, the discount badge on a
-                            row of its own, the variants, and the buttons under
-                            those — in a card whose right half was empty. The
-                            chips share a row now and colour/size sit beside
-                            the actions rather than above them, which takes
-                            roughly a third of the height out of every line
-                            without dropping a single word. */}
-                        <h3 className="text-sm font-semibold text-[#1a1a1a] break-words sm:text-base">{item.name}</h3>
-
-                        {/* The rating chip appears on its own the moment a
-                            product is reviewed — the condition is the live
-                            review count, so no edit here is ever needed.
-
-                            What this replaced showed a filled star beside
-                            "(0)" on everything, because rating comes back null
-                            for all but one product in the catalogue and
-                            {item.rating} rendered as nothing. That reads as a
-                            score of nought rather than as an absence of one,
-                            which is the worse of the two lies.
-
-                            Guarded as a whole row, not chip by chip: an empty
-                            flex box still carries its top margin, which is a
-                            gap under the name of every unrated line. */}
-                        {(((item.reviews ?? 0) > 0 && item.rating) || (item.discount != null && item.discount > 0)) && (
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
-                            {(item.reviews ?? 0) > 0 && item.rating ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-[#fdf8ee] px-2 py-0.5 text-xs font-semibold text-[#8a6a2f] ring-1 ring-[#f0e3c8]">
-                                <Star className="h-3 w-3 fill-current text-[#e8a33d]" />
-                                {item.rating}
-                                <span className="font-medium text-[#b0a087]">({item.reviews})</span>
-                              </span>
-                            ) : null}
-                            {item.discount != null && item.discount > 0 ? (
-                              <span className="inline-flex items-center rounded-full bg-[#fdf1ef] px-2 py-0.5 text-xs font-semibold text-[#c41617] ring-1 ring-[#f4dcd7]">
-                                Save {item.discount}%
-                              </span>
-                            ) : null}
-                          </div>
-                        )}
-
-                        {/* Colour and size. flex-wrap with nowrap per pair: as a
-                            plain flex row the label and the value competed for
-                            one cramped line on a phone and the VALUE lost —
-                            "Size: Set of 8" came out as three stacked lines.
-                            Wrapping between pairs and never inside one keeps
-                            each fact whole. */}
-                        {item.variantDetails && (item.variantDetails.color || item.variantDetails.size) && (
-                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium text-[#4a423c] sm:text-sm">
-                            {item.variantDetails.color && (
-                              <div className="flex items-center gap-2 whitespace-nowrap">
-                                <span className="text-[#8a807a]">Color:</span>
-                                <div className="flex items-center gap-1">
-                                  {item.variantDetails.colorHex && (
-                                    <div
-                                      className="w-3 h-3 rounded-full border border-[#e3dbd1]"
-                                      style={{ backgroundColor: item.variantDetails.colorHex }}
-                                    />
-                                  )}
-                                  <span>{item.variantDetails.color}</span>
-                                </div>
-                              </div>
-                            )}
-                            {item.variantDetails.size && (
-                              <div className="flex items-center gap-2 whitespace-nowrap">
-                                <span className="text-[#8a807a]">Size:</span>
-                                <span>{item.variantDetails.size}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* ── Actions ──────────────────────────────────────
-                          A column of their own now rather than a tail on the
-                          end of the variants line. Because the description
-                          absorbs the slack these land at the same x on every
-                          card, instead of wherever that card's size text
-                          happened to stop. */}
-                      <div className="flex shrink-0 items-center gap-1.5 @min-[36rem]:grow">
-                        <button
-                          onClick={() => moveToWishlist(item)}
-                          aria-label="Move to wishlist"
-                          title="Move this item to your wishlist and remove it from the cart"
-                          className="inline-flex items-center gap-1.5 rounded-full ring-1 ring-[#efe6df] px-2.5 py-1.5 text-xs font-semibold text-[#6b625b] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] hover:ring-[#f4dcd7]"
-                        >
-                          <Heart className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Move to Wishlist</span>
-                          <span className="sm:hidden">Wishlist</span>
-                        </button>
-                        <button
-                          onClick={() => removeItem(item.id)}
-                          aria-label="Remove item"
-                          title="Remove from cart"
-                          className="rounded-full p-1.5 text-[#b3a99f] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617]"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {/* ── Quantity and money ─────────────────────────────
-                          The stepper beside the figures rather than stacked
-                          above them. Two questions — how many, and how much —
-                          asked together, and side by side they cost one row
-                          instead of two.
-
-                          They travel as a pair: when the card is too narrow for
-                          five columns this is the piece that drops to a second
-                          line, and it takes its rule with it, so a phone still
-                          gets the money set apart from the description exactly
-                          as it was. Reversed there, because the total belongs
-                          on the left under the name it refers to.
-
-                          Two thresholds, not one. At 36rem of card the pair
-                          stops being a full-width footer and tucks to the
-                          right. It only starts taking a share of the leftover
-                          width at 54rem — the point past which it is certain
-                          of a place on the first line. Growing it any earlier
-                          would fling the stepper and the price to opposite
-                          edges of a line they had been pushed down onto, with
-                          the stepper stranded under the photograph. */}
-                      <div className="flex basis-full flex-row-reverse flex-wrap items-center justify-between gap-3 border-t border-[#f0e8df] pt-2.5 @min-[36rem]:ml-auto @min-[36rem]:basis-auto @min-[36rem]:flex-row @min-[36rem]:gap-4 @min-[54rem]:grow @min-[36rem]:border-0 @min-[36rem]:pt-0">
-                        {/* How many */}
-                        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
-                          {!item.inStock ? (
-                            <span className="text-xs sm:text-sm text-red-600 font-medium bg-red-50 px-2 py-1 rounded">Out of Stock</span>
-                          ) : (item.availableStock !== undefined && item.quantity > item.availableStock) ? (
-                            <span className="text-xs sm:text-sm text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded">
-                              Only {item.availableStock} in stock
-                            </span>
-                          ) : null}
-                          <div className="flex items-center overflow-hidden rounded-full ring-1 ring-[#e9ded2]">
-                            <button
-                              onClick={() => updateQuantity(item.id, item.productId, item.quantity - 1)}
-                              aria-label="Decrease quantity"
-                              className="p-1.5 text-[#6b625b] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] disabled:cursor-not-allowed disabled:opacity-30"
-                              disabled={!item.inStock || item.quantity <= 1}
-                            >
-                              <Minus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                            </button>
-                            <span className="px-3 py-1 text-sm font-semibold tabular-nums text-[#1a1a1a] sm:px-3.5 sm:text-base">{item.quantity}</span>
-                            <button
-                              onClick={() => updateQuantity(item.id, item.productId, item.quantity + 1)}
-                              aria-label="Increase quantity"
-                              className="p-1.5 text-[#6b625b] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] disabled:cursor-not-allowed disabled:opacity-30"
-                              disabled={!item.inStock || (item.availableStock != null && item.quantity >= item.availableStock)}
-                            >
-                              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* How much.
-
-                            The big figure is what this LINE costs, not what one
-                            of them costs. It was the unit price, with the line
-                            total underneath behind a "LINE TOTAL" label — so
-                            the largest number on the card was never the number
-                            the customer was checking, and the one that was
-                            arrived wearing a caption explaining itself.
-                            Promoting the total removes both problems.
-
-                            The struck price scales with it, or the comparison
-                            would be a line total against a single unit's
-                            original — a discount several times larger than the
-                            real one.
-
-                            A floor on the width so the steppers to its left
-                            line up as well, rather than shifting a few px per
-                            card with the number of digits in the price. */}
-                        <div className="flex shrink-0 flex-col items-start gap-0.5 @min-[36rem]:min-w-[8.5rem] @min-[36rem]:items-end @min-[36rem]:text-right">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xl font-bold tabular-nums text-[#1a1a1a] sm:text-[22px]">{formatPrice(item.price * item.quantity)}</span>
-                            {item.offerStrikePrice ? (
-                              <span className="text-xs sm:text-sm text-[#8a807a] line-through tabular-nums">{formatPrice(item.offerStrikePrice * item.quantity)}</span>
-                            ) : item.originalPrice ? (
-                              <span className="text-xs sm:text-sm text-[#8a807a] line-through tabular-nums">{formatPrice(item.originalPrice * item.quantity)}</span>
-                            ) : null}
-                            {item.activeOffer && (
-                              <span className="inline-flex items-center rounded-full bg-linear-to-r from-[#e01a1b] to-[#ff5a36] px-2 py-0.5 text-[10px] font-bold text-white">
-                                {item.activeOffer.badge}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* The unit price, now the small print. Only where
-                              there is more than one — at a quantity of one it
-                              would sit directly beneath an identical figure and
-                              say the same thing twice. */}
-                          {item.quantity > 1 && (
-                            <span className="text-xs font-medium tabular-nums text-[#8a807a]">
-                              {formatPrice(item.price)} each
-                            </span>
+                        <div className="shrink-0">
+                          {item.images && item.images.length > 0 ? (
+                            /* The frame crops and the picture moves inside it, so
+                               the row's own geometry never changes on hover. */
+                            <div className="group h-16 w-16 overflow-hidden rounded-lg ring-1 ring-[#efe6df] sm:h-20 sm:w-20 sm:rounded-xl">
+                              <Image
+                                src={item.images[0]}
+                                alt={item.name}
+                                width={96}
+                                height={96}
+                                className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.07]"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-[#f6f1ea] ring-1 ring-[#efe6df] sm:h-20 sm:w-20 sm:rounded-xl">
+                              <Package className="h-6 w-6 text-[#c9aeab] sm:h-7 sm:w-7" />
+                            </div>
                           )}
                         </div>
-                      </div>
 
-                      {/* ── Shipping ─────────────────────────────────────
-                          Its own full-width line, since it is about the line as a
-                          whole and is wider than any one column holds.
+                        <div className="min-w-0 flex-1">
+                          {/* Facts on the left, money on the right, exactly as
+                              Amazon sets a cart line. The money block is sized
+                              to its content and the facts take the slack, so
+                              the figures form a column down the list. */}
+                          <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-2">
+                            <div className="min-w-0 flex-1 basis-[13rem]">
+                              <h3 className="text-sm font-semibold text-[#1a1a1a] break-words sm:text-[15px]">{item.name}</h3>
 
-                          Guarded on the wrapper, not just inside it: rendered
-                          unconditionally it left an empty box carrying a top
-                          margin under every line that has no shipping choice —
-                          which, in the current catalogue, is all of them. */}
-                      {transportOptionsFor(item).length >= 1 && (
-                      <div className="basis-full">
-                          {/* Shipping method — only when the product actually offers a
-                              choice. AIR and SHIP carry different rates and delivery
-                              windows, so this changes what the customer pays. */}
-                          {transportOptionsFor(item).length >= 1 && (() => {
-                            // The rate/delivery + courier choice lives on the product page
-                            // (its Shipping card). The cart deep-links there — highlighting
-                            // that card — and the product page writes the choice back to
-                            // this line and returns here.
-                            const cfg = (item as any).product?.logisticsConfig || {}
-                            const shippingHref = `/products/${item.productId}?selectShipping=1&cartItem=${item.id}`
-                            if (needsTransportChoice(item)) {
-                              return (
-                                <Link
-                                  href={shippingHref}
-                                  className="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-colors"
-                                >
-                                  <Truck className="w-4 h-4" />
-                                  Select shipping method
-                                  <span className="text-red-500">*</span>
-                                  <ArrowRight className="w-3.5 h-3.5" />
-                                </Link>
-                              )
-                            }
-                            const mode = item.transportType || (Array.isArray(cfg.transportTypes) ? cfg.transportTypes[0] : undefined)
-                            const days = mode === 'AIR' ? cfg.airDeliveryDays : cfg.shipDeliveryDays
-                            return (
-                              <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#efeae3] bg-[#faf7f3] px-3.5 py-2.5">
-                                <Truck className="w-4 h-4 text-[#8a807a]" />
-                                <span className="text-xs font-medium text-[#4a423c]">
-                                  Shipping: <span className="font-semibold text-[#1a1a1a]">{mode === 'AIR' ? 'Air' : 'Sea'}</span>
-                                  {days ? <span className="text-[#b3a99f]"> · {days} days</span> : null}
-                                  {item.courier ? <span className="text-[#b3a99f]"> · </span> : null}
-                                  {item.courier ? <span className="font-semibold text-[#1a1a1a]">{courierName(item.courier)}</span> : null}
-                                </span>
-                                <Link href={shippingHref} className="text-xs font-semibold text-[#e01a1b] hover:underline ml-1">
-                                  Change
-                                </Link>
+                              {item.variantDetails && (item.variantDetails.color || item.variantDetails.size) && (
+                                <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#6b625b] sm:text-[13px]">
+                                  {item.variantDetails.color && (
+                                    <span className="flex items-center gap-1.5 whitespace-nowrap">
+                                      <span className="text-[#a1948a]">Color:</span>
+                                      {item.variantDetails.colorHex && (
+                                        <span
+                                          className="inline-block h-3 w-3 rounded-full border border-[#e3dbd1]"
+                                          style={{ backgroundColor: item.variantDetails.colorHex }}
+                                        />
+                                      )}
+                                      <span className="font-medium text-[#4a423c]">{item.variantDetails.color}</span>
+                                    </span>
+                                  )}
+                                  {item.variantDetails.size && (
+                                    <span className="flex items-center gap-1.5 whitespace-nowrap">
+                                      <span className="text-[#a1948a]">Size:</span>
+                                      <span className="font-medium text-[#4a423c]">{item.variantDetails.size}</span>
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Stock state, stated rather than implied. Both
+                                  references put this on every line; we hold
+                                  inStock on every product, so it costs nothing
+                                  to say. */}
+                              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-[13px]">
+                                {!item.inStock ? (
+                                  <span className="font-semibold text-[#c41617]">Out of stock</span>
+                                ) : lowStock ? (
+                                  <span className="font-semibold text-[#a86a12]">Only {item.availableStock} left</span>
+                                ) : (
+                                  <span className="font-medium text-[#157f4a]">In stock</span>
+                                )}
+
+                                {/* Which offer did this. The title was already
+                                    in the payload and thrown away, so with two
+                                    store-wide offers running neither the
+                                    customer nor the admin could tell from the
+                                    page which one had won. */}
+                                {item.activeOffer?.title ? (
+                                  <span className="inline-flex items-center gap-1 text-[#8a807a]">
+                                    <span aria-hidden className="h-1 w-1 rounded-full bg-[#ded3c6]" />
+                                    {item.activeOffer.title}
+                                  </span>
+                                ) : null}
+
+                                {(item.reviews ?? 0) > 0 && item.rating ? (
+                                  <span className="inline-flex items-center gap-1 text-[#8a807a]">
+                                    <span aria-hidden className="h-1 w-1 rounded-full bg-[#ded3c6]" />
+                                    <Star className="h-3 w-3 fill-current text-[#e8a33d]" />
+                                    {item.rating}
+                                    <span className="text-[#b0a087]">({item.reviews})</span>
+                                  </span>
+                                ) : null}
                               </div>
-                            )
-                          })()}
+                            </div>
+
+                            {/* Flipkart's price line: how much off, what it
+                                was, what it is -- read left to right in that
+                                order, on one line. */}
+                            <div className="shrink-0 text-left @min-[24rem]:text-right">
+                              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 @min-[24rem]:justify-end">
+                                {offPct > 0 && (
+                                  <span className="inline-flex items-baseline gap-0.5 text-[13px] font-bold text-[#157f4a]">
+                                    <ArrowDown className="h-3 w-3 self-center" strokeWidth={3} />
+                                    {offPct}%
+                                  </span>
+                                )}
+                                {lineList > linePaid && (
+                                  <span className="text-[13px] tabular-nums text-[#a1948a] line-through">{formatPrice(lineList)}</span>
+                                )}
+                                <span className="text-lg font-bold tabular-nums text-[#1a1a1a] sm:text-xl">{formatPrice(linePaid)}</span>
+                              </div>
+                              {item.quantity > 1 && (
+                                <p className="mt-1 text-xs tabular-nums text-[#8a807a]">{formatPrice(item.price)} each</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Controls as a divided strip, the way both
+                              references set them: the stepper, then the two
+                              actions as plain links rather than pill buttons
+                              competing with Proceed to Checkout. */}
+                          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                            <div className="flex items-center overflow-hidden rounded-full ring-1 ring-[#e9ded2]">
+                              <button
+                                onClick={() => updateQuantity(item.id, item.productId, item.quantity - 1)}
+                                aria-label="Decrease quantity"
+                                className="p-1.5 text-[#6b625b] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] disabled:cursor-not-allowed disabled:opacity-30"
+                                disabled={!item.inStock || item.quantity <= 1}
+                              >
+                                <Minus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                              </button>
+                              <span className="px-3 py-1 text-sm font-semibold tabular-nums text-[#1a1a1a] sm:px-3.5">{item.quantity}</span>
+                              <button
+                                onClick={() => updateQuantity(item.id, item.productId, item.quantity + 1)}
+                                aria-label="Increase quantity"
+                                className="p-1.5 text-[#6b625b] transition-colors hover:bg-[#fdf1ef] hover:text-[#c41617] disabled:cursor-not-allowed disabled:opacity-30"
+                                disabled={!item.inStock || (item.availableStock != null && item.quantity >= item.availableStock)}
+                              >
+                                <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                              </button>
+                            </div>
+
+                            <span aria-hidden className="h-4 w-px bg-[#eadfd2]" />
+
+                            <button
+                              onClick={() => moveToWishlist(item)}
+                              title="Move this item to your wishlist and remove it from the cart"
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#6b625b] transition-colors hover:text-[#c41617] sm:text-[13px]"
+                            >
+                              <Heart className="h-3.5 w-3.5" />
+                              Move to Wishlist
+                            </button>
+
+                            <span aria-hidden className="h-4 w-px bg-[#eadfd2]" />
+
+                            <button
+                              onClick={() => removeItem(item.id)}
+                              title="Remove from cart"
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#6b625b] transition-colors hover:text-[#c41617] sm:text-[13px]"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Remove
+                            </button>
+                          </div>
+
+                {transportOptionsFor(item).length >= 1 && (
+                <div className="basis-full">
+                    {/* Shipping method — only when the product actually offers a
+                        choice. AIR and SHIP carry different rates and delivery
+                        windows, so this changes what the customer pays. */}
+                    {transportOptionsFor(item).length >= 1 && (() => {
+                      // The rate/delivery + courier choice lives on the product page
+                      // (its Shipping card). The cart deep-links there — highlighting
+                      // that card — and the product page writes the choice back to
+                      // this line and returns here.
+                      const cfg = (item as any).product?.logisticsConfig || {}
+                      const shippingHref = `/products/${item.productId}?selectShipping=1&cartItem=${item.id}`
+                      if (needsTransportChoice(item)) {
+                        return (
+                          <Link
+                            href={shippingHref}
+                            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-colors"
+                          >
+                            <Truck className="w-4 h-4" />
+                            Select shipping method
+                            <span className="text-red-500">*</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </Link>
+                        )
+                      }
+                      const mode = item.transportType || (Array.isArray(cfg.transportTypes) ? cfg.transportTypes[0] : undefined)
+                      const days = mode === 'AIR' ? cfg.airDeliveryDays : cfg.shipDeliveryDays
+                      return (
+                        <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#efeae3] bg-[#faf7f3] px-3.5 py-2.5">
+                          <Truck className="w-4 h-4 text-[#8a807a]" />
+                          <span className="text-xs font-medium text-[#4a423c]">
+                            Shipping: <span className="font-semibold text-[#1a1a1a]">{mode === 'AIR' ? 'Air' : 'Sea'}</span>
+                            {days ? <span className="text-[#b3a99f]"> · {days} days</span> : null}
+                            {item.courier ? <span className="text-[#b3a99f]"> · </span> : null}
+                            {item.courier ? <span className="font-semibold text-[#1a1a1a]">{courierName(item.courier)}</span> : null}
+                          </span>
+                          <Link href={shippingHref} className="text-xs font-semibold text-[#e01a1b] hover:underline ml-1">
+                            Change
+                          </Link>
+                        </div>
+                      )
+                    })()}
+                </div>
+                )}
+                        </div>
                       </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                    </li>
+                    )
+                  })}
+                </ul>
               </div>
             )}
 
@@ -1212,42 +1378,54 @@ export default function Order() {
                     </Link>
                   )}
 
-                  {/* What this basket saved, as one figure.
+                  {/* ── Reassurance under the button ──────────────────────
+                      Three promises, then what we take. It replaced the
+                      savings figure that used to sit here.
 
-                      Every line already shows its own struck price, but nobody
-                      adds six of them up in their head — so the total is the
-                      one piece of arithmetic worth doing for the customer, and
-                      it is the last thing they read before the button.
+                      Two things in the reference could not be copied as they
+                      stood, and both would have been lies on this site:
 
-                      It is measured against what each line is struck through
-                      at, which is exactly the number printed beside it, plus
-                      whatever a promo code took off. Nothing is asserted here
-                      that is not already visible further up the page, which is
-                      why it needs no policy behind it to stay true — unlike a
-                      shipping or returns claim, it cannot quietly go stale.
+                      "7 days return" -- the Returns page promises THIRTY days
+                      from delivery. Copying the reference would have shortened
+                      a policy the business actually makes.
 
-                      Hidden entirely at zero rather than announcing a saving
-                      of nothing: a full-price basket should say nothing at
-                      all. */}
-                  {(() => {
-                    const listTotal = cartItems.reduce((sum, item) => {
-                      const list = item.offerStrikePrice ?? item.originalPrice ?? item.price
-                      return sum + (list > item.price ? list : item.price) * item.quantity
-                    }, 0)
-                    const saved = (listTotal - summary.subtotal) + summary.discount
-                    if (listTotal <= 0 || saved < 0.01) return null
-                    const pct = Math.round((saved / listTotal) * 100)
-                    return (
-                      <div className="mt-1 border-t border-[#f0e8df] pt-4 text-center">
-                        <p className="text-xs font-medium text-[#6b625b] sm:text-[13px]">
-                          You&apos;re saving{' '}
-                          <span className="font-bold tabular-nums text-green-700">{formatPrice(saved)}</span>
-                          {pct > 0 ? <span className="tabular-nums text-[#8a807a]"> ({pct}%)</span> : null}
-                          {' '}on this order
-                        </p>
+                      PayPal and Apple Pay logos -- neither appears anywhere in
+                      this codebase. The only gateway wired up is Razorpay
+                      (PayU exists but is switched off), so the methods listed
+                      are the ones Razorpay actually settles. A payment badge
+                      is a promise about what will work at the next step; a
+                      wrong one is discovered at the worst possible moment. */}
+                  <div className="mt-5 border-t border-[#f0e8df] pt-4">
+                    <p className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-[#8a807a] sm:text-xs">
+                      <Lock className="h-3 w-3 shrink-0" strokeWidth={2.4} />
+                      Secure checkout. Your data is protected.
+                    </p>
+
+                    <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[#f6efe6] pt-4 text-center">
+                      {[
+                        { icon: <Truck className="h-4 w-4" strokeWidth={1.9} />, title: 'Free Shipping', note: 'On all orders' },
+                        { icon: <RotateCcw className="h-4 w-4" strokeWidth={1.9} />, title: 'Easy Returns', note: '30 days return' },
+                        { icon: <ShieldCheck className="h-4 w-4" strokeWidth={1.9} />, title: 'Secure Payment', note: '100% protected' },
+                      ].map((t) => (
+                        <div key={t.title} className="flex flex-col items-center gap-1.5">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#eef8f1] text-[#157f4a] ring-1 ring-[#dcefe3]">
+                            {t.icon}
+                          </span>
+                          <span className="text-[11px] font-semibold leading-tight text-[#3f3a35]">{t.title}</span>
+                          <span className="text-[10px] leading-tight text-[#a1948a]">{t.note}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 border-t border-[#f6efe6] pt-4">
+                      <p className="text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[#b3a99f]">We accept</p>
+                      <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
+                        {(['visa', 'mastercard', 'rupay', 'upi', 'netbanking'] as const).map((m) => (
+                          <PaymentMark key={m} id={m} />
+                        ))}
                       </div>
-                    )
-                  })()}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1300,6 +1478,123 @@ export default function Order() {
           </>
         )}
       </div>
+
+      {/* ── The coupon stub ───────────────────────────────────────────────
+          Three things carry the moment, and all three break the plain
+          rectangle a card would otherwise be: a seal that hangs off the top
+          edge, a burst that leaves the card entirely, and a scalloped foot.
+
+          The masking does the notches at the tear line AND the scallop along
+          the bottom, as three gradient layers intersected. Where
+          mask-composite is not understood the layers add instead, which
+          resolves to opaque everywhere and simply leaves the card a plain
+          rectangle — the fallback is never a hole in the wrong place.
+
+          The shadow lives on the outer wrapper because a mask clips
+          everything an element paints, box-shadow included, so a shadow on
+          the masked box would be sliced off at its own edge. */}
+      {couponLanded && (
+        <div
+          className="coupon-scrim fixed inset-0 z-60 flex items-center justify-center bg-[#2f1e1a]/60 p-4 backdrop-blur-[3px]"
+          onClick={() => setCouponLanded(null)}
+        >
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            {/* The burst. Outside the card and behind it, pinned to the
+                middle of the stub so the pieces read as coming from under
+                the seal rather than from the corners of the screen. */}
+            <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 h-0 w-0">
+              {COUPON_BURST.map((p, i) => (
+                <span
+                  key={i}
+                  className="coupon-piece absolute block"
+                  style={{
+                    width: p.w, height: p.h,
+                    background: p.c,
+                    borderRadius: p.round ? '9999px' : '1px',
+                    animationDelay: p.d + 'ms',
+                    ['--tx' as string]: p.tx + 'px',
+                    ['--ty' as string]: p.ty + 'px',
+                    ['--r' as string]: p.r + 'deg',
+                  } as React.CSSProperties}
+                />
+              ))}
+            </div>
+
+            <div className="coupon-card relative w-[21rem] max-w-[calc(100vw-2rem)] rounded-t-2xl shadow-[0_34px_80px_-28px_rgba(50,25,12,0.8)]">
+              {/* The seal, hanging off the top edge. It is the stamp — same
+                  swung-down arrival — but round and overhanging, so it reads
+                  as pressed onto the paper from outside rather than printed
+                  within it.
+
+                  A tick rather than a ticket. The card is ALREADY a ticket —
+                  notched sides, tear line, scalloped foot — so a ticket glyph
+                  on top of it said the same thing twice, and at this size the
+                  glyph collapsed into an unreadable shape anyway. The seal's
+                  job is the one thing the card cannot say for itself: that it
+                  worked. */}
+              <span className="coupon-stamp absolute -top-9 left-1/2 z-10 flex h-[4.5rem] w-[4.5rem] -translate-x-1/2 items-center justify-center rounded-full bg-linear-to-br from-[#1a8c53] to-[#116b3e] shadow-[0_10px_24px_-8px_rgba(17,107,62,0.85)] ring-4 ring-white">
+                <Check className="h-10 w-10 text-white" strokeWidth={2.9} />
+              </span>
+
+              <div
+                role="status"
+                aria-live="polite"
+                className="relative overflow-hidden rounded-t-2xl bg-white"
+                style={{
+                  WebkitMaskImage: 'radial-gradient(circle 11px at 0 calc(100% - 5.25rem), transparent 11px, #000 11.5px), radial-gradient(circle 11px at 100% calc(100% - 5.25rem), transparent 11px, #000 11.5px), radial-gradient(circle 8px at 8px 100%, transparent 8px, #000 8.5px)',
+                  maskImage: 'radial-gradient(circle 11px at 0 calc(100% - 5.25rem), transparent 11px, #000 11.5px), radial-gradient(circle 11px at 100% calc(100% - 5.25rem), transparent 11px, #000 11.5px), radial-gradient(circle 8px at 8px 100%, transparent 8px, #000 8.5px)',
+                  WebkitMaskSize: '100% 100%, 100% 100%, 16px 100%',
+                  maskSize: '100% 100%, 100% 100%, 16px 100%',
+                  WebkitMaskRepeat: 'no-repeat, no-repeat, repeat-x',
+                  maskRepeat: 'no-repeat, no-repeat, repeat-x',
+                  WebkitMaskComposite: 'source-in',
+                  maskComposite: 'intersect',
+                }}
+              >
+                {/* the weave the policy banners carry, and a warm wash from the seal */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 opacity-[0.035]"
+                  style={{ backgroundImage:
+                    'repeating-linear-gradient(90deg,#8a6a49 0 1px,transparent 1px 14px),'
+                    + 'repeating-linear-gradient(0deg,#8a6a49 0 1px,transparent 1px 14px)' }}
+                />
+                <span aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_58%_at_50%_0%,rgba(21,127,74,0.10)_0%,rgba(21,127,74,0)_70%)]" />
+                <span aria-hidden className="coupon-sheen pointer-events-none absolute inset-y-0 -left-1/4 w-1/4 bg-linear-to-r from-transparent via-white/75 to-transparent" />
+
+                <div className="relative px-6 pb-7 pt-14 text-center">
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[0.26em] text-[#4a7c62]">Coupon applied</p>
+                  {/* The figure is the hero. The code is the receipt for it —
+                      what the customer feels is the money, not the string
+                      they typed. */}
+                  <p className="mt-3 font-playfair text-[42px] font-semibold leading-none tabular-nums text-[#157f4a]">
+                    <CountUp value={couponLanded.amount} delay={260} duration={800} />
+                  </p>
+                  <p className="mt-2.5 text-[13px] font-medium text-[#8a807a]">saved on this order</p>
+                </div>
+
+                {/* The tear line and the code below it. Fixed at 5.25rem so
+                    the notches above have something constant to sit against,
+                    whatever the code's length. */}
+                <div className="relative flex h-[5.25rem] items-center justify-center border-t-2 border-dashed border-[#ede2d5] bg-[#fdfaf6] px-6 pb-2">
+                  <span className="inline-flex items-center rounded-lg border border-dashed border-[#e3d2bb] bg-white px-3.5 py-2 font-mono text-[13px] font-bold uppercase tracking-[0.14em] break-all text-[#2f1e1a]">
+                    {couponLanded.code}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCouponLanded(null)}
+              aria-label="Close"
+              className="mx-auto mt-6 flex h-9 w-9 items-center justify-center rounded-full text-white/70 ring-1 ring-white/30 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
