@@ -674,7 +674,14 @@ export default function CategoryRibbon() {
       </div>
 
       {/* ─────────── Mobile full-screen discovery layer ─────────── */}
-      {mobileOpen && (
+      {/* Portalled to <body>, exactly like the desktop panel above, and for the
+          same reason. This component's own root carries backdrop-blur-sm, and a
+          non-none backdrop-filter makes an element the containing block for its
+          fixed-position descendants. Rendered in place, `fixed inset-0` resolved
+          against that 58px ribbon strip instead of the viewport: the panel
+          opened as a 58px-tall box showing its own header bar and nothing else,
+          with all nine category rows present but squashed out of sight. */}
+      {mounted && mobileOpen && createPortal(
         <div className="fixed inset-0 z-[70] flex flex-col bg-white md:hidden">
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             {mobileCat !== null ? (
@@ -753,7 +760,8 @@ export default function CategoryRibbon() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

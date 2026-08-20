@@ -300,15 +300,15 @@ const Header = () => {
           bottom edge. Same container/max-width as the ribbon so both align. */}
       <header className="relative z-30 bg-white transition-all duration-300">
         <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14 sm:h-16 lg:h-[68px] gap-3 sm:gap-4">
+          <div className="flex items-center justify-between h-14 sm:h-16 lg:h-[68px] gap-1 min-[360px]:gap-2 sm:gap-4">
 
             {/* Logo — sized to sit comfortably in the row without dominating it. */}
             <Link href="/" className="flex items-center shrink-0">
               <CompanyLogo
                 variant={logoVariant}
-                className="h-11 sm:h-12 lg:h-14 w-auto object-contain"
-                skeletonClassName="h-11 sm:h-12 lg:h-14 aspect-square bg-gray-100"
-                fallbackSizes="(max-width: 640px) 44px, (max-width: 1024px) 48px, 56px"
+                className="h-7 min-[360px]:h-8 sm:h-12 lg:h-14 w-auto object-contain"
+                skeletonClassName="h-7 min-[360px]:h-8 sm:h-12 lg:h-14 aspect-square bg-gray-100"
+                fallbackSizes="(max-width: 360px) 26px, (max-width: 640px) 32px, (max-width: 1024px) 48px, 56px"
                 priority
               />
             </Link>
@@ -338,7 +338,7 @@ const Header = () => {
             </form>
 
             {/* Action Icons */}
-            <div className="flex items-center justify-end gap-1 sm:gap-2 shrink-0">
+            <div className="flex items-center justify-end gap-0.5 min-[360px]:gap-1 sm:gap-2 shrink-0">
               {/* DISCOVER ✦ — the marketplace exploration entry point (complements search) */}
               <DiscoverNav />
 
@@ -354,7 +354,7 @@ const Header = () => {
               {/* Wishlist — same format as Account & Cart */}
               <Link
                 href="/wishlist"
-                className="order-3 flex items-center gap-1.5 px-2.5 lg:px-3 py-2 rounded-lg text-gray-700 hover:text-[#e01a1b] hover:bg-[#fff1f1] text-sm font-medium transition-colors"
+                className="order-3 flex items-center gap-1.5 px-1.5 min-[360px]:px-2.5 lg:px-3 py-2 rounded-lg text-gray-700 hover:text-[#e01a1b] hover:bg-[#fff1f1] text-sm font-medium transition-colors"
               >
                 <span className="relative">
                   <Heart className="w-5 h-5 text-[#e01a1b]" />
@@ -370,7 +370,7 @@ const Header = () => {
               {/* Cart — same format as Account & Wishlist */}
               <Link
                 href="/cart"
-                className="order-2 flex items-center gap-1.5 px-2.5 lg:px-3 py-2 rounded-lg text-gray-700 hover:text-[#e01a1b] hover:bg-[#fff1f1] text-sm font-medium transition-colors"
+                className="order-2 flex items-center gap-1.5 px-1.5 min-[360px]:px-2.5 lg:px-3 py-2 rounded-lg text-gray-700 hover:text-[#e01a1b] hover:bg-[#fff1f1] text-sm font-medium transition-colors"
               >
                 <span className="relative">
                   <ShoppingCart className="w-5 h-5 text-[#e01a1b]" />
@@ -386,7 +386,7 @@ const Header = () => {
               {/* Search Icon — mobile only (desktop uses the inline bar) */}
               <button
                 onClick={() => setShowSearchModal(true)}
-                className="order-5 md:hidden p-2 text-[#222222] hover:text-white hover:bg-[#e01a1b] rounded-lg transition-all duration-200 transform hover:scale-110"
+                className="order-5 md:hidden p-2 min-[360px]:p-2.5 text-[#222222] hover:text-white hover:bg-[#e01a1b] rounded-lg transition-all duration-200 transform hover:scale-110"
                 aria-label="Search"
               >
                 <Search className="w-5 h-5 md:w-6 md:h-6" />

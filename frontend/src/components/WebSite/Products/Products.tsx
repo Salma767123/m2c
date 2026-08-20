@@ -6,7 +6,8 @@ import VendorPartnerCTA from '@/components/WebSite/VendorPartnerCTA/VendorPartne
 import Reveal from '@/components/WebSite/Shared/Reveal';
 import CategoryHero from '@/components/WebSite/Shared/CategoryHero';
 import SectionBackdrop from '@/components/WebSite/Shared/SectionBackdrop';
-import { Search, Filter, ChevronDown, Star, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Search, Filter, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { FaceIcon, FACE_FILTER_LABELS, type FaceValue } from '@/components/WebSite/Shared/FaceRating';
 
 /**
  * The banner's fallback, used with nothing selected and for any category whose
@@ -517,7 +518,11 @@ const Products = () => {
       <div>
         <h4 className="text-base font-medium text-gray-900 mb-3">Customer Reviews</h4>
         <div className="space-y-2">
-          {[4, 3, 2, 1].map((rating) => (
+          {/* 5 was absent: the list was inherited from "4 stars & up", where
+              nobody offers a 5-star-only filter because it reads as a mistake
+              next to four stars. With words it is the most useful rung there
+              is -- "Loved it" -- and leaving it out looked like an oversight. */}
+          {[5, 4, 3, 2].map((rating) => (
             <label key={rating} className="flex items-center cursor-pointer">
               <input
                 type="radio"
@@ -531,16 +536,16 @@ const Products = () => {
                 }}
                 className="border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
               />
-              <div className="ml-2 flex items-center">
-                <div className="flex">
-                  {Array.from({ length: 5 }, (_, i) => (
-                    <Star
-                      key={i}
-                      className={`w-4 h-4 ${i < rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
-                    />
-                  ))}
-                </div>
-                <span className="ml-1 text-sm text-gray-700">& Up</span>
+              {/* One face and the words, instead of five stars and "& Up".
+                  A row of five star glyphs repeated four times was twenty
+                  glyphs saying four things; the face is the threshold and the
+                  label says it in words. Colour only on the selected row, so
+                  the list reads as a set of choices rather than four ratings. */}
+              <div className="ml-2 flex items-center gap-2">
+                <FaceIcon value={rating as FaceValue} className="h-5 w-5" />
+                <span className={`text-sm ${selectedRating === rating ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
+                  {FACE_FILTER_LABELS[rating as FaceValue]}
+                </span>
               </div>
             </label>
           ))}
@@ -557,7 +562,7 @@ const Products = () => {
               }}
               className="border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
             />
-            <span className="ml-2 text-sm text-gray-700">All Ratings</span>
+            <span className={`ml-2 text-sm ${selectedRating === 0 ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>Any rating</span>
           </label>
         </div>
       </div>
@@ -751,7 +756,7 @@ const Products = () => {
                     {sortBy === 'createdAt' && 'Newest First'}
                     {sortBy === 'price-low' && 'Price: Low to High'}
                     {sortBy === 'price-high' && 'Price: High to Low'}
-                    {sortBy === 'rating' && 'Highest Rated'}
+                    {sortBy === 'rating' && 'Most Loved'}
                   </span>
                   <ChevronDown className="ml-2 h-4 w-4 flex-shrink-0" />
                 </button>
@@ -762,7 +767,7 @@ const Products = () => {
                         { value: 'createdAt', label: 'Newest First' },
                         { value: 'price-low', label: 'Price: Low to High' },
                         { value: 'price-high', label: 'Price: High to Low' },
-                        { value: 'rating', label: 'Highest Rated' }
+                        { value: 'rating', label: 'Most Loved' }
                       ].map((option) => (
                         <button
                           key={option.value}

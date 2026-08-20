@@ -451,3 +451,32 @@ body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
 }
+
+/* ─── Face ratings ────────────────────────────────────────────────────────
+   Defined once here rather than in the component: FaceIcon renders dozens of
+   times on a listing page, and a <style> tag per instance would ship the same
+   keyframes over and over. */
+@keyframes m2cFaceBounce {
+  0%   { transform: scale(1) rotate(0deg) }
+  30%  { transform: scale(1.2) rotate(-8deg) }
+  55%  { transform: scale(0.94) rotate(4deg) }
+  75%  { transform: scale(1.07) rotate(-2deg) }
+  100% { transform: scale(1) rotate(0deg) }
+}
+.m2c-face-bounce { animation: m2cFaceBounce 560ms cubic-bezier(0.34, 1.56, 0.64, 1) }
+
+@keyframes m2cFaceWobble {
+  0%, 100% { transform: rotate(0deg) translateY(0) }
+  25%      { transform: rotate(-9deg) translateY(-1px) }
+  50%      { transform: rotate(0deg) translateY(-2.5px) }
+  75%      { transform: rotate(9deg) translateY(-1px) }
+}
+.m2c-face-wobble:hover svg, .m2c-face-wobble:focus-visible svg {
+  animation: m2cFaceWobble 720ms ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m2c-face-bounce,
+  .m2c-face-wobble:hover svg,
+  .m2c-face-wobble:focus-visible svg { animation: none }
+}
