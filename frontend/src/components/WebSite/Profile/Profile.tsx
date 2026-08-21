@@ -482,7 +482,10 @@ const Profile = () => {
 
         <div className="flex flex-col gap-5 sm:gap-6 lg:flex-row lg:gap-8">
           {/* ── Sidebar ──────────────────────────────────────────────────── */}
-          <Reveal className="shrink-0 lg:w-72" delay={90}>
+          {/* Sticky from lg up. Order History runs to about 1,600px while
+              this column is roughly 400px, so scrolling the orders used to
+              leave a metre of empty page where the navigation had been. */}
+          <Reveal className="shrink-0 lg:sticky lg:top-6 lg:w-72 lg:self-start" delay={90}>
             <div className="rounded-2xl border border-[#efe4d8] bg-white p-3 shadow-[0_10px_30px_-24px_rgba(74,50,38,0.5)] sm:p-4">
               {/* ── Identity ──────────────────────────────────────────────
                   Centred stack, and no rule inside it. A hairline between the

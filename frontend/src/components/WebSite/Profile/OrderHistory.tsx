@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Package, Eye, Download, Star, Truck, CheckCircle, Clock, AlertCircle, ChevronLeft, ChevronRight, ShoppingBag } from 'lucide-react'
+import { Package, Eye, Download, Truck, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronLeft, ChevronRight, ShoppingBag, SlidersHorizontal } from 'lucide-react'
+import { FaceIcon } from '@/components/WebSite/Shared/FaceRating';
 import orderService, { Order as APIOrder } from '@/services/orderService'
 import Reveal from '@/components/WebSite/Shared/Reveal'
+import SelectMenu from '@/components/WebSite/Shared/SelectMenu'
+import DateField from '@/components/WebSite/Shared/DateField'
 import { formatPrice } from '@/lib/currency'
 import { showErrorToast } from '@/lib/toast-utils'
 
@@ -28,6 +31,21 @@ import { showErrorToast } from '@/lib/toast-utils'
 
 const ORDERS_PER_PAGE = 5
 
+/** Lines of an order shown before the rest go behind a toggle. */
+const ITEMS_PREVIEW = 2
+
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All orders' },
+  { value: 'processing', label: 'Processing' },
+  { value: 'shipped', label: 'Shipped' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
+
+const FIELD_LABEL =
+  'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a89a8d]'
+
+
 /** Show each amount in the currency the order was charged in, not a hardcoded '$'. */
 function money(amount: number, order: Pick<APIOrder, 'currency'>): string {
   return formatPrice(amount, order.currency === 'USD' ? 'USD' : 'INR')
@@ -50,10 +68,10 @@ const CARD =
   'rounded-2xl border border-[#efe4d8] bg-white p-4 shadow-[0_10px_30px_-24px_rgba(74,50,38,0.5)] sm:p-6 lg:p-7'
 
 const PRIMARY_BTN =
-  'inline-flex items-center justify-center gap-2 rounded-full bg-[#e01a1b] px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_10px_24px_-12px_rgba(224,26,27,0.8)] transition-all duration-300 hover:bg-[#c41617]'
+  'inline-flex items-center justify-center gap-2 rounded-full bg-[#e01a1b] px-5 py-2 text-[13px] font-semibold text-white shadow-[0_10px_24px_-12px_rgba(224,26,27,0.8)] transition-all duration-300 hover:bg-[#c41617]'
 
 const QUIET_BTN =
-  'inline-flex items-center justify-center gap-2 rounded-full border border-[#e6dcd0] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#5f5550] transition-colors duration-200 hover:bg-[#faf7f3] hover:text-[#1a1a1a]'
+  'inline-flex items-center justify-center gap-2 rounded-full border border-[#e6dcd0] bg-white px-4 py-2 text-[13px] font-semibold text-[#5f5550] transition-colors duration-200 hover:bg-[#faf7f3] hover:text-[#1a1a1a]'
 
 const PAGE_BTN =
   'flex shrink-0 items-center gap-1 rounded-lg border border-[#e6dcd0] bg-white px-2 py-2 text-sm font-medium text-[#5f5550] transition-colors hover:bg-[#faf7f3] disabled:cursor-not-allowed disabled:opacity-40 sm:gap-2 sm:px-4'
@@ -96,6 +114,18 @@ export default function OrderHistory() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  /** Orders whose full item list the reader has asked to see. */
+  const [openItems, setOpenItems] = useState<Set<string>>(new Set())
+
+  const toggleItems = (id: string) =>
+    setOpenItems((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
 
   useEffect(() => {
     fetchOrders()
@@ -128,8 +158,30 @@ export default function OrderHistory() {
 
   const statusMeta = (status: string) => STATUS_META[getNormalizedStatus(status)]
 
-  const totalPages = Math.ceil(orders.length / ORDERS_PER_PAGE)
-  const paginatedOrders = orders.slice(
+  /** The `to` day is inclusive -- picking the same day for both should find
+   *  that day's orders, not none of them. */
+  const withinDates = (iso: string) => {
+    const t = new Date(iso).getTime()
+    if (fromDate && t < new Date(`${fromDate}T00:00:00`).getTime()) return false
+    if (toDate && t > new Date(`${toDate}T23:59:59.999`).getTime()) return false
+    return true
+  }
+
+  const filtersOn = statusFilter !== 'all' || !!fromDate || !!toDate
+
+  const visibleOrders = orders.filter((o) =>
+    (statusFilter === 'all' || getNormalizedStatus(o.status) === statusFilter) && withinDates(o.createdAt)
+  )
+
+  const clearFilters = () => {
+    setStatusFilter('all')
+    setFromDate('')
+    setToDate('')
+    setCurrentPage(1)
+  }
+
+  const totalPages = Math.ceil(visibleOrders.length / ORDERS_PER_PAGE)
+  const paginatedOrders = visibleOrders.slice(
     (currentPage - 1) * ORDERS_PER_PAGE,
     currentPage * ORDERS_PER_PAGE
   )
@@ -259,12 +311,66 @@ export default function OrderHistory() {
         </div>
       ) : (
         <>
+          {/* Status and dates. Both narrow the set the pagination then counts,
+              so the page numbers describe what is on screen. */}
+          <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-[#efe4d8] bg-[#faf7f3] p-3 sm:flex-row sm:items-end sm:gap-4 sm:p-4">
+            <div className="sm:w-48">
+              <span className={FIELD_LABEL}>Status</span>
+              <SelectMenu
+                value={statusFilter}
+                options={STATUS_OPTIONS}
+                onChange={(v) => { setStatusFilter(v); setCurrentPage(1) }}
+                ariaLabel="Filter orders by status"
+              />
+            </div>
+
+            <div className="flex flex-1 items-end gap-3">
+              <DateField
+                className="min-w-0 flex-1"
+                label="From"
+                placeholder="Any date"
+                value={fromDate}
+                max={toDate || undefined}
+                onChange={(v) => { setFromDate(v); setCurrentPage(1) }}
+              />
+              <DateField
+                className="min-w-0 flex-1"
+                label="To"
+                placeholder="Any date"
+                value={toDate}
+                min={fromDate || undefined}
+                onChange={(v) => { setToDate(v); setCurrentPage(1) }}
+                align="right"
+              />
+            </div>
+
+            {filtersOn && (
+              <button onClick={clearFilters} className={`${QUIET_BTN} shrink-0`}>
+                Clear
+              </button>
+            )}
+          </div>
+
+          {visibleOrders.length === 0 ? (
+            <div className="rounded-2xl border border-[#efe4d8] bg-[#faf7f3] px-6 py-12 text-center">
+              <span aria-hidden className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-white text-[#a89a8d]">
+                <SlidersHorizontal className="h-5 w-5" />
+              </span>
+              <h3 className="font-playfair text-lg font-semibold text-[#1a1a1a]">No orders match</h3>
+              <p className="mx-auto mt-1.5 mb-5 max-w-sm text-sm leading-relaxed text-[#5f5550]">
+                You have {orders.length} order{orders.length !== 1 ? 's' : ''} in total. Widen the dates or choose a different status.
+              </p>
+              <button onClick={clearFilters} className={PRIMARY_BTN}>Clear filters</button>
+            </div>
+          ) : (
+          <>
           <p className="mb-4 text-[13px] text-[#7a6d62]">
             Showing {(currentPage - 1) * ORDERS_PER_PAGE + 1}–
-            {Math.min(currentPage * ORDERS_PER_PAGE, orders.length)} of {orders.length}
+            {Math.min(currentPage * ORDERS_PER_PAGE, visibleOrders.length)} of {visibleOrders.length}
+            {filtersOn && <span className="text-[#a89a8d]"> (filtered from {orders.length})</span>}
           </p>
 
-          <div className="space-y-4 sm:space-y-5">
+          <div className="space-y-3">
             {paginatedOrders.map((order, index) => {
               const meta = statusMeta(order.status)
               const StatusIcon = meta.icon
@@ -273,14 +379,14 @@ export default function OrderHistory() {
                 <Reveal
                   key={order.id}
                   delay={index * 90}
-                  className="rounded-2xl border border-[#efe4d8] p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-[#e6dcd0] hover:shadow-[0_18px_40px_-26px_rgba(74,50,38,0.6)] sm:p-5"
+                  className="rounded-2xl border border-[#efe4d8] p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-[#e6dcd0] hover:shadow-[0_18px_40px_-26px_rgba(74,50,38,0.6)]"
                 >
                   {/* ── Order header ───────────────────────────────────────
                       The order number is what a customer reads out on the
                       phone, so it leads. Date sits under it, status and total
                       sit opposite — three pieces of information, three
                       distinct sizes, rather than four things at one weight. */}
-                  <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                  <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
                     <div className="min-w-0">
                       <h3 className="font-mono text-[15px] font-semibold break-all text-[#1a1a1a]">
                         {order.orderId}
@@ -292,7 +398,9 @@ export default function OrderHistory() {
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end sm:gap-1.5">
+                    {/* Badge and total side by side rather than stacked: as a column this
+                        was three lines deep on its own, on every card. */}
+                    <div className="flex items-center justify-between gap-4 sm:justify-end">
                       <span
                         className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${meta.badge}`}
                       >
@@ -311,20 +419,20 @@ export default function OrderHistory() {
                   </div>
 
                   {/* ── Items ──────────────────────────────────────────── */}
-                  <div className="space-y-2.5">
-                    {order.items.map((item) => (
-                      <div key={item.id} className="flex items-start gap-3 rounded-xl bg-[#faf7f3] p-3 sm:gap-4">
+                  <div className="space-y-2">
+                    {(openItems.has(order.id) ? order.items : order.items.slice(0, ITEMS_PREVIEW)).map((item) => (
+                      <div key={item.id} className="flex items-center gap-3 rounded-xl bg-[#faf7f3] p-2.5">
                         {item.productImage ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={item.productImage}
                             alt={item.productName}
                             loading="lazy"
-                            className="h-14 w-14 shrink-0 rounded-lg border border-[#e6dcd0] object-cover sm:h-16 sm:w-16"
+                            className="h-11 w-11 shrink-0 rounded-lg border border-[#e6dcd0] object-cover sm:h-12 sm:w-12"
                           />
                         ) : (
-                          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-[#e6dcd0] bg-white sm:h-16 sm:w-16">
-                            <Package className="h-6 w-6 text-[#a89a8d]" />
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#e6dcd0] bg-white sm:h-12 sm:w-12">
+                            <Package className="h-5 w-5 text-[#a89a8d]" />
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
@@ -345,10 +453,21 @@ export default function OrderHistory() {
                         </div>
                       </div>
                     ))}
+                    {order.items.length > ITEMS_PREVIEW && (
+                      <button
+                        onClick={() => toggleItems(order.id)}
+                        className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#e01a1b] transition-colors hover:text-[#c41617]"
+                      >
+                        {openItems.has(order.id)
+                          ? 'Show less'
+                          : `Show ${order.items.length - ITEMS_PREVIEW} more item${order.items.length - ITEMS_PREVIEW === 1 ? '' : 's'}`}
+                        <ChevronDown className={`h-4 w-4 transition-transform ${openItems.has(order.id) ? 'rotate-180' : ''}`} />
+                      </button>
+                    )}
                   </div>
 
                   {/* ── Actions ────────────────────────────────────────── */}
-                  <div className="mt-4 flex flex-wrap gap-2 border-t border-[#f2e9df] pt-4 sm:gap-3">
+                  <div className="mt-3 flex flex-wrap gap-2 border-t border-[#f2e9df] pt-3">
                     <Link href={`/order/${order.orderId}`} className={`${PRIMARY_BTN} flex-1 sm:flex-none`}>
                       <Eye className="h-4 w-4" />
                       View details
@@ -359,7 +478,7 @@ export default function OrderHistory() {
                          rather than removed, because deciding whether reviews
                          ship is not a UI call. */
                       <button className={`${QUIET_BTN} flex-1 sm:flex-none`}>
-                        <Star className="h-4 w-4" />
+                        <FaceIcon value={5} className="h-4 w-4" />
                         Write review
                       </button>
                     )}
@@ -419,6 +538,8 @@ export default function OrderHistory() {
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
+          )}
+          </>
           )}
         </>
       )}
