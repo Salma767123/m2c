@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { productService, Product, ProductVariant } from '@/services/productService';
@@ -8,7 +8,7 @@ import { publicProductService, type PublicProduct } from '@/services/publicProdu
 import ProductCard from '@/components/WebSite/ProductCard/ProductCard';
 import { cartService } from '@/services/cartService';
 import { userAuthService } from '@/services/userAuthService';
-import { Heart, Truck, Shield, RotateCcw, Package, Plane, Ship, AlertTriangle, Info, Box, Check, User, Award, Clock, ChevronDown, Tag, Search, ThumbsUp, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Heart, Truck, Shield, RotateCcw, Package, Plane, Ship, AlertTriangle, Info, Box, Check, User, Award, Clock, ChevronDown, Tag, Search, ThumbsUp, X, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
 import { hasManufacturerInfo, manufacturerDisplayName } from '@/lib/manufacturerInfo';
 import { useToast } from '@/hooks/use-toast';
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils';
@@ -34,8 +34,213 @@ import FeaturedProducts from '@/components/WebSite/Featured/Products';
 // storefront shows the exact icons they selected.
 import { CARE_INSTRUCTIONS, CareIcon, CATEGORY_COLORS } from '@/components/VendorDashboard/Products/CareInstructionModal';
 
+/** A soft ground behind each care symbol, matched to its category. */
+/**
+ * Each promise is drawn differently: its own ground, its own colour, its own
+ * shape behind the icon and its own flourish. Four facts set as four copies of
+ * one tile read as a spec strip; four facts drawn four ways read as a set.
+ * Cycles by position, so a product with five promises gets the first motif
+ * again rather than an undesigned fifth.
+ */
+const PROMISE_MOTIFS = [
+  {
+    card: 'bg-[#f7f5ec] ring-[#e8e4d3]',
+    round: '',
+    numeral: 'text-[#c2c79f]',
+    numPos: 'left-4 top-3 sm:left-5 sm:top-4',
+    icon: 'bg-[#edeada] text-[#78814e] rounded-t-[2.25rem] rounded-b-lg',
+    rule: 'bg-[#78814e]',
+    blob: 'bg-[#78814e]/25',
+  },
+  {
+    card: 'bg-[#eef4fc] ring-[#dae7f6]',
+    // Width pinned to the row's min-height so the box is square and the radius
+    // describes a circle rather than an oval. Only applied at four across: in
+    // a 684px cell the same circle is a 233px disc with 450px of nothing
+    // beside it, which is the hole it was meant to avoid.
+    round: 'sm:mx-auto sm:w-64 sm:max-w-full sm:rounded-full',
+    numeral: 'text-[#a7c3e6]',
+    // The round card has no corner to sit in -- tucked further in so the
+    // curve passes outside the numeral instead of through it.
+    numPos: 'left-4 top-3 sm:left-10 sm:top-7',
+    icon: 'bg-[#dfebf9] text-[#1f5faa] rounded-full',
+    rule: 'bg-[#1f5faa]',
+    blob: 'bg-[#1f5faa]/20',
+  },
+  {
+    card: 'bg-[#fdf7f2] ring-[#f2e2d3]',
+    round: '',
+    numeral: 'text-[#eab48c]',
+    numPos: 'left-4 top-3 sm:left-5 sm:top-4',
+    icon: 'bg-[#fbe9da] text-[#c86a2e] rounded-lg',
+    rule: 'bg-[#c86a2e]',
+    blob: 'bg-[#c86a2e]/30',
+  },
+  {
+    card: 'bg-[#faf7f3] ring-[#ebe1d6]',
+    round: '',
+    numeral: 'text-[#c8b6a5]',
+    numPos: 'left-4 top-3 sm:left-5 sm:top-4',
+    icon: 'bg-[#f0e7dc] text-[#6b5240] [clip-path:polygon(50%_0%,100%_25%,100%_75%,50%_100%,0%_75%,0%_25%)]',
+    rule: 'bg-[#6b5240]',
+    blob: 'bg-[#8a6a4c]/30',
+  },
+] as const;
+
+/** The orders the reviews can be read in. Module scope so the identity is
+ *  stable and the control's effects do not re-run on every render. */
+const REVIEW_SORTS = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'highest', label: 'Most loved' },
+  { value: 'lowest', label: 'Least loved' },
+];
+
+/**
+ * The reviews sort control.
+ *
+ * A native <select> hands its open list to the operating system: a square
+ * white box with a blue highlight, dropped over a page drawn down to the
+ * hairline. This is the same control drawn to match, and it keeps the keyboard
+ * behaviour the native one gave away for free -- arrows, Enter, Escape, and
+ * closing on a click anywhere else.
+ */
+function ReviewSortSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(0);
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLUListElement | null>(null);
+  const current = options.find((o) => o.value === value) || options[0];
+
+  useEffect(() => {
+    if (!open) return;
+    listRef.current?.focus();
+    const away = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', away);
+    return () => document.removeEventListener('mousedown', away);
+  }, [open]);
+
+  // The row the arrow keys start from is decided as the list opens, not in an
+  // effect afterwards -- there is nothing to react to, it is part of opening.
+  const openList = () => {
+    setFocused(Math.max(0, options.findIndex((o) => o.value === value)));
+    setOpen(true);
+  };
+
+  const choose = (v: string) => {
+    onChange(v);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={boxRef} className="relative w-full sm:w-44 lg:w-full">
+      <style>{`
+        @keyframes m2cSortIn {
+          from { opacity: 0; transform: translateY(-6px) }
+          to   { opacity: 1; transform: none }
+        }
+        .m2c-sort-panel { animation: m2cSortIn 150ms cubic-bezier(0.22, 1, 0.36, 1) }
+        @media (prefers-reduced-motion: reduce) { .m2c-sort-panel { animation: none } }
+      `}</style>
+
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => (open ? setOpen(false) : openList())}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openList();
+          }
+        }}
+        className={`flex w-full items-center justify-between gap-2 rounded-full border bg-white py-2 pl-4 pr-3 text-sm font-medium text-gray-700 transition ${
+          open ? 'border-[#e01a1b]/40 ring-2 ring-[#e01a1b]/15' : 'border-[#eadfd4] hover:border-[#e01a1b]/30'
+        }`}
+      >
+        <span className="truncate">{current.label}</span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-[#a1948a] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <ul
+          ref={listRef}
+          role="listbox"
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') { e.preventDefault(); setOpen(false); return; }
+            if (e.key === 'ArrowDown') { e.preventDefault(); setFocused((i) => (i + 1) % options.length); return; }
+            if (e.key === 'ArrowUp') { e.preventDefault(); setFocused((i) => (i - 1 + options.length) % options.length); return; }
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(options[focused].value); }
+          }}
+          className="m2c-sort-panel absolute right-0 z-30 mt-2 w-full min-w-[11.5rem] overflow-hidden rounded-2xl border border-[#eadfd4] bg-white p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.13)] outline-none"
+        >
+          {options.map((o, i) => {
+            const on = o.value === value;
+            return (
+              <li
+                key={o.value}
+                role="option"
+                aria-selected={on}
+                onClick={() => choose(o.value)}
+                onMouseEnter={() => setFocused(i)}
+                className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
+                  on
+                    ? 'bg-[#e01a1b]/[0.06] font-semibold text-[#e01a1b]'
+                    : focused === i
+                      ? 'bg-[#f7f2ec] text-gray-800'
+                      : 'text-gray-700'
+                }`}
+              >
+                <span>{o.label}</span>
+                {on && <Check className="h-4 w-4 shrink-0" strokeWidth={2.6} />}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** A faint dot grid, used as a corner flourish on two of the promise cards. */
+const DOT_GRID = 'bg-[radial-gradient(circle,currentColor_1.1px,transparent_1.1px)] bg-[length:9px_9px]';
+
+const CARE_TINTS: Record<string, string> = {
+  'Washing': 'bg-[#e8f1fb]',
+  'Bleaching': 'bg-[#fdf1de]',
+  'Drying': 'bg-[#e6f5ee]',
+  'Ironing': 'bg-[#fdeade]',
+  'Dry Cleaning': 'bg-[#f0eafb]',
+  'Special': 'bg-[#fdeaee]',
+}
+
 /** How many specification rows the hero shows before "Show all". */
 const SPEC_PREVIEW = 6;
+
+
+/**
+ * Below this many reviews the section drops its apparatus -- no search, no
+ * sort, no filter chips, no face row -- and sets the quotations in a narrow
+ * centred column instead. Searching one review is not a thing anybody does,
+ * and the controls were what made the section look empty.
+ */
+const REVIEWS_NEED_TOOLS = 4;
+
+/** Motion is off for anyone who has asked their system for less of it. */
+const reduceMotion = () =>
+  typeof window !== 'undefined' &&
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 
 interface ProductDetailProps {
   productSlug: string;
@@ -63,6 +268,9 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
   const [showAllDetails, setShowAllDetails] = useState(false);
   /** The hero spec table opens short. Thirteen rows beside the price is a wall. */
   const [showAllSpecs, setShowAllSpecs] = useState(false);
+  /** Bumped on every face tap so the bounce replays, even on the same face --
+   *  a keyed remount is the only way to restart a CSS animation. */
+  const [facePulse, setFacePulse] = useState(0);
   const [isImageHovered, setIsImageHovered] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [imageRef, setImageRef] = useState<HTMLImageElement | null>(null);
@@ -96,6 +304,21 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
   const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
   const [showMakerModal, setShowMakerModal] = useState(false);
 
+  // ── Filtering the reviews ────────────────────────────────────────────────
+  // Tapping a face used to make the list snap to its new arrangement. These
+  // hold a FLIP: every visible review's position is read just before the
+  // filter changes, then each one is put back where it was and released, so
+  // the survivors travel to their new places instead of jumping. Reviews that
+  // were not on screen before fade up rather than appearing mid-air.
+  const reviewRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const reviewRects = useRef<Map<string, DOMRect>>(new Map());
+  const snapshotReviews = () => {
+    if (reduceMotion()) return;
+    const map = new Map<string, DOMRect>();
+    reviewRefs.current.forEach((el, id) => map.set(id, el.getBoundingClientRect()));
+    reviewRects.current = map;
+  };
+
   // Is the hero's description actually cut off, or is that all there is?
   // Measured, not guessed: the 4-line clamp starts hiding text at 208
   // characters in a 346px phone column, 314 on desktop and 414 on a tablet, so
@@ -110,6 +333,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
     const pid = product?.id;
     if (!pid) return;
     let cancelled = false;
+
     setLoadingReviews(true);
     reviewService.getProductReviews(pid)
       .then((res) => { if (!cancelled && res.success && res.data) setReviews(res.data); })
@@ -136,6 +360,46 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
 
   // Reset the load-more window whenever the filters change.
   useEffect(() => { setReviewShown(5); }, [reviewSort, reviewStar, reviewSearch]);
+
+  useLayoutEffect(() => {
+    const before = reviewRects.current;
+    if (!before.size) return;
+    reviewRects.current = new Map();
+    if (reduceMotion()) return;
+
+    const moved: HTMLDivElement[] = [];
+    const arrived: HTMLDivElement[] = [];
+    reviewRefs.current.forEach((el, id) => {
+      const was = before.get(id);
+      if (!was) { arrived.push(el); return; }
+      const now = el.getBoundingClientRect();
+      const dx = was.left - now.left;
+      const dy = was.top - now.top;
+      if (!dx && !dy) return;
+      el.style.transition = 'none';
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+      moved.push(el);
+    });
+    if (!moved.length && !arrived.length) return;
+
+    // Every card has to be sitting at its old position on screen before any of
+    // them is released, or there is nothing to travel from and it snaps. The
+    // same trap as the wishlist: reading a rect flushes the PREVIOUS element,
+    // so without this the last one in the loop is the only one that jumps.
+    arrived.forEach((el) => { el.style.transition = 'none'; el.style.opacity = '0'; el.style.transform = 'translateY(10px)'; });
+    void document.body.offsetHeight;
+
+    requestAnimationFrame(() => {
+      [...moved, ...arrived].forEach((el) => {
+        el.style.transition = 'transform 460ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease';
+        el.style.transform = '';
+        el.style.opacity = '';
+        const done = () => { el.style.transition = ''; el.style.transform = ''; el.style.opacity = ''; };
+        el.addEventListener('transitionend', done, { once: true });
+        window.setTimeout(done, 560);
+      });
+    });
+  }, [reviewStar, reviewSort, reviewSearch, reviewShown]);
 
   // Re-measured whenever the text or the column changes, so a phone rotating
   // to landscape gets the right answer too.
@@ -603,6 +867,34 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
     }
   };
 
+  /**
+   * Hand the product to whatever the device offers -- the platform share sheet
+   * on a phone, the clipboard on a desktop browser that has none. A cancelled
+   * sheet is not a failure and is not reported as one.
+   */
+  const shareProduct = async () => {
+    if (!product) return;
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title: product.name, text: `Take a look at ${product.name}`, url });
+        return;
+      } catch (error) {
+        // Cancelling the sheet is a decision, not a failure -- stop there.
+        // Anything else (desktop Chrome defines share() and rejects it on
+        // plenty of setups) falls through to the clipboard rather than
+        // leaving the customer with a toast and no link.
+        if (error instanceof Error && error.name === 'AbortError') return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      showSuccessToast('Link copied', 'Product link copied to your clipboard');
+    } catch {
+      showErrorToast('Share failed', 'Could not share this product. Please try again.');
+    }
+  };
+
   const handleWishlistToggle = async () => {
     if (!product) return;
 
@@ -639,7 +931,6 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
     }
   };
 
-
   // Get available stock based on selected variant or base stock
   const availableStock = selectedVariant
     ? selectedVariant.stock
@@ -675,6 +966,10 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
 
   // Get current image URL
   const currentImageUrl = displayImages[selectedImage]?.url;
+
+  /** The photograph that sits behind the care panel: whatever the gallery is
+   *  showing, so choosing a variant changes it too. */
+  const carePhoto = currentImageUrl || displayImages[0]?.url || null;
 
   // A short table of the facts a shopper checks before buying, shown in the
   // hero beside the image. Amazon does the same and keeps the full list further
@@ -728,41 +1023,6 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
   })();
   const careList: string[] = Array.isArray(fabricSpec.careInstructions) ? fabricSpec.careInstructions : [];
 
-  // ── The cloth ──────────────────────────────────────────────────────────
-  // Three figures, set large, under the gallery. A marketplace page describes
-  // a towel the way it would describe a phone case; a mill describes it by
-  // GSM, weight and size, and those are already on the product. The unit is
-  // split off the number so the figure can be set big and the unit small,
-  // which is what makes it read as a spec sheet rather than another table.
-  const clothFigures = (() => {
-    const out: { value: string; unit?: string; label: string }[] = [];
-    const num = (v: unknown) => String(v).trim();
-    const split = (raw: string) => {
-      const m = raw.match(/^([\d.,]+)\s*(.*)$/);
-      return m ? { value: m[1], unit: m[2] || undefined } : { value: raw };
-    };
-    if (fabricSpec.gsm != null && num(fabricSpec.gsm) !== '') {
-      out.push({ ...split(num(fabricSpec.gsm).replace(/gsm/i, '').trim()), unit: 'gsm', label: 'Density' });
-    }
-    if (product.weight) {
-      const unit = product.weightUnit && !/[a-z]/i.test(String(product.weight)) ? String(product.weightUnit) : '';
-      out.push({ ...split(`${product.weight}${unit ? ` ${unit}` : ''}`), label: 'Weight' });
-    }
-    const size = product.dimensions
-      || (!product.hasVariants && product.singleUnitSize)
-      || (fabricSpec.length && fabricSpec.breadth ? `${fabricSpec.length} \u00d7 ${fabricSpec.breadth} cm` : '');
-    if (size) out.push({ value: String(size), label: 'Size' });
-    if (out.length < 3 && fabricSpec.composition) {
-      out.push({ ...split(num(fabricSpec.composition)), label: 'Composition' });
-    }
-    return out.slice(0, 3);
-  })();
-  const clothLine = [product.material, product.fabricType, fabricSpec.weave ? `${fabricSpec.weave} weave` : null]
-    .filter((x) => x && String(x).trim())
-    .join(' \u00b7 ');
-
-  // "Why choose this?" reasons — derived from real product/vendor data, used in the
-  // hero rail (under the manufacturer card). Items with no backing data are skipped.
   const whyChoose: { icon: any; title: string; desc: string }[] = [];
   if (product.dispatchTimeline) whyChoose.push({ icon: Truck, title: 'Fast Dispatch', desc: 'Fast delivery' });
   if (logisticsResult && logisticsResult.totalShippingCost === 0) whyChoose.push({ icon: Ship, title: 'Free Shipping', desc: 'No shipping charge on this item' });
@@ -1042,12 +1302,11 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     </div>
                   )}
 
-
                 </div>
               </div>
 
               {/* Product Info - Shows magnified image when hovering (desktop only) */}
-              <div className="product-info-container lg:col-span-5 relative p-3 sm:p-4 lg:p-6 lg:pl-4">
+              <div className="product-info-container lg:col-span-4 relative p-3 sm:p-4 lg:p-6 lg:pl-4">
                 {/* Magnified Image Overlay - Desktop only (hover-driven). lg:hidden on mobile so info always shows. */}
                 {isImageHovered && currentImageUrl && (
                   <div className="hidden lg:flex w-full h-full items-center justify-center bg-white rounded-r-2xl">
@@ -1071,13 +1330,26 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                         <div className="flex-1 min-w-0">
                           <h1 className="font-playfair text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold text-[#1a1a1a] mb-2 sm:mb-2.5 leading-tight break-words tracking-tight">{product.name}</h1>
                         </div>
-                        <button
-                          onClick={handleWishlistToggle}
-                          aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-                          className={`p-2 sm:p-3 rounded-full transition-colors shrink-0 ${isWishlisted ? 'bg-red-50 hover:bg-red-100' : 'bg-gray-50 hover:bg-gray-100'}`}
-                        >
-                          <Heart className={`w-5 h-5 sm:w-6 sm:h-6 ${isWishlisted ? 'fill-current text-red-500' : 'text-gray-400'}`} />
-                        </button>
+                        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                          {/* Share. The page had no way to send a product to
+                              anyone -- and this is the page people want to
+                              send, not the listing it came from. */}
+                          <button
+                            onClick={shareProduct}
+                            aria-label="Share this product"
+                            title="Share this product"
+                            className="shrink-0 rounded-full bg-gray-50 p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-[#1a1a1a] sm:p-3"
+                          >
+                            <Share2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                          </button>
+                          <button
+                            onClick={handleWishlistToggle}
+                            aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                            className={`p-2 sm:p-3 rounded-full transition-colors shrink-0 ${isWishlisted ? 'bg-red-50 hover:bg-red-100' : 'bg-gray-50 hover:bg-gray-100'}`}
+                          >
+                            <Heart className={`w-5 h-5 sm:w-6 sm:h-6 ${isWishlisted ? 'fill-current text-red-500' : 'text-gray-400'}`} />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Rating. The listing payload carries an average and a
@@ -1226,42 +1498,6 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                         </div>
                       )}
 
-                {/* ══ The cloth ══
-                    Sits in the middle column, which is where the empty space
-                    under a tall buy box actually is. In the gallery column it
-                    pushed the maker below the fold on a phone -- which was the
-                    whole point of moving the maker up. Only drawn when the
-                    vendor has entered
-                    at least two of the three figures -- one number on its own
-                    is not a spec sheet, it is a stray fact. */}
-                {clothFigures.length >= 2 && (
-                  <div className="overflow-hidden rounded-2xl bg-[linear-gradient(130deg,#fdf9f5_0%,#f8f3ec_100%)] ring-1 ring-[#efe6df]">
-                    <div className="flex items-center gap-2 px-4 pt-4 sm:px-5 sm:pt-5">
-                      <span className="h-px w-6 bg-[#d8c9b8]" />
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#b9a99b]">The cloth</span>
-                    </div>
-                    <dl className="flex divide-x divide-[#eadfd4] px-2 pb-4 pt-3 sm:pb-5">
-                      {clothFigures.map((f) => (
-                        <div key={f.label} className="min-w-0 flex-1 px-2 text-center sm:px-3">
-                          {/* The figure shrinks when it is a dimension rather
-                              than a number -- "50 × 40 cm" set at 28px wrapped
-                              onto a second line and pushed its own label out
-                              of step with the two beside it. The fixed height
-                              keeps all three labels on one line regardless. */}
-                          <dd className="flex h-8 items-center justify-center font-playfair font-semibold leading-none tracking-tight text-[#1a1a1a]">
-                            <span className={`tabular-nums ${f.value.length > 7 ? 'text-[17px] sm:text-xl' : 'text-2xl sm:text-[28px]'}`}>{f.value}</span>
-                            {f.unit && <span className="ml-1 self-end pb-0.5 font-sans text-[12px] font-semibold uppercase tracking-wide text-[#a1948a]">{f.unit}</span>}
-                          </dd>
-                          <dt className="mt-2 truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[#a1948a]">{f.label}</dt>
-                        </div>
-                      ))}
-                    </dl>
-                    {clothLine && (
-                      <p className="border-t border-[#eadfd4] px-4 py-2.5 text-center text-[12.5px] text-[#6b625b] sm:px-5">{clothLine}</p>
-                    )}
-                  </div>
-                )}
-
                       {/* The whole specification, not a six-row taste of it.
                           The full table used to sit in its own band lower down,
                           repeating every row of this one. */}
@@ -1302,7 +1538,6 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                         </div>
                       )}
 
-
                     </div>
                   </div>
               </div>
@@ -1319,7 +1554,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                   live in here, so hiding the rail below lg would have taken Add
                   to Cart off every phone. Below lg it simply stacks under the
                   product facts. */}
-              <aside className="flex flex-col gap-5 self-start p-3 sm:p-4 lg:col-span-3 lg:sticky lg:top-40 lg:p-6 lg:pl-2">
+              <aside className="flex flex-col gap-5 self-start p-3 sm:p-4 lg:col-span-4 lg:sticky lg:top-40 lg:p-6 lg:pl-2">
                 <div className="rounded-2xl bg-white p-4 ring-1 ring-black/[0.07] sm:p-5">
                   {/* The asking price again, compact, at the top of the box. */}
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pb-3">
@@ -1693,21 +1928,82 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
             // The column count follows the number of facts. Fixed at four, a
             // product with two of them left half the row empty -- which is the
             // white space this block was moved here to stop making.
-            <div className={`mt-4 grid grid-cols-2 gap-3 sm:mt-5 ${
-              whyChoose.length <= 2 ? 'lg:grid-cols-2' : whyChoose.length === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4'
+            // Four separate cards rather than one divided band: each promise
+            // gets its own ground, colour, shape and flourish, numbered along
+            // the row. The count still drives the columns, so a product with
+            // two promises does not leave half a row empty.
+            <div className={`mt-5 grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:mt-6 sm:gap-4 ${
+              // The cards always fill the row. Fewer of them means wider ones,
+              // not a narrower band with the rest of the page left blank.
+              whyChoose.length <= 2
+                ? 'sm:grid-cols-2'
+                : whyChoose.length === 3
+                  ? 'sm:grid-cols-3'
+                  : 'sm:grid-cols-2 lg:grid-cols-4'
             }`}>
               {whyChoose.map((w, i) => {
                 const Icon = w.icon;
+                const m = PROMISE_MOTIFS[i % PROMISE_MOTIFS.length];
+                // Two cards are 684px each. Standing the icon beside the words
+                // uses that width; stacking them centres a 72px icon over one
+                // short line and leaves the rest of the card empty.
+                const wide = whyChoose.length <= 2;
                 return (
-                  <div key={i} className="flex items-start gap-3 rounded-xl bg-white p-4 ring-1 ring-black/[0.06] sm:rounded-2xl">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e01a1b]/[0.08] text-[#e01a1b]">
-                      <Icon className="h-4 w-4" />
+                  <article
+                    key={i}
+                    className={`group relative flex flex-col items-center justify-center overflow-hidden rounded-2xl px-5 py-7 text-center ring-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_14px_34px_rgba(0,0,0,0.07)] sm:px-8 sm:py-10 ${
+                      wide ? 'sm:min-h-[11.5rem] sm:flex-row sm:items-center sm:gap-7 sm:text-left' : 'sm:min-h-64'
+                    } ${m.card} ${whyChoose.length >= 4 ? m.round : ''}`}
+                  >
+                    {/* The numeral, set large and pale in the corner the way a
+                        plate number sits on a drawing. */}
+                    <span aria-hidden className={`absolute font-playfair text-[28px] font-semibold leading-none tracking-tight sm:text-[34px] ${m.numPos} ${m.numeral}`}>
+                      {String(i + 1).padStart(2, '0')}
                     </span>
-                    <div className="min-w-0">
-                      <h3 className="text-[14.5px] font-semibold leading-tight text-gray-900">{w.title}</h3>
-                      <p className="mt-1 text-[13px] leading-snug text-gray-500">{w.desc}</p>
+
+                    {/* One flourish per motif, cycling with it: a disc running
+                        off the edge, a dot grid, corner brackets, a hexagon.
+                        Decorative only, so all of it is hidden from readers. */}
+                    {i % 4 === 0 && (
+                      <span aria-hidden className={`absolute bottom-3 left-3 h-8 w-12 text-[#78814e]/35 ${DOT_GRID}`} />
+                    )}
+                    {i % 4 === 1 && (
+                      <span aria-hidden className={`absolute -left-8 -bottom-8 h-24 w-24 rounded-full ${m.blob}`} />
+                    )}
+                    {i % 4 === 2 && (
+                      <>
+                        <span aria-hidden className={`absolute -right-5 -top-5 h-14 w-14 rounded-full ${m.blob}`} />
+                        <span aria-hidden className="absolute right-2.5 top-2.5 h-6 w-6 rounded-tr-md border-r-2 border-t-2 border-[#c86a2e]/70" />
+                        <span aria-hidden className="absolute bottom-2.5 left-2.5 h-6 w-6 rounded-bl-md border-b-2 border-l-2 border-[#c86a2e]/70" />
+                      </>
+                    )}
+                    {i % 4 === 3 && (
+                      <>
+                        <span aria-hidden className={`absolute -right-4 bottom-6 h-14 w-12 [clip-path:polygon(50%_0%,100%_25%,100%_75%,50%_100%,0%_75%,0%_25%)] ${m.blob}`} />
+                        <span aria-hidden className={`absolute right-3 top-3 h-8 w-10 text-[#8a6a4c]/35 ${DOT_GRID}`} />
+                      </>
+                    )}
+
+                    {/* The disc is anchored to the icon, not to the card, so
+                        it peeks out from behind the arch wherever the icon is
+                        standing. */}
+                    <span className="relative flex shrink-0">
+                      {i % 4 === 0 && (
+                        <span aria-hidden className={`absolute -right-5 top-1 h-14 w-14 rounded-full ${m.blob}`} />
+                      )}
+                      <span className={`relative flex h-16 w-16 items-center justify-center shadow-[0_3px_12px_rgba(0,0,0,0.06)] transition-transform duration-300 group-hover:scale-110 sm:h-[4.5rem] sm:w-[4.5rem] ${m.icon}`}>
+                        <Icon className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={1.6} />
+                      </span>
+                    </span>
+                    {/* `contents` keeps the stacked card exactly as it was:
+                        the wrapper draws no box, so these stay direct children
+                        of the card's own column. */}
+                    <div className={wide ? 'relative flex flex-col items-center sm:items-start' : 'contents'}>
+                      <h3 className={`relative font-playfair text-[15px] font-semibold leading-tight text-[#2b2320] sm:text-[17px] ${wide ? 'mt-4 sm:mt-0' : 'mt-4'}`}>{w.title}</h3>
+                      <p className="relative mt-1 max-w-[15rem] text-[12.5px] leading-snug text-[#8a807a]">{w.desc}</p>
+                      <span aria-hidden className={`relative mt-3.5 h-[2.5px] w-8 rounded-full ${m.rule}`} />
                     </div>
-                  </div>
+                  </article>
                 );
               })}
             </div>
@@ -1768,7 +2064,6 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                 };
               }
             }
-
 
             // Only when there is more of it than the hero already printed.
             // Two lines under a large heading, repeated from a screen above,
@@ -1866,7 +2161,11 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                   if (!activeOffer && !coupon) return null;
 
                   const card = 'group relative flex flex-col overflow-hidden rounded-xl bg-white ring-1 ring-black/[0.06] transition-shadow duration-300 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] sm:rounded-2xl';
-                  const art = 'relative block aspect-[16/7] w-full overflow-hidden bg-[linear-gradient(135deg,#fff4f0_0%,#fdeeee_100%)]';
+                  // 16/7 at full width made each banner 684x299 -- the two of
+                  // them were the biggest thing on the page by a distance. A
+                  // longer ratio in a narrower panel keeps the artwork legible
+                  // without letting it run the page.
+                  const art = 'relative block aspect-[21/6] w-full overflow-hidden bg-[linear-gradient(135deg,#fff4f0_0%,#fdeeee_100%)]';
 
                   return (
                     <div>
@@ -1886,7 +2185,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                         )}
                       </div>
 
-                      <div className={`grid grid-cols-1 gap-3 sm:gap-4 ${activeOffer && coupon ? 'md:grid-cols-2' : 'lg:max-w-2xl'}`}>
+                      <div className={`grid grid-cols-1 gap-3 sm:gap-4 ${activeOffer && coupon ? 'md:grid-cols-2' : 'lg:max-w-xl'}`}>
                         {activeOffer && (
                           <div className={card}>
                             <div className={art}>
@@ -1899,7 +2198,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                 </span>
                               )}
                             </div>
-                            <div className="flex flex-1 flex-col gap-1 p-4 sm:p-5">
+                            <div className="flex flex-1 flex-col gap-1 p-3 sm:p-4">
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <span className="rounded-md bg-[#e01a1b] px-2 py-0.5 text-[11px] font-extrabold tracking-wide text-white">{activeOffer.badge}</span>
                                 <span className="text-[15px] font-bold text-[#1a1a1a] sm:text-base">{activeOffer.title}</span>
@@ -1931,7 +2230,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                 </span>
                               )}
                             </div>
-                            <div className="flex flex-1 flex-col gap-1 p-4 sm:p-5">
+                            <div className="flex flex-1 flex-col gap-1 p-3 sm:p-4">
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <span className="rounded-md bg-[#157f4a] px-2 py-0.5 text-[11px] font-extrabold tracking-wide text-white">{coupon.badge}</span>
                                 <span className="text-[15px] font-bold text-[#1a1a1a] sm:text-base">{coupon.title}</span>
@@ -1964,13 +2263,13 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     page was spent on a promo card. Everything is open now, one
                     section per hairline, and the body type is a step larger --
                     13px in a 900px-wide column was hard to read. */}
-                <div id="product-information" className={`scroll-mt-40 grid grid-cols-1 gap-4 sm:gap-5 ${bandCols}`}>
+                <div id="product-information" className={`scroll-mt-40 grid grid-cols-1 divide-y divide-[#eadfd4] border-y border-[#eadfd4] lg:divide-x lg:divide-y-0 ${bandCols}`}>
                   {hasDescription && (
-                    <section className="rounded-xl bg-white px-5 py-6 ring-1 ring-black/[0.06] sm:rounded-2xl sm:px-6 sm:py-7">
+                    <section className="px-1 py-6 sm:px-5 sm:py-7">
                       <h2 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl">Product description</h2>
                       {product.description && (
-                        <>
-                          <p className={`mt-3 whitespace-pre-line text-[15px] leading-7 text-gray-600 sm:text-base ${showAllDetails ? '' : 'line-clamp-6'}`}>{product.description}</p>
+                        <div className="mt-3.5 rounded-2xl bg-white p-4 ring-1 ring-[#efe6df] sm:p-5">
+                          <p className={`whitespace-pre-line text-[15px] leading-7 text-[#4a423c] sm:text-base ${showAllDetails ? '' : 'line-clamp-6'}`}>{product.description}</p>
                           {product.description.length > 260 && (
                             <button
                               onClick={() => setShowAllDetails(!showAllDetails)}
@@ -1980,7 +2279,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                               <ChevronDown className={`h-4 w-4 transition-transform ${showAllDetails ? 'rotate-180' : ''}`} />
                             </button>
                           )}
-                        </>
+                        </div>
                       )}
                       {product.tags && product.tags.length > 0 && (
                         <div className="mt-4 flex flex-wrap gap-2">
@@ -1995,46 +2294,150 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                   )}
 
                   {careList.length > 0 && (
-                    <section className="rounded-xl bg-white px-5 py-6 ring-1 ring-black/[0.06] sm:rounded-2xl sm:px-6 sm:py-7">
-                      <h2 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl">Care instructions</h2>
-                      <div className="mt-3 flex flex-wrap gap-2.5">
+                  <section className="relative overflow-hidden px-1 py-7 sm:px-5 sm:py-9">
+                    {/* The product itself, bleeding in from the right and
+                        fading into the ground so it reads as a backdrop rather
+                        than a second gallery. Hidden on narrow screens, where
+                        there is no width to spare for atmosphere. */}
+                    {carePhoto && (
+                      <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 hidden w-[44%] lg:block">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={carePhoto} alt="" loading="lazy" className="h-full w-full object-cover object-center" />
+                        {/* Fades on BOTH edges. Fading only the left left a
+                            hard vertical cut where the photograph met the
+                            shipping panel, which read as a crop rather than a
+                            backdrop. */}
+                        <span className="absolute inset-0 bg-[linear-gradient(90deg,#f9f5f2_0%,rgba(249,245,242,0.92)_18%,rgba(249,245,242,0.45)_45%,rgba(249,245,242,0.5)_70%,rgba(249,245,242,0.94)_92%,#f9f5f2_100%)]" />
+                        <span className="absolute inset-x-0 top-0 h-16 bg-[linear-gradient(180deg,#f9f5f2_0%,transparent_100%)]" />
+                        <span className="absolute inset-x-0 bottom-0 h-16 bg-[linear-gradient(0deg,#f9f5f2_0%,transparent_100%)]" />
+                      </div>
+                    )}
+
+                    <div className="relative lg:max-w-[60%]">
+                      <p className="font-playfair text-[15px] italic tracking-wide text-[#b08a5e]">Keep it fresh</p>
+                      <h2 className="mt-1 font-playfair text-2xl font-semibold tracking-tight text-[#1a1a1a] sm:text-3xl">How to care for it</h2>
+                      <p className="mt-1.5 max-w-md text-[13px] text-[#a1948a] sm:text-sm">
+                        A little care goes a long way in keeping it soft and long lasting.
+                      </p>
+
+                      <div className="mt-5 grid grid-cols-2 gap-2.5 sm:mt-6 sm:grid-cols-3 sm:gap-3">
                         {careList.map((instruction, index) => {
                           const item = CARE_INSTRUCTIONS.find((c) => c.label === instruction);
-                          const iconColor = item ? CATEGORY_COLORS[item.category] || 'text-gray-500' : 'text-gray-400';
+                          const iconColor = item ? CATEGORY_COLORS[item.category] || 'text-[#6b625b]' : 'text-[#a1948a]';
+                          const tint = item ? CARE_TINTS[item.category] || 'bg-[#f4efe8]' : 'bg-[#f4efe8]';
                           return (
-                            <span key={index} className="group inline-flex items-center gap-2 rounded-full bg-white py-2 pl-2 pr-4 text-[14px] font-semibold text-gray-700 shadow-sm ring-1 ring-gray-200 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:ring-[#e01a1b]/30">
-                              {item ? (
-                                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#faf7f3] ${iconColor} transition-transform duration-300 group-hover:scale-110`}><CareIcon paths={item.paths} className="h-4 w-4" /></span>
-                              ) : (
-                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[11px] font-bold text-gray-500">{index + 1}</span>
-                              )}
-                              {instruction}
-                            </span>
+                            <div
+                              key={index}
+                              className="group flex flex-col items-center rounded-2xl bg-white/85 p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.04)] ring-1 ring-[#efe6df] backdrop-blur-[2px] transition-all duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-[0_10px_26px_rgba(0,0,0,0.07)] sm:p-4"
+                            >
+                              <span className={`mx-auto flex h-11 w-11 items-center justify-center rounded-full ${tint} ${iconColor} transition-transform duration-300 group-hover:scale-110`}>
+                                {item ? <CareIcon paths={item.paths} className="h-5 w-5" /> : <span className="text-[13px] font-bold">{index + 1}</span>}
+                              </span>
+                              <p className="mt-2.5 text-[12.5px] font-bold leading-tight text-[#2b2320] sm:text-[13.5px]">{instruction}</p>
+                              {/* The second line is the symbol's own category,
+                                  which is real data. The reference writes a
+                                  sentence of advice under each one; inventing
+                                  laundry advice per product is not something
+                                  this page is entitled to do. */}
+                              {item && <p className="mt-auto pt-0.5 text-[11px] text-[#a1948a]">{item.category}</p>}
+                            </div>
                           );
                         })}
                       </div>
-                    </section>
+                    </div>
+                  </section>
                   )}
 
-                  {/* Centred, unlike its neighbours: this card holds two small
-                      tiles and a line of small print, and left-aligning them in
-                      a 682px box left the whole right half of it empty. */}
                   {hasShipping && (
-                  <section className="rounded-xl bg-white px-5 py-6 text-center ring-1 ring-black/[0.06] sm:rounded-2xl sm:px-6 sm:py-7">
-                    <h2 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl">Shipping</h2>
-                    {logisticsResult ? (
-                      <div className="mx-auto mt-3 grid max-w-md grid-cols-2 gap-3">
-                        <div className="rounded-xl bg-[#faf7f3] p-4 text-center ring-1 ring-[#f0e8df]">
-                          <p className="text-[12.5px] text-gray-500">Delivery time</p>
-                          <p className="mt-0.5 text-[17px] font-bold text-gray-900">{logisticsResult.deliveryDays} days</p>
+                  <section className="relative overflow-hidden px-1 py-7 text-center sm:px-5 sm:py-9">
+                    <style>{`
+                      /* The dashes travel along the curve, from the first stop
+                         to the last, so the line reads as a route rather than
+                         a border. Offset only -- nothing reflows.
+                         (No backticks in here: this is a JS template literal.) */
+                      @keyframes m2cRouteFlow { to { stroke-dashoffset: -24 } }
+                      .m2c-route { animation: m2cRouteFlow 1.4s linear infinite }
+                      @media (prefers-reduced-motion: reduce) {
+                        .m2c-route { animation: none }
+                      }
+                    `}</style>
+
+                    <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-[#f4efe8] text-[#b08a5e]">
+                      <Package className="h-4 w-4" />
+                    </span>
+                    <h2 className="mt-2.5 font-playfair text-2xl font-semibold tracking-tight text-[#1a1a1a] sm:text-3xl">Getting it to you</h2>
+                    <p className="mt-1.5 text-[13px] text-[#a1948a] sm:text-sm">Straight from the people who made it</p>
+
+                    {logisticsResult ? (() => {
+                      const cost = logisticsResult.totalShippingCost === 0
+                        ? 'Free shipping'
+                        : `${formatPrice(getCurrency() === 'USD' ? convertINRtoUSD(logisticsResult.totalShippingCost) : logisticsResult.totalShippingCost)} shipping`;
+                      const days = product.dispatchTimeline?.processingDays;
+                      const stops = [
+                        {
+                          icon: Package,
+                          pill: days ? `Day ${days}` : 'First',
+                          title: 'Packed',
+                          detail: days ? `${days} day${days === 1 ? '' : 's'} to dispatch` : 'Prepared for despatch',
+                        },
+                        {
+                          icon: isSurfaceRegion() ? Truck : Plane,
+                          pill: transportModeLabel(logisticsResult.selectedTransport, getRegion()),
+                          title: 'On its way',
+                          detail: cost,
+                        },
+                        {
+                          icon: Check,
+                          pill: `Within ${logisticsResult.deliveryDays} days`,
+                          title: 'At your door',
+                          detail: `${logisticsResult.deliveryDays} day estimate`,
+                        },
+                      ];
+                      return (
+                        <div className="relative mx-auto mt-7 max-w-2xl sm:mt-8">
+                          {/* The route, drawn behind the stops. Two gentle
+                              curves so it wanders between them rather than
+                              ruling a straight line through. */}
+                          <svg
+                            aria-hidden
+                            className="pointer-events-none absolute inset-x-0 top-[3.15rem] h-8 w-full sm:top-[3.4rem]"
+                            viewBox="0 0 300 30"
+                            preserveAspectRatio="none"
+                            fill="none"
+                          >
+                            <path
+                              d="M 62 15 C 92 -2, 118 32, 150 15 C 182 -2, 208 32, 238 15"
+                              stroke="#d8c9b8"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeDasharray="6 6"
+                              className="m2c-route"
+                            />
+                          </svg>
+
+                          <div className="relative grid grid-cols-3 gap-2">
+                            {stops.map((s, i) => {
+                              const Icon = s.icon;
+                              const last = i === stops.length - 1;
+                              return (
+                                <div key={s.title} className="flex flex-col items-center text-center">
+                                  <span className="rounded-full bg-[#f2e7d8] px-2.5 py-1 text-[10.5px] font-semibold text-[#8a6a44] sm:text-[11.5px]">
+                                    {s.pill}
+                                  </span>
+                                  <span className={`mt-2.5 flex h-14 w-14 items-center justify-center rounded-full shadow-[0_4px_16px_rgba(0,0,0,0.07)] sm:h-16 sm:w-16 ${last ? 'bg-[#157f4a] text-white' : 'bg-white text-[#b08a5e]'}`}>
+                                    <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
+                                  </span>
+                                  <p className="mt-2.5 text-[13.5px] font-bold text-[#2b2320] sm:text-[15px]">{s.title}</p>
+                                  <p className="mt-0.5 text-[11.5px] leading-snug text-[#a1948a] sm:text-[12.5px]">{s.detail}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <div className="rounded-xl bg-[#faf7f3] p-4 text-center ring-1 ring-[#f0e8df]">
-                          <p className="text-[12.5px] text-gray-500">Shipping</p>
-                          <p className="mt-0.5 text-[17px] font-bold text-gray-900">{logisticsResult.totalShippingCost === 0 ? 'FREE' : formatPrice(getCurrency() === 'USD' ? convertINRtoUSD(logisticsResult.totalShippingCost) : logisticsResult.totalShippingCost)}</p>
-                        </div>
-                      </div>
-                    ) : null}
-                    <p className="mx-auto mt-3 max-w-md text-[14px] leading-relaxed text-gray-500">
+                      );
+                    })() : null}
+
+                    <p className="mx-auto mt-7 max-w-md text-[12.5px] leading-relaxed text-[#a1948a]">
                       Shipping method and final delivery estimate are confirmed in the purchase panel above.
                     </p>
                   </section>
@@ -2117,7 +2520,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
 
           {/* Customer Reviews */}
           {showReviews && (
-            <div id="customer-reviews" className="mt-6 sm:mt-8 bg-white rounded-xl sm:rounded-2xl ring-1 ring-gray-100 p-4 sm:p-5 lg:p-6 scroll-mt-48">
+            <div id="customer-reviews" className="mt-8 scroll-mt-48 border-t border-[#eadfd4] pt-6 sm:mt-10 sm:pt-8">
               <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
                 <h3 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a] tracking-tight">Customer Reviews</h3>
                 <button
@@ -2192,14 +2595,22 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       const wellRated = positiveFace(avg) !== null;
                       const enough = total >= 5;
                       const showPct = wellRated && enough && loved >= 50;
+
+
                       return (
                         <div>
-                          <div className="relative overflow-hidden rounded-xl bg-[linear-gradient(120deg,#fff8f4_0%,#faf7f3_55%,#f7f2ec_100%)] p-4 ring-1 ring-[#f0e8df] sm:rounded-2xl sm:p-5 lg:p-6">
+                          <div className="relative border-b border-[#eadfd4] pb-5 sm:pb-6">
                            {/* The top face, very faint, sitting behind the
                                figures -- the section had no mark of its own and
-                               read as a settings panel. */}
-                           <span aria-hidden className="pointer-events-none absolute -right-6 -top-8 opacity-[0.06]">
-                             <FaceIcon value={5} className="h-40 w-40" />
+                               read as a settings panel.
+
+                               It is clipped by a box of its own rather than by
+                               the band, because the band holds the sort list
+                               and that has to be allowed to hang below it. */}
+                           <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+                             <span className="absolute -right-6 -top-8 block opacity-[0.06]">
+                               <FaceIcon value={5} className="h-40 w-40" />
+                             </span>
                            </span>
                            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-8">
                             <div className="relative lg:w-44 lg:shrink-0">
@@ -2230,31 +2641,79 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                             <div className="mt-1.5 text-[12px] text-gray-500">{total} rating{total === 1 ? '' : 's'}{withText > 0 ? ` • ${withText} review${withText === 1 ? '' : 's'}` : ''}</div>
                             </div>
 
-                            {/* The breakdown, capped so the bars do not run the
-                                width of the page on a wide screen. */}
-                            <div className="relative w-full space-y-1 lg:max-w-sm lg:flex-1">
-                              {dist.map(({ star, count }) => {
-                                const active = reviewStar === star;
-                                return (
-                                  <button
-                                    key={star}
-                                    onClick={() => setReviewStar(active ? 0 : star)}
-                                    className="group flex w-full items-center gap-2 rounded-md px-1 py-0.5 hover:bg-white transition-colors"
-                                  >
-                                    <FaceIcon value={star as FaceValue} className="h-4 w-4 shrink-0" />
-                                    <span className={`w-[4.6rem] shrink-0 text-left text-[11px] ${active ? 'font-semibold text-[#e01a1b]' : 'text-gray-500'}`}>{FACE_LABELS[star as FaceValue]}</span>
-                                    <div className="flex-1 h-2 rounded-full bg-gray-200 overflow-hidden">
-                                      <div className={`h-full rounded-full transition-all duration-500 ${active ? 'bg-[#e01a1b]' : 'bg-amber-400 group-hover:bg-amber-500'}`} style={{ width: `${total ? (count / total) * 100 : 0}%` }} />
-                                    </div>
-                                    <span className="text-[11px] text-gray-400 w-6 text-right shrink-0">{count}</span>
-                                  </button>
-                                );
-                              })}
+                            {/* ── The five faces ───────────────────────────
+                                One face per RATING, not one per review. A face
+                                for every review is fine at thirty and absurd at
+                                two thousand -- it made the row a texture rather
+                                than a control. Five, evenly spaced, each with
+                                its word and its count, and each one a filter.
+                                This also replaces the chip row that sat under
+                                the band repeating the same five words. */}
+                            <div className="relative w-full lg:flex-1">
+                              <div className="grid grid-cols-5 gap-1 sm:gap-2">
+                                {dist.map(({ star, count }) => {
+                                  const v = star as FaceValue;
+                                  const active = reviewStar === star;
+                                  const empty = count === 0;
+                                  return (
+                                    <button
+                                      key={star}
+                                      type="button"
+                                      disabled={empty}
+                                      onClick={() => { snapshotReviews(); setFacePulse((n) => n + 1); setReviewStar(active ? 0 : star); }}
+                                      title={empty ? `No ${FACE_LABELS[v]} reviews yet` : `${FACE_LABELS[v]} — show only these`}
+                                      aria-label={`${FACE_LABELS[v]} — show only these`}
+                                      aria-pressed={active}
+                                      className={`m2c-face-wobble group/face flex flex-col items-center gap-1.5 rounded-xl px-1 py-2 transition-all duration-300 ${
+                                        empty ? 'cursor-default opacity-30' : 'hover:bg-white/70'
+                                      } ${active ? 'bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)] ring-1 ring-[#e01a1b]/25' : ''}`}
+                                    >
+                                      <span
+                                        key={active ? `p${facePulse}` : `s${star}`}
+                                        className={`inline-block transition-transform duration-300 ${active ? 'm2c-face-bounce' : 'group-hover/face:scale-110'}`}
+                                      >
+                                        <FaceIcon value={v} className="h-8 w-8 sm:h-9 sm:w-9" />
+                                      </span>
+                                      <span className={`text-[10px] font-semibold leading-tight sm:text-[11px] ${active ? 'text-[#e01a1b]' : 'text-[#6b625b]'}`}>
+                                        {FACE_LABELS[v]}
+                                      </span>
+                                      <span className={`text-[12px] font-bold leading-none tabular-nums ${active ? 'text-[#e01a1b]' : 'text-[#1a1a1a]'}`}>
+                                        {count}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <p className="mt-3 text-[12.5px] text-[#6b625b]">
+                                <span className="font-semibold tabular-nums text-[#1a1a1a]">{total}</span> {total === 1 ? 'person' : 'people'}
+                                {dist[0].count > 0 && (
+                                  <> &middot; <span className="font-semibold tabular-nums text-[#1a1a1a]">{dist[0].count}</span> loved it</>
+                                )}
+                                {reviewStar !== 0 && (
+                                  <>
+                                    {' '}&middot;{' '}
+                                    <button
+                                      onClick={() => { snapshotReviews(); setReviewStar(0); }}
+                                      className="font-semibold text-[#e01a1b] hover:text-[#c41617]"
+                                    >
+                                      showing {FACE_LABELS[reviewStar as FaceValue]}{' '}&mdash; clear
+                                    </button>
+                                  </>
+                                )}
+                              </p>
                             </div>
 
                             {/* Search and sort move up here from above the list:
                                 they are how you interrogate the summary, and it
-                                is the third thing this band has room for. */}
+                                is the third thing this band has room for.
+
+                                They used to be withheld under four reviews,
+                                back when the row drew one face PER REVIEW and a
+                                single face between a headline and a search box
+                                was the empty space this section was accused of.
+                                Five labelled faces fill that middle whatever
+                                the count, so the band is one shape at every
+                                size and nothing is withheld. */}
                             <div className="relative flex w-full flex-col gap-2.5 sm:flex-row lg:ml-auto lg:w-72 lg:shrink-0 lg:flex-col">
                               <div className="relative flex-1">
                                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -2265,16 +2724,11 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                   className="w-full rounded-full border border-[#eadfd4] bg-white py-2 pl-9 pr-3 text-sm text-gray-700 transition placeholder:text-gray-400 focus:border-[#e01a1b]/40 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/15"
                                 />
                               </div>
-                              <select
+                              <ReviewSortSelect
                                 value={reviewSort}
-                                onChange={(e) => setReviewSort(e.target.value as typeof reviewSort)}
-                                className="cursor-pointer rounded-full border border-[#eadfd4] bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition focus:border-[#e01a1b]/40 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/15"
-                              >
-                                <option value="newest">Newest first</option>
-                                <option value="oldest">Oldest first</option>
-                                <option value="highest">Most loved</option>
-                                <option value="lowest">Least loved</option>
-                              </select>
+                                options={REVIEW_SORTS}
+                                onChange={(v) => { snapshotReviews(); setReviewSort(v as typeof reviewSort); }}
+                              />
                             </div>
                            </div>
                           </div>
@@ -2294,7 +2748,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       if (shots.length === 0) return null;
                       const all = shots.map((x) => x.src);
                       return (
-                        <div className="rounded-xl bg-white p-4 ring-1 ring-black/[0.06] sm:rounded-2xl sm:p-5">
+                        <div className="border-b border-[#eadfd4] pb-5 sm:pb-6">
                           <div className="mb-3 flex items-baseline gap-2">
                             <h4 className="text-[13px] font-bold uppercase tracking-[0.12em] text-[#a1948a]">Photos from customers</h4>
                             <span className="text-[12px] tabular-nums text-gray-400">{shots.length}</span>
@@ -2316,100 +2770,112 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
 
                     {/* ── The reviews themselves ── */}
                     <div className="min-w-0">
-                      {/* The face filters, on their own line under the band */}
-                      <div className="mb-3 flex flex-wrap items-center gap-1.5 sm:mb-4">
-                        {[0, 5, 4, 3, 2, 1].map((s) => {
-                          const active = reviewStar === s;
-                          return (
-                            <button
-                              key={s}
-                              onClick={() => setReviewStar(s)}
-                              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                                active
-                                  ? (s === 0 ? 'bg-[#e01a1b] text-white' : 'bg-[#fff1f1] text-[#c41617] ring-1 ring-[#e01a1b]/40')
-                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                              }`}
-                            >
-                              {s === 0 ? 'All' : (
-                                <>
-                                  <FaceIcon value={s as FaceValue} className="h-4 w-4" />
-                                  {FACE_LABELS[s as FaceValue]}
-                                </>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
 
-                      {/* Scrollable review list with thin separators */}
+                      {/* The quotations. Narrow and centred when there are few
+                          of them -- a single quotation across a 1,382px row is
+                          a third of a line of text and two-thirds of nothing. */}
                       {filteredReviews.length === 0 ? (
                         <p className="text-sm text-gray-400 text-center py-8">No reviews match your filters.</p>
                       ) : (
-                        <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-[repeat(auto-fit,minmax(24rem,1fr))]">
+                        <div className={reviews.length < REVIEWS_NEED_TOOLS
+                          ? 'mx-auto max-w-2xl'
+                          : 'grid grid-cols-1 gap-5 sm:gap-6 md:grid-cols-[repeat(auto-fit,minmax(24rem,1fr))]'}>
                           {filteredReviews.slice(0, reviewShown).map((review) => {
                             const countryName = getCountryName(review.user?.country);
                             const flag = countryName ? getCountryFlag(review.user?.country) : '';
                             const imgs = (review.images || []).filter(Boolean);
                             const helped = helpfulIds.has(review.id);
+                            const face = (Math.min(5, Math.max(1, Math.round(review.rating))) || 3) as FaceValue;
+                            const said = (review.comment || '').trim();
                             return (
-                              <div key={review.id} className="relative overflow-hidden rounded-xl bg-white p-4 ring-1 ring-black/[0.06] transition-shadow duration-300 hover:shadow-[0_10px_28px_rgba(0,0,0,0.07)] sm:p-5">
-                                {/* A band of colour down the edge, warm for the
-                                    faces we advertise and grey for the rest, so
-                                    a wall of cards is scannable before a word
-                                    of it is read. */}
-                                <span aria-hidden className={`absolute inset-y-0 left-0 w-1 ${Math.round(review.rating) >= 4 ? 'bg-[#FFD130]' : Math.round(review.rating) === 3 ? 'bg-[#e0d2c4]' : 'bg-[#d8cec4]'}`} />
-                                <div className="flex items-start gap-3">
-                                  {review.user?.image ? (
-                                    <Image src={review.user.image} alt="" width={36} height={36} className="w-9 h-9 rounded-full object-cover ring-1 ring-black/5 shrink-0" />
+                              <div
+                                key={review.id}
+                                ref={(el) => {
+                                  if (el) reviewRefs.current.set(review.id, el);
+                                  else reviewRefs.current.delete(review.id);
+                                }}
+                                className="group/rev py-1"
+                              >
+                                {/* A card, but one shaped like what it is: what
+                                    somebody said. The bubble carries the words,
+                                    the tail points down at whoever said them,
+                                    and the top edge takes the colour of their
+                                    face -- warm for the ones we advertise, grey
+                                    below. Boxes with a border said "row in a
+                                    table"; this says "quotation". */}
+                                <div className="relative rounded-2xl rounded-bl-md bg-white p-5 shadow-[0_2px_14px_rgba(0,0,0,0.05)] ring-1 ring-black/[0.05] transition-all duration-300 group-hover/rev:-translate-y-0.5 group-hover/rev:shadow-[0_12px_30px_rgba(0,0,0,0.08)] sm:p-6">
+                                  <span aria-hidden className={`absolute inset-x-5 top-0 h-[3px] rounded-b-full ${Math.round(review.rating) >= 4 ? 'bg-[#FFD130]' : Math.round(review.rating) === 3 ? 'bg-[#e0d2c4]' : 'bg-[#d8cec4]'}`} />
+                                  {/* the tail, two triangles so it keeps the
+                                      hairline ring along its edge */}
+                                  <span aria-hidden className="absolute -bottom-[9px] left-6 h-0 w-0 border-l-[10px] border-r-[10px] border-t-[10px] border-l-transparent border-r-transparent border-t-black/[0.06]" />
+                                  <span aria-hidden className="absolute -bottom-[8px] left-6 h-0 w-0 border-l-[10px] border-r-[10px] border-t-[10px] border-l-transparent border-r-transparent border-t-white" />
+
+                                  {/* What they said. When a customer rated but
+                                      wrote nothing there is no quotation to
+                                      set, so the face and its word stand in --
+                                      that IS what they said. */}
+                                  {said ? (
+                                    <>
+                                      <span aria-hidden className="block font-playfair text-3xl leading-none text-[#e5d3c4]">&ldquo;</span>
+                                      <blockquote className="mt-1 whitespace-pre-line font-playfair text-[16px] leading-relaxed text-[#2b2320] sm:text-[17.5px]">
+                                        {said}
+                                      </blockquote>
+                                    </>
                                   ) : (
-                                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center shrink-0">
-                                      <span className="text-sm font-bold text-gray-500">{(review.user?.name || 'C')[0].toUpperCase()}</span>
-                                    </div>
+                                    <p className="inline-flex items-center gap-2.5">
+                                      <FaceIcon value={face} className="h-8 w-8" />
+                                      <span className="font-playfair text-[18px] font-semibold text-[#2b2320]">{FACE_LABELS[face]}</span>
+                                    </p>
                                   )}
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="font-semibold text-gray-900 text-sm truncate">{review.user?.name || 'Customer'}</span>
-                                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                                        <Check className="w-3 h-3" /> Verified Purchase
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-400">
+
+                                  {imgs.length > 0 && (
+                                  <div className="mt-4 flex flex-wrap gap-2">
+                                    {imgs.map((src, idx) => (
+                                      <button
+                                        key={idx}
+                                        onClick={() => setLightbox({ images: imgs, index: idx })}
+                                        className="group/img relative h-16 w-16 overflow-hidden rounded-lg ring-1 ring-gray-200 transition-all hover:ring-[#e01a1b]/50"
+                                      >
+                                        <Image src={src} alt="" fill sizes="64px" className="object-cover transition-transform duration-300 group-hover/img:scale-110" />
+                                      </button>
+                                    ))}
+                                  </div>
+                                  )}
+                                </div>
+
+                                {/* Whoever said it, under the tail rather than
+                                    inside the bubble -- a speech bubble belongs
+                                    to the person beneath it. */}
+                                <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 pl-2 text-[12px] text-[#a1948a]">
+                                  {review.user?.image ? (
+                                    <Image src={review.user.image} alt="" width={28} height={28} className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-black/5" />
+                                  ) : (
+                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f2ece5] text-[11px] font-bold text-[#a1948a]">
+                                      {(review.user?.name || 'C')[0].toUpperCase()}
+                                    </span>
+                                  )}
+                                  <span className="font-semibold text-[#4a423c]">{review.user?.name || 'Customer'}</span>
+                                  {said && (
+                                    <span className="inline-flex items-center gap-1.5">
                                       {/* Inside the reviews list a low score DOES
                                           show its own face -- the rule against sad
                                           faces is about merchandising surfaces, not
                                           about hiding what a customer actually said. */}
-                                      <span className="inline-flex items-center gap-1.5">
-                                        <FaceIcon value={(Math.min(5, Math.max(1, Math.round(review.rating))) || 3) as FaceValue} className="h-4 w-4" />
-                                        <span className="font-semibold text-gray-600">{FACE_LABELS[(Math.min(5, Math.max(1, Math.round(review.rating))) || 3) as FaceValue]}</span>
-                                      </span>
-                                      <span>{new Date(review.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                                      {countryName && <span className="border-l border-gray-200 pl-2">{flag ? `${flag} ` : ''}{countryName}</span>}
-                                    </div>
-                                    {review.comment && (
-                                      <p className="mt-2 text-sm text-gray-600 leading-relaxed whitespace-pre-line">{review.comment}</p>
-                                    )}
-                                    {imgs.length > 0 && (
-                                      <div className="mt-2.5 flex flex-wrap gap-2">
-                                        {imgs.map((src, idx) => (
-                                          <button
-                                            key={idx}
-                                            onClick={() => setLightbox({ images: imgs, index: idx })}
-                                            className="relative w-16 h-16 rounded-lg overflow-hidden ring-1 ring-gray-200 hover:ring-[#e01a1b]/50 transition-all group"
-                                          >
-                                            <Image src={src} alt="" fill sizes="64px" className="object-cover transition-transform duration-300 group-hover:scale-110" />
-                                          </button>
-                                        ))}
-                                      </div>
-                                    )}
-                                    <div className="mt-2.5">
-                                      <button
-                                        onClick={() => setHelpfulIds((prev) => { const n = new Set(prev); if (n.has(review.id)) n.delete(review.id); else n.add(review.id); return n; })}
-                                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${helped ? 'border-[#e01a1b]/30 bg-[#fff1f1] text-[#e01a1b]' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'}`}
-                                      >
-                                        <ThumbsUp className={`w-3.5 h-3.5 ${helped ? 'fill-[#e01a1b]' : ''}`} /> {helped ? 'Marked helpful' : 'Helpful'}
-                                      </button>
-                                    </div>
-                                  </div>
+                                      <FaceIcon value={face} className="h-4 w-4" />
+                                      <span className="font-semibold text-[#6b625b]">{FACE_LABELS[face]}</span>
+                                    </span>
+                                  )}
+                                  <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
+                                    <Check className="h-3 w-3" /> Verified
+                                  </span>
+                                  <span>{new Date(review.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                  {countryName && <span>{flag ? `${flag} ` : ''}{countryName}</span>}
+                                  <button
+                                    onClick={() => setHelpfulIds((prev) => { const n = new Set(prev); if (n.has(review.id)) n.delete(review.id); else n.add(review.id); return n; })}
+                                    className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${helped ? 'border-[#e01a1b]/30 bg-[#fff1f1] text-[#e01a1b]' : 'border-[#e6dcd2] text-[#6b625b] hover:border-[#d6c8bb] hover:text-[#1a1a1a]'}`}
+                                  >
+                                    <ThumbsUp className={`h-3.5 w-3.5 ${helped ? 'fill-[#e01a1b]' : ''}`} /> {helped ? 'Marked helpful' : 'Helpful'}
+                                  </button>
                                 </div>
                               </div>
                             );
@@ -2421,7 +2887,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       {filteredReviews.length > reviewShown && (
                         <div className="mt-4 flex justify-center">
                           <button
-                            onClick={() => setReviewShown((n) => n + 5)}
+                            onClick={() => { snapshotReviews(); setReviewShown((n) => n + 5); }}
                             className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-700 hover:border-[#e01a1b]/40 hover:text-[#e01a1b] hover:bg-[#fff1f1] transition-colors"
                           >
                             Load more reviews <span className="text-gray-400">({filteredReviews.length - reviewShown})</span>
@@ -2553,7 +3019,6 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
               </div>
             </div>
           )}
-
 
         </div >
 
