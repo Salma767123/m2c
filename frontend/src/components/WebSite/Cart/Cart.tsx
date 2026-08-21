@@ -1022,12 +1022,19 @@ export default function Order() {
                     const offPct = lineList > linePaid ? Math.round(((lineList - linePaid) / lineList) * 100) : 0
                     const lowStock = item.inStock && item.availableStock != null
                       && item.availableStock > 0 && item.availableStock <= 5
+                    // The cart line carries no slug, only the product id -- and
+                    // the public product route takes either, so the id is a
+                    // valid address for the page. (backend getPublicProduct
+                    // branches on whether the parameter looks like an ObjectId.)
+                    const productHref = `/products/${item.productId}`
 
                     return (
                     <li key={item.id} className="@container px-4 py-4 sm:px-5 sm:py-5">
                       <div className="flex gap-3 sm:gap-4">
-                        {/* Product Image */}
-                        <div className="shrink-0">
+                        {/* Product Image. A link: the photograph is the first
+                            thing anyone clicks when they want another look at
+                            what they are about to buy, and it went nowhere. */}
+                        <Link href={productHref} aria-label={`View ${item.name}`} className="shrink-0">
                           {item.images && item.images.length > 0 ? (
                             /* The frame crops and the picture moves inside it, so
                                the row's own geometry never changes on hover. */
@@ -1045,7 +1052,7 @@ export default function Order() {
                               <Package className="h-6 w-6 text-[#c9aeab] sm:h-7 sm:w-7" />
                             </div>
                           )}
-                        </div>
+                        </Link>
 
                         <div className="min-w-0 flex-1">
                           {/* Facts on the left, money on the right, exactly as
@@ -1054,7 +1061,9 @@ export default function Order() {
                               the figures form a column down the list. */}
                           <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-2">
                             <div className="min-w-0 flex-1 basis-[13rem]">
-                              <h3 className="text-sm font-semibold text-[#1a1a1a] break-words sm:text-[15px]">{item.name}</h3>
+                              <h3 className="text-sm font-semibold text-[#1a1a1a] break-words sm:text-[15px]">
+                                <Link href={productHref} className="transition-colors hover:text-[#e01a1b]">{item.name}</Link>
+                              </h3>
 
                               {item.variantDetails && (item.variantDetails.color || item.variantDetails.size) && (
                                 <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#6b625b] sm:text-[13px]">
