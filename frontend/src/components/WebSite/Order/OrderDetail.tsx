@@ -4,12 +4,12 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { FaceIcon } from '@/components/WebSite/Shared/FaceRating';
 import {
   ArrowLeft,
   Package,
   Truck,
   CheckCircle,
-  Star,
   Calendar,
   MapPin,
   CreditCard,
@@ -538,7 +538,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                           onClick={() => setReviewModalState({ isOpen: true, orderId: orderDetails.id, items: orderDetails.items })}
                           className="btn-shine flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 bg-[#e01a1b] text-white rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300"
                         >
-                          <Star className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
+                          <FaceIcon value={5} className="w-4 h-4 shrink-0" />
                           <span className="font-medium text-sm">Write a Review</span>
                         </button>
                       )
