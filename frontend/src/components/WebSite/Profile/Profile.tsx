@@ -116,10 +116,43 @@ function PageGround() {
   );
 }
 
+/** The site header is pinned at top:0 and stands 131px tall, so anything
+ *  scrolled to y=0 starts underneath it. Same clearance the sticky sidebar
+ *  and ProductDetail use against that header. */
+const HEADER_CLEARANCE = 146;
+
 const Profile = () => {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
+  const tabsRowRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Switching tab puts you back at the top of the panel.
+   *
+   * Without this you keep the scroll position of the tab you left. Coming out
+   * of a long Order History into a short Profile Information drops you at the
+   * bottom of the page looking at the footer, with the form you actually asked
+   * for somewhere off the top of the screen.
+   *
+   * document.body.scrollTop -- NOT window.scrollTo, and NOT
+   * document.scrollingElement. globals.css sets overflow on html and body, and
+   * on this page the window does not scroll at all: window.scrollTo(0, 600)
+   * measurably leaves both scroll positions at 0. scrollingElement reports
+   * documentElement here, which is the one that does nothing. Only body moves.
+   */
+  const selectTab = (id: string) => {
+    setActiveTab(id);
+    const row = tabsRowRef.current;
+    if (!row) return;
+    const top = row.getBoundingClientRect().top + document.body.scrollTop - HEADER_CLEARANCE;
+    // Only ever come back UP. Choosing a tab while already at the top should
+    // not push the page down to meet the panel.
+    if (document.body.scrollTop <= top) return;
+    const still = typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    document.body.scrollTo({ top: Math.max(0, top), behavior: still ? 'auto' : 'smooth' });
+  };
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -385,7 +418,7 @@ const Profile = () => {
       onEdit={() => setIsEditing(true)}
       onSave={handleSave}
       onCancel={handleCancel}
-      onGoToAddresses={() => setActiveTab('addresses')}
+      onGoToAddresses={() => selectTab('addresses')}
     />
   );
 
@@ -480,12 +513,17 @@ const Profile = () => {
           </p>
         </Reveal>
 
-        <div className="flex flex-col gap-5 sm:gap-6 lg:flex-row lg:gap-8">
+        <div ref={tabsRowRef} className="flex flex-col gap-5 sm:gap-6 lg:flex-row lg:gap-8">
           {/* ── Sidebar ──────────────────────────────────────────────────── */}
           {/* Sticky from lg up. Order History runs to about 1,600px while
               this column is roughly 400px, so scrolling the orders used to
               leave a metre of empty page where the navigation had been. */}
-          <Reveal className="shrink-0 lg:sticky lg:top-6 lg:w-72 lg:self-start" delay={90}>
+          {/* top-40, not top-6. The site header is pinned at top:0 and stands
+              131px tall on z-50, so a column parking at 22px slides underneath
+              it and loses its avatar and name -- the two things the panel is
+              for. 40 is 146px, which is the clearance ProductDetail already
+              uses against the same header. */}
+          <Reveal className="shrink-0 lg:sticky lg:top-40 lg:w-72 lg:self-start" delay={90}>
             <div className="rounded-2xl border border-[#efe4d8] bg-white p-3 shadow-[0_10px_30px_-24px_rgba(74,50,38,0.5)] sm:p-4">
               {/* ── Identity ──────────────────────────────────────────────
                   Centred stack, and no rule inside it. A hairline between the
@@ -591,7 +629,7 @@ const Profile = () => {
                   return (
                     <button
                       key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
+                      onClick={() => selectTab(tab.id)}
                       aria-current={active ? 'page' : undefined}
                       className={`relative flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[14px] font-medium transition-colors duration-200 ${active
                         ? 'bg-[#fdf3f0] text-[#7a0f10]'
