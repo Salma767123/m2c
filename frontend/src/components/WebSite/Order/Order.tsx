@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { formatPrice, getRegionalPrice } from "@/lib/currency"
+import { FaceIcon } from '@/components/WebSite/Shared/FaceRating';
 import {
   Package,
   Truck,
@@ -22,7 +23,8 @@ import {
   Copy,
   X
 } from "lucide-react"
-import Dropdown from "@/components/UI/Dropdown"
+import SelectMenu from "@/components/WebSite/Shared/SelectMenu"
+import DateField from "@/components/WebSite/Shared/DateField"
 import Reveal from "@/components/WebSite/Shared/Reveal"
 import orderService, { Order as APIOrder } from "@/services/orderService"
 import productService from "@/services/productService"
@@ -91,6 +93,8 @@ const ORDERS_PER_PAGE = 5
 export default function OrderList() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [fromDate, setFromDate] = useState("")
+  const [toDate, setToDate] = useState("")
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set())
   const [reviewModalState, setReviewModalState] = useState<{ isOpen: boolean, orderId: string, items: any[] }>({ isOpen: false, orderId: '', items: [] })
   const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set())
@@ -245,13 +249,36 @@ export default function OrderList() {
     return color.replace(/\s*\(#[0-9a-fA-F]{3,6}\)/, '').trim()
   }
 
+  /** Both ends inclusive: the same day picked twice should find that day's
+   *  orders rather than none of them. */
+  const withinDates = (iso: string) => {
+    const t = new Date(iso).getTime()
+    if (fromDate && t < new Date(`${fromDate}T00:00:00`).getTime()) return false
+    if (toDate && t > new Date(`${toDate}T23:59:59.999`).getTime()) return false
+    return true
+  }
+
+  const filtersOn = searchTerm !== "" || statusFilter !== "all" || fromDate !== "" || toDate !== ""
+
+  const clearFilters = () => {
+    setSearchTerm("")
+    setStatusFilter("all")
+    setFromDate("")
+    setToDate("")
+    setCurrentPage(1)
+    setPastPage(1)
+  }
+
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.items.some(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()))
 
+    if (!matchesSearch) return false
+    if (!withinDates(order.date)) return false
+
     // Adjust logic for status filter to match transformed status
-    if (statusFilter === "all") return matchesSearch
-    return matchesSearch && order.status.toLowerCase().includes(statusFilter.toLowerCase())
+    if (statusFilter === "all") return true
+    return order.status.toLowerCase().includes(statusFilter.toLowerCase())
   })
 
   // Categorize orders based on status logic
@@ -359,34 +386,69 @@ export default function OrderList() {
 
               {/* Search and Filter */}
               <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6 mb-5 sm:mb-6 lg:mb-8">
-                <div className="flex flex-col md:flex-row gap-3 sm:gap-4">
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 sm:w-5 sm:h-5" />
+                {/* One line: what, which status, and when. Bottom-aligned so
+                    the search box and the status button sit level with the two
+                    date fields rather than floating above their labels.
+                    Native date inputs, so the calendar is the operating
+                    system's own rather than a picker bolted on. */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3 lg:flex-nowrap lg:gap-4">
+                  <div className="relative min-w-0 flex-1 sm:min-w-[13rem]">
+                    <Search className="absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 transform text-slate-400 sm:w-5 sm:h-5" />
                     <input
                       type="text"
                       placeholder="Search orders..."
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 text-sm sm:text-base border rounded-lg sm:rounded-md border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all"
+                      onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); setPastPage(1) }}
+                      className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 text-sm sm:text-base border rounded-lg sm:rounded-md border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="min-w-40">
-                      <Dropdown
-                        id="status-filter"
-                        value={statusFilter}
-                        options={[
-                          { value: "all", label: "All Orders" },
-                          { value: "processing", label: "Processing" },
-                          { value: "shipped", label: "Shipped" },
-                          { value: "received", label: "Received" },
-                          { value: "cancelled", label: "Cancelled" }
-                        ]}
-                        onChange={(value) => setStatusFilter(value as string)}
-                        placeholder="Filter by status"
-                      />
-                    </div>
-                  </div>
+
+                  <SelectMenu
+                    className="w-full sm:w-44 lg:shrink-0"
+                    buttonClassName="rounded-lg sm:rounded-md"
+                    tone="slate"
+                    ariaLabel="Filter orders by status"
+                    value={statusFilter}
+                    options={[
+                      { value: "all", label: "All Orders" },
+                      { value: "processing", label: "Processing" },
+                      { value: "shipped", label: "Shipped" },
+                      { value: "delivered", label: "Delivered" },
+                      { value: "cancelled", label: "Cancelled" }
+                    ]}
+                    onChange={(v) => { setStatusFilter(v); setCurrentPage(1); setPastPage(1) }}
+                    placeholder="Filter by status"
+                  />
+
+                  <DateField
+                    className="min-w-0 flex-1 sm:min-w-[10.5rem] sm:max-w-[12rem] lg:shrink-0"
+                    label="From"
+                    placeholder="Any date"
+                    tone="slate"
+                    value={fromDate}
+                    max={toDate || undefined}
+                    onChange={(v) => { setFromDate(v); setCurrentPage(1); setPastPage(1) }}
+                  />
+
+                  <DateField
+                    className="min-w-0 flex-1 sm:min-w-[10.5rem] sm:max-w-[12rem] lg:shrink-0"
+                    label="To"
+                    placeholder="Any date"
+                    tone="slate"
+                    value={toDate}
+                    min={fromDate || undefined}
+                    onChange={(v) => { setToDate(v); setCurrentPage(1); setPastPage(1) }}
+                    align="right"
+                  />
+
+                  {filtersOn && (
+                    <button
+                      onClick={clearFilters}
+                      className="shrink-0 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 sm:rounded-md"
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -506,7 +568,7 @@ export default function OrderList() {
                         </div>
 
                         {/* Estimated Delivery */}
-                        {order.estimatedDelivery && order.status !== 'received' && order.status !== 'cancelled' && (
+                        {order.estimatedDelivery && order.status !== 'delivered' && order.status !== 'cancelled' && (
                           <div className="mt-4 p-3 bg-[#e01a1b]/5 border border-[#e01a1b]/20 rounded-lg">
                             <p className="text-sm text-[#c41617]">
                               <Clock className="w-4 h-4 inline mr-2" />
@@ -668,7 +730,7 @@ export default function OrderList() {
                                 onClick={() => setReviewModalState({ isOpen: true, orderId: order.id, items: order.items })}
                                 className="btn-shine flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-[#e01a1b] text-white rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300"
                               >
-                                <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                                <FaceIcon value={5} className="w-4 h-4" />
                                 <span className="text-sm font-medium">Write Review</span>
                               </button>
                             )
@@ -702,8 +764,8 @@ export default function OrderList() {
                   <Package className="w-12 h-12 sm:w-16 sm:h-16 text-slate-300 mx-auto mb-3 sm:mb-4" />
                   <h3 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a] mb-2">No Orders Found</h3>
                   <p className="text-sm sm:text-base text-slate-600 mb-4 sm:mb-6">
-                    {searchTerm || statusFilter !== "all"
-                      ? "Try adjusting your search or filter criteria"
+                    {filtersOn
+                      ? "Try adjusting your search, status or dates"
                       : "You haven't placed any orders yet"
                     }
                   </p>

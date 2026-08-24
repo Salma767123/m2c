@@ -31,8 +31,6 @@ import {
   ArrowDown,
   Landmark,
   Lock,
-  RotateCcw,
-  ShieldCheck,
   Check,
   X,
   Clock,
@@ -1281,9 +1279,15 @@ export default function Order() {
                     onChange={(e) => setPromoCode(e.target.value)}
                     className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-[#e3dbd1] rounded-lg sm:rounded-xl focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] outline-none"
                   />
+                  {/* Dead while a code is already on the cart. Nothing stopped
+                      Apply being pressed again, which re-ran the same coupon
+                      against the same cart -- the shopper removes the current
+                      one first, which is what the Remove button below is for. */}
                   <button
                     onClick={applyPromoCode}
-                    className="px-4 sm:px-6 py-2.5 sm:py-3 bg-[#1a1a1a] hover:bg-[#e01a1b] text-white font-medium rounded-lg sm:rounded-xl transition-colors text-sm sm:text-base shrink-0"
+                    disabled={!!appliedPromo}
+                    title={appliedPromo ? 'Remove the current code before applying another' : undefined}
+                    className="px-4 sm:px-6 py-2.5 sm:py-3 bg-[#1a1a1a] hover:bg-[#e01a1b] text-white font-medium rounded-lg sm:rounded-xl transition-colors text-sm sm:text-base shrink-0 disabled:cursor-not-allowed disabled:bg-[#cfc7bd] disabled:hover:bg-[#cfc7bd]"
                   >
                     Apply
                   </button>
@@ -1409,22 +1413,6 @@ export default function Order() {
                       <Lock className="h-3 w-3 shrink-0" strokeWidth={2.4} />
                       Secure checkout. Your data is protected.
                     </p>
-
-                    <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[#f6efe6] pt-4 text-center">
-                      {[
-                        { icon: <Truck className="h-4 w-4" strokeWidth={1.9} />, title: 'Free Shipping', note: 'On all orders' },
-                        { icon: <RotateCcw className="h-4 w-4" strokeWidth={1.9} />, title: 'Easy Returns', note: '30 days return' },
-                        { icon: <ShieldCheck className="h-4 w-4" strokeWidth={1.9} />, title: 'Secure Payment', note: '100% protected' },
-                      ].map((t) => (
-                        <div key={t.title} className="flex flex-col items-center gap-1.5">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#eef8f1] text-[#157f4a] ring-1 ring-[#dcefe3]">
-                            {t.icon}
-                          </span>
-                          <span className="text-[11px] font-semibold leading-tight text-[#3f3a35]">{t.title}</span>
-                          <span className="text-[10px] leading-tight text-[#a1948a]">{t.note}</span>
-                        </div>
-                      ))}
-                    </div>
 
                     <div className="mt-4 border-t border-[#f6efe6] pt-4">
                       <p className="text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[#b3a99f]">We accept</p>
