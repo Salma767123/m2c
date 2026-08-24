@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useRef } from 'react';
 import { ArrowRight } from 'lucide-react';
 
 /**
@@ -42,6 +43,14 @@ import { ArrowRight } from 'lucide-react';
  *
  * Replace the copy with real numbers (thread count, GSM, certificate no.) when
  * they are confirmed.
+ *
+ * It arrives rather than simply being there. Every other band on this page
+ * moves -- the hero weaves, the board flips, the tags sway, the app unveils,
+ * the footer threads -- and this was the one that did not, which is most of
+ * why it read as flat. The claims come in one after another, left to right, so
+ * you read them in order instead of meeting five columns of small text at
+ * once. It adds no height, which was the constraint that got the old version
+ * cut in the first place.
  */
 
 const GLASS = 'rgba(255,255,255,.22)';
@@ -106,8 +115,70 @@ const MARKS = [
 ];
 
 export default function ValueSection() {
+  const rootRef = useRef<HTMLElement>(null);
+
+  /**
+   * Own observer rather than <Reveal>: this band is the last thing before the
+   * footer, so it is reached at the very bottom of the page, and Reveal's
+   * timed fail-safe would have fired long before anyone got here.
+   *
+   * If the browser has no IntersectionObserver the band is shown immediately.
+   * The items start at opacity 0, so without that fail-safe an old browser
+   * would be left staring at an empty strip.
+   */
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      el.classList.add('is-in');
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          el.classList.add('is-in');
+          io.disconnect();
+        }
+      },
+      { threshold: 0.3, rootMargin: '0px 0px -6% 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
-    <section className="relative border-t border-[#efe4d8] bg-white py-10 font-sans sm:py-12">
+    <section
+      ref={rootRef}
+      className="relative border-t border-[#efe4d8] bg-white py-10 font-sans sm:py-12"
+    >
+      <style>{`
+        /* Hand-written, because tailwindcss-animate is in package.json but was
+           never registered as a plugin under Tailwind v4 -- its class names
+           compile to nothing here. */
+        @keyframes m2cVsRise {
+          from { opacity: 0; transform: translateY(14px) }
+          to   { opacity: 1; transform: none }
+        }
+        @keyframes m2cVsRule {
+          from { transform: scaleX(0) }
+          to   { transform: scaleX(1) }
+        }
+        .vs-rise { opacity: 0 }
+        /* both, not backwards. An item has to be invisible through its delay,
+           which backwards alone gives -- but the resting style here IS
+           opacity 0, so backwards alone also drops it back to invisible the
+           instant the animation ends. It has to hold the finish as well.
+           The plain opacity is the belt to that braces: if the animation
+           never runs, the claims are still readable. */
+        .is-in .vs-rise { opacity: 1; animation: m2cVsRise 520ms cubic-bezier(0.22, 1, 0.36, 1) both }
+        .vs-rule { transform: scaleX(0); transform-origin: left }
+        .is-in .vs-rule { transform: none; animation: m2cVsRule 460ms cubic-bezier(0.22, 1, 0.36, 1) 100ms both }
+
+        @media (prefers-reduced-motion: reduce) {
+          .vs-rise, .is-in .vs-rise { animation: none; opacity: 1; transform: none }
+          .vs-rule, .is-in .vs-rule { animation: none; transform: none }
+        }
+      `}</style>
       <div className="relative mx-auto max-w-420 px-4 sm:px-6 lg:px-8">
         {/* ── Masthead ────────────────────────────────────────────────────
             The band used to be a dead end: five claims and nowhere to go from
@@ -119,14 +190,15 @@ export default function ValueSection() {
             Brand red, the same pill Featured and Best Sellers carry, so the
             third call to action on the page matches the other two. */}
         <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
-          <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c41617] sm:text-xs">
-            <span aria-hidden className="h-px w-6 bg-[#c41617]" />
+          <span className="vs-rise inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c41617] sm:text-xs">
+            <span aria-hidden className="vs-rule h-px w-6 bg-[#c41617]" />
             The M2C standard
           </span>
 
           <Link
             href="/products"
-            className="group hidden shrink-0 items-center gap-2 rounded-full bg-[#e01a1b] px-6 py-2.5 text-[12.5px] font-semibold uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_-12px_rgba(224,26,27,0.75)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c41617] lg:inline-flex"
+            style={{ animationDelay: '120ms' }}
+            className="vs-rise group hidden shrink-0 items-center gap-2 rounded-full bg-[#e01a1b] px-6 py-2.5 text-[12.5px] font-semibold uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_-12px_rgba(224,26,27,0.75)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c41617] lg:inline-flex"
           >
             Shop the collection
             <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
@@ -144,7 +216,11 @@ export default function ValueSection() {
           {labels.map((l, i) => (
             <div
               key={l.n}
-              className={`group flex items-start gap-3.5 lg:px-5 ${
+              // 70ms apart: close enough to read as one movement across the
+              // row, far enough apart that you see five things and not a
+              // single block fading.
+              style={{ animationDelay: `${180 + i * 70}ms` }}
+              className={`vs-rise group flex items-start gap-3.5 lg:px-5 ${
                 i > 0 ? 'lg:border-l lg:border-[#efe4d8]' : ''
               } ${i === 0 ? 'lg:pl-0' : ''}`}
             >
@@ -175,7 +251,8 @@ export default function ValueSection() {
         <div className="mt-8 flex justify-center lg:hidden">
           <Link
             href="/products"
-            className="group inline-flex items-center gap-2 rounded-full bg-[#e01a1b] px-6 py-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_-12px_rgba(224,26,27,0.8)] transition-all duration-300 hover:bg-[#c41617]"
+            style={{ animationDelay: '540ms' }}
+            className="vs-rise group inline-flex items-center gap-2 rounded-full bg-[#e01a1b] px-6 py-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_-12px_rgba(224,26,27,0.8)] transition-all duration-300 hover:bg-[#c41617]"
           >
             Shop the collection
             <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
