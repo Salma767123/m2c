@@ -239,9 +239,9 @@ export default function FeaturedProducts() {
     // shape, same grid columns and gaps, same 5/4 image ratio as ProductCard.
     // Anything that differs here shows up as a jump when the fetch resolves.
     return (
-      <section className={`${GROUND} py-8 font-sans sm:py-10 lg:py-14`}>
+      <section className={`${GROUND} pt-3 pb-8 font-sans sm:pt-4 sm:pb-10 lg:pt-5 lg:pb-14`}>
         <div className={`mx-auto ${SHELL} px-3 sm:px-4 md:px-6 lg:px-8`}>
-          <div className="mb-5 lg:mb-6">
+          <div className="mb-3 lg:mb-4">
             <div className="flex items-center justify-center gap-4 lg:justify-start">
               <div className="h-3 w-28 animate-pulse rounded bg-[#e6dacc]" />
               <div className="hidden h-px flex-1 bg-[#ece0d2] lg:block" />
@@ -276,7 +276,7 @@ export default function FeaturedProducts() {
   }
 
   return (
-    <section className={`relative overflow-hidden py-8 font-sans sm:py-10 lg:py-14 ${GROUND}`}>
+    <section className={`relative overflow-hidden pt-3 pb-8 font-sans sm:pt-4 sm:pb-10 lg:pt-5 lg:pb-14 ${GROUND}`}>
       <style>{`
         /* ── The unroll ────────────────────────────────────────────────────
            Two tracks sharing one duration, one easing and one per-card delay
@@ -362,7 +362,7 @@ export default function FeaturedProducts() {
             No red pill: Top Selling and Best Sellers below both carry one in
             the same corner, and three of them is what made the page read as
             one section repeated. */}
-        <div className="mb-5 lg:mb-6">
+        <div className="mb-3 lg:mb-4">
           <div className="flex items-center justify-center gap-4 lg:justify-start">
             {/* #c41617 rather than the usual #e01a1b: on this linen ground the
                 brand red measures 4.15:1, and this is 11px bold text. The

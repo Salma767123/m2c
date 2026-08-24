@@ -97,7 +97,7 @@ export default function BrandPromo() {
   }, []);
 
   return (
-    <section className="bg-white py-6 font-sans sm:py-8 lg:py-10">
+    <section className="bg-white pt-3 pb-1 font-sans sm:pt-4 sm:pb-1.5 lg:pt-5 lg:pb-2">
       <style>{`
         /* The veil. Vertical below sm, where the photograph sits as a band above
            the copy; horizontal from sm, where it sits beside it. Both end fully
@@ -178,8 +178,10 @@ export default function BrandPromo() {
             ariaLabel="Join us as a vendor"
             image={{
               src: '/assets/images/promo/sellers.webp',
+              // slightly lower anchor so the "your brand · our platform" tag at the
+              // image's bottom isn't clipped off the shorter panel.
               alt: 'Four M2C vendors standing among folded textiles and packed cartons',
-              position: '50% 20%',
+              position: '50% 42%',
             }}
             eyebrow="Your success, our platform"
             eyebrowClass="text-[#e0a83d]"
@@ -246,7 +248,7 @@ function Panel({
   delay: string;
 }) {
   const shell =
-    'bp-panel group relative block w-full overflow-hidden rounded-3xl text-left shadow-[0_18px_50px_-26px_rgba(0,0,0,0.45)] transition-shadow duration-500 hover:shadow-[0_26px_66px_-22px_rgba(0,0,0,0.5)] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#e01a1b]/40';
+    'bp-panel group relative block w-full overflow-hidden rounded-3xl text-left focus:outline-none focus-visible:ring-4 focus-visible:ring-[#e01a1b]/40';
 
   const body = (
     <>
@@ -271,7 +273,7 @@ function Panel({
         <span aria-hidden className="bp-veil absolute inset-0" />
       </div>
 
-      <div className="relative p-6 sm:w-[58%] sm:py-9 sm:pl-8 sm:pr-4 lg:py-10 lg:pl-10">
+      <div className="relative p-6 sm:w-[58%] sm:py-6 sm:pl-8 sm:pr-4 lg:py-6 lg:pl-10">
         <span className={`text-[10.5px] font-bold uppercase tracking-[0.18em] ${eyebrowClass}`}>{eyebrow}</span>
 
         <h3 className={`font-playfair mt-2.5 text-[26px] font-semibold leading-[1.12] tracking-tight sm:text-[28px] lg:text-[34px] ${headingClass}`}>
@@ -280,7 +282,7 @@ function Panel({
 
         {/* Three facts, not a paragraph — the artwork made the same points as
             pill graphics, and they read faster as a list than as prose. */}
-        <ul className="mt-5 space-y-2.5">
+        <ul className="mt-4 space-y-2">
           {features.map(({ Icon, label, note }) => (
             <li key={label} className="flex items-center gap-2.5">
               <Icon className={`h-[18px] w-[18px] shrink-0 ${featureIconClass}`} strokeWidth={1.9} aria-hidden />
@@ -296,7 +298,7 @@ function Panel({
             control, and putting an interactive element inside it would nest one
             inside the other. */}
         <span
-          className={`mt-6 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-semibold tracking-[0.02em] transition-colors duration-300 ${ctaClass}`}
+          className={`mt-5 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-semibold tracking-[0.02em] transition-colors duration-300 ${ctaClass}`}
         >
           {cta}
           <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />

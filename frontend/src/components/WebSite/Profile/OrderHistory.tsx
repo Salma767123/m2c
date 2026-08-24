@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Package, Eye, Download, Star, Truck, CheckCircle, Clock, AlertCircle, ChevronLeft, ChevronRight, ShoppingBag } from 'lucide-react'
 import orderService, { Order as APIOrder } from '@/services/orderService'
+import reviewService from '@/services/reviewService'
+import ReviewModal from '@/components/WebSite/Order/ReviewModal'
 import Reveal from '@/components/WebSite/Shared/Reveal'
 import { formatPrice } from '@/lib/currency'
 import { showErrorToast } from '@/lib/toast-utils'
@@ -96,6 +98,8 @@ export default function OrderHistory() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set())
+  const [reviewModal, setReviewModal] = useState<{ isOpen: boolean; orderId: string; items: APIOrder['items'] }>({ isOpen: false, orderId: '', items: [] })
 
   useEffect(() => {
     fetchOrders()
@@ -127,6 +131,27 @@ export default function OrderHistory() {
   }
 
   const statusMeta = (status: string) => STATUS_META[getNormalizedStatus(status)]
+
+  // For delivered orders, find which already carry a review so the button shows
+  // "Reviewed" instead of an inert "Write review" — mirroring the order-detail page.
+  useEffect(() => {
+    const delivered = orders.filter((o) => getNormalizedStatus(o.status) === 'delivered' && o.items?.[0]?.productId)
+    if (delivered.length === 0) return
+    let cancelled = false
+    Promise.all(
+      delivered.map((o) =>
+        reviewService
+          .checkReviewStatus(o.items[0].productId, o.id)
+          .then((r: { hasReviewed?: boolean }) => (r?.hasReviewed ? o.id : null))
+          .catch(() => null),
+      ),
+    ).then((ids) => {
+      if (cancelled) return
+      const reviewed = ids.filter(Boolean) as string[]
+      if (reviewed.length) setReviewedOrders((prev) => new Set([...prev, ...reviewed]))
+    })
+    return () => { cancelled = true }
+  }, [orders])
 
   const totalPages = Math.ceil(orders.length / ORDERS_PER_PAGE)
   const paginatedOrders = orders.slice(
@@ -354,14 +379,20 @@ export default function OrderHistory() {
                       View details
                     </Link>
                     {getNormalizedStatus(order.status) === 'delivered' && (
-                      /* ⚠️ This button has never had an onClick — it was inert
-                         before this redesign and it still is. Left in place
-                         rather than removed, because deciding whether reviews
-                         ship is not a UI call. */
-                      <button className={`${QUIET_BTN} flex-1 sm:flex-none`}>
-                        <Star className="h-4 w-4" />
-                        Write review
-                      </button>
+                      reviewedOrders.has(order.id) ? (
+                        <span className={`${QUIET_BTN} flex-1 cursor-default border-green-200 bg-green-50 text-green-600 sm:flex-none`}>
+                          <CheckCircle className="h-4 w-4" />
+                          Reviewed
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setReviewModal({ isOpen: true, orderId: order.id, items: order.items })}
+                          className={`${QUIET_BTN} flex-1 sm:flex-none`}
+                        >
+                          <Star className="h-4 w-4" />
+                          Write review
+                        </button>
+                      )
                     )}
                     <button
                       onClick={() => handleDownloadInvoice(order.id)}
@@ -422,6 +453,26 @@ export default function OrderHistory() {
           )}
         </>
       )}
+
+      <ReviewModal
+        isOpen={reviewModal.isOpen}
+        onClose={() => {
+          const closedId = reviewModal.orderId
+          const firstProduct = reviewModal.items?.[0]?.productId
+          setReviewModal({ isOpen: false, orderId: '', items: [] })
+          // Re-check so a just-submitted review flips the button to "Reviewed".
+          if (closedId && firstProduct) {
+            reviewService
+              .checkReviewStatus(firstProduct, closedId)
+              .then((r: { hasReviewed?: boolean }) => {
+                if (r?.hasReviewed) setReviewedOrders((prev) => new Set([...prev, closedId]))
+              })
+              .catch(() => {})
+          }
+        }}
+        orderId={reviewModal.orderId}
+        items={reviewModal.items}
+      />
     </div>
   )
 }

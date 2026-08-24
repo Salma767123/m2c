@@ -495,6 +495,9 @@ const CouponManagement = () => {
         formData={formData}
         setFormData={setFormData}
         onSubmit={handleSubmit}
+        firstOrderLocked={coupons.some(
+          (c) => c.isFirstOrder && c.isActive && new Date(c.expiryDate) > new Date() && c.id !== selectedCoupon?.id,
+        )}
       />
 
       {/* Free Shipping Modal */}

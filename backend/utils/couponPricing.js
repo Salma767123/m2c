@@ -77,6 +77,19 @@ async function evaluateCoupon({ code, cartTotal, userId, currency: rawCurrency }
         }
     }
 
+    // First-order coupons apply only when the customer has no prior orders — i.e.
+    // this IS their first order. Once they've placed any order it's gone for good,
+    // whether or not they actually used it on that first order.
+    if (coupon.isFirstOrder) {
+        if (!userId) {
+            return { ok: false, message: 'Please sign in to use this first-order offer' };
+        }
+        const priorOrders = await prisma.order.count({ where: { customerId: userId } });
+        if (priorOrders > 0) {
+            return { ok: false, message: 'This coupon is only valid on your first order' };
+        }
+    }
+
     if (coupon.freeShipping && coupon.freeShippingOrderNumbers?.length > 0 && userId) {
         const orderCount = await prisma.order.count({ where: { customerId: userId } });
         const nextOrderNumber = orderCount + 1;

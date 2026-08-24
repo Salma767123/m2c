@@ -20,7 +20,9 @@ import {
   ChevronLeft,
   ExternalLink,
   Copy,
-  X
+  X,
+  XCircle,
+  RotateCcw
 } from "lucide-react"
 import Dropdown from "@/components/UI/Dropdown"
 import Reveal from "@/components/WebSite/Shared/Reveal"
@@ -28,7 +30,7 @@ import orderService, { Order as APIOrder } from "@/services/orderService"
 import productService from "@/services/productService"
 import { courierService } from "@/services/courierService"
 import { courierName, courierTrackingUrl } from "@/lib/couriers"
-import { showSuccessToast } from "@/lib/toast-utils"
+import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 import ReviewModal from "./ReviewModal"
 
 /**
@@ -83,7 +85,17 @@ interface Order {
   courier?: string | null
   estimatedDelivery?: string
   paymentStatus?: string
+  /** Raw backend status (e.g. ORDER_CREATED, DELIVERED) — drives cancel/return eligibility. */
+  rawStatus?: string
+  returnRequest?: { status?: string; reason?: string } | null
+  refundStatus?: string | null
 }
+
+// Statuses from which a customer may still cancel (pre-dispatch).
+const CANCELLABLE_STATUSES = new Set([
+  'ORDER_CREATED', 'VENDOR_PROCESSING', 'PACKED_BY_VENDOR',
+  'IN_TRANSIT_TO_ADMIN_HUB', 'RECEIVED_AT_ADMIN_HUB', 'APPROVED_BY_ADMIN_HUB',
+])
 
 // ── Constants ───────────────────────────────────────────
 const ORDERS_PER_PAGE = 5
@@ -97,6 +109,36 @@ export default function OrderList() {
   const [currentPage, setCurrentPage] = useState(1)
   // Order whose tracking modal is open (null = closed).
   const [trackOrder, setTrackOrder] = useState<Order | null>(null)
+  // Cancel / return confirmation modal.
+  const [actionModal, setActionModal] = useState<{ order: Order; type: 'cancel' | 'return' } | null>(null)
+  const [actionReason, setActionReason] = useState('')
+  const [actionSubmitting, setActionSubmitting] = useState(false)
+
+  const submitAction = async () => {
+    if (!actionModal) return
+    const { order, type } = actionModal
+    if (type === 'return' && !actionReason.trim()) {
+      showErrorToast('Reason required', 'Please tell us why you want to return this order.')
+      return
+    }
+    try {
+      setActionSubmitting(true)
+      if (type === 'cancel') {
+        const res = await orderService.cancelOrder(order.id, actionReason.trim() || undefined)
+        showSuccessToast('Order Cancelled', res.message || 'Your refund has been initiated.')
+      } else {
+        const res = await orderService.requestReturn(order.id, actionReason.trim())
+        showSuccessToast('Return Requested', res.message || 'We will review it shortly.')
+      }
+      setActionModal(null)
+      setActionReason('')
+      fetchOrders()
+    } catch (e: any) {
+      showErrorToast('Failed', e?.message || 'Please try again.')
+    } finally {
+      setActionSubmitting(false)
+    }
+  }
 
   // Prime the admin-managed courier registry so courierName()/courierTrackingUrl()
   // can resolve the order's courier id to its name + tracking website.
@@ -153,6 +195,9 @@ export default function OrderList() {
           trackingNumber: apiOrder.trackingReference,
           courier: apiOrder.courier,
           estimatedDelivery: apiOrder.estimatedDelivery,
+          rawStatus: apiOrder.status,
+          returnRequest: (apiOrder as any).returnRequest ?? null,
+          refundStatus: (apiOrder as any).refundStatus ?? null,
         }))
         setOrders(transformedOrders)
         setCurrentPage(1)
@@ -503,6 +548,30 @@ export default function OrderList() {
                             <Download className="w-4 h-4 shrink-0" />
                             <span className="truncate">Download Invoice / Packing List</span>
                           </button>
+                          {CANCELLABLE_STATUSES.has(order.rawStatus || '') && (
+                            <button
+                              onClick={() => { setActionReason(''); setActionModal({ order, type: 'cancel' }) }}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-red-300 text-red-600 rounded-full hover:bg-red-50 transition-colors"
+                            >
+                              <XCircle className="w-4 h-4" /> Cancel Order
+                            </button>
+                          )}
+                          {order.rawStatus === 'DELIVERED' && order.returnRequest?.status !== 'Requested' && order.returnRequest?.status !== 'Approved' && (
+                            <button
+                              onClick={() => { setActionReason(''); setActionModal({ order, type: 'return' }) }}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors"
+                            >
+                              <RotateCcw className="w-4 h-4" /> Return
+                            </button>
+                          )}
+                          {order.returnRequest?.status === 'Requested' && (
+                            <span className="flex items-center px-3 py-2 text-xs font-semibold text-amber-700 bg-amber-50 rounded-full">Return Requested</span>
+                          )}
+                          {order.refundStatus && ['INITIATED', 'PROCESSED', 'MANUAL'].includes(order.refundStatus) && (
+                            <span className="flex items-center px-3 py-2 text-xs font-semibold text-green-700 bg-green-50 rounded-full">
+                              Refund {order.refundStatus === 'PROCESSED' ? 'Completed' : order.refundStatus === 'MANUAL' ? 'Being Processed' : 'Initiated'}
+                            </span>
+                          )}
                         </div>
 
                         {/* Estimated Delivery */}
@@ -689,6 +758,30 @@ export default function OrderList() {
                             <Download className="w-4 h-4 shrink-0" />
                             <span className="truncate">Download Invoice / Packing List</span>
                           </button>
+                          {CANCELLABLE_STATUSES.has(order.rawStatus || '') && (
+                            <button
+                              onClick={() => { setActionReason(''); setActionModal({ order, type: 'cancel' }) }}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-red-300 text-red-600 rounded-full hover:bg-red-50 transition-colors"
+                            >
+                              <XCircle className="w-4 h-4" /> Cancel Order
+                            </button>
+                          )}
+                          {order.rawStatus === 'DELIVERED' && order.returnRequest?.status !== 'Requested' && order.returnRequest?.status !== 'Approved' && (
+                            <button
+                              onClick={() => { setActionReason(''); setActionModal({ order, type: 'return' }) }}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors"
+                            >
+                              <RotateCcw className="w-4 h-4" /> Return
+                            </button>
+                          )}
+                          {order.returnRequest?.status === 'Requested' && (
+                            <span className="flex items-center px-3 py-2 text-xs font-semibold text-amber-700 bg-amber-50 rounded-full">Return Requested</span>
+                          )}
+                          {order.refundStatus && ['INITIATED', 'PROCESSED', 'MANUAL'].includes(order.refundStatus) && (
+                            <span className="flex items-center px-3 py-2 text-xs font-semibold text-green-700 bg-green-50 rounded-full">
+                              Refund {order.refundStatus === 'PROCESSED' ? 'Completed' : order.refundStatus === 'MANUAL' ? 'Being Processed' : 'Initiated'}
+                            </span>
+                          )}
                         </div>
                       </Reveal>
                     ))}
@@ -840,6 +933,58 @@ export default function OrderList() {
         orderId={reviewModalState.orderId}
         items={reviewModalState.items}
       />
+
+      {/* Cancel / Return confirmation modal */}
+      {actionModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]" onClick={() => !actionSubmitting && setActionModal(null)}>
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5" onClick={(e) => e.stopPropagation()}>
+            <div className={`h-1 w-full ${actionModal.type === 'cancel' ? 'bg-gradient-to-r from-red-500 to-rose-500' : 'bg-gradient-to-r from-slate-500 to-slate-600'}`} />
+            <div className="p-6">
+              <h3 className="text-[17px] font-bold text-slate-900">
+                {actionModal.type === 'cancel' ? 'Cancel this order?' : 'Request a return'}
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Order #{actionModal.order.orderNumber}
+                {actionModal.type === 'cancel'
+                  ? ' — the order will be cancelled and your payment refunded to the original method.'
+                  : ' — tell us why, and our team will review your return.'}
+              </p>
+
+              <label className="mt-4 block text-sm font-medium text-slate-700">
+                Reason {actionModal.type === 'return' && <span className="text-red-500">*</span>}
+                {actionModal.type === 'cancel' && <span className="font-normal text-slate-400"> (optional)</span>}
+              </label>
+              <textarea
+                value={actionReason}
+                onChange={(e) => setActionReason(e.target.value)}
+                disabled={actionSubmitting}
+                rows={3}
+                placeholder={actionModal.type === 'cancel' ? 'Changed my mind, ordered by mistake…' : 'Damaged, defective, not as described, wrong size…'}
+                className="mt-1.5 w-full resize-none rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none transition-all focus:border-[#e01a1b] focus:ring-4 focus:ring-[#e01a1b]/10 disabled:bg-slate-50"
+              />
+
+              <div className="mt-5 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setActionModal(null)}
+                  disabled={actionSubmitting}
+                  className="rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Keep Order
+                </button>
+                <button
+                  type="button"
+                  onClick={submitAction}
+                  disabled={actionSubmitting}
+                  className={`rounded-full px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${actionModal.type === 'cancel' ? 'bg-[#e01a1b] hover:bg-[#c41617]' : 'bg-slate-800 hover:bg-slate-900'}`}
+                >
+                  {actionSubmitting ? 'Submitting…' : actionModal.type === 'cancel' ? 'Cancel Order' : 'Submit Return'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Track-order modal — courier partner + tracking ID + courier website link */}
       {trackOrder && (

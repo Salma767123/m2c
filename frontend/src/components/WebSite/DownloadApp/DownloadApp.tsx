@@ -111,7 +111,7 @@ function StoreBadge({
       href="#"
       onClick={(e) => e.preventDefault()}
       aria-label={`${sub} ${label}`}
-      className="group inline-flex items-center gap-3 rounded-xl bg-[#1a1416] px-5 py-2.5 text-white shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:bg-black hover:shadow-lg"
+      className="group inline-flex items-center gap-3 rounded-xl bg-black px-5 py-2.5 text-white shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#141414] hover:shadow-lg"
     >
       {children}
       <span className="flex flex-col text-left leading-tight">
@@ -373,8 +373,19 @@ export default function DownloadApp() {
               </svg>
             </StoreBadge>
             <StoreBadge sub="GET IT ON" label="Google Play">
-              <svg viewBox="0 0 512 512" className="h-6 w-6 shrink-0" fill="currentColor" aria-hidden="true">
-                <path d="M325.3 234.3 104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6-58.9-34.1-65.7 64.5 65.7 64.5 60.1-34.1c18-14.3 18-46.5-1.2-60.8zM104.6 499l220.7-221.3 60.1 60.1L104.6 499z" />
+              {/* Official Google Play mark — its brand identity is the four-colour
+                  play triangle (blue → green → yellow → red), so it's filled with
+                  those colours rather than the monochrome white the others use. */}
+              <svg viewBox="0 0 512 512" className="h-6 w-6 shrink-0" aria-hidden="true">
+                <defs>
+                  <linearGradient id="m2c-gplay" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#00D2FF" />
+                    <stop offset="42%" stopColor="#00F076" />
+                    <stop offset="74%" stopColor="#FFD500" />
+                    <stop offset="100%" stopColor="#FF3D00" />
+                  </linearGradient>
+                </defs>
+                <path fill="url(#m2c-gplay)" d="M325.3 234.3 104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6-58.9-34.1-65.7 64.5 65.7 64.5 60.1-34.1c18-14.3 18-46.5-1.2-60.8zM104.6 499l220.7-221.3 60.1 60.1L104.6 499z" />
               </svg>
             </StoreBadge>
           </div>

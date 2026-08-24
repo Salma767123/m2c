@@ -655,6 +655,31 @@ const updateAdminOrderStatus = async (req, res) => {
             });
         });
 
+        // Approving a return (→ RETURNED): stop any vendor payout, mark the return
+        // request approved, and issue the customer's refund automatically.
+        if (status === 'RETURNED') {
+            try {
+                await prisma.settlement.updateMany({
+                    where: { orderId: order.id, status: { in: ['Pending', 'Processing'] } },
+                    data: { status: 'Cancelled' },
+                });
+                const { issueRefund } = require('../utils/refund');
+                const refund = await issueRefund(order);
+                const prevReturn = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest : {};
+                await prisma.order.update({
+                    where: { id: order.id },
+                    data: {
+                        refundStatus: refund.refundStatus,
+                        refundId: refund.refundId,
+                        refundAmount: order.totalAmount,
+                        returnRequest: { ...prevReturn, status: 'Approved', decidedAt: new Date().toISOString() },
+                    },
+                });
+            } catch (e) {
+                console.error('Return refund error:', e?.message || e);
+            }
+        }
+
         // Send push notification to customer (fire-and-forget)
         if (status && order.customerId) {
             const notifHelper = STATUS_NOTIFICATION_MAP[status];

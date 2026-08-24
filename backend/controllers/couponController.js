@@ -24,6 +24,7 @@ const createCoupon = async (req, res) => {
             popupTitle,
             popupMessage,
             applicableCategories,
+            isFirstOrder,
         } = req.body;
 
         // Check if coupon code already exists
@@ -36,6 +37,20 @@ const createCoupon = async (req, res) => {
                 success: false,
                 message: 'Coupon code already exists'
             });
+        }
+
+        // Only one active first-order coupon may exist at a time.
+        if (isFirstOrder) {
+            const now = new Date();
+            const activeFirstOrder = await prisma.coupon.findFirst({
+                where: { isFirstOrder: true, isActive: true, expiryDate: { gt: now } },
+            });
+            if (activeFirstOrder) {
+                return res.status(400).json({
+                    success: false,
+                    message: `An active first-order coupon (${activeFirstOrder.code}) already exists. Deactivate it before creating another.`,
+                });
+            }
         }
 
         // Upload the popup image to Cloudinary so only the URL is stored, never a
@@ -62,9 +77,10 @@ const createCoupon = async (req, res) => {
                 popupTitle: popupTitle || undefined,
                 popupMessage: popupMessage || undefined,
                 applicableCategories: applicableCategories || [],
+                isFirstOrder: isFirstOrder || false,
             }
         });
-       
+
         res.status(201).json({
             success: true,
             data: coupon,
@@ -174,6 +190,20 @@ const updateCoupon = async (req, res) => {
         // A newly-picked popup image arrives as base64 — upload it to Cloudinary and
         // store only the URL (existing URLs pass through unchanged).
         if (updateData.popupImage) updateData.popupImage = await resolveBase64InValue(updateData.popupImage, { folder: 'coupons' });
+
+        // Enabling first-order (or reactivating one) must keep at most one active.
+        if (updateData.isFirstOrder === true) {
+            const now = new Date();
+            const other = await prisma.coupon.findFirst({
+                where: { id: { not: id }, isFirstOrder: true, isActive: true, expiryDate: { gt: now } },
+            });
+            if (other) {
+                return res.status(400).json({
+                    success: false,
+                    message: `An active first-order coupon (${other.code}) already exists. Deactivate it first.`,
+                });
+            }
+        }
 
         const coupon = await prisma.coupon.update({
             where: { id },
@@ -334,9 +364,16 @@ const getPromotionalCoupons = async (req, res) => {
     try {
         const { limit = 10 } = req.query;
 
+        // Only surface coupons that are actually usable right now: active, already
+        // started, and not past their expiry. Previously only `isActive` was checked,
+        // so expired coupons kept showing on the storefront even though the admin
+        // panel (which derives status from the date) marked them EXPIRED.
+        const now = new Date();
         const coupons = await prisma.coupon.findMany({
             where: {
-                isActive: true
+                isActive: true,
+                startDate: { lte: now },
+                expiryDate: { gt: now }
             },
             select: {
                 id: true,
@@ -378,6 +415,47 @@ const getPromotionalCoupons = async (req, res) => {
             message: 'Failed to fetch promotional coupons',
             data: []
         });
+    }
+};
+
+// Get the active first-order coupon for the storefront promo strip (Public).
+// Returns the single active, non-expired first-order coupon, or null so the strip
+// hides itself — never hardcoded.
+const getFirstOrderCoupon = async (req, res) => {
+    try {
+        const now = new Date();
+        const coupon = await prisma.coupon.findFirst({
+            where: {
+                isFirstOrder: true,
+                isActive: true,
+                startDate: { lte: now },
+                expiryDate: { gt: now },
+            },
+            select: { code: true, description: true, discountType: true, discountValue: true },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        if (!coupon) {
+            return res.json({ success: true, data: null });
+        }
+
+        const offer = coupon.discountType === 'PERCENTAGE'
+            ? `${coupon.discountValue}% off`
+            : `₹${coupon.discountValue} off`;
+
+        res.json({
+            success: true,
+            data: {
+                code: coupon.code,
+                description: coupon.description && coupon.description.trim()
+                    ? coupon.description
+                    : `Take an extra ${offer} with code`,
+                offer,
+            },
+        });
+    } catch (error) {
+        console.error('Get first-order coupon error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch first-order coupon', data: null });
     }
 };
 
@@ -680,6 +758,7 @@ module.exports = {
     applyCoupon,
     applyFreeShippingOffer,
     getPromotionalCoupons,
+    getFirstOrderCoupon,
     getPopupCoupons,
     // Free shipping offer functions
     createFreeShippingOffer,

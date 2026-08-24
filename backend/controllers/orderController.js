@@ -1110,8 +1110,146 @@ const getOrderById = async (req, res) => {
     }
 };
 
+// Statuses from which a customer may still cancel — anything before the parcel
+// leaves the hub for them. Once SHIPPED_TO_CUSTOMER they must use Return instead.
+const CUSTOMER_CANCELLABLE = new Set([
+    'ORDER_CREATED',
+    'VENDOR_PROCESSING',
+    'PACKED_BY_VENDOR',
+    'IN_TRANSIT_TO_ADMIN_HUB',
+    'RECEIVED_AT_ADMIN_HUB',
+    'APPROVED_BY_ADMIN_HUB',
+]);
+
+// How many days after delivery a customer may raise a return.
+const RETURN_WINDOW_DAYS = 7;
+
+// Customer: cancel own order (pre-dispatch). Cancels the vendor settlement and
+// issues an automatic refund for prepaid orders.
+const cancelMyOrder = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { id } = req.params;
+        const reason = (req.body?.reason || '').toString().trim().slice(0, 300) || null;
+
+        const order = await prisma.order.findUnique({ where: { id }, include: { items: true } });
+        if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
+        if (order.customerId !== userId) return res.status(403).json({ success: false, error: 'Not your order' });
+        if (!CUSTOMER_CANCELLABLE.has(order.status)) {
+            return res.status(409).json({
+                success: false,
+                error: 'This order can no longer be cancelled. If it has shipped, please request a return once it is delivered.',
+            });
+        }
+
+        await prisma.$transaction(async (tx) => {
+            // Stop the vendor payout for a cancelled order.
+            await tx.settlement.updateMany({
+                where: { orderId: order.id, status: { in: ['Pending', 'Processing'] } },
+                data: { status: 'Cancelled' },
+            });
+            await tx.order.update({
+                where: { id: order.id },
+                data: {
+                    status: 'CANCELLED',
+                    cancelReason: reason,
+                    statusHistory: {
+                        create: {
+                            status: 'CANCELLED',
+                            updatedBy: userId,
+                            updatedByType: 'customer',
+                            comment: `Cancelled by customer${reason ? `: ${reason}` : ''}`,
+                        },
+                    },
+                },
+            });
+        });
+
+        // Refund (fire after the state change so a gateway hiccup can't undo the cancel).
+        const { issueRefund } = require('../utils/refund');
+        const refund = await issueRefund(order);
+        const updated = await prisma.order.update({
+            where: { id: order.id },
+            data: { refundStatus: refund.refundStatus, refundId: refund.refundId, refundAmount: order.totalAmount },
+        });
+
+        // Notify vendors so they stop processing.
+        try {
+            const { createNotification } = require('./notificationController');
+            const vendorIds = [...new Set(order.items.map((i) => i.vendorId).filter(Boolean))];
+            for (const vid of vendorIds) {
+                createNotification({
+                    userId: vid, role: 'VENDOR', type: 'ORDER_CANCELLED',
+                    title: 'Order Cancelled', message: `Order #${order.orderId} was cancelled by the customer.`,
+                    data: { orderId: order.id },
+                }).catch(() => {});
+            }
+        } catch { /* notifications are best-effort */ }
+
+        res.json({ success: true, data: updated, message: 'Order cancelled. Your refund has been initiated.' });
+    } catch (error) {
+        console.error('Cancel my order error:', error);
+        res.status(500).json({ success: false, error: 'Failed to cancel order' });
+    }
+};
+
+// Customer: request a return on a delivered order. Does NOT change the order
+// status — it raises a request the admin approves (→ RETURNED + refund).
+const requestReturn = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { id } = req.params;
+        const reason = (req.body?.reason || '').toString().trim().slice(0, 500);
+        if (!reason) return res.status(400).json({ success: false, error: 'Please provide a reason for the return' });
+
+        const order = await prisma.order.findUnique({ where: { id } });
+        if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
+        if (order.customerId !== userId) return res.status(403).json({ success: false, error: 'Not your order' });
+        if (order.status !== 'DELIVERED') {
+            return res.status(409).json({ success: false, error: 'Returns are only available for delivered orders' });
+        }
+        const existing = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest : null;
+        if (existing && existing.status === 'Requested') {
+            return res.status(409).json({ success: false, error: 'A return request is already pending for this order' });
+        }
+        if (existing && existing.status === 'Approved') {
+            return res.status(409).json({ success: false, error: 'This order has already been approved for return' });
+        }
+
+        // Enforce the return window (from the delivered status-history entry, else createdAt).
+        const deliveredAt = order.actualDelivery || order.updatedAt || order.createdAt;
+        const windowEnd = new Date(deliveredAt);
+        windowEnd.setDate(windowEnd.getDate() + RETURN_WINDOW_DAYS);
+        if (new Date() > windowEnd) {
+            return res.status(409).json({ success: false, error: `The ${RETURN_WINDOW_DAYS}-day return window has closed for this order` });
+        }
+
+        const updated = await prisma.order.update({
+            where: { id: order.id },
+            data: { returnRequest: { reason, status: 'Requested', requestedAt: new Date().toISOString() } },
+        });
+
+        // Notify admins to review.
+        try {
+            const { createNotificationForRole } = require('./notificationController');
+            createNotificationForRole?.({
+                role: 'ADMIN', type: 'RETURN_REQUESTED',
+                title: 'Return Requested', message: `Return requested for order #${order.orderId}.`,
+                data: { orderId: order.id },
+            }).catch?.(() => {});
+        } catch { /* best-effort */ }
+
+        res.json({ success: true, data: updated, message: 'Return request submitted. We will review it shortly.' });
+    } catch (error) {
+        console.error('Request return error:', error);
+        res.status(500).json({ success: false, error: 'Failed to submit return request' });
+    }
+};
+
 module.exports = {
     createOrder,
     getUserOrders,
-    getOrderById
+    getOrderById,
+    cancelMyOrder,
+    requestReturn,
 };

@@ -88,6 +88,9 @@ router.post('/vendor/:id/reship', requireVendorRole, vendorOrderController.reshi
 router.post('/', orderController.createOrder);
 router.get('/', orderController.getUserOrders);
 router.get('/:id', orderController.getOrderById);
+// Customer self-service: cancel a pre-dispatch order, or request a return after delivery.
+router.post('/:id/cancel', orderController.cancelMyOrder);
+router.post('/:id/return', orderController.requestReturn);
 
 // Customer: Download their own invoice
 router.get('/:id/invoice', async (req, res) => {

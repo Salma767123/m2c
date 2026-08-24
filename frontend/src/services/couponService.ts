@@ -1,4 +1,5 @@
 import axios from '@/lib/axios';
+import { userAuthService } from '@/services/userAuthService';
 
 export interface Coupon {
     id: string;
@@ -21,8 +22,18 @@ export interface Coupon {
     popupTitle?: string;
     popupMessage?: string;
     applicableCategories?: string[];
+    /** First-order coupon — only applies to a customer's first order and surfaces
+     *  in the storefront promo strip. At most one active at a time. */
+    isFirstOrder?: boolean;
     createdAt?: string;
     updatedAt?: string;
+}
+
+/** The active first-order coupon shown in the storefront promo strip (or null). */
+export interface FirstOrderCoupon {
+    code: string;
+    description: string;
+    offer: string;
 }
 
 export interface PopupCoupon {
@@ -62,7 +73,10 @@ export interface ApplyCouponResponse {
 class CouponService {
     async applyCoupon(code: string, cartTotal: number, currency?: string): Promise<ApplyCouponResponse> {
         try {
-            const response = await axios.post('/coupons/apply', { code, cartTotal, currency });
+            // Include the logged-in user's id so the server can enforce per-user and
+            // first-order rules at cart time (the /apply route is public).
+            const userId = userAuthService.getUserData()?.id;
+            const response = await axios.post('/coupons/apply', { code, cartTotal, currency, userId });
             return response.data;
         } catch (error: unknown) {
             // Return the error message from the backend if available
@@ -91,6 +105,17 @@ class CouponService {
                 .filter((c: { message?: string }) => c.message && c.message.trim());
         } catch {
             return [];
+        }
+    }
+
+    // Active first-order coupon for the storefront promo strip. Returns null when
+    // none is active (the strip hides itself). Never hardcoded.
+    async getFirstOrderCoupon(): Promise<FirstOrderCoupon | null> {
+        try {
+            const response = await axios.get('/coupons/first-order', { timeout: 5000 });
+            return response.data?.success && response.data.data ? (response.data.data as FirstOrderCoupon) : null;
+        } catch {
+            return null;
         }
     }
 

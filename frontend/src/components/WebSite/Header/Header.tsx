@@ -316,16 +316,15 @@ const Header = () => {
             {/* Prominent inline search — the primary way to find products
                 (Amazon/Flipkart/Myntra pattern). Fills the header on md+; on
                 mobile the compact search icon in the actions opens the modal. */}
-            <form onSubmit={handleSearchSubmit} className="hidden md:flex flex-1 min-w-0 max-w-md lg:max-w-lg mx-4 lg:mx-6">
+            <form onSubmit={handleSearchSubmit} className="hidden md:flex flex-1 min-w-0 max-w-xs lg:max-w-sm mx-4 lg:mx-6">
               <div className="relative w-full">
-                <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search for products, categories & more"
                   aria-label="Search products"
-                  className="w-full pl-10 pr-28 py-2 lg:py-2.5 rounded-full bg-gray-50 border border-gray-200 text-sm text-gray-800 placeholder-gray-400 focus:bg-white focus:border-[#e01a1b] focus:ring-4 focus:ring-[#e01a1b]/10 outline-none transition-all"
+                  className="w-full pl-4 pr-28 py-2 lg:py-2.5 rounded-full bg-gray-50 border border-gray-200 text-sm text-gray-800 placeholder-gray-400 focus:bg-white focus:border-[#e01a1b] focus:ring-4 focus:ring-[#e01a1b]/10 outline-none transition-all"
                 />
                 <button
                   type="submit"

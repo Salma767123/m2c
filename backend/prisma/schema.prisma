@@ -1106,6 +1106,16 @@ model Order {
   // Courier partner (DB Courier id) chosen for the final hub→customer leg.
   courier           String?
 
+  // ── Cancellation / Return / Refund ──────────────────────────────────────
+  cancelReason  String? // Reason the customer/admin gave when cancelling
+  // Customer return request (raised after delivery; admin approves/rejects).
+  // Shape: { reason, status: 'Requested'|'Approved'|'Rejected', requestedAt, decidedAt, note }
+  returnRequest Json?
+  // Gateway refund tracking. refundStatus: 'INITIATED'|'PROCESSED'|'FAILED'|'MANUAL'|'NONE'
+  refundId      String?
+  refundStatus  String?
+  refundAmount  Float?
+
   // DEPRECATED: Vendor shipping details now live on VendorShipment.
   // Retained for backward compatibility with pre-migration orders.
   vendorCarrier    String?
@@ -1355,6 +1365,11 @@ model Coupon {
   perUserLimit Int? @default(1) // How many times a single user can use this
 
   isActive Boolean @default(true)
+
+  // "First Order" coupon — only applies to a customer's very first order, and once
+  // enabled+active it's the only first-order coupon allowed (surfaced in the
+  // storefront's promo strip). At most one active first-order coupon at a time.
+  isFirstOrder Boolean @default(false)
 
   // Dynamic Free Shipping on Nth Orders
   freeShipping             Boolean @default(false) // Whether this coupon grants free shipping

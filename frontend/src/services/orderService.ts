@@ -127,6 +127,12 @@ export interface Order {
     trackingReference?: string;
     /** Courier partner id chosen at ship-to-customer (resolve via lib/couriers). */
     courier?: string | null;
+    /** Cancel/return/refund state. */
+    cancelReason?: string | null;
+    returnRequest?: { reason?: string; status?: 'Requested' | 'Approved' | 'Rejected'; requestedAt?: string; decidedAt?: string; note?: string } | null;
+    refundStatus?: 'INITIATED' | 'PROCESSED' | 'FAILED' | 'MANUAL' | 'NONE' | null;
+    refundId?: string | null;
+    refundAmount?: number | null;
     // DEPRECATED: These now live on VendorShipment
     vendorCarrier?: string;
     vendorTrackingId?: string;
@@ -204,6 +210,26 @@ class OrderService {
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to fetch order');
+        }
+    }
+
+    // Customer: cancel own pre-dispatch order (auto-refund for prepaid).
+    async cancelOrder(id: string, reason?: string): Promise<{ success: boolean; data: Order; message?: string }> {
+        try {
+            const response = await axios.post(`/orders/${id}/cancel`, { reason });
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.message || 'Failed to cancel order');
+        }
+    }
+
+    // Customer: request a return on a delivered order (admin approves).
+    async requestReturn(id: string, reason: string): Promise<{ success: boolean; data: Order; message?: string }> {
+        try {
+            const response = await axios.post(`/orders/${id}/return`, { reason });
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.message || 'Failed to submit return request');
         }
     }
 

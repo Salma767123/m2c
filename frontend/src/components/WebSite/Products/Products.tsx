@@ -522,7 +522,7 @@ const Products = () => {
               nobody offers a 5-star-only filter because it reads as a mistake
               next to four stars. With words it is the most useful rung there
               is -- "Loved it" -- and leaving it out looked like an oversight. */}
-          {[5, 4, 3, 2].map((rating) => (
+          {[5, 4, 3, 2, 1].map((rating) => (
             <label key={rating} className="flex items-center cursor-pointer">
               <input
                 type="radio"
