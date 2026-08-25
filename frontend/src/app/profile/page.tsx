@@ -1,7 +1,14 @@
+import { Suspense } from "react"
 import Profile from "@/components/WebSite/Profile/Profile"
 
 export default function ProfilePage() {
-  return <Profile />
+  // Profile reads useSearchParams() (?tab= deep-link), which must sit inside a
+  // Suspense boundary or the static prerender of /profile fails the build.
+  return (
+    <Suspense fallback={null}>
+      <Profile />
+    </Suspense>
+  )
 }
 
 export const metadata = {
