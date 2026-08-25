@@ -15,13 +15,16 @@ import {
   Eye,
   Download,
   Star,
+  Sparkles,
   Plus,
   ShoppingCart,
   AlertCircle,
   ChevronLeft,
   ExternalLink,
   Copy,
-  X
+  X,
+  XCircle,
+  RotateCcw
 } from "lucide-react"
 import SelectMenu from "@/components/WebSite/Shared/SelectMenu"
 import DateField from "@/components/WebSite/Shared/DateField"
@@ -30,7 +33,7 @@ import orderService, { Order as APIOrder } from "@/services/orderService"
 import productService from "@/services/productService"
 import { courierService } from "@/services/courierService"
 import { courierName, courierTrackingUrl } from "@/lib/couriers"
-import { showSuccessToast } from "@/lib/toast-utils"
+import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 import ReviewModal from "./ReviewModal"
 
 /**
@@ -85,7 +88,35 @@ interface Order {
   courier?: string | null
   estimatedDelivery?: string
   paymentStatus?: string
+  /** Raw backend status (e.g. ORDER_CREATED, DELIVERED) — drives cancel/return eligibility. */
+  rawStatus?: string
+  returnRequest?: { status?: string; reason?: string } | null
+  refundStatus?: string | null
 }
+
+// Statuses from which a customer may still cancel (pre-dispatch).
+const CANCELLABLE_STATUSES = new Set([
+  'ORDER_CREATED', 'VENDOR_PROCESSING', 'PACKED_BY_VENDOR',
+  'IN_TRANSIT_TO_ADMIN_HUB', 'RECEIVED_AT_ADMIN_HUB', 'APPROVED_BY_ADMIN_HUB',
+])
+
+// Preset reasons offered in the cancel / return modal ("Other" reveals a text box).
+const CANCEL_REASONS = [
+  'Changed my mind',
+  'Ordered by mistake',
+  'Found a better price elsewhere',
+  'Delivery is taking too long',
+  'Need to change address or details',
+  'Other',
+]
+const RETURN_REASONS = [
+  'Damaged or defective',
+  'Wrong item received',
+  'Not as described',
+  'Size or fit issue',
+  'Quality not satisfactory',
+  'Other',
+]
 
 // ── Constants ───────────────────────────────────────────
 const ORDERS_PER_PAGE = 5
@@ -101,6 +132,46 @@ export default function OrderList() {
   const [currentPage, setCurrentPage] = useState(1)
   // Order whose tracking modal is open (null = closed).
   const [trackOrder, setTrackOrder] = useState<Order | null>(null)
+  // Cancel / return confirmation modal.
+  const [actionModal, setActionModal] = useState<{ order: Order; type: 'cancel' | 'return' } | null>(null)
+  const [reasonChoice, setReasonChoice] = useState('')  // selected preset reason
+  const [actionReason, setActionReason] = useState('')  // free text when "Other"
+  const [actionSubmitting, setActionSubmitting] = useState(false)
+
+  const openActionModal = (order: Order, type: 'cancel' | 'return') => {
+    setReasonChoice('')
+    setActionReason('')
+    setActionModal({ order, type })
+  }
+
+  const submitAction = async () => {
+    if (!actionModal) return
+    const { order, type } = actionModal
+    // Final reason = the selected preset, or the free text when "Other".
+    const finalReason = reasonChoice === 'Other' ? actionReason.trim() : reasonChoice
+    if (type === 'return' && !finalReason) {
+      showErrorToast('Reason required', reasonChoice === 'Other' ? 'Please describe the reason.' : 'Please select a reason for the return.')
+      return
+    }
+    try {
+      setActionSubmitting(true)
+      if (type === 'cancel') {
+        const res = await orderService.cancelOrder(order.id, finalReason || undefined)
+        showSuccessToast('Order Cancelled', res.message || 'Your refund has been initiated.')
+      } else {
+        const res = await orderService.requestReturn(order.id, finalReason)
+        showSuccessToast('Return Requested', res.message || 'We will review it shortly.')
+      }
+      setActionModal(null)
+      setReasonChoice('')
+      setActionReason('')
+      fetchOrders()
+    } catch (e: any) {
+      showErrorToast('Failed', e?.message || 'Please try again.')
+    } finally {
+      setActionSubmitting(false)
+    }
+  }
 
   // Prime the admin-managed courier registry so courierName()/courierTrackingUrl()
   // can resolve the order's courier id to its name + tracking website.
@@ -157,6 +228,9 @@ export default function OrderList() {
           trackingNumber: apiOrder.trackingReference,
           courier: apiOrder.courier,
           estimatedDelivery: apiOrder.estimatedDelivery,
+          rawStatus: apiOrder.status,
+          returnRequest: (apiOrder as any).returnRequest ?? null,
+          refundStatus: (apiOrder as any).refundStatus ?? null,
         }))
         setOrders(transformedOrders)
         setCurrentPage(1)
@@ -361,19 +435,19 @@ export default function OrderList() {
 
 
   return (
-    <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8 font-sans">
+    <div className="min-h-screen bg-slate-50 py-3 sm:py-4 lg:py-5 font-sans">
       <div className="max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-5 sm:gap-6 lg:gap-8">
           {/* Main Content - Orders */}
           <div className="xl:col-span-3">
             <div className="max-w-6xl">
               {/* Header */}
-              <Reveal className="mb-5 sm:mb-6 lg:mb-8">
+              <Reveal className="mb-3 sm:mb-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <Package className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-[#e01a1b] shrink-0" />
                     <div className="min-w-0">
-                      <h1 className="font-playfair text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#1a1a1a] tracking-tight mb-1 sm:mb-2 truncate">My Orders</h1>
+                      <h1 className="font-playfair text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#1a1a1a] tracking-tight mb-0.5 truncate">My Orders</h1>
                       <p className="text-sm sm:text-base text-slate-600">Track and manage your orders</p>
                     </div>
                   </div>
@@ -385,40 +459,45 @@ export default function OrderList() {
               </Reveal>
 
               {/* Search and Filter */}
-              <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6 mb-5 sm:mb-6 lg:mb-8">
-                {/* One line: what, which status, and when. Bottom-aligned so
-                    the search box and the status button sit level with the two
-                    date fields rather than floating above their labels.
-                    Native date inputs, so the calendar is the operating
-                    system's own rather than a picker bolted on. */}
+              <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-4 lg:p-5 mb-4 sm:mb-5">
+                {/* One labeled row: what, which status, and when. Every field
+                    carries the same small label so the controls line up and no
+                    empty band is left above the label-less ones. Native date
+                    inputs, so the calendar is the operating system's own. */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3 lg:flex-nowrap lg:gap-4">
-                  <div className="relative min-w-0 flex-1 sm:min-w-[13rem]">
-                    <Search className="absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 transform text-slate-400 sm:w-5 sm:h-5" />
-                    <input
-                      type="text"
-                      placeholder="Search orders..."
-                      value={searchTerm}
-                      onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); setPastPage(1) }}
-                      className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 text-sm sm:text-base border rounded-lg sm:rounded-md border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all"
-                    />
+                  <div className="min-w-0 flex-1 sm:min-w-[13rem]">
+                    <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Search</span>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 transform text-slate-400 sm:w-5 sm:h-5" />
+                      <input
+                        type="text"
+                        placeholder="Order no. or product…"
+                        value={searchTerm}
+                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); setPastPage(1) }}
+                        className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 text-sm sm:text-base border rounded-lg sm:rounded-md border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] transition-all"
+                      />
+                    </div>
                   </div>
 
-                  <SelectMenu
-                    className="w-full sm:w-44 lg:shrink-0"
-                    buttonClassName="rounded-lg sm:rounded-md"
-                    tone="slate"
-                    ariaLabel="Filter orders by status"
-                    value={statusFilter}
-                    options={[
-                      { value: "all", label: "All Orders" },
-                      { value: "processing", label: "Processing" },
-                      { value: "shipped", label: "Shipped" },
-                      { value: "delivered", label: "Delivered" },
-                      { value: "cancelled", label: "Cancelled" }
-                    ]}
-                    onChange={(v) => { setStatusFilter(v); setCurrentPage(1); setPastPage(1) }}
-                    placeholder="Filter by status"
-                  />
+                  <div className="w-full sm:w-44 lg:shrink-0">
+                    <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Status</span>
+                    <SelectMenu
+                      className="w-full"
+                      buttonClassName="rounded-lg sm:rounded-md"
+                      tone="slate"
+                      ariaLabel="Filter orders by status"
+                      value={statusFilter}
+                      options={[
+                        { value: "all", label: "All Orders" },
+                        { value: "processing", label: "Processing" },
+                        { value: "shipped", label: "Shipped" },
+                        { value: "delivered", label: "Delivered" },
+                        { value: "cancelled", label: "Cancelled" }
+                      ]}
+                      onChange={(v) => { setStatusFilter(v); setCurrentPage(1); setPastPage(1) }}
+                      placeholder="Filter by status"
+                    />
+                  </div>
 
                   <DateField
                     className="min-w-0 flex-1 sm:min-w-[10.5rem] sm:max-w-[12rem] lg:shrink-0"
@@ -455,7 +534,7 @@ export default function OrderList() {
               {/* Current Orders */}
               {currentOrders.length > 0 && (
                 <div className="mb-6 sm:mb-8">
-                  <Reveal as="h2" className="font-playfair text-xl sm:text-2xl font-semibold text-[#1a1a1a] tracking-tight mb-4 sm:mb-6">Current Orders</Reveal>
+                  <Reveal as="h2" className="font-playfair text-xl sm:text-2xl font-semibold text-[#1a1a1a] tracking-tight mb-3 sm:mb-4">Current Orders</Reveal>
                   <div className="space-y-4 sm:space-y-6">
                     {paginatedCurrentOrders.map((order, index) => (
                       <Reveal key={order.id} delay={index * 90} className="group bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] border border-slate-200 p-4 sm:p-5 lg:p-6 hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] hover:-translate-y-1 hover:ring-[#e01a1b]/20 transition-all duration-500">
@@ -563,8 +642,32 @@ export default function OrderList() {
                             className="w-full sm:w-auto flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition-colors"
                           >
                             <Download className="w-4 h-4 shrink-0" />
-                            <span className="truncate">Download Invoice / Packing List</span>
+                            <span className="truncate">Download Invoice</span>
                           </button>
+                          {CANCELLABLE_STATUSES.has(order.rawStatus || '') && (
+                            <button
+                              onClick={() => openActionModal(order, 'cancel')}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-red-300 text-red-600 rounded-full hover:bg-red-50 transition-colors"
+                            >
+                              <XCircle className="w-4 h-4" /> Cancel Order
+                            </button>
+                          )}
+                          {order.rawStatus === 'DELIVERED' && order.returnRequest?.status !== 'Requested' && order.returnRequest?.status !== 'Approved' && (
+                            <button
+                              onClick={() => openActionModal(order, 'return')}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors"
+                            >
+                              <RotateCcw className="w-4 h-4" /> Return
+                            </button>
+                          )}
+                          {order.returnRequest?.status === 'Requested' && (
+                            <span className="flex items-center px-3 py-2 text-xs font-semibold text-amber-700 bg-amber-50 rounded-full">Return Requested</span>
+                          )}
+                          {order.refundStatus && ['INITIATED', 'PROCESSED', 'MANUAL'].includes(order.refundStatus) && (
+                            <span className="flex items-center px-3 py-2 text-xs font-semibold text-green-700 bg-green-50 rounded-full">
+                              Refund {order.refundStatus === 'PROCESSED' ? 'Completed' : order.refundStatus === 'MANUAL' ? 'Being Processed' : 'Initiated'}
+                            </span>
+                          )}
                         </div>
 
                         {/* Estimated Delivery */}
@@ -749,8 +852,32 @@ export default function OrderList() {
                             className="w-full sm:w-auto flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition-colors"
                           >
                             <Download className="w-4 h-4 shrink-0" />
-                            <span className="truncate">Download Invoice / Packing List</span>
+                            <span className="truncate">Download Invoice</span>
                           </button>
+                          {CANCELLABLE_STATUSES.has(order.rawStatus || '') && (
+                            <button
+                              onClick={() => openActionModal(order, 'cancel')}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-red-300 text-red-600 rounded-full hover:bg-red-50 transition-colors"
+                            >
+                              <XCircle className="w-4 h-4" /> Cancel Order
+                            </button>
+                          )}
+                          {order.rawStatus === 'DELIVERED' && order.returnRequest?.status !== 'Requested' && order.returnRequest?.status !== 'Approved' && (
+                            <button
+                              onClick={() => openActionModal(order, 'return')}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors"
+                            >
+                              <RotateCcw className="w-4 h-4" /> Return
+                            </button>
+                          )}
+                          {order.returnRequest?.status === 'Requested' && (
+                            <span className="flex items-center px-3 py-2 text-xs font-semibold text-amber-700 bg-amber-50 rounded-full">Return Requested</span>
+                          )}
+                          {order.refundStatus && ['INITIATED', 'PROCESSED', 'MANUAL'].includes(order.refundStatus) && (
+                            <span className="flex items-center px-3 py-2 text-xs font-semibold text-green-700 bg-green-50 rounded-full">
+                              Refund {order.refundStatus === 'PROCESSED' ? 'Completed' : order.refundStatus === 'MANUAL' ? 'Being Processed' : 'Initiated'}
+                            </span>
+                          )}
                         </div>
                       </Reveal>
                     ))}
@@ -804,10 +931,15 @@ export default function OrderList() {
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-slate-900 font-semibold text-sm">{formatPrice(getRegionalPrice(item))}</span>
                           </div>
-                          {item.rating && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                              <span className="text-xs text-slate-600">{Number(item.rating).toFixed(1)}</span>
+                          {Number(item.reviews) > 0 ? (
+                            <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-[#F5A524] to-[#F59E0B] px-1.5 py-0.5 text-[11px] leading-none text-white shadow-[0_2px_9px_rgba(245,158,11,0.5)]">
+                              <span className="font-bold tabular-nums">{(Number(item.rating) || 0).toFixed(1)}</span>
+                              <Sparkles className="h-3 w-3 fill-white text-white" strokeWidth={1.5} />
+                              <span className="tabular-nums text-white/85">{Number(item.reviews)}</span>
+                            </div>
+                          ) : (
+                            <div className="mt-1 inline-flex items-center rounded-md bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide leading-none text-white shadow-[0_2px_9px_rgba(99,102,241,0.5)]">
+                              New
                             </div>
                           )}
                         </div>
@@ -848,6 +980,17 @@ export default function OrderList() {
                               <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">{item.discount}% OFF</span>
                             )}
                           </div>
+                          {Number(item.reviews) > 0 ? (
+                            <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-[#F5A524] to-[#F59E0B] px-1.5 py-0.5 text-[11px] leading-none text-white shadow-[0_2px_9px_rgba(245,158,11,0.5)]">
+                              <span className="font-bold tabular-nums">{(Number(item.rating) || 0).toFixed(1)}</span>
+                              <Sparkles className="h-3 w-3 fill-white text-white" strokeWidth={1.5} />
+                              <span className="tabular-nums text-white/85">{Number(item.reviews)}</span>
+                            </div>
+                          ) : (
+                            <div className="mt-1 inline-flex items-center rounded-md bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide leading-none text-white shadow-[0_2px_9px_rgba(99,102,241,0.5)]">
+                              New
+                            </div>
+                          )}
                         </div>
                       </div>
                     </Link>
@@ -902,6 +1045,82 @@ export default function OrderList() {
         orderId={reviewModalState.orderId}
         items={reviewModalState.items}
       />
+
+      {/* Cancel / Return confirmation modal */}
+      {actionModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]" onClick={() => !actionSubmitting && setActionModal(null)}>
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5" onClick={(e) => e.stopPropagation()}>
+            <div className={`h-1 w-full ${actionModal.type === 'cancel' ? 'bg-gradient-to-r from-red-500 to-rose-500' : 'bg-gradient-to-r from-slate-500 to-slate-600'}`} />
+            <div className="p-6">
+              <h3 className="text-[17px] font-bold text-slate-900">
+                {actionModal.type === 'cancel' ? 'Cancel this order?' : 'Request a return'}
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Order #{actionModal.order.orderNumber}
+                {actionModal.type === 'cancel'
+                  ? ' — the order will be cancelled and your payment refunded to the original method.'
+                  : ' — tell us why, and our team will review your return.'}
+              </p>
+
+              <label className="mt-4 block text-sm font-medium text-slate-700">
+                Reason {actionModal.type === 'return' && <span className="text-red-500">*</span>}
+                {actionModal.type === 'cancel' && <span className="font-normal text-slate-400"> (optional)</span>}
+              </label>
+              <div className="mt-2 space-y-1.5">
+                {(actionModal.type === 'cancel' ? CANCEL_REASONS : RETURN_REASONS).map((r) => (
+                  <label
+                    key={r}
+                    className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      reasonChoice === r ? 'border-[#e01a1b] bg-[#fff5f5] text-[#1a1a1a]' : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="cancel-return-reason"
+                      value={r}
+                      checked={reasonChoice === r}
+                      onChange={() => setReasonChoice(r)}
+                      disabled={actionSubmitting}
+                      className="h-4 w-4 accent-[#e01a1b]"
+                    />
+                    {r}
+                  </label>
+                ))}
+              </div>
+              {reasonChoice === 'Other' && (
+                <textarea
+                  value={actionReason}
+                  onChange={(e) => setActionReason(e.target.value)}
+                  disabled={actionSubmitting}
+                  rows={2}
+                  autoFocus
+                  placeholder="Please describe your reason…"
+                  className="mt-2 w-full resize-none rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none transition-all focus:border-[#e01a1b] focus:ring-4 focus:ring-[#e01a1b]/10 disabled:bg-slate-50"
+                />
+              )}
+
+              <div className="mt-5 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setActionModal(null)}
+                  disabled={actionSubmitting}
+                  className="rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Keep Order
+                </button>
+                <button
+                  type="button"
+                  onClick={submitAction}
+                  disabled={actionSubmitting}
+                  className={`rounded-full px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${actionModal.type === 'cancel' ? 'bg-[#e01a1b] hover:bg-[#c41617]' : 'bg-slate-800 hover:bg-slate-900'}`}
+                >
+                  {actionSubmitting ? 'Submitting…' : actionModal.type === 'cancel' ? 'Cancel Order' : 'Submit Return'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Track-order modal — courier partner + tracking ID + courier website link */}
       {trackOrder && (

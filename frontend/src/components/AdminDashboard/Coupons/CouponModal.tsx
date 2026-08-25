@@ -16,6 +16,8 @@ interface CouponModalProps {
   formData: Partial<Coupon>;
   setFormData: (data: Partial<Coupon>) => void;
   onSubmit: (e: React.FormEvent) => void;
+  /** True when another active first-order coupon already exists — locks this toggle. */
+  firstOrderLocked?: boolean;
 }
 
 const CouponModal = ({
@@ -25,7 +27,8 @@ const CouponModal = ({
   coupon,
   formData,
   setFormData,
-  onSubmit
+  onSubmit,
+  firstOrderLocked = false,
 }: CouponModalProps) => {
   const [popupImagePreview, setPopupImagePreview] = useState<string>('');
   const popupFileInputRef = useRef<HTMLInputElement>(null);
@@ -488,6 +491,40 @@ const CouponModal = ({
                     </div>
                   </div>
                 </div>
+
+                {/* First Order Section — the coupon shown in the storefront promo strip */}
+                {(() => {
+                  const locked = (firstOrderLocked && !formData.isFirstOrder) || mode === 'view';
+                  return (
+                    <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold text-slate-900">First Order Coupon</h3>
+                          <p className="mt-0.5 text-xs text-slate-500">Shows in the storefront promo strip and only applies to a customer&apos;s first order.</p>
+                        </div>
+                        <label className={`flex items-center gap-3 ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+                          <div className="relative">
+                            <input
+                              type="checkbox"
+                              checked={formData.isFirstOrder || false}
+                              disabled={locked}
+                              onChange={(e) => setFormData({ ...formData, isFirstOrder: e.target.checked })}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-brand-500/40 rounded-full peer peer-checked:bg-brand-500 transition-colors"></div>
+                            <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform"></div>
+                          </div>
+                          <span className="text-sm text-slate-700">{formData.isFirstOrder ? 'Enabled' : 'Disabled'}</span>
+                        </label>
+                      </div>
+                      {firstOrderLocked && !formData.isFirstOrder && (
+                        <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-amber-200">
+                          An active first-order coupon already exists. Deactivate it before enabling this one.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Promotional Popup Section */}
                 <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">

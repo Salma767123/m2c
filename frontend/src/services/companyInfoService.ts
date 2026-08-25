@@ -80,7 +80,7 @@ export interface PublicCompanyInfo {
 
 const LOGO_CACHE_KEY = 'companyInfo_public';
 const DEFAULT_INFO: PublicCompanyInfo = {
-  companyName: 'M2C MarkDowns Private Limited',
+  companyName: 'M2C Markdowns Pvt Ltd',
   companyLogo: null,
   secondaryLogo: null,
   companyEmail: null,

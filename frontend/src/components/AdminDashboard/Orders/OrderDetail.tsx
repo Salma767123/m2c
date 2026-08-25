@@ -9,6 +9,7 @@ import { formatPrice } from "@/lib/currency";
 import { courierName, transportModeLabel } from "@/lib/couriers";
 import { courierService } from "@/services/courierService";
 import { hubService, Hub } from "@/services/hubService";
+import Dropdown from "@/components/UI/Dropdown";
 import { MapPin as HubIcon } from "lucide-react";
 import axiosInstance from "@/lib/axios";
 import { hasPermission } from "@/lib/auth";
@@ -388,8 +389,10 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                     </div>
                 </div>
 
-                {/* Right Column - Stakeholders */}
-                <div className="space-y-6">
+                {/* Right Column - Stakeholders. Sticky on lg+ so it stays in view
+                    while the items list scrolls; self-start/h-fit keep the grid
+                    from stretching it (which would disable position: sticky). */}
+                <div className="space-y-6 lg:sticky lg:top-6 lg:self-start lg:h-fit">
                     {/* Customer Details — same semantic structure as VendorToHubDetail and
                         HubToCustomerDetail. Stacked instead of 2-column because this card
                         lives in a narrow right rail; the sub-section headings keep the
@@ -527,16 +530,12 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                         ) : hasPermission('hub_to_customer:update_status') ? (
                             <div className="space-y-4">
                                 <p className="text-sm text-slate-600 italic">Assign a hub to allow the vendor to process this order.</p>
-                                <select
-                                    className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                                <Dropdown
                                     value={selectedHubId}
-                                    onChange={(e) => setSelectedHubId(e.target.value)}
-                                >
-                                    <option value="">Select a hub...</option>
-                                    {hubs.map(hub => (
-                                        <option key={hub.id} value={hub.id}>{hub.name} ({hub.city})</option>
-                                    ))}
-                                </select>
+                                    onChange={(v) => setSelectedHubId(v as string)}
+                                    placeholder="Select a hub..."
+                                    options={hubs.map(hub => ({ value: hub.id, label: `${hub.name} (${hub.city})` }))}
+                                />
                                 <button
                                     onClick={handleAssignHub}
                                     disabled={isAssigningHub || !selectedHubId}

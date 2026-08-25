@@ -2,14 +2,39 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Package, Eye, Download, Truck, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronLeft, ChevronRight, ShoppingBag, SlidersHorizontal } from 'lucide-react'
-import { FaceIcon } from '@/components/WebSite/Shared/FaceRating';
+import { Package, Eye, Download, Truck, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronLeft, ChevronRight, ShoppingBag, SlidersHorizontal, Star, XCircle, RotateCcw } from 'lucide-react'
 import orderService, { Order as APIOrder } from '@/services/orderService'
+import reviewService from '@/services/reviewService'
+import ReviewModal from '@/components/WebSite/Order/ReviewModal'
 import Reveal from '@/components/WebSite/Shared/Reveal'
 import SelectMenu from '@/components/WebSite/Shared/SelectMenu'
 import DateField from '@/components/WebSite/Shared/DateField'
 import { formatPrice } from '@/lib/currency'
-import { showErrorToast } from '@/lib/toast-utils'
+import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
+
+// Order can be cancelled by the customer up to (but not including) dispatch.
+const CANCELLABLE_STATUSES = new Set([
+  'ORDER_CREATED', 'VENDOR_PROCESSING', 'PACKED_BY_VENDOR',
+  'IN_TRANSIT_TO_ADMIN_HUB', 'RECEIVED_AT_ADMIN_HUB', 'APPROVED_BY_ADMIN_HUB',
+])
+
+// Preset reasons offered in the cancel / return modal ("Other" reveals a text box).
+const CANCEL_REASONS = [
+  'Changed my mind',
+  'Ordered by mistake',
+  'Found a better price elsewhere',
+  'Delivery is taking too long',
+  'Need to change address or details',
+  'Other',
+]
+const RETURN_REASONS = [
+  'Damaged or defective',
+  'Wrong item received',
+  'Not as described',
+  'Size or fit issue',
+  'Quality not satisfactory',
+  'Other',
+]
 
 /**
  * Order History.
@@ -114,11 +139,52 @@ export default function OrderHistory() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set())
+  const [reviewModal, setReviewModal] = useState<{ isOpen: boolean; orderId: string; items: APIOrder['items'] }>({ isOpen: false, orderId: '', items: [] })
   const [statusFilter, setStatusFilter] = useState('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   /** Orders whose full item list the reader has asked to see. */
   const [openItems, setOpenItems] = useState<Set<string>>(new Set())
+  // Cancel / return confirmation modal.
+  const [actionModal, setActionModal] = useState<{ order: APIOrder; type: 'cancel' | 'return' } | null>(null)
+  const [reasonChoice, setReasonChoice] = useState('')
+  const [actionReason, setActionReason] = useState('')
+  const [actionSubmitting, setActionSubmitting] = useState(false)
+
+  const openActionModal = (order: APIOrder, type: 'cancel' | 'return') => {
+    setReasonChoice('')
+    setActionReason('')
+    setActionModal({ order, type })
+  }
+
+  const submitAction = async () => {
+    if (!actionModal) return
+    const { order, type } = actionModal
+    const finalReason = reasonChoice === 'Other' ? actionReason.trim() : reasonChoice
+    if (type === 'return' && !finalReason) {
+      showErrorToast('Reason required', reasonChoice === 'Other' ? 'Please describe the reason.' : 'Please select a reason for the return.')
+      return
+    }
+    try {
+      setActionSubmitting(true)
+      if (type === 'cancel') {
+        const res = await orderService.cancelOrder(order.id, finalReason || undefined)
+        showSuccessToast('Order Cancelled', res.message || 'Your refund has been initiated.')
+      } else {
+        const res = await orderService.requestReturn(order.id, finalReason)
+        showSuccessToast('Return Requested', res.message || 'We will review it shortly.')
+      }
+      setActionModal(null)
+      setReasonChoice('')
+      setActionReason('')
+      fetchOrders()
+    } catch (e: any) {
+      showErrorToast('Failed', e?.message || 'Please try again.')
+    } finally {
+      setActionSubmitting(false)
+    }
+  }
 
   const toggleItems = (id: string) =>
     setOpenItems((prev) => {
@@ -157,6 +223,27 @@ export default function OrderHistory() {
   }
 
   const statusMeta = (status: string) => STATUS_META[getNormalizedStatus(status)]
+
+  // For delivered orders, find which already carry a review so the button shows
+  // "Reviewed" instead of an inert "Write review" — mirroring the order-detail page.
+  useEffect(() => {
+    const delivered = orders.filter((o) => getNormalizedStatus(o.status) === 'delivered' && o.items?.[0]?.productId)
+    if (delivered.length === 0) return
+    let cancelled = false
+    Promise.all(
+      delivered.map((o) =>
+        reviewService
+          .checkReviewStatus(o.items[0].productId, o.id)
+          .then((r: { hasReviewed?: boolean }) => (r?.hasReviewed ? o.id : null))
+          .catch(() => null),
+      ),
+    ).then((ids) => {
+      if (cancelled) return
+      const reviewed = ids.filter(Boolean) as string[]
+      if (reviewed.length) setReviewedOrders((prev) => new Set([...prev, ...reviewed]))
+    })
+    return () => { cancelled = true }
+  }, [orders])
 
   /** The `to` day is inclusive -- picking the same day for both should find
    *  that day's orders, not none of them. */
@@ -473,14 +560,20 @@ export default function OrderHistory() {
                       View details
                     </Link>
                     {getNormalizedStatus(order.status) === 'delivered' && (
-                      /* ⚠️ This button has never had an onClick — it was inert
-                         before this redesign and it still is. Left in place
-                         rather than removed, because deciding whether reviews
-                         ship is not a UI call. */
-                      <button className={`${QUIET_BTN} flex-1 sm:flex-none`}>
-                        <FaceIcon value={5} className="h-4 w-4" />
-                        Write review
-                      </button>
+                      reviewedOrders.has(order.id) ? (
+                        <span className={`${QUIET_BTN} flex-1 cursor-default border-green-200 bg-green-50 text-green-600 sm:flex-none`}>
+                          <CheckCircle className="h-4 w-4" />
+                          Reviewed
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setReviewModal({ isOpen: true, orderId: order.id, items: order.items })}
+                          className={`${QUIET_BTN} flex-1 sm:flex-none`}
+                        >
+                          <Star className="h-4 w-4" />
+                          Write review
+                        </button>
+                      )
                     )}
                     <button
                       onClick={() => handleDownloadInvoice(order.id)}
@@ -489,6 +582,31 @@ export default function OrderHistory() {
                       <Download className="h-4 w-4" />
                       Invoice
                     </button>
+                    {CANCELLABLE_STATUSES.has(order.status) && (
+                      <button
+                        onClick={() => openActionModal(order, 'cancel')}
+                        className={`${QUIET_BTN} flex-1 border-red-200 text-[#e01a1b] hover:bg-red-50 hover:text-[#c41617] sm:flex-none`}
+                      >
+                        <XCircle className="h-4 w-4" />
+                        Cancel
+                      </button>
+                    )}
+                    {getNormalizedStatus(order.status) === 'delivered'
+                      && order.returnRequest?.status !== 'Requested'
+                      && order.returnRequest?.status !== 'Approved' && (
+                      <button
+                        onClick={() => openActionModal(order, 'return')}
+                        className={`${QUIET_BTN} flex-1 sm:flex-none`}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Return
+                      </button>
+                    )}
+                    {order.returnRequest?.status === 'Requested' && (
+                      <span className={`${QUIET_BTN} flex-1 cursor-default border-amber-200 bg-amber-50 text-amber-700 sm:flex-none`}>
+                        Return Requested
+                      </span>
+                    )}
                   </div>
                 </Reveal>
               )
@@ -542,6 +660,102 @@ export default function OrderHistory() {
           </>
           )}
         </>
+      )}
+
+      <ReviewModal
+        isOpen={reviewModal.isOpen}
+        onClose={() => {
+          const closedId = reviewModal.orderId
+          const firstProduct = reviewModal.items?.[0]?.productId
+          setReviewModal({ isOpen: false, orderId: '', items: [] })
+          // Re-check so a just-submitted review flips the button to "Reviewed".
+          if (closedId && firstProduct) {
+            reviewService
+              .checkReviewStatus(firstProduct, closedId)
+              .then((r: { hasReviewed?: boolean }) => {
+                if (r?.hasReviewed) setReviewedOrders((prev) => new Set([...prev, closedId]))
+              })
+              .catch(() => {})
+          }
+        }}
+        orderId={reviewModal.orderId}
+        items={reviewModal.items}
+      />
+
+      {/* Cancel / Return confirmation modal */}
+      {actionModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]" onClick={() => !actionSubmitting && setActionModal(null)}>
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5" onClick={(e) => e.stopPropagation()}>
+            <div className={`h-1 w-full ${actionModal.type === 'cancel' ? 'bg-gradient-to-r from-red-500 to-rose-500' : 'bg-gradient-to-r from-slate-500 to-slate-600'}`} />
+            <div className="p-6">
+              <h3 className="text-[17px] font-bold text-slate-900">
+                {actionModal.type === 'cancel' ? 'Cancel this order?' : 'Request a return'}
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Order #{actionModal.order.orderId}
+                {actionModal.type === 'cancel'
+                  ? ' — the order will be cancelled and your payment refunded to the original method.'
+                  : ' — tell us why, and our team will review your return.'}
+              </p>
+
+              <label className="mt-4 block text-sm font-medium text-slate-700">
+                Reason {actionModal.type === 'return' && <span className="text-red-500">*</span>}
+                {actionModal.type === 'cancel' && <span className="font-normal text-slate-400"> (optional)</span>}
+              </label>
+              <div className="mt-2 space-y-1.5">
+                {(actionModal.type === 'cancel' ? CANCEL_REASONS : RETURN_REASONS).map((r) => (
+                  <label
+                    key={r}
+                    className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      reasonChoice === r ? 'border-[#e01a1b] bg-[#fff5f5] text-[#1a1a1a]' : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="cancel-return-reason"
+                      value={r}
+                      checked={reasonChoice === r}
+                      onChange={() => setReasonChoice(r)}
+                      disabled={actionSubmitting}
+                      className="h-4 w-4 accent-[#e01a1b]"
+                    />
+                    {r}
+                  </label>
+                ))}
+              </div>
+              {reasonChoice === 'Other' && (
+                <textarea
+                  value={actionReason}
+                  onChange={(e) => setActionReason(e.target.value)}
+                  disabled={actionSubmitting}
+                  rows={2}
+                  autoFocus
+                  placeholder="Please describe your reason…"
+                  className="mt-2 w-full resize-none rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none transition-all focus:border-[#e01a1b] focus:ring-4 focus:ring-[#e01a1b]/10 disabled:bg-slate-50"
+                />
+              )}
+
+              <div className="mt-5 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setActionModal(null)}
+                  disabled={actionSubmitting}
+                  className="rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {actionModal.type === 'cancel' ? 'Keep Order' : 'Close'}
+                </button>
+                <button
+                  type="button"
+                  onClick={submitAction}
+                  disabled={actionSubmitting}
+                  className={`rounded-full px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${actionModal.type === 'cancel' ? 'bg-[#e01a1b] hover:bg-[#c41617]' : 'bg-slate-800 hover:bg-slate-900'}`}
+                >
+                  {actionSubmitting ? 'Submitting…' : actionModal.type === 'cancel' ? 'Cancel Order' : 'Submit Return'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

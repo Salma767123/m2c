@@ -114,7 +114,7 @@ export default function BestSeller() {
     // Mirrors the loaded row — same columns, gaps and 5/4 image ratio as
     // ProductCard. Anything that differs shows as a jump when the fetch lands.
     return (
-      <section className={`${GROUND} py-8 font-sans sm:py-10 lg:py-14`}>
+      <section className={`${GROUND} pt-3 pb-8 font-sans sm:pt-4 sm:pb-10 lg:pt-5 lg:pb-14`}>
         <div className={`mx-auto ${SHELL} px-3 sm:px-4 md:px-6 lg:px-8`}>
           <div className="mb-6 lg:mb-8">
             <div className="mx-auto h-3 w-32 animate-pulse rounded bg-[#f3e5e0] lg:mx-0" />
@@ -158,7 +158,7 @@ export default function BestSeller() {
   const visible = products.slice(0, BEST_SELLER_COUNT);
 
   return (
-    <section className={`relative overflow-hidden py-8 font-sans sm:py-10 lg:py-14 ${GROUND}`}>
+    <section className={`relative overflow-hidden pt-3 pb-8 font-sans sm:pt-4 sm:pb-10 lg:pt-5 lg:pb-14 ${GROUND}`}>
       <style>{`
         /* ── The cards ─────────────────────────────────────────────────────
            Rise, fade and settle out of a slight under-scale, staggered across

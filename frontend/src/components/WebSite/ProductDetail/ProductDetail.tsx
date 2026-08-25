@@ -9,6 +9,7 @@ import ProductCard from '@/components/WebSite/ProductCard/ProductCard';
 import { cartService } from '@/services/cartService';
 import { userAuthService } from '@/services/userAuthService';
 import { Heart, Truck, Shield, RotateCcw, Package, Plane, Ship, AlertTriangle, Info, Box, Check, User, Award, Clock, ChevronDown, Tag, Search, ThumbsUp, X, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { hasManufacturerInfo, manufacturerDisplayName } from '@/lib/manufacturerInfo';
 import { useToast } from '@/hooks/use-toast';
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils';
@@ -230,18 +231,6 @@ const CARE_TINTS: Record<string, string> = {
 const SPEC_PREVIEW = 6;
 
 
-/**
- * Below this many reviews the quotations sit in one narrow centred column
- * rather than the wide grid.
- *
- * It was four, which caught a product with three real reviews and left a
- * 612px column in a 1,412px row -- the empty space this section was rebuilt to
- * stop making. At two, only a product with a single review is centred, and
- * that one is centred deliberately: alone in a three-column grid it would sit
- * at the far left with two thirds of the row blank.
- */
-const REVIEWS_NEED_TOOLS = 2;
-
 /** Motion is off for anyone who has asked their system for less of it. */
 const reduceMotion = () =>
   typeof window !== 'undefined' &&
@@ -305,6 +294,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
   const [reviewStar, setReviewStar] = useState<number>(0); // 0 = all
   const [reviewSearch, setReviewSearch] = useState('');
   const [reviewShown, setReviewShown] = useState(5); // Load-more window
+  const [showAllModal, setShowAllModal] = useState(false); // "View all reviews" modal
   const [helpfulIds, setHelpfulIds] = useState<Set<string>>(new Set());
   const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
   const [showMakerModal, setShowMakerModal] = useState(false);
@@ -430,6 +420,152 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
       });
     });
   }, [reviewStar, reviewSort, reviewSearch, reviewShown]);
+
+  // Escape closes the "view all" modal; lock body scroll while it is open.
+  useEffect(() => {
+    if (!showAllModal) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowAllModal(false); };
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
+  }, [showAllModal]);
+
+  /**
+   * One review row — reused by the compact on-page feed and the "view all"
+   * modal so both stay identical. avatar → sentiment/verified → text → meta,
+   * with Helpful on the right. `withRef` wires the on-page scroll snapshot; the
+   * modal copies pass false so the two never fight over the same ref map.
+   */
+  const renderReviewRow = (review: (typeof reviews)[number], withRef: boolean) => {
+    const countryName = getCountryName(review.user?.country);
+    const flag = countryName ? getCountryFlag(review.user?.country) : '';
+    const imgs = (review.images || []).filter(Boolean);
+    const helped = helpfulIds.has(review.id);
+    const face = (Math.min(5, Math.max(1, Math.round(review.rating))) || 3) as FaceValue;
+    const said = (review.comment || '').trim();
+    return (
+      <div
+        key={review.id}
+        ref={withRef ? (el) => { if (el) reviewRefs.current.set(review.id, el); else reviewRefs.current.delete(review.id); } : undefined}
+        className="group/rev flex gap-3.5 py-5 sm:gap-5 sm:py-6"
+      >
+        <div className="shrink-0">
+          {review.user?.image ? (
+            <Image src={review.user.image} alt="" width={44} height={44} className="h-10 w-10 rounded-full object-cover ring-1 ring-black/5 sm:h-11 sm:w-11" />
+          ) : (
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f2ece5] text-sm font-bold text-[#a1948a] sm:h-11 sm:w-11">
+              {(review.user?.name || 'C')[0].toUpperCase()}
+            </span>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <span className="inline-flex items-center gap-1.5">
+              <FaceIcon value={face} className="h-5 w-5 shrink-0" />
+              <span className="text-[13px] font-semibold text-[#2b2320]">{FACE_LABELS[face]}</span>
+            </span>
+            <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-emerald-600">
+              <Check className="h-3 w-3" /> Verified
+            </span>
+          </div>
+          {said && (
+            <blockquote className="mt-2 whitespace-pre-line font-playfair text-[16px] leading-relaxed text-[#2b2320] sm:text-[17px]">{said}</blockquote>
+          )}
+          {imgs.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {imgs.map((src, idx) => (
+                <button key={idx} onClick={() => setLightbox({ images: imgs, index: idx })} className="group/img relative h-16 w-16 overflow-hidden rounded-lg ring-1 ring-gray-200 transition-all hover:ring-[#e01a1b]/50">
+                  <Image src={src} alt="" fill sizes="64px" className="object-cover transition-transform duration-300 group-hover/img:scale-110" />
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-[#a1948a]">
+            <span className="font-semibold text-[#4a423c]">{review.user?.name || 'Customer'}</span>
+            <span aria-hidden className="text-[#d8cabb]">&middot;</span>
+            <span>{new Date(review.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+            {countryName && (<><span aria-hidden className="text-[#d8cabb]">&middot;</span><span>{flag ? `${flag} ` : ''}{countryName}</span></>)}
+          </div>
+        </div>
+        <div className="shrink-0 self-start">
+          <button
+            onClick={() => setHelpfulIds((prev) => { const n = new Set(prev); if (n.has(review.id)) n.delete(review.id); else n.add(review.id); return n; })}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${helped ? 'border-[#e01a1b]/30 bg-[#fff1f1] text-[#e01a1b]' : 'border-[#e6dcd2] text-[#6b625b] hover:border-[#d6c8bb] hover:text-[#1a1a1a]'}`}
+          >
+            <ThumbsUp className={`h-3.5 w-3.5 ${helped ? 'fill-[#e01a1b]' : ''}`} /> <span className="hidden sm:inline">{helped ? 'Marked helpful' : 'Helpful'}</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  /** The existing emoji rating summary, kept identical — only regrouped. The
+   *  sidebar variant stacks the five faces vertically; the modal variant lays
+   *  them out horizontally where there is more width. */
+  const renderRatings = (variant: 'sidebar' | 'modal') => {
+    const total = reviews.length;
+    const withText = reviews.filter((r) => r.comment && r.comment.trim()).length;
+    const dist = [5, 4, 3, 2, 1].map((star) => ({ star, count: reviews.filter((r) => Math.round(r.rating || 0) === star).length }));
+    const faceBtn = (star: number, count: number) => {
+      const v = star as FaceValue;
+      const active = reviewStar === star;
+      const empty = count === 0;
+      const onClick = () => { snapshotReviews(); setFacePulse((n) => n + 1); setReviewStar(active ? 0 : star); };
+      if (variant === 'sidebar') {
+        return (
+          <button key={star} type="button" disabled={empty} onClick={onClick} aria-pressed={active}
+            className={`flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors ${empty ? 'cursor-default opacity-40' : 'hover:bg-[#faf5ef]'} ${active ? 'bg-[#fff1f1] ring-1 ring-[#e01a1b]/25' : ''}`}>
+            <FaceIcon value={v} className="h-6 w-6 shrink-0" />
+            <span className={`flex-1 text-[13px] font-medium ${active ? 'text-[#e01a1b]' : 'text-[#4a423c]'}`}>{FACE_LABELS[v]}</span>
+            <span className={`text-[13px] font-bold tabular-nums ${active ? 'text-[#e01a1b]' : 'text-[#1a1a1a]'}`}>{count}</span>
+          </button>
+        );
+      }
+      return (
+        <button key={star} type="button" disabled={empty} onClick={onClick} aria-pressed={active}
+          className={`flex items-center gap-2 rounded-full border px-3 py-1.5 transition-colors ${empty ? 'cursor-default opacity-40' : 'hover:bg-[#faf5ef]'} ${active ? 'border-[#e01a1b]/40 bg-[#fff1f1]' : 'border-[#eadfd4]'}`}>
+          <FaceIcon value={v} className="h-5 w-5 shrink-0" />
+          <span className={`text-[12.5px] font-semibold ${active ? 'text-[#e01a1b]' : 'text-[#4a423c]'}`}>{FACE_LABELS[v]}</span>
+          <span className={`text-[12.5px] font-bold tabular-nums ${active ? 'text-[#e01a1b]' : 'text-[#1a1a1a]'}`}>{count}</span>
+        </button>
+      );
+    };
+    const countLine = (
+      <p className="text-[12px] text-[#6b625b]">
+        <span className="font-semibold tabular-nums text-[#1a1a1a]">{total}</span> rating{total === 1 ? '' : 's'} &middot;{' '}
+        <span className="font-semibold tabular-nums text-[#1a1a1a]">{withText}</span> review{withText === 1 ? '' : 's'}
+      </p>
+    );
+    if (variant === 'sidebar') {
+      return (
+        <aside className="rounded-2xl border border-[#eadfd4] bg-white/70 p-5 lg:sticky lg:top-40">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#a1948a]">Ratings</p>
+          <div className="mt-1.5">{countLine}</div>
+          <div className="mt-4 space-y-1">{dist.map((d) => faceBtn(d.star, d.count))}</div>
+          {dist[0].count > 0 && (
+            <p className="mt-4 border-t border-[#f2e9df] pt-3 text-[12px] text-[#6b625b]">
+              <span className="font-semibold tabular-nums text-[#1a1a1a]">{total}</span> {total === 1 ? 'person' : 'people'} &middot; <span className="font-semibold tabular-nums text-[#1a1a1a]">{dist[0].count}</span> loved it
+            </p>
+          )}
+          {reviewStar !== 0 && (
+            <button onClick={() => { snapshotReviews(); setReviewStar(0); }} className="mt-2 text-[12px] font-semibold text-[#e01a1b] hover:text-[#c41617]">
+              Showing {FACE_LABELS[reviewStar as FaceValue]} — clear
+            </button>
+          )}
+        </aside>
+      );
+    }
+    return (
+      <div>
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#a1948a]">Ratings</p>
+          {countLine}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">{dist.map((d) => faceBtn(d.star, d.count))}</div>
+      </div>
+    );
+  };
 
   // Re-measured whenever the text or the column changes, so a phone rotating
   // to landscape gets the right answer too.
@@ -1129,9 +1265,9 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
             </nav>
           )}
           <div className="bg-white rounded-xl sm:rounded-2xl overflow-clip">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
+            <div className="grid grid-cols-1 lg:grid-cols-[4.5fr_3.5fr_4fr] gap-0">
               {/* Product Images */}
-              <div className="lg:col-span-4 p-3 sm:p-4 lg:p-6 bg-linear-to-br from-[#faf9f7] to-white">
+              <div className="p-3 sm:p-4 lg:p-6 bg-linear-to-br from-[#faf9f7] to-white">
                 <div className="lg:sticky lg:top-40">
                   {/*
                     Gallery — vertical thumbnail rail beside the image on desktop,
@@ -1336,11 +1472,11 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
               </div>
 
               {/* Product Info - Shows magnified image when hovering (desktop only) */}
-              <div className="product-info-container lg:col-span-4 relative p-3 sm:p-4 lg:p-6 lg:pl-4">
+              <div className="product-info-container relative p-3 sm:p-4 lg:p-6 lg:pl-4">
                 {/* Magnified Image Overlay - Desktop only (hover-driven). lg:hidden on mobile so info always shows. */}
                 {isImageHovered && currentImageUrl && (
-                  <div className="hidden lg:flex w-full h-full items-center justify-center bg-white rounded-r-2xl">
-                    <div className="w-full h-160 bg-white rounded-xl border-2 border-gray-200 shadow-2xl overflow-hidden">
+                  <div className="hidden lg:flex w-full items-start justify-center bg-white rounded-r-2xl lg:sticky lg:top-40">
+                    <div className="w-full aspect-[5/6] bg-white rounded-xl border-2 border-gray-200 shadow-2xl overflow-hidden">
                       <div
                         className="w-full h-full bg-cover bg-no-repeat transition-all duration-150"
                         style={{
@@ -1584,7 +1720,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                   live in here, so hiding the rail below lg would have taken Add
                   to Cart off every phone. Below lg it simply stacks under the
                   product facts. */}
-              <aside className="flex flex-col gap-5 self-start p-3 sm:p-4 lg:col-span-4 lg:sticky lg:top-40 lg:p-6 lg:pl-2">
+              <aside className="flex flex-col gap-5 self-start p-3 sm:p-4 lg:sticky lg:top-40 lg:p-6 lg:pl-2">
                 <div className="rounded-2xl bg-white p-4 ring-1 ring-black/[0.07] sm:p-5">
                   {/* The asking price again, compact, at the top of the box. */}
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pb-3">
@@ -2079,12 +2215,12 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                           return (
                             <article
                               key={i}
-                              className={`group relative flex flex-col items-center justify-center overflow-hidden rounded-2xl px-5 py-6 text-center ring-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_14px_34px_rgba(0,0,0,0.07)] lg:flex-row lg:items-center lg:gap-5 lg:px-5 lg:py-4 lg:text-left ${m.card}`}
+                              className={`group relative flex flex-col items-center justify-center overflow-hidden rounded-2xl px-5 py-6 text-center ring-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_14px_34px_rgba(0,0,0,0.07)] lg:flex-row lg:items-center lg:justify-start lg:gap-5 lg:px-5 lg:py-4 lg:text-left ${m.card}`}
                             >
                               {/* Top left while the card stands up; once it lies
                                   down the icon owns that corner, so it crosses
                                   to the right. */}
-                              <span aria-hidden className={`absolute left-4 top-3 font-playfair text-[28px] font-semibold leading-none tracking-tight lg:left-auto lg:right-4 lg:top-3 lg:text-[26px] ${m.numeral}`}>
+                              <span aria-hidden className={`absolute left-4 top-3 font-playfair text-[28px] font-semibold leading-none tracking-tight lg:left-auto lg:right-4 lg:top-1/2 lg:-translate-y-1/2 lg:text-[26px] ${m.numeral}`}>
                                 {String(i + 1).padStart(2, '0')}
                               </span>
 
@@ -2171,7 +2307,9 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                         A little care goes a long way in keeping it soft and long lasting.
                       </p>
 
-                      <div className={`mt-5 grid grid-cols-2 gap-2.5 sm:mt-6 sm:gap-3 ${soloBand ? 'sm:grid-cols-3 lg:grid-cols-5' : 'xl:grid-cols-3'}`}>
+                      {/* Compact list: one small row per instruction — round icon
+                          on the left, label + its category (real data) stacked. */}
+                      <div className={`mt-5 grid grid-cols-1 gap-2 sm:mt-6 ${soloBand ? 'sm:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-1'}`}>
                         {careList.map((instruction, index) => {
                           const item = CARE_INSTRUCTIONS.find((c) => c.label === instruction);
                           const iconColor = item ? CATEGORY_COLORS[item.category] || 'text-[#6b625b]' : 'text-[#a1948a]';
@@ -2179,18 +2317,17 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                           return (
                             <div
                               key={index}
-                              className="group flex flex-col items-center rounded-2xl bg-white/85 p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.04)] ring-1 ring-[#efe6df] backdrop-blur-[2px] transition-all duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-[0_10px_26px_rgba(0,0,0,0.07)] sm:p-4"
+                              className="group flex items-center gap-3 rounded-xl bg-white/85 px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ring-1 ring-[#efe6df] backdrop-blur-[2px] transition-all duration-300 hover:bg-white hover:shadow-[0_6px_16px_rgba(0,0,0,0.06)]"
                             >
-                              <span className={`mx-auto flex h-11 w-11 items-center justify-center rounded-full ${tint} ${iconColor} transition-transform duration-300 group-hover:scale-110`}>
-                                {item ? <CareIcon paths={item.paths} className="h-5 w-5" /> : <span className="text-[13px] font-bold">{index + 1}</span>}
+                              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${tint} ${iconColor} transition-transform duration-300 group-hover:scale-105`}>
+                                {item ? <CareIcon paths={item.paths} className="h-4 w-4" /> : <span className="text-[12px] font-bold">{index + 1}</span>}
                               </span>
-                              <p className="mt-2.5 text-[12.5px] font-bold leading-tight text-[#2b2320] sm:text-[13.5px]">{instruction}</p>
-                              {/* The second line is the symbol's own category,
-                                  which is real data. The reference writes a
-                                  sentence of advice under each one; inventing
-                                  laundry advice per product is not something
-                                  this page is entitled to do. */}
-                              {item && <p className="mt-auto pt-0.5 text-[11px] text-[#a1948a]">{item.category}</p>}
+                              <div className="min-w-0">
+                                <p className="text-[13px] font-bold leading-tight text-[#2b2320]">{instruction}</p>
+                                {/* The second line is the symbol's own category,
+                                    which is real data — not invented advice. */}
+                                {item && <p className="text-[11px] leading-tight text-[#a1948a]">{item.category}</p>}
+                              </div>
                             </div>
                           );
                         })}
@@ -2589,9 +2726,13 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       column of full-width rows beside it, so one short review
                       sat alone on a 900px line and the chart's own column was
                       mostly air below it. */}
-                  <div className="space-y-4 sm:space-y-5">
-                    {/* ── The summary band ── */}
-                    {(() => {
+                  <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-6">
+                    {/* Ratings — a compact card on the right (desktop) / above the feed (mobile) */}
+                    <div className="lg:order-2">{renderRatings('sidebar')}</div>
+                    {/* Review feed — the primary content, left/main column */}
+                    <div className="min-w-0 space-y-4 sm:space-y-5 lg:order-1">
+                    {/* Old full-width summary band, superseded by the sidebar card above. */}
+                    {false && (() => {
                       const total = reviews.length;
                       const avg = total ? reviews.reduce((s, r) => s + (r.rating || 0), 0) / total : 0;
                       const withText = reviews.filter((r) => r.comment && r.comment.trim()).length;
@@ -2627,8 +2768,8 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                <FaceIcon value={5} className="h-40 w-40" />
                              </span>
                            </span>
-                           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-8">
-                            <div className="relative lg:w-44 lg:shrink-0">
+                           <div className="flex flex-col items-center gap-4 text-center">
+                            <div className="relative">
                             {/* A fixed heading, so the top of this card is the same
                                 thing every time. It used to change shape with the data:
                                 a percentage, or a single word, or nothing at all. The
@@ -2664,7 +2805,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                 its word and its count, and each one a filter.
                                 This also replaces the chip row that sat under
                                 the band repeating the same five words. */}
-                            <div className="relative w-full lg:flex-1">
+                            <div className="relative mx-auto w-full max-w-2xl">
                               <div className="grid grid-cols-5 gap-1 sm:gap-2">
                                 {dist.map(({ star, count }) => {
                                   const v = star as FaceValue;
@@ -2717,39 +2858,34 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                 )}
                               </p>
                             </div>
-
-                            {/* Search and sort move up here from above the list:
-                                they are how you interrogate the summary, and it
-                                is the third thing this band has room for.
-
-                                They used to be withheld under four reviews,
-                                back when the row drew one face PER REVIEW and a
-                                single face between a headline and a search box
-                                was the empty space this section was accused of.
-                                Five labelled faces fill that middle whatever
-                                the count, so the band is one shape at every
-                                size and nothing is withheld. */}
-                            <div className="relative flex w-full flex-col gap-2.5 sm:flex-row lg:ml-auto lg:w-72 lg:shrink-0 lg:flex-col">
-                              <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                                <input
-                                  value={reviewSearch}
-                                  onChange={(e) => setReviewSearch(e.target.value)}
-                                  placeholder="Search reviews..."
-                                  className="w-full rounded-full border border-[#eadfd4] bg-white py-2 pl-9 pr-3 text-sm text-gray-700 transition placeholder:text-gray-400 focus:border-[#e01a1b]/40 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/15"
-                                />
-                              </div>
-                              <ReviewSortSelect
-                                value={reviewSort}
-                                options={REVIEW_SORTS}
-                                onChange={(v) => { snapshotReviews(); setReviewSort(v as typeof reviewSort); }}
-                              />
-                            </div>
                            </div>
                           </div>
                         </div>
                       );
                     })()}
+
+                    {/* ── Review toolbar: count + search + sort on one axis ── */}
+                    <div className="flex flex-col gap-3 border-b border-[#eadfd4] pb-5 sm:flex-row sm:items-center sm:justify-between sm:pb-6">
+                      <p className="text-[15px] font-semibold text-[#1a1a1a]">
+                        <span className="tabular-nums">{filteredReviews.length}</span> Review{filteredReviews.length === 1 ? '' : 's'}
+                      </p>
+                      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+                        <div className="relative sm:w-64">
+                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          <input
+                            value={reviewSearch}
+                            onChange={(e) => setReviewSearch(e.target.value)}
+                            placeholder="Search reviews..."
+                            className="w-full rounded-full border border-[#eadfd4] bg-white py-2 pl-9 pr-3 text-sm text-gray-700 transition placeholder:text-gray-400 focus:border-[#e01a1b]/40 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/15"
+                          />
+                        </div>
+                        <ReviewSortSelect
+                          value={reviewSort}
+                          options={REVIEW_SORTS}
+                          onChange={(v) => { snapshotReviews(); setReviewSort(v as typeof reviewSort); }}
+                        />
+                      </div>
+                    </div>
 
                     {/* ── Photographs from customers ──────────────────────
                         Every review's pictures, gathered into one strip. They
@@ -2792,10 +2928,13 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       {filteredReviews.length === 0 ? (
                         <p className="text-sm text-gray-400 text-center py-8">No reviews match your filters.</p>
                       ) : (
-                        <div className={reviews.length < REVIEWS_NEED_TOOLS
-                          ? 'mx-auto max-w-2xl'
-                          : 'grid grid-cols-1 gap-5 sm:gap-6 md:grid-cols-[repeat(auto-fit,minmax(24rem,1fr))]'}>
-                          {filteredReviews.slice(0, reviewShown).map((review) => {
+                        /* A single-column feed: every review is one full-width
+                           row — avatar left, what they said in the middle, the
+                           Helpful action on the right — separated by thin rules.
+                           A professional product-review list, not a wall of
+                           floating cards. */
+                        <div className="max-h-[min(68vh,640px)] divide-y divide-[#eadfd4] overflow-y-auto pr-1 [scrollbar-width:thin]">
+                          {filteredReviews.slice(0, 8).map((review) => {
                             const countryName = getCountryName(review.user?.country);
                             const flag = countryName ? getCountryFlag(review.user?.country) : '';
                             const imgs = (review.images || []).filter(Boolean);
@@ -2809,87 +2948,71 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                   if (el) reviewRefs.current.set(review.id, el);
                                   else reviewRefs.current.delete(review.id);
                                 }}
-                                className="group/rev py-1"
+                                className="group/rev flex gap-3.5 py-5 sm:gap-5 sm:py-6"
                               >
-                                {/* A card, but one shaped like what it is: what
-                                    somebody said. The bubble carries the words,
-                                    the tail points down at whoever said them,
-                                    and the top edge takes the colour of their
-                                    face -- warm for the ones we advertise, grey
-                                    below. Boxes with a border said "row in a
-                                    table"; this says "quotation". */}
-                                <div className="relative rounded-2xl rounded-bl-md bg-white p-5 shadow-[0_2px_14px_rgba(0,0,0,0.05)] ring-1 ring-black/[0.05] transition-all duration-300 group-hover/rev:-translate-y-0.5 group-hover/rev:shadow-[0_12px_30px_rgba(0,0,0,0.08)] sm:p-6">
-                                  <span aria-hidden className={`absolute inset-x-5 top-0 h-[3px] rounded-b-full ${Math.round(review.rating) >= 4 ? 'bg-[#FFD130]' : Math.round(review.rating) === 3 ? 'bg-[#e0d2c4]' : 'bg-[#d8cec4]'}`} />
-                                  {/* the tail, two triangles so it keeps the
-                                      hairline ring along its edge */}
-                                  <span aria-hidden className="absolute -bottom-[9px] left-6 h-0 w-0 border-l-[10px] border-r-[10px] border-t-[10px] border-l-transparent border-r-transparent border-t-black/[0.06]" />
-                                  <span aria-hidden className="absolute -bottom-[8px] left-6 h-0 w-0 border-l-[10px] border-r-[10px] border-t-[10px] border-l-transparent border-r-transparent border-t-white" />
-
-                                  {/* What they said. When a customer rated but
-                                      wrote nothing there is no quotation to
-                                      set, so the face and its word stand in --
-                                      that IS what they said. */}
-                                  {said ? (
-                                    <>
-                                      <span aria-hidden className="block font-playfair text-3xl leading-none text-[#e5d3c4]">&ldquo;</span>
-                                      <blockquote className="mt-1 whitespace-pre-line font-playfair text-[16px] leading-relaxed text-[#2b2320] sm:text-[17.5px]">
-                                        {said}
-                                      </blockquote>
-                                    </>
-                                  ) : (
-                                    <p className="inline-flex items-center gap-2.5">
-                                      <FaceIcon value={face} className="h-8 w-8" />
-                                      <span className="font-playfair text-[18px] font-semibold text-[#2b2320]">{FACE_LABELS[face]}</span>
-                                    </p>
-                                  )}
-
-                                  {imgs.length > 0 && (
-                                  <div className="mt-4 flex flex-wrap gap-2">
-                                    {imgs.map((src, idx) => (
-                                      <button
-                                        key={idx}
-                                        onClick={() => setLightbox({ images: imgs, index: idx })}
-                                        className="group/img relative h-16 w-16 overflow-hidden rounded-lg ring-1 ring-gray-200 transition-all hover:ring-[#e01a1b]/50"
-                                      >
-                                        <Image src={src} alt="" fill sizes="64px" className="object-cover transition-transform duration-300 group-hover/img:scale-110" />
-                                      </button>
-                                    ))}
-                                  </div>
-                                  )}
-                                </div>
-
-                                {/* Whoever said it, under the tail rather than
-                                    inside the bubble -- a speech bubble belongs
-                                    to the person beneath it. */}
-                                <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 pl-2 text-[12px] text-[#a1948a]">
+                                {/* LEFT — the reviewer */}
+                                <div className="shrink-0">
                                   {review.user?.image ? (
-                                    <Image src={review.user.image} alt="" width={28} height={28} className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-black/5" />
+                                    <Image src={review.user.image} alt="" width={44} height={44} className="h-10 w-10 rounded-full object-cover ring-1 ring-black/5 sm:h-11 sm:w-11" />
                                   ) : (
-                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f2ece5] text-[11px] font-bold text-[#a1948a]">
+                                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f2ece5] text-sm font-bold text-[#a1948a] sm:h-11 sm:w-11">
                                       {(review.user?.name || 'C')[0].toUpperCase()}
                                     </span>
                                   )}
-                                  <span className="font-semibold text-[#4a423c]">{review.user?.name || 'Customer'}</span>
-                                  {said && (
+                                </div>
+
+                                {/* CENTRE — sentiment, then words, then who + when */}
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                                     <span className="inline-flex items-center gap-1.5">
-                                      {/* Inside the reviews list a low score DOES
-                                          show its own face -- the rule against sad
-                                          faces is about merchandising surfaces, not
-                                          about hiding what a customer actually said. */}
-                                      <FaceIcon value={face} className="h-4 w-4" />
-                                      <span className="font-semibold text-[#6b625b]">{FACE_LABELS[face]}</span>
+                                      <FaceIcon value={face} className="h-5 w-5 shrink-0" />
+                                      <span className="text-[13px] font-semibold text-[#2b2320]">{FACE_LABELS[face]}</span>
                                     </span>
+                                    <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-emerald-600">
+                                      <Check className="h-3 w-3" /> Verified
+                                    </span>
+                                  </div>
+
+                                  {said && (
+                                    <blockquote className="mt-2 whitespace-pre-line font-playfair text-[16px] leading-relaxed text-[#2b2320] sm:text-[17px]">
+                                      {said}
+                                    </blockquote>
                                   )}
-                                  <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
-                                    <Check className="h-3 w-3" /> Verified
-                                  </span>
-                                  <span>{new Date(review.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                                  {countryName && <span>{flag ? `${flag} ` : ''}{countryName}</span>}
+
+                                  {imgs.length > 0 && (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                      {imgs.map((src, idx) => (
+                                        <button
+                                          key={idx}
+                                          onClick={() => setLightbox({ images: imgs, index: idx })}
+                                          className="group/img relative h-16 w-16 overflow-hidden rounded-lg ring-1 ring-gray-200 transition-all hover:ring-[#e01a1b]/50"
+                                        >
+                                          <Image src={src} alt="" fill sizes="64px" className="object-cover transition-transform duration-300 group-hover/img:scale-110" />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-[#a1948a]">
+                                    <span className="font-semibold text-[#4a423c]">{review.user?.name || 'Customer'}</span>
+                                    <span aria-hidden className="text-[#d8cabb]">&middot;</span>
+                                    <span>{new Date(review.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                    {countryName && (
+                                      <>
+                                        <span aria-hidden className="text-[#d8cabb]">&middot;</span>
+                                        <span>{flag ? `${flag} ` : ''}{countryName}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* RIGHT — Helpful */}
+                                <div className="shrink-0 self-start">
                                   <button
                                     onClick={() => setHelpfulIds((prev) => { const n = new Set(prev); if (n.has(review.id)) n.delete(review.id); else n.add(review.id); return n; })}
-                                    className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${helped ? 'border-[#e01a1b]/30 bg-[#fff1f1] text-[#e01a1b]' : 'border-[#e6dcd2] text-[#6b625b] hover:border-[#d6c8bb] hover:text-[#1a1a1a]'}`}
+                                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${helped ? 'border-[#e01a1b]/30 bg-[#fff1f1] text-[#e01a1b]' : 'border-[#e6dcd2] text-[#6b625b] hover:border-[#d6c8bb] hover:text-[#1a1a1a]'}`}
                                   >
-                                    <ThumbsUp className={`h-3.5 w-3.5 ${helped ? 'fill-[#e01a1b]' : ''}`} /> {helped ? 'Marked helpful' : 'Helpful'}
+                                    <ThumbsUp className={`h-3.5 w-3.5 ${helped ? 'fill-[#e01a1b]' : ''}`} /> <span className="hidden sm:inline">{helped ? 'Marked helpful' : 'Helpful'}</span>
                                   </button>
                                 </div>
                               </div>
@@ -2898,19 +3021,74 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                         </div>
                       )}
 
-                      {/* Load more */}
-                      {filteredReviews.length > reviewShown && (
-                        <div className="mt-4 flex justify-center">
+                      {/* View all — only when the feed is capped */}
+                      {filteredReviews.length > 8 && (
+                        <div className="mt-4 border-t border-[#eadfd4] pt-4 flex justify-center">
                           <button
-                            onClick={() => { snapshotReviews(); setReviewShown((n) => n + 5); }}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-700 hover:border-[#e01a1b]/40 hover:text-[#e01a1b] hover:bg-[#fff1f1] transition-colors"
+                            onClick={() => setShowAllModal(true)}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-[#e6dcd2] px-5 py-2 text-sm font-semibold text-[#5f5550] hover:border-[#e01a1b]/40 hover:text-[#e01a1b] hover:bg-[#fff1f1] transition-colors"
                           >
-                            Load more reviews <span className="text-gray-400">({filteredReviews.length - reviewShown})</span>
+                            View all reviews <span className="text-gray-400">({filteredReviews.length})</span>
+                            <ChevronRight className="h-4 w-4" />
                           </button>
                         </div>
                       )}
                     </div>
+                    </div>
                   </div>
+
+                  {/* ── View-all modal: the compact rating summary + the full,
+                      searchable, sortable review list ── */}
+                  {showAllModal && createPortal(
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-4">
+                      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowAllModal(false)} />
+                      <div className="relative flex h-[88vh] w-[92vw] max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        {/* header + compact ratings */}
+                        <div className="flex items-start justify-between gap-3 border-b border-[#eadfd4] px-5 py-4 sm:px-6">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-playfair text-lg font-semibold tracking-tight text-[#1a1a1a] sm:text-xl">Customer Reviews</h3>
+                            <div className="mt-3">{renderRatings('modal')}</div>
+                          </div>
+                          <button onClick={() => setShowAllModal(false)} aria-label="Close" className="shrink-0 rounded-full p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700">
+                            <X className="h-5 w-5" />
+                          </button>
+                        </div>
+                        {/* toolbar */}
+                        <div className="flex flex-col gap-2.5 border-b border-[#eadfd4] px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                          <p className="text-[14px] font-semibold text-[#1a1a1a]">
+                            <span className="tabular-nums">{filteredReviews.length}</span> Review{filteredReviews.length === 1 ? '' : 's'}
+                          </p>
+                          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+                            <div className="relative sm:w-64">
+                              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                              <input
+                                value={reviewSearch}
+                                onChange={(e) => setReviewSearch(e.target.value)}
+                                placeholder="Search reviews..."
+                                className="w-full rounded-full border border-[#eadfd4] bg-white py-2 pl-9 pr-3 text-sm text-gray-700 transition placeholder:text-gray-400 focus:border-[#e01a1b]/40 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/15"
+                              />
+                            </div>
+                            <ReviewSortSelect
+                              value={reviewSort}
+                              options={REVIEW_SORTS}
+                              onChange={(v) => { setReviewSort(v as typeof reviewSort); }}
+                            />
+                          </div>
+                        </div>
+                        {/* all reviews */}
+                        <div className="min-h-0 flex-1 overflow-y-auto px-5 sm:px-6">
+                          {filteredReviews.length === 0 ? (
+                            <p className="py-10 text-center text-sm text-gray-400">No reviews match your filters.</p>
+                          ) : (
+                            <div className="divide-y divide-[#eadfd4]">
+                              {filteredReviews.map((review) => renderReviewRow(review, false))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>,
+                    document.body,
+                  )}
                 </>
               )}
             </div>

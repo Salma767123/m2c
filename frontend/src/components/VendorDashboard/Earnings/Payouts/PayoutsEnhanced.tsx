@@ -291,7 +291,7 @@ export default function PayoutsEnhanced() {
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(156, 163, 175);
     doc.text(
-      `Generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} | M2C MarkDowns Private Limited`,
+      `Generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} | M2C Markdowns Pvt Ltd`,
       pageW / 2, y, { align: 'center' }
     );
 

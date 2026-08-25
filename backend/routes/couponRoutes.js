@@ -8,6 +8,7 @@ const {
     applyCoupon, // Public/User endpoint
     applyFreeShippingOffer, // Public/User endpoint for free shipping
     getPromotionalCoupons, // Public endpoint for promotional display
+    getFirstOrderCoupon,
     getPopupCoupons, // Public endpoint for category/product popup modals
     // Free shipping offer functions
     createFreeShippingOffer,
@@ -26,6 +27,7 @@ router.post('/apply', applyCoupon);
 router.post('/apply-free-shipping', applyFreeShippingOffer);
 router.post('/check-free-shipping', checkFreeShipping);
 router.get('/promotional', getPromotionalCoupons); // Public endpoint for promotional display
+router.get('/first-order', getFirstOrderCoupon); // Public — active first-order coupon for the promo strip
 router.get('/popup', getPopupCoupons); // Public endpoint for category/product popup modals
 
 // Free shipping offer routes (Admin only) - MUST come before /:id route

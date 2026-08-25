@@ -316,7 +316,7 @@ export default function NoticeBoard() {
   }, [notices.length])
 
   return (
-    <section className="relative border-t border-black/5 bg-linear-to-b from-[#f7f6f4] to-white pb-7 pt-6 sm:pb-11 sm:pt-9">
+    <section className="relative border-t border-black/5 bg-linear-to-b from-[#f7f6f4] to-white pb-7 pt-3 sm:pb-11 sm:pt-4">
       {/* Section header. It was pinned hard against the band above with 4px of
           clearance and set in small grey text, so it read as a stray caption
           rather than as the start of a section. The rule between the two ends

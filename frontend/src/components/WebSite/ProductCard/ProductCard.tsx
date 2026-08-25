@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Product as ServiceProduct } from '@/services/productService';
 import { PublicProduct } from '@/services/publicProductService';
 import { Product as MockProduct } from '@/components/mockData/products';
-import { ShoppingCart, Heart } from 'lucide-react';
+import { ShoppingCart, Heart, Sparkles } from 'lucide-react';
 import { FaceIcon, positiveFace } from '@/components/WebSite/Shared/FaceRating';
 import { cartService } from '@/services/cartService';
 import { wishlistService } from '@/services/wishlistService';
@@ -267,8 +267,8 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
               pill below it put two of them on every card. */}
           {discountPct ? (
             <span
-              className={`absolute top-2.5 left-2.5 z-10 rounded-md text-[11px] font-bold tabular-nums text-white ${showcase
-                ? 'bg-[#7a0f10] px-2 py-1 tracking-[0.03em] shadow-[0_5px_12px_-4px_rgba(122,15,16,0.6)]'
+              className={`absolute top-2 left-2 z-10 rounded-md text-[10px] font-bold tabular-nums text-white ${showcase
+                ? 'bg-[#22c55e] px-1.5 py-0.5 shadow-[0_0_10px_rgba(34,197,94,0.7)]'
                 : 'bg-[#22c55e] px-1.5 py-0.5 shadow-[0_0_4px_rgba(34,197,94,0.35)]'
                 }`}
             >
@@ -277,28 +277,17 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
           ) : null}
 
           {/* Rating — compact metric pinned to the image's bottom-left corner */}
-          <div className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 rounded-md bg-white/80 px-1.5 py-0.5 text-[11px] leading-none shadow-sm ring-1 ring-black/[0.06] backdrop-blur-sm">
-            {/* A count, never a percentage. "100% loved it" off two reviews
-                reads as invented and "67%" off three reads as bad, while a
-                count is honest at any size and only ever grows. The face is
-                shown only when the score is one we are happy to advertise --
-                below that the badge falls back to the bare number of reviews
-                and the detail stays in the reviews section. */}
-            {!hasReviews ? (
-              <span className="font-semibold text-gray-600">New</span>
-            ) : badgeFace ? (
-              <>
-                <FaceIcon value={badgeFace} className="h-3.5 w-3.5" />
-                <span className="font-semibold text-[#1a1a1a]">
-                  <span className="tabular-nums">{reviewCount}</span> loved this
-                </span>
-              </>
-            ) : (
-              <span className="font-semibold text-gray-600">
-                <span className="tabular-nums">{reviewCount}</span> reviews
-              </span>
-            )}
-          </div>
+          {hasReviews ? (
+            <div className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-[#F5A524] to-[#F59E0B] px-1.5 py-0.5 text-[11px] leading-none text-white shadow-[0_2px_9px_rgba(245,158,11,0.5)]">
+              <span className="font-bold tabular-nums">{ratingValue.toFixed(1)}</span>
+              <Sparkles className="h-3 w-3 fill-white text-white" strokeWidth={1.5} />
+              <span className="tabular-nums text-white/85">{reviewCount}</span>
+            </div>
+          ) : (
+            <div className="absolute bottom-2 left-2 z-10 inline-flex items-center rounded-md bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide leading-none text-white shadow-[0_2px_9px_rgba(99,102,241,0.5)]">
+              New
+            </div>
+          )}
 
           {/* Wishlist — compact glyph on a subtle frosted disc so it stays clearly
               visible over both light and dark product photos. */}
@@ -306,12 +295,15 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
             onClick={handleToggleWishlist}
             aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
             title={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-            className="absolute top-2 right-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-white/75 backdrop-blur-sm shadow-sm ring-1 ring-black/[0.06] transition-all duration-300 hover:bg-white active:scale-90 focus:outline-none"
+            className={`absolute top-2 right-2 z-10 grid h-8 w-8 place-items-center rounded-full backdrop-blur-sm shadow-md transition-all duration-300 hover:scale-105 active:scale-90 focus:outline-none ${isInWishlist
+              ? 'bg-[#e01a1b] ring-1 ring-[#e01a1b]'
+              : 'bg-white ring-1 ring-[#e01a1b]/30 hover:ring-[#e01a1b]/60'
+              }`}
           >
             <Heart
-              className={`h-4 w-4 transition-all duration-300 ${isInWishlist
-                ? 'fill-[#e01a1b] text-[#e01a1b] scale-110'
-                : 'text-[#3a3a3a] hover:text-[#e01a1b]'
+              className={`h-[18px] w-[18px] transition-all duration-300 ${isInWishlist
+                ? 'fill-white text-white scale-110'
+                : 'fill-[#e01a1b]/10 text-[#e01a1b]'
                 }`}
               strokeWidth={2.2}
             />
@@ -361,7 +353,7 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
               // text, so the card carries one accent colour instead of three.
               <span
                 className={`ml-auto tabular-nums ${showcase
-                  ? 'text-[11.5px] font-semibold text-[#7a0f10]'
+                  ? 'text-[11.5px] font-bold text-[#16a34a] [text-shadow:0_0_8px_rgba(34,197,94,0.55)]'
                   : 'rounded bg-[#22c55e]/12 px-1.5 py-0.5 text-[10.5px] font-bold text-[#15803d]'
                   }`}
               >

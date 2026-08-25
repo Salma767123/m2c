@@ -336,7 +336,7 @@ export default function HeroSection() {
             dashes plus 34px of padding read as a second element competing with
             the image rather than an index under it. */}
         {multi && (
-          <div className="flex items-center justify-center gap-1.5 px-4 pb-2.5 pt-2 sm:gap-2.5 sm:pb-5 sm:pt-3.5">
+          <div className="flex items-center justify-center gap-1.5 px-4 pb-1.5 pt-1.5 sm:gap-2.5 sm:pb-2.5 sm:pt-2.5">
             {slides.map((slide, index) => {
               const active = index === current;
               return (

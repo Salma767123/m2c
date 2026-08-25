@@ -340,7 +340,7 @@ export default function CustomerManagement() {
                           )}
                         </div>
                         <div>
-                          <div className="font-medium">{customer.firstName} {customer.lastName}</div>
+                          <div className="font-medium">{customer.fullName || `${customer.firstName} ${customer.lastName}`.trim()}</div>
                           <div className="text-sm text-slate-500">{customer.email}</div>
                         </div>
                       </div>

@@ -24,7 +24,7 @@ import type { UserProfile } from '@/components/WebSite/Profile/types';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { userProfileService } from '@/services/userProfileService';
 import { userAuthService } from '@/services/userAuthService';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 /**
  * My Account.
@@ -123,9 +123,21 @@ const HEADER_CLEARANCE = 146;
 
 const Profile = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const tabsRowRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Allow deep-linking straight to a tab via ?tab=support (used by the
+   * "Raise a Ticket" button on the order refund note, for example).
+   */
+  useEffect(() => {
+    const t = searchParams?.get('tab');
+    if (t && ['profile', 'addresses', 'orders', 'support'].includes(t)) {
+      setActiveTab(t);
+    }
+  }, [searchParams]);
 
   /**
    * Switching tab puts you back at the top of the panel.
@@ -426,6 +438,14 @@ const Profile = () => {
   // circle when only one name is on file.
   const initials = `${userProfile.firstName.charAt(0)}${userProfile.lastName.charAt(0)}`.toUpperCase() || 'U';
 
+  // Full display name: Title + First + Middle + Last, skipping any empty parts.
+  const fullNameWithTitle = [
+    userProfile.title,
+    userProfile.firstName,
+    userProfile.middleName,
+    userProfile.lastName,
+  ].map((p) => (p || '').trim()).filter(Boolean).join(' ');
+
   // joinDate has always been fetched, mapped and thrown away. Rendered as
   // "March 2024" — the day is noise on an account page.
   const memberSince = (() => {
@@ -506,7 +526,7 @@ const Profile = () => {
             Your account
           </span>
           <h1 className="mb-1 font-playfair text-2xl font-semibold tracking-tight text-[#1a1a1a] sm:mb-2 sm:text-3xl lg:text-4xl">
-            My Account
+            {fullNameWithTitle || 'My Account'}
           </h1>
           <p className="text-sm text-[#5f5550] sm:text-base">
             Manage your profile and account settings
@@ -600,19 +620,8 @@ const Profile = () => {
                   </div>
 
                   <h2 className="mt-3 text-[15px] font-semibold text-[#1a1a1a]">
-                    {userProfile.firstName} {userProfile.lastName}
+                    {fullNameWithTitle || `${userProfile.firstName} ${userProfile.lastName}`.trim()}
                   </h2>
-
-                  {/* break-words, not break-all: it breaks at the @ and the
-                      dots first and only splits a run of characters when it
-                      has to, so an ordinary address never ends up hyphenated
-                      mid-word. #7a6d62 measures 5.0:1 on white. */}
-                  <p
-                    className="mt-0.5 max-w-full text-xs break-words text-[#7a6d62]"
-                    title={userProfile.email}
-                  >
-                    {userProfile.email}
-                  </p>
 
                   {memberSince && (
                     <p className="mt-2.5 text-[11px] font-medium uppercase tracking-[0.1em] text-[#a89a8d]">

@@ -56,12 +56,12 @@ const PERKS = ['Grow Your Business', 'Zero Selling Fee', 'Transparent Earnings',
 export default function VendorPartnerCTA() {
   return (
     <section className="bg-white font-sans py-6 sm:py-8">
-      <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <Reveal>
           <Link
             href="/vendor"
             aria-label="Sell on M2C — become a vendor partner"
-            className="group grid overflow-hidden rounded-3xl bg-linear-to-r from-[#faf4ec] via-[#f7efe4] to-[#f2e6d5] ring-1 ring-[#e8dac4] shadow-[0_18px_50px_-30px_rgba(12,30,56,0.45)] transition-shadow duration-500 hover:shadow-[0_24px_64px_-28px_rgba(12,30,56,0.55)] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#e01a1b]/40 md:grid-cols-[minmax(0,1fr)_18rem] lg:grid-cols-[minmax(0,1fr)_23rem]"
+            className="group grid overflow-hidden rounded-3xl bg-linear-to-r from-[#faf4ec] via-[#f7efe4] to-[#f2e6d5] ring-1 ring-[#e8dac4] shadow-[0_18px_50px_-30px_rgba(12,30,56,0.45)] transition-shadow duration-500 hover:shadow-[0_24px_64px_-28px_rgba(12,30,56,0.55)] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#e01a1b]/40 md:grid-cols-[minmax(0,1fr)_20rem] lg:grid-cols-[minmax(0,1fr)_26rem]"
           >
             {/* ── Words ──────────────────────────────────────────────────
                 Stacked on narrow screens; from lg the copy and the button
@@ -119,16 +119,13 @@ export default function VendorPartnerCTA() {
                   fills whatever height the text column decides. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/assets/images/banner/m2cseller-photo.webp"
+                src="/assets/images/banner/m2cseller-photo-v2.webp"
                 alt=""
                 loading="lazy"
-                /* origin-left, not the default centre. Scaling from the centre
-                   walks the photo's left edge outward on hover, which drags
-                   darker content up against the cream and turns a soft join
-                   into a hard vertical line — the edge appearing to "cut".
-                   Anchored left, that edge never moves: the zoom grows to the
-                   right, into the panel, where it is clipped and unseen. */
-                className="absolute inset-0 h-full w-full origin-left object-cover object-[50%_12%] transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                /* The source's blank right margin has been cropped out of the
+                   file itself (m2cseller-photo-v2, 360x661), so the panel fills
+                   with the figures at a natural scale — no zoom, no dead edge. */
+                className="absolute inset-0 h-full w-full object-cover object-[50%_20%] transition-transform duration-700 ease-out group-hover:scale-[1.04]"
               />
               {/* Softens the photo's cut edge into the cream so the two halves
                   read as one panel rather than as a picture pasted beside text.

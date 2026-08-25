@@ -72,6 +72,8 @@ export interface VendorShipment {
     order?: {
         id: string;
         orderId: string;
+        /** Overall order status (may differ from this vendor's shipment.status). */
+        status?: string;
         customerName?: string;
         customerEmail?: string;
         customerPhone?: string;
@@ -127,6 +129,12 @@ export interface Order {
     trackingReference?: string;
     /** Courier partner id chosen at ship-to-customer (resolve via lib/couriers). */
     courier?: string | null;
+    /** Cancel/return/refund state. */
+    cancelReason?: string | null;
+    returnRequest?: { reason?: string; status?: 'Requested' | 'Approved' | 'Rejected'; requestedAt?: string; decidedAt?: string; note?: string } | null;
+    refundStatus?: 'INITIATED' | 'PROCESSED' | 'FAILED' | 'MANUAL' | 'NONE' | null;
+    refundId?: string | null;
+    refundAmount?: number | null;
     // DEPRECATED: These now live on VendorShipment
     vendorCarrier?: string;
     vendorTrackingId?: string;
@@ -204,6 +212,26 @@ class OrderService {
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to fetch order');
+        }
+    }
+
+    // Customer: cancel own pre-dispatch order (auto-refund for prepaid).
+    async cancelOrder(id: string, reason?: string): Promise<{ success: boolean; data: Order; message?: string }> {
+        try {
+            const response = await axios.post(`/orders/${id}/cancel`, { reason });
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.message || 'Failed to cancel order');
+        }
+    }
+
+    // Customer: request a return on a delivered order (admin approves).
+    async requestReturn(id: string, reason: string): Promise<{ success: boolean; data: Order; message?: string }> {
+        try {
+            const response = await axios.post(`/orders/${id}/return`, { reason });
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.message || 'Failed to submit return request');
         }
     }
 
@@ -329,13 +357,38 @@ class OrderService {
         id: string,
         status: string,
         assignedHubId?: string,
-        extra?: { courier?: string; trackingReference?: string },
+        extra?: { courier?: string; trackingReference?: string; cancelReason?: string },
     ): Promise<{ success: boolean; data: Order }> {
         try {
             const response = await axios.put(`/orders/admin/${id}/status`, { status, assignedHubId, ...(extra || {}) });
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to update admin order status');
+        }
+    }
+
+    // Admin: cancel the whole order (any pre-shipment stage). Cancels settlements
+    // and auto-refunds the customer if paid. Works from both the vendor-to-hub and
+    // hub-to-customer pages (accepts either page's update_status permission).
+    async cancelAdminOrder(
+        id: string,
+        cancelReason: string,
+    ): Promise<{ success: boolean; data: Order }> {
+        try {
+            const response = await axios.put(`/orders/admin/${id}/cancel`, { cancelReason });
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.message || 'Failed to cancel order');
+        }
+    }
+
+    // Admin: approve/reject a customer return request (approve → RETURNED + refund).
+    async decideReturn(id: string, decision: 'approve' | 'reject', note?: string): Promise<{ success: boolean; data: Order; message?: string }> {
+        try {
+            const response = await axios.post(`/orders/admin/${id}/return-decision`, { decision, note });
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.message || 'Failed to process return decision');
         }
     }
 
