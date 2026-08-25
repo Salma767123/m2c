@@ -126,16 +126,18 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Profile Card */}
-        <Card className="lg:col-span-1 border border-slate-200">
+        {/* Profile Card — sticky on lg+ so it stays in view while the orders
+            column scrolls. self-start stops the grid from stretching it to the
+            row height, which would otherwise break position: sticky. */}
+        <Card className="rounded-2xl border-slate-200 shadow-sm lg:col-span-1 lg:sticky lg:top-6 lg:self-start">
           <CardContent className="p-6">
             <div className="flex flex-col items-center text-center">
-              <div className="w-20 h-20 bg-brand-500 rounded-full flex items-center justify-center mb-4">
+              <div className="mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-brand-500 to-brand-600 shadow-lg ring-4 ring-brand-500/10">
                 {customer.avatar ? (
                   <img
                     src={customer.avatar}
                     alt={customer.name}
-                    className="w-full h-full object-cover rounded-full"
+                    className="h-full w-full object-cover"
                   />
                 ) : (
                   <span className="text-2xl font-bold text-white">
@@ -187,50 +189,74 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
                 </div>
               </div>
             </div>
+
+            {/* Saved Addresses — kept here in the profile column so the customer's
+                contact details and where they ship read as one block. */}
+            {customer.addresses && customer.addresses.length > 0 && (
+              <div className="mt-6 border-t border-slate-200 pt-6">
+                <div className="mb-3 flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-slate-600" />
+                  <p className="text-sm font-semibold text-slate-900">Saved Addresses</p>
+                  <span className="text-xs font-medium text-slate-400">({customer.addresses.length})</span>
+                </div>
+                <div className="space-y-3">
+                  {customer.addresses.map((addr: any, idx: number) => (
+                    <div key={idx} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      {addr.name && <p className="mb-1 font-medium text-slate-900">{addr.name}</p>}
+                      <p className="text-sm text-slate-600">{addr.address || addr.street}</p>
+                      {addr.addressLine2 && <p className="text-sm text-slate-600">{addr.addressLine2}</p>}
+                      <p className="text-sm text-slate-600">{addr.city}, {getStateName(addr.state, addr.country)} {addr.zipCode || addr.postalCode}</p>
+                      <p className="text-sm text-slate-600">{getCountryName(addr.country)}</p>
+                      {addr.phone && <p className="mt-1 text-sm text-slate-500">{formatPhoneForDisplay(addr.phone, addr.country)}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Right Column */}
         <div className="lg:col-span-2 space-y-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-3 gap-4">
-            <Card className="border border-slate-200">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card className="rounded-2xl border-slate-200 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
               <CardContent className="p-5">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-blue-50 rounded-lg">
-                    <ShoppingBag className="h-5 w-5 text-blue-600" />
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-sm">
+                    <ShoppingBag className="h-5 w-5" />
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Total Orders</p>
-                    <p className="text-2xl font-bold text-slate-900">{customer.totalOrders}</p>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Total Orders</p>
+                    <p className="mt-0.5 text-2xl font-bold text-slate-900">{customer.totalOrders}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border border-slate-200">
+            <Card className="rounded-2xl border-slate-200 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
               <CardContent className="p-5">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-green-50 rounded-lg">
-                    <CreditCard className="h-5 w-5 text-green-600" />
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-sm">
+                    <CreditCard className="h-5 w-5" />
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Total Spent</p>
-                    <p className="text-2xl font-bold text-slate-900">₹{customer.totalSpent?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Total Spent</p>
+                    <p className="mt-0.5 truncate text-2xl font-bold text-slate-900">₹{customer.totalSpent?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border border-slate-200">
+            <Card className="rounded-2xl border-slate-200 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
               <CardContent className="p-5">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-amber-50 rounded-lg">
-                    <Star className="h-5 w-5 text-amber-500" />
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-sm">
+                    <Star className="h-5 w-5" />
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Reviews</p>
-                    <p className="text-2xl font-bold text-slate-900">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Reviews</p>
+                    <p className="mt-0.5 text-2xl font-bold text-slate-900">
                       {customer.averageRating ? `${customer.averageRating} ★` : '—'}
                     </p>
                     <p className="text-xs text-slate-400">{customer.reviewsCount || 0} review{customer.reviewsCount !== 1 ? 's' : ''}</p>
@@ -240,34 +266,8 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
             </Card>
           </div>
 
-          {/* Addresses */}
-          {customer.addresses && customer.addresses.length > 0 && (
-            <Card className="border border-slate-200">
-              <CardHeader className="border-b border-slate-200 bg-slate-50">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-slate-600" />
-                  Saved Addresses
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {customer.addresses.map((addr: any, idx: number) => (
-                    <div key={idx} className="p-4 border border-slate-200 rounded-lg bg-slate-50">
-                      {addr.name && <p className="font-medium text-slate-900 mb-1">{addr.name}</p>}
-                      <p className="text-sm text-slate-600">{addr.address || addr.street}</p>
-                      {addr.addressLine2 && <p className="text-sm text-slate-600">{addr.addressLine2}</p>}
-                      <p className="text-sm text-slate-600">{addr.city}, {getStateName(addr.state, addr.country)} {addr.zipCode || addr.postalCode}</p>
-                      <p className="text-sm text-slate-600">{getCountryName(addr.country)}</p>
-                      {addr.phone && <p className="text-sm text-slate-500 mt-1">{formatPhoneForDisplay(addr.phone, addr.country)}</p>}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Recent Orders */}
-          <Card className="border border-slate-200">
+          <Card className="overflow-hidden rounded-2xl border-slate-200 shadow-sm">
             <CardHeader className="border-b border-slate-200 bg-slate-50">
               <CardTitle className="text-base flex items-center gap-2">
                 <Package className="h-4 w-4 text-slate-600" />
@@ -335,7 +335,7 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
           </Card>
 
           {/* Support Tickets — raised by this customer; click through to the ticket */}
-          <Card className="border border-slate-200">
+          <Card className="overflow-hidden rounded-2xl border-slate-200 shadow-sm">
             <CardHeader className="border-b border-slate-200 bg-slate-50">
               <CardTitle className="text-base flex items-center gap-2">
                 <LifeBuoy className="h-4 w-4 text-slate-600" />

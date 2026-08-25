@@ -12,8 +12,12 @@ export interface UserAddress {
 
 export interface Customer {
     id: string;
+    title?: string;
     firstName: string;
+    middleName?: string;
     lastName: string;
+    /** "Title First Middle Last", composed server-side. */
+    fullName?: string;
     email: string;
     phone: string;
     status: 'active' | 'suspended' | 'pending';

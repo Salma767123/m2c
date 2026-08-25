@@ -26,6 +26,8 @@ router.put('/admin/shipments/:id/status', requireAdminRole, requirePermission('v
 router.get('/admin', requireAdminRole, requirePermission(['hub_to_customer:view', 'invoices:view']), adminOrderController.getAllOrdersAdmin);
 router.get('/admin/:id', requireAdminRole, requirePermission(['hub_to_customer:view', 'invoices:view']), adminOrderController.getAdminOrderById);
 router.put('/admin/:id/status', requireAdminRole, requirePermission('hub_to_customer:update_status'), adminOrderController.updateAdminOrderStatus);
+router.put('/admin/:id/cancel', requireAdminRole, requirePermission(['hub_to_customer:update_status', 'vendor_to_hub:update_status']), adminOrderController.cancelAdminOrder);
+router.post('/admin/:id/return-decision', requireAdminRole, requirePermission('hub_to_customer:update_status'), adminOrderController.decideReturn);
 
 // Admin: Get invoice HTML for an order — part of the Billing module
 router.get('/admin/:id/invoice', requireAdminRole, requirePermission(['invoices:print', 'invoices:view', 'hub_to_customer:view']), async (req, res) => {

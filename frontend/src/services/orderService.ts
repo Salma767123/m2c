@@ -72,6 +72,8 @@ export interface VendorShipment {
     order?: {
         id: string;
         orderId: string;
+        /** Overall order status (may differ from this vendor's shipment.status). */
+        status?: string;
         customerName?: string;
         customerEmail?: string;
         customerPhone?: string;
@@ -355,13 +357,38 @@ class OrderService {
         id: string,
         status: string,
         assignedHubId?: string,
-        extra?: { courier?: string; trackingReference?: string },
+        extra?: { courier?: string; trackingReference?: string; cancelReason?: string },
     ): Promise<{ success: boolean; data: Order }> {
         try {
             const response = await axios.put(`/orders/admin/${id}/status`, { status, assignedHubId, ...(extra || {}) });
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to update admin order status');
+        }
+    }
+
+    // Admin: cancel the whole order (any pre-shipment stage). Cancels settlements
+    // and auto-refunds the customer if paid. Works from both the vendor-to-hub and
+    // hub-to-customer pages (accepts either page's update_status permission).
+    async cancelAdminOrder(
+        id: string,
+        cancelReason: string,
+    ): Promise<{ success: boolean; data: Order }> {
+        try {
+            const response = await axios.put(`/orders/admin/${id}/cancel`, { cancelReason });
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.message || 'Failed to cancel order');
+        }
+    }
+
+    // Admin: approve/reject a customer return request (approve → RETURNED + refund).
+    async decideReturn(id: string, decision: 'approve' | 'reject', note?: string): Promise<{ success: boolean; data: Order; message?: string }> {
+        try {
+            const response = await axios.post(`/orders/admin/${id}/return-decision`, { decision, note });
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.message || 'Failed to process return decision');
         }
     }
 

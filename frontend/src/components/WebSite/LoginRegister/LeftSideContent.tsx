@@ -33,7 +33,7 @@ export default function LeftSideContent({ isLogin }: LeftSideContentProps) {
               />
             </div>
             <h1 className="font-playfair text-4xl font-semibold tracking-tight mb-3">
-              M 2 C MarkDowns Private Limited
+              M 2 C Markdowns Pvt Ltd
             </h1>
             <p className="text-xl text-gray-100 font-medium">
               {isLogin 

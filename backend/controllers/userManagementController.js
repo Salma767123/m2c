@@ -7,6 +7,19 @@ const { sendTemplatedEmail } = require('../utils/emailTemplateRenderer');
 // CUSTOMER MANAGEMENT
 // ==========================================
 
+// Compose a full display name "Title First Middle Last" from a user's stored
+// `name` (which is First + Last only) plus the separate title/middleName columns.
+// Empty parts are skipped, and the middle name is woven in after the first name.
+const composeFullName = (u) => {
+    const parts = String(u.name || '').trim().split(/\s+/).filter(Boolean);
+    const firstName = parts[0] || '';
+    const lastName = parts.slice(1).join(' ');
+    return [u.title, firstName, u.middleName, lastName]
+        .map((p) => String(p || '').trim())
+        .filter(Boolean)
+        .join(' ');
+};
+
 // Get all customers (Users)
 exports.getCustomers = async (req, res) => {
     try {
@@ -33,6 +46,8 @@ exports.getCustomers = async (req, res) => {
             select: {
                 id: true,
                 name: true,
+                title: true,
+                middleName: true,
                 email: true,
                 phoneNumber: true,
                 isActive: true,
@@ -96,8 +111,11 @@ exports.getCustomers = async (req, res) => {
 
             return {
                 id: c.id,
+                title: c.title || '',
                 firstName: c.name.split(' ')[0] || '',
+                middleName: c.middleName || '',
                 lastName: c.name.split(' ').slice(1).join(' ') || '',
+                fullName: composeFullName(c),
                 email: c.email,
                 phone: c.phoneNumber || 'N/A',
                 status: currentStatus,
@@ -138,6 +156,8 @@ exports.getCustomerById = async (req, res) => {
             select: {
                 id: true,
                 name: true,
+                title: true,
+                middleName: true,
                 email: true,
                 phoneNumber: true,
                 isActive: true,
@@ -216,7 +236,7 @@ exports.getCustomerById = async (req, res) => {
             success: true,
             data: {
                 id: customer.id,
-                name: customer.name,
+                name: composeFullName(customer) || customer.name,
                 email: customer.email,
                 phone: customer.phoneNumber || 'N/A',
                 status: currentStatus,

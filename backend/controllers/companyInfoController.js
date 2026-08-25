@@ -11,7 +11,7 @@ const getCompanyInfo = async (req, res) => {
     if (!companyInfo) {
       companyInfo = await prisma.companyInfo.create({
         data: {
-          companyName: 'M2C Marketplace Pvt Ltd'
+          companyName: 'M2C Markdowns Pvt Ltd'
         }
       });
     }
@@ -300,7 +300,7 @@ const getPublicCompanyInfo = async (req, res) => {
     res.json({
       success: true,
       data: {
-        companyName: companyInfo?.companyName || 'M2C MarkDowns Private Limited',
+        companyName: companyInfo?.companyName || 'M2C Markdowns Pvt Ltd',
         companyLogo: companyInfo?.companyLogo || null,
         secondaryLogo: companyInfo?.secondaryLogo || null,
         companyEmail: companyInfo?.companyEmail || null,
@@ -319,7 +319,7 @@ const getPublicCompanyInfo = async (req, res) => {
     });
   } catch (error) {
     console.error('Get public company info error:', error);
-    res.json({ success: true, data: { companyName: 'M2C MarkDowns Private Limited', companyLogo: null } });
+    res.json({ success: true, data: { companyName: 'M2C Markdowns Pvt Ltd', companyLogo: null } });
   }
 };
 

@@ -106,6 +106,7 @@ const getShipmentByIdAdmin = async (req, res) => {
                         select: {
                             id: true,
                             orderId: true,
+                            status: true,
                             customerName: true,
                             customerEmail: true,
                             customerPhone: true,
@@ -141,6 +142,7 @@ const getShipmentByIdAdmin = async (req, res) => {
                         select: {
                             id: true,
                             orderId: true,
+                            status: true,
                             customerName: true,
                             customerEmail: true,
                             customerPhone: true,
@@ -471,9 +473,10 @@ const updateAdminOrderStatus = async (req, res) => {
     try {
         const adminId = req.userId || req.adminId;
         const { id } = req.params;
-        const { status, courier, trackingReference } = req.body;
+        const { status, courier, trackingReference, cancelReason } = req.body;
         const courierId = courier != null ? String(courier).trim() : '';
         const trackingId = trackingReference != null ? String(trackingReference).trim() : '';
+        const cancelReasonText = cancelReason != null ? String(cancelReason).trim() : '';
 
         if (status !== undefined && status !== null && status !== '') {
             if (typeof status !== 'string' || !ALLOWED_ORDER_STATUSES.has(status)) {
@@ -576,6 +579,29 @@ const updateAdminOrderStatus = async (req, res) => {
                     },
                     data: { status: 'Cancelled' },
                 });
+                // Cancel every non-terminal vendor shipment too, so the per-vendor
+                // Vendor-to-Hub view reflects the cancellation and stops offering
+                // "Assign Hub / Proceed" on an order that's already cancelled.
+                const liveShipments = await tx.vendorShipment.findMany({
+                    where: { orderId: order.id, status: { notIn: ['CANCELLED', 'RETURNED'] } },
+                    select: { id: true },
+                });
+                for (const s of liveShipments) {
+                    await tx.vendorShipment.update({
+                        where: { id: s.id },
+                        data: {
+                            status: 'CANCELLED',
+                            statusHistory: {
+                                create: {
+                                    status: 'CANCELLED',
+                                    updatedBy: adminId,
+                                    updatedByType: 'admin',
+                                    comment: `Order cancelled by admin${cancelReasonText ? ` — ${cancelReasonText}` : ''}`,
+                                },
+                            },
+                        },
+                    });
+                }
             }
 
             // Safety net: backfill dueDate on any Pending settlements that still
@@ -629,6 +655,9 @@ const updateAdminOrderStatus = async (req, res) => {
                     // Freeze the dispatch courier + tracking ID onto the order when it
                     // ships to the customer (shown to the customer + on the order pages).
                     ...(status === 'SHIPPED_TO_CUSTOMER' ? { courier: courierId, trackingReference: trackingId } : {}),
+                    // Record the admin's cancellation reason so it shows on both the
+                    // admin cancellation panel and the customer's order page.
+                    ...(nextStatus === 'CANCELLED' && cancelReasonText ? { cancelReason: cancelReasonText } : {}),
                     statusHistory: {
                         create: {
                             status: nextStatus,
@@ -636,7 +665,9 @@ const updateAdminOrderStatus = async (req, res) => {
                             updatedByType: 'admin',
                             comment: status === 'SHIPPED_TO_CUSTOMER'
                                 ? `Admin shipped to customer via ${courierName(courierId) || courierId} · Tracking ${trackingId}`
-                                : `Admin updated status to ${nextStatus}`,
+                                : nextStatus === 'CANCELLED'
+                                    ? `Admin cancelled the order${cancelReasonText ? ` — ${cancelReasonText}` : ''}`
+                                    : `Admin updated status to ${nextStatus}`,
                         },
                     },
                 },
@@ -677,6 +708,27 @@ const updateAdminOrderStatus = async (req, res) => {
                 });
             } catch (e) {
                 console.error('Return refund error:', e?.message || e);
+            }
+        }
+
+        // Admin cancelling the order (→ CANCELLED): issue the customer's refund
+        // automatically, exactly like a customer-initiated cancel. Settlements were
+        // already cancelled inside the transaction above. issueRefund never throws
+        // (returns MANUAL for COD/unpaid, FAILED if the gateway declines).
+        if (status === 'CANCELLED' && !order.refundStatus) {
+            try {
+                const { issueRefund } = require('../utils/refund');
+                const refund = await issueRefund(order);
+                await prisma.order.update({
+                    where: { id: order.id },
+                    data: {
+                        refundStatus: refund.refundStatus,
+                        refundId: refund.refundId,
+                        refundAmount: order.totalAmount,
+                    },
+                });
+            } catch (e) {
+                console.error('Cancel refund error:', e?.message || e);
             }
         }
 
@@ -747,6 +799,101 @@ const updateAdminOrderStatus = async (req, res) => {
     }
 };
 
+// Admin: approve or reject a customer's return request.
+//   approve → order becomes RETURNED, settlement cancelled, refund issued.
+//   reject  → the request is closed; order stays DELIVERED, no refund.
+const decideReturn = async (req, res) => {
+    try {
+        const adminId = req.userId || req.adminId;
+        const { id } = req.params;
+        const decision = (req.body?.decision || '').toString().toLowerCase();
+        const note = (req.body?.note || '').toString().trim().slice(0, 300) || null;
+
+        if (decision !== 'approve' && decision !== 'reject') {
+            return res.status(400).json({ success: false, error: "decision must be 'approve' or 'reject'" });
+        }
+
+        const order = await prisma.order.findUnique({ where: { id }, include: { items: true } });
+        if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
+        const rr = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest : null;
+        if (!rr || rr.status !== 'Requested') {
+            return res.status(409).json({ success: false, error: 'There is no pending return request for this order' });
+        }
+
+        const { createNotification } = require('./notificationController');
+
+        if (decision === 'reject') {
+            const updated = await prisma.order.update({
+                where: { id: order.id },
+                data: { returnRequest: { ...rr, status: 'Rejected', decidedAt: new Date().toISOString(), note } },
+            });
+            if (order.customerId) {
+                createNotification({
+                    userId: order.customerId, role: 'USER', type: 'RETURN_REJECTED',
+                    title: 'Return Declined', message: `Your return request for order #${order.orderId} was not approved${note ? `: ${note}` : '.'}`,
+                    data: { orderId: order.id },
+                }).catch(() => {});
+            }
+            return res.json({ success: true, data: updated, message: 'Return request rejected' });
+        }
+
+        // Approve → RETURNED + settlement clawback + refund.
+        await prisma.$transaction(async (tx) => {
+            await tx.settlement.updateMany({
+                where: { orderId: order.id, status: { in: ['Pending', 'Processing'] } },
+                data: { status: 'Cancelled' },
+            });
+            await tx.order.update({
+                where: { id: order.id },
+                data: {
+                    status: 'RETURNED',
+                    statusHistory: {
+                        create: {
+                            status: 'RETURNED', updatedBy: adminId, updatedByType: 'admin',
+                            comment: `Return approved by admin${note ? `: ${note}` : ''}`,
+                        },
+                    },
+                },
+            });
+        });
+
+        const { issueRefund } = require('../utils/refund');
+        const refund = await issueRefund(order);
+        const updated = await prisma.order.update({
+            where: { id: order.id },
+            data: {
+                refundStatus: refund.refundStatus, refundId: refund.refundId, refundAmount: order.totalAmount,
+                returnRequest: { ...rr, status: 'Approved', decidedAt: new Date().toISOString(), note },
+            },
+        });
+
+        if (order.customerId) {
+            createNotification({
+                userId: order.customerId, role: 'USER', type: 'RETURN_APPROVED',
+                title: 'Return Approved', message: `Your return for order #${order.orderId} was approved. Your refund is being processed.`,
+                data: { orderId: order.id },
+            }).catch(() => {});
+        }
+
+        res.json({ success: true, data: updated, message: 'Return approved and refund initiated' });
+    } catch (error) {
+        console.error('Decide return error:', error);
+        res.status(500).json({ success: false, error: 'Failed to process return decision' });
+    }
+};
+
+// Dedicated admin cancel entry point. Forces status=CANCELLED and delegates to
+// updateAdminOrderStatus (which enforces the transition guard, cancels
+// settlements and issues the refund). Exists as its own route so it can accept
+// either the vendor-to-hub or hub-to-customer "update_status" permission —
+// admins cancel a whole order from whichever stage/page they're on — without
+// widening the shared status endpoint's ship/deliver transitions.
+const cancelAdminOrder = async (req, res) => {
+    const cancelReason = req.body?.cancelReason;
+    req.body = { status: 'CANCELLED', cancelReason };
+    return updateAdminOrderStatus(req, res);
+};
+
 module.exports = {
     getAllShipmentsAdmin,
     getShipmentByIdAdmin,
@@ -754,4 +901,6 @@ module.exports = {
     getAllOrdersAdmin,
     getAdminOrderById,
     updateAdminOrderStatus,
+    cancelAdminOrder,
+    decideReturn,
 };

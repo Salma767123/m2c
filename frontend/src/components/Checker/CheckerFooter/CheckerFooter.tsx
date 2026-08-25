@@ -8,7 +8,7 @@ export default function Footer() {
       <div className="flex flex-col md:flex-row justify-between items-center space-y-2 md:space-y-0">
         {/* Left Section - Copyright */}
         <div className="flex items-center space-x-1 text-sm text-white">
-          <span>© {currentYear} M2C MarkDowns Private Limited</span>
+          <span>© {currentYear} M2C Markdowns Pvt Ltd</span>
           <span>Made with</span>
           <Heart className="h-4 w-4 text-white fill-current" />
           <span>by QC Team</span>

@@ -1163,6 +1163,28 @@ const cancelMyOrder = async (req, res) => {
                     },
                 },
             });
+            // Cancel every non-terminal vendor shipment too, so per-vendor views
+            // (Vendor to Hub) reflect the cancellation and stop offering "Proceed".
+            const liveShipments = await tx.vendorShipment.findMany({
+                where: { orderId: order.id, status: { notIn: ['CANCELLED', 'RETURNED'] } },
+                select: { id: true },
+            });
+            for (const s of liveShipments) {
+                await tx.vendorShipment.update({
+                    where: { id: s.id },
+                    data: {
+                        status: 'CANCELLED',
+                        statusHistory: {
+                            create: {
+                                status: 'CANCELLED',
+                                updatedBy: userId,
+                                updatedByType: 'customer',
+                                comment: `Order cancelled by customer${reason ? `: ${reason}` : ''}`,
+                            },
+                        },
+                    },
+                });
+            }
         });
 
         // Refund (fire after the state change so a gateway hiccup can't undo the cancel).

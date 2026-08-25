@@ -104,9 +104,11 @@ export default function ProfileTab({
       : "border-[#eee6dc]! bg-[#faf7f3]! [&>span]:text-[#5f5550]!",
   ].join(" ");
 
-  /** Same treatment, squared on the right so it butts against the number. */
+  /** Same treatment, squared on the right so it butts against the number.
+      Fixed height (matching the number input) so the two halves align as one
+      field rather than one box sitting shorter than the other. */
   const codeButtonClass = [
-    "rounded-l-xl! rounded-r-none! px-3! py-3! text-[15px]!",
+    "h-[50px]! rounded-l-xl! rounded-r-none! px-3! py-0! text-[15px]!",
     "border-[#e6dcd0]! bg-white!",
     isEditing ? "hover:border-[#c9bcae]!" : "border-[#eee6dc]! bg-[#faf7f3]! text-[#5f5550]!",
   ].join(" ");
@@ -144,8 +146,8 @@ export default function ProfileTab({
         <Icon className="h-4 w-4 text-[#a89a8d]" />
         {label}
       </label>
-      <div className="flex">
-        <div className="w-[112px] shrink-0">
+      <div className="flex items-stretch">
+        <div className="w-[116px] shrink-0">
           <CountryCodeSelect
             value={code || "+91"}
             onChange={(v) => handleInputChange(codeField, v)}
@@ -160,7 +162,7 @@ export default function ProfileTab({
           onChange={(e) => handleInputChange(numberField, e.target.value)}
           disabled={!isEditing}
           placeholder={placeholder}
-          className={`${fieldClass} rounded-l-none border-l-0`}
+          className={`${fieldClass} h-[50px] min-w-0 flex-1 rounded-l-none border-l-0 py-0`}
         />
       </div>
     </div>

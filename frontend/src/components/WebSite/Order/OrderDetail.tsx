@@ -20,14 +20,19 @@ import {
   MessageCircle,
   AlertCircle,
   Clock,
-  ExternalLink
+  ExternalLink,
+  RotateCcw,
+  XCircle
 } from "lucide-react"
 import { formatPrice } from '@/lib/currency'
+import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { courierService } from "@/services/courierService"
 import { courierName, courierTrackingUrl } from "@/lib/couriers"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import Reveal from "@/components/WebSite/Shared/Reveal"
 import orderService, { Order as APIOrder } from "@/services/orderService"
+import productService from "@/services/productService"
+import ProductCard from "@/components/WebSite/ProductCard/ProductCard"
 import ReviewModal from "./ReviewModal"
 import reviewService from "@/services/reviewService"
 import { getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants"
@@ -108,6 +113,30 @@ const historyForStep = (
   return { reachedAt: matches[0].timestamp }
 }
 
+// Order can be cancelled by the customer up to (but not including) dispatch.
+const CANCELLABLE_STATUSES = new Set([
+  'ORDER_CREATED', 'VENDOR_PROCESSING', 'PACKED_BY_VENDOR',
+  'IN_TRANSIT_TO_ADMIN_HUB', 'RECEIVED_AT_ADMIN_HUB', 'APPROVED_BY_ADMIN_HUB',
+])
+
+// Preset reasons offered in the cancel / return modal ("Other" reveals a text box).
+const CANCEL_REASONS = [
+  'Changed my mind',
+  'Ordered by mistake',
+  'Found a better price elsewhere',
+  'Delivery is taking too long',
+  'Need to change address or details',
+  'Other',
+]
+const RETURN_REASONS = [
+  'Damaged or defective',
+  'Wrong item received',
+  'Not as described',
+  'Size or fit issue',
+  'Quality not satisfactory',
+  'Other',
+]
+
 export default function OrderDetail({ orderId }: OrderDetailProps) {
   const [quantities, setQuantities] = useState<{ [key: number]: number }>({})
   const [orderDetails, setOrderDetails] = useState<APIOrder | null>(null)
@@ -115,10 +144,87 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
   const [error, setError] = useState<string | null>(null)
   const [reviewModalState, setReviewModalState] = useState<{ isOpen: boolean, orderId: string, items: any[] }>({ isOpen: false, orderId: '', items: [] })
   const [hasReviewed, setHasReviewed] = useState(false)
+  const [similarProducts, setSimilarProducts] = useState<any[]>([])
+  // Cancel / return confirmation modal.
+  const [actionModal, setActionModal] = useState<'cancel' | 'return' | null>(null)
+  const [reasonChoice, setReasonChoice] = useState('')  // selected preset reason
+  const [actionReason, setActionReason] = useState('')   // free text when "Other"
+  const [actionSubmitting, setActionSubmitting] = useState(false)
+
+  const openActionModal = (type: 'cancel' | 'return') => {
+    setReasonChoice('')
+    setActionReason('')
+    setActionModal(type)
+  }
+
+  const submitAction = async () => {
+    if (!actionModal || !orderDetails) return
+    const type = actionModal
+    // Final reason = the selected preset, or the free text when "Other".
+    const finalReason = reasonChoice === 'Other' ? actionReason.trim() : reasonChoice
+    if (type === 'return' && !finalReason) {
+      showErrorToast('Reason required', reasonChoice === 'Other' ? 'Please describe the reason.' : 'Please select a reason for the return.')
+      return
+    }
+    try {
+      setActionSubmitting(true)
+      if (type === 'cancel') {
+        const res = await orderService.cancelOrder(orderDetails.id, finalReason || undefined)
+        showSuccessToast('Order Cancelled', res.message || 'Your refund has been initiated.')
+      } else {
+        const res = await orderService.requestReturn(orderDetails.id, finalReason)
+        showSuccessToast('Return Requested', res.message || 'We will review it shortly.')
+      }
+      setActionModal(null)
+      setReasonChoice('')
+      setActionReason('')
+      fetchOrder()
+    } catch (e: any) {
+      showErrorToast('Failed', e?.message || 'Please try again.')
+    } finally {
+      setActionSubmitting(false)
+    }
+  }
 
   useEffect(() => {
     fetchOrder()
   }, [orderId])
+
+  // Similar products — matched by the ordered items' category, deduped against the
+  // products already in this order, with a best-seller fallback so the strip always
+  // populates even when the category is sparse.
+  useEffect(() => {
+    if (!orderDetails?.items?.length) { setSimilarProducts([]); return }
+    let cancelled = false
+    const orderedIds = new Set(orderDetails.items.map((i) => String(i.productId)))
+    ;(async () => {
+      const seen = new Map<string, any>()
+      const add = (items?: any[]) => {
+        (items || []).forEach((p) => {
+          const id = String(p.id)
+          if (!orderedIds.has(id) && !seen.has(id)) seen.set(id, p)
+        })
+      }
+      try {
+        // Learn the category from the first ordered product, then pull that category.
+        const first = await productService.getPublicProduct(String(orderDetails.items[0].productId)).catch(() => null)
+        const category = first?.success ? first.data?.category : undefined
+        if (category) {
+          const r = await productService.getPublicProducts({ category, limit: 12, inStock: true })
+          if (r.success) add(r.data?.items)
+        }
+        // Fallback so the strip isn't empty when the category is sparse or unknown.
+        if (seen.size < 5) {
+          const r = await productService.getPublicProducts({ sortBy: 'rating', sortOrder: 'desc', limit: 12, inStock: true })
+          if (r.success) add(r.data?.items)
+        }
+        if (!cancelled) setSimilarProducts(Array.from(seen.values()).slice(0, 5))
+      } catch {
+        if (!cancelled) setSimilarProducts([])
+      }
+    })()
+    return () => { cancelled = true }
+  }, [orderDetails?.id])
 
   const fetchOrder = async () => {
     try {
@@ -352,10 +458,34 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 <p className="text-xs sm:text-sm text-slate-600 break-all">Order #{orderDetails.orderId}</p>
               </div>
             </div>
-            <div className="shrink-0">
+            <div className="shrink-0 flex flex-col items-start sm:items-end gap-2">
               <div className={`inline-flex items-center px-3 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium ${getStatusColorClass(orderDetails.status)}`}>
                 <Package className="w-4 h-4 mr-1" />
                 {formatStatus(getNormalizedStatus(orderDetails.status))}
+              </div>
+              {/* Customer actions — cancel pre-dispatch, request return post-delivery */}
+              <div className="flex flex-wrap items-center gap-2">
+                {CANCELLABLE_STATUSES.has(orderDetails.status) && (
+                  <button
+                    onClick={() => openActionModal('cancel')}
+                    className="inline-flex items-center gap-2 rounded-full border border-[#e01a1b] px-4 py-2 text-sm font-medium text-[#e01a1b] transition-colors hover:bg-[#e01a1b]/5"
+                  >
+                    <XCircle className="w-4 h-4" /> Cancel Order
+                  </button>
+                )}
+                {orderDetails.status === 'DELIVERED'
+                  && orderDetails.returnRequest?.status !== 'Requested'
+                  && orderDetails.returnRequest?.status !== 'Approved' && (
+                  <button
+                    onClick={() => openActionModal('return')}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    <RotateCcw className="w-4 h-4" /> Return
+                  </button>
+                )}
+                {orderDetails.returnRequest?.status === 'Requested' && (
+                  <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">Return Requested</span>
+                )}
               </div>
             </div>
           </div>
@@ -366,9 +496,14 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
           <div className="lg:col-span-2 space-y-6">
             {/* Courier & Tracking — the dispatch details the admin entered */}
             {(orderDetails.courier || orderDetails.trackingReference) && (
-              <Card className="border">
+              <Card className="rounded-2xl border border-slate-200 shadow-sm">
                 <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Shipping & Tracking</CardTitle>
+                  <CardTitle className="flex items-center gap-2.5 text-lg sm:text-xl">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#e01a1b]/10 text-[#e01a1b]">
+                      <Truck className="w-5 h-5" />
+                    </span>
+                    Shipping &amp; Tracking
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -401,17 +536,63 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
             )}
 
             {/* Order Status Timeline — "Track Order" deep-links here (#order-status) */}
-            <Card className="border scroll-mt-28" id="order-status">
+            <Card className="scroll-mt-28 rounded-2xl border border-slate-200 shadow-sm" id="order-status">
               <CardHeader>
-                <CardTitle className="text-lg sm:text-xl">Order Status</CardTitle>
+                <CardTitle className="flex items-center gap-2.5 text-lg sm:text-xl">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
+                    <Clock className="w-5 h-5" />
+                  </span>
+                  Order Status
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {normalizedStatus === 'cancelled' ? (
-                  <div className="flex flex-col items-center justify-center p-4">
-                    <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-red-500 mb-2" />
-                    <span className="text-base sm:text-lg font-medium text-red-600">Order Cancelled</span>
-                    <span className="text-xs sm:text-sm text-slate-500">{new Date(orderDetails.createdAt).toLocaleDateString()}</span>
-                  </div>
+                  (() => {
+                    // Full history of what happened, oldest → newest, with date + time —
+                    // so a cancelled/returned order still reads like a tracking trail.
+                    const history = [...(orderDetails.statusHistory || [])]
+                      .filter((h) => h?.status && h?.timestamp)
+                      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                    const events = history.length
+                      ? history
+                      : [{ status: orderDetails.status, timestamp: orderDetails.createdAt }]
+                    // Ensure the trail opens with "Order Placed" even if that entry wasn't logged.
+                    if (!events.some((h) => String(h.status).toUpperCase() === 'ORDER_CREATED')) {
+                      events.unshift({ status: 'ORDER_CREATED', timestamp: orderDetails.createdAt })
+                    }
+                    const isEnd = (s: string) => ['CANCELLED', 'REJECTED_BY_ADMIN_HUB', 'RETURNED'].includes(String(s).toUpperCase())
+                    return (
+                      <ol className="relative">
+                        {events.map((h, idx) => {
+                          const isLast = idx === events.length - 1
+                          const ended = isEnd(h.status)
+                          return (
+                            <li key={idx} className="relative flex gap-3 sm:gap-4">
+                              <div className="flex flex-col items-center">
+                                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${ended ? 'bg-red-500' : 'bg-green-500'}`}>
+                                  {ended ? <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-white" /> : <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-white" />}
+                                </div>
+                                {!isLast && <div className="w-0.5 flex-1 my-1 rounded-full bg-slate-200" />}
+                              </div>
+                              <div className={`min-w-0 flex-1 ${isLast ? 'pb-0' : 'pb-5 sm:pb-6'}`}>
+                                <span className={`text-sm sm:text-base font-semibold ${ended ? 'text-red-600' : 'text-slate-800'}`}>
+                                  {formatStatus(String(h.status))}
+                                </span>
+                                {formatDateTime(h.timestamp) && (
+                                  <p className="mt-1 flex items-center gap-1.5 text-xs sm:text-sm text-slate-500">
+                                    <Clock className="w-3.5 h-3.5 shrink-0" /> {formatDateTime(h.timestamp)}
+                                  </p>
+                                )}
+                                {ended && orderDetails.cancelReason && (
+                                  <p className="mt-0.5 text-xs text-slate-500">Reason: {orderDetails.cancelReason}</p>
+                                )}
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ol>
+                    )
+                  })()
                 ) : (
                   <ol className="relative">
                     {timelineSteps.map((step, idx) => {
@@ -471,33 +652,112 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                     })}
                   </ol>
                 )}
+
+                {/* Payment & refund — refund block only when the order was actually paid */}
+                {(() => {
+                  const paid = ['PAID', 'SUCCESS', 'CAPTURED'].includes(String(orderDetails.paymentStatus || '').toUpperCase())
+                  const refundLabel: Record<string, string> = {
+                    INITIATED: 'Refund Initiated', PROCESSED: 'Refunded',
+                    MANUAL: 'Refund Being Processed', FAILED: 'Refund Failed', NONE: 'No Refund',
+                  }
+                  const refundColor: Record<string, string> = {
+                    INITIATED: 'text-blue-600', PROCESSED: 'text-green-600',
+                    MANUAL: 'text-amber-600', FAILED: 'text-red-600', NONE: 'text-slate-500',
+                  }
+                  const rStatus = String(orderDetails.refundStatus || '').toUpperCase()
+                  const cur = orderDetails.currency === 'USD' ? 'USD' : 'INR'
+                  return (
+                    <div className="mt-5 space-y-1.5 border-t border-slate-100 pt-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-slate-500">Payment Status</span>
+                        <span className={`font-semibold ${paid ? 'text-green-600' : 'text-yellow-600'}`}>
+                          {orderDetails.paymentStatus || 'PENDING'}
+                        </span>
+                      </div>
+                      {paid && orderDetails.refundStatus && (
+                        <>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-slate-500">Refund Status</span>
+                            <span className={`font-semibold ${refundColor[rStatus] || 'text-slate-600'}`}>
+                              {refundLabel[rStatus] || orderDetails.refundStatus}
+                            </span>
+                          </div>
+                          {orderDetails.refundAmount != null && (
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-slate-500">Refund Amount</span>
+                              <span className="font-medium text-slate-900">{formatPrice(orderDetails.refundAmount, cur)}</span>
+                            </div>
+                          )}
+                          {orderDetails.refundId && (
+                            <div className="flex items-center justify-between gap-3 text-sm">
+                              <span className="shrink-0 text-slate-500">Refund ID</span>
+                              <span className="break-all text-right font-mono text-xs text-slate-600">{orderDetails.refundId}</span>
+                            </div>
+                          )}
+                          {rStatus === 'FAILED' && (
+                            <div className="pt-1">
+                              <p className="text-xs text-slate-500">Your refund couldn&apos;t be processed automatically. Our team will process it manually. For more info, contact us.</p>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <Link
+                                  href="/profile?tab=support"
+                                  className="inline-flex items-center justify-center rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700"
+                                >
+                                  Raise a Ticket
+                                </Link>
+                                <Link
+                                  href="/contact"
+                                  className="inline-flex items-center justify-center rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                                >
+                                  Contact Us
+                                </Link>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )
+                })()}
               </CardContent>
             </Card>
 
             {/* Ordered Items */}
-            <Card className="border overflow-hidden">
-              <CardHeader className="border-b bg-slate-50">
-                <CardTitle className="text-lg sm:text-xl">Ordered Items</CardTitle>
+            <Card className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+              <CardHeader className="border-b border-slate-100">
+                <CardTitle className="flex items-center gap-2.5 text-lg sm:text-xl">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#e01a1b]/10 text-[#e01a1b]">
+                    <Package className="w-5 h-5" />
+                  </span>
+                  Ordered Items
+                  <span className="ml-auto rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                    {orderDetails.items.length} {orderDetails.items.length === 1 ? 'item' : 'items'}
+                  </span>
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-4 sm:p-5 lg:p-6">
                 <div className="space-y-4 sm:space-y-6">
                   {orderDetails.items.map((item) => (
                     <div key={item.id} className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 border border-slate-200 rounded-2xl ring-1 ring-black/5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 hover:ring-[#e01a1b]/20 transition-all duration-500">
-                      <div className="relative w-16 h-16 sm:w-20 sm:h-20 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+                      <Link
+                        href={`/products/${item.productId}`}
+                        className="group/thumb relative w-16 h-16 sm:w-20 sm:h-20 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center shrink-0"
+                      >
                         {item.productImage ? (
                           <Image
                             src={item.productImage}
                             alt={item.productName}
                             fill
                             sizes="80px"
-                            className="object-cover"
+                            className="object-cover transition-transform duration-500 group-hover/thumb:scale-105"
                           />
                         ) : (
                           <Package className="w-8 h-8 sm:w-10 sm:h-10 text-slate-400" />
                         )}
-                      </div>
+                      </Link>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-slate-900 mb-1 text-sm sm:text-base break-words">{item.productName}</h3>
+                        <Link href={`/products/${item.productId}`} className="inline-block">
+                          <h3 className="font-semibold text-slate-900 mb-1 text-sm sm:text-base break-words transition-colors hover:text-[#e01a1b]">{item.productName}</h3>
+                        </Link>
                         <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs sm:text-sm text-slate-600 mb-2">
                           <span>Qty: {item.quantity}</span>
                           {item.color && <span>{item.color}</span>}
@@ -529,7 +789,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                     </button>
                     {normalizedStatus === "received" && (
                       hasReviewed ? (
-                        <div className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 bg-green-50 text-green-600 rounded-lg sm:rounded-xl">
+                        <div className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 bg-green-50 text-green-600 rounded-full ring-1 ring-green-200">
                           <CheckCircle className="w-4 h-4 shrink-0" />
                           <span className="font-medium text-sm">Review Submitted</span>
                         </div>
@@ -553,9 +813,14 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-8 space-y-6">
               {/* Order Summary */}
-              <Card className="border overflow-hidden">
-                <CardHeader className="border-b bg-slate-100">
-                  <CardTitle className="text-lg sm:text-xl">Order Summary</CardTitle>
+              <Card className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+                <CardHeader className="border-b border-slate-100">
+                  <CardTitle className="flex items-center gap-2.5 text-lg sm:text-xl">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#e01a1b]/10 text-[#e01a1b]">
+                      <CreditCard className="w-5 h-5" />
+                    </span>
+                    Order Summary
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-5 lg:p-6 space-y-3 sm:space-y-4">
                   <div className="flex justify-between">
@@ -578,23 +843,28 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                       <span className="font-medium text-green-600">-{money(orderDetails.discount)}</span>
                     </div>
                   )}
-                  <div className="border-t border-slate-200 pt-4">
-                    <div className="flex justify-between text-lg font-bold">
-                      <span>Total</span>
-                      <span>{money(orderDetails.totalAmount)}</span>
-                    </div>
+                  <div className="mt-1 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+                    <span className="text-base font-bold text-slate-900">Total</span>
+                    <span className="text-xl font-bold text-[#e01a1b]">{money(orderDetails.totalAmount)}</span>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Delivery Information */}
-              <Card className="border overflow-hidden">
-                <CardHeader className="border-b bg-slate-100">
-                  <CardTitle className="text-lg sm:text-xl">Delivery Info</CardTitle>
+              <Card className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+                <CardHeader className="border-b border-slate-100">
+                  <CardTitle className="flex items-center gap-2.5 text-lg sm:text-xl">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-green-500/10 text-green-600">
+                      <Truck className="w-5 h-5" />
+                    </span>
+                    Delivery Info
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-5 lg:p-6 space-y-3 sm:space-y-4">
                   <div className="flex items-center gap-3">
-                    <Calendar className="w-5 h-5 text-[#e01a1b] shrink-0" />
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#e01a1b]/10 text-[#e01a1b]">
+                      <Calendar className="w-5 h-5" />
+                    </span>
                     <div>
                       <p className="font-medium text-slate-900">
                         {normalizedStatus === "received" ? "Delivered" : "Estimated Delivery"}
@@ -611,7 +881,9 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                   </div>
                   {shippingAddr && (
                     <div className="flex items-start gap-3">
-                      <MapPin className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+                      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-green-500/10 text-green-600">
+                        <MapPin className="w-5 h-5" />
+                      </span>
                       <div className="min-w-0">
                         <p className="font-medium text-slate-900">Shipping Address</p>
                         <div className="text-sm text-slate-600 break-words">
@@ -624,7 +896,9 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                     </div>
                   )}
                   <div className="flex items-center gap-3">
-                    <CreditCard className="w-5 h-5 text-[#e01a1b] shrink-0" />
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+                      <CreditCard className="w-5 h-5" />
+                    </span>
                     <div>
                       <p className="font-medium text-slate-900">Payment Method</p>
                       <p className="text-sm text-slate-600">{orderDetails.paymentMethod || "N/A"}</p>
@@ -636,6 +910,34 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
             </div>
           </div>
         </div>
+
+        {/* Similar Products */}
+        {similarProducts.length > 0 && (
+          <Reveal className="mt-10 sm:mt-12 lg:mt-14">
+            <div className="mb-4 flex items-end justify-between gap-4 sm:mb-6">
+              <div>
+                <span className="mb-1 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#e01a1b]">
+                  <span className="h-px w-6 bg-[#e01a1b]" /> More to explore
+                </span>
+                <h2 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl lg:text-3xl">
+                  Similar Products
+                </h2>
+              </div>
+              <Link
+                href="/products"
+                className="hidden shrink-0 items-center gap-1 whitespace-nowrap text-sm font-semibold text-[#e01a1b] hover:text-[#c41617] sm:inline-flex"
+              >
+                View all
+                <ExternalLink className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+              {similarProducts.map((p) => (
+                <ProductCard key={p.id} product={p} />
+              ))}
+            </div>
+          </Reveal>
+        )}
 
       </div>
       <ReviewModal
@@ -652,6 +954,82 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
         orderId={reviewModalState.orderId}
         items={reviewModalState.items}
       />
+
+      {/* Cancel / Return confirmation modal */}
+      {actionModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]" onClick={() => !actionSubmitting && setActionModal(null)}>
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5" onClick={(e) => e.stopPropagation()}>
+            <div className={`h-1 w-full ${actionModal === 'cancel' ? 'bg-gradient-to-r from-red-500 to-rose-500' : 'bg-gradient-to-r from-slate-500 to-slate-600'}`} />
+            <div className="p-6">
+              <h3 className="text-[17px] font-bold text-slate-900">
+                {actionModal === 'cancel' ? 'Cancel this order?' : 'Request a return'}
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Order #{orderDetails.orderId}
+                {actionModal === 'cancel'
+                  ? ' — the order will be cancelled and your payment refunded to the original method.'
+                  : ' — tell us why, and our team will review your return.'}
+              </p>
+
+              <label className="mt-4 block text-sm font-medium text-slate-700">
+                Reason {actionModal === 'return' && <span className="text-red-500">*</span>}
+                {actionModal === 'cancel' && <span className="font-normal text-slate-400"> (optional)</span>}
+              </label>
+              <div className="mt-2 space-y-1.5">
+                {(actionModal === 'cancel' ? CANCEL_REASONS : RETURN_REASONS).map((r) => (
+                  <label
+                    key={r}
+                    className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      reasonChoice === r ? 'border-[#e01a1b] bg-[#fff5f5] text-[#1a1a1a]' : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="cancel-return-reason"
+                      value={r}
+                      checked={reasonChoice === r}
+                      onChange={() => setReasonChoice(r)}
+                      disabled={actionSubmitting}
+                      className="h-4 w-4 accent-[#e01a1b]"
+                    />
+                    {r}
+                  </label>
+                ))}
+              </div>
+              {reasonChoice === 'Other' && (
+                <textarea
+                  value={actionReason}
+                  onChange={(e) => setActionReason(e.target.value)}
+                  disabled={actionSubmitting}
+                  rows={2}
+                  autoFocus
+                  placeholder="Please describe your reason…"
+                  className="mt-2 w-full resize-none rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none transition-all focus:border-[#e01a1b] focus:ring-4 focus:ring-[#e01a1b]/10 disabled:bg-slate-50"
+                />
+              )}
+
+              <div className="mt-5 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setActionModal(null)}
+                  disabled={actionSubmitting}
+                  className="rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {actionModal === 'cancel' ? 'Keep Order' : 'Close'}
+                </button>
+                <button
+                  type="button"
+                  onClick={submitAction}
+                  disabled={actionSubmitting}
+                  className={`rounded-full px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${actionModal === 'cancel' ? 'bg-[#e01a1b] hover:bg-[#c41617]' : 'bg-slate-800 hover:bg-slate-900'}`}
+                >
+                  {actionSubmitting ? 'Submitting…' : actionModal === 'cancel' ? 'Cancel Order' : 'Submit Return'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

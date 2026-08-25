@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X, Copy, MapPin, ExternalLink, Mail, Phone } from "lucide-react";
+import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X, XCircle, Copy, MapPin, ExternalLink, Mail, Phone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Dropdown from "@/components/UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
@@ -19,6 +19,32 @@ interface VendorToHubDetailProps {
 }
 
 import { hubService, Hub } from "@/services/hubService";
+
+// Admin can cancel the whole order at any stage up to (but not including)
+// shipment to the customer. After that it's a Return, not a Cancel.
+const CANCELLABLE_ORDER_STATUSES = new Set([
+  "ORDER_CREATED",
+  "VENDOR_PROCESSING",
+  "PACKED_BY_VENDOR",
+  "IN_TRANSIT_TO_ADMIN_HUB",
+  "RECEIVED_AT_ADMIN_HUB",
+  "APPROVED_BY_ADMIN_HUB",
+  "REJECTED_BY_ADMIN_HUB",
+]);
+
+const ADMIN_CANCEL_REASONS = [
+  "Customer requested cancellation",
+  "Item out of stock / unavailable",
+  "Payment issue",
+  "Suspected fraud",
+  "Vendor unable to fulfil",
+  "Pricing / listing error",
+  "Other",
+];
+
+// "CANCELLED" → "Cancelled"
+const formatStatusLabel = (status: string) =>
+  String(status || "").replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase());
 
 export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
   const router = useRouter();
@@ -42,6 +68,41 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
   // Guard against duplicate status/review submissions from rapid double-clicks.
   const [isProcessing, setIsProcessing] = useState(false);
   const processingRef = useRef(false);
+
+  // Admin order cancellation (whole order, any pre-shipment stage).
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelChoice, setCancelChoice] = useState("");
+  const [cancelOther, setCancelOther] = useState("");
+  const [cancelling, setCancelling] = useState(false);
+
+  const handleCancelOrder = async () => {
+    const reason = cancelChoice === "Other" ? cancelOther.trim() : cancelChoice;
+    if (!reason) {
+      showErrorToast("Please select or enter a cancellation reason.");
+      return;
+    }
+    const orderPk = shipment?.order?.id;
+    if (!orderPk) {
+      showErrorToast("Order reference unavailable.");
+      return;
+    }
+    try {
+      setCancelling(true);
+      const res = await orderService.cancelAdminOrder(orderPk, reason);
+      if (res.success) {
+        const paid = ["PAID", "SUCCESS", "CAPTURED"].includes(String(shipment?.order?.paymentStatus || "").toUpperCase());
+        showSuccessToast("Order cancelled" + (paid ? " — refund initiated" : ""));
+        setShowCancelModal(false);
+        setCancelChoice("");
+        setCancelOther("");
+        await fetchShipmentDetails();
+      }
+    } catch (error: any) {
+      showErrorToast(error.message || "Failed to cancel order");
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   // Force a re-render once the admin-managed courier catalogue is loaded, so
   // courierName() can resolve DB courier ids to their display names.
@@ -194,6 +255,9 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
   // TODO: Uncomment when shipment amount is needed on the UI
   // const shipmentAmount = shipment.items?.reduce((acc, item) => acc + item.totalPrice, 0) || 0;
   const order = shipment.order;
+  // Once the whole order is cancelled/returned, no per-vendor action applies —
+  // hide Proceed / Received / Review regardless of the (possibly stale) shipment status.
+  const orderIsTerminal = ["CANCELLED", "RETURNED"].includes(String(order?.status || "").toUpperCase());
   // Every figure below is stored in the currency the buyer was charged in, so a .com
   // order holds USD. Show that as the source of truth, with an INR equivalent from the
   // order's own rate snapshot (never the live rate, which would rewrite history).
@@ -226,7 +290,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           </div>
         </div>
         <div className="flex gap-3">
-          {shipment.status === "ORDER_CREATED" && hasPermission('vendor_to_hub:update_status') && (
+          {!orderIsTerminal && shipment.status === "ORDER_CREATED" && hasPermission('vendor_to_hub:update_status') && (
             <button
               onClick={handleProceed}
               className="px-6 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-medium"
@@ -234,7 +298,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               Assign Hub / Proceed
             </button>
           )}
-          {shipment.status === "IN_TRANSIT_TO_ADMIN_HUB" && hasPermission('vendor_to_hub:update_status') && (
+          {!orderIsTerminal && shipment.status === "IN_TRANSIT_TO_ADMIN_HUB" && hasPermission('vendor_to_hub:update_status') && (
             <button
               onClick={handleMarkAsReceived}
               disabled={isProcessing}
@@ -243,13 +307,26 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               {isProcessing ? "Updating Status..." : "Mark as Received at Hub"}
             </button>
           )}
-          {shipment.status === "RECEIVED_AT_ADMIN_HUB" && hasPermission('vendor_to_hub:edit') && (
+          {!orderIsTerminal && shipment.status === "RECEIVED_AT_ADMIN_HUB" && hasPermission('vendor_to_hub:edit') && (
             <button
               onClick={() => setShowReviewModal(true)}
               className="px-6 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-medium"
             >
               Review Delivery & Approve
             </button>
+          )}
+          {CANCELLABLE_ORDER_STATUSES.has(shipment.order?.status || shipment.status) && hasPermission('vendor_to_hub:update_status') && (
+            <button
+              onClick={() => setShowCancelModal(true)}
+              className="px-6 py-2 rounded-lg border border-red-300 bg-white text-red-600 hover:bg-red-50 transition-colors font-medium"
+            >
+              Cancel Order
+            </button>
+          )}
+          {orderIsTerminal && (
+            <div className="px-6 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 font-medium">
+              Order {formatStatusLabel(order?.status || "")}
+            </div>
           )}
         </div>
       </div>
@@ -876,6 +953,66 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                 }`}
               >
                 {isProcessing ? "Submitting..." : isApproved ? "Approve Shipment" : "Reject Shipment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Order modal — whole order, any pre-shipment stage */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-1 flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-red-500" />
+              <h3 className="text-lg font-semibold text-slate-900">Cancel Order</h3>
+            </div>
+            <p className="mb-4 text-sm text-slate-500">
+              This cancels the entire order{["PAID", "SUCCESS", "CAPTURED"].includes(String(shipment.order?.paymentStatus || "").toUpperCase())
+                ? " and automatically refunds the customer"
+                : ""}. All pending vendor settlements will be cancelled. This can&apos;t be undone.
+            </p>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500">Reason</label>
+            <div className="space-y-2">
+              {ADMIN_CANCEL_REASONS.map((r) => (
+                <label key={r} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="radio"
+                    name="admin-cancel-reason"
+                    value={r}
+                    checked={cancelChoice === r}
+                    onChange={() => setCancelChoice(r)}
+                    className="h-4 w-4 accent-red-600"
+                  />
+                  {r}
+                </label>
+              ))}
+            </div>
+            {cancelChoice === "Other" && (
+              <textarea
+                value={cancelOther}
+                onChange={(e) => setCancelOther(e.target.value)}
+                placeholder="Enter the reason…"
+                rows={3}
+                className="mt-2 w-full rounded-lg border border-slate-200 p-2.5 text-sm text-slate-700 focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400"
+              />
+            )}
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(false)}
+                disabled={cancelling}
+                className="rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+              >
+                Keep Order
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelOrder}
+                disabled={cancelling || !cancelChoice || (cancelChoice === "Other" && !cancelOther.trim())}
+                className="inline-flex items-center gap-2 rounded-full bg-red-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {cancelling ? "Cancelling…" : "Cancel Order"}
               </button>
             </div>
           </div>

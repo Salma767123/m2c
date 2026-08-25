@@ -88,7 +88,7 @@ export default function Settings() {
 
   // Company info state (only for super_admin and admin)
   const [companyInfo, setCompanyInfo] = useState({
-    companyName: "M2C Marketplace Pvt Ltd",
+    companyName: "M2C Markdowns Pvt Ltd",
     companyLogo: "",
     secondaryLogo: "",
     gstNumber: "29ABCDE1234F1Z5",

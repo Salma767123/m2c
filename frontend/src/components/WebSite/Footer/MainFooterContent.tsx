@@ -80,8 +80,8 @@ import { useSamePageTop } from "@/components/WebSite/Shared/useSamePageTop";
  * the rows beneath it.
  */
 const ColHeading = ({ children }: { children: React.ReactNode }) => (
-  <h4 className="flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.24em] text-[#f5c8c2]">
-    <span aria-hidden className="h-px w-5 shrink-0 bg-[#f5c8c2]" />
+  <h4 className="flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.24em] text-[#ff6b6c]">
+    <span aria-hidden className="h-px w-5 shrink-0 bg-gradient-to-r from-[#e01a1b] to-[#ff6b6c]" />
     {children}
   </h4>
 );
@@ -110,7 +110,7 @@ const ColHeading = ({ children }: { children: React.ReactNode }) => (
  * screen reader should hear it once.
  */
 const ROW =
-  "group flex w-full items-center gap-2.5 py-[7px] leading-none text-[#fdf6f1] transition-colors duration-300";
+  "group flex w-full items-center gap-2.5 py-[7px] leading-none text-[#e7e2df] transition-colors duration-300";
 const SWAP = "transition-transform duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-full";
 
 /**
@@ -125,7 +125,7 @@ const SWAP = "transition-transform duration-[420ms] ease-[cubic-bezier(0.22,1,0.
 const SwapLabel = ({ label, wrapper = "", line = "" }: { label: string; wrapper?: string; line?: string }) => (
   <span className={`relative block h-[1.4em] overflow-hidden ${wrapper}`}>
     <span className={`block leading-[1.4] ${SWAP} ${line}`}>{label}</span>
-    <span aria-hidden className={`absolute inset-x-0 top-full block leading-[1.4] text-[#ffd9d4] ${SWAP} ${line}`}>
+    <span aria-hidden className={`absolute inset-x-0 top-full block leading-[1.4] text-[#ff6b6c] ${SWAP} ${line}`}>
       {label}
     </span>
   </span>
@@ -163,7 +163,7 @@ const ConnectRow = ({
     {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
     className={`${ROW} text-[16px]`}
   >
-    <Icon className="h-4 w-4 shrink-0 text-[#eec4bd] transition-colors duration-300 group-hover:text-white" />
+    <Icon className="h-4 w-4 shrink-0 text-[#ff8f8f] transition-colors duration-300 group-hover:text-white" />
     {/* The email overruns a 236px column, so its two copies truncate together —
         applied to one only, the red copy would arrive a different length. */}
     <SwapLabel label={label} wrapper="min-w-0 flex-1" line={clip ? "truncate" : ""} />
@@ -173,7 +173,7 @@ const ConnectRow = ({
 const MainFooterContent = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [companyInfo, setCompanyInfo] = useState<PublicCompanyInfo>({
-    companyName: 'M2C MarkDowns Private Limited',
+    companyName: 'M2C Markdowns Pvt Ltd',
     companyLogo: null,
     secondaryLogo: null,
     companyEmail: null,
@@ -267,7 +267,7 @@ const MainFooterContent = () => {
   ].filter((s) => s.url) as { url: string; Icon: typeof Instagram; label: string; fill: string }[];
 
   return (
-    <div ref={rootRef} className="relative overflow-hidden text-[#fdf6f1]">
+    <div ref={rootRef} className="relative overflow-hidden text-[#e7e2df]">
       <style>{`
         .m2c-col { opacity: 0; transform: translateY(22px); }
         .is-woven .m2c-col {
@@ -304,12 +304,12 @@ const MainFooterContent = () => {
             <Link href="/" className="inline-block">
               <CompanyLogo
                 className="h-12 w-auto object-contain sm:h-14"
-                skeletonClassName="h-12 sm:h-14 w-40 bg-black/5"
+                skeletonClassName="h-12 sm:h-14 w-40 bg-white/10"
                 fallbackWidth={220}
                 fallbackHeight={56}
               />
             </Link>
-            <p className="mt-5 max-w-[19rem] text-[14.5px] leading-[1.65] text-[#e8cfc9]">
+            <p className="mt-5 max-w-[19rem] text-[14.5px] leading-[1.65] text-[#b3adaa]">
               Home textiles bought direct from the workshops that weave them — towels, aprons, table linen and bath accessories in cotton that lasts.
             </p>
             {/* Solid oxblood rather than a white pill on a warm ground. The
@@ -317,7 +317,7 @@ const MainFooterContent = () => {
                 same mismatch the newsletter card had. */}
             <Link
               href="/about"
-              className="group mt-6 inline-flex items-center gap-2 rounded-full bg-[#fdf6f1] px-6 py-2.5 text-[13px] font-semibold tracking-[0.04em] text-[#6b1b1e] transition-colors duration-200 hover:bg-white"
+              className="group mt-6 inline-flex items-center gap-2 rounded-full bg-[#e01a1b] px-6 py-2.5 text-[13px] font-semibold tracking-[0.04em] text-white shadow-[0_10px_26px_-12px_rgba(224,26,27,0.9)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c41617] hover:shadow-[0_16px_32px_-12px_rgba(224,26,27,0.9)]"
             >
               About M2C
               <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" />
@@ -387,7 +387,7 @@ const MainFooterContent = () => {
 
             {connectSocials.length > 0 && (
               <>
-                <p className="mt-7 text-[11px] font-bold uppercase tracking-[0.2em] text-[#eecdc7]">Follow us</p>
+                <p className="mt-7 text-[11px] font-bold uppercase tracking-[0.2em] text-[#9a9491]">Follow us</p>
                 <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
                   {connectSocials.map(({ url, Icon, label, fill }) => (
                     <a
@@ -406,7 +406,7 @@ const MainFooterContent = () => {
                           the name survives on the accessible name and the
                           tooltip. */}
                       <Icon
-                        className="relative z-10 h-[18px] w-[18px] text-[#f8d5d0] transition-colors duration-300 group-hover:text-white"
+                        className="relative z-10 h-[18px] w-[18px] text-[#d9d4d1] transition-colors duration-300 group-hover:text-white"
                         strokeWidth={1.8}
                       />
                     </a>

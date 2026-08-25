@@ -239,7 +239,7 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
             )}
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/80">Invoice</p>
-              {(companyName !== "M2C Store" && companyName !== "M2C Marketplace Pvt Ltd") && (
+              {(companyName !== "M2C Store" && companyName !== "M2C Marketplace Pvt Ltd" && companyName !== "M2C Markdowns Pvt Ltd") && (
                 <p className="mt-0.5 text-xl font-bold text-white">{companyName}</p>
               )}
               <p className="mt-1 inline-flex items-center rounded-md bg-white/20 px-2.5 py-1 font-mono text-sm font-bold tracking-wide text-white ring-1 ring-white/30">

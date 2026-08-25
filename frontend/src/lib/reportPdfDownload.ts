@@ -6,7 +6,7 @@ const BRAND_R = 34
 const BRAND_G = 34
 const BRAND_B = 34
 
-const COMPANY_NAME = "M 2 C MarkDowns Private Limited"
+const COMPANY_NAME = "M 2 C Markdowns Pvt Ltd"
 const LOGO_PATH = "/assets/logo/m2c-logo.png"
 
 interface DownloadReportPdfOptions {

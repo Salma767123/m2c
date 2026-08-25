@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Package, CreditCard, User, MapPin, Truck, Star, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Package, CreditCard, User, MapPin, Truck, Star, CheckCircle, XCircle, AlertTriangle, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order, VendorShipment } from "@/services/orderService";
@@ -16,6 +16,74 @@ interface HubToCustomerDetailProps {
   orderId: string;
 }
 
+// Order can be cancelled by admin at any stage up to (but not including) shipment.
+// Once shipped/delivered it goes through Return, not Cancel.
+const CANCELLABLE_ORDER_STATUSES = new Set([
+  "ORDER_CREATED",
+  "VENDOR_PROCESSING",
+  "PACKED_BY_VENDOR",
+  "IN_TRANSIT_TO_ADMIN_HUB",
+  "RECEIVED_AT_ADMIN_HUB",
+  "APPROVED_BY_ADMIN_HUB",
+  "REJECTED_BY_ADMIN_HUB",
+]);
+
+const ADMIN_CANCEL_REASONS = [
+  "Customer requested cancellation",
+  "Item out of stock / unavailable",
+  "Payment issue",
+  "Suspected fraud",
+  "Vendor unable to fulfil",
+  "Pricing / listing error",
+  "Other",
+];
+
+// "SHIPPED_TO_CUSTOMER" → "Shipped To Customer"
+const formatStatusLabel = (status: string) =>
+  String(status || "").replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase());
+
+// ISO → "17 Aug 2026, 2:09 PM" (null on bad input)
+const formatTimelineDate = (iso?: string | null): string | null => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleString("en-IN", {
+    day: "numeric", month: "short", year: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  });
+};
+
+// Who moved the order into this status.
+const actorLabel = (updatedByType?: string): string => {
+  switch (String(updatedByType || "").toLowerCase()) {
+    case "admin": return "Admin";
+    case "customer": return "Customer";
+    case "vendor": return "Vendor";
+    case "system": return "System";
+    default: return "System";
+  }
+};
+
+const isNegativeStatus = (status: string) =>
+  ["CANCELLED", "RETURNED", "REJECTED_BY_ADMIN_HUB"].includes(String(status || "").toUpperCase());
+
+// Build the ordered timeline from status history, oldest first. Synthesises an
+// ORDER_CREATED step at the order's creation time when history doesn't record one
+// (older orders predate status-history logging).
+const buildTimeline = (
+  history: any[] | undefined,
+  createdAt?: string,
+): Array<{ status: string; timestamp?: string; updatedByType?: string; comment?: string }> => {
+  const rows = [...(history || [])]
+    .filter((h) => h && h.status)
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  const hasCreated = rows.some((r) => String(r.status).toUpperCase() === "ORDER_CREATED");
+  if (!hasCreated && createdAt) {
+    rows.unshift({ status: "ORDER_CREATED", timestamp: createdAt, updatedByType: "system", comment: "Order placed" });
+  }
+  return rows;
+};
+
 export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProps) {
   const router = useRouter();
   const [order, setOrder] = useState<Order | null>(null);
@@ -27,6 +95,60 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
   const [shipCourier, setShipCourier] = useState("");
   const [shipTracking, setShipTracking] = useState("");
   const [submittingShip, setSubmittingShip] = useState(false);
+  // Return-request review.
+  const [returnDeciding, setReturnDeciding] = useState(false);
+  const [showReject, setShowReject] = useState(false);
+  const [rejectNote, setRejectNote] = useState("");
+
+  // Admin order cancellation (whole order, any pre-shipment stage).
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelChoice, setCancelChoice] = useState("");
+  const [cancelOther, setCancelOther] = useState("");
+  const [cancelling, setCancelling] = useState(false);
+
+  const handleCancelOrder = async () => {
+    const reason = cancelChoice === "Other" ? cancelOther.trim() : cancelChoice;
+    if (!reason) {
+      showErrorToast("Please select or enter a cancellation reason.");
+      return;
+    }
+    try {
+      setCancelling(true);
+      const res = await orderService.cancelAdminOrder(orderId, reason);
+      if (res.success) {
+        const paid = ["PAID", "SUCCESS", "CAPTURED"].includes(String(order?.paymentStatus || "").toUpperCase());
+        showSuccessToast("Order cancelled" + (paid ? " — refund initiated" : ""));
+        setOrder(res.data);
+        setShowCancelModal(false);
+        setCancelChoice("");
+        setCancelOther("");
+      }
+    } catch (error: any) {
+      showErrorToast(error.message || "Failed to cancel order");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleReturnDecision = async (decision: "approve" | "reject") => {
+    if (!order) return;
+    if (decision === "reject" && !rejectNote.trim()) {
+      showErrorToast("Reason required", "Please add a reason for rejecting the return.");
+      return;
+    }
+    try {
+      setReturnDeciding(true);
+      const res = await orderService.decideReturn(order.id, decision, rejectNote.trim() || undefined);
+      showSuccessToast(decision === "approve" ? "Return Approved" : "Return Rejected", res.message || "");
+      setOrder(res.data);
+      setShowReject(false);
+      setRejectNote("");
+    } catch (e: any) {
+      showErrorToast("Failed", e?.message || "Please try again.");
+    } finally {
+      setReturnDeciding(false);
+    }
+  };
 
   useEffect(() => {
     fetchOrderDetails();
@@ -314,6 +436,14 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
               Order Delivered
             </div>
           )}
+          {CANCELLABLE_ORDER_STATUSES.has(status) && hasPermission('hub_to_customer:update_status') && (
+            <button
+              onClick={() => setShowCancelModal(true)}
+              className="px-6 py-2 rounded-lg border border-red-300 bg-white text-red-600 hover:bg-red-50 transition-colors font-medium"
+            >
+              Cancel Order
+            </button>
+          )}
         </div>
       </div>
 
@@ -336,6 +466,190 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           </div>
         </div>
       )}
+
+      {/* Cancellation — shown when the order was cancelled (reason + refund) */}
+      {order.status === 'CANCELLED' && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+          <div className="mb-3 flex items-center gap-2">
+            <XCircle className="h-5 w-5 text-red-500" />
+            <h2 className="text-lg font-semibold text-slate-900">Cancellation</h2>
+          </div>
+          <div className="space-y-3 text-sm">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Reason</p>
+              <p className="mt-0.5 text-slate-900">{order.cancelReason || '— (no reason given)'}</p>
+            </div>
+
+            {/* Refund details — mirrors what the customer sees on their order page */}
+            <div className="rounded-md border border-slate-100 bg-slate-50 p-3">
+              <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">Refund</p>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-500">Payment Status</span>
+                  <span className={`font-semibold ${
+                    ['PAID', 'SUCCESS', 'CAPTURED'].includes(String(order.paymentStatus || '').toUpperCase())
+                      ? 'text-green-600' : 'text-amber-600'
+                  }`}>
+                    {order.paymentStatus || '—'}
+                  </span>
+                </div>
+                {(() => {
+                  const map: Record<string, { label: string; cls: string }> = {
+                    INITIATED: { label: 'Refund Initiated', cls: 'text-blue-600' },
+                    PROCESSED: { label: 'Refunded', cls: 'text-green-600' },
+                    MANUAL: { label: 'Manual Refund Pending', cls: 'text-amber-600' },
+                    FAILED: { label: 'Refund Failed', cls: 'text-red-600' },
+                    NONE: { label: 'No Refund', cls: 'text-slate-600' },
+                  };
+                  const s = String(order.refundStatus || '').toUpperCase();
+                  const info = map[s];
+                  if (!order.refundStatus) return null;
+                  return (
+                    <>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-slate-500">Refund Status</span>
+                        <span className={`font-semibold ${info?.cls || 'text-slate-700'}`}>
+                          {info?.label || order.refundStatus}
+                        </span>
+                      </div>
+                      {typeof order.refundAmount === 'number' && order.refundAmount > 0 && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-slate-500">Refund Amount</span>
+                          <span className="text-right font-semibold text-slate-800">{money(order.refundAmount)}</span>
+                        </div>
+                      )}
+                      {order.refundId && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-slate-500">Refund ID</span>
+                          <span className="break-all text-right font-mono text-xs text-slate-600">{order.refundId}</span>
+                        </div>
+                      )}
+                      {s === 'FAILED' && (
+                        <p className="pt-1 text-xs text-slate-500">Automatic refund failed at the gateway — process this refund manually.</p>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return Request — shown when a customer has raised one */}
+      {order.returnRequest && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <RotateCcw className="h-5 w-5 text-slate-600" />
+            <h2 className="text-lg font-semibold text-slate-900">Return Request</h2>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+              order.returnRequest.status === "Requested" ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+                : order.returnRequest.status === "Approved" ? "bg-green-50 text-green-700 ring-1 ring-green-200"
+                : "bg-red-50 text-red-700 ring-1 ring-red-200"
+            }`}>
+              {order.returnRequest.status}
+            </span>
+          </div>
+
+          <div className="space-y-2 text-sm">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Reason</p>
+              <p className="mt-0.5 text-slate-900">{order.returnRequest.reason || "—"}</p>
+            </div>
+            {order.returnRequest.requestedAt && (
+              <p className="text-xs text-slate-500">Requested on {new Date(order.returnRequest.requestedAt).toLocaleString("en-IN")}</p>
+            )}
+            {order.returnRequest.note && (
+              <p className="text-xs text-slate-500">Admin note: {order.returnRequest.note}</p>
+            )}
+            {order.refundStatus && (
+              <p className="text-xs text-slate-500">
+                Refund: <span className="font-semibold text-slate-700">{order.refundStatus}</span>
+                {order.refundId ? ` · ${order.refundId}` : ""}
+              </p>
+            )}
+          </div>
+
+          {order.returnRequest.status === "Requested" && (
+            <div className="mt-4">
+              {!showReject ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => handleReturnDecision("approve")}
+                    disabled={returnDeciding}
+                    className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+                  >
+                    <CheckCircle className="h-4 w-4" /> Approve & Refund
+                  </button>
+                  <button
+                    onClick={() => setShowReject(true)}
+                    disabled={returnDeciding}
+                    className="inline-flex items-center gap-2 rounded-lg border border-red-300 px-5 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+                  >
+                    <XCircle className="h-4 w-4" /> Reject
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <textarea
+                    value={rejectNote}
+                    onChange={(e) => setRejectNote(e.target.value)}
+                    rows={2}
+                    placeholder="Reason for rejecting the return (shown to the customer)…"
+                    className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                  />
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => handleReturnDecision("reject")} disabled={returnDeciding} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">Confirm Reject</button>
+                    <button onClick={() => { setShowReject(false); setRejectNote(""); }} disabled={returnDeciding} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Order Timeline — full status history with date, time and who acted */}
+      {(() => {
+        const timeline = buildTimeline(order.statusHistory, order.createdAt);
+        if (timeline.length === 0) return null;
+        return (
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+            <div className="flex items-center gap-2 mb-4">
+              <Truck className="h-5 w-5 text-slate-600" />
+              <h2 className="text-lg font-semibold text-slate-900">Order Timeline</h2>
+            </div>
+            <ol className="relative">
+              {timeline.map((step, i) => {
+                const negative = isNegativeStatus(step.status);
+                const isLast = i === timeline.length - 1;
+                return (
+                  <li key={i} className="flex gap-3 pb-5 last:pb-0">
+                    <div className="flex flex-col items-center">
+                      {negative
+                        ? <XCircle className="h-5 w-5 shrink-0 text-red-500" />
+                        : <CheckCircle className="h-5 w-5 shrink-0 text-green-600" />}
+                      {!isLast && <span className="mt-1 w-px flex-1 bg-slate-200" />}
+                    </div>
+                    <div className="-mt-0.5 min-w-0 flex-1">
+                      <p className={`text-sm font-semibold ${negative ? "text-red-600" : "text-slate-900"}`}>
+                        {formatStatusLabel(step.status)}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {formatTimelineDate(step.timestamp) || "—"}
+                        <span className="text-slate-400"> · by {actorLabel(step.updatedByType)}</span>
+                      </p>
+                      {step.comment && (
+                        <p className="mt-0.5 text-xs text-slate-500">{step.comment}</p>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        );
+      })()}
 
       {/* Order Details */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
@@ -682,6 +996,66 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
                 className="inline-flex items-center gap-2 rounded-full bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submittingShip ? "Shipping…" : "Confirm & Ship"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Order modal — whole order, any pre-shipment stage */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-1 flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-red-500" />
+              <h3 className="text-lg font-semibold text-slate-900">Cancel Order</h3>
+            </div>
+            <p className="mb-4 text-sm text-slate-500">
+              This cancels the entire order{["PAID", "SUCCESS", "CAPTURED"].includes(String(order.paymentStatus || "").toUpperCase())
+                ? " and automatically refunds the customer"
+                : ""}. All pending vendor settlements will be cancelled. This can&apos;t be undone.
+            </p>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500">Reason</label>
+            <div className="space-y-2">
+              {ADMIN_CANCEL_REASONS.map((r) => (
+                <label key={r} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="radio"
+                    name="admin-cancel-reason"
+                    value={r}
+                    checked={cancelChoice === r}
+                    onChange={() => setCancelChoice(r)}
+                    className="h-4 w-4 accent-red-600"
+                  />
+                  {r}
+                </label>
+              ))}
+            </div>
+            {cancelChoice === "Other" && (
+              <textarea
+                value={cancelOther}
+                onChange={(e) => setCancelOther(e.target.value)}
+                placeholder="Enter the reason…"
+                rows={3}
+                className="mt-2 w-full rounded-lg border border-slate-200 p-2.5 text-sm text-slate-700 focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400"
+              />
+            )}
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(false)}
+                disabled={cancelling}
+                className="rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+              >
+                Keep Order
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelOrder}
+                disabled={cancelling || !cancelChoice || (cancelChoice === "Other" && !cancelOther.trim())}
+                className="inline-flex items-center gap-2 rounded-full bg-red-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {cancelling ? "Cancelling…" : "Cancel Order"}
               </button>
             </div>
           </div>
