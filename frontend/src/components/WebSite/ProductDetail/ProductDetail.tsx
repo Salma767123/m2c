@@ -1265,9 +1265,9 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
             </nav>
           )}
           <div className="bg-white rounded-xl sm:rounded-2xl overflow-clip">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
+            <div className="grid grid-cols-1 lg:grid-cols-[4.5fr_3.5fr_4fr] gap-0">
               {/* Product Images */}
-              <div className="lg:col-span-4 p-3 sm:p-4 lg:p-6 bg-linear-to-br from-[#faf9f7] to-white">
+              <div className="p-3 sm:p-4 lg:p-6 bg-linear-to-br from-[#faf9f7] to-white">
                 <div className="lg:sticky lg:top-40">
                   {/*
                     Gallery — vertical thumbnail rail beside the image on desktop,
@@ -1472,7 +1472,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
               </div>
 
               {/* Product Info - Shows magnified image when hovering (desktop only) */}
-              <div className="product-info-container lg:col-span-4 relative p-3 sm:p-4 lg:p-6 lg:pl-4">
+              <div className="product-info-container relative p-3 sm:p-4 lg:p-6 lg:pl-4">
                 {/* Magnified Image Overlay - Desktop only (hover-driven). lg:hidden on mobile so info always shows. */}
                 {isImageHovered && currentImageUrl && (
                   <div className="hidden lg:flex w-full items-start justify-center bg-white rounded-r-2xl lg:sticky lg:top-40">
@@ -1720,7 +1720,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                   live in here, so hiding the rail below lg would have taken Add
                   to Cart off every phone. Below lg it simply stacks under the
                   product facts. */}
-              <aside className="flex flex-col gap-5 self-start p-3 sm:p-4 lg:col-span-4 lg:sticky lg:top-40 lg:p-6 lg:pl-2">
+              <aside className="flex flex-col gap-5 self-start p-3 sm:p-4 lg:sticky lg:top-40 lg:p-6 lg:pl-2">
                 <div className="rounded-2xl bg-white p-4 ring-1 ring-black/[0.07] sm:p-5">
                   {/* The asking price again, compact, at the top of the box. */}
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pb-3">
