@@ -413,8 +413,14 @@ const getCart = async (req, res) => {
 const updateCartItem = async (req, res) => {
   try {
     const { itemId } = req.params;
-    const { quantity, transportType, courier } = req.body;
+    const { quantity, transportType, courier, currency } = req.body;
     const userId = req.userId;
+    // The storefront sends its active currency when the shopper sets shipping.
+    // The courier picker is region-specific, so we must validate the chosen
+    // courier against the region the shopper is actually looking at — not the
+    // (possibly stale, other-region) currency frozen on the line when it was
+    // first added. A blank/invalid value falls back to the line's currency.
+    const reqCurrency = (currency === 'USD' || currency === 'INR') ? currency : null;
 
     // Any field may be updated independently — the cart's transport selector changes
     // transportType (+ courier), the +/- steppers change only quantity.
@@ -487,9 +493,10 @@ const updateCartItem = async (req, res) => {
     }
     // Validate the courier against the region (from the line's currency) and the
     // resolved transport mode (the new choice if supplied, else the stored one).
+    const effectiveCurrency = reqCurrency || cartItem.currency;
     if (wantsCourier && courier !== null) {
       const mode = wantsTransport ? transportType : (cartItem.transportType || (allowed.length === 1 ? allowed[0] : null));
-      if (!(await isCourierAvailable(courier, cartItem.currency, mode))) {
+      if (!(await isCourierAvailable(courier, effectiveCurrency, mode))) {
         return res.status(400).json({
           success: false,
           error: 'Selected courier is not available for this shipping method'
@@ -503,6 +510,10 @@ const updateCartItem = async (req, res) => {
         ...(wantsQuantity ? { quantity } : {}),
         ...(wantsTransport ? { transportType } : {}),
         ...(wantsCourier ? { courier } : {}),
+        // Re-align the line to the region the shopper set shipping in, so a line
+        // added in another region (e.g. an old .com/USD line) doesn't keep
+        // rejecting this region's couriers.
+        ...(reqCurrency && (wantsTransport || wantsCourier) ? { currency: reqCurrency } : {}),
       }
     });
 

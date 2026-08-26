@@ -247,6 +247,7 @@ const Profile = () => {
 
         setUserProfile(profile);
         setEditedProfile(profile);
+        syncStoredTitle(profile.title || '');
       }
     } catch (error: any) {
       console.error('Error loading profile:', error);
@@ -334,6 +335,26 @@ const Profile = () => {
       dispatchAuthChange();
     } catch {
       /* non-fatal — header will pick it up on next load */
+    }
+  };
+
+  // Mirror the title into the stored auth session so the header's "Signed in as"
+  // shows the full name with title even for sessions created before login began
+  // returning it. Only writes when the stored copy is missing/stale.
+  const syncStoredTitle = (title: string) => {
+    try {
+      const store = localStorage.getItem('userToken') ? localStorage : sessionStorage;
+      const raw = store.getItem('userData');
+      if (raw) {
+        const u = JSON.parse(raw);
+        if ((u.title || '') !== (title || '')) {
+          u.title = title;
+          store.setItem('userData', JSON.stringify(u));
+          dispatchAuthChange();
+        }
+      }
+    } catch {
+      /* non-fatal — header will pick it up on next login */
     }
   };
 

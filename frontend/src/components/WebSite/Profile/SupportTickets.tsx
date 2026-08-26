@@ -65,13 +65,6 @@ const CATEGORY_OPTIONS = [
   { value: 'account', label: 'Account & Login' },
   { value: 'other', label: 'Other' },
 ]
-const PRIORITY_OPTIONS = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'urgent', label: 'Urgent' },
-]
-
 const DESCRIPTION_MIN = 20
 const DESCRIPTION_MAX = 600
 
@@ -343,16 +336,6 @@ function CreateTicket({ onCancel, onCreated }: { onCancel: () => void; onCreated
               {errors.otherCategory && <p className="mt-1.5 text-xs font-medium text-[#a01718]">{errors.otherCategory}</p>}
             </div>
           )}
-        </div>
-
-        <div className="sm:max-w-[50%]">
-          <Dropdown
-            label="Priority"
-            value={form.priority}
-            options={PRIORITY_OPTIONS}
-            onChange={(v) => setForm((p) => ({ ...p, priority: v as string }))}
-            placeholder="Select priority"
-          />
         </div>
 
         <div>

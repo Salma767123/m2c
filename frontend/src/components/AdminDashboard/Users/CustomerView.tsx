@@ -202,6 +202,19 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
                 <div className="space-y-3">
                   {customer.addresses.map((addr: any, idx: number) => (
                     <div key={idx} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      {addr.type && (
+                        <div className="mb-1.5 flex items-center gap-2">
+                          <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                            {String(addr.type).charAt(0).toUpperCase() + String(addr.type).slice(1)}
+                          </span>
+                          {addr.typeLabel && (
+                            <span className="text-xs font-medium text-slate-700">{addr.typeLabel}</span>
+                          )}
+                          {addr.isDefault && (
+                            <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700">Default</span>
+                          )}
+                        </div>
+                      )}
                       {addr.name && <p className="mb-1 font-medium text-slate-900">{addr.name}</p>}
                       <p className="text-sm text-slate-600">{addr.address || addr.street}</p>
                       {addr.addressLine2 && <p className="text-sm text-slate-600">{addr.addressLine2}</p>}

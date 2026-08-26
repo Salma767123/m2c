@@ -395,6 +395,7 @@ const login = async (req, res) => {
         user: {
           id: user.id,
           email: user.email,
+          title: user.title,
           name: user.name,
           role: userType,
           image: user.image,
@@ -614,6 +615,7 @@ const googleCallback = async (req, res) => {
         user: {
           id: user.id,
           email: user.email,
+          title: user.title,
           name: user.name,
           role: isAdmin ? "admin" : "user",
           image: user.image,
@@ -1735,8 +1737,14 @@ function normalizeAddressData(body) {
     const byName = stateList.find((s) => s.name.toLowerCase() === stateValue.toLowerCase());
     canonicalState = (byCode || byName)?.isoCode ?? stateValue.toUpperCase();
   }
+  // Office/company name (work) or custom label (other); ignored for home.
+  const addrType = String(body.type).toLowerCase();
+  const typeLabel = (addrType === "work" || addrType === "other") && body.typeLabel
+    ? String(body.typeLabel).trim().slice(0, 80)
+    : "";
   return {
-    type: String(body.type).toLowerCase(),
+    type: addrType,
+    typeLabel,
     name: String(body.name).trim(),
     phone: phoneE164,
     phone2: body.phone2 && String(body.phone2).trim() ? toE164(body.phone2, countryIso) : "",
