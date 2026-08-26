@@ -195,6 +195,21 @@ class OrderService {
         }
     }
 
+    // Pre-payment fulfilment check — runs the same courier/stock/shipping
+    // validation the server enforces on createOrder, BEFORE the payment gateway
+    // opens, so the customer is never charged for a cart that can't be placed.
+    // Throws with the server's user-facing message when the cart is not placeable.
+    async validateCheckout(currency: string): Promise<{ success: boolean }> {
+        try {
+            const response = await axios.post('/orders/validate-checkout', { currency });
+            return response.data;
+        } catch (error: any) {
+            const apiError = error?.response?.data;
+            const message = apiError?.error || error.message || 'Your cart could not be validated.';
+            throw new Error(message);
+        }
+    }
+
     // Get user orders
     async getUserOrders(): Promise<{ success: boolean; data: Order[] }> {
         try {

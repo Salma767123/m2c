@@ -560,6 +560,18 @@ export default function Checkout() {
         return;
       }
 
+      // Pre-payment fulfilment check. Confirm the server can actually place this
+      // cart (courier availability, shipping method, stock) BEFORE we open the
+      // payment gateway — otherwise the customer gets charged and createOrder then
+      // rejects the order, leaving them stranded on checkout being asked to pay again.
+      try {
+        await orderService.validateCheckout(getCurrency())
+      } catch (validationErr: any) {
+        setError(validationErr?.message || "Your order can't be placed. Please review your cart.")
+        setPlacingOrder(false)
+        return
+      }
+
       const shippingAddress = {
         firstName: formData.firstName,
         middleName: formData.middleName || "",

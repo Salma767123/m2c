@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
+import orderService from "@/services/orderService"
 import { cartService } from "@/services/cartService"
 import { wishlistService } from "@/services/wishlistService"
 import { couponService } from "@/services/couponService"
@@ -14,6 +16,7 @@ import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, getCurrency, g
 import { applyOfferToPrice, type ActiveOffer } from "@/lib/offers"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
 import { courierName } from "@/lib/couriers"
+import { courierService } from "@/services/courierService"
 import Reveal from "@/components/WebSite/Shared/Reveal"
 import ProductCard from "@/components/WebSite/ProductCard/ProductCard"
 import {
@@ -233,11 +236,34 @@ interface OrderSummary {
 }
 
 export default function Order() {
+  const router = useRouter()
   const [cartItems, setCartItems] = useState<OrderItem[]>([])
   const [isHydrated, setIsHydrated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  // Blocks the "Proceed to Checkout" click while the server re-validates the cart
+  // (courier availability, shipping method, stock) so an invalid-but-selected
+  // courier is caught HERE instead of after payment on the checkout page.
+  const [validatingCheckout, setValidatingCheckout] = useState(false)
+
+  const handleProceedToCheckout = async () => {
+    try {
+      setValidatingCheckout(true)
+      await orderService.validateCheckout(getCurrency())
+      router.push("/checkout")
+    } catch (err: any) {
+      showErrorToast('Cannot proceed to checkout', err?.message || 'Please review the shipping and courier for your items.')
+    } finally {
+      setValidatingCheckout(false)
+    }
+  }
   const [similarProducts, setSimilarProducts] = useState<PublicProduct[]>([])
+  // Prime the admin-managed courier catalogue so courierName() resolves the DB
+  // courier ids stored on cart lines to their display names (else it prints the id).
+  const [, setCourierTick] = useState(0)
+  useEffect(() => {
+    courierService.getActiveCouriers().then(() => setCourierTick((t) => t + 1)).catch(() => {})
+  }, [])
 
   // Empty-cart discovery rails.
   const [suggested, setSuggested] = useState<PublicProduct[]>([])
@@ -262,11 +288,22 @@ export default function Order() {
   useEffect(() => {
     if (cartItems.length === 0) { setSimilarProducts([]); return }
     let cancelled = false
+    const TARGET = 6
     const run = async () => {
       const cats = Array.from(new Set(cartItems.map((i) => i.category).filter(Boolean))) as string[]
       const inCart = new Set(cartItems.map((i) => i.productId))
+      const seen = new Set<string>()
+      const list: PublicProduct[] = []
+      // Collect distinct, not-in-cart products up to TARGET.
+      const addFrom = (items: PublicProduct[]) => {
+        for (const p of items) {
+          if (list.length >= TARGET) break
+          if (!p || inCart.has(p.id) || seen.has(p.id)) continue
+          seen.add(p.id)
+          list.push(p)
+        }
+      }
       try {
-        let pool: PublicProduct[] = []
         if (cats.length) {
           const results = await Promise.all(
             cats.slice(0, 4).map((c) =>
@@ -276,19 +313,15 @@ export default function Order() {
                 .catch(() => [] as PublicProduct[]),
             ),
           )
-          pool = results.flat()
+          results.forEach(addFrom)
         }
-        // Fallback so the rail isn't empty when categories are sparse.
-        if (pool.length === 0) {
-          const r = await publicProductService.getProducts({ limit: 8, sortBy: 'createdAt', sortOrder: 'desc' })
-          pool = r.success && r.data ? r.data.items : []
+        // Top up from recent products whenever the category pool didn't fill the
+        // rail — including the common case where the cart's category contains only
+        // the cart item itself (so every category result gets filtered out).
+        if (list.length < TARGET) {
+          const r = await publicProductService.getProducts({ limit: 12, sortBy: 'createdAt', sortOrder: 'desc' })
+          if (r.success && r.data) addFrom(r.data.items)
         }
-        const seen = new Set<string>()
-        const list = pool.filter((p) => {
-          if (inCart.has(p.id) || seen.has(p.id)) return false
-          seen.add(p.id)
-          return true
-        }).slice(0, 6)
         if (!cancelled) setSimilarProducts(list)
       } catch {
         if (!cancelled) setSimilarProducts([])
@@ -1270,11 +1303,11 @@ export default function Order() {
                   a customer and the only number they are looking for. */}
               <div className="overflow-hidden rounded-xl bg-white shadow-[0_1px_2px_rgba(90,60,40,0.05)] ring-1 ring-[#efe6df] sm:rounded-2xl lg:sticky lg:top-8">
               <div className="border-b border-[#f0e8df] p-4 sm:p-5 lg:p-6">
-                <h3 className="font-playfair text-base sm:text-lg font-semibold text-[#1a1a1a] mb-3 sm:mb-4">Promo Code</h3>
+                <h3 className="font-playfair text-base sm:text-lg font-semibold text-[#1a1a1a] mb-3 sm:mb-4">Coupon</h3>
                 <div className="flex gap-2 sm:gap-3">
                   <input
                     type="text"
-                    placeholder="Enter promo code"
+                    placeholder="Enter coupon code"
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
                     className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-[#e3dbd1] rounded-lg sm:rounded-xl focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] outline-none"
@@ -1382,13 +1415,15 @@ export default function Order() {
                       Remove out of stock items to proceed
                     </button>
                   ) : (
-                    <Link href="/checkout">
-                      <button className="btn-shine w-full bg-[#e01a1b] text-white font-semibold py-4 px-6 rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2 group mb-4">
-                        <CreditCard className="w-5 h-5" />
-                        Proceed to Checkout
-                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                      </button>
-                    </Link>
+                    <button
+                      onClick={handleProceedToCheckout}
+                      disabled={validatingCheckout}
+                      className="btn-shine w-full bg-[#e01a1b] text-white font-semibold py-4 px-6 rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2 group mb-4 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
+                    >
+                      <CreditCard className="w-5 h-5" />
+                      {validatingCheckout ? 'Checking availability…' : 'Proceed to Checkout'}
+                      {!validatingCheckout && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />}
+                    </button>
                   )}
 
                   {/* ── Reassurance under the button ──────────────────────

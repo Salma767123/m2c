@@ -126,7 +126,10 @@ class CartService {
   /** Set the shipping mode and courier for one cart line. */
   async setShipping(itemId: string, transportType: 'AIR' | 'SHIP', courier: string): Promise<CartResponse> {
     try {
-      const response = await axios.put(`/cart/${itemId}`, { transportType, courier });
+      // Send the active storefront currency so the server validates the courier
+      // against the region the shopper is actually in (and re-aligns a line that
+      // was added in another region), not the currency frozen on the line.
+      const response = await axios.put(`/cart/${itemId}`, { transportType, courier, currency: getCurrency() });
       return response.data;
     } catch (error: any) {
       throw new Error(error?.response?.data?.error || error.message || 'Failed to set shipping method');

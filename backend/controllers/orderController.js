@@ -1268,8 +1268,77 @@ const requestReturn = async (req, res) => {
     }
 };
 
+// Pre-payment fulfilment check. Runs the same cart validations that createOrder
+// enforces (stock, shipping method, courier availability) BEFORE the customer is
+// sent to the payment gateway — so we never capture a payment for an order that
+// createOrder would then reject (which stranded the customer: charged, no order,
+// bounced back to checkout). Returns { success:true } when the cart can be placed,
+// or the first blocking problem as a 400 with a user-facing message.
+const validateCheckout = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const currency = req.body?.currency === 'USD' ? 'USD' : 'INR';
+
+        const cart = await prisma.cart.findFirst({ where: { userId }, include: { items: true } });
+        if (!cart || cart.items.length === 0) {
+            return res.status(400).json({ success: false, error: 'Your cart is empty.' });
+        }
+
+        const products = await Promise.all(cart.items.map((item) =>
+            prisma.product.findUnique({
+                where: { id: item.productId },
+                include: { variants: item.variantId ? { where: { id: item.variantId } } : false },
+            })
+        ));
+
+        for (let i = 0; i < cart.items.length; i++) {
+            const item = cart.items[i];
+            const product = products[i];
+
+            if (!product) {
+                return res.status(400).json({ success: false, error: 'A product in your cart is no longer available. Please review your cart.' });
+            }
+            if (!product.inStock) {
+                return res.status(400).json({ success: false, error: `"${product.name}" is out of stock. Please remove it to continue.` });
+            }
+            const variant = item.variantId && product.variants?.length > 0 ? product.variants[0] : null;
+            const checkStock = variant ? variant.stock : product.totalStock;
+            if (product.trackInventory && checkStock < item.quantity) {
+                return res.status(400).json({ success: false, error: `Insufficient stock for "${product.name}".` });
+            }
+
+            // Shipping method + courier — the checks that produced "courier not
+            // available" only AFTER payment. Mirror them here, pre-payment.
+            const allowedTransports = Array.isArray(product.logisticsConfig?.transportTypes)
+                ? product.logisticsConfig.transportTypes
+                : [];
+            if (allowedTransports.length > 1 && !item.transportType) {
+                return res.status(400).json({ success: false, error: `Please choose a shipping method for "${product.name}" before placing the order.` });
+            }
+            if (item.transportType && !allowedTransports.includes(item.transportType)) {
+                return res.status(400).json({ success: false, error: `The selected shipping method is not available for "${product.name}".` });
+            }
+            const lineTransport = item.transportType || allowedTransports[0] || null;
+            if (allowedTransports.length > 0) {
+                if (!item.courier) {
+                    return res.status(400).json({ success: false, error: `Please choose a courier partner for "${product.name}" before placing the order.` });
+                }
+                if (!(await isCourierAvailable(item.courier, currency, lineTransport))) {
+                    return res.status(400).json({ success: false, error: `The selected courier is not available for "${product.name}". Please go back to your cart and choose a different courier.` });
+                }
+            }
+        }
+
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Validate checkout error:', error);
+        return res.status(500).json({ success: false, error: 'Could not validate your cart. Please try again.' });
+    }
+};
+
 module.exports = {
     createOrder,
+    validateCheckout,
     getUserOrders,
     getOrderById,
     cancelMyOrder,

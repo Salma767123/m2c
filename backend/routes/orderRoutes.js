@@ -88,6 +88,9 @@ router.post('/vendor/:id/reship', requireVendorRole, vendorOrderController.reshi
 // CUSTOMER ROUTES (/api/orders/*)
 // ============================================
 router.post('/', orderController.createOrder);
+// Pre-payment fulfilment check — the storefront calls this before opening the
+// payment gateway, so a cart that createOrder would reject never gets charged.
+router.post('/validate-checkout', orderController.validateCheckout);
 router.get('/', orderController.getUserOrders);
 router.get('/:id', orderController.getOrderById);
 // Customer self-service: cancel a pre-dispatch order, or request a return after delivery.

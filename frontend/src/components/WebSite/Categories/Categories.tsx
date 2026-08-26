@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Package, LifeBuoy, Search, MessageCircle } from 'lucide-react';
+import { Package, Search, MessageCircle, ArrowRight, Headphones } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { categoryService } from '@/services/categoryService';
 import Reveal from '@/components/WebSite/Shared/Reveal';
@@ -213,62 +213,73 @@ export default function Categories() {
           children. */}
       <div className="pb-10 sm:pb-12 lg:pb-16">
         <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-[#fdf8f6] via-white to-[#faece8] p-6 text-center ring-1 ring-[#f0dcd6] shadow-[0_20px_60px_-34px_rgba(26,20,22,0.35)] sm:p-8 lg:p-12">
-            {/* The same drifting dot grid, blur blobs and outline rings the
-                product sections use — so the card has something living in it
-                rather than being a still panel. */}
-            <SectionBackdrop />
+          {/* A split "help desk": a deep branded band states the offer, and two
+              tappable action rows to its right make the choice — a distinct shape
+              from the old centred icon-headline-buttons stack. */}
+          <Reveal>
+            <div className="grid overflow-hidden rounded-[28px] shadow-[0_30px_80px_-34px_rgba(26,20,22,0.5)] md:grid-cols-[1.05fr_1fr]">
+              {/* ── Left: branded band ── */}
+              <div className="relative flex flex-col justify-center overflow-hidden bg-[#7a0f10] p-8 text-white sm:p-10 lg:p-12">
+                {/* HD support-team photo background */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: "url('/assets/images/banner/help-support-bg.jpg')" }}
+                />
+                {/* brand gradient wash over the photo so the copy stays legible */}
+                <span aria-hidden className="pointer-events-none absolute inset-0 bg-linear-to-br from-[#e01a1b]/90 via-[#c41617]/80 to-[#7a0f10]/95" />
+                {/* soft light so the band is alive not flat */}
+                <span aria-hidden className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
+                <span aria-hidden className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-black/20 blur-3xl" />
 
-            <div className="relative">
-              {/* Staggered rather than simultaneous: 0, 90, 180, 270ms, so the
-                  block assembles downward instead of appearing all at once. */}
-              <Reveal className="mb-5 flex justify-center">
-                {/* No halo behind the mark. It pulsed on a loop at the top of
-                    the block and read as a vibration rather than as emphasis —
-                    a support card should be calm. The mark just sits there; the
-                    staggered entrance is the only movement it needs. */}
-                <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-b from-[#fdf1ef] to-[#f9e3df] text-[#e01a1b] ring-1 ring-[#f0d5cf]">
-                  <LifeBuoy className="h-8 w-8" strokeWidth={1.6} />
-                </span>
-              </Reveal>
-
-              <Reveal delay={90}>
-                <h2 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl md:text-3xl">
-                  Need Help?
-                </h2>
-                {/* A short seam under the name — the one piece of brand colour
-                    that stops the three lines reading as one centred stack. */}
-                <span aria-hidden className="mx-auto mt-4 block h-[3px] w-12 rounded-full bg-[#e01a1b] sm:w-14" />
-              </Reveal>
-
-              <Reveal delay={180}>
-                <p className="mx-auto mt-5 max-w-xl text-sm text-balance text-gray-600 sm:text-base">
-                  Use our search feature or contact our support team for assistance finding specific products.
-                </p>
-              </Reveal>
-
-              <Reveal delay={270}>
-                <div className="mt-6 flex flex-col justify-center gap-3 sm:mt-8 sm:flex-row sm:gap-4">
-                  <Link
-                    href="/products"
-                    className="btn-shine group inline-flex items-center justify-center gap-2 rounded-full bg-[#e01a1b] px-6 py-3 text-sm font-semibold text-white shadow-[0_6px_20px_rgba(224,26,27,0.3)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c41617] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] sm:text-base"
-                  >
-                    <Search className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
-                    Search Products
-                  </Link>
-                  {/* The outline button had no lift while the one beside it
-                      did, so the pair behaved like two different controls. */}
-                  <Link
-                    href="/contact"
-                    className="group inline-flex items-center justify-center gap-2 rounded-full border border-[#e01a1b] bg-white/70 px-6 py-3 text-sm font-semibold text-[#e01a1b] backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#e01a1b] hover:text-white hover:shadow-[0_12px_30px_rgba(224,26,27,0.28)] sm:text-base"
-                  >
-                    <MessageCircle className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
-                    Contact Support
-                  </Link>
+                <div className="relative">
+                  <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/30 backdrop-blur-sm">
+                    <Headphones className="h-7 w-7" strokeWidth={1.7} />
+                  </span>
+                  <p className="mt-6 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/75">
+                    <span aria-hidden className="h-px w-5 bg-white/60" /> We&apos;re here for you
+                  </p>
+                  <h2 className="mt-2 font-playfair text-2xl font-semibold leading-tight tracking-tight sm:text-3xl lg:text-[2.4rem]">
+                    Need Help?
+                  </h2>
+                  <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/85 sm:text-[15px]">
+                    Use our search feature or contact our support team for assistance finding specific products.
+                  </p>
                 </div>
-              </Reveal>
+              </div>
+
+              {/* ── Right: action rows ── */}
+              <div className="flex flex-col justify-center gap-3 bg-white p-5 sm:gap-4 sm:p-7 lg:p-8">
+                <Link
+                  href="/products"
+                  className="group flex items-center gap-4 rounded-2xl border border-[#f0e6e0] bg-[#fdf8f6] p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-[#e01a1b]/30 hover:bg-white hover:shadow-[0_16px_34px_-20px_rgba(224,26,27,0.55)] sm:p-5"
+                >
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-[#e01a1b] to-[#c41617] text-white shadow-[0_8px_20px_-8px_rgba(224,26,27,0.7)] transition-transform duration-300 group-hover:scale-105">
+                    <Search className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-semibold text-[#1a1a1a]">Search Products</span>
+                    <span className="block text-[13px] text-gray-500">Find exactly what you need, fast.</span>
+                  </span>
+                  <ArrowRight className="h-5 w-5 shrink-0 text-[#e01a1b] transition-transform duration-300 group-hover:translate-x-1" />
+                </Link>
+
+                <Link
+                  href="/contact"
+                  className="group flex items-center gap-4 rounded-2xl border border-[#f0e6e0] bg-[#fdf8f6] p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-[#e01a1b]/30 hover:bg-white hover:shadow-[0_16px_34px_-20px_rgba(224,26,27,0.55)] sm:p-5"
+                >
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-[#e01a1b] ring-1 ring-[#f0d5cf] transition-transform duration-300 group-hover:scale-105">
+                    <MessageCircle className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-semibold text-[#1a1a1a]">Contact Support</span>
+                    <span className="block text-[13px] text-gray-500">Talk to our team — we reply quickly.</span>
+                  </span>
+                  <ArrowRight className="h-5 w-5 shrink-0 text-[#e01a1b] transition-transform duration-300 group-hover:translate-x-1" />
+                </Link>
+              </div>
             </div>
-          </div>
+          </Reveal>
         </div>
       </div>
     </div>

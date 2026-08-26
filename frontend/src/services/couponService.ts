@@ -79,15 +79,22 @@ class CouponService {
             const response = await axios.post('/coupons/apply', { code, cartTotal, currency, userId });
             return response.data;
         } catch (error: unknown) {
-            // Return the error message from the backend if available
-            if (error && typeof error === 'object' && 'response' in error) {
-                const axiosError = error as { response?: { data?: unknown } };
-                if (axiosError.response && axiosError.response.data) {
-                    return axiosError.response.data as ApplyCouponResponse;
+            // Surface the backend's actual reason (e.g. "only valid on your first
+            // order"). The axios interceptor reshapes errors to { message, status,
+            // data } where `data` is the backend body; a raw axios error keeps it
+            // at error.response.data. Handle both so the user never sees the
+            // generic "Failed to apply coupon" when the server explained why.
+            if (error && typeof error === 'object') {
+                const e = error as { response?: { data?: unknown }; data?: unknown; message?: string };
+                const body = (e.data ?? e.response?.data) as ApplyCouponResponse | undefined;
+                if (body && typeof body === 'object' && 'success' in body) {
+                    return body;
+                }
+                if (typeof e.message === 'string' && e.message) {
+                    throw new Error(e.message);
                 }
             }
-            const errorMessage = error instanceof Error ? error.message : 'Failed to apply coupon';
-            throw new Error(errorMessage);
+            throw new Error('Failed to apply coupon');
         }
     }
 

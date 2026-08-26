@@ -54,6 +54,7 @@ const Header = () => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
   const [userName, setUserName] = useState("");
+  const [userTitle, setUserTitle] = useState("");
   const [userImage, setUserImage] = useState("");
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
@@ -122,15 +123,18 @@ const Header = () => {
         try {
           const user = JSON.parse(userData)
           setUserName(user.name || '')
+          setUserTitle(user.title || '')
           setUserImage(user.image || '')
         } catch {
           setIsUserLoggedIn(false)
           setUserName('')
+          setUserTitle('')
           setUserImage('')
         }
       } else {
         setIsUserLoggedIn(false)
         setUserName('')
+        setUserTitle('')
         setUserImage('')
       }
     }
@@ -306,9 +310,9 @@ const Header = () => {
             <Link href="/" className="flex items-center shrink-0">
               <CompanyLogo
                 variant={logoVariant}
-                className="h-7 min-[360px]:h-8 sm:h-12 lg:h-14 w-auto object-contain"
-                skeletonClassName="h-7 min-[360px]:h-8 sm:h-12 lg:h-14 aspect-square bg-gray-100"
-                fallbackSizes="(max-width: 360px) 26px, (max-width: 640px) 32px, (max-width: 1024px) 48px, 56px"
+                className="h-8 min-[360px]:h-10 sm:h-14 lg:h-16 w-auto object-contain"
+                skeletonClassName="h-8 min-[360px]:h-10 sm:h-14 lg:h-16 aspect-square bg-gray-100"
+                fallbackSizes="(max-width: 360px) 32px, (max-width: 640px) 40px, (max-width: 1024px) 56px, 64px"
                 priority
               />
             </Link>
@@ -461,7 +465,7 @@ const Header = () => {
                         <>
                           <div className="px-3 sm:px-4 py-2 border-b border-slate-100">
                             <p className="text-xs text-slate-500">Signed in as</p>
-                            <p className="text-sm font-semibold text-slate-800 truncate">{userName}</p>
+                            <p className="text-sm font-semibold text-slate-800 truncate">{[userTitle, userName].filter(Boolean).join(' ')}</p>
                           </div>
                         </>
                       )}
@@ -617,7 +621,7 @@ const Header = () => {
               {isUserLoggedIn && userName && (
                 <div className="px-3 sm:px-4 py-2 bg-gray-50 rounded-lg mb-2">
                   <p className="text-xs text-slate-500">Signed in as</p>
-                  <p className="text-sm font-semibold text-slate-800 truncate">{userName}</p>
+                  <p className="text-sm font-semibold text-slate-800 truncate">{[userTitle, userName].filter(Boolean).join(' ')}</p>
                 </div>
               )}
 

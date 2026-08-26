@@ -163,6 +163,7 @@ model Address {
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   type         String // home, work, other
+  typeLabel    String? // office/company name (work) or custom label (other)
   name         String?
   phone        String?
   phone2       String? // optional secondary mobile (E.164)
