@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import ProductCard from '@/components/WebSite/ProductCard/ProductCard';
+import { CTA_PILL, CTA_PILL_ICON } from '@/components/WebSite/Shared/ctaPill';
 import { publicProductService, PublicProduct } from '@/services/publicProductService';
 
 /**
@@ -251,10 +252,10 @@ export default function BestSeller() {
         <div className="mt-7 flex justify-center lg:hidden">
           <Link
             href="/products?collection=best-seller"
-            className="btn-shine group inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-[#e01a1b] px-6 py-2.5 text-[13.5px] font-semibold text-white shadow-[0_10px_24px_-12px_rgba(224,26,27,0.8)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c41617] sm:px-7 sm:py-3 sm:text-sm"
+            className={CTA_PILL}
           >
             View All Products
-            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+            <ArrowRight className={CTA_PILL_ICON} />
           </Link>
         </div>
       </div>

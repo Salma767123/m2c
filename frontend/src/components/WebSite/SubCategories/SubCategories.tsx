@@ -203,14 +203,23 @@ export default function SubCategories({ categorySlug }: { categorySlug: string }
         {/* Subcategories Grid */}
         {subcategories.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6 lg:gap-8">
+            {/* h-full on the wrapper, then a column inside it.
+
+                Grid tracks already stretch, but the stretch stopped at Reveal:
+                the Link inside was `block`, so each card sized to its own text
+                and two cards in a row ended at two different heights whenever
+                one name wrapped to a second line or one description ran
+                longer. The chain has to be unbroken — Reveal h-full, Link
+                h-full flex-col, body grow — for the Explore Collection row to
+                land on the same line in both. */}
             {subcategories.map((subcategory, index) => (
-              <Reveal key={subcategory.id} delay={index * 90}>
+              <Reveal key={subcategory.id} delay={index * 90} className="h-full">
               <Link
                 href={`/products?category=${category.slug}&subcategory=${subcategory.slug}`}
-                className="group relative block bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] hover:ring-[#e01a1b]/20 transition-all duration-500 overflow-hidden transform hover:-translate-y-1.5"
+                className="group relative flex h-full flex-col bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] hover:ring-[#e01a1b]/20 transition-all duration-500 overflow-hidden transform hover:-translate-y-1.5"
               >
                 {/* Image Section */}
-                <div className="relative h-40 sm:h-48 md:h-56 overflow-hidden rounded-t-2xl bg-gradient-to-br from-gray-100 to-orange-200">
+                <div className="relative h-32 shrink-0 overflow-hidden rounded-t-2xl bg-gradient-to-br from-gray-100 to-orange-200 sm:h-48 md:h-56">
                   {subcategory.image ? (
                     <Image
                       src={subcategory.image}
@@ -235,8 +244,8 @@ export default function SubCategories({ categorySlug }: { categorySlug: string }
 
                   {/* Product Count Badge */}
                   {subcategory.productCount !== undefined && (
-                    <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full shadow-lg">
-                      <span className="text-xs font-semibold text-gray-700">
+                    <div className="absolute top-2 right-2 bg-white/95 backdrop-blur-sm px-2 py-0.5 rounded-full shadow-lg sm:top-4 sm:right-4 sm:px-3 sm:py-1">
+                      <span className="text-[10px] font-semibold text-gray-700 sm:text-xs">
                         {subcategory.productCount} items
                       </span>
                     </div>
@@ -244,13 +253,15 @@ export default function SubCategories({ categorySlug }: { categorySlug: string }
                 </div>
 
                 {/* Content Section */}
-                <div className="p-6">
-                  <div className="mb-4">
-                    <h3 className="font-playfair text-base sm:text-lg lg:text-xl font-semibold text-[#1a1a1a] mb-2 group-hover:text-[#e01a1b] transition-colors duration-300 break-words">
+                <div className="flex grow flex-col p-3 sm:p-5 lg:p-6">
+                  {/* Takes the slack, so a one-line name and a three-line one
+                      both leave Explore Collection on the card's floor. */}
+                  <div className="mb-3 grow sm:mb-4">
+                    <h3 className="font-playfair text-[13px] sm:text-lg lg:text-xl font-semibold text-[#1a1a1a] mb-1.5 sm:mb-2 group-hover:text-[#e01a1b] transition-colors duration-300 break-words line-clamp-2">
                       {subcategory.name}
                     </h3>
                     {subcategory.description && (
-                      <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
+                      <p className="text-[11.5px] sm:text-sm text-gray-600 leading-relaxed line-clamp-2 sm:line-clamp-3">
                         {subcategory.description}
                       </p>
                     )}
@@ -258,9 +269,9 @@ export default function SubCategories({ categorySlug }: { categorySlug: string }
 
                   {/* Action Button */}
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center text-[#e01a1b] font-semibold text-sm transition-colors duration-300">
+                    <div className="flex items-center text-[#e01a1b] font-semibold text-[11.5px] sm:text-sm transition-colors duration-300">
                       <span>Explore Collection</span>
-                      <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
+                      <ArrowRight className="ml-1.5 h-3.5 w-3.5 shrink-0 group-hover:translate-x-1 transition-transform duration-300 sm:ml-2 sm:h-4 sm:w-4" />
                     </div>
                   </div>
                 </div>
