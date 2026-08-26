@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import ProductCard from '@/components/WebSite/ProductCard/ProductCard';
+import { CTA_PILL, CTA_PILL_ICON, RAIL_BUTTON } from '@/components/WebSite/Shared/ctaPill';
 import { publicProductService, PublicProduct } from '@/services/publicProductService';
 
 /**
@@ -328,10 +329,10 @@ export default function TopSelling() {
                 it is until we come back to buttons properly. */}
             <Link
               href="/products?collection=top-selling"
-              className="btn-shine group inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-[#e01a1b] px-7 py-3 text-[15px] font-semibold text-white shadow-[0_10px_26px_-8px_rgba(224,26,27,0.55)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c41617] hover:shadow-[0_16px_34px_-10px_rgba(224,26,27,0.6)]"
+              className={CTA_PILL}
             >
               View All Products
-              <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+              <ArrowRight className={CTA_PILL_ICON} />
             </Link>
 
             {/* On touch as well as desktop. These were desktop-only at first,
@@ -430,9 +431,9 @@ function RailButton({ dir, disabled, onClick }: { dir: 1 | -1; disabled: boolean
       onClick={onClick}
       disabled={disabled}
       aria-label={dir === 1 ? 'Show later products' : 'Show earlier products'}
-      className="grid h-11 w-11 place-items-center rounded-full border border-[#dcc9bd] bg-white text-[#7a0f10] transition-all duration-300 hover:border-[#e01a1b] hover:bg-[#e01a1b] hover:text-white disabled:cursor-not-allowed disabled:border-[#ece4dc] disabled:bg-white disabled:text-[#cbbcb2] disabled:hover:bg-white"
+      className={RAIL_BUTTON}
     >
-      <Icon className="h-5 w-5" strokeWidth={2.2} />
+      <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={2.2} />
     </button>
   );
 }

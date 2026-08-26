@@ -267,7 +267,7 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
               pill below it put two of them on every card. */}
           {discountPct ? (
             <span
-              className={`absolute top-2 left-2 z-10 rounded-md text-[10px] font-bold tabular-nums text-white ${showcase
+              className={`absolute top-1.5 left-1.5 z-10 rounded-md text-[9px] font-bold tabular-nums text-white sm:top-2 sm:left-2 sm:text-[10px] ${showcase
                 ? 'bg-[#22c55e] px-1.5 py-0.5 shadow-[0_0_10px_rgba(34,197,94,0.7)]'
                 : 'bg-[#22c55e] px-1.5 py-0.5 shadow-[0_0_4px_rgba(34,197,94,0.35)]'
                 }`}
@@ -278,13 +278,13 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
 
           {/* Rating — compact metric pinned to the image's bottom-left corner */}
           {hasReviews ? (
-            <div className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-[#F5A524] to-[#F59E0B] px-1.5 py-0.5 text-[11px] leading-none text-white shadow-[0_2px_9px_rgba(245,158,11,0.5)]">
+            <div className="absolute bottom-1.5 left-1.5 z-10 inline-flex items-center gap-0.5 rounded-md bg-gradient-to-r from-[#F5A524] to-[#F59E0B] px-1 py-0.5 text-[9.5px] leading-none text-white shadow-[0_2px_9px_rgba(245,158,11,0.5)] sm:bottom-2 sm:left-2 sm:gap-1 sm:px-1.5 sm:text-[11px]">
               <span className="font-bold tabular-nums">{ratingValue.toFixed(1)}</span>
-              <Sparkles className="h-3 w-3 fill-white text-white" strokeWidth={1.5} />
+              <Sparkles className="h-2.5 w-2.5 fill-white text-white sm:h-3 sm:w-3" strokeWidth={1.5} />
               <span className="tabular-nums text-white/85">{reviewCount}</span>
             </div>
           ) : (
-            <div className="absolute bottom-2 left-2 z-10 inline-flex items-center rounded-md bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide leading-none text-white shadow-[0_2px_9px_rgba(99,102,241,0.5)]">
+            <div className="absolute bottom-1.5 left-1.5 z-10 inline-flex items-center rounded-md bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide leading-none text-white shadow-[0_2px_9px_rgba(99,102,241,0.5)] sm:bottom-2 sm:left-2 sm:px-2 sm:text-[10.5px]">
               New
             </div>
           )}
@@ -295,13 +295,17 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
             onClick={handleToggleWishlist}
             aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
             title={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-            className={`absolute top-2 right-2 z-10 grid h-8 w-8 place-items-center rounded-full backdrop-blur-sm shadow-md transition-all duration-300 hover:scale-105 active:scale-90 focus:outline-none ${isInWishlist
+            // 28px on a phone rather than 32. It sits over the photo of a card
+            // that is itself only ~163px wide, and at 32 it was taking a fifth
+            // of that width off the product. Still past the 24px minimum for a
+            // touch target, and the tap area is the button, not the glyph.
+            className={`absolute top-1.5 right-1.5 z-10 grid h-7 w-7 place-items-center rounded-full backdrop-blur-sm shadow-md transition-all duration-300 hover:scale-105 active:scale-90 focus:outline-none sm:top-2 sm:right-2 sm:h-8 sm:w-8 ${isInWishlist
               ? 'bg-[#e01a1b] ring-1 ring-[#e01a1b]'
               : 'bg-white ring-1 ring-[#e01a1b]/30 hover:ring-[#e01a1b]/60'
               }`}
           >
             <Heart
-              className={`h-[18px] w-[18px] transition-all duration-300 ${isInWishlist
+              className={`h-4 w-4 transition-all duration-300 sm:h-[18px] sm:w-[18px] ${isInWishlist
                 ? 'fill-white text-white scale-110'
                 : 'fill-[#e01a1b]/10 text-[#e01a1b]'
                 }`}
@@ -318,8 +322,16 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
           )}
         </div>
 
-        {/* ── Body: Product → Rating → Price → Action ─────────────────────── */}
-        <div className={`flex grow flex-col ${showcase ? 'p-3.5 sm:p-4' : 'p-2.5'}`}>
+        {/* ── Body: Product → Rating → Price → Action ───────────────────────
+
+            Every size below steps up at sm, because these cards are laid out
+            two to a row on a phone. On a 375px viewport that is grid-cols-2
+            inside px-4 with a gap-4 between — about 163px of card, and 135px
+            of content once the showcase padding is taken off. The desktop
+            sizes were being asked to fit in a bit over half the width they
+            were drawn for, which is what broke "Save $2.65" across two lines
+            mid-amount. */}
+        <div className={`flex grow flex-col ${showcase ? 'p-2.5 sm:p-4' : 'p-2 sm:p-2.5'}`}>
           {/* Meta block grows so the price + action stay bottom-aligned across cards */}
           <div className="grow">
             {/* Showcase raises the name and drops the price's weight below it.
@@ -327,23 +339,32 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
                 handpicked showcase the product is, and a 14px name under a 20px
                 extrabold price inverts that. */}
             <h3
-              className={`font-playfair font-semibold leading-snug tracking-tight text-[#1a1a1a] line-clamp-2 transition-colors duration-300 group-hover:text-[#e01a1b] ${showcase ? 'text-[15px] sm:text-[17px]' : 'text-[13px] sm:text-sm'
+              className={`font-playfair font-semibold leading-snug tracking-tight text-[#1a1a1a] line-clamp-2 transition-colors duration-300 group-hover:text-[#e01a1b] ${showcase ? 'text-[13px] sm:text-[17px]' : 'text-[12px] sm:text-sm'
                 }`}
             >
               {product.name}
             </h3>
           </div>
 
-          {/* Price — the financial hero, consolidated on one line */}
-          <div className={`flex items-baseline gap-2 ${showcase ? 'mt-2.5' : 'mt-2'}`}>
+          {/* Price — the financial hero.
+              One line where there is room for one, and a clean second line
+              where there is not. It was a nowrap row before, so on a phone the
+              savings had nowhere to go but inside itself: the span narrowed
+              and "Save $2.65" broke after "Save", leaving a bare "$2.65" on
+              its own line reading like a third price. Wrapping the ROW and
+              refusing to wrap the AMOUNTS puts the break where it belongs.
+
+              ml-auto only from sm. Pushed right on a wrapped line the savings
+              would sit alone against the far edge, which reads as a stray. */}
+          <div className={`flex flex-wrap items-baseline gap-x-2 gap-y-0.5 ${showcase ? 'mt-2 sm:mt-2.5' : 'mt-1.5 sm:mt-2'}`}>
             <span
-              className={`leading-none tracking-tight tabular-nums text-[#1a1a1a] ${showcase ? 'text-[19px] sm:text-[21px] font-semibold' : 'text-lg sm:text-xl font-extrabold'
+              className={`whitespace-nowrap leading-none tracking-tight tabular-nums text-[#1a1a1a] ${showcase ? 'text-[16px] sm:text-[21px] font-semibold' : 'text-base sm:text-xl font-extrabold'
                 }`}
             >
               {formatPrice(effectivePrice || 0)}
             </span>
             {strikePrice && strikePrice > (effectivePrice || 0) ? (
-              <span className={`line-through tabular-nums ${showcase ? 'text-[12.5px] text-[#8a7d72]' : 'text-xs text-gray-400'}`}>
+              <span className={`whitespace-nowrap line-through tabular-nums ${showcase ? 'text-[11px] text-[#8a7d72] sm:text-[12.5px]' : 'text-[10.5px] text-gray-400 sm:text-xs'}`}>
                 {formatPrice(strikePrice)}
               </span>
             ) : null}
@@ -352,9 +373,9 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
               // in showcase it loses the green pill and becomes plain oxblood
               // text, so the card carries one accent colour instead of three.
               <span
-                className={`ml-auto tabular-nums ${showcase
-                  ? 'text-[11.5px] font-bold text-[#16a34a] [text-shadow:0_0_8px_rgba(34,197,94,0.55)]'
-                  : 'rounded bg-[#22c55e]/12 px-1.5 py-0.5 text-[10.5px] font-bold text-[#15803d]'
+                className={`whitespace-nowrap tabular-nums sm:ml-auto ${showcase
+                  ? 'text-[10px] font-bold text-[#16a34a] [text-shadow:0_0_8px_rgba(34,197,94,0.55)] sm:text-[11.5px]'
+                  : 'rounded bg-[#22c55e]/12 px-1 py-0.5 text-[9.5px] font-bold text-[#15803d] sm:px-1.5 sm:text-[10.5px]'
                   }`}
               >
                 Save {formatPrice(savingsAmount)}
@@ -365,25 +386,36 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
           {/* Action — one integrated row, moderate radius.
               Showcase drops the stepper: a quantity control belongs on the
               detail page, and on a listing card it eats width and adds noise
-              beside three other controls. Adding still works, one at a time. */}
-          <div className={`flex items-center gap-2 ${showcase ? 'mt-3' : 'mt-2.5'}`}>
+              beside three other controls. Adding still works, one at a time.
+
+              The grid variant keeps its stepper, but stacked rather than
+              alongside: basis-full puts the button on its own line under it.
+
+              Side by side it did not fit at ANY width, which is why the label
+              was arriving as "Add to Ca". The grid gets denser as the viewport
+              grows — 2 columns on a phone, 6 at xl — so the card stays between
+              about 166px and 192px the whole way up. Take off the padding and
+              the stepper's ~76px and the button is left with 65-95px for a
+              label plus an icon that need roughly 90px. There is no breakpoint
+              where the row wins, so there is no breakpoint to unstack at. */}
+          <div className={`flex flex-wrap items-center gap-1.5 sm:gap-2 ${showcase ? 'mt-2.5 sm:mt-3' : 'mt-2 sm:mt-2.5'}`}>
             {isActuallyInStock && !showcase && (
               <div className="inline-flex shrink-0 items-center rounded-md ring-1 ring-gray-200 bg-gray-50/70">
                 <button
                   onClick={handleDecrement}
                   disabled={quantity <= 1}
                   aria-label="Decrease quantity"
-                  className="grid h-8 w-7 place-items-center rounded-l-md text-gray-500 transition-colors duration-200 hover:text-[#e01a1b] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-gray-500"
+                  className="grid h-7 w-6 place-items-center rounded-l-md text-gray-500 transition-colors duration-200 hover:text-[#e01a1b] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-gray-500 sm:h-8 sm:w-7"
                 >
-                  <span className="text-base font-semibold leading-none">−</span>
+                  <span className="text-[15px] font-semibold leading-none sm:text-base">−</span>
                 </button>
-                <span className="w-5 text-center text-sm font-semibold tabular-nums text-[#1a1a1a]">{quantity}</span>
+                <span className="w-4 text-center text-[13px] font-semibold tabular-nums text-[#1a1a1a] sm:w-5 sm:text-sm">{quantity}</span>
                 <button
                   onClick={handleIncrement}
                   aria-label="Increase quantity"
-                  className="grid h-8 w-7 place-items-center rounded-r-md text-gray-500 transition-colors duration-200 hover:text-[#e01a1b]"
+                  className="grid h-7 w-6 place-items-center rounded-r-md text-gray-500 transition-colors duration-200 hover:text-[#e01a1b] sm:h-8 sm:w-7"
                 >
-                  <span className="text-base font-semibold leading-none">+</span>
+                  <span className="text-[15px] font-semibold leading-none sm:text-base">+</span>
                 </button>
               </div>
             )}
@@ -396,7 +428,7 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
               // in the section — louder than the products they were selling.
               // Not a hover-reveal: that leaves touch devices with no visible
               // buy affordance at all.
-              className={`group/btn flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap font-semibold transition-all duration-300 disabled:cursor-not-allowed ${showcase ? 'h-10 rounded-lg px-4 text-[13px]' : 'btn-shine h-8 rounded-md px-3 text-xs'
+              className={`group/btn flex min-w-0 flex-1 basis-full items-center justify-center gap-1 whitespace-nowrap font-semibold transition-all duration-300 disabled:cursor-not-allowed sm:gap-1.5 ${showcase ? 'h-8 rounded-lg px-2 text-[11.5px] sm:h-10 sm:px-4 sm:text-[13px]' : 'btn-shine h-7 rounded-md px-2 text-[11px] sm:h-8 sm:px-3 sm:text-xs'
                 } ${isActuallyInStock
                   ? showcase
                     ? 'bg-[#fbf4ec] text-[#7a0f10] ring-1 ring-[#e2d1bd] hover:bg-[#e01a1b] hover:text-white hover:ring-[#e01a1b] hover:shadow-[0_10px_22px_-10px_rgba(224,26,27,0.65)] active:scale-[0.98]'
@@ -406,7 +438,7 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
                     : 'cursor-not-allowed bg-gray-100 text-gray-400 ring-1 ring-gray-200'
                 }`}
             >
-              <ShoppingCart className="h-4 w-4 transition-transform duration-300 group-hover/btn:scale-110" />
+              <ShoppingCart className="h-3.5 w-3.5 shrink-0 transition-transform duration-300 group-hover/btn:scale-110 sm:h-4 sm:w-4" />
               {isAddingToCart ? 'Adding…' : isActuallyInStock ? 'Add to Cart' : 'Unavailable'}
             </button>
           </div>
