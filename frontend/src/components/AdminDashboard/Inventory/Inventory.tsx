@@ -78,6 +78,49 @@ const getStatusBadge = (currentStock: number, lowStockAlert: number) => {
   return <Badge className="bg-green-50 text-green-700 border border-green-200">In Stock</Badge>
 }
 
+// Stock level for a single stock/min pair.
+type StockLevel = 'out' | 'low' | 'in'
+const levelOf = (stock: number, min: number): StockLevel =>
+  stock <= 0 ? 'out' : stock <= min ? 'low' : 'in'
+
+// Roll the base stock together with every variant into one parent status,
+// checking each variant's OWN stock vs its OWN minimum:
+//   · "Out of Stock" only when nothing is sellable — base and every variant at 0.
+//   · "Low Stock" when the base OR any variant is at/below its minimum, or a
+//     variant is out while others still have stock (partial out-of-stock).
+//   · "In Stock" otherwise.
+// A product without variants falls back to its aggregate stock vs minimum.
+const rollupLevel = (item: InventoryItem): StockLevel => {
+  const variants = item.variants || []
+  if (variants.length === 0) return levelOf(item.currentStock, item.lowStockAlert)
+  const allOut = (item.currentStock || 0) <= 0 && variants.every((v) => (v.stock || 0) <= 0)
+  if (allOut) return 'out'
+  const anyIssue =
+    (item.currentStock || 0) <= item.lowStockAlert ||
+    variants.some((v) => (v.stock || 0) <= v.effectiveThreshold)
+  return anyIssue ? 'low' : 'in'
+}
+
+const getRollupBadge = (item: InventoryItem) => {
+  const level = rollupLevel(item)
+  const hasVariants = (item.variants?.length || 0) > 0
+  // When the aggregate looks fine but a variant dragged the status down, hint why.
+  const fromVariant = hasVariants && level !== levelOf(item.currentStock, item.lowStockAlert)
+  const badge =
+    level === 'out'
+      ? <Badge className="bg-red-50 text-red-700 border border-red-200">Out of Stock</Badge>
+      : level === 'low'
+        ? <Badge className="bg-yellow-50 text-yellow-700 border border-yellow-200">Low Stock</Badge>
+        : <Badge className="bg-green-50 text-green-700 border border-green-200">In Stock</Badge>
+  if (!fromVariant) return badge
+  return (
+    <span className="inline-flex items-center gap-1">
+      {badge}
+      <span className="text-[10px] font-medium text-slate-400">variant</span>
+    </span>
+  )
+}
+
 const getApprovalBadge = (item: InventoryItem) => {
   if (!item.hasProductCreated) return <Badge className="bg-slate-100 text-slate-600">No Product</Badge>
   switch (item.productApprovalStatus) {
@@ -191,9 +234,11 @@ export default function Inventory() {
   const filteredItems = inventoryItems.filter(item => {
     if (!inDateRange(item.lastRestocked)) return false
     if (statusFilter === 'all') return true
-    if (statusFilter === 'out_of_stock') return item.currentStock === 0
-    if (statusFilter === 'low_stock') return item.currentStock <= item.lowStockAlert && item.currentStock > 0
-    if (statusFilter === 'in_stock') return item.currentStock > item.lowStockAlert
+    // Filter on the rolled-up level (base + variants) so it matches the badge shown.
+    const level = rollupLevel(item)
+    if (statusFilter === 'out_of_stock') return level === 'out'
+    if (statusFilter === 'low_stock') return level === 'low'
+    if (statusFilter === 'in_stock') return level === 'in'
     return true
   })
 
@@ -438,14 +483,14 @@ export default function Inventory() {
                           {getApprovalBadge(item)}
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className={`font-semibold ${item.currentStock <= item.lowStockAlert ? 'text-red-600' : 'text-slate-900'}`}>
+                          <span className={`font-semibold ${rollupLevel(item) !== 'in' ? 'text-red-600' : 'text-slate-900'}`}>
                             {item.currentStock}
                           </span>
                         </TableCell>
                         <TableCell className="text-sm text-slate-600 text-center">
                           {item.lowStockAlert}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap">{getStatusBadge(item.currentStock, item.lowStockAlert)}</TableCell>
+                        <TableCell className="whitespace-nowrap">{getRollupBadge(item)}</TableCell>
                         <TableCell className="text-sm text-slate-600 whitespace-nowrap">
                           {item.lastRestocked ? new Date(item.lastRestocked).toLocaleDateString() : 'Never'}
                         </TableCell>

@@ -900,7 +900,7 @@ const Products = () => {
                   <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-5">
                     {filteredProducts.map((product, index) => (
                       <Reveal key={product.id} delay={index * 90}>
-                        <ProductCard product={product} />
+                        <ProductCard product={product} variant="showcase" />
                       </Reveal>
                     ))}
                   </div>

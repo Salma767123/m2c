@@ -12,6 +12,10 @@ export interface CartItem {
   transportType?: 'AIR' | 'SHIP' | null;
   /** Courier partner id (see lib/couriers) chosen for this line. */
   courier?: string | null;
+  /** True when this line is a free gift from a "Buy A get B free" offer (price 0). */
+  isFreeGift?: boolean;
+  /** The offer that granted this free-gift line. */
+  giftOfferId?: string | null;
   product?: {
     id: string;
     name: string;
@@ -51,12 +55,30 @@ export interface CartItem {
   };
 }
 
+/** A free gift the customer must choose (offer's free set has multiple products/variants). */
+export interface PendingGift {
+  offerId: string;
+  offerTitle: string;
+  getQty: number;
+  freeScope?: 'PRODUCT' | 'CATEGORY' | null;
+  options: {
+    productId: string;
+    name: string;
+    image: string | null;
+    variants: { id: string; size?: string; color?: string; colorHex?: string; stock: number }[];
+  }[];
+}
+
 export interface CartResponse {
   success: boolean;
   data?: {
     items: CartItem[];
     total: number;
     itemCount: number;
+    /** Free gifts awaiting the customer's choice (chooser modal). */
+    pendingGifts?: PendingGift[];
+    /** Chooser data for every choosable gift offer (chosen or not) — powers "Change gift". */
+    giftOptions?: PendingGift[];
   };
   message?: string;
   error?: string;
@@ -95,6 +117,18 @@ class CartService {
       return result;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to add item to cart');
+    }
+  }
+
+  /** Choose a free gift (for a "Buy A get B free" offer whose free set has options). */
+  async addFreeGift(offerId: string, productId: string, variantId?: string): Promise<CartResponse> {
+    try {
+      const response = await axios.post('/cart/gift', { offerId, productId, variantId }, { params: { region: getRegion() } });
+      const result: CartResponse = response.data;
+      if (result.success && result.data) this._notify(result.data.itemCount);
+      return result;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to add free gift');
     }
   }
 

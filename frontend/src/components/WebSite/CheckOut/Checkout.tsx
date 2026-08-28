@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -11,16 +11,18 @@ import {
   Lock,
   Shield,
   Loader2,
-  ShoppingBag
+  ShoppingBag,
+  BadgePercent
 } from "lucide-react"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
-import { formatPrice, getCurrency, getRegion, getRegionalPrice, convertUSDtoINR, convertINRtoUSD } from '@/lib/currency'
+import { formatPrice, getCurrency, getRegion, getRegionalPrice, getRegionalOriginalPrice, convertUSDtoINR, convertINRtoUSD } from '@/lib/currency'
 import { applyOfferToPrice, type ActiveOffer } from '@/lib/offers'
 import ShippingForm from "./CheckoutProcess/ShippingForm"
 import PaymentForm from "./CheckoutProcess/PaymentForm"
 import ReviewOrder from "./CheckoutProcess/ReviewOrder"
 import AddressSelector from "./CheckoutProcess/AddressSelector"
 import Reveal from "@/components/WebSite/Shared/Reveal"
+import OfferCelebration from "@/components/WebSite/Shared/OfferCelebration"
 import cartService, { CartItem } from "@/services/cartService"
 import orderService, { CreateOrderParams } from "@/services/orderService"
 import { stashRecentOrder } from "@/lib/recentOrder"
@@ -161,6 +163,32 @@ export default function Checkout() {
     discount: 0,
     total: 0
   })
+
+  // Dynamic delivery estimate: the slowest line decides when the whole order lands.
+  // Days come from each item's chosen transport (Air/Surface) in its logistics config;
+  // the date is today + that many days. Computed in an effect so `new Date()` never runs
+  // during render (the repo forbids impure calls there).
+  const [deliveryEstimate, setDeliveryEstimate] = useState<{ days: number; dateLabel: string; mode?: 'AIR' | 'SHIP' } | null>(null)
+
+  useEffect(() => {
+    if (!cartItems.length) { setDeliveryEstimate(null); return }
+    let maxDays = 0
+    const modes = new Set<'AIR' | 'SHIP'>()
+    for (const item of cartItems) {
+      const config = (item.product as any)?.logisticsConfig
+      if (!config) continue
+      const types = Array.isArray(config.transportTypes) ? config.transportTypes : []
+      const mode = ((item as any).transportType || types[0]) as 'AIR' | 'SHIP' | undefined
+      const result = calculateLogistics(config as LogisticsConfig, item.quantity, mode, getRegion())
+      if (result.deliveryDays > maxDays) maxDays = result.deliveryDays
+      if (result.selectedTransport) modes.add(result.selectedTransport)
+    }
+    if (maxDays <= 0) { setDeliveryEstimate(null); return }
+    const d = new Date()
+    d.setDate(d.getDate() + maxDays)
+    const dateLabel = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+    setDeliveryEstimate({ days: maxDays, dateLabel, mode: modes.size === 1 ? [...modes][0] : undefined })
+  }, [cartItems])
 
   useEffect(() => {
     fetchCart()
@@ -461,6 +489,7 @@ export default function Checkout() {
    *  Razorpay amount — which the server's createOrder re-derives and reconciles, so
    *  the quoted total always equals the charged total. */
   const getItemPrice = (item: CartItem) => {
+    if (item.isFreeGift) return 0 // free-gift line — charged nothing, matches the server
     const base = item.variant
       ? getRegionalPrice(item.variant as any)
       : item.product
@@ -469,6 +498,77 @@ export default function Checkout() {
     const offer: ActiveOffer | undefined = item.product?.activeOffer
     return offer ? applyOfferToPrice(base, offer, getCurrency(), item.quantity, convertINRtoUSD) : base
   }
+
+  // Automatic-offer celebration on the checkout page (gift box for BOGO, coin for
+  // savings). Shares the sessionStorage guard with the cart so it fires only once
+  // per offer-state across the two pages.
+  const [offerCelebration, setOfferCelebration] = useState<
+    { kind: 'bogo'; freeUnits: number; dealLabel: string } | { kind: 'savings'; amount: number } | null
+  >(null)
+  const offerCelebratedRef = useRef(false)
+
+  const offerAgg = useMemo(() => {
+    let freeUnits = 0
+    let savings = 0
+    let bogoLabel = ''
+    for (const it of cartItems) {
+      // Free-gift line — celebrate as a gift-box freebie.
+      if (it.isFreeGift) {
+        const base = it.variant ? getRegionalPrice(it.variant as any) : it.product ? getRegionalPrice(it.product as any) : 0
+        if (base > 0) { freeUnits += it.quantity; savings += base * it.quantity; if (!bogoLabel) bogoLabel = 'Free gift unlocked' }
+        continue
+      }
+      const ao = it.product?.activeOffer
+      if (!ao) continue
+      if (ao.type === 'BOGO' && ao.bogoMode !== 'CROSS') {
+        const buy = Math.max(1, ao.minQty || 1)
+        const free = Math.max(0, ao.getQty || 0)
+        const group = buy + free
+        const fu = group > 0 && it.quantity >= group ? free : 0
+        if (fu > 0) {
+          freeUnits += fu
+          if (!bogoLabel) bogoLabel = `Buy ${buy} Get ${free} Free`
+        }
+      }
+      const base = it.variant
+        ? getRegionalPrice(it.variant as any)
+        : it.product
+          ? getRegionalPrice(it.product as any)
+          : it.price
+      const paid = getItemPrice(it)
+      if (base > paid) {
+        const lineSaving = (base - paid) * it.quantity
+        savings += lineSaving
+        // Cross-product BOGO free line — count the freebie for the gift-box popup.
+        if (ao.type === 'BOGO' && ao.bogoMode === 'CROSS') {
+          const fu = Math.round(lineSaving / base)
+          if (fu > 0) {
+            freeUnits += fu
+            if (!bogoLabel) bogoLabel = ao.title || 'Free item'
+          }
+        }
+      }
+    }
+    return { freeUnits, savings: Math.round(savings * 100) / 100, bogoLabel }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems])
+
+  useEffect(() => {
+    if (loading || offerCelebratedRef.current) return
+    if (offerAgg.freeUnits <= 0 && offerAgg.savings <= 0) return
+    const sig = `${offerAgg.freeUnits}|${offerAgg.savings}|${cartItems.map((i) => i.productId).sort().join(',')}`
+    try { if (sessionStorage.getItem('offerCelebrated') === sig) { offerCelebratedRef.current = true; return } } catch { /* ignore */ }
+    offerCelebratedRef.current = true
+    const t = setTimeout(() => {
+      try { sessionStorage.setItem('offerCelebrated', sig) } catch { /* ignore */ }
+      setOfferCelebration(
+        offerAgg.freeUnits > 0
+          ? { kind: 'bogo', freeUnits: offerAgg.freeUnits, dealLabel: offerAgg.bogoLabel }
+          : { kind: 'savings', amount: offerAgg.savings }
+      )
+    }, 600)
+    return () => clearTimeout(t)
+  }, [loading, offerAgg, cartItems])
 
   const calculateTotals = () => {
     // Round PER LINE, exactly as the server does (orderController: each itemTotal
@@ -501,10 +601,14 @@ export default function Checkout() {
       : r2line(getCurrency() === 'USD' ? convertINRtoUSD(logisticsShippingInr) : logisticsShippingInr);
     // Same per-line rounding and same base (the rounded line total) the server
     // uses, so the tax shown here equals the tax the server will store.
+    // GST on the POST-coupon net: allocate the coupon across lines in proportion
+    // to their value and tax each net at its own rate, matching orderController.
     const tax = cartItems.reduce((sum, item) => {
-      const itemSubtotal = r2line(getItemPrice(item) * item.quantity)
+      const gross = r2line(getItemPrice(item) * item.quantity)
+      const couponShare = subtotal > 0 ? (gross / subtotal) * discountAmount : 0
+      const net = Math.max(0, gross - couponShare)
       const gstRate = item.product?.gstPercentage ? item.product.gstPercentage / 100 : 0
-      return sum + r2line(itemSubtotal * gstRate)
+      return sum + r2line(net * gstRate)
     }, 0)
 
     // Round every component to 2dp BEFORE summing, mirroring the server
@@ -866,7 +970,7 @@ export default function Checkout() {
   )
 
   const renderReview = () => (
-    <ReviewOrder formData={formData} />
+    <ReviewOrder formData={formData} deliveryEstimate={deliveryEstimate} />
   )
 
   if (loading) {
@@ -932,6 +1036,25 @@ export default function Checkout() {
     )
   }
 
+  // Rich, reconcilable savings breakdown — same model as the cart's Order Summary.
+  // MRP → product discount → offer discount (baked into getItemPrice) → coupon →
+  // taxable amount → tax → delivery → total. Reads the same price ladder as the cart.
+  const round2 = (n: number) => Math.round(n * 100) / 100
+  const mrpOf = (it: CartItem) => {
+    const src = (it.variant ?? it.product) as any
+    return (src ? (getRegionalOriginalPrice(src) ?? getRegionalPrice(src)) : it.price) || 0
+  }
+  const sellingOf = (it: CartItem) => {
+    const src = (it.variant ?? it.product) as any
+    return (src ? getRegionalPrice(src) : it.price) || 0
+  }
+  const listSubtotal = cartItems.reduce((s, it) => s + Math.max(mrpOf(it), sellingOf(it), getItemPrice(it)) * it.quantity, 0)
+  const preOfferSubtotal = cartItems.reduce((s, it) => s + sellingOf(it) * it.quantity, 0)
+  const productDiscount = Math.max(0, round2(listSubtotal - preOfferSubtotal))
+  const offerDiscount = Math.max(0, round2(preOfferSubtotal - orderSummary.subtotal))
+  const couponDiscount = orderSummary.discount
+  const totalSavings = round2(productDiscount + offerDiscount + couponDiscount)
+
   return (
     /**
      * ── Two panes, not two cards ─────────────────────────────────────────
@@ -958,6 +1081,16 @@ export default function Checkout() {
      * to fill, not the arithmetic.
      */
     <div className="min-h-screen bg-[#faf6f2] font-sans">
+      {offerCelebration && (
+        <OfferCelebration
+          open
+          onClose={() => setOfferCelebration(null)}
+          variant={offerCelebration.kind}
+          freeUnits={offerCelebration.kind === 'bogo' ? offerCelebration.freeUnits : undefined}
+          dealLabel={offerCelebration.kind === 'bogo' ? offerCelebration.dealLabel : undefined}
+          amountLabel={offerCelebration.kind === 'savings' ? formatPrice(offerCelebration.amount) : undefined}
+        />
+      )}
       {/* An ordinary contained page.
           Two earlier attempts made this a pair of full-height panes running to
           the screen edge. Both failed for the same reason: a pane has to be as
@@ -1191,7 +1324,11 @@ export default function Checkout() {
                             {itemSize && <span className="whitespace-nowrap">Size: {itemSize}</span>}
                           </div>
                         )}
-                        {item.product?.activeOffer && (
+                        {item.isFreeGift ? (
+                          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[#eaf7ef] px-1.5 py-0.5 text-[9px] font-bold text-[#157f4a] ring-1 ring-[#c9e9d5]">
+                            🎁 FREE GIFT
+                          </span>
+                        ) : item.product?.activeOffer && (
                           <span className="mt-1.5 inline-flex items-center rounded-full bg-[#fdf1ef] px-1.5 py-0.5 text-[9px] font-bold text-[#c41617] ring-1 ring-[#f4dcd7]">
                             {item.product.activeOffer.badge}
                           </span>
@@ -1199,7 +1336,7 @@ export default function Checkout() {
                       </div>
 
                       <span className="shrink-0 font-semibold tabular-nums text-[#1a1a1a]">
-                        {formatPrice(getItemPrice(item) * item.quantity)}
+                        {item.isFreeGift ? <span className="text-[#157f4a]">FREE</span> : formatPrice(getItemPrice(item) * item.quantity)}
                       </span>
                     </li>
                   )
@@ -1222,45 +1359,77 @@ export default function Checkout() {
               </>
               ); })()}
 
-              <div className="space-y-3 border-t border-[#eee2d2] pt-5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-[#6b625b]">Subtotal</span>
-                  <span className="font-medium tabular-nums">{formatPrice(orderSummary.subtotal)}</span>
+              {/* Price ladder — same aggregated, reconcilable breakdown as the
+                  cart's Order Summary. Discount rows only show when they exist and
+                  read as green savings; the coupon sits above the taxable amount. */}
+              <div className="space-y-2.5 border-t border-[#eee2d2] pt-5 text-[13.5px] sm:text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#6b625b]">Items subtotal</span>
+                  <span className="tabular-nums text-[#1a1a1a]">{formatPrice(listSubtotal)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-[#6b625b]">Shipping</span>
-                  <span className="font-medium tabular-nums">
-                    {orderSummary.shipping === 0 ? (
-                      <span className="flex items-center gap-1 text-[#1f7a4d]">
-                        <Truck className="h-4 w-4" />
-                        Free
-                      </span>
-                    ) : (
-                      `${formatPrice(orderSummary.shipping)}`
-                    )}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#6b625b]">Tax (GST)</span>
-                  <span className="font-medium tabular-nums">{formatPrice(orderSummary.tax)}</span>
-                </div>
-                {orderSummary.discount > 0 && (
-                  <div className="flex justify-between text-[#1f7a4d]">
-                    <span>Discount</span>
-                    <span className="font-medium tabular-nums">-{formatPrice(orderSummary.discount)}</span>
+
+                {productDiscount > 0 && (
+                  <div className="flex items-center justify-between text-[#157f4a]">
+                    <span>Product discount</span>
+                    <span className="font-medium tabular-nums">−{formatPrice(productDiscount)}</span>
                   </div>
                 )}
+                {offerDiscount > 0 && (
+                  <div className="flex items-center justify-between text-[#157f4a]">
+                    <span>Offer discount</span>
+                    <span className="font-medium tabular-nums">−{formatPrice(offerDiscount)}</span>
+                  </div>
+                )}
+                {couponDiscount > 0 && (
+                  <div className="flex items-center justify-between text-[#157f4a]">
+                    <span>Coupon discount</span>
+                    <span className="font-medium tabular-nums">−{formatPrice(couponDiscount)}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between border-t border-dashed border-[#ece1d4] pt-2.5">
+                  <span className="text-[#6b625b]">Taxable amount</span>
+                  <span className="font-medium tabular-nums text-[#1a1a1a]">{formatPrice(Math.max(0, orderSummary.subtotal - couponDiscount))}</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-[#6b625b]">Tax (GST)</span>
+                  <span className="tabular-nums text-[#1a1a1a]">{formatPrice(orderSummary.tax)}</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-[#6b625b]">Delivery charges</span>
+                  {orderSummary.shipping === 0 ? (
+                    <span className="inline-flex items-center gap-1 font-semibold text-[#157f4a]">
+                      <Truck className="h-3.5 w-3.5" /> FREE
+                    </span>
+                  ) : (
+                    <span className="tabular-nums text-[#1a1a1a]">{formatPrice(orderSummary.shipping)}</span>
+                  )}
+                </div>
               </div>
+
+              {totalSavings > 0 && (
+                <div className="mt-4 flex items-center justify-between rounded-xl bg-[#eaf7ef] px-3.5 py-2.5 ring-1 ring-[#cdebd8]">
+                  <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#157f4a]">
+                    <BadgePercent className="h-4 w-4" /> You save
+                  </span>
+                  <span className="text-[15px] font-bold tabular-nums text-[#157f4a]">{formatPrice(totalSavings)}</span>
+                </div>
+              )}
 
               {/* The one dark object on the page, and the only one that earns
                   it: the figure the whole checkout exists to arrive at. */}
               <div className="mt-5 rounded-2xl bg-linear-to-br from-[#2f1e1a] to-[#1f1312] px-5 py-4 text-white shadow-[0_14px_34px_-20px_rgba(70,40,25,0.85)]">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-base font-semibold sm:text-lg">Total</span>
+                  <span className="text-base font-semibold sm:text-lg">Total payable</span>
                   <span className="font-playfair text-2xl font-semibold tabular-nums sm:text-[28px]">
                     {formatPrice(orderSummary.total)}
                   </span>
                 </div>
+                <p className="mt-1.5 text-[11.5px] leading-snug text-white/55">
+                  Taxes are calculated based on applicable product tax rates.
+                </p>
                 {/*
                   Our Razorpay account settles in INR, so a USD order is
                   converted server-side before the payment is created.

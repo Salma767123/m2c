@@ -6,9 +6,11 @@ import { getCountryName, getCountryFlag, getStateName, formatPhoneForDisplay } f
 
 interface ReviewOrderProps {
   formData: CheckoutFormData
+  /** Dynamic delivery estimate computed from the chosen courier/transport per line. */
+  deliveryEstimate?: { days: number; dateLabel: string; mode?: 'AIR' | 'SHIP' } | null
 }
 
-export default function ReviewOrder({ formData }: ReviewOrderProps) {
+export default function ReviewOrder({ formData, deliveryEstimate }: ReviewOrderProps) {
   return (
     <div className="space-y-6">
       <div>
@@ -63,9 +65,17 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
           <Calendar className="w-5 h-5 text-[#e01a1b]" />
           <div>
             <h4 className="font-semibold text-[#1a1a1a]">Estimated Delivery</h4>
-            <p className="text-sm text-[#5a524b]">
-              5-7 business days
-            </p>
+            {deliveryEstimate ? (
+              <p className="text-sm text-[#5a524b]">
+                <span className="font-semibold text-[#1a1a1a]">Arrives by {deliveryEstimate.dateLabel}</span>
+                <span className="text-[#8a807a]">
+                  {" "}· {deliveryEstimate.days} {deliveryEstimate.days === 1 ? "day" : "days"}
+                  {deliveryEstimate.mode ? ` via ${deliveryEstimate.mode === "AIR" ? "Air" : "Surface"}` : ""}
+                </span>
+              </p>
+            ) : (
+              <p className="text-sm text-[#5a524b]">Calculated once shipping is selected</p>
+            )}
           </div>
         </div>
       </div>

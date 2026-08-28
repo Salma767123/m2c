@@ -307,10 +307,30 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                         </div>
                         <div className="mt-6 border-t border-slate-100 pt-4 flex justify-end">
                             <div className="w-full max-w-xs space-y-2">
+                                {/* Subtotal → Discount → Taxable → Tax → Shipping → Total:
+                                    the coupon reduces the taxable base (GST on the net). */}
                                 <div className="flex justify-between text-sm">
                                     <span className="text-slate-500">Subtotal</span>
                                     <span className="text-slate-900 font-medium">{money(order.subtotal ?? 0)}</span>
                                 </div>
+                                {order.discount > 0 ? (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-500">Discount</span>
+                                        <span className="text-green-600 font-medium">−{money(order.discount)}</span>
+                                    </div>
+                                ) : null}
+                                {order.discount > 0 ? (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-500">Taxable amount</span>
+                                        <span className="text-slate-900 font-medium">{money(Math.max(0, (order.subtotal ?? 0) - order.discount))}</span>
+                                    </div>
+                                ) : null}
+                                {order.tax > 0 ? (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-500">Tax</span>
+                                        <span className="text-slate-900 font-medium">{money(order.tax)}</span>
+                                    </div>
+                                ) : null}
                                 {order.shippingCost > 0 ? (
                                     <div className="flex justify-between text-sm">
                                         <span className="text-slate-500">Shipping</span>
@@ -322,18 +342,6 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                                         <span className="text-green-600 font-medium">FREE</span>
                                     </div>
                                 )}
-                                {order.tax > 0 ? (
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-slate-500">Tax</span>
-                                        <span className="text-slate-900 font-medium">{money(order.tax)}</span>
-                                    </div>
-                                ) : null}
-                                {order.discount > 0 ? (
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-slate-500">Discount</span>
-                                        <span className="text-red-600 font-medium">-{money(order.discount)}</span>
-                                    </div>
-                                ) : null}
                                 <div className="flex justify-between pt-2 border-t border-slate-200">
                                     <span className="text-base font-semibold text-slate-900">Total</span>
                                     <span className="text-xl font-bold text-teal-600">{money(order.totalAmount ?? 0)}</span>

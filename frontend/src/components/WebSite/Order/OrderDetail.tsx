@@ -22,7 +22,9 @@ import {
   Clock,
   ExternalLink,
   RotateCcw,
-  XCircle
+  XCircle,
+  BadgePercent,
+  ClipboardCheck
 } from "lucide-react"
 import { formatPrice } from '@/lib/currency'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
@@ -76,6 +78,9 @@ const isStatusReached = (orderStatus: string, step: string) => {
 
   // If cancelled, don't show any progress
   if (normalized === 'cancelled') return false;
+
+  // A placed order is always "confirmed" — that's the first, always-complete step.
+  if (step === 'confirmed') return true;
 
   const currentIndex = statusOrder.indexOf(normalized)
   const stepIndex = statusOrder.indexOf(step)
@@ -387,6 +392,21 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
   // own currency once and use it for every amount below.
   const money = (n: number) => formatPrice(n, orderDetails.currency === 'USD' ? 'USD' : 'INR')
 
+  // Savings breakdown for the cart-style Order Summary. The stored order exposes
+  // each line's pre-offer price (originalUnitPrice, set only when an offer applied),
+  // so we can surface the offer discount alongside the coupon. Product-level MRP
+  // isn't frozen per line, so "Subtotal" starts at the post-offer goods value.
+  const round2 = (n: number) => Math.round(n * 100) / 100
+  const offerDiscount = Math.max(0, round2(
+    orderDetails.items.reduce((s, it) => {
+      const orig = it.originalUnitPrice
+      return s + (orig && orig > it.unitPrice ? (orig - it.unitPrice) * it.quantity : 0)
+    }, 0)
+  ))
+  const couponDiscount = orderDetails.discount || 0
+  const totalSavings = round2(offerDiscount + couponDiscount)
+  const itemsSubtotal = round2(orderDetails.subtotal + offerDiscount)
+
   const normalizedStatus = getNormalizedStatus(orderDetails.status)
   const shippingAddr = orderDetails.shippingAddress || {}
   const cityState = (loc?: { city?: string | null; state?: string | null } | null) =>
@@ -404,6 +424,20 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
     const recv = historyForStep(orderDetails.statusHistory, 'received')
     return [
       {
+        // Always-complete first step: the moment the customer placed the order.
+        // No location here — just when it was confirmed.
+        key: 'confirmed' as const,
+        label: 'Order Confirmed',
+        Icon: ClipboardCheck,
+        activeBg: 'bg-blue-500',
+        activeText: 'text-blue-600',
+        lineNext: 'processing',
+        at: formatDateTime(orderDetails.createdAt),
+        detail: '',
+      },
+      {
+        // Order assigned to the vendor to pack and hand to the hub. The time is when
+        // the admin assigned it; the location is the vendor's city/state.
         key: 'processing' as const,
         label: 'Processing',
         Icon: Package,
@@ -411,7 +445,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
         activeText: 'text-yellow-600',
         lineNext: 'shipped',
         at: formatDateTime(proc.reachedAt || orderDetails.createdAt),
-        detail: vendorPlace ? `Preparing at ${vendorPlace}.` : 'Order confirmed and being prepared.',
+        detail: vendorPlace ? `Assigned to vendor · ${vendorPlace}.` : 'Assigned to vendor for packing.',
       },
       {
         key: 'shipped' as const,
@@ -421,7 +455,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
         activeText: 'text-[#e01a1b]',
         lineNext: 'received',
         at: formatDateTime(ship.reachedAt || orderDetails.vendorShippedAt),
-        detail: hubPlace ? `Shipped from ${hubPlace} hub.` : 'Your order is on the way.',
+        detail: hubPlace ? `Shipped from ${hubPlace}.` : 'Your order is on the way.',
       },
       {
         key: 'received' as const,
@@ -822,30 +856,67 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                     Order Summary
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 sm:p-5 lg:p-6 space-y-3 sm:space-y-4">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Subtotal</span>
-                    <span className="font-medium">{money(orderDetails.subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Shipping</span>
-                    <span className="font-medium text-green-600">
-                      {orderDetails.shippingCost > 0 ? money(orderDetails.shippingCost) : 'Free'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Tax</span>
-                    <span className="font-medium">{money(orderDetails.tax)}</span>
-                  </div>
-                  {orderDetails.discount > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">Discount</span>
-                      <span className="font-medium text-green-600">-{money(orderDetails.discount)}</span>
+                <CardContent className="p-4 sm:p-5 lg:p-6">
+                  {/* Cart-style price ladder. Discount rows only show when they
+                      exist and read as green savings; the coupon sits above the
+                      taxable amount (GST is charged on the post-coupon net). */}
+                  <div className="space-y-2.5 text-[13.5px] sm:text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">Items subtotal</span>
+                      <span className="tabular-nums text-slate-900">{money(itemsSubtotal)}</span>
                     </div>
-                  )}
-                  <div className="mt-1 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
-                    <span className="text-base font-bold text-slate-900">Total</span>
-                    <span className="text-xl font-bold text-[#e01a1b]">{money(orderDetails.totalAmount)}</span>
+
+                    {offerDiscount > 0 && (
+                      <div className="flex items-center justify-between text-[#157f4a]">
+                        <span>Offer discount</span>
+                        <span className="font-medium tabular-nums">−{money(offerDiscount)}</span>
+                      </div>
+                    )}
+                    {couponDiscount > 0 && (
+                      <div className="flex items-center justify-between text-[#157f4a]">
+                        <span>Coupon discount</span>
+                        <span className="font-medium tabular-nums">−{money(couponDiscount)}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between border-t border-dashed border-slate-200 pt-2.5">
+                      <span className="text-slate-600">Taxable amount</span>
+                      <span className="font-medium tabular-nums text-slate-900">{money(Math.max(0, orderDetails.subtotal - couponDiscount))}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">Tax (GST)</span>
+                      <span className="tabular-nums text-slate-900">{money(orderDetails.tax)}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">Delivery charges</span>
+                      {orderDetails.shippingCost > 0 ? (
+                        <span className="tabular-nums text-slate-900">{money(orderDetails.shippingCost)}</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 font-semibold text-[#157f4a]">
+                          <Truck className="h-3.5 w-3.5" /> FREE
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 border-t border-slate-100 pt-4">
+                    {totalSavings > 0 && (
+                      <div className="mb-3 flex items-center justify-between rounded-xl bg-[#eaf7ef] px-3.5 py-2.5 ring-1 ring-[#cdebd8]">
+                        <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#157f4a]">
+                          <BadgePercent className="h-4 w-4" /> You save
+                        </span>
+                        <span className="text-[15px] font-bold tabular-nums text-[#157f4a]">{money(totalSavings)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[15px] font-semibold text-slate-900 sm:text-base">Total payable</span>
+                      <span className="text-2xl font-bold tabular-nums text-[#e01a1b]">{money(orderDetails.totalAmount)}</span>
+                    </div>
+                    <p className="mt-1.5 text-[11.5px] leading-snug text-slate-400">
+                      Taxes are calculated based on applicable product tax rates.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -933,7 +1004,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
               {similarProducts.map((p) => (
-                <ProductCard key={p.id} product={p} />
+                <ProductCard key={p.id} product={p} variant="showcase" />
               ))}
             </div>
           </Reveal>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, Percent, Calendar, Tag, Loader2, X, ImageIcon, Upload, CheckCircle, Clock, XCircle, PauseCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Percent, Calendar, Tag, Loader2, X, ImageIcon, Upload, CheckCircle, Clock, XCircle, PauseCircle, PlayCircle } from 'lucide-react'
 import { offerService, type Offer, type OfferInput, type OfferStatus } from '@/services/offerService'
 import { categoryService } from '@/services/categoryService'
 import { adminProductService, type AdminProduct } from '@/services/adminProductService'
@@ -136,6 +136,21 @@ export default function OfferManagement() {
     }
   }
 
+  // Activate / pause an offer straight from the row.
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const handleToggleActive = async (o: Offer) => {
+    try {
+      setTogglingId(o.id)
+      await offerService.setOfferActive(o.id, !o.isActive)
+      showSuccessToast(o.isActive ? 'Offer paused' : 'Offer activated')
+      load()
+    } catch (e) {
+      showErrorToast(e instanceof Error ? e.message : 'Failed to update offer')
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -234,6 +249,16 @@ export default function OfferManagement() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleToggleActive(o)}
+                          disabled={togglingId === o.id}
+                          className={`p-1.5 rounded disabled:opacity-50 ${o.isActive ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50'}`}
+                          title={o.isActive ? 'Pause offer' : 'Activate offer'}
+                        >
+                          {togglingId === o.id
+                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                            : o.isActive ? <PauseCircle className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />}
+                        </button>
                         <button onClick={() => openEdit(o)} className="p-1.5 text-gray-500 hover:text-[#e01a1b] hover:bg-red-50 rounded" title="Edit">
                           <Pencil className="w-4 h-4" />
                         </button>
@@ -300,28 +325,35 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
   const [categories, setCategories] = useState<string[]>([])
   const [products, setProducts] = useState<AdminProduct[]>([])
   const [productQuery, setProductQuery] = useState('')
+  const [freeProductQuery, setFreeProductQuery] = useState('')
 
   const set = <K extends keyof OfferInput>(k: K, v: OfferInput[K]) => setForm((f) => ({ ...f, [k]: v }))
 
-  // Load pickers lazily when the scope needs them.
+  // Load pickers lazily when either the BUY scope or the CROSS-BOGO FREE scope needs them.
+  const needsCategories = form.scope === 'CATEGORY' || form.freeScope === 'CATEGORY'
+  const needsProducts = form.scope === 'PRODUCT' || form.freeScope === 'PRODUCT'
   useEffect(() => {
-    if (form.scope === 'CATEGORY' && categories.length === 0) {
+    if (needsCategories && categories.length === 0) {
       categoryService
         .getCategories({})
         .then((r) => setCategories(Array.from(new Set(r.data.map((c) => c.name))).sort()))
         .catch(() => {})
     }
-    if (form.scope === 'PRODUCT' && products.length === 0) {
+    if (needsProducts && products.length === 0) {
       adminProductService
         .getAllProducts({ limit: 500, approvalStatus: 'APPROVED' })
         .then((r) => setProducts(r.data?.products || []))
         .catch(() => {})
     }
-  }, [form.scope, categories.length, products.length])
+  }, [needsCategories, needsProducts, categories.length, products.length])
 
   const filteredProducts = useMemo(
     () => products.filter((p) => p.name.toLowerCase().includes(productQuery.toLowerCase())).slice(0, 60),
     [products, productQuery]
+  )
+  const filteredFreeProducts = useMemo(
+    () => products.filter((p) => p.name.toLowerCase().includes(freeProductQuery.toLowerCase())).slice(0, 60),
+    [products, freeProductQuery]
   )
 
   const toggleId = (list: string[] | undefined, id: string): string[] => {
@@ -332,6 +364,12 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
   const submit = async () => {
     if (!form.title?.trim()) return showErrorToast('Title is required')
     if (!form.endsAt) return showErrorToast('End date is required')
+    if (form.type === 'BOGO' && form.bogoMode === 'CROSS') {
+      if (form.scope === 'STORE') return showErrorToast('Pick a buy product or category for a cross-product BOGO')
+      if (!form.freeScope) return showErrorToast('Choose the free item type (product or category)')
+      if (form.freeScope === 'PRODUCT' && !(form.freeProductIds || []).length) return showErrorToast('Select at least one free product')
+      if (form.freeScope === 'CATEGORY' && !(form.freeCategoryNames || []).length) return showErrorToast('Select at least one free category')
+    }
     setSaving(true)
     try {
       const payload: OfferInput = {
@@ -370,6 +408,7 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
 
   const t = form.type
   const showPercent = t === 'PERCENTAGE' || t === 'QUANTITY' || t === 'THRESHOLD'
+  const isCrossBogo = t === 'BOGO' && form.bogoMode === 'CROSS'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -438,13 +477,39 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
               options={(Object.keys(TYPE_LABELS) as OfferType[]).map((k) => ({ value: k, label: TYPE_LABELS[k] }))}
             />
             <Dropdown
-              label="Applies to *"
+              label={isCrossBogo ? 'Buy — applies to *' : 'Applies to *'}
               value={form.scope || 'STORE'}
               onChange={(v) => set('scope', v as OfferScope)}
               disabled={form.type === 'THRESHOLD'}
-              options={(Object.keys(SCOPE_LABELS) as OfferScope[]).map((k) => ({ value: k, label: SCOPE_LABELS[k] }))}
+              options={(Object.keys(SCOPE_LABELS) as OfferScope[])
+                // A cross-product BOGO must have a specific buy set — hide "Whole store".
+                .filter((k) => !(isCrossBogo && k === 'STORE'))
+                .map((k) => ({ value: k, label: SCOPE_LABELS[k] }))}
             />
           </div>
+
+          {/* BOGO: how the free item is chosen. */}
+          {t === 'BOGO' && (
+            <Dropdown
+              label="Free item by"
+              value={form.bogoMode || 'SAME'}
+              onChange={(v) => {
+                set('bogoMode', v as 'SAME' | 'CROSS')
+                if (v === 'SAME') {
+                  set('freeScope', null)
+                  set('freeProductIds', [])
+                  set('freeCategoryNames', [])
+                } else if (form.scope === 'STORE') {
+                  // cross needs a specific buy set — nudge off "Whole store"
+                  set('scope', 'PRODUCT')
+                }
+              }}
+              options={[
+                { value: 'SAME', label: 'Quantity — same item (buy N, get M of it free)' },
+                { value: 'CROSS', label: 'Product / Category — buy one item, get a different one free' },
+              ]}
+            />
+          )}
 
           {/* Discount magnitude */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -536,10 +601,39 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
             )}
           </div>
 
+          {/* BOGO explainer — spells out the deal so there's no "is this working?" doubt. */}
+          {t === 'BOGO' && (
+            <div className="rounded-lg border border-[#f0d5cf] bg-[#fdf6f4] px-3 py-2.5 text-xs leading-relaxed text-[#7a5a52]">
+              <span className="font-semibold text-[#c41617]">
+                Buy {form.minQty || 0} &amp; get {form.getQty || 0} free
+              </span>{' '}
+              {isCrossBogo ? (
+                <>
+                  — the customer buys from the <span className="font-semibold">buy set</span> and
+                  gets a <span className="font-semibold">different</span> item from the{' '}
+                  <span className="font-semibold">free set</span> free. They must add the free item
+                  to the cart themselves; the cheapest qualifying one is discounted.
+                </>
+              ) : (
+                <>
+                  — the free item is the <span className="font-semibold">same product</span> the
+                  customer buys.{' '}
+                  {form.scope === 'STORE'
+                    ? 'Applies to every product in the store (counted per product).'
+                    : form.scope === 'PRODUCT'
+                      ? 'Applies only to the products you select below.'
+                      : 'Applies only to products in the categories you select below.'}
+                </>
+              )}
+            </div>
+          )}
+
           {/* Scope targeting */}
           {form.scope === 'CATEGORY' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Target categories</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t === 'BOGO' ? (isCrossBogo ? 'Buy categories' : 'Buy & free categories (same item)') : 'Target categories'}
+              </label>
               <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
                 {categories.map((c) => {
                   const on = (form.categoryNames || []).includes(c)
@@ -562,7 +656,7 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
           {form.scope === 'PRODUCT' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Target products{' '}
+                {t === 'BOGO' ? (isCrossBogo ? 'Buy products' : 'Buy & free products (same item)') : 'Target products'}{' '}
                 <span className="text-xs text-gray-400">({(form.productIds || []).length} selected)</span>
               </label>
               <input
@@ -584,6 +678,74 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
                 })}
                 {products.length === 0 && <div className="px-3 py-2 text-xs text-gray-400">Loading products…</div>}
               </div>
+            </div>
+          )}
+
+          {/* ── CROSS BOGO: the FREE (get) set — a different product/category ── */}
+          {isCrossBogo && (
+            <div className="rounded-lg border border-[#e6f2ea] bg-[#f6fbf8] p-3 space-y-3">
+              <p className="text-sm font-semibold text-[#157f4a]">Free item — what the customer gets</p>
+              <Dropdown
+                label="Free item is a *"
+                value={form.freeScope || ''}
+                onChange={(v) => set('freeScope', v as OfferScope)}
+                placeholder="Choose product or category"
+                options={[
+                  { value: 'PRODUCT', label: 'Specific products' },
+                  { value: 'CATEGORY', label: 'Categories' },
+                ]}
+              />
+
+              {form.freeScope === 'CATEGORY' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Free categories <span className="text-xs text-gray-400">({(form.freeCategoryNames || []).length} selected)</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
+                    {categories.map((c) => {
+                      const on = (form.freeCategoryNames || []).includes(c)
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => set('freeCategoryNames', toggleId(form.freeCategoryNames, c))}
+                          className={`px-2.5 py-1 rounded-full text-xs border ${on ? 'bg-[#157f4a] text-white border-[#157f4a]' : 'bg-white text-gray-600 border-gray-300'}`}
+                        >
+                          {c}
+                        </button>
+                      )
+                    })}
+                    {categories.length === 0 && <span className="text-xs text-gray-400">Loading categories…</span>}
+                  </div>
+                </div>
+              )}
+
+              {form.freeScope === 'PRODUCT' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Free products <span className="text-xs text-gray-400">({(form.freeProductIds || []).length} selected)</span>
+                  </label>
+                  <input
+                    value={freeProductQuery}
+                    onChange={(e) => setFreeProductQuery(e.target.value)}
+                    placeholder="Search products…"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:border-[#157f4a]"
+                  />
+                  <div className="max-h-52 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100 bg-white">
+                    {filteredFreeProducts.map((p) => {
+                      const on = (form.freeProductIds || []).includes(p.id)
+                      return (
+                        <label key={p.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
+                          <input type="checkbox" checked={on} onChange={() => set('freeProductIds', toggleId(form.freeProductIds, p.id))} />
+                          <span className="text-gray-800">{p.name}</span>
+                          <span className="text-xs text-gray-400 ml-auto">{p.category}</span>
+                        </label>
+                      )
+                    })}
+                    {products.length === 0 && <div className="px-3 py-2 text-xs text-gray-400">Loading products…</div>}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

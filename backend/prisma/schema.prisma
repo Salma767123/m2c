@@ -219,6 +219,12 @@ model CartItem {
   // choices depend on transportType (AIR vs SHIP). See utils/couriers.js.
   courier String?
 
+  // Free gift line, granted by a CROSS "Buy A get B free" offer. Priced at 0, its
+  // quantity is fixed by the offer, and the server removes it automatically when the
+  // buy condition is no longer met. `giftOfferId` is the Offer that granted it.
+  isFreeGift  Boolean @default(false)
+  giftOfferId String? @db.ObjectId
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1173,6 +1179,10 @@ model OrderItem {
   quantity   Int
   unitPrice  Float
   totalPrice Float
+  // Customer GST rate (%) actually charged on this line, frozen at checkout from
+  // the product's own gstPercentage — so the invoice prints the real per-item
+  // rate (e.g. 5% vs 12%) rather than a blended average. Null on legacy rows.
+  gstPercentage Float?
   // INR-normalised twin of totalPrice, frozen at write time from the parent order's
   // exchangeRate. OrderItem has no currency column of its own — it inherits the
   // parent Order's — so product/vendor/category revenue groupBys cannot even filter
@@ -1431,8 +1441,19 @@ model Offer {
   //   PRODUCT  → productIds     (Product.id list)
   //   CATEGORY → categoryNames  (Product.category string list)
   //   STORE    → applies to everything, both lists ignored
+  // For a CROSS BOGO this is the BUY set (what the customer must purchase).
   productIds    String[] @default([])
   categoryNames String[] @default([])
+
+  // BOGO free-item mode (BOGO only):
+  //   "SAME"  (default/legacy) → buy N and get M of the SAME product free.
+  //   "CROSS" → buy N of the buy set above, get M free from the free set below.
+  bogoMode String? @default("SAME")
+
+  // CROSS BOGO free (get) set. Read according to `freeScope`; ignored when SAME.
+  freeScope         OfferScope?
+  freeProductIds    String[]    @default([])
+  freeCategoryNames String[]    @default([])
 
   // Which storefront the offer runs on. Reuses the product visibility enum so an
   // IN_ONLY offer never applies to a .com (USD) order and vice-versa.

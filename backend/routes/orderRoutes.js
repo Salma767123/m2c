@@ -9,6 +9,25 @@ const { getOrderInvoiceHTML } = require('../utils/email/templates/orderInvoiceTe
 const { prisma } = require('../config/database');
 const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
 
+// Legacy orders (placed before per-line GST was frozen on the order item) have
+// no gstPercentage on their items. Backfill it from each product's current rate
+// so the invoice prints the real per-item rate instead of a blended average.
+// In-memory only — never persisted (the product's rate may have moved since).
+async function attachItemGst(order) {
+    const missing = (order?.items || []).filter((it) => it.gstPercentage == null && it.productId);
+    if (missing.length === 0) return;
+    const ids = [...new Set(missing.map((it) => it.productId))];
+    const products = await prisma.product.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, gstPercentage: true },
+    });
+    const rateById = new Map(products.map((p) => [p.id, p.gstPercentage]));
+    for (const it of missing) {
+        const r = rateById.get(it.productId);
+        if (r != null) it.gstPercentage = r;
+    }
+}
+
 // Apply base auth middleware to all routes
 router.use(authenticateToken);
 
@@ -38,6 +57,9 @@ router.get('/admin/:id/invoice', requireAdminRole, requirePermission(['invoices:
 
         const order = await prisma.order.findUnique({ where, include: { items: ACTIVE_ITEMS_FILTER } });
         if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
+
+        // Backfill per-line GST rate for legacy orders so the invoice prints real rates.
+        await attachItemGst(order);
 
         // Fetch company info for invoice header (logo, name, GST, etc.)
         const company = await prisma.companyInfo.findFirst({

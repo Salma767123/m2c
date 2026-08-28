@@ -12,11 +12,15 @@ const computeStockFlags = (item) => {
   const variants = item.variants || [];
   if (variants.length > 0) {
     const allZero = variants.every(v => (v.stock || 0) === 0) && (item.baseStock || 0) === 0;
-    const anyLow = variants.some(v => {
+    // At/below threshold — INCLUDING a fully out-of-stock variant (stock 0). A
+    // product whose base or any variant is at/below its own minimum, or has a
+    // variant out while others still have stock, is flagged low (needs attention)
+    // rather than silently reading in-stock off the healthy aggregate.
+    const anyIssue = variants.some(v => {
       const t = v.lowStockThreshold ?? item.lowStockAlert;
-      return (v.stock || 0) > 0 && (v.stock || 0) <= t;
+      return (v.stock || 0) <= t;
     });
-    return { out: allZero, low: !allZero && anyLow };
+    return { out: allZero, low: !allZero && anyIssue };
   }
   return {
     out: (item.currentStock || 0) === 0,
@@ -1013,8 +1017,15 @@ const getAllInventory = async (req, res) => {
           }
         },
         products: {
-          select: { id: true, approvalStatus: true },
-          take: 1
+          select: {
+            id: true,
+            approvalStatus: true,
+            hasVariants: true,
+            variants: {
+              select: { id: true, variantName: true, size: true, color: true, sku: true, stock: true, lowStockThreshold: true },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
         }
       },
       orderBy: { createdAt: 'desc' },
@@ -1022,12 +1033,21 @@ const getAllInventory = async (req, res) => {
       take: parseInt(limit)
     });
 
-    // Enrich items with product approval status
+    // Enrich items with product approval status + per-variant stock breakdown so
+    // the table can expand a product into its variants and evaluate low/out stock
+    // per variant (mirrors getVendorInventory).
     const enrichedItems = inventoryItems.map(item => {
       const { products, ...rest } = item;
+      // Prefer the inventory's primary product (productId); else the newest one.
+      const product = (products || []).find(p => p.id === item.productId) || products?.[0] || null;
       return {
         ...rest,
-        productApprovalStatus: products?.[0]?.approvalStatus || null
+        productApprovalStatus: product?.approvalStatus || null,
+        hasVariants: product?.hasVariants || false,
+        variants: (product?.variants || []).map(v => ({
+          ...v,
+          effectiveThreshold: v.lowStockThreshold ?? item.lowStockAlert,
+        })),
       };
     });
 
