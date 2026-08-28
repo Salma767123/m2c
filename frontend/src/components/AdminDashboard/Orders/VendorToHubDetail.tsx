@@ -371,13 +371,31 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           </div>
           */}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-4 border-t border-slate-200">
+        {/* Subtotal → Discount → Taxable → Tax → Shipping → Total: the coupon
+            reduces the taxable base (GST is charged on the post-coupon net). */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6 pt-4 border-t border-slate-200">
           <div>
             <p className="text-sm text-slate-600">Subtotal</p>
             <p className="text-base font-medium text-slate-900 mt-1">
               {money(order?.subtotal)}
             </p>
           </div>
+          {(order?.discount ?? 0) > 0 && (
+            <div>
+              <p className="text-sm text-slate-600">Discount</p>
+              <p className="text-base font-medium text-green-600 mt-1">
+                −{money(order?.discount)}
+              </p>
+            </div>
+          )}
+          {(order?.discount ?? 0) > 0 && (
+            <div>
+              <p className="text-sm text-slate-600">Taxable amount</p>
+              <p className="text-base font-medium text-slate-900 mt-1">
+                {money(Math.max(0, (order?.subtotal ?? 0) - (order?.discount ?? 0)))}
+              </p>
+            </div>
+          )}
           <div>
             <p className="text-sm text-slate-600">Tax</p>
             <p className="text-base font-medium text-slate-900 mt-1">
@@ -388,12 +406,6 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
             <p className="text-sm text-slate-600">Shipping</p>
             <p className="text-base font-medium text-slate-900 mt-1">
               {money(order?.shippingCost)}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-600">Discount</p>
-            <p className="text-base font-medium text-green-600 mt-1">
-              -{money(order?.discount)}
             </p>
           </div>
           <div>

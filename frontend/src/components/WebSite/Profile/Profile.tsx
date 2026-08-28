@@ -17,6 +17,7 @@ import ProfileTab from '@/components/WebSite/Profile/ProfileTab';
 import AddressBook from '@/components/WebSite/Profile/AddressBook';
 import OrderHistory from '@/components/WebSite/Profile/OrderHistory';
 import SupportTickets from '@/components/WebSite/Profile/SupportTickets';
+import AccountDiscovery from '@/components/WebSite/Profile/AccountDiscovery';
 import Reveal from '@/components/WebSite/Shared/Reveal';
 import LogoutConfirmModal from '@/components/WebSite/Shared/LogoutConfirmModal';
 // import Notifications from '@/components/WebSite/Profile/Notifications';
@@ -701,6 +702,10 @@ const Profile = () => {
             {activeTab === 'support' && <SupportTickets />}
           </Reveal>
         </div>
+
+        {/* Recently viewed + items awaiting review — their own sections below the whole
+            account block, shown on every tab. Each self-hides when empty. */}
+        <AccountDiscovery />
       </div>
 
       <LogoutConfirmModal

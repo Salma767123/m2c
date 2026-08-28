@@ -687,13 +687,31 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           </div>
           */}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-4 border-t border-slate-200">
+        {/* Subtotal → Discount → Taxable → Tax → Shipping → Total: the coupon
+            reduces the taxable base (GST is charged on the post-coupon net). */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6 pt-4 border-t border-slate-200">
           <div>
             <p className="text-sm text-slate-600">Subtotal</p>
             <p className="text-base font-medium text-slate-900 mt-1">
               {money(order.subtotal)}
             </p>
           </div>
+          {order.discount > 0 && (
+            <div>
+              <p className="text-sm text-slate-600">Discount</p>
+              <p className="text-base font-medium text-green-600 mt-1">
+                −{money(order.discount)}
+              </p>
+            </div>
+          )}
+          {order.discount > 0 && (
+            <div>
+              <p className="text-sm text-slate-600">Taxable amount</p>
+              <p className="text-base font-medium text-slate-900 mt-1">
+                {money(Math.max(0, order.subtotal - order.discount))}
+              </p>
+            </div>
+          )}
           <div>
             <p className="text-sm text-slate-600">Tax</p>
             <p className="text-base font-medium text-slate-900 mt-1">
@@ -704,12 +722,6 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
             <p className="text-sm text-slate-600">Shipping</p>
             <p className="text-base font-medium text-slate-900 mt-1">
               {money(order.shippingCost)}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-600">Discount</p>
-            <p className="text-base font-medium text-green-600 mt-1">
-              -{money(order.discount)}
             </p>
           </div>
           <div>
@@ -873,33 +885,61 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           )}
           <div className="space-y-3">
             {shipments.map((s) => {
-              const reviewData = (s as VendorShipment & { adminReviews?: Array<{ approved?: boolean; rating?: number }> }).adminReviews?.[0];
+              const reviewData = (s as VendorShipment & { adminReviews?: Array<{ approved?: boolean; rating?: number; rejectionReason?: string | null; qualityCheckNotes?: string | null; reviewComments?: string | null }> }).adminReviews?.[0];
+              const isRejected = s.status === 'REJECTED_BY_ADMIN_HUB';
+              const hasRejectionDetail = isRejected && (reviewData?.rejectionReason || reviewData?.qualityCheckNotes || reviewData?.reviewComments);
               return (
-                <div key={s.id} className="flex items-center gap-4 p-3 border border-slate-100 rounded-lg">
-                  {s.status === 'APPROVED_BY_ADMIN_HUB' ? (
-                    <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
-                  ) : s.status === 'REJECTED_BY_ADMIN_HUB' ? (
-                    <XCircle className="h-5 w-5 text-red-500 shrink-0" />
-                  ) : s.status === 'CANCELLED' ? (
-                    <XCircle className="h-5 w-5 text-slate-400 shrink-0" />
-                  ) : (
-                    <AlertTriangle className="h-5 w-5 text-yellow-500 shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900">{s.vendorName}</p>
-                    <p className="text-xs text-slate-500">
-                      {s.items?.length || 0} item{(s.items?.length || 0) !== 1 ? 's' : ''} &middot; {s.status.replace(/_/g, ' ')}
-                    </p>
+                <div key={s.id} className="overflow-hidden rounded-lg border border-slate-100">
+                  <div className="flex items-center gap-4 p-3">
+                    {s.status === 'APPROVED_BY_ADMIN_HUB' ? (
+                      <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                    ) : s.status === 'REJECTED_BY_ADMIN_HUB' ? (
+                      <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+                    ) : s.status === 'CANCELLED' ? (
+                      <XCircle className="h-5 w-5 text-slate-400 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="h-5 w-5 text-yellow-500 shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900">{s.vendorName}</p>
+                      <p className="text-xs text-slate-500">
+                        {s.items?.length || 0} item{(s.items?.length || 0) !== 1 ? 's' : ''} &middot; {s.status.replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                    {s.vendorCarrier && (
+                      <p className="text-xs text-slate-500 shrink-0">
+                        {s.vendorCarrier}: {s.vendorTrackingId}
+                      </p>
+                    )}
+                    {reviewData?.approved && typeof reviewData.rating === 'number' && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                        <span className="text-xs font-medium text-slate-700">{reviewData.rating}/5</span>
+                      </div>
+                    )}
                   </div>
-                  {s.vendorCarrier && (
-                    <p className="text-xs text-slate-500 shrink-0">
-                      {s.vendorCarrier}: {s.vendorTrackingId}
-                    </p>
+
+                  {/* Why the hub rejected this vendor shipment — the reason + QC notes the
+                      admin recorded at review time, so it's visible without digging. */}
+                  {hasRejectionDetail && (
+                    <div className="border-t border-red-100 bg-red-50 px-3 py-2.5">
+                      <p className="flex items-center gap-1.5 text-xs font-semibold text-red-700">
+                        <XCircle className="h-3.5 w-3.5" /> Rejection reason
+                      </p>
+                      {reviewData?.rejectionReason && (
+                        <p className="mt-1 text-sm text-red-800">{reviewData.rejectionReason}</p>
+                      )}
+                      {reviewData?.qualityCheckNotes && (
+                        <p className="mt-1 text-xs text-red-700/80"><span className="font-medium">QC notes:</span> {reviewData.qualityCheckNotes}</p>
+                      )}
+                      {reviewData?.reviewComments && (
+                        <p className="mt-1 text-xs text-red-700/80"><span className="font-medium">Comments:</span> {reviewData.reviewComments}</p>
+                      )}
+                    </div>
                   )}
-                  {reviewData?.approved && typeof reviewData.rating === 'number' && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                      <span className="text-xs font-medium text-slate-700">{reviewData.rating}/5</span>
+                  {isRejected && !hasRejectionDetail && (
+                    <div className="border-t border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700/80">
+                      Rejected at the hub — no written reason was recorded.
                     </div>
                   )}
                 </div>

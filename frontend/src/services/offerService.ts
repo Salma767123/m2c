@@ -20,6 +20,11 @@ export interface Offer {
   minCartValueINR?: number | null
   productIds: string[]
   categoryNames: string[]
+  // BOGO free-item mode + the free (get) set for a CROSS ("buy A get B") deal.
+  bogoMode?: 'SAME' | 'CROSS' | null
+  freeScope?: OfferScope | null
+  freeProductIds?: string[]
+  freeCategoryNames?: string[]
   region: OfferRegion
   priority: number
   startsAt: string
@@ -47,6 +52,10 @@ export type OfferInput = Partial<
     | 'minCartValueINR'
     | 'productIds'
     | 'categoryNames'
+    | 'bogoMode'
+    | 'freeScope'
+    | 'freeProductIds'
+    | 'freeCategoryNames'
     | 'region'
     | 'priority'
     | 'startsAt'
@@ -106,6 +115,19 @@ class OfferService {
   async updateOffer(id: string, data: OfferInput): Promise<Offer> {
     try {
       const res = await axios.put(`/offers/${id}`, data)
+      return res.data.data
+    } catch (error) {
+      throw new Error(errMessage(error, 'Failed to update offer'))
+    }
+  }
+
+  // Activate / pause an offer. Sends only isActive — the backend merges it with
+  // the existing offer, so no other field is touched. A paused offer stops
+  // applying at checkout; the derived status becomes PAUSED (or ACTIVE/SCHEDULED
+  // again on re-activate, based on its window).
+  async setOfferActive(id: string, isActive: boolean): Promise<Offer> {
+    try {
+      const res = await axios.put(`/offers/${id}`, { isActive })
       return res.data.data
     } catch (error) {
       throw new Error(errMessage(error, 'Failed to update offer'))

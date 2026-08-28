@@ -86,6 +86,8 @@ export default function VendorToHub() {
     "PACKED_BY_VENDOR": "Packed by Vendor",
     "IN_TRANSIT_TO_ADMIN_HUB": "In Transit to Hub",
     "RECEIVED_AT_ADMIN_HUB": "Received at Hub",
+    "APPROVED_BY_ADMIN_HUB": "Approved by Admin Hub",
+    "REJECTED_BY_ADMIN_HUB": "Rejected by Admin Hub",
   };
   const ACTIVE_STATUSES = ["ORDER_CREATED", "VENDOR_PROCESSING", "PACKED_BY_VENDOR", "IN_TRANSIT_TO_ADMIN_HUB"];
   const statusOptions = Object.keys(STATUS_LABELS);
@@ -236,6 +238,10 @@ export default function VendorToHub() {
         return "bg-blue-50 text-blue-700 border border-blue-200";
       case "RECEIVED_AT_ADMIN_HUB":
         return "bg-green-50 text-green-700 border border-green-200";
+      case "APPROVED_BY_ADMIN_HUB":
+        return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+      case "REJECTED_BY_ADMIN_HUB":
+        return "bg-red-50 text-red-700 border border-red-200";
       case "MIXED":
         return "bg-orange-50 text-orange-700 border border-orange-200";
       default:

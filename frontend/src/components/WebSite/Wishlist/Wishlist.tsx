@@ -526,7 +526,7 @@ const Wishlist = () => {
         {motion}
         <div className="mx-auto max-w-7xl px-3 sm:px-4 md:px-6 lg:px-8 xl:max-w-420">
           <div className="wish-sweep mb-5 h-40 rounded-2xl bg-[#f2e9e1] sm:mb-7 sm:h-48 sm:rounded-3xl" />
-          <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:gap-5 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:gap-5 xl:grid-cols-5 2xl:grid-cols-6">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="overflow-hidden rounded-2xl bg-white ring-1 ring-black/[0.05]">
                 <div className="wish-sweep aspect-4/3 bg-[#ece5dd]" />
@@ -708,7 +708,7 @@ const Wishlist = () => {
             A grid, not a list. As full-width rows every card was mostly empty
             paper: a thumbnail and a short name on the left, and a metre of
             nothing to the right of it. */}
-        <ul className="grid list-none grid-cols-1 gap-3 p-0 min-[360px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:gap-5 xl:grid-cols-4">
+        <ul className="grid list-none grid-cols-1 gap-3 p-0 min-[360px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:gap-5 xl:grid-cols-5 2xl:grid-cols-6">
           {wishlistItems.map((item, index) => {
             if (!item.product) return null;
             const product = item.product;

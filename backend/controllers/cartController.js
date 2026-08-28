@@ -2,7 +2,7 @@ const { prisma } = require('../config/database');
 const { isVisibleInRegion, normalizeRegion } = require('../utils/regionVisibility');
 const { isCourierAvailable } = require('../utils/couriers');
 const { resolveUsdRate, resolveUnitPrice } = require('../utils/orderCurrency');
-const { buildActiveOffer, qualifyingThresholdIds } = require('../utils/offers');
+const { buildActiveOffer, qualifyingThresholdIds, qualifyingCrossBogo, isOfferLive } = require('../utils/offers');
 
 // Add item to cart
 const addToCart = async (req, res) => {
@@ -205,6 +205,106 @@ const addToCart = async (req, res) => {
 };
 
 // Get cart
+/**
+ * Reconcile free-gift lines for CROSS "Buy A get B free" offers on a cart.
+ *  - Removes gift lines whose offer no longer exists or whose buy condition is no
+ *    longer met.
+ *  - For each newly-qualifying offer: if the free set resolves to exactly ONE in-stock
+ *    product with no variants, the gift is auto-added (price 0, qty = getQty). Otherwise
+ *    a `pendingGift` descriptor is returned so the storefront can show a chooser.
+ * Mutates the DB; returns { pendingGifts, changed }.
+ */
+async function reconcileFreeGifts(cart, currency, now) {
+  const crossOffers = await prisma.offer.findMany({
+    where: { isActive: true, startsAt: { lte: now }, endsAt: { gte: now }, type: 'BOGO', bogoMode: 'CROSS' },
+  });
+
+  const gifts = cart.items.filter((i) => i.isFreeGift);
+  const buyItems = cart.items.filter((i) => !i.isFreeGift);
+
+  // No live cross offers → clear any leftover gift lines.
+  if (crossOffers.length === 0) {
+    if (gifts.length) await prisma.cartItem.deleteMany({ where: { id: { in: gifts.map((g) => g.id) } } });
+    return { pendingGifts: [], changed: gifts.length > 0 };
+  }
+
+  // Categories of the customer's own (paid) items, for buy-condition matching.
+  const buyProductIds = [...new Set(buyItems.map((i) => i.productId))];
+  const buyProducts = buyProductIds.length
+    ? await prisma.product.findMany({ where: { id: { in: buyProductIds } }, select: { id: true, category: true } })
+    : [];
+  const catById = new Map(buyProducts.map((p) => [p.id, p.category]));
+  const lines = buyItems.map((i) => ({ product: { id: i.productId, category: catById.get(i.productId) }, quantity: i.quantity, isFreeGift: false }));
+
+  const qualifying = qualifyingCrossBogo(crossOffers, lines, currency, now);
+  const qualifyingIds = new Set(qualifying.map((q) => q.offer.id));
+
+  let changed = false;
+
+  // 1. Drop gift lines whose offer no longer qualifies.
+  for (const gift of gifts) {
+    if (!gift.giftOfferId || !qualifyingIds.has(gift.giftOfferId)) {
+      await prisma.cartItem.delete({ where: { id: gift.id } });
+      changed = true;
+    }
+  }
+
+  // 2. Grant gifts for qualifying offers not yet satisfied.
+  // pendingGifts = qualifying offers with NO gift chosen yet (drive the banner).
+  // giftOptions  = the chooser data for every CHOOSABLE offer (multiple products or
+  //                variants), whether or not one is chosen — so the gift line can offer
+  //                a "Change gift" button.
+  const pendingGifts = [];
+  const giftOptions = [];
+  for (const { offer, getQty } of qualifying) {
+    const existingUnits = gifts
+      .filter((g) => g.giftOfferId === offer.id)
+      .reduce((s, g) => s + g.quantity, 0);
+
+    // Resolve in-stock free candidates.
+    const where = offer.freeScope === 'CATEGORY'
+      ? { category: { in: offer.freeCategoryNames || [] }, inStock: true }
+      : { id: { in: offer.freeProductIds || [] }, inStock: true };
+    const candidates = await prisma.product.findMany({
+      where,
+      select: {
+        id: true, name: true, hasVariants: true, totalStock: true,
+        images: { select: { url: true, isPrimary: true }, orderBy: { isPrimary: 'desc' }, take: 1 },
+        variants: { select: { id: true, size: true, color: true, colorHex: true, stock: true } },
+      },
+      take: 50,
+    });
+    if (candidates.length === 0) continue;
+
+    const choosable = candidates.length > 1 || candidates.some((c) => (c.variants?.length || 0) > 0);
+    const descriptor = {
+      offerId: offer.id,
+      offerTitle: offer.title,
+      getQty,
+      freeScope: offer.freeScope,
+      options: candidates.map((c) => ({
+        productId: c.id,
+        name: c.name,
+        image: c.images?.[0]?.url || null,
+        variants: (c.variants || []).map((v) => ({ id: v.id, size: v.size, color: v.color, colorHex: v.colorHex, stock: v.stock })),
+      })),
+    };
+
+    if (choosable) {
+      giftOptions.push(descriptor);
+      if (existingUnits < getQty) pendingGifts.push(descriptor); // still needs a choice
+    } else if (existingUnits < getQty) {
+      // Single, unambiguous free product → auto-add.
+      await prisma.cartItem.create({
+        data: { cartId: cart.id, productId: candidates[0].id, variantId: null, quantity: getQty - existingUnits, price: 0, currency, isFreeGift: true, giftOfferId: offer.id },
+      });
+      changed = true;
+    }
+  }
+
+  return { pendingGifts, giftOptions, changed };
+}
+
 const getCart = async (req, res) => {
   try {
     const userId = req.userId;
@@ -220,7 +320,7 @@ const getCart = async (req, res) => {
       });
     }
 
-    const cart = await prisma.cart.findFirst({
+    let cart = await prisma.cart.findFirst({
       where: { userId },
       include: {
         items: true
@@ -236,6 +336,22 @@ const getCart = async (req, res) => {
           itemCount: 0
         }
       });
+    }
+
+    // Auto-add / clean up free-gift lines for "Buy A get B free" offers, then re-load
+    // the cart if it changed so the rest of this handler prices the final line-up.
+    const giftCurrency = normalizeRegion(req.query.region) === 'US' ? 'USD' : 'INR';
+    let pendingGifts = [];
+    let giftOptions = [];
+    try {
+      const recon = await reconcileFreeGifts(cart, giftCurrency, new Date());
+      pendingGifts = recon.pendingGifts;
+      giftOptions = recon.giftOptions;
+      if (recon.changed) {
+        cart = await prisma.cart.findFirst({ where: { userId }, include: { items: true } });
+      }
+    } catch (e) {
+      console.warn('[cart] free-gift reconcile skipped:', e.message);
     }
 
     // Get product details for each item
@@ -368,21 +484,23 @@ const getCart = async (req, res) => {
         const rate = currency === 'USD' ? await resolveUsdRate(prisma) : null;
 
         // Whole-cart INR subtotal (pre-offer selling price) to test THRESHOLD offers.
+        // Free-gift lines are excluded — they're rewards, not spend.
         let preSubtotalINR = 0;
         for (const it of itemsWithProducts) {
+          if (it.isFreeGift) continue;
           const sku = it.variant || it.product;
           if (sku) preSubtotalINR += resolveUnitPrice(sku, 'INR', null) * it.quantity;
         }
         const thresholdIds = qualifyingThresholdIds(offers, preSubtotalINR, currency, now);
 
         for (const it of itemsWithProducts) {
-          if (!it.product) continue;
+          if (!it.product || it.isFreeGift) continue; // gift lines are already free (₹0)
           // Resolve against the chosen SKU's price but keep the product's id/category
           // so scope matching (product/category) stays correct for variants.
           const priced = it.variant
             ? { ...it.product, priceINR: it.variant.priceINR, priceUSD: it.variant.priceUSD, adminFixedPrice: it.variant.adminFixedPrice, basePrice: it.variant.price }
             : it.product;
-          const activeOffer = buildActiveOffer(priced, offers, currency, rate, now, it.quantity, thresholdIds);
+          const activeOffer = buildActiveOffer(priced, offers, currency, rate, now, it.quantity, thresholdIds, null);
           if (activeOffer) it.product.activeOffer = activeOffer;
         }
       }
@@ -397,7 +515,9 @@ const getCart = async (req, res) => {
       data: {
         items: itemsWithProducts,
         total,
-        itemCount: itemsWithProducts.length
+        itemCount: itemsWithProducts.length,
+        pendingGifts,
+        giftOptions
       }
     });
   } catch (error) {
@@ -621,10 +741,83 @@ const clearCart = async (req, res) => {
   }
 };
 
+/**
+ * Add a customer-chosen free gift (for a CROSS "Buy A get B free" offer whose free set
+ * has multiple products/variants). Validates the offer is live, the buy condition is met,
+ * and the chosen product/variant is a legitimate free-set member and in stock, then adds
+ * (or replaces) the gift line at ₹0.
+ */
+const addFreeGift = async (req, res) => {
+  try {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    const { offerId, productId, variantId } = req.body;
+    if (!offerId || !productId) return res.status(400).json({ success: false, error: 'offerId and productId are required' });
+
+    const cart = await prisma.cart.findFirst({ where: { userId }, include: { items: true } });
+    if (!cart) return res.status(404).json({ success: false, error: 'Cart not found' });
+
+    const now = new Date();
+    const offer = await prisma.offer.findUnique({ where: { id: offerId } });
+    if (!offer || offer.type !== 'BOGO' || offer.bogoMode !== 'CROSS' || !isOfferLive(offer, now)) {
+      return res.status(400).json({ success: false, error: 'This gift offer is not available' });
+    }
+
+    // Confirm the buy condition is met (gift lines excluded from the count).
+    const currency = normalizeRegion(req.query.region) === 'US' ? 'USD' : 'INR';
+    const buyItems = cart.items.filter((i) => !i.isFreeGift);
+    const buyProducts = buyItems.length
+      ? await prisma.product.findMany({ where: { id: { in: [...new Set(buyItems.map((i) => i.productId))] } }, select: { id: true, category: true } })
+      : [];
+    const catById = new Map(buyProducts.map((p) => [p.id, p.category]));
+    const lines = buyItems.map((i) => ({ product: { id: i.productId, category: catById.get(i.productId) }, quantity: i.quantity, isFreeGift: false }));
+    const qualifies = qualifyingCrossBogo([offer], lines, currency, now).length > 0;
+    if (!qualifies) return res.status(400).json({ success: false, error: 'Add the required items to unlock this free gift' });
+
+    // The chosen product must be a legitimate, in-stock free-set member.
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { id: true, category: true, inStock: true, hasVariants: true, variants: { select: { id: true, stock: true } } },
+    });
+    if (!product || !product.inStock) return res.status(400).json({ success: false, error: 'That free item is unavailable' });
+    const inFreeSet = offer.freeScope === 'CATEGORY'
+      ? (offer.freeCategoryNames || []).some((c) => c && product.category && c.toLowerCase() === product.category.toLowerCase())
+      : (offer.freeProductIds || []).includes(productId);
+    if (!inFreeSet) return res.status(400).json({ success: false, error: 'That item is not part of this offer' });
+    if (product.hasVariants) {
+      const v = (product.variants || []).find((x) => x.id === variantId);
+      if (!variantId || !v) return res.status(400).json({ success: false, error: 'Please choose a variant for the free item' });
+      if ((v.stock ?? 0) <= 0) return res.status(400).json({ success: false, error: 'That variant is out of stock' });
+    }
+
+    // Replace any existing gift for this offer with the chosen one.
+    const existing = cart.items.filter((i) => i.isFreeGift && i.giftOfferId === offerId);
+    if (existing.length) await prisma.cartItem.deleteMany({ where: { id: { in: existing.map((e) => e.id) } } });
+    await prisma.cartItem.create({
+      data: {
+        cartId: cart.id,
+        productId,
+        variantId: product.hasVariants ? variantId : null,
+        quantity: Math.max(1, offer.getQty || 1),
+        price: 0,
+        currency,
+        isFreeGift: true,
+        giftOfferId: offerId,
+      },
+    });
+
+    res.json({ success: true, message: 'Free gift added' });
+  } catch (error) {
+    console.error('Add free gift error:', error);
+    res.status(500).json({ success: false, error: 'Failed to add free gift' });
+  }
+};
+
 module.exports = {
   addToCart,
   getCart,
   updateCartItem,
   removeFromCart,
-  clearCart
+  clearCart,
+  addFreeGift
 };

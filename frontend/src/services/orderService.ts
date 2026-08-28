@@ -8,6 +8,9 @@ export interface OrderItem {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
+    /** Unit price before the automatic offer (set only when an offer applied),
+     *  so the order view can show how much the offer saved. */
+    originalUnitPrice?: number;
     // Vendor-derived price (what the vendor is actually paid). Backend attaches
     // these for all vendor-panel responses; admin/customer price is never shown.
     vendorUnitPrice?: number;

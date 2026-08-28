@@ -1748,19 +1748,6 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       )}
                     </div>
 
-                    {/* Dispatch Timeline */}
-                    {product.dispatchTimeline && (
-                      <div className="bg-[#fff1f1] p-2 rounded-lg mb-3">
-                        <div className="text-xs text-gray-700">
-                          <span className="font-semibold">Dispatch: </span>
-                          {product.dispatchTimeline.processingDays} days processing + {product.dispatchTimeline.shippingDays} days shipping
-                          <span className="text-[#e01a1b] font-semibold ml-1">
-                            (Total: {product.dispatchTimeline.totalDays} days)
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
                     {/* Smart Logistics Section */}
                     {logisticsResult && product.logisticsConfig && (
                       <div
@@ -3242,7 +3229,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                 {relatedProducts.map((p) => (
-                  <ProductCard key={p.id} product={p} />
+                  <ProductCard key={p.id} product={p} variant="showcase" />
                 ))}
               </div>
             </div>

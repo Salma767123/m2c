@@ -85,9 +85,21 @@ function buildOfferData(body) {
   if (type === 'QUANTITY') {
     if (mQty == null || mQty < 2) return { error: 'Quantity deals need minQty of at least 2' };
   }
+  // BOGO mode: SAME = buy N get M of the same item; CROSS = buy from one set, get
+  // free from another (different) set.
+  const bogoMode = type === 'BOGO' && String(body.bogoMode || '').toUpperCase() === 'CROSS' ? 'CROSS' : 'SAME';
+  const fScope = OFFER_SCOPES.includes(body.freeScope) ? body.freeScope : null;
+  const fpIds = Array.isArray(body.freeProductIds) ? body.freeProductIds.filter(Boolean) : [];
+  const fcNames = Array.isArray(body.freeCategoryNames) ? body.freeCategoryNames.filter(Boolean) : [];
   if (type === 'BOGO') {
     if (mQty == null || mQty < 1) return { error: 'BOGO needs minQty of at least 1' };
     if (gQty == null || gQty < 1) return { error: 'BOGO needs getQty of at least 1' };
+    if (bogoMode === 'CROSS') {
+      if (scope === 'STORE') return { error: 'A cross-product BOGO needs a specific buy product or category' };
+      if (fScope !== 'PRODUCT' && fScope !== 'CATEGORY') return { error: 'Choose the free item type (product or category)' };
+      if (fScope === 'PRODUCT' && fpIds.length === 0) return { error: 'Select at least one free product' };
+      if (fScope === 'CATEGORY' && fcNames.length === 0) return { error: 'Select at least one free category' };
+    }
   }
   if (type === 'THRESHOLD') {
     if (minCart == null || minCart <= 0) return { error: 'Threshold offers need a minCartValueINR' };
@@ -112,6 +124,10 @@ function buildOfferData(body) {
       minCartValueINR: type === 'THRESHOLD' ? minCart : null,
       productIds: scope === 'PRODUCT' ? pIds : [],
       categoryNames: scope === 'CATEGORY' ? cNames : [],
+      bogoMode: type === 'BOGO' ? bogoMode : null,
+      freeScope: type === 'BOGO' && bogoMode === 'CROSS' ? fScope : null,
+      freeProductIds: type === 'BOGO' && bogoMode === 'CROSS' && fScope === 'PRODUCT' ? fpIds : [],
+      freeCategoryNames: type === 'BOGO' && bogoMode === 'CROSS' && fScope === 'CATEGORY' ? fcNames : [],
       region: reg,
       priority: num(priority) || 0,
       startsAt: start,

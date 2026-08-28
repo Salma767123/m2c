@@ -300,13 +300,13 @@ const ProductCard = ({ product, variant = 'grid' }: ProductCardProps) => {
             // of that width off the product. Still past the 24px minimum for a
             // touch target, and the tap area is the button, not the glyph.
             className={`absolute top-1.5 right-1.5 z-10 grid h-7 w-7 place-items-center rounded-full backdrop-blur-sm shadow-md transition-all duration-300 hover:scale-105 active:scale-90 focus:outline-none sm:top-2 sm:right-2 sm:h-8 sm:w-8 ${isInWishlist
-              ? 'bg-[#e01a1b] ring-1 ring-[#e01a1b]'
+              ? 'bg-white ring-1 ring-[#e01a1b]/30'
               : 'bg-white ring-1 ring-[#e01a1b]/30 hover:ring-[#e01a1b]/60'
               }`}
           >
             <Heart
               className={`h-4 w-4 transition-all duration-300 sm:h-[18px] sm:w-[18px] ${isInWishlist
-                ? 'fill-white text-white scale-110'
+                ? 'fill-[#e01a1b] text-[#e01a1b] scale-110'
                 : 'fill-[#e01a1b]/10 text-[#e01a1b]'
                 }`}
               strokeWidth={2.2}

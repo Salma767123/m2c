@@ -10,7 +10,7 @@ const { evaluateCoupon } = require('../utils/couponPricing');
 const { calculateLogistics, convertShippingToOrderCurrency, qualifiesForFreeShipping } = require('../utils/logistics');
 const { isVisibleInRegion } = require('../utils/regionVisibility');
 const { isCourierAvailable } = require('../utils/couriers');
-const { applyBestOffer, qualifyingThresholdIds } = require('../utils/offers');
+const { applyBestOffer, qualifyingThresholdIds, qualifyingCrossBogo, offerAppliesToFreeSet } = require('../utils/offers');
 
 /** Round a money value to 2 decimals, avoiding float artefacts (e.g. 115.19999). */
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -185,6 +185,21 @@ const createOrder = async (req, res) => {
         }
         const thresholdEligibleIds = qualifyingThresholdIds(activeOffers, preSubtotalINR, currency, orderNow);
 
+        // Cross-product BOGO ("buy A get B free") is delivered as free-gift lines that the
+        // cart auto-added/chose (isFreeGift, price 0). Re-validate them here: the buy
+        // condition must still hold and the gifted product must belong to the offer's free
+        // set — otherwise the cart changed since the gift was granted and we reject so the
+        // customer can review rather than get a free item they no longer qualify for.
+        const giftBuyLines = [];
+        for (let i = 0; i < cart.items.length; i++) {
+            const p = productsForItems[i];
+            if (!p || cart.items[i].isFreeGift) continue;
+            giftBuyLines.push({ product: p, quantity: cart.items[i].quantity, isFreeGift: false });
+        }
+        const qualifyingGiftOfferIds = new Set(
+            qualifyingCrossBogo(activeOffers, giftBuyLines, currency, orderNow).map((q) => q.offer.id)
+        );
+
         for (let i = 0; i < cart.items.length; i++) {
             const item = cart.items[i];
             const product = productsForItems[i];
@@ -226,27 +241,47 @@ const createOrder = async (req, res) => {
                 });
             }
 
+            // A free-gift line ("Buy A get B free"): validate it still qualifies, then
+            // price it at 0. If the buy condition or free set no longer holds, the cart
+            // changed since the gift was granted — reject so nothing free slips through.
+            const isGift = !!item.isFreeGift;
+            if (isGift) {
+                const giftOffer = activeOffers.find((o) => o.id === item.giftOfferId);
+                const valid = giftOffer
+                    && qualifyingGiftOfferIds.has(item.giftOfferId)
+                    && offerAppliesToFreeSet(giftOffer, product);
+                if (!valid) {
+                    return res.status(400).json({
+                        success: false,
+                        error: `Your free gift "${product.name}" is no longer valid because your cart changed. Please review your cart and try again.`,
+                    });
+                }
+            }
+
             // Price the line in the order's currency. Shared with the storefront's
             // getRegionalPrice() chain — see resolveUnitPrice() for why a USD order
             // must convert from INR rather than fall through to an INR field.
-            const sellingUnitPrice = resolveUnitPrice(variant || product, currency, orderExchangeRate);
+            const sellingUnitPrice = isGift ? 0 : resolveUnitPrice(variant || product, currency, orderExchangeRate);
 
             // Apply the best automatic Offer to the SELLING price only. This never
             // touches vendorPrice below, so the vendor settlement is unchanged — M2C's
             // margin absorbs the discount. With no live offers, applyBestOffer returns
             // the price untouched and offer=null, so this is a no-op for every existing
             // order. Offer eligibility (category/product, region, min-qty) is resolved
-            // server-side here; the storefront badge is only advisory.
-            const offerResult = applyBestOffer({
-                product,
-                sellingUnitPrice,
-                quantity: item.quantity,
-                currency,
-                rate: orderExchangeRate,
-                offers: activeOffers,
-                now: orderNow,
-                thresholdEligibleIds,
-            });
+            // server-side here; the storefront badge is only advisory. Gift lines skip
+            // this entirely — they are already ₹0.
+            const offerResult = isGift
+                ? { unitPrice: 0 }
+                : applyBestOffer({
+                    product,
+                    sellingUnitPrice,
+                    quantity: item.quantity,
+                    currency,
+                    rate: orderExchangeRate,
+                    offers: activeOffers,
+                    now: orderNow,
+                    thresholdEligibleIds,
+                });
             const unitPrice = offerResult.unitPrice;
 
             // Round per line as well: the invoice prints each item's totalPrice,
@@ -270,9 +305,12 @@ const createOrder = async (req, res) => {
                     `charging 0% GST to the customer and paying 0 tax to the vendor.`
                 );
             }
+            // The customer GST is NOT charged here. A coupon reduces the taxable
+            // value (see the post-coupon block below), so tax has to wait until the
+            // coupon is known — otherwise GST would be charged on the pre-coupon
+            // amount, over-charging the customer. Only the per-line RATE is frozen
+            // now (stored on the order item), so the invoice can reproduce the split.
             const customerGstRate = product.gstPercentage || 0;
-            const itemTax = round2(itemTotal * customerGstRate / 100);
-            computedTax += itemTax;
 
             // Shipping for this line, from the product's own logistics config.
             // Same calculator the storefront uses (utils/logistics.js is a port of
@@ -393,6 +431,9 @@ const createOrder = async (req, res) => {
                 unitPrice: unitPrice,
                 totalPrice: itemTotal,
                 totalPriceINR: toINR(itemTotal, currency, orderExchangeRate),
+                // Freeze the GST rate charged on this line so the invoice shows the
+                // real per-item rate, not a blended average across mixed-rate carts.
+                gstPercentage: customerGstRate,
                 transportType: lineTransport,
                 courier: lineCourier,
                 logistics: lineLogisticsSnapshot || undefined,
@@ -453,17 +494,6 @@ const createOrder = async (req, res) => {
           discount = 1.6760000000000002.
         */
         const roundedSubtotal = round2(subtotal);
-        // Server-computed GST wins over the client's figure. The client value is
-        // only compared, so a genuine mismatch (stale cart price, tampering) is
-        // visible in the logs instead of silently becoming the invoiced tax.
-        const roundedTax = round2(computedTax);
-        const clientTax = round2(Number(tax) || 0);
-        if (Math.abs(clientTax - roundedTax) > 0.01) {
-            console.warn(
-                `[createOrder] Client tax ${clientTax} != server tax ${roundedTax} ` +
-                `(user ${userId}, ${currency}). Storing the server figure.`
-            );
-        }
         // ── Discount: re-derived server-side from the coupon row ─────────────
         // The client reads `discount` out of localStorage, so it is attacker-
         // controlled. Re-run the same validator the /coupons/apply endpoint uses,
@@ -490,6 +520,34 @@ const createOrder = async (req, res) => {
             roundedDiscount = round2(evaluated.discountAmount);
             validatedCouponCode = evaluated.code;
             couponGrantsFreeShipping = Boolean(evaluated.freeShipping);
+        }
+        // ── GST on the POST-coupon net (correct treatment) ──────────────────
+        // Under GST, a discount recorded on the invoice and given at the time of
+        // supply is excluded from the taxable value — so the coupon must reduce the
+        // base BEFORE tax, not after. Allocate the coupon across the taxable lines
+        // in proportion to each line's value, tax each line's net at its own frozen
+        // rate, and sum. Proportional allocation keeps mixed-rate carts correct, and
+        // the invoice re-derives the identical split from (subtotal, discount, each
+        // line's totalPrice + gstPercentage), so the printed lines reconcile exactly.
+        // Product-level discounts and automatic offers are already baked into each
+        // line's price, so they are taxed net too. The VENDOR settlement tax above is
+        // deliberately left on the vendor's own base — M2C's margin absorbs the coupon.
+        for (const oi of orderItemsData) {
+            const gross = oi.totalPrice;
+            const couponShare = roundedSubtotal > 0 ? (gross / roundedSubtotal) * roundedDiscount : 0;
+            const netTaxable = Math.max(0, gross - couponShare);
+            computedTax += round2(netTaxable * (oi.gstPercentage || 0) / 100);
+        }
+        // Server-computed GST wins over the client's figure. The client value is
+        // only compared, so a genuine mismatch (stale cart price, tampering) is
+        // visible in the logs instead of silently becoming the invoiced tax.
+        const roundedTax = round2(computedTax);
+        const clientTax = round2(Number(tax) || 0);
+        if (Math.abs(clientTax - roundedTax) > 0.01) {
+            console.warn(
+                `[createOrder] Client tax ${clientTax} != server tax ${roundedTax} ` +
+                `(user ${userId}, ${currency}). Storing the server figure.`
+            );
         }
         const clientDiscount = round2(Number(discount) || 0);
         if (Math.abs(clientDiscount - roundedDiscount) > 0.01) {
