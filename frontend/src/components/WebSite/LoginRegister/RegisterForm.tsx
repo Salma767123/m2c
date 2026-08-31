@@ -221,7 +221,16 @@ export default function RegisterForm({ onGoogleAuth }: RegisterFormProps) {
         showErrorToast('Registration Failed', response.message || 'Something went wrong. Please try again.')
       }
     } catch (error: any) {
-      console.error('Registration error:', error)
+      // Same reasoning as LoginForm: an email or phone number the server
+      // refuses is an answer, not a fault, and console.error puts a
+      // full-screen Next.js dev overlay in front of it — printing the
+      // interceptor's plain { message, status, data } object as "{}" while it
+      // does so. Only a network failure or a server fault gets a console; the
+      // toast carries everything else.
+      const status = error?.status ?? error?.response?.status ?? 0
+      if (status === 0 || status >= 500) {
+        console.error(`Registration failed (status ${status}): ${error?.message ?? 'no message'}`)
+      }
       const errorMessage = error?.data?.error || error?.data?.message || error?.message || error.response?.data?.error || error.response?.data?.message || 'Something went wrong. Please try again.'
       showErrorToast('Registration Failed', errorMessage)
     } finally {

@@ -91,3 +91,37 @@ export function formatScheduledDate(ymd?: string | null): string {
   if (isNaN(d.getTime())) return ymd;
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+/**
+ * Normalize an inspection's scheduledTime to a 12-hour clock with a meridiem,
+ * whatever the admin stored: 24-hour ("20:50" → "8:50 PM"), bare ("09:00" →
+ * "9:00 AM"), or already-12h ("08:16 AM" → "8:16 AM").
+ *
+ * The dashboard was printing this field raw, so a slot saved in 24-hour form
+ * arrived as "20:50" with no meridiem at all — and "08:16" is a genuinely
+ * ambiguous thing to show a checker who has to be on site at one of them. The
+ * web dashboard already normalized it; this is that same function, so the two
+ * screens can no longer disagree about the same booking.
+ *
+ * Anything unparseable is returned untouched: a value we do not recognise is
+ * still a value the admin typed, and blanking it would be worse than showing
+ * it in whatever shape it arrived.
+ */
+export function formatScheduledTime(raw?: string | null): string {
+  if (!raw) return '';
+  const s = String(raw).trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])?$/);
+  if (!m) return s;
+  let h = parseInt(m[1], 10);
+  const min = m[2];
+  const mer = m[3]?.toUpperCase();
+  if (mer) {
+    // Already 12-hour — just canonicalize (drop any leading zero, uppercase).
+    if (h === 0) h = 12;
+    return `${h}:${min} ${mer}`;
+  }
+  // 24-hour (or bare) input → convert to 12-hour.
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${min} ${suffix}`;
+}
