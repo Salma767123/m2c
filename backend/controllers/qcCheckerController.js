@@ -903,6 +903,9 @@ const getAssignedVendors = async (req, res) => {
         if (search) {
             where.OR = [
                 { companyName: { contains: search, mode: 'insensitive' } },
+                // Vendor ID (VND-YYYY-NNNN). A checker who has the code from a
+                // report or an email must be able to find the vendor by it.
+                { vendorCode: { contains: search, mode: 'insensitive' } },
                 { factoryCity: { contains: search, mode: 'insensitive' } },
                 { factoryState: { contains: search, mode: 'insensitive' } },
             ];
@@ -914,6 +917,9 @@ const getAssignedVendors = async (req, res) => {
                 where,
                 select: {
                     id: true,
+                    // Shown as "Vendor ID" in the list, and searchable via the
+                    // vendorCode branch of where.OR above.
+                    vendorCode: true,
                     companyName: true,
                     ownerName: true,
                     businessEmail: true,

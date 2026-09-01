@@ -2,6 +2,9 @@
 
 export interface Vendor {
   id: string
+  // Human-readable vendor code (VND-YYYY-NNNN) shown as "Vendor ID" in the UI.
+  // Nullable — vendors predating the code generator have none.
+  vendorCode?: string | null
   name: string
   location: string
   submittedDate?: string

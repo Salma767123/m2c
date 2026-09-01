@@ -161,6 +161,9 @@ const inspectionStatusStyle = (s?: string | null) =>
 
 interface Vendor {
   id: string;
+  // Real vendor code (VND-YYYY-NNNN). Null for vendors created before the code
+  // generator existed — those fall back to the id-derived string below.
+  vendorCode?: string | null;
   name: string;
   location: string;
   state?: string | null;
@@ -196,6 +199,7 @@ const transformVendor = (v: any): Vendor => {
     : undefined;
   return {
     id: v.id,
+    vendorCode: v.vendorCode ?? null,
     name: v.companyName,
     location: formatLocation(v.factoryCity, v.factoryState),
     state: v.factoryState || null,
@@ -449,7 +453,7 @@ export default function VendorsTab() {
         <View className="flex-1 flex-row items-center bg-white border border-slate-200 rounded-xl px-4 py-3">
           <Search size={18} color="#94a3b8" />
           <TextInput
-            placeholder="Search by name, city, or state..."
+            placeholder="Search by name, vendor ID, city, or state..."
             value={searchInput}
             onChangeText={setSearchInput}
             className="flex-1 ml-3 text-sm text-slate-900"
@@ -564,7 +568,7 @@ export default function VendorsTab() {
                           {v.name}
                         </AppText>
                         <Text className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mt-0.5">
-                          VND-{v.id.substring(0, 8).toUpperCase()}
+                          {v.vendorCode || `VND-${v.id.substring(0, 8).toUpperCase()}`}
                         </Text>
                       </View>
                     </View>
