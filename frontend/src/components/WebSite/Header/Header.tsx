@@ -528,14 +528,54 @@ const Header = () => {
                 )}
               </div>
 
-              {/* Mobile Menu Button */}
+              {/* Mobile Menu Button — last in the cluster, so it sits in the
+                  corner.
+
+                  It is written last in this file but was carrying no order
+                  class at all, which is order: 0 — ahead of Discover's order-1
+                  and everything after it. So the control that opens the whole
+                  navigation was arriving at the LEFT of the icon cluster, in
+                  the middle of the header, which is the one place a hamburger
+                  is not looked for. order-last rather than order-6: the
+                  siblings run 1 through 5 and this should stay at the end
+                  whatever gets added between them. */}
+              {/* Signed in, it wears the customer's face instead of three bars.
+                  The menu behind it is mostly their account — orders, wishlist,
+                  profile, sign out — so their own picture says what is in there
+                  better than a hamburger does, and it doubles as the "am I
+                  signed in?" answer without opening anything.
+
+                  Open, it goes back to an X whoever you are: a close control
+                  has to look like one, and an avatar that is already showing an
+                  open panel gives no way to read "tap to close".
+
+                  Signed out, or signed in with no picture, it is the hamburger
+                  and the User glyph respectively — the same fallback ladder the
+                  desktop account pill uses. */}
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="lg:hidden p-2 text-slate-700 hover:text-gray-600 hover:bg-slate-100 rounded-lg transition-all duration-200 transform hover:scale-110"
-                aria-label="Toggle menu"
+                className={`order-last lg:hidden text-slate-700 transition-all duration-200 transform hover:scale-110 ${isUserLoggedIn && !isMenuOpen
+                  ? 'p-0.5 rounded-full'
+                  : 'p-2 rounded-lg hover:text-gray-600 hover:bg-slate-100'
+                  }`}
+                aria-label={isMenuOpen ? 'Close menu' : isUserLoggedIn ? 'Open account menu' : 'Open menu'}
+                aria-expanded={isMenuOpen}
               >
                 {isMenuOpen ? (
                   <X className="w-6 h-6" />
+                ) : isUserLoggedIn ? (
+                  userImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={userImage}
+                      alt=""
+                      className="w-8 h-8 rounded-full object-cover ring-2 ring-[#e01a1b]/25"
+                    />
+                  ) : (
+                    <span className="grid h-8 w-8 place-items-center rounded-full bg-[#fff1f1] ring-2 ring-[#e01a1b]/25">
+                      <User className="w-4 h-4 text-[#e01a1b]" />
+                    </span>
+                  )
                 ) : (
                   <Menu className="w-6 h-6" />
                 )}

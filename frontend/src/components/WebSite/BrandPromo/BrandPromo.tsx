@@ -99,15 +99,20 @@ export default function BrandPromo() {
   return (
     <section className="bg-white pt-3 pb-1 font-sans sm:pt-4 sm:pb-1.5 lg:pt-5 lg:pb-2">
       <style>{`
-        /* The veil. Vertical below sm, where the photograph sits as a band above
-           the copy; horizontal from sm, where it sits beside it. Both end fully
-           opaque against the copy and fully clear across the subject, so the
-           photograph is never dimmed where it matters. */
+        /* The veil. Horizontal at every width, but running in opposite
+           directions above and below sm, because the photograph changes sides:
+           LEFT on a phone, RIGHT from sm. Either way it is clear over the
+           subject and fully opaque where it meets the copy, so the photograph
+           is never dimmed where it matters and the text never sits on a
+           picture.
+
+           It used to be vertical below sm, where the photograph was a band
+           across the top of the panel. */
         .bp-veil {
-          background: linear-gradient(to bottom,
-            rgba(var(--g), 0) 30%,
-            rgba(var(--g), .55) 62%,
-            rgba(var(--g), .93) 86%,
+          background: linear-gradient(to right,
+            rgba(var(--g), 0) 26%,
+            rgba(var(--g), .55) 58%,
+            rgba(var(--g), .93) 84%,
             rgb(var(--g)) 100%);
         }
         @media (min-width: 640px) {
@@ -261,34 +266,49 @@ function Panel({
           into the strip the veil does not cover — putting a hard vertical seam
           of raw photograph against the flat ground. The panel's own
           overflow-hidden does not help: the spill is inside the panel. */}
-      <div className="bp-art relative h-44 w-full overflow-hidden sm:absolute sm:inset-y-0 sm:right-0 sm:h-auto sm:w-[64%]">
+      {/* Absolute at every width now. On a phone it was `relative h-44 w-full`
+          — a 176px band stacked above the copy — so each panel carried the
+          photograph's height on top of its own, and the two together spent
+          most of a screen. Beside the copy instead, the photograph costs no
+          height at all: the panel is as tall as its words and no taller.
+
+          Left on a phone, right from sm. It changes sides because the copy
+          column does, and the veil in the stylesheet is reversed to match. */}
+      <div className="bp-art absolute inset-y-0 left-0 w-[42%] overflow-hidden sm:left-auto sm:right-0 sm:w-[64%]">
         <Image
           src={image.src}
           alt={image.alt}
           fill
-          sizes="(max-width: 640px) 100vw, (max-width: 1280px) 45vw, 640px"
+          sizes="(max-width: 640px) 45vw, (max-width: 1280px) 45vw, 640px"
           className="object-cover"
           style={{ objectPosition: image.position }}
         />
         <span aria-hidden className="bp-veil absolute inset-0" />
       </div>
 
-      <div className="relative p-6 sm:w-[58%] sm:py-6 sm:pl-8 sm:pr-4 lg:py-6 lg:pl-10">
-        <span className={`text-[10.5px] font-bold uppercase tracking-[0.18em] ${eyebrowClass}`}>{eyebrow}</span>
+      {/* ml-auto below sm, so the copy sits against the right edge with the
+          photograph behind its left. From sm the art is absolute on the right
+          and this starts at the left, as before. */}
+      <div className="relative ml-auto w-[62%] px-4 py-4 sm:ml-0 sm:w-[58%] sm:py-6 sm:pl-8 sm:pr-4 lg:py-6 lg:pl-10">
+        {/* Everything below steps up at sm. The copy column is 62% of the card
+            on a phone now rather than the whole of it — about 210px — and 26px
+            Playfair in 210px turns "Premium textiles, straight from the
+            makers." into six lines. */}
+        <span className={`text-[9px] font-bold uppercase tracking-[0.14em] sm:text-[10.5px] sm:tracking-[0.18em] ${eyebrowClass}`}>{eyebrow}</span>
 
-        <h3 className={`font-playfair mt-2.5 text-[26px] font-semibold leading-[1.12] tracking-tight sm:text-[28px] lg:text-[34px] ${headingClass}`}>
+        <h3 className={`font-playfair mt-1.5 text-[17px] font-semibold leading-[1.15] tracking-tight sm:mt-2.5 sm:text-[28px] sm:leading-[1.12] lg:text-[34px] ${headingClass}`}>
           {heading}
         </h3>
 
         {/* Three facts, not a paragraph — the artwork made the same points as
             pill graphics, and they read faster as a list than as prose. */}
-        <ul className="mt-4 space-y-2">
+        <ul className="mt-3 space-y-1.5 sm:mt-4 sm:space-y-2">
           {features.map(({ Icon, label, note }) => (
-            <li key={label} className="flex items-center gap-2.5">
-              <Icon className={`h-[18px] w-[18px] shrink-0 ${featureIconClass}`} strokeWidth={1.9} aria-hidden />
-              <span className={`text-[13.5px] font-semibold leading-tight ${featureLabelClass}`}>
+            <li key={label} className="flex items-start gap-1.5 sm:items-center sm:gap-2.5">
+              <Icon className={`mt-px h-3.5 w-3.5 shrink-0 sm:mt-0 sm:h-[18px] sm:w-[18px] ${featureIconClass}`} strokeWidth={1.9} aria-hidden />
+              <span className={`text-[11px] font-semibold leading-tight sm:text-[13.5px] ${featureLabelClass}`}>
                 {label}
-                <span className={`ml-1.5 font-normal ${featureNoteClass}`}>· {note}</span>
+                <span className={`ml-1 font-normal sm:ml-1.5 ${featureNoteClass}`}>· {note}</span>
               </span>
             </li>
           ))}
@@ -298,10 +318,10 @@ function Panel({
             control, and putting an interactive element inside it would nest one
             inside the other. */}
         <span
-          className={`mt-5 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-semibold tracking-[0.02em] transition-colors duration-300 ${ctaClass}`}
+          className={`mt-3.5 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-semibold tracking-[0.02em] transition-colors duration-300 sm:mt-5 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-[13px] ${ctaClass}`}
         >
           {cta}
-          <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+          <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-300 group-hover:translate-x-1 sm:h-4 sm:w-4" />
         </span>
       </div>
     </>

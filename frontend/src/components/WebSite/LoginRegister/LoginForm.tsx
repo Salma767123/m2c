@@ -153,11 +153,28 @@ export default function LoginForm({ onGoogleAuth }: LoginFormProps) {
         showErrorToast('Login Failed', response.message || 'Invalid credentials. Please try again.')
       }
     } catch (error: any) {
-      console.error('Login error:', error)
+      // The axios interceptor reshapes failures into a plain
+      // { message, status, data } object rather than an Error.
+      const status = error.status ?? error.response?.status ?? 0
+      const errorCode = error.data?.code || error.response?.data?.code
+
+      // A refused password is an ANSWER, not a fault.
+      //
+      // This used to be an unconditional console.error(error). Two things came
+      // of that: Next.js treats console.error as a Console Error and threw a
+      // full-screen dev overlay in front of every mistyped password, and the
+      // overlay cannot serialise a plain object, so what it printed was
+      // "Login error: {}" — the one thing the log existed for did not survive.
+      //
+      // So: anything the server refused deliberately (4xx) is reported by the
+      // toast below and nowhere else. Only a network failure or a server fault
+      // is a real fault worth a console. Interpolated rather than passed as an
+      // object, so it can never print as {} again.
+      if (status === 0 || status >= 500) {
+        console.error(`Login failed (status ${status}): ${error?.message ?? 'no message'}`)
+      }
 
       // Handle Google account trying credential login
-      // Note: axios interceptor reshapes errors to { message, status, data }
-      const errorCode = error.data?.code || error.response?.data?.code
       if (errorCode === 'GOOGLE_ACCOUNT') {
         setGoogleAccountEmail(loginData.email)
         showErrorToast('Google Account', 'This account was created with Google sign-in. Please use the Google button to log in.')

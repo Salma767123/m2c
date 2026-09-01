@@ -48,9 +48,14 @@ import { publicProductService, PublicProduct } from '@/services/publicProductSer
 /** Asked for, not guaranteed — the tag decides how many come back. */
 const RAIL_COUNT = 10;
 
-/** Entrance sequence. The gap between the masthead finishing and the cards
- *  starting is the whole point: read the heading, then watch the row. */
-const LEAD_STEPS = ['0ms', '90ms', '190ms', '290ms', '380ms'];
+/** Entrance sequence — eyebrow, heading, copy, button. The gap between the
+ *  masthead finishing and the cards starting is the whole point: read the
+ *  heading, then watch the row.
+ *
+ *  There was a fifth step at 380ms for the swipe hint that used to follow the
+ *  button. The hint is gone; CARDS_BEGIN_MS is set independently, so nothing
+ *  downstream was keyed to it. */
+const LEAD_STEPS = ['0ms', '90ms', '190ms', '290ms'];
 const CARDS_BEGIN_MS = 520;
 const CARD_STAGGER_MS = 85;
 const CARD_MS = 620;
@@ -93,7 +98,6 @@ export default function TopSelling() {
      view, to change a boolean the interval reads once every 3.4s. */
   const inViewRef = useRef(false);
   const hoverRef = useRef(false);
-  const hintRef = useRef<HTMLParagraphElement | null>(null);
 
   useEffect(() => {
     const fetchTopSellingProducts = async () => {
@@ -169,12 +173,11 @@ export default function TopSelling() {
     return item ? item.offsetWidth + gap : el.clientWidth * 0.3;
   };
 
+  // Called from every genuine interaction — pointer, wheel, arrow — and from
+  // nothing the rail does on its own. It used to retire the swipe hint as well
+  // as pause the auto-advance; the hint is gone, so pausing is all it does.
   const holdOff = () => {
     holdUntil.current = Date.now() + HOLD_OFF_MS;
-    // Called from every genuine interaction — pointer, wheel, arrow — and from
-    // nothing the rail does on its own, which makes it exactly the right hook
-    // for retiring the swipe hint.
-    hintRef.current?.classList.add('is-done');
   };
 
   const page = (dir: 1 | -1) => {
@@ -260,22 +263,11 @@ export default function TopSelling() {
         }
 
 
-        /* A short nudge in the direction of travel, with a long pause between —
-           a continuously moving arrow reads as a loading state. */
-        @keyframes m2cNudge {
-          0%, 62%, 100% { transform: translateX(0) }
-          78%           { transform: translateX(5px) }
-        }
-        .m2c-nudge { animation: m2cNudge 2.6s ease-in-out infinite }
-        .m2c-hint.is-done { opacity: 0; pointer-events: none }
-
         @media (prefers-reduced-motion: reduce) {
           .m2c-lead > *, .m2c-rail > *,
           .is-in .m2c-lead > *, .is-in .m2c-rail > * {
             opacity: 1; transform: none; animation: none;
           }
-          .m2c-nudge { animation: none }
-          .m2c-hint { transition: none }
         }
       `}</style>
 
@@ -319,10 +311,21 @@ export default function TopSelling() {
             Most popular items loved by our customers, proven by sales and reviews
           </p>
 
-          <div
-            className="mt-7 flex flex-wrap items-center gap-3"
-            style={{ '--d': LEAD_STEPS[3] } as React.CSSProperties}
-          >
+          {/* The rail's arrows used to sit here, beside the pill. They are
+              under the rail now — see below. A control belongs with the thing
+              it controls, and next to a call to action they read as a third
+              button in the same row rather than as the rail's own.
+
+              A "Swipe to see more" line sat under this too, on touch only. It
+              is gone: the arrows under the rail now say the same thing and say
+              it as a control rather than as an instruction.
+
+              Right-aligned below lg, where the masthead is the full width of
+              the page and the pill would otherwise sit alone against the left
+              margin. From lg the masthead is a 21rem column beside the rail,
+              so the pill goes back under the copy it belongs to — pushed right
+              in a column that narrow it would just look detached. */}
+          <div className="mt-7 flex justify-end lg:justify-start" style={{ '--d': LEAD_STEPS[3] } as React.CSSProperties}>
             {/* The standard pill, same as Featured and Best Sellers. Several
                 alternatives were tried here — a hang tag, an ink sweep, a woven
                 fill, a hairline-and-arrow — and none landed, so this stays as
@@ -334,36 +337,7 @@ export default function TopSelling() {
               View All Products
               <ArrowRight className={CTA_PILL_ICON} />
             </Link>
-
-            {/* On touch as well as desktop. These were desktop-only at first,
-                on the reasoning that swiping is the control on a phone — but a
-                rail with no arrows just reads as a static two-card row unless
-                someone happens to try dragging it, and the arrows are the only
-                thing announcing that there is more. 44px targets, which is the
-                minimum a thumb needs. */}
-            <div className="flex items-center gap-2">
-              <RailButton dir={-1} disabled={atStart} onClick={() => page(-1)} />
-              <RailButton dir={1} disabled={atEnd} onClick={() => page(1)} />
-            </div>
           </div>
-
-          {/* Touch only. On a phone the rail reads as a static two-card row
-              unless something says otherwise; on desktop the cursor, the hover
-              states and the visible arrows already say it, so the line would
-              just be an instruction nobody needs.
-
-              It retires the moment the reader does anything to the rail —
-              telling someone to swipe after they have swiped is noise. Not on
-              the auto-advance though: that is the rail moving itself, not the
-              reader learning anything. */}
-          <p
-            ref={hintRef}
-            className="m2c-hint mt-4 flex items-center gap-1.5 text-[12.5px] font-medium text-[#7a6d66] transition-opacity duration-500 lg:hidden"
-            style={{ '--d': LEAD_STEPS[4] } as React.CSSProperties}
-          >
-            Swipe to see more
-            <ArrowRight aria-hidden className="m2c-nudge h-3.5 w-3.5" />
-          </p>
         </div>
 
         {/* ── The rail ─────────────────────────────────────────────────────
@@ -384,9 +358,12 @@ export default function TopSelling() {
               snapping ignored the rail's own pl-12 and parked every card hard
               against the strip's left edge. Matching scroll-padding to the
               padding puts the resting position back inside it. */}
+          {/* pb is smaller than pt now: the arrow row below supplies the rest
+              of the strip's bottom margin, so the two together come to the
+              same height the rail had on its own. */}
           <div
             ref={railRef}
-            className="m2c-rail scrollbar-hide flex snap-x snap-mandatory scroll-pl-4 scroll-smooth gap-4 overflow-x-auto px-4 py-6 sm:gap-5 sm:scroll-pl-6 sm:px-6 lg:scroll-pl-12 lg:py-8 lg:pl-12 lg:pr-10"
+            className="m2c-rail scrollbar-hide flex snap-x snap-mandatory scroll-pl-4 scroll-smooth gap-4 overflow-x-auto px-4 pb-4 pt-6 sm:gap-5 sm:scroll-pl-6 sm:px-6 lg:scroll-pl-12 lg:pb-5 lg:pl-12 lg:pr-10 lg:pt-8"
           >
             {products.map((product, index) => (
               // Direct flex children, so they stretch to the tallest and
@@ -400,6 +377,24 @@ export default function TopSelling() {
                 <ProductCard product={product} variant="showcase" />
               </div>
             ))}
+          </div>
+
+          {/* ── Rail controls ────────────────────────────────────────────
+              Under the cards and against the right edge, on the strip's own
+              ground — the corner a thumb reaches without crossing the rail.
+
+              On touch as well as desktop. These were desktop-only at first, on
+              the reasoning that swiping is the control on a phone — but a rail
+              with no arrows just reads as a static two-card row unless someone
+              happens to try dragging it, and the arrows are the only thing
+              announcing that there is more. 44px targets, which is the minimum
+              a thumb needs.
+
+              Right padding matches the rail's own, so the arrows line up with
+              where the last card stops rather than floating past it. */}
+          <div className="relative z-10 flex items-center justify-end gap-2 px-4 pb-6 sm:px-6 lg:px-10 lg:pb-8">
+            <RailButton dir={-1} disabled={atStart} onClick={() => page(-1)} />
+            <RailButton dir={1} disabled={atEnd} onClick={() => page(1)} />
           </div>
 
           {/* Between snap points a card is genuinely half over the padding and
@@ -421,8 +416,10 @@ export default function TopSelling() {
   );
 }
 
-/** Rail arrow. Disabled at each end rather than hidden, so the control row
- *  keeps its width and the masthead does not shift as you scroll. */
+/** Rail arrow. Disabled at each end rather than hidden, so the pair keeps its
+ *  width and the row under the rail does not reflow as you scroll — a control
+ *  that vanishes at the end of a rail moves the one beside it under the thumb
+ *  already on its way down. */
 function RailButton({ dir, disabled, onClick }: { dir: 1 | -1; disabled: boolean; onClick: () => void }) {
   const Icon = dir === 1 ? ChevronRight : ChevronLeft;
   return (

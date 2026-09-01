@@ -21,7 +21,7 @@ import {
 import StatCard from './StatCard';
 import qcCheckerService from '../../services/qcCheckerService';
 import { formatCheckerName } from '../Vendor/Steps/fieldHelpers';
-import { vendorInspectionStatusOf, vendorScheduledMs, formatScheduledDate } from '@/lib/checkerVendorStatus';
+import { vendorInspectionStatusOf, vendorScheduledMs, formatScheduledDate, formatScheduledTime } from '@/lib/checkerVendorStatus';
 import { router } from 'expo-router';
 import { brand } from '@/constants/design';
 
@@ -507,7 +507,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
                             <CalendarDays size={11} color="#94a3b8" />
                             <Text className="text-[11px] text-slate-400" numberOfLines={1}>
                               {schedDate
-                                ? `Scheduled ${formatScheduledDate(schedDate)}${schedTime ? ` · ${schedTime}` : ''}`
+                                ? `Scheduled ${formatScheduledDate(schedDate)}${schedTime ? ` · ${formatScheduledTime(schedTime)}` : ''}`
                                 : 'Not scheduled yet'}
                             </Text>
                           </View>
@@ -571,7 +571,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
                             <CalendarDays size={11} color="#94a3b8" />
                             <Text className="text-[11px] text-slate-400" numberOfLines={1}>
                               {schedDate
-                                ? `Scheduled ${formatScheduledDate(schedDate)}${schedTime ? ` · ${schedTime}` : ''}`
+                                ? `Scheduled ${formatScheduledDate(schedDate)}${schedTime ? ` · ${formatScheduledTime(schedTime)}` : ''}`
                                 : 'Not scheduled yet'}
                             </Text>
                           </View>

@@ -98,10 +98,15 @@ export default function VendorPartnerCTA() {
 
               {/* A span, not a button — the whole band is already the link, and
                   a control inside a link is neither valid nor operable. */}
-              <span className="mt-1 inline-flex w-fit shrink-0 items-center gap-2.5 rounded-full bg-[#0c1e38] px-5 py-2.5 text-[12.5px] font-bold uppercase tracking-[0.12em] text-white ring-1 ring-[#f8b341]/60 transition-colors duration-300 group-hover:bg-[#12233c] lg:mt-0 lg:px-7 lg:py-3.5 lg:text-[13.5px]">
-                <Store className="h-4 w-4 text-[#f8b341]" strokeWidth={2} />
+              {/* Smaller below sm, and the tracking comes down with it.
+                  Sixteen uppercase characters at 0.12em is the widest this
+                  label ever gets, and on a phone it was setting the band's
+                  width on its own — the letter-spacing costs about as much
+                  room here as the padding does. */}
+              <span className="mt-1 inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full bg-[#0c1e38] px-3.5 py-1.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-white ring-1 ring-[#f8b341]/60 transition-colors duration-300 group-hover:bg-[#12233c] sm:gap-2.5 sm:px-5 sm:py-2.5 sm:text-[12.5px] sm:tracking-[0.12em] lg:mt-0 lg:px-7 lg:py-3.5 lg:text-[13.5px]">
+                <Store className="h-3.5 w-3.5 shrink-0 text-[#f8b341] sm:h-4 sm:w-4" strokeWidth={2} />
                 Join as a Seller
-                <ArrowRight className="h-4 w-4 text-[#f8b341] transition-transform duration-300 group-hover:translate-x-1" />
+                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#f8b341] transition-transform duration-300 group-hover:translate-x-1 sm:h-4 sm:w-4" />
               </span>
             </div>
 

@@ -121,15 +121,42 @@ const flipKeyframes = Array.from({ length: TILES }, (_, c) => {
 }).join('\n')
 
 /**
+ * How many tiles a phone gets.
+ *
+ * Eight tiles two-up is four rows of board before the page moves on, which on a
+ * phone is most of a screen spent on promos. Four is one screenful of two rows,
+ * and nothing is lost: every coupon and offer on the board is on /offers, which
+ * the "All offers" control at the head of the section goes to.
+ *
+ * Only below sm. From 640px up the row is wide enough to be worth its height,
+ * and at lg the board is four across, so eight is two rows there as well.
+ */
+const MOBILE_TILES = 4
+
+/**
  * Which track each tile runs, per column count.
  *
  * It cannot be an inline style any more: the answer depends on the breakpoint,
  * and inline styles cannot be media-queried. So each tile carries a stable
  * class for its DOM position and the stylesheet decides which sweep position
  * that is — two columns by default, four from lg, matching the grid exactly.
+ *
+ * The phone needs its own mapping rather than just inheriting the first four
+ * two-column tracks. Those are sweep positions 0, 1, 3, 2 — the first half of
+ * an eight-slot outbound sweep — so with the other four tiles hidden the board
+ * would turn four cards, stand still for the length of four more, and then
+ * turn them back. Spacing the four survivors every other slot (0, 2, 6, 4)
+ * gives the same even rhythm the full board has, and it needs no new keyframes
+ * because it reuses the tracks the hidden tiles are no longer running.
  */
 const tileTracks = [
   ...Array.from({ length: TILES }, (_, i) => `.m2c-t${i} { animation-name: m2cFlip${snakeOrder(i, 2)} }`),
+  '@media (max-width: 639px) {',
+  ...Array.from(
+    { length: MOBILE_TILES },
+    (_, i) => `  .m2c-t${i} { animation-name: m2cFlip${snakeOrder(i, 2) * (TILES / MOBILE_TILES)} }`,
+  ),
+  '}',
   '@media (min-width: 1024px) {',
   ...Array.from({ length: TILES }, (_, i) => `  .m2c-t${i} { animation-name: m2cFlip${snakeOrder(i, 4)} }`),
   '}',
@@ -321,18 +348,29 @@ export default function NoticeBoard() {
           clearance and set in small grey text, so it read as a stray caption
           rather than as the start of a section. The rule between the two ends
           ties them into one line instead of leaving them floating apart. */}
-      <div className="mx-auto mb-6 flex max-w-[1400px] items-center gap-4 px-4 sm:px-6">
-        <h2 className="inline-flex shrink-0 items-center gap-2 text-[13px] font-bold uppercase tracking-[0.2em] text-[#1a1416] sm:text-[14.5px]">
-          <Sparkles className="h-[17px] w-[17px] text-[#e01a1b]" />
+      {/* Both ends are shrink-0, which is correct — a heading that truncates
+          and a pill that squashes are both worse than a short rule. It does
+          mean the row cannot absorb anything, so the two ends have to actually
+          fit, and below sm they did not: the pill was arriving as "All of"
+          against the right edge.
+
+          The tracking was most of it. Sixteen uppercase characters at 0.2em of
+          a 13px font is about 42px of pure letter-spacing — more than the
+          icon and both gaps together — so it comes down on phones along with
+          the type. The rule between them keeps its min-w-0 and gives up its
+          width first, as it should. */}
+      <div className="mx-auto mb-6 flex max-w-[1400px] items-center gap-2.5 px-4 sm:gap-4 sm:px-6">
+        <h2 className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[#1a1416] sm:gap-2 sm:text-[14.5px] sm:tracking-[0.2em]">
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#e01a1b] sm:h-[17px] sm:w-[17px]" />
           What&apos;s happening
         </h2>
         <span aria-hidden className="h-px min-w-0 flex-1 bg-linear-to-r from-black/[0.14] to-transparent" />
         <Link
           href="/offers"
-          className="group inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#e01a1b]/25 px-3.5 py-1.5 text-[12.5px] font-semibold text-[#e01a1b] transition-colors hover:bg-[#fff1f1] sm:text-[13px]"
+          className="group inline-flex shrink-0 items-center gap-1 rounded-full border border-[#e01a1b]/25 px-2.5 py-1 text-[11px] font-semibold text-[#e01a1b] transition-colors hover:bg-[#fff1f1] sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[13px]"
         >
           All offers
-          <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+          <ArrowRight className="h-3 w-3 shrink-0 transition-transform duration-300 group-hover:translate-x-0.5 sm:h-3.5 sm:w-3.5" />
         </Link>
       </div>
 
@@ -375,7 +413,14 @@ export default function NoticeBoard() {
             <div
               key={`tile-${i}`}
               data-deal
-              className="[perspective:1400px]"
+              // Hidden rather than not rendered. The count is a CSS breakpoint
+              // question, and deciding it in JS would mean either reading the
+              // viewport during render — which the server cannot do, so the
+              // markup would not match on hydration — or a resize listener
+              // re-rendering the board on every drag of a window edge.
+              // display:none also stops the tile's flip animation, so the four
+              // that are off screen are not turning behind it.
+              className={`[perspective:1400px] ${i >= MOBILE_TILES ? 'hidden sm:block' : ''}`}
               style={{ animationDelay: `${i * 60}ms` }}
             >
               {/* The track comes from tileTracks in the stylesheet above, which
