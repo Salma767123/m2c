@@ -902,6 +902,7 @@ const getAssignedVendors = async (req, res) => {
         if (status) where.status = status;
         if (search) {
             where.OR = [
+                { vendorCode: { contains: search, mode: 'insensitive' } },
                 { companyName: { contains: search, mode: 'insensitive' } },
                 { factoryCity: { contains: search, mode: 'insensitive' } },
                 { factoryState: { contains: search, mode: 'insensitive' } },
