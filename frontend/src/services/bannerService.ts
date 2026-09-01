@@ -98,11 +98,22 @@ export const BANNER_LINK_ALL = '__all__';
  * Returns null when the banner has no link (so it stays non-clickable).
  */
 export function bannerHref(b: Pick<BannerImage, 'linkType' | 'linkValue'>): string | null {
-    if (b.linkType === 'product' && b.linkValue) {
-        return b.linkValue === BANNER_LINK_ALL ? '/products' : `/products/${b.linkValue}`;
+    const value = b.linkValue || '';
+    // Multiple targets are stored comma-joined (e.g. "slug-a,slug-b").
+    const slugs = value === BANNER_LINK_ALL ? [] : value.split(',').map((s) => s.trim()).filter(Boolean);
+
+    if (b.linkType === 'product' && value) {
+        if (value === BANNER_LINK_ALL) return '/products';
+        // One product → its own page; several → the products page filtered to that set.
+        if (slugs.length <= 1) return `/products/${slugs[0]}`;
+        return `/products?products=${encodeURIComponent(slugs.join(','))}`;
     }
-    if (b.linkType === 'category' && b.linkValue) {
-        return b.linkValue === BANNER_LINK_ALL ? '/categories' : `/products?category=${b.linkValue}`;
+    if (b.linkType === 'category' && value) {
+        if (value === BANNER_LINK_ALL) return '/categories';
+        // One category → the products page filtered to it. Several categories →
+        // the categories page listing just those selected categories.
+        if (slugs.length <= 1) return `/products?category=${encodeURIComponent(slugs[0])}`;
+        return `/categories?only=${encodeURIComponent(slugs.join(','))}`;
     }
     return null;
 }

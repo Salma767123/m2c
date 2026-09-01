@@ -1077,10 +1077,20 @@ model Order {
   // Pricing
   subtotal     Float
   shippingCost Float   @default(0)
-  tax          Float   @default(0)
+  tax          Float   @default(0) // Total GST = cgst + sgst + igst
   discount     Float   @default(0)
   totalAmount  Float
   couponCode   String?
+
+  // GST split (India / `.in` only). Determined by comparing the Admin/Company
+  // registered State (supplier) with the customer's shipping State (place of
+  // supply): same state = intrastate (CGST+SGST), different = interstate (IGST).
+  // These are display fields — `tax` remains the authoritative total. All 0 /
+  // null when no GST applies (non-`.in` regions).
+  cgstAmount Float   @default(0)
+  sgstAmount Float   @default(0)
+  igstAmount Float   @default(0)
+  taxType    String? // 'INTRASTATE' | 'INTERSTATE' | null
 
   // Currency
   currency String @default("INR") // INR or USD
@@ -1392,6 +1402,7 @@ model Coupon {
   popupTitle           String?
   popupMessage         String?
   applicableCategories String[] // Category names to target (e.g., ["Towel", "Apron"])
+  applicableProducts   String[] // Product ids within the chosen categories to target (empty = all products in those categories)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1613,7 +1624,10 @@ model CompanyInfo {
   taxId                      String?
 
   // Registered Address
-  registeredAddress String?
+  registeredAddress String? // Address line 1
+  addressLine2      String?
+  addressLine3      String?
+  landmark          String?
   city              String?
   state             String?
   country           String?
@@ -1820,7 +1834,9 @@ model VendorEnquiry {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   companyName String
-  gstNumber   String
+  // "REGISTERED" (has GST) | "UNREGISTERED" (no GST). GST is optional for the latter.
+  vendorType  String    @default("REGISTERED")
+  gstNumber   String?
   email       String
   phone       String
   website     String?

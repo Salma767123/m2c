@@ -914,6 +914,7 @@ const getAssignedVendors = async (req, res) => {
                 where,
                 select: {
                     id: true,
+                    vendorCode: true,
                     companyName: true,
                     ownerName: true,
                     businessEmail: true,

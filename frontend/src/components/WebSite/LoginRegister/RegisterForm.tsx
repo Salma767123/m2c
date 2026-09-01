@@ -3,10 +3,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/UI/Button'
 import { 
-  Eye, 
-  EyeOff, 
-  AlertCircle, 
-  User
+  Eye,
+  EyeOff,
+  AlertCircle,
+  User,
+  Check,
+  Circle
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 
@@ -365,9 +367,11 @@ export default function RegisterForm({ onGoogleAuth }: RegisterFormProps) {
               <span className="wrap-break-word">{passwordError}</span>
             </div>
           )}
-          {/* Password Strength Indicator */}
-          {registerData.password && !passwordError && (
+          {/* Password Strength Indicator + requirements checklist */}
+          {registerData.password && (
             <div className="mt-2 sm:mt-3">
+              {!passwordError && (
+              <>
               <div className="flex items-center justify-between mb-1 sm:mb-2">
                 <span className="text-xs font-medium text-gray-600">Password Strength</span>
                 <span className={`text-xs font-semibold ${
@@ -381,11 +385,37 @@ export default function RegisterForm({ onGoogleAuth }: RegisterFormProps) {
                 <div
                   className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 ${getPasswordStrengthColor(passwordStrength)}`}
                   style={{
-                    width: passwordStrength === "weak" ? "33%" : 
+                    width: passwordStrength === "weak" ? "33%" :
                            passwordStrength === "medium" ? "66%" : "100%"
                   }}
                 ></div>
               </div>
+              </>
+              )}
+
+              {/* Live requirements checklist — ticks off as each rule is met so the
+                  customer knows exactly how to reach a strong password. */}
+              {(() => {
+                const pwd = registerData.password
+                const rules = [
+                  { label: 'At least 12 characters', ok: pwd.length >= 12 },
+                  { label: 'One uppercase letter (A–Z)', ok: /[A-Z]/.test(pwd) },
+                  { label: 'One number (0–9)', ok: /[0-9]/.test(pwd) },
+                  { label: 'One special character (!@#$%^&*)', ok: /[!@#$%^&*]/.test(pwd) },
+                ]
+                return (
+                  <ul className="mt-2.5 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                    {rules.map((r) => (
+                      <li key={r.label} className={`flex items-center gap-1.5 text-[11px] sm:text-xs ${r.ok ? 'text-green-600' : 'text-gray-500'}`}>
+                        {r.ok
+                          ? <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
+                          : <Circle className="h-3.5 w-3.5 shrink-0 text-gray-300" />}
+                        <span>{r.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )
+              })()}
             </div>
           )}
         </div>

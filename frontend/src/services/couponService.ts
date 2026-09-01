@@ -22,6 +22,9 @@ export interface Coupon {
     popupTitle?: string;
     popupMessage?: string;
     applicableCategories?: string[];
+    /** Product ids within the chosen categories to target (empty = every product
+     *  in those categories). */
+    applicableProducts?: string[];
     /** First-order coupon — only applies to a customer's first order and surfaces
      *  in the storefront promo strip. At most one active at a time. */
     isFirstOrder?: boolean;

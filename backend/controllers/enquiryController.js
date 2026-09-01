@@ -5,11 +5,19 @@ const { sendTemplatedEmail } = require('../utils/emailTemplateRenderer');
 const submitEnquiry = async (req, res) => {
     try {
         const { name, companyName, gstNumber, email, phone, website } = req.body;
+        // Registered vendors must provide a GST number; unregistered ones may skip it.
+        const vendorType = req.body.vendorType === 'UNREGISTERED' ? 'UNREGISTERED' : 'REGISTERED';
 
-        if (!name || !companyName || !gstNumber || !email || !phone) {
+        if (!name || !companyName || !email || !phone) {
             return res.status(400).json({
                 success: false,
-                message: 'Name, company name, GST number, email and phone are required'
+                message: 'Name, company name, email and phone are required'
+            });
+        }
+        if (vendorType === 'REGISTERED' && !gstNumber) {
+            return res.status(400).json({
+                success: false,
+                message: 'GST number is required for registered vendors'
             });
         }
 
@@ -29,7 +37,8 @@ const submitEnquiry = async (req, res) => {
             data: {
                 name,
                 companyName,
-                gstNumber,
+                vendorType,
+                gstNumber: gstNumber || null,
                 email,
                 phone,
                 website: website || null,

@@ -295,8 +295,11 @@ class ProductService {
     page?: number;
     limit?: number;
     search?: string;
+    /** Single category name, or a comma-separated set (banner multi-category links). */
     category?: string;
     subCategory?: string;
+    /** Comma-separated product slugs to restrict the list to (banner product-set links). */
+    products?: string;
     minPrice?: number;
     maxPrice?: number;
     sortBy?: string;

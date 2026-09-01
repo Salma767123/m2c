@@ -79,6 +79,18 @@ export interface PublicProduct {
   activeOffer?: ActiveOffer;
 }
 
+/** A lightweight autocomplete row from /products/public/suggest. */
+export interface SearchSuggestion {
+  id: string;
+  name: string;
+  category?: string;
+  image?: string | null;
+  adminFixedPrice?: number | null;
+  basePrice?: number;
+  priceINR?: number | null;
+  priceUSD?: number | null;
+}
+
 export interface ProductsResponse {
   success: boolean;
   data?: {
@@ -117,6 +129,18 @@ class PublicProductService {
         success: false,
         message: error.message || 'Failed to fetch products'
       };
+    }
+  }
+
+  // Autocomplete suggestions for the header search — a small, relevance-ranked set.
+  async getSuggestions(q: string): Promise<SearchSuggestion[]> {
+    try {
+      const term = q.trim();
+      if (term.length < 2) return [];
+      const response = await axios.get('/products/public/suggest', { params: { q: term, region: getRegion() } });
+      return response.data?.success && Array.isArray(response.data.data) ? response.data.data : [];
+    } catch {
+      return [];
     }
   }
 

@@ -8,6 +8,8 @@ export interface OrderItem {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
+    /** GST rate charged on this line, frozen at checkout (per-product). */
+    gstPercentage?: number | null;
     /** Unit price before the automatic offer (set only when an offer applied),
      *  so the order view can show how much the offer saved. */
     originalUnitPrice?: number;
@@ -113,6 +115,11 @@ export interface Order {
     subtotal: number;
     shippingCost: number;
     tax: number;
+    /** GST split (display) — total stays `tax`. Intrastate: cgst+sgst; interstate: igst. */
+    cgstAmount?: number;
+    sgstAmount?: number;
+    igstAmount?: number;
+    taxType?: 'INTRASTATE' | 'INTERSTATE' | null;
     discount: number;
     /** Currency the buyer was actually charged in — 'INR' on .in, 'USD' on .com. */
     currency?: 'INR' | 'USD';

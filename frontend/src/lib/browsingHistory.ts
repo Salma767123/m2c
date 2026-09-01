@@ -59,3 +59,9 @@ export function recordSearch(term: string): void {
 export function getRecentSearches(): string[] {
   return read(RECENT_SEARCHES_KEY);
 }
+
+/** Remove one recent search term (case-insensitive). */
+export function removeRecentSearch(term: string): void {
+  const t = (term || '').trim().toLowerCase();
+  write(RECENT_SEARCHES_KEY, read(RECENT_SEARCHES_KEY).filter((s) => s.toLowerCase() !== t));
+}

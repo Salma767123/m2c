@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Tag, Percent, Calendar, TrendingUp, Info, Upload, Megaphone, ChevronDown } from 'lucide-react';
+import { X, Tag, Percent, Calendar, TrendingUp, Info, Upload, Megaphone, ChevronDown, Package, Loader2 } from 'lucide-react';
 import Dropdown from '@/components/UI/Dropdown';
 import { Coupon } from '@/services/couponService';
 import { categoryService } from '@/services/categoryService';
+import adminProductService from '@/services/adminProductService';
 import { showErrorToast } from '@/lib/toast-utils';
 import { centerNotice } from '@/components/UI/CenterNotice';
 
@@ -36,6 +37,16 @@ const CouponModal = ({
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
 
+  // Products belonging to the selected categories — the "Products" field's options.
+  type CouponProduct = { id: string; name: string; sku: string; category: string; image?: string };
+  const [categoryProducts, setCategoryProducts] = useState<CouponProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+
+  const selectedCategories = formData.applicableCategories || [];
+  const selectedCategoriesKey = selectedCategories.join('|');
+
   // Fetch categories for the dropdown
   useEffect(() => {
     if (isOpen) {
@@ -47,6 +58,49 @@ const CouponModal = ({
       }).catch(() => {});
     }
   }, [isOpen, formData.popupImage]);
+
+  // When categories change, load every product in those categories (union, deduped)
+  // so the Products field can list them, and prune any selected product that no
+  // longer belongs to a chosen category.
+  useEffect(() => {
+    if (!isOpen || selectedCategories.length === 0) {
+      setCategoryProducts([]);
+      return;
+    }
+    let cancelled = false;
+    setProductsLoading(true);
+    Promise.all(
+      selectedCategories.map((cat) =>
+        adminProductService.getAllProducts({ category: cat, limit: 500 })
+          .then((r) => r.data?.products || [])
+          .catch(() => [] as any[]),
+      ),
+    ).then((lists) => {
+      if (cancelled) return;
+      const seen = new Map<string, CouponProduct>();
+      lists.flat().forEach((p: any) => {
+        if (p?.id && !seen.has(p.id)) {
+          seen.set(p.id, {
+            id: p.id,
+            name: p.name,
+            sku: p.baseSku || p.sku || '',
+            category: p.category,
+            image: p.images?.[0]?.url,
+          });
+        }
+      });
+      const list = Array.from(seen.values());
+      setCategoryProducts(list);
+      const validIds = new Set(list.map((p) => p.id));
+      const current = formData.applicableProducts || [];
+      const pruned = current.filter((id) => validIds.has(id));
+      if (pruned.length !== current.length) {
+        setFormData({ ...formData, applicableProducts: pruned });
+      }
+    }).finally(() => { if (!cancelled) setProductsLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, selectedCategoriesKey]);
 
   if (!isOpen) return null;
 
@@ -586,7 +640,7 @@ const CouponModal = ({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Popup Title */}
                         <div>
                           <label className="block text-sm font-semibold text-slate-700 mb-2">Popup Title</label>
@@ -663,6 +717,129 @@ const CouponModal = ({
                             </div>
                           )}
                         </div>
+
+                      {/* Products — shown once at least one category is picked.
+                          Lists every product in the selected categories with a
+                          select-all, per-product checkboxes and name/SKU search.
+                          An empty selection means "all products in those categories". */}
+                      {selectedCategories.length > 0 && (
+                        <div className="relative">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">
+                            Products
+                            <span className="ml-1.5 font-normal text-slate-400">
+                              — from {selectedCategories.length === 1 ? 'the selected category' : `${selectedCategories.length} categories`}
+                            </span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => { setShowProductDropdown((prev) => !prev); setProductSearch(''); }}
+                            className="w-full flex items-center justify-between px-4 py-2.5 border border-slate-300 rounded-lg bg-white hover:border-slate-400 transition-colors text-left"
+                          >
+                            <span className={`text-sm ${(formData.applicableProducts || []).length > 0 ? 'text-slate-900' : 'text-slate-400'}`}>
+                              {(formData.applicableProducts || []).length > 0
+                                ? `${(formData.applicableProducts || []).length} product${(formData.applicableProducts || []).length === 1 ? '' : 's'} selected`
+                                : `All products (${categoryProducts.length})`}
+                            </span>
+                            <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${showProductDropdown ? 'rotate-180' : ''}`} />
+                          </button>
+                          {showProductDropdown && (
+                            <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg">
+                              <div className="p-2 border-b border-slate-100">
+                                <input
+                                  type="text"
+                                  value={productSearch}
+                                  onChange={(e) => setProductSearch(e.target.value)}
+                                  placeholder="Search by product name or SKU..."
+                                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-1 focus:ring-brand-500/40 focus:border-brand-500 outline-none"
+                                  autoFocus
+                                />
+                              </div>
+
+                              {productsLoading ? (
+                                <div className="flex items-center justify-center gap-2 px-4 py-6 text-sm text-slate-400">
+                                  <Loader2 className="w-4 h-4 animate-spin" /> Loading products…
+                                </div>
+                              ) : (() => {
+                                const q = productSearch.trim().toLowerCase();
+                                const filtered = categoryProducts.filter(
+                                  (p) => !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q),
+                                );
+                                const selectedIds = formData.applicableProducts || [];
+                                const allSelected = filtered.length > 0 && filtered.every((p) => selectedIds.includes(p.id));
+                                return (
+                                  <>
+                                    {/* Select all (respects the current search filter). */}
+                                    {filtered.length > 0 && (
+                                      <label className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-100 bg-slate-50/70 hover:bg-slate-100 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={allSelected}
+                                          onChange={() => {
+                                            const ids = filtered.map((p) => p.id);
+                                            const next = allSelected
+                                              ? selectedIds.filter((id) => !ids.includes(id))
+                                              : Array.from(new Set([...selectedIds, ...ids]));
+                                            setFormData({ ...formData, applicableProducts: next });
+                                          }}
+                                          className="w-4 h-4 accent-brand-500 rounded"
+                                        />
+                                        <span className="text-sm font-semibold text-slate-700">
+                                          {allSelected ? 'Deselect all' : 'Select all'}{q ? ' (matching)' : ''}
+                                        </span>
+                                      </label>
+                                    )}
+                                    <div className="max-h-56 overflow-y-auto">
+                                      {filtered.map((p) => {
+                                        const checked = selectedIds.includes(p.id);
+                                        return (
+                                          <label
+                                            key={p.id}
+                                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 cursor-pointer"
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={checked}
+                                              onChange={() => {
+                                                setFormData({
+                                                  ...formData,
+                                                  applicableProducts: checked
+                                                    ? selectedIds.filter((id) => id !== p.id)
+                                                    : [...selectedIds, p.id],
+                                                });
+                                              }}
+                                              className="w-4 h-4 accent-brand-500 rounded shrink-0"
+                                            />
+                                            {p.image ? (
+                                              // eslint-disable-next-line @next/next/no-img-element
+                                              <img src={p.image} alt={p.name} className="h-8 w-8 shrink-0 rounded object-cover border border-slate-200" />
+                                            ) : (
+                                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-100 text-slate-400">
+                                                <Package className="h-4 w-4" />
+                                              </span>
+                                            )}
+                                            <span className="min-w-0 flex-1">
+                                              <span className="block truncate text-sm text-slate-800">{p.name}</span>
+                                              {p.sku && <span className="block truncate text-xs text-slate-400">SKU: {p.sku}</span>}
+                                            </span>
+                                          </label>
+                                        );
+                                      })}
+                                      {filtered.length === 0 && (
+                                        <p className="px-4 py-3 text-sm text-slate-400">
+                                          {categoryProducts.length === 0 ? 'No products in the selected categories' : 'No products match your search'}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
+                          <p className="mt-1.5 text-xs text-slate-400">
+                            Leave empty to target all products in the selected categories.
+                          </p>
+                        </div>
+                      )}
                       </div>
 
                       {/* Popup Message */}

@@ -24,6 +24,7 @@ const createCoupon = async (req, res) => {
             popupTitle,
             popupMessage,
             applicableCategories,
+            applicableProducts,
             isFirstOrder,
         } = req.body;
 
@@ -77,6 +78,7 @@ const createCoupon = async (req, res) => {
                 popupTitle: popupTitle || undefined,
                 popupMessage: popupMessage || undefined,
                 applicableCategories: applicableCategories || [],
+                applicableProducts: applicableProducts || [],
                 isFirstOrder: isFirstOrder || false,
             }
         });

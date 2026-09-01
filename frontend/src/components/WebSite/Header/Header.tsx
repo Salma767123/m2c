@@ -19,6 +19,7 @@ import {
 import { IconUserFilled } from '@tabler/icons-react';
 import DiscoverNav from "./Discover/DiscoverNav";
 import CategoryRibbon from "./CategoryRibbon/CategoryRibbon";
+import SearchAutocomplete from "./SearchAutocomplete";
 import { isAuthenticated } from "@/lib/auth";
 import { recordSearch } from "@/lib/browsingHistory";
 import { cartService } from "@/services/cartService";
@@ -320,25 +321,9 @@ const Header = () => {
             {/* Prominent inline search — the primary way to find products
                 (Amazon/Flipkart/Myntra pattern). Fills the header on md+; on
                 mobile the compact search icon in the actions opens the modal. */}
-            <form onSubmit={handleSearchSubmit} className="hidden md:flex flex-1 min-w-0 max-w-xs lg:max-w-sm mx-4 lg:mx-6">
-              <div className="relative w-full">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search for products, categories & more"
-                  aria-label="Search products"
-                  className="w-full pl-4 pr-28 py-2 lg:py-2.5 rounded-full bg-gray-50 border border-gray-200 text-sm text-gray-800 placeholder-gray-400 focus:bg-white focus:border-[#e01a1b] focus:ring-4 focus:ring-[#e01a1b]/10 outline-none transition-all"
-                />
-                <button
-                  type="submit"
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 bg-[#e01a1b] hover:bg-[#c41617] text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-colors"
-                >
-                  <Search className="w-4 h-4" />
-                  <span className="hidden 2xl:inline">Search</span>
-                </button>
-              </div>
-            </form>
+            <div className="hidden md:flex flex-1 min-w-0 max-w-xs lg:max-w-sm mx-4 lg:mx-6">
+              <SearchAutocomplete variant="desktop" popularSearches={popularSearches} />
+            </div>
 
             {/* Action Icons */}
             <div className="flex items-center justify-end gap-0.5 min-[360px]:gap-1 sm:gap-2 shrink-0">
@@ -744,55 +729,26 @@ const Header = () => {
               className="bg-white rounded-b-2xl shadow-[0_18px_40px_-12px_rgba(15,23,42,0.35)] w-full max-w-3xl mx-auto overflow-hidden border border-t-0 border-slate-200"
             >
               <div className="p-4 sm:p-5">
-                {/* Search Input Section */}
-                <form
-                  onSubmit={handleSearchSubmit}
-                  className="flex items-center gap-2 sm:gap-3 bg-slate-50 border border-slate-200 focus-within:border-[#e01a1b] focus-within:ring-2 focus-within:ring-[#e01a1b]/15 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all duration-200"
-                >
-                  <Search className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 shrink-0" />
-                  <input
-                    type="text"
-                    placeholder="Search for products, categories, brands..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="flex-1 text-sm sm:text-base font-medium outline-none bg-transparent text-slate-800 placeholder-slate-400"
-                    autoFocus
-                  />
-                  {searchQuery && (
-                    <button
-                      type="submit"
-                      className="bg-[#e01a1b] hover:bg-[#c01617] text-white px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-colors shrink-0"
-                    >
-                      Search
-                    </button>
-                  )}
+                {/* Smart search-as-you-type — suggestions, recent + popular searches,
+                    keyboard nav; Enter opens the full results page. */}
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="min-w-0 flex-1">
+                    <SearchAutocomplete
+                      variant="mobile"
+                      autoFocus
+                      popularSearches={popularSearches}
+                      onNavigate={() => setShowSearchModal(false)}
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowSearchModal(false)}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors shrink-0"
+                    className="mt-1.5 shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700"
                     aria-label="Close search"
                   >
-                    <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <X className="h-4 w-4 sm:h-5 sm:w-5" />
                   </button>
-                </form>
-                {!searchQuery && popularSearches.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-[11px] font-bold text-slate-500 mb-2.5 uppercase tracking-widest">
-                      Popular Searches
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {popularSearches.map((term) => (
-                        <button
-                          key={term}
-                          onClick={() => handleSearchShortcut(term)}
-                          className="px-3 py-1.5 bg-slate-50 hover:bg-[#e01a1b] hover:border-[#e01a1b] hover:text-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 transition-colors duration-200"
-                        >
-                          {term}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             </div>
           </div>
