@@ -99,6 +99,7 @@ function formatVendorLocation(city?: string | null, state?: string | null): stri
 
 interface RawVendor {
   id: string
+  vendorCode?: string | null
   companyName: string
   ownerName?: string | null
   businessEmail?: string | null
@@ -129,6 +130,7 @@ function transformVendor(v: RawVendor): Vendor {
 
   return {
     id: v.id,
+    vendorCode: v.vendorCode || undefined,
     name: v.companyName,
     location: formatVendorLocation(v.factoryCity, v.factoryState),
     submittedDate: v.submittedAt
@@ -666,7 +668,7 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
                           {vendor.name}
                         </p>
                         <p className="text-[10px] font-mono text-slate-400 mt-1 uppercase tracking-wider">
-                          VND-{vendor.id.substring(0, 8).toUpperCase()}
+                          {vendor.vendorCode || '—'}
                         </p>
                       </div>
                     </TableCell>

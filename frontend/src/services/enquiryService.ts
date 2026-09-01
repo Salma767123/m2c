@@ -19,7 +19,8 @@ export interface VendorEnquiry {
 export interface SubmitEnquiryData {
     name: string;
     companyName: string;
-    gstNumber: string;
+    vendorType?: 'REGISTERED' | 'UNREGISTERED';
+    gstNumber?: string;
     email: string;
     phone: string;
     website?: string;

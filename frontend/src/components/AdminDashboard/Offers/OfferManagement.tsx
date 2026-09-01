@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, Percent, Calendar, Tag, Loader2, X, ImageIcon, Upload, CheckCircle, Clock, XCircle, PauseCircle, PlayCircle } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Plus, Pencil, Trash2, Percent, Calendar, Tag, Loader2, X, ImageIcon, Upload, CheckCircle, Clock, XCircle, PauseCircle, PlayCircle, ChevronDown } from 'lucide-react'
 import { offerService, type Offer, type OfferInput, type OfferStatus } from '@/services/offerService'
 import { categoryService } from '@/services/categoryService'
 import { adminProductService, type AdminProduct } from '@/services/adminProductService'
@@ -9,6 +9,104 @@ import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import type { OfferType, OfferScope, OfferRegion } from '@/lib/offers'
 import Dropdown from '@/components/UI/Dropdown'
 import Pagination from '@/components/UI/Pagination'
+
+/**
+ * Multi-select category dropdown used by the product pickers — a button that opens
+ * a searchable checklist with a "Select all" row. Empty selection means "all".
+ */
+function CategoryMultiSelect({
+  categories,
+  selected,
+  onChange,
+  accent = 'red',
+}: {
+  categories: string[]
+  selected: string[]
+  onChange: (next: string[]) => void
+  accent?: 'red' | 'green'
+}) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  const accentCls = accent === 'green' ? 'accent-[#157f4a]' : 'accent-[#e01a1b]'
+  const filtered = categories.filter((c) => c.toLowerCase().includes(q.trim().toLowerCase()))
+  const allOn = filtered.length > 0 && filtered.every((c) => selected.includes(c))
+  const toggle = (c: string) =>
+    onChange(selected.includes(c) ? selected.filter((x) => x !== c) : [...selected, c])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => { setOpen((o) => !o); setQ('') }}
+        className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-left hover:border-gray-400 transition-colors"
+      >
+        <span className={selected.length ? 'text-gray-800' : 'text-gray-400'}>
+          {selected.length
+            ? `${selected.length} categor${selected.length === 1 ? 'y' : 'ies'} selected`
+            : `All categories (${categories.length})`}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+          <div className="p-2 border-b border-gray-100">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search categories…"
+              autoFocus
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-[#e01a1b]"
+            />
+          </div>
+          {filtered.length > 0 && (
+            <label className="flex items-center gap-2 px-3 py-2 text-sm border-b border-gray-100 bg-gray-50/70 hover:bg-gray-100 cursor-pointer">
+              <input
+                type="checkbox"
+                className={`w-4 h-4 rounded ${accentCls}`}
+                checked={allOn}
+                onChange={() =>
+                  onChange(
+                    allOn
+                      ? selected.filter((c) => !filtered.includes(c))
+                      : Array.from(new Set([...selected, ...filtered])),
+                  )
+                }
+              />
+              <span className="font-semibold text-gray-700">
+                {allOn ? 'Deselect all' : 'Select all'}{q ? ' (matching)' : ''}
+              </span>
+            </label>
+          )}
+          <div className="max-h-52 overflow-y-auto">
+            {filtered.map((c) => (
+              <label key={c} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className={`w-4 h-4 rounded ${accentCls}`}
+                  checked={selected.includes(c)}
+                  onChange={() => toggle(c)}
+                />
+                <span className="text-gray-700">{c}</span>
+              </label>
+            ))}
+            {filtered.length === 0 && <p className="px-3 py-2 text-xs text-gray-400">No categories found</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const TYPE_LABELS: Record<OfferType, string> = {
   PERCENTAGE: 'Percentage off',
@@ -326,12 +424,18 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
   const [products, setProducts] = useState<AdminProduct[]>([])
   const [productQuery, setProductQuery] = useState('')
   const [freeProductQuery, setFreeProductQuery] = useState('')
+  // Category filters for the two product pickers — narrow the product list to the
+  // chosen categories first, then pick products. Empty = all categories.
+  const [productCatFilter, setProductCatFilter] = useState<string[]>([])
+  const [freeProductCatFilter, setFreeProductCatFilter] = useState<string[]>([])
 
   const set = <K extends keyof OfferInput>(k: K, v: OfferInput[K]) => setForm((f) => ({ ...f, [k]: v }))
 
   // Load pickers lazily when either the BUY scope or the CROSS-BOGO FREE scope needs them.
-  const needsCategories = form.scope === 'CATEGORY' || form.freeScope === 'CATEGORY'
   const needsProducts = form.scope === 'PRODUCT' || form.freeScope === 'PRODUCT'
+  // The product pickers now offer a category filter, so categories are needed
+  // whenever products are — not only for the CATEGORY scope.
+  const needsCategories = form.scope === 'CATEGORY' || form.freeScope === 'CATEGORY' || needsProducts
   useEffect(() => {
     if (needsCategories && categories.length === 0) {
       categoryService
@@ -347,13 +451,20 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
     }
   }, [needsCategories, needsProducts, categories.length, products.length])
 
+  // Match on product name OR SKU, and narrow to the picker's category filter.
+  const matchProduct = (p: AdminProduct, q: string, cats: string[]) => {
+    if (cats.length > 0 && !cats.includes(p.category)) return false
+    const s = q.trim().toLowerCase()
+    if (!s) return true
+    return p.name.toLowerCase().includes(s) || String(p.baseSku || '').toLowerCase().includes(s)
+  }
   const filteredProducts = useMemo(
-    () => products.filter((p) => p.name.toLowerCase().includes(productQuery.toLowerCase())).slice(0, 60),
-    [products, productQuery]
+    () => products.filter((p) => matchProduct(p, productQuery, productCatFilter)).slice(0, 60),
+    [products, productQuery, productCatFilter]
   )
   const filteredFreeProducts = useMemo(
-    () => products.filter((p) => p.name.toLowerCase().includes(freeProductQuery.toLowerCase())).slice(0, 60),
-    [products, freeProductQuery]
+    () => products.filter((p) => matchProduct(p, freeProductQuery, freeProductCatFilter)).slice(0, 60),
+    [products, freeProductQuery, freeProductCatFilter]
   )
 
   const toggleId = (list: string[] | undefined, id: string): string[] => {
@@ -659,10 +770,18 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
                 {t === 'BOGO' ? (isCrossBogo ? 'Buy products' : 'Buy & free products (same item)') : 'Target products'}{' '}
                 <span className="text-xs text-gray-400">({(form.productIds || []).length} selected)</span>
               </label>
+
+              {/* Step 1 — pick categories to narrow the list (optional). */}
+              <p className="text-xs font-medium text-gray-500 mb-1">Filter by category</p>
+              <div className="mb-2">
+                <CategoryMultiSelect categories={categories} selected={productCatFilter} onChange={setProductCatFilter} accent="red" />
+              </div>
+
+              {/* Step 2 — pick products (from the filtered categories). */}
               <input
                 value={productQuery}
                 onChange={(e) => setProductQuery(e.target.value)}
-                placeholder="Search products…"
+                placeholder="Search by product name or SKU…"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:border-[#e01a1b]"
               />
               <div className="max-h-52 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
@@ -671,12 +790,19 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
                   return (
                     <label key={p.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
                       <input type="checkbox" checked={on} onChange={() => set('productIds', toggleId(form.productIds, p.id))} />
-                      <span className="text-gray-800">{p.name}</span>
-                      <span className="text-xs text-gray-400 ml-auto">{p.category}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-gray-800">{p.name}</span>
+                        {p.baseSku && <span className="block truncate text-[11px] font-mono text-gray-400">SKU: {p.baseSku}</span>}
+                      </span>
+                      <span className="text-xs text-gray-400 ml-auto shrink-0">{p.category}</span>
                     </label>
                   )
                 })}
-                {products.length === 0 && <div className="px-3 py-2 text-xs text-gray-400">Loading products…</div>}
+                {filteredProducts.length === 0 && (
+                  <div className="px-3 py-2 text-xs text-gray-400">
+                    {products.length === 0 ? 'Loading products…' : 'No products match your filters'}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -725,10 +851,18 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Free products <span className="text-xs text-gray-400">({(form.freeProductIds || []).length} selected)</span>
                   </label>
+
+                  {/* Step 1 — filter by category (optional). */}
+                  <p className="text-xs font-medium text-gray-500 mb-1">Filter by category</p>
+                  <div className="mb-2">
+                    <CategoryMultiSelect categories={categories} selected={freeProductCatFilter} onChange={setFreeProductCatFilter} accent="green" />
+                  </div>
+
+                  {/* Step 2 — pick products. */}
                   <input
                     value={freeProductQuery}
                     onChange={(e) => setFreeProductQuery(e.target.value)}
-                    placeholder="Search products…"
+                    placeholder="Search by product name or SKU…"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:border-[#157f4a]"
                   />
                   <div className="max-h-52 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100 bg-white">
@@ -737,12 +871,19 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
                       return (
                         <label key={p.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
                           <input type="checkbox" checked={on} onChange={() => set('freeProductIds', toggleId(form.freeProductIds, p.id))} />
-                          <span className="text-gray-800">{p.name}</span>
-                          <span className="text-xs text-gray-400 ml-auto">{p.category}</span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-gray-800">{p.name}</span>
+                            {p.baseSku && <span className="block truncate text-[11px] font-mono text-gray-400">SKU: {p.baseSku}</span>}
+                          </span>
+                          <span className="text-xs text-gray-400 ml-auto shrink-0">{p.category}</span>
                         </label>
                       )
                     })}
-                    {products.length === 0 && <div className="px-3 py-2 text-xs text-gray-400">Loading products…</div>}
+                    {filteredFreeProducts.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-gray-400">
+                        {products.length === 0 ? 'Loading products…' : 'No products match your filters'}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

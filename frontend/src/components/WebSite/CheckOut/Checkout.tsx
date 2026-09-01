@@ -16,6 +16,8 @@ import {
 } from "lucide-react"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
 import { formatPrice, getCurrency, getRegion, getRegionalPrice, getRegionalOriginalPrice, convertUSDtoINR, convertINRtoUSD } from '@/lib/currency'
+import { isIntrastate, gstRateRows } from '@/lib/gst'
+import { companyInfoService } from '@/services/companyInfoService'
 import { applyOfferToPrice, type ActiveOffer } from '@/lib/offers'
 import ShippingForm from "./CheckoutProcess/ShippingForm"
 import PaymentForm from "./CheckoutProcess/PaymentForm"
@@ -163,6 +165,16 @@ export default function Checkout() {
     discount: 0,
     total: 0
   })
+
+  // Admin/Company registered State = GST SUPPLIER state (place-of-supply split).
+  // Fetched from public company info; falls back to a single "Tax (GST)" row
+  // until it loads (and for any legacy config without a state set).
+  const [supplierLocation, setSupplierLocation] = useState<{ state: string | null; country: string | null }>({ state: null, country: null })
+  useEffect(() => {
+    companyInfoService.getPublicCompanyInfo()
+      .then((ci) => setSupplierLocation({ state: ci?.state ?? null, country: ci?.country ?? null }))
+      .catch(() => { /* keep fallback */ })
+  }, [])
 
   // Dynamic delivery estimate: the slowest line decides when the whole order lands.
   // Days come from each item's chosen transport (Air/Surface) in its logistics config;
@@ -499,6 +511,22 @@ export default function Checkout() {
     return offer ? applyOfferToPrice(base, offer, getCurrency(), item.quantity, convertINRtoUSD) : base
   }
 
+  // Rate-wise GST rows for the summary: CGST+SGST (intrastate) / IGST (interstate),
+  // bucketed by product rate. Until both the company state and the customer's
+  // chosen state are known, a neutral per-rate "GST" row is shown instead.
+  const gstLines = (() => {
+    if (getRegion() !== 'IN' || orderSummary.tax <= 0) return []
+    const lines = cartItems.map((item) => {
+      const gross = getItemPrice(item) * item.quantity
+      const couponShare = orderSummary.subtotal > 0 ? (gross / orderSummary.subtotal) * orderSummary.discount : 0
+      return { net: Math.max(0, gross - couponShare), rate: item.product?.gstPercentage || 0 }
+    })
+    const mode = (!supplierLocation.state || !formData.state)
+      ? 'COMBINED' as const
+      : (isIntrastate(supplierLocation.state, formData.state, supplierLocation.country, formData.country) ? 'INTRASTATE' as const : 'INTERSTATE' as const)
+    return gstRateRows(lines, mode)
+  })()
+
   // Automatic-offer celebration on the checkout page (gift box for BOGO, coin for
   // savings). Shares the sessionStorage guard with the cart so it fires only once
   // per offer-state across the two pages.
@@ -603,7 +631,9 @@ export default function Checkout() {
     // uses, so the tax shown here equals the tax the server will store.
     // GST on the POST-coupon net: allocate the coupon across lines in proportion
     // to their value and tax each net at its own rate, matching orderController.
-    const tax = cartItems.reduce((sum, item) => {
+    // Tax/GST applies ONLY on the `.in` storefront; 0 for `.com`/other regions
+    // (mirrors the server, which gates on the order currency).
+    const tax = getRegion() !== 'IN' ? 0 : cartItems.reduce((sum, item) => {
       const gross = r2line(getItemPrice(item) * item.quantity)
       const couponShare = subtotal > 0 ? (gross / subtotal) * discountAmount : 0
       const net = Math.max(0, gross - couponShare)
@@ -1387,15 +1417,23 @@ export default function Checkout() {
                   </div>
                 )}
 
-                <div className="flex items-center justify-between border-t border-dashed border-[#ece1d4] pt-2.5">
-                  <span className="text-[#6b625b]">Taxable amount</span>
-                  <span className="font-medium tabular-nums text-[#1a1a1a]">{formatPrice(Math.max(0, orderSummary.subtotal - couponDiscount))}</span>
-                </div>
+                {/* Taxable amount + Tax (GST) only on the `.in` storefront;
+                    hidden on `.com`/other regions where no tax is charged. */}
+                {getRegion() === 'IN' && (
+                  <>
+                    <div className="flex items-center justify-between border-t border-dashed border-[#ece1d4] pt-2.5">
+                      <span className="text-[#6b625b]">Taxable amount</span>
+                      <span className="font-medium tabular-nums text-[#1a1a1a]">{formatPrice(Math.max(0, orderSummary.subtotal - couponDiscount))}</span>
+                    </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-[#6b625b]">Tax (GST)</span>
-                  <span className="tabular-nums text-[#1a1a1a]">{formatPrice(orderSummary.tax)}</span>
-                </div>
+                    {gstLines.map((row) => (
+                      <div key={row.label} className="flex items-center justify-between">
+                        <span className="text-[#6b625b]">{row.label}</span>
+                        <span className="tabular-nums text-[#1a1a1a]">{formatPrice(row.amount)}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
 
                 <div className="flex items-center justify-between">
                   <span className="text-[#6b625b]">Delivery charges</span>
@@ -1427,9 +1465,11 @@ export default function Checkout() {
                     {formatPrice(orderSummary.total)}
                   </span>
                 </div>
-                <p className="mt-1.5 text-[11.5px] leading-snug text-white/55">
-                  Taxes are calculated based on applicable product tax rates.
-                </p>
+                {getRegion() === 'IN' && (
+                  <p className="mt-1.5 text-[11.5px] leading-snug text-white/55">
+                    Taxes are calculated based on applicable product tax rates.
+                  </p>
+                )}
                 {/*
                   Our Razorpay account settles in INR, so a USD order is
                   converted server-side before the payment is created.

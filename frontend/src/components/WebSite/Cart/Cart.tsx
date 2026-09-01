@@ -13,6 +13,9 @@ import { getRecentSearches, getRecentlyViewed } from "@/lib/browsingHistory"
 import { userAuthService } from "@/services/userAuthService"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, getCurrency, getRegion, convertINRtoUSD } from "@/lib/currency"
+import { isIntrastate, gstRateRows } from "@/lib/gst"
+import { companyInfoService } from "@/services/companyInfoService"
+import addressService from "@/services/addressService"
 import { applyOfferToPrice, type ActiveOffer } from "@/lib/offers"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
 import { courierName } from "@/lib/couriers"
@@ -345,6 +348,27 @@ export default function Order() {
   const [isHydrated, setIsHydrated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  // GST place-of-supply inputs: SUPPLIER = company registered state, PLACE OF
+  // SUPPLY = the customer's default saved address state. Used only on `.in` to
+  // split the tax into CGST+SGST / IGST; falls back to a combined "Tax (GST)"
+  // row until both are known.
+  const [gstSupplier, setGstSupplier] = useState<{ state: string | null; country: string | null }>({ state: null, country: null })
+  const [gstCustomer, setGstCustomer] = useState<{ state: string | null; country: string | null }>({ state: null, country: null })
+  useEffect(() => {
+    if (getRegion() !== 'IN') return
+    companyInfoService.getPublicCompanyInfo()
+      .then((ci) => setGstSupplier({ state: ci?.state ?? null, country: ci?.country ?? null }))
+      .catch(() => { /* keep fallback */ })
+  }, [])
+  useEffect(() => {
+    if (getRegion() !== 'IN' || !isAuthenticated) return
+    addressService.list()
+      .then((list) => {
+        const def = list.find((a) => a.isDefault) || list[0]
+        if (def) setGstCustomer({ state: def.state ?? null, country: (def as any).country ?? null })
+      })
+      .catch(() => { /* keep fallback */ })
+  }, [isAuthenticated])
   // Blocks the "Proceed to Checkout" click while the server re-validates the cart
   // (courier availability, shipping method, stock) so an invalid-but-selected
   // courier is caught HERE instead of after payment on the checkout page.
@@ -1094,7 +1118,9 @@ export default function Order() {
     // This mirrors the server (orderController) exactly, so the quoted tax equals
     // the charged tax. Product discounts / automatic offers are already inside
     // item.price, so they are taxed net too.
-    const tax = cartItems.reduce((sum, item) => {
+    // Tax/GST applies ONLY on the `.in` storefront. On `.com` and every other
+    // region tax is 0 (mirrors the server, which gates on the order currency).
+    const tax = getRegion() !== 'IN' ? 0 : cartItems.reduce((sum, item) => {
       const gross = item.price * item.quantity
       const couponShare = subtotal > 0 ? (gross / subtotal) * discount : 0
       const net = Math.max(0, gross - couponShare)
@@ -1108,6 +1134,22 @@ export default function Order() {
   }
 
   const summary = calculateSummary()
+
+  // GST breakup rows for the cart summary (IN only). Split when both the company
+  // state and the customer's default address state are known; otherwise show a
+  // single "Tax (GST)" row (place of supply is finalised at checkout).
+  const gstLines = (() => {
+    if (getRegion() !== 'IN' || summary.tax <= 0) return []
+    const lines = cartItems.map((i) => {
+      const gross = i.price * i.quantity
+      const couponShare = summary.subtotal > 0 ? (gross / summary.subtotal) * summary.discount : 0
+      return { net: Math.max(0, gross - couponShare), rate: i.gstPercentage || 0 }
+    })
+    const mode = (!gstSupplier.state || !gstCustomer.state)
+      ? 'COMBINED' as const
+      : (isIntrastate(gstSupplier.state, gstCustomer.state, gstSupplier.country, gstCustomer.country) ? 'INTRASTATE' as const : 'INTERSTATE' as const)
+    return gstRateRows(lines, mode)
+  })()
 
   // Rich, reconcilable savings breakdown for the Order Summary. Each line bridges
   // one step of the price ladder so the numbers add up top-to-bottom:
@@ -1741,18 +1783,25 @@ export default function Order() {
                       </div>
                     )}
 
-                    {/* Taxable amount = subtotal − all discounts (product, offer,
-                        coupon): the exact base GST is charged on. The coupon sits
-                        ABOVE this line because it reduces the taxable value. */}
-                    <div className="flex items-center justify-between border-t border-dashed border-[#ece1d4] pt-2.5">
-                      <span className="text-[#6b625b]">Taxable amount</span>
-                      <span className="font-medium tabular-nums text-[#1a1a1a]">{formatPrice(Math.max(0, summary.subtotal - couponDiscount))}</span>
-                    </div>
+                    {/* Taxable amount + Tax (GST) are shown ONLY on the `.in`
+                        storefront. On `.com`/other regions no tax is charged, so
+                        the whole tax block is hidden. Taxable amount = subtotal −
+                        all discounts (the coupon sits ABOVE, reducing the base). */}
+                    {getRegion() === 'IN' && (
+                      <>
+                        <div className="flex items-center justify-between border-t border-dashed border-[#ece1d4] pt-2.5">
+                          <span className="text-[#6b625b]">Taxable amount</span>
+                          <span className="font-medium tabular-nums text-[#1a1a1a]">{formatPrice(Math.max(0, summary.subtotal - couponDiscount))}</span>
+                        </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#6b625b]">Tax (GST)</span>
-                      <span className="tabular-nums text-[#1a1a1a]">{formatPrice(summary.tax)}</span>
-                    </div>
+                        {gstLines.map((row) => (
+                          <div key={row.label} className="flex items-center justify-between">
+                            <span className="text-[#6b625b]">{row.label}</span>
+                            <span className="tabular-nums text-[#1a1a1a]">{formatPrice(row.amount)}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
 
                     <div className="flex items-center justify-between">
                       <span className="text-[#6b625b]">Delivery charges</span>
@@ -1780,9 +1829,11 @@ export default function Order() {
                       <span className="text-[15px] font-semibold text-[#1a1a1a] sm:text-base">Total payable</span>
                       <span className="font-playfair text-[26px] font-bold tabular-nums text-[#1a1a1a] sm:text-[28px]">{formatPrice(summary.total)}</span>
                     </div>
-                    <p className="mt-1.5 text-[11.5px] leading-snug text-[#a1948a]">
-                      Taxes are calculated based on applicable product tax rates.
-                    </p>
+                    {getRegion() === 'IN' && (
+                      <p className="mt-1.5 text-[11.5px] leading-snug text-[#a1948a]">
+                        Taxes are calculated based on applicable product tax rates.
+                      </p>
+                    )}
                   </div>
 
                   {cartItems.some(needsTransportChoice) ? (

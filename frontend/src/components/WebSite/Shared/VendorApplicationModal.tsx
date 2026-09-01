@@ -7,6 +7,7 @@ import { showCenterNotice } from '@/components/UI/CenterNotice';
 import { enquiryService } from '@/services/enquiryService';
 
 const EMPTY = {
+  vendorType: 'REGISTERED' as 'REGISTERED' | 'UNREGISTERED',
   name: '',
   companyName: '',
   gstNumber: '',
@@ -117,6 +118,9 @@ export default function VendorApplicationModal({
    * speaks up once you try, and a six-field form should say where you are
    * while you are still inside it.
    */
+  // GST is only a required answer for a REGISTERED vendor; an unregistered vendor
+  // can apply without one.
+  const isRegistered = form.vendorType === 'REGISTERED';
   const filled = useMemo(() => ({
     name: form.name.trim() !== '',
     companyName: form.companyName.trim() !== '',
@@ -127,19 +131,30 @@ export default function VendorApplicationModal({
     phone: form.phone.trim() !== '',
   }), [form]);
 
-  const answeredCount = Object.values(filled).filter(Boolean).length;
-  const requiredCount = Object.keys(filled).length;
+  // GST counts toward the progress only when a registered vendor is applying.
+  const requiredKeys = (isRegistered
+    ? ['name', 'companyName', 'email', 'gstNumber', 'phone']
+    : ['name', 'companyName', 'email', 'phone']) as (keyof typeof filled)[];
+  const answeredCount = requiredKeys.filter((k) => filled[k]).length;
+  const requiredCount = requiredKeys.length;
   const readyToSend = answeredCount === requiredCount;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     setGstTouched(true);
-    if (!form.gstNumber) {
-      setGstError('GST Number is required');
-      return;
-    }
-    if (!GST_PATTERN.test(form.gstNumber)) {
+    if (isRegistered) {
+      // Registered vendor → GST is mandatory and must be valid.
+      if (!form.gstNumber) {
+        setGstError('GST Number is required');
+        return;
+      }
+      if (!GST_PATTERN.test(form.gstNumber)) {
+        setGstError(`GST Number must be exactly ${GST_LENGTH} alphanumeric characters`);
+        return;
+      }
+    } else if (form.gstNumber && !GST_PATTERN.test(form.gstNumber)) {
+      // Unregistered vendor → GST optional, but if they typed one it must be valid.
       setGstError(`GST Number must be exactly ${GST_LENGTH} alphanumeric characters`);
       return;
     }
@@ -149,7 +164,8 @@ export default function VendorApplicationModal({
       await enquiryService.submitEnquiry({
         name: form.name,
         companyName: form.companyName,
-        gstNumber: form.gstNumber,
+        vendorType: form.vendorType,
+        gstNumber: form.gstNumber || undefined,
         email: form.email,
         phone: form.phone,
         website: form.website || undefined,
@@ -322,7 +338,7 @@ export default function VendorApplicationModal({
                 id="vendor-application-title"
                 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl"
               >
-                Vendor Application
+                Join as a Vendor
               </h2>
               <p className="mt-0.5 text-[13px] text-[#5f5550]">Fill in your details to join our marketplace</p>
             </div>
@@ -375,6 +391,43 @@ export default function VendorApplicationModal({
               </div>
             </div>
 
+            {/* Registered vs unregistered — decides whether GST is mandatory. */}
+            <div className="mb-5">
+              <label className="mb-2 block text-[13px] font-semibold text-[#3d352f]">
+                Vendor type <span className="text-[#e01a1b]">*</span>
+              </label>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {([
+                  { value: 'REGISTERED', label: 'Registered vendor', hint: 'Has a GST number' },
+                  { value: 'UNREGISTERED', label: 'Unregistered vendor', hint: 'No GST number' },
+                ] as const).map((opt) => {
+                  const active = form.vendorType === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setForm((f) => ({ ...f, vendorType: opt.value }));
+                        if (opt.value === 'UNREGISTERED') { setGstError(''); setGstTouched(false); }
+                      }}
+                      className={`flex items-center justify-between gap-2 rounded-xl border px-4 py-3 text-left transition-all ${
+                        active ? 'border-[#e01a1b] bg-[#fdf1ef] ring-1 ring-[#e01a1b]/30' : 'border-[#e6dcd3] bg-white hover:border-[#e01a1b]/40'
+                      }`}
+                    >
+                      <span>
+                        <span className={`block text-sm font-semibold ${active ? 'text-[#c41617]' : 'text-[#3d352f]'}`}>{opt.label}</span>
+                        <span className="block text-[12px] text-[#a89a8d]">{opt.hint}</span>
+                      </span>
+                      <span className={`h-4 w-4 shrink-0 rounded-full border-2 ${active ? 'border-[#e01a1b] bg-[#e01a1b]' : 'border-[#cbbfb4]'}`} />
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-[12.5px] text-[#a89a8d]">
+                {isRegistered ? 'GST number is required for registered vendors.' : 'GST number is optional for unregistered vendors.'}
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div className="group">
                 <label htmlFor="vendor-name" className={LABEL_CLASS}>
@@ -419,7 +472,9 @@ export default function VendorApplicationModal({
 
               <div className="group">
                 <label htmlFor="vendor-gst" className={LABEL_CLASS}>
-                  GST Number <span className="text-[#e01a1b]">*</span>
+                  GST Number {isRegistered
+                    ? <span className="text-[#e01a1b]">*</span>
+                    : <span className="font-normal text-[#a89a8d]">(optional)</span>}
                 </label>
                 <div className="relative">
                   <FileText aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#c0b3a6]" />
@@ -427,7 +482,7 @@ export default function VendorApplicationModal({
                     type="text"
                     id="vendor-gst"
                     name="gstNumber"
-                    required
+                    required={isRegistered}
                     maxLength={GST_LENGTH}
                     value={form.gstNumber}
                     onChange={handleChange}

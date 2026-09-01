@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { Store, ArrowRight } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { showSuccessToast } from '@/lib/toast-utils'
 import LoginForm from './LoginForm'
@@ -126,6 +128,29 @@ export default function LoginRegister() {
                 </button>
               </>
             )}
+          </div>
+
+          {/* Vendor CTA — a separate path for sellers, not customers. Links to the
+              dedicated vendor registration form. */}
+          <div className="mt-5 sm:mt-6 rounded-2xl border border-[#f0e0da] bg-linear-to-br from-[#fdf6f4] to-white p-4 sm:p-5">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-[#e01a1b] to-[#c41617] text-white shadow-[0_8px_20px_-8px_rgba(224,26,27,0.7)]">
+                <Store className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-[#1a1a1a]">Want to sell on M2C?</p>
+                <p className="text-[13px] leading-snug text-[#7a6d62]">
+                  Reach thousands of buyers — register your business as a vendor.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/vendor/register"
+              className="group mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#e01a1b] py-2.5 text-sm font-semibold text-[#e01a1b] transition-colors hover:bg-[#e01a1b] hover:text-white"
+            >
+              Join as a Vendor
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
           </div>
         </Reveal>
       </div>

@@ -8,7 +8,8 @@ const { withRetry } = require('../utils/dbRetry');
 const { resolveUsdRate, toINR, resolveUnitPrice } = require('../utils/orderCurrency');
 const { evaluateCoupon } = require('../utils/couponPricing');
 const { calculateLogistics, convertShippingToOrderCurrency, qualifiesForFreeShipping } = require('../utils/logistics');
-const { isVisibleInRegion } = require('../utils/regionVisibility');
+const { isVisibleInRegion, normalizeRegion } = require('../utils/regionVisibility');
+const { isIntrastate, splitLineTax } = require('../utils/gst');
 const { isCourierAvailable } = require('../utils/couriers');
 const { applyBestOffer, qualifyingThresholdIds, qualifyingCrossBogo, offerAppliesToFreeSet } = require('../utils/offers');
 
@@ -133,6 +134,25 @@ const createOrder = async (req, res) => {
         // twin, and those must all share one rate for the order to be internally
         // consistent. Snapshotting also stops admin rate edits rewriting this order.
         const orderExchangeRate = currency === 'USD' ? await resolveUsdRate(prisma) : null;
+        // Customer GST/tax is charged ONLY on the `.in` storefront (currency INR).
+        // On `.com` and every other region tax is 0 and no tax line is shown. This
+        // gates the customer rate only — vendor settlement GST (below) is a separate
+        // payout tied to the vendor's GSTIN, not the storefront, and is unaffected.
+        const taxApplies = normalizeRegion(currency) === 'IN';
+
+        // GST place-of-supply split: SUPPLIER = the Admin/Company registered State,
+        // PLACE OF SUPPLY = the customer's shipping State. Same state -> intrastate
+        // (CGST+SGST); different -> interstate (IGST). Vendor/warehouse/hub location
+        // is deliberately NOT used. Only relevant when tax applies (`.in`).
+        let intrastate = false;
+        if (taxApplies) {
+            const company = await prisma.companyInfo.findFirst({ select: { state: true, country: true } });
+            intrastate = isIntrastate(
+                company?.state, shippingAddress?.state,
+                company?.country, shippingAddress?.country,
+            );
+        }
+
         let subtotal = 0;
         // Customer GST accumulated per line below. The client also sends a `tax`,
         // but it is advisory only — this server-side figure is what gets stored.
@@ -310,7 +330,7 @@ const createOrder = async (req, res) => {
             // coupon is known — otherwise GST would be charged on the pre-coupon
             // amount, over-charging the customer. Only the per-line RATE is frozen
             // now (stored on the order item), so the invoice can reproduce the split.
-            const customerGstRate = product.gstPercentage || 0;
+            const customerGstRate = taxApplies ? (product.gstPercentage || 0) : 0;
 
             // Shipping for this line, from the product's own logistics config.
             // Same calculator the storefront uses (utils/logistics.js is a port of
@@ -532,16 +552,28 @@ const createOrder = async (req, res) => {
         // Product-level discounts and automatic offers are already baked into each
         // line's price, so they are taxed net too. The VENDOR settlement tax above is
         // deliberately left on the vendor's own base — M2C's margin absorbs the coupon.
+        // Accumulate the tax, splitting each line into CGST/SGST (intrastate) or
+        // IGST (interstate) per its own product rate — products may differ.
+        let cgstTotal = 0, sgstTotal = 0, igstTotal = 0;
         for (const oi of orderItemsData) {
             const gross = oi.totalPrice;
             const couponShare = roundedSubtotal > 0 ? (gross / roundedSubtotal) * roundedDiscount : 0;
             const netTaxable = Math.max(0, gross - couponShare);
-            computedTax += round2(netTaxable * (oi.gstPercentage || 0) / 100);
+            const lineTax = round2(netTaxable * (oi.gstPercentage || 0) / 100);
+            computedTax += lineTax;
+            const split = splitLineTax(lineTax, intrastate);
+            cgstTotal += split.cgst;
+            sgstTotal += split.sgst;
+            igstTotal += split.igst;
         }
         // Server-computed GST wins over the client's figure. The client value is
         // only compared, so a genuine mismatch (stale cart price, tampering) is
         // visible in the logs instead of silently becoming the invoiced tax.
         const roundedTax = round2(computedTax);
+        const cgstAmount = round2(cgstTotal);
+        const sgstAmount = round2(sgstTotal);
+        const igstAmount = round2(igstTotal);
+        const taxType = roundedTax > 0 ? (intrastate ? 'INTRASTATE' : 'INTERSTATE') : null;
         const clientTax = round2(Number(tax) || 0);
         if (Math.abs(clientTax - roundedTax) > 0.01) {
             console.warn(
@@ -718,6 +750,12 @@ const createOrder = async (req, res) => {
                     subtotal: roundedSubtotal,
                     shippingCost: roundedShipping,
                     tax: roundedTax,
+                    // GST split (display) — total stays `tax`. Intrastate =>
+                    // cgst+sgst, interstate => igst. All 0 / null when no GST.
+                    cgstAmount,
+                    sgstAmount,
+                    igstAmount,
+                    taxType,
                     discount: roundedDiscount,
                     totalAmount,
                     couponCode: validatedCouponCode,

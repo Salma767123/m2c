@@ -7,6 +7,7 @@ import { useState, useEffect } from "react"
 import orderService, { Order } from "@/services/orderService"
 import { popRecentOrder } from "@/lib/recentOrder"
 import { formatPrice } from "@/lib/currency"
+import { orderGstRows } from "@/lib/gst"
 import { useSearchParams } from "next/navigation"
 import { getCountryName, getCountryFlag, getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants"
 import Reveal from "@/components/WebSite/Shared/Reveal"
@@ -369,14 +370,22 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between border-t border-dashed border-[#ece1d4] pt-2.5 text-[#5f5550]">
-                    <span>Taxable amount</span>
-                    <span className="font-medium tabular-nums text-[#3f3833]">{money(Math.max(0, order.subtotal - couponDiscount))}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[#5f5550]">
-                    <span>Tax (GST)</span>
-                    <span className="tabular-nums text-[#3f3833]">{money(order.tax)}</span>
-                  </div>
+                  {/* Tax shown only for the `.in` region (INR orders); `.com`
+                      and other regions carry no tax, so the block is hidden. */}
+                  {order.currency === 'INR' && (
+                    <>
+                      <div className="flex items-center justify-between border-t border-dashed border-[#ece1d4] pt-2.5 text-[#5f5550]">
+                        <span>Taxable amount</span>
+                        <span className="font-medium tabular-nums text-[#3f3833]">{money(Math.max(0, order.subtotal - couponDiscount))}</span>
+                      </div>
+                      {orderGstRows(order).map((row) => (
+                        <div key={row.label} className="flex items-center justify-between text-[#5f5550]">
+                          <span>{row.label}</span>
+                          <span className="tabular-nums text-[#3f3833]">{money(row.amount)}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
                   <div className="flex items-center justify-between text-[#5f5550]">
                     <span>Delivery charges</span>
                     {order.shippingCost > 0 ? (
@@ -412,9 +421,11 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
                       {payMeta.label}
                     </span>
                   </div>
-                  <p className="mt-2.5 text-[11.5px] leading-snug text-[#a89a8d]">
-                    Taxes are calculated based on applicable product tax rates.
-                  </p>
+                  {order.currency === 'INR' && (
+                    <p className="mt-2.5 text-[11.5px] leading-snug text-[#a89a8d]">
+                      Taxes are calculated based on applicable product tax rates.
+                    </p>
+                  )}
                 </div>
 
                 {/* Notification Settings */}

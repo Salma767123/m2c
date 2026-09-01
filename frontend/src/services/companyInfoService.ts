@@ -14,6 +14,9 @@ export interface CompanyInfo {
   businessRegistrationNumber?: string;
   taxId?: string;
   registeredAddress?: string;
+  addressLine2?: string;
+  addressLine3?: string;
+  landmark?: string;
   city?: string;
   state?: string;
   country?: string;
@@ -48,6 +51,9 @@ export interface UpdateLegalInfoData {
 
 export interface UpdateAddressData {
   registeredAddress?: string;
+  addressLine2?: string;
+  addressLine3?: string;
+  landmark?: string;
   city?: string;
   state?: string;
   country?: string;

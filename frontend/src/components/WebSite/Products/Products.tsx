@@ -92,6 +92,10 @@ const Products = () => {
   const subcategoryParam = searchParams.get('subcategory');
   const searchStringParam = searchParams.get('search');
   const collectionParam = searchParams.get('collection');
+  // Banner "product set" link: a comma-separated list of product slugs to show alone.
+  const productsParam = searchParams.get('products');
+  // Category names resolved from a multi-category banner link (?category=a,b,c).
+  const [multiCategoryNames, setMultiCategoryNames] = useState<string[]>([]);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,14 +158,21 @@ const Products = () => {
           setCategoriesList(categoriesResponse.data);
 
           if (categoryParam) {
-            const foundCategory = categoriesResponse.data.find(
-              (cat: any) => cat.slug.toLowerCase() === categoryParam.toLowerCase()
-            );
+            // A banner may target several categories at once → "?category=a,b,c".
+            const slugs = categoryParam.split(',').map((s) => s.trim()).filter(Boolean);
+            const matched = slugs
+              .map((slug) => categoriesResponse.data.find((cat: any) => cat.slug.toLowerCase() === slug.toLowerCase()))
+              .filter(Boolean) as any[];
 
-            if (foundCategory) {
-              setCategoryName(foundCategory.name);
-              setSelectedCategory(foundCategory.name);
-
+            if (matched.length > 1) {
+              // Multi-category: apply all of them via the API, leave the single
+              // sidebar category on "All" so it doesn't narrow further.
+              setMultiCategoryNames(matched.map((c) => c.name));
+              setCategoryName(matched.map((c) => c.name).join(', '));
+            } else if (matched.length === 1) {
+              setMultiCategoryNames([]);
+              setCategoryName(matched[0].name);
+              setSelectedCategory(matched[0].name);
               // A sub-category in the URL is intentionally NOT auto-applied as a
               // filter: landing shows the whole category, and the shopper narrows
               // it via the sidebar if they want. This avoids an empty result when
@@ -202,11 +213,19 @@ const Products = () => {
       try {
         setLoading(true);
 
+        // Banner-driven targeting: a specific product set, or several categories.
+        const productSet = productsParam ? productsParam.split(',').map((s) => s.trim()).filter(Boolean) : [];
+        const categoryFilter = multiCategoryNames.length > 1
+          ? multiCategoryNames.join(',')
+          : (selectedCategory !== 'All' ? selectedCategory : undefined);
+
         const params: Record<string, any> = {
           page: currentPage,
           limit: 12,
           search: searchTerm || undefined,
-          category: selectedCategory !== 'All' ? selectedCategory : undefined,
+          // A product-set link ignores category so it shows exactly those products.
+          category: productSet.length ? undefined : categoryFilter,
+          products: productSet.length ? productSet.join(',') : undefined,
           subCategory: selectedSubcategory || undefined,
           minPrice: priceRange.min > 0 ? priceRange.min : undefined,
           maxPrice: priceRange.max < 100000 ? priceRange.max : undefined,
@@ -246,7 +265,7 @@ const Products = () => {
     return () => {
       ignore = true;
     };
-  }, [currentPage, searchTerm, selectedCategory, selectedSubcategory, priceRange, sortBy, inStockOnly, selectedRating, selectedColors, selectedSizes, selectedMaterials, selectedFabricTypes, minDiscount, newArrivals, selectedCollection, searchStringParam]);
+  }, [currentPage, searchTerm, selectedCategory, selectedSubcategory, priceRange, sortBy, inStockOnly, selectedRating, selectedColors, selectedSizes, selectedMaterials, selectedFabricTypes, minDiscount, newArrivals, selectedCollection, searchStringParam, productsParam, multiCategoryNames]);
 
   // Keep the collection filter in sync when the ?collection= param changes while
   // already on this page (e.g. jumping between the home sections' "View All" links).

@@ -27,6 +27,7 @@ import {
   ClipboardCheck
 } from "lucide-react"
 import { formatPrice } from '@/lib/currency'
+import { orderGstRows } from '@/lib/gst'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { courierService } from "@/services/courierService"
 import { courierName, courierTrackingUrl } from "@/lib/couriers"
@@ -879,15 +880,23 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between border-t border-dashed border-slate-200 pt-2.5">
-                      <span className="text-slate-600">Taxable amount</span>
-                      <span className="font-medium tabular-nums text-slate-900">{money(Math.max(0, orderDetails.subtotal - couponDiscount))}</span>
-                    </div>
+                    {/* Tax shown only for the `.in` region (INR orders); hidden
+                        on `.com`/other regions which carry no tax. */}
+                    {orderDetails.currency === 'INR' && (
+                      <>
+                        <div className="flex items-center justify-between border-t border-dashed border-slate-200 pt-2.5">
+                          <span className="text-slate-600">Taxable amount</span>
+                          <span className="font-medium tabular-nums text-slate-900">{money(Math.max(0, orderDetails.subtotal - couponDiscount))}</span>
+                        </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Tax (GST)</span>
-                      <span className="tabular-nums text-slate-900">{money(orderDetails.tax)}</span>
-                    </div>
+                        {orderGstRows(orderDetails).map((row) => (
+                          <div key={row.label} className="flex items-center justify-between">
+                            <span className="text-slate-600">{row.label}</span>
+                            <span className="tabular-nums text-slate-900">{money(row.amount)}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
 
                     <div className="flex items-center justify-between">
                       <span className="text-slate-600">Delivery charges</span>
@@ -914,9 +923,11 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                       <span className="text-[15px] font-semibold text-slate-900 sm:text-base">Total payable</span>
                       <span className="text-2xl font-bold tabular-nums text-[#e01a1b]">{money(orderDetails.totalAmount)}</span>
                     </div>
-                    <p className="mt-1.5 text-[11.5px] leading-snug text-slate-400">
-                      Taxes are calculated based on applicable product tax rates.
-                    </p>
+                    {orderDetails.currency === 'INR' && (
+                      <p className="mt-1.5 text-[11.5px] leading-snug text-slate-400">
+                        Taxes are calculated based on applicable product tax rates.
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>

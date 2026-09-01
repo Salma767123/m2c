@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Upload, X, Image, Trash2, GripVertical, Plus, Eye, EyeOff, Info, Link2, Edit } from 'lucide-react';
+import { Save, Upload, X, Image, Trash2, GripVertical, Plus, Eye, EyeOff, Info, Link2, Edit, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '../../UI/Card';
 import Dropdown from '../../UI/Dropdown';
-import SearchableSelect, { SearchableOption } from '../../UI/SearchableSelect';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { bannerService, BannerImage, BannerLink, BANNER_LINK_ALL } from '@/services/bannerService';
 import { categoryService } from '@/services/categoryService';
@@ -24,6 +23,192 @@ const LINK_TYPE_OPTIONS = [
     { value: 'product', label: 'Product' },
     { value: 'category', label: 'Category' },
 ];
+
+type BLOption = { value: string; name: string; sku?: string; category?: string };
+
+// A button that opens a dropdown panel and closes on outside-click.
+function MiniDropdown({
+    open, setOpen, label, children,
+}: {
+    open: boolean; setOpen: (v: boolean) => void; label: React.ReactNode; children: React.ReactNode;
+}) {
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (!open) return;
+        const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+        document.addEventListener('mousedown', onDoc);
+        return () => document.removeEventListener('mousedown', onDoc);
+    }, [open, setOpen]);
+    return (
+        <div ref={ref} className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen(!open)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm text-left hover:border-slate-400 transition-colors"
+            >
+                <span className="truncate">{label}</span>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+                <div className="absolute z-30 mt-1 w-full min-w-[16rem] bg-white border border-slate-200 rounded-lg shadow-lg">
+                    {children}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/**
+ * Banner "Link to" selector — multi-select.
+ *   • Category → pick one or many categories (or "All categories"). Clicking the
+ *     banner opens /products filtered to those categories.
+ *   • Product  → first narrow by category, then pick one or many products (or "All
+ *     products"). Clicking opens /products filtered to those products.
+ * The selection is stored comma-joined in `value` (or the BANNER_LINK_ALL sentinel).
+ */
+function BannerLinkSelector({
+    type, setType, value, setValue, categories, products,
+}: {
+    type: 'none' | 'product' | 'category';
+    setType: (t: 'none' | 'product' | 'category') => void;
+    value: string;
+    setValue: (v: string) => void;
+    categories: BLOption[];
+    products: BLOption[];
+}) {
+    const isAll = value === BANNER_LINK_ALL;
+    const selected = !isAll && value ? value.split(',').map((s) => s.trim()).filter(Boolean) : [];
+
+    const [openTarget, setOpenTarget] = useState(false);
+    const [q, setQ] = useState('');
+    // Product mode: filter the product list by category first (UI only, not stored).
+    const [openCat, setOpenCat] = useState(false);
+    const [catQ, setCatQ] = useState('');
+    const [prodCatFilter, setProdCatFilter] = useState<string[]>([]); // category NAMES
+
+    const setSlugs = (ids: string[]) => setValue(ids.join(','));
+    const toggle = (slug: string) => {
+        const base = isAll ? [] : selected;
+        setSlugs(base.includes(slug) ? base.filter((x) => x !== slug) : [...base, slug]);
+    };
+
+    const s = q.trim().toLowerCase();
+    const filteredCats = categories.filter((c) => c.name.toLowerCase().includes(s));
+    const filteredProds = products.filter((p) =>
+        (prodCatFilter.length === 0 || (p.category && prodCatFilter.includes(p.category))) &&
+        (!s || p.name.toLowerCase().includes(s) || String(p.sku || '').toLowerCase().includes(s)),
+    );
+
+    const targetLabel = () => {
+        if (type === 'none') return null;
+        if (isAll) return type === 'product' ? 'All products' : 'All categories';
+        if (selected.length === 0) return <span className="text-slate-400">{type === 'product' ? 'Select products…' : 'Select categories…'}</span>;
+        if (selected.length === 1) {
+            const opt = (type === 'product' ? products : categories).find((o) => o.value === selected[0]);
+            return opt?.name || `1 ${type}`;
+        }
+        return `${selected.length} ${type === 'product' ? 'products' : 'categories'} selected`;
+    };
+
+    return (
+        <div>
+            <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1.5">
+                <Link2 className="h-4 w-4 text-slate-400" /> Link to (optional)
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                    <Dropdown
+                        value={type}
+                        options={LINK_TYPE_OPTIONS}
+                        onChange={(v) => { setType(v as 'none' | 'product' | 'category'); setValue(''); setProdCatFilter([]); setQ(''); }}
+                        buttonClassName="py-2 rounded-lg text-sm"
+                    />
+                </div>
+
+                {/* Product mode: category filter (narrows the product list). */}
+                {type === 'product' && (
+                    <MiniDropdown
+                        open={openCat}
+                        setOpen={(v) => { setOpenCat(v); setCatQ(''); }}
+                        label={<span className={prodCatFilter.length ? 'text-slate-800' : 'text-slate-400'}>
+                            {prodCatFilter.length ? `${prodCatFilter.length} categor${prodCatFilter.length === 1 ? 'y' : 'ies'}` : 'Filter by category'}
+                        </span>}
+                    >
+                        <div className="p-2 border-b border-slate-100">
+                            <input value={catQ} onChange={(e) => setCatQ(e.target.value)} placeholder="Search categories…" autoFocus
+                                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-[#e01a1b]" />
+                        </div>
+                        <div className="max-h-52 overflow-y-auto">
+                            {categories.filter((c) => c.name.toLowerCase().includes(catQ.trim().toLowerCase())).map((c) => {
+                                const on = prodCatFilter.includes(c.name);
+                                return (
+                                    <label key={c.value} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer">
+                                        <input type="checkbox" className="w-4 h-4 rounded accent-[#e01a1b]" checked={on}
+                                            onChange={() => setProdCatFilter(on ? prodCatFilter.filter((x) => x !== c.name) : [...prodCatFilter, c.name])} />
+                                        <span className="text-slate-700">{c.name}</span>
+                                    </label>
+                                );
+                            })}
+                            {categories.length === 0 && <p className="px-3 py-2 text-xs text-slate-400">No categories</p>}
+                        </div>
+                    </MiniDropdown>
+                )}
+
+                {/* Target multi-select (categories or products). */}
+                {type !== 'none' && (
+                    <div className={type === 'product' ? '' : 'sm:col-span-2'}>
+                        <MiniDropdown open={openTarget} setOpen={(v) => { setOpenTarget(v); setQ(''); }} label={targetLabel()}>
+                            <div className="p-2 border-b border-slate-100">
+                                <input value={q} onChange={(e) => setQ(e.target.value)} autoFocus
+                                    placeholder={type === 'product' ? 'Search by name or SKU…' : 'Search by name…'}
+                                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-[#e01a1b]" />
+                            </div>
+                            {/* All … row (exclusive). */}
+                            <label className="flex items-center gap-2 px-3 py-2 text-sm border-b border-slate-100 bg-slate-50/70 hover:bg-slate-100 cursor-pointer">
+                                <input type="checkbox" className="w-4 h-4 rounded accent-[#e01a1b]" checked={isAll}
+                                    onChange={() => setValue(isAll ? '' : BANNER_LINK_ALL)} />
+                                <span className="font-semibold text-slate-700">{type === 'product' ? 'All products' : 'All categories'}</span>
+                            </label>
+                            <div className="max-h-52 overflow-y-auto">
+                                {type === 'category'
+                                    ? filteredCats.map((c) => {
+                                        const on = !isAll && selected.includes(c.value);
+                                        return (
+                                            <label key={c.value} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer">
+                                                <input type="checkbox" className="w-4 h-4 rounded accent-[#e01a1b]" checked={on} onChange={() => toggle(c.value)} />
+                                                <span className="text-slate-700">{c.name}</span>
+                                            </label>
+                                        );
+                                    })
+                                    : filteredProds.map((p) => {
+                                        const on = !isAll && selected.includes(p.value);
+                                        return (
+                                            <label key={p.value} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer">
+                                                <input type="checkbox" className="w-4 h-4 rounded accent-[#e01a1b] shrink-0" checked={on} onChange={() => toggle(p.value)} />
+                                                <span className="min-w-0">
+                                                    <span className="block truncate text-slate-800">{p.name}</span>
+                                                    {p.sku && <span className="block truncate text-[11px] font-mono text-slate-400">SKU: {p.sku}</span>}
+                                                </span>
+                                                {p.category && <span className="ml-auto text-xs text-slate-400 shrink-0">{p.category}</span>}
+                                            </label>
+                                        );
+                                    })}
+                                {(type === 'category' ? filteredCats.length : filteredProds.length) === 0 && (
+                                    <p className="px-3 py-2 text-xs text-slate-400">No {type === 'product' ? 'products' : 'categories'} found</p>
+                                )}
+                            </div>
+                        </MiniDropdown>
+                    </div>
+                )}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+                {type === 'none'
+                    ? 'This banner is not clickable.'
+                    : `Clicking opens the ${type === 'product' ? 'selected products' : 'selected categories'} on the storefront. Leave the target empty to keep it non-clickable.`}
+            </p>
+        </div>
+    );
+}
 
 export default function BannerSettingsTab() {
     const canManage = hasPermission('settings:edit');
@@ -48,35 +233,23 @@ export default function BannerSettingsTab() {
 
     // Click-through link options (loaded once) + the current form selections.
     // linkValue holds the target's slug (product route accepts slug or id).
-    const [linkProducts, setLinkProducts] = useState<{ value: string; name: string; sku?: string }[]>([]);
+    const [linkProducts, setLinkProducts] = useState<{ value: string; name: string; sku?: string; category?: string }[]>([]);
     const [linkCategories, setLinkCategories] = useState<{ value: string; name: string }[]>([]);
     const [newLinkType, setNewLinkType] = useState<'none' | 'product' | 'category'>('none');
     const [newLinkValue, setNewLinkValue] = useState('');
     const [editLinkType, setEditLinkType] = useState<'none' | 'product' | 'category'>('none');
     const [editLinkValue, setEditLinkValue] = useState('');
 
-    // Human label for a chosen link value (handles the "All …" sentinel + specific items).
+    // Human label for a chosen link value (handles the "All …" sentinel, a single
+    // item, or a comma-joined set → "N products" / "N categories").
     const linkLabelFor = (type: 'product' | 'category', value: string): string | undefined => {
         if (value === BANNER_LINK_ALL) return type === 'product' ? 'All products' : 'All categories';
-        return (type === 'product' ? linkProducts : linkCategories).find((o) => o.value === value)?.name;
-    };
-
-    // Options for the searchable target dropdown: an "All …" entry pinned on top,
-    // then every product (searchable by name + SKU) / category (by name).
-    const targetOptions = (type: 'none' | 'product' | 'category'): SearchableOption[] => {
-        if (type === 'product') {
-            return [
-                { value: BANNER_LINK_ALL, label: 'All products', pinned: true },
-                ...linkProducts.map((p) => ({ value: p.value, label: p.name, keywords: p.sku, hint: p.sku ? `SKU: ${p.sku}` : undefined })),
-            ];
-        }
-        if (type === 'category') {
-            return [
-                { value: BANNER_LINK_ALL, label: 'All categories', pinned: true },
-                ...linkCategories.map((c) => ({ value: c.value, label: c.name })),
-            ];
-        }
-        return [];
+        const src = type === 'product' ? linkProducts : linkCategories;
+        const slugs = value.split(',').map((s) => s.trim()).filter(Boolean);
+        const names = slugs.map((s) => src.find((o) => o.value === s)?.name).filter(Boolean) as string[];
+        if (names.length === 0) return undefined;
+        if (names.length === 1) return names[0];
+        return `${names.length} ${type === 'product' ? 'products' : 'categories'}`;
     };
 
     // Turn the form selections into the payload the service expects (+ cache the label).
@@ -101,7 +274,7 @@ export default function BannerSettingsTab() {
                 (catRes.data || []).map((c: any) => ({ value: c.slug, name: c.name })).filter((o: any) => o.value)
             );
             setLinkProducts(
-                (prodRes.data?.products || []).map((p: any) => ({ value: p.slug || p.id, name: p.name, sku: p.baseSku }))
+                (prodRes.data?.products || []).map((p: any) => ({ value: p.slug || p.id, name: p.name, sku: p.baseSku, category: p.category }))
             );
         } catch (error) {
             // Non-fatal: the link dropdowns just stay empty.
@@ -308,46 +481,6 @@ export default function BannerSettingsTab() {
         );
     }
 
-    // Shared "Link to" selector, reused by the add and edit forms.
-    const renderLinkSelector = (
-        type: 'none' | 'product' | 'category',
-        setType: (t: 'none' | 'product' | 'category') => void,
-        value: string,
-        setValue: (v: string) => void
-    ) => {
-        return (
-            <div>
-                <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1.5">
-                    <Link2 className="h-4 w-4 text-slate-400" /> Link to (optional)
-                </label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                    <div className="sm:w-40">
-                        <Dropdown
-                            value={type}
-                            options={LINK_TYPE_OPTIONS}
-                            onChange={(v) => { setType(v as 'none' | 'product' | 'category'); setValue(''); }}
-                            buttonClassName="py-2 rounded-lg text-sm"
-                        />
-                    </div>
-                    {type !== 'none' && (
-                        <div className="flex-1 min-w-0">
-                            <SearchableSelect
-                                value={value}
-                                options={targetOptions(type)}
-                                placeholder={`Select a ${type}…`}
-                                searchPlaceholder={type === 'product' ? 'Search by name or SKU…' : 'Search by name…'}
-                                onChange={(v) => setValue(v)}
-                                buttonClassName="py-2 rounded-lg text-sm"
-                            />
-                        </div>
-                    )}
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                    Clicking this banner on the website opens the selected page.
-                </p>
-            </div>
-        );
-    };
 
     return (
         <div className="space-y-6">
@@ -451,55 +584,28 @@ export default function BannerSettingsTab() {
                             </div>
                         </div>
 
-                        {/* Alt text + click-through link — one balanced 3-column row */}
-                        <div>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                {/* Alt Text */}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                                        Alt Text (for accessibility)
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={newAltText}
-                                        onChange={(e) => setNewAltText(e.target.value)}
-                                        placeholder="Describe the banner image..."
-                                        className="w-full h-10 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm"
-                                    />
-                                </div>
-
-                                {/* Link type */}
-                                <div>
-                                    <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1">
-                                        <Link2 className="h-4 w-4 text-slate-400" /> Link to
-                                    </label>
-                                    <Dropdown
-                                        value={newLinkType}
-                                        options={LINK_TYPE_OPTIONS}
-                                        onChange={(v) => { setNewLinkType(v as 'none' | 'product' | 'category'); setNewLinkValue(''); }}
-                                        buttonClassName="py-2 rounded-lg text-sm"
-                                    />
-                                </div>
-
-                                {/* Link target */}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                                        {newLinkType === 'category' ? 'Category' : newLinkType === 'product' ? 'Product' : 'Target'}
-                                    </label>
-                                    <SearchableSelect
-                                        value={newLinkValue}
-                                        options={targetOptions(newLinkType)}
-                                        placeholder={newLinkType === 'none' ? 'Pick a link type first' : `Select a ${newLinkType}…`}
-                                        searchPlaceholder={newLinkType === 'product' ? 'Search by name or SKU…' : 'Search by name…'}
-                                        disabled={newLinkType === 'none'}
-                                        onChange={(v) => setNewLinkValue(v)}
-                                        buttonClassName="py-2 rounded-lg text-sm"
-                                    />
-                                </div>
+                        {/* Alt text + click-through link */}
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                    Alt Text (for accessibility)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={newAltText}
+                                    onChange={(e) => setNewAltText(e.target.value)}
+                                    placeholder="Describe the banner image..."
+                                    className="w-full h-10 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm"
+                                />
                             </div>
-                            <p className="text-xs text-slate-500 mt-1.5">
-                                Clicking this banner on the website opens the selected page.
-                            </p>
+                            <BannerLinkSelector
+                                type={newLinkType}
+                                setType={setNewLinkType}
+                                value={newLinkValue}
+                                setValue={setNewLinkValue}
+                                categories={linkCategories}
+                                products={linkProducts}
+                            />
                         </div>
 
                         {/* Submit Button */}
@@ -582,7 +688,14 @@ export default function BannerSettingsTab() {
                                                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 text-sm"
                                                     />
                                                     <p className="text-xs text-slate-400">Click the image to replace it</p>
-                                                    {renderLinkSelector(editLinkType, setEditLinkType, editLinkValue, setEditLinkValue)}
+                                                    <BannerLinkSelector
+                                                        type={editLinkType}
+                                                        setType={setEditLinkType}
+                                                        value={editLinkValue}
+                                                        setValue={setEditLinkValue}
+                                                        categories={linkCategories}
+                                                        products={linkProducts}
+                                                    />
                                                     <div className="flex gap-2">
                                                         <button
                                                             onClick={() => handleUpdateBanner(banner.id)}

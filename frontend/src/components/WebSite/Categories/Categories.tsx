@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Package, Search, MessageCircle, ArrowRight, Headphones } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { categoryService } from '@/services/categoryService';
 import Reveal from '@/components/WebSite/Shared/Reveal';
 import CategoryHero from '@/components/WebSite/Shared/CategoryHero';
@@ -21,6 +22,11 @@ interface Category {
 }
 
 export default function Categories() {
+  const searchParams = useSearchParams();
+  // A category banner that targets several categories links here as
+  // "?only=slug-a,slug-b" — the page then lists just those categories.
+  const onlyParam = searchParams.get('only');
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,12 +40,15 @@ export default function Categories() {
           sortBy: 'sortOrder',
           sortOrder: 'asc'
         });
-        
-        console.log('Categories response:', response);
-        
+
         if (response.success && response.data) {
-          console.log('Categories data:', response.data);
-          setCategories(response.data);
+          const onlySlugs = onlyParam
+            ? onlyParam.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+            : [];
+          const data = onlySlugs.length
+            ? response.data.filter((c: Category) => onlySlugs.includes(String(c.slug).toLowerCase()))
+            : response.data;
+          setCategories(data);
         } else {
           setError('Failed to load categories');
         }
@@ -52,7 +61,7 @@ export default function Categories() {
     };
 
     fetchCategories();
-  }, []);
+  }, [onlyParam]);
 
   if (loading) {
     /* Skeleton mirrors the loaded page (banner + intro + category grid). */

@@ -2,6 +2,8 @@
 
 export interface Vendor {
   id: string
+  /** Human-readable vendor code (VND-YYYY-NNNN), from the backend. */
+  vendorCode?: string
   name: string
   location: string
   submittedDate?: string

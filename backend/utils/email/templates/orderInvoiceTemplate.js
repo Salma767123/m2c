@@ -11,6 +11,7 @@
 
 const { Country, State } = require('country-state-city');
 const { parsePhoneNumberFromString } = require('libphonenumber-js');
+const { uniformGstRate, withPct, orderGstRateRows } = require('../../gst');
 
 // Escape user-supplied strings before interpolating into the invoice HTML.
 // Defense-in-depth: customerName / recipient / address / item fields all flow from
@@ -97,6 +98,10 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
     subtotal = 0,
     shippingCost = 0,
     tax = 0,
+    cgstAmount = 0,
+    sgstAmount = 0,
+    igstAmount = 0,
+    taxType = null,
     discount = 0,
     totalAmount = 0,
     paymentMethod,
@@ -137,8 +142,10 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
   const sym = invoiceCurrency === 'INR' ? '₹' : '$';
 
   // A GST-registered seller must head the document "TAX INVOICE" (standard
-  // practice); without a GSTIN it's a plain commercial invoice.
-  const invoiceTitle = gstNumber ? 'TAX INVOICE' : 'INVOICE';
+  // practice); without a GSTIN it's a plain commercial invoice. Tax only applies
+  // on the `.in` region (INR orders), so non-INR invoices are always plain
+  // "INVOICE" even if the seller has a GSTIN.
+  const invoiceTitle = (gstNumber && invoiceCurrency === 'INR') ? 'TAX INVOICE' : 'INVOICE';
 
   const fmt = (n) =>
     Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -172,7 +179,8 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
   ].filter(Boolean).join('\n');
 
   const payStatusColor = paymentStatus === 'PAID' ? '#16a34a' : '#dc2626';
-  const payStatusLabel = paymentStatus === 'PAID' ? 'PAID' : paymentStatus;
+  // On a paid invoice, show the amount alongside the badge (e.g. "PAID · ₹1,669.95").
+  const payStatusLabel = paymentStatus === 'PAID' ? `PAID · ${sym}${fmt(totalAmount)}` : paymentStatus;
 
   // Per-line tax breakdown using each line's OWN GST rate (frozen on the order
   // item at checkout, or backfilled from the product before this template runs),
@@ -182,6 +190,11 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
   // Amount" = net + line tax.
   const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
   const fallbackRate = subtotal > 0 ? (tax / subtotal) * 100 : 0; // percent
+  // Same place-of-supply mode as the summary: intrastate => CGST+SGST per line,
+  // interstate => IGST per line.
+  const lineIntrastate = !(taxType === 'INTERSTATE' || (Number(igstAmount) || 0) > 0);
+  const rl = (p) => `${parseFloat(Number(p).toFixed(2))}%`;
+  const stack = (a, b) => `<div>${a}</div><div style="margin-top:4px;">${b}</div>`;
 
   // A coupon reduces the taxable value (GST is charged on the post-coupon net).
   // Re-derive the identical per-line split the order used: allocate the discount
@@ -196,8 +209,22 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
     const ratePct = item.gstPercentage != null ? Number(item.gstPercentage) : fallbackRate;
     const lineTax = round2(net * ratePct / 100);
     const lineTotal = round2(net + lineTax);
-    const rateLabel = ratePct > 0 ? `${ratePct.toFixed(2).replace(/\.00$/, '')}%` : '—';
-    const typeLabel = ratePct > 0 ? (gstNumber ? 'GST' : 'Tax') : '—';
+
+    // Per-line tax columns, split by place of supply (CGST+SGST or IGST).
+    let typeCell, rateCell, amtCell;
+    if (ratePct <= 0 || lineTax <= 0) {
+      typeCell = rateCell = amtCell = '—';
+    } else if (lineIntrastate) {
+      const cgst = round2(lineTax / 2);
+      const sgst = round2(lineTax - cgst);
+      typeCell = stack('CGST', 'SGST');
+      rateCell = stack(rl(ratePct / 2), rl(ratePct / 2));
+      amtCell = stack(`${sym}${fmt(cgst)}`, `${sym}${fmt(sgst)}`);
+    } else {
+      typeCell = 'IGST';
+      rateCell = rl(ratePct);
+      amtCell = `${sym}${fmt(lineTax)}`;
+    }
     return `
         <tr>
             <td style="${cellBase}">
@@ -208,9 +235,9 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
             <td style="${cellBase} text-align:right;">${sym}${fmt(item.unitPrice)}</td>
             <td style="${cellBase} text-align:center;">${item.quantity}</td>
             <td style="${cellBase} text-align:right;">${sym}${fmt(net)}</td>
-            <td style="${cellBase} text-align:center; color:#6b7280;">${typeLabel}</td>
-            <td style="${cellBase} text-align:center; color:#6b7280;">${rateLabel}</td>
-            <td style="${cellBase} text-align:right;">${lineTax > 0 ? `${sym}${fmt(lineTax)}` : '—'}</td>
+            <td style="${cellBase} text-align:center; color:#6b7280;">${typeCell}</td>
+            <td style="${cellBase} text-align:center; color:#6b7280;">${rateCell}</td>
+            <td style="${cellBase} text-align:right;">${amtCell}</td>
             <td style="${cellBase} text-align:right; font-weight:700; color:#1a1a1a;">${sym}${fmt(lineTotal)}</td>
         </tr>
     `;
@@ -235,7 +262,26 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
     summaryRow('Subtotal', `${sym}${fmt(subtotal)}`),
     discount > 0 ? summaryRow('Discount', `− ${sym}${fmt(discount)}`, { color: '#16a34a' }) : '',
     discount > 0 ? summaryRow('Taxable amount', `${sym}${fmt(taxableAmount)}`) : '',
-    tax > 0 ? summaryRow(gstNumber ? 'Tax (GST)' : 'Tax', `${sym}${fmt(tax)}`) : '',
+    // GST breakup: interstate => IGST, intrastate => CGST + SGST. Falls back to a
+    // single "Tax" row for legacy orders that predate the split (no taxType).
+    ...(() => {
+      if (tax <= 0) return [];
+      // GST-compliant rate-wise breakup (one CGST+SGST / IGST pair per rate).
+      const rows = orderGstRateRows({ tax, taxType, igstAmount, subtotal, discount, items });
+      if (rows.length) return rows.map((r) => summaryRow(r.label, `${sym}${fmt(r.amount)}`));
+      // Legacy fallback (items without per-line rate) — order-level split.
+      if (taxType === 'INTERSTATE' || igstAmount > 0) {
+        return [summaryRow(withPct('IGST', uniformGstRate(items)), `${sym}${fmt(igstAmount || tax)}`)];
+      }
+      if (taxType === 'INTRASTATE' || cgstAmount > 0 || sgstAmount > 0) {
+        const half = uniformGstRate(items); const h = half != null ? half / 2 : null;
+        return [
+          summaryRow(withPct('CGST', h), `${sym}${fmt(cgstAmount)}`),
+          summaryRow(withPct('SGST', h), `${sym}${fmt(sgstAmount)}`),
+        ];
+      }
+      return [summaryRow(withPct(gstNumber ? 'Tax (GST)' : 'Tax', uniformGstRate(items)), `${sym}${fmt(tax)}`)];
+    })(),
     summaryRow('Shipping', shippingCost > 0 ? `${sym}${fmt(shippingCost)}` : 'Free'),
   ].join('');
 
