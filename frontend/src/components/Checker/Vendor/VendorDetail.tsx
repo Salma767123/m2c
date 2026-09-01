@@ -1257,6 +1257,9 @@ export default function VendorDetail({
             <div>
               <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Vendor</p>
               <p className="font-semibold text-slate-900">{companyName}</p>
+              {fullVendor?.vendorCode && (
+                <p className="mt-0.5 font-mono text-[11px] uppercase tracking-wider text-slate-400">{fullVendor.vendorCode}</p>
+              )}
             </div>
           </div>
 
