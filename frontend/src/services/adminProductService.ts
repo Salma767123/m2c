@@ -10,6 +10,7 @@ export interface AdminProduct {
   originalPrice?: number;
   discount?: number;
   gstPercentage?: number;
+  hsnCode?: string;
   adminFixedPrice?: number; // Admin's fixed price (separate from basePrice)
   singleUnitSize?: string;
   singleUnitColor?: string;

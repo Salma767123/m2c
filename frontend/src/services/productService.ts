@@ -18,6 +18,7 @@ export interface ProductFormData {
   originalPrice?: number;
   discount?: number;
   gstPercentage?: number;
+  hsnCode?: string;
   // Vendor payout economics (attached by the backend on vendor-facing responses only).
   // What the vendor is actually paid: GST on their base price, and the per-unit total.
   vendorGstRate?: number;

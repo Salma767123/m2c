@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Save, RefreshCw, CalendarClock, CalendarCheck, AlertTriangle, CheckCircle } from "lucide-react";
+import { Save, RefreshCw, CalendarClock, CalendarCheck, AlertTriangle, CheckCircle, ImageIcon, Upload, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/UI/Card";
+import ImageCropModal from "@/components/UI/ImageCropModal";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { invoiceSettingsService, InvoiceSettingsData } from "@/services/invoiceSettingsService";
 import { hasPermission } from "@/lib/auth";
@@ -72,6 +73,9 @@ export default function InvoiceSettings() {
     // Local FY anchor state (auto mode)
     const [fyMonth, setFyMonth] = useState(4); // April default
     const [fyDay, setFyDay] = useState(1);
+    // Invoice logo crop-then-upload flow.
+    const [cropSrc, setCropSrc] = useState<string | null>(null);
+    const [cropFileName, setCropFileName] = useState("");
 
     // ── Fetch ────────────────────────────────────────────────────────────────
     const fetchSettings = useCallback(async () => {
@@ -119,6 +123,8 @@ export default function InvoiceSettings() {
                 currentSequence: Number(settings.currentSequence),
                 autoFinancialYear: settings.autoFinancialYear,
                 formatTemplate: settings.formatTemplate,
+                // URL passes through; a fresh data URI uploads; "" clears it.
+                invoiceLogo: settings.invoiceLogo ?? '',
             };
 
             if (settings.autoFinancialYear) {
@@ -140,6 +146,26 @@ export default function InvoiceSettings() {
         } finally {
             setSaving(false);
         }
+    };
+
+    // ── Invoice logo: pick → crop → set as data URI (uploaded to Cloudinary on Save) ──
+    const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) { showErrorToast("Invalid file", "Please choose an image."); return; }
+        if (file.size > 5 * 1024 * 1024) { showErrorToast("Too large", "Image must be under 5MB."); return; }
+        setCropFileName(file.name);
+        setCropSrc(URL.createObjectURL(file));
+        e.target.value = ""; // allow re-selecting the same file
+    };
+
+    const handleLogoCropped = (croppedFile: File) => {
+        const reader = new FileReader();
+        reader.onloadend = () => setSettings((s) => (s ? { ...s, invoiceLogo: reader.result as string } : s));
+        reader.readAsDataURL(croppedFile);
+        if (cropSrc?.startsWith("blob:")) URL.revokeObjectURL(cropSrc);
+        setCropSrc(null);
+        setCropFileName("");
     };
 
     // ── Invoice number preview ────────────────────────────────────────────────
@@ -277,6 +303,53 @@ export default function InvoiceSettings() {
                         <p className="text-xs text-slate-500 mt-1">
                             Auto-incremented with each invoice. Resets to 1 at financial year rollover.
                         </p>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* ── Invoice Logo ── */}
+            <Card>
+                <CardContent className="p-6">
+                    <div className="mb-1 flex items-center gap-2">
+                        <ImageIcon className="w-5 h-5 text-[#e01a1b]" />
+                        <h2 className="text-lg font-bold text-slate-900">Invoice Logo</h2>
+                    </div>
+                    <p className="text-sm text-slate-500 mb-5">
+                        Shown on every invoice. If not set, the company logo is used.
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-5">
+                        <div className="flex h-24 w-40 items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50">
+                            {settings.invoiceLogo ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={settings.invoiceLogo} alt="Invoice logo" className="max-h-full max-w-full object-contain" />
+                            ) : (
+                                <span className="flex flex-col items-center gap-1 text-slate-400">
+                                    <ImageIcon className="h-6 w-6" />
+                                    <span className="text-[11px]">No logo</span>
+                                </span>
+                            )}
+                        </div>
+
+                        {hasPermission("settings:edit") && (
+                            <div className="flex flex-col gap-2">
+                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-[#e01a1b] hover:text-[#e01a1b]">
+                                    <Upload className="h-4 w-4" />
+                                    {settings.invoiceLogo ? "Replace logo" : "Upload logo"}
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleLogoSelect} />
+                                </label>
+                                {settings.invoiceLogo && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSettings((s) => (s ? { ...s, invoiceLogo: "" } : s))}
+                                        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-[#e01a1b]"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" /> Remove
+                                    </button>
+                                )}
+                                <p className="text-xs text-slate-400">PNG or JPG · crop after selecting · saved on “Save Settings”.</p>
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -482,6 +555,21 @@ export default function InvoiceSettings() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Crop step for the invoice logo (rectangular). */}
+            <ImageCropModal
+                src={cropSrc}
+                fileName={cropFileName}
+                title="Crop invoice logo"
+                cropShape="rect"
+                aspect={3}
+                onCancel={() => {
+                    if (cropSrc?.startsWith("blob:")) URL.revokeObjectURL(cropSrc);
+                    setCropSrc(null);
+                    setCropFileName("");
+                }}
+                onCropped={handleLogoCropped}
+            />
         </div>
     );
 }

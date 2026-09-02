@@ -850,6 +850,7 @@ model Product {
   originalPrice Float?
   discount      Float?
   gstPercentage Float? // GST Percentage for the product
+  hsnCode       String? // HSN / SAC code for GST classification (e.g. "6302")
 
   // Single Unit Pricing Configuration
   singleUnitSize     String?
@@ -2043,6 +2044,9 @@ model InvoiceSettings {
   financialYearStartMonth Int      @default(4) // 4 = April (Indian FY)
   financialYearStartDay   Int      @default(1) // 1st of the month
   formatTemplate          String   @default("{PREFIX}-{FY}-{SEQ}")
+  // Cloudinary URL of the logo printed on every invoice. Falls back to the company
+  // logo when unset.
+  invoiceLogo             String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
