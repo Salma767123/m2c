@@ -166,6 +166,7 @@ interface ProductFormData {
   originalPrice?: number
   discount?: number
   gstPercentage?: number
+  hsnCode?: string
 
   // Basic Product Info - Size & Color
   singleUnitSize?: string
@@ -262,6 +263,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     originalPrice: undefined,
     discount: undefined,
     gstPercentage: undefined,
+    hsnCode: '',
 
     // Basic Product Info - Size & Color
     singleUnitSize: '',
@@ -669,6 +671,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               originalPrice: product.originalPrice,
               discount: product.discount,
               gstPercentage: product.gstPercentage,
+              hsnCode: product.hsnCode || '',
 
               // Basic Product Info - Size & Color
               singleUnitSize: (product as any).singleUnitSize || '',
@@ -2625,6 +2628,20 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               <span className="text-sm font-bold text-slate-800 select-none shrink-0">%</span>
                             </div>
                             <p className="text-xs text-slate-500 mt-1">Enter a custom tax percentage</p>
+                          </div>
+
+                          {/* HSN / SAC code — GST classification, printed on invoices. */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">HSN / SAC Code</label>
+                            <input
+                              type="text"
+                              value={formData.hsnCode ?? ''}
+                              onChange={(e) => setFormData(prev => ({ ...prev, hsnCode: e.target.value }))}
+                              placeholder="e.g., 6302"
+                              maxLength={8}
+                              className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
+                            />
+                            <p className="text-xs text-slate-500 mt-1">HSN/SAC code for GST classification</p>
                           </div>
                         </div>
                       )

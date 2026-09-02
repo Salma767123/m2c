@@ -1,4 +1,5 @@
 const { prisma } = require('../config/database');
+const { uploadDataUriIfBase64 } = require('../config/cloudinary');
 
 // ============================================================
 // FINANCIAL YEAR HELPERS
@@ -117,6 +118,7 @@ const updateInvoiceSettings = async (req, res) => {
             financialYearStartDay,    // 1-31
             financialYearStart,       // ISO date string (manual mode only)
             formatTemplate,
+            invoiceLogo,              // Cloudinary URL, data URI (new upload), or "" to clear
         } = req.body;
 
         let settings = await prisma.invoiceSettings.findFirst();
@@ -131,6 +133,11 @@ const updateInvoiceSettings = async (req, res) => {
         if (currentSequence !== undefined) updateData.currentSequence = parseInt(currentSequence);
         if (autoFinancialYear !== undefined) updateData.autoFinancialYear = autoFinancialYear;
         if (formatTemplate !== undefined) updateData.formatTemplate = formatTemplate;
+        // Upload a freshly-cropped data URI to Cloudinary; a plain URL passes through,
+        // and "" clears the logo (falls back to the company logo on invoices).
+        if (invoiceLogo !== undefined) {
+            updateData.invoiceLogo = invoiceLogo ? await uploadDataUriIfBase64(invoiceLogo, { folder: 'invoice' }) : null;
+        }
 
         const isAuto = autoFinancialYear ?? settings.autoFinancialYear;
 

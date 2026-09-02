@@ -62,19 +62,23 @@ router.get('/admin/:id/invoice', requireAdminRole, requirePermission(['invoices:
         await attachItemGst(order);
 
         // Fetch company info for invoice header (logo, name, GST, etc.)
-        const company = await prisma.companyInfo.findFirst({
-            select: { companyName: true, gstNumber: true, registeredAddress: true, state: true, country: true, companyLogo: true, companyWebsite: true }
-        });
+        const [company, invSettings] = await Promise.all([
+            prisma.companyInfo.findFirst({
+                select: { companyName: true, gstNumber: true, registeredAddress: true, state: true, country: true, companyLogo: true, companyWebsite: true }
+            }),
+            prisma.invoiceSettings.findFirst({ select: { invoiceLogo: true } }),
+        ]);
 
         const html = getOrderInvoiceHTML(order, company ? {
             companyName: company.companyName,
-            companyLogo: company.companyLogo,
+            // Dedicated invoice logo wins; fall back to the company logo when unset.
+            companyLogo: invSettings?.invoiceLogo || company.companyLogo,
             gstNumber: company.gstNumber,
             address: company.registeredAddress,
             state: company.state,
             country: company.country,
             companyWebsite: company.companyWebsite,
-        } : {});
+        } : (invSettings?.invoiceLogo ? { companyLogo: invSettings.invoiceLogo } : {}));
         res.setHeader('Content-Type', 'text/html');
         res.send(html);
     } catch (err) {
@@ -131,19 +135,23 @@ router.get('/:id/invoice', async (req, res) => {
         if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
         if (order.customerId !== userId) return res.status(403).json({ success: false, error: 'Unauthorized' });
 
-        const company = await prisma.companyInfo.findFirst({
-            select: { companyName: true, gstNumber: true, registeredAddress: true, state: true, country: true, companyLogo: true, companyWebsite: true }
-        });
+        const [company, invSettings] = await Promise.all([
+            prisma.companyInfo.findFirst({
+                select: { companyName: true, gstNumber: true, registeredAddress: true, state: true, country: true, companyLogo: true, companyWebsite: true }
+            }),
+            prisma.invoiceSettings.findFirst({ select: { invoiceLogo: true } }),
+        ]);
 
         const html = getOrderInvoiceHTML(order, company ? {
             companyName: company.companyName,
-            companyLogo: company.companyLogo,
+            // Dedicated invoice logo wins; fall back to the company logo when unset.
+            companyLogo: invSettings?.invoiceLogo || company.companyLogo,
             gstNumber: company.gstNumber,
             address: company.registeredAddress,
             state: company.state,
             country: company.country,
             companyWebsite: company.companyWebsite,
-        } : {});
+        } : (invSettings?.invoiceLogo ? { companyLogo: invSettings.invoiceLogo } : {}));
         res.setHeader('Content-Type', 'text/html');
         res.send(html);
     } catch (err) {

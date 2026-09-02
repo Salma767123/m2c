@@ -171,6 +171,7 @@ const createProduct = async (req, res) => {
       originalPrice,
       discount,
       gstPercentage,
+      hsnCode,
 
       // Single Unit Pricing Configuration
       singleUnitSize,
@@ -328,6 +329,7 @@ const createProduct = async (req, res) => {
           originalPrice: originalPrice ? parseFloat(originalPrice) : null,
           discount: discount ? parseFloat(discount) : null,
           gstPercentage: gstPercentage !== null && gstPercentage !== undefined && gstPercentage !== '' ? parseFloat(gstPercentage) : null,
+          hsnCode: hsnCode ? String(hsnCode).trim() : null,
 
           // Single Unit Pricing Configuration
           singleUnitSize: singleUnitSize || null,
@@ -796,6 +798,9 @@ const updateProduct = async (req, res) => {
           }),
           ...(updateData.gstPercentage !== undefined && {
             gstPercentage: parseFloat(updateData.gstPercentage)
+          }),
+          ...(updateData.hsnCode !== undefined && {
+            hsnCode: updateData.hsnCode ? String(updateData.hsnCode).trim() : null
           }),
 
           // Single Unit Pricing Configuration
@@ -1751,6 +1756,7 @@ const createProductByAdmin = async (req, res) => {
       originalPrice,
       discount,
       gstPercentage,
+      hsnCode,
       adminFixedPrice, // Admin can set their own price
       priceINR,
       priceUSD,
@@ -1950,6 +1956,7 @@ const createProductByAdmin = async (req, res) => {
           originalPrice: originalPrice ? parseFloat(originalPrice) : null,
           discount: discount ? parseFloat(discount) : null,
           gstPercentage: gstPercentage !== null && gstPercentage !== undefined && gstPercentage !== '' ? parseFloat(gstPercentage) : null,
+          hsnCode: hsnCode ? String(hsnCode).trim() : null,
           adminFixedPrice: numOrNull(adminFixedPrice),
           ...productPrices,
           priceVisibility: priceVisibility || 'BOTH',
