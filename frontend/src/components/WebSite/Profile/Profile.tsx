@@ -8,7 +8,8 @@ import {
   LifeBuoy,
   LogOut,
   Camera,
-  Loader2
+  Loader2,
+  RotateCcw
 } from 'lucide-react';
 import Image from 'next/image';
 import { dispatchAuthChange } from '@/lib/authEvents';
@@ -16,6 +17,7 @@ import ImageCropModal from '@/components/UI/ImageCropModal';
 import ProfileTab from '@/components/WebSite/Profile/ProfileTab';
 import AddressBook from '@/components/WebSite/Profile/AddressBook';
 import OrderHistory from '@/components/WebSite/Profile/OrderHistory';
+import ReturnsSection from '@/components/WebSite/Profile/ReturnsSection';
 import SupportTickets from '@/components/WebSite/Profile/SupportTickets';
 import AccountDiscovery from '@/components/WebSite/Profile/AccountDiscovery';
 import Reveal from '@/components/WebSite/Shared/Reveal';
@@ -135,7 +137,7 @@ const Profile = () => {
    */
   useEffect(() => {
     const t = searchParams?.get('tab');
-    if (t && ['profile', 'addresses', 'orders', 'support'].includes(t)) {
+    if (t && ['profile', 'addresses', 'orders', 'returns', 'support'].includes(t)) {
       setActiveTab(t);
     }
   }, [searchParams]);
@@ -440,6 +442,7 @@ const Profile = () => {
     { id: 'profile', label: 'Profile Information', icon: User },
     { id: 'addresses', label: 'Saved Addresses', icon: MapPin },
     { id: 'orders', label: 'Order History', icon: Package },
+    { id: 'returns', label: 'Returns & Replacements', icon: RotateCcw },
     { id: 'support', label: 'Support', icon: LifeBuoy },
   ];
 
@@ -699,6 +702,7 @@ const Profile = () => {
             {activeTab === 'profile' && renderProfileTab()}
             {activeTab === 'addresses' && <AddressBook />}
             {activeTab === 'orders' && <OrderHistory />}
+            {activeTab === 'returns' && <ReturnsSection />}
             {activeTab === 'support' && <SupportTickets />}
           </Reveal>
         </div>

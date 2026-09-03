@@ -5,6 +5,9 @@ import Image from 'next/image';
 import { Package, ArrowRight, Grid3X3 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { categoryService } from '@/services/categoryService';
+import { publicProductService, PublicProduct } from '@/services/publicProductService';
+import { getRecentlyViewed } from '@/lib/browsingHistory';
+import ProductCard from '@/components/WebSite/ProductCard/ProductCard';
 import PromotionalPopup from '@/components/WebSite/PromotionalPopup/PromotionalPopup';
 import Reveal from '@/components/WebSite/Shared/Reveal';
 
@@ -31,6 +34,36 @@ export default function SubCategories({ categorySlug }: { categorySlug: string }
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Product rails shown below the subcategories (replacing the old CTA card).
+  const [categoryProducts, setCategoryProducts] = useState<PublicProduct[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<PublicProduct[]>([]);
+
+  // Once the category resolves, load related products + the recently-viewed list.
+  useEffect(() => {
+    if (!category) return;
+    let cancelled = false;
+    (async () => {
+      // Products in this category.
+      const r = await publicProductService
+        .getProducts({ category: category.name, limit: 8 })
+        .catch(() => null);
+      if (!cancelled) setCategoryProducts(r?.success && r.data ? r.data.items : []);
+
+      // Recently viewed — resolve stored ids to live products (most recent first).
+      const ids = getRecentlyViewed().slice(0, 8);
+      if (ids.length) {
+        const results = await Promise.all(
+          ids.map((id) =>
+            publicProductService.getProduct(id).then((x) => (x.success ? x.data : null)).catch(() => null),
+          ),
+        );
+        if (!cancelled) setRecentlyViewed(results.filter(Boolean).slice(0, 6) as PublicProduct[]);
+      } else if (!cancelled) {
+        setRecentlyViewed([]);
+      }
+    })();
+    return () => { cancelled = true };
+  }, [category]);
 
   useEffect(() => {
     const fetchCategoryAndSubcategories = async () => {
@@ -310,66 +343,60 @@ export default function SubCategories({ categorySlug }: { categorySlug: string }
           </div>
         )}
 
-        {/* Call to Action Section — compact on mobile */}
-        <Reveal className="relative mt-8 sm:mt-12 lg:mt-16 rounded-xl sm:rounded-2xl shadow-lg sm:shadow-2xl overflow-hidden bg-white ring-1 ring-black/5">
-          {/* Live accent line */}
-          <div className="absolute inset-x-0 top-0 h-1 animate-accent-bar z-20" />
-
-          <div className="grid md:grid-cols-2">
-            {/* Content panel — sits beside the photo rather than on top of it, so
-                the imagery needs no darkening overlay to keep this readable. */}
-            <div className="relative px-5 sm:px-8 lg:px-12 py-7 sm:py-10 lg:py-14 flex flex-col justify-center text-center md:text-left">
-              {/* Whisper-fine diagonal texture */}
-              <div
-                className="pointer-events-none absolute inset-0 opacity-[0.04]"
-                style={{
-                  backgroundImage:
-                    "repeating-linear-gradient(45deg, #e01a1b 0, #e01a1b 1px, transparent 1px, transparent 14px)",
-                }}
-              />
-
-              <div className="relative">
-                <h2 className="font-playfair text-xl sm:text-2xl lg:text-3xl font-semibold mb-2 sm:mb-3 tracking-tight text-[#1a1a1a]">
-                  Can&apos;t Find What You&apos;re Looking For?
+        {/* Explore More Products — products from this category. */}
+        {categoryProducts.length > 0 && (
+          <Reveal className="mt-10 sm:mt-14 lg:mt-16">
+            <div className="mb-5 sm:mb-6 flex items-end justify-between gap-4">
+              <div>
+                <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-2">
+                  <span className="h-px w-6 bg-[#e01a1b]" />
+                  Explore More
+                </span>
+                <h2 className="font-playfair text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a1a1a] tracking-tight">
+                  More in {category.name}
                 </h2>
-                <p className="text-sm sm:text-base text-slate-600 font-sans mb-5 sm:mb-7 max-w-md mx-auto md:mx-0">
-                  Discover more products with our advanced search or browse our complete collection
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start font-sans">
-                  <button
-                    onClick={() => window.dispatchEvent(new CustomEvent('open-search-modal'))}
-                    className="group btn-shine inline-flex items-center justify-center gap-2 bg-[#e01a1b] text-white px-6 sm:px-8 py-3 rounded-full hover:bg-[#c41617] transition-all duration-300 font-semibold text-sm sm:text-base whitespace-nowrap shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5"
-                  >
-                    <Package className="w-4 h-4 sm:w-5 sm:h-5" />
-                    Search Products
-                  </button>
-                  <Link
-                    href="/products"
-                    className="group inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 rounded-full border-2 border-[#e01a1b]/25 text-[#e01a1b] font-semibold text-sm sm:text-base whitespace-nowrap hover:bg-[#e01a1b] hover:text-white hover:border-[#e01a1b] transition-all duration-300 hover:-translate-y-0.5"
-                  >
-                    <Grid3X3 className="w-4 h-4 sm:w-5 sm:h-5" />
-                    Browse All Products
-                  </Link>
-                </div>
               </div>
+              <Link
+                href={`/products?category=${category.slug}`}
+                className="group inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#e01a1b]/25 px-3.5 py-1.5 text-[12.5px] sm:text-[13px] font-semibold text-[#e01a1b] transition-colors hover:bg-[#fff1f1]"
+              >
+                View all
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
             </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5">
+              {categoryProducts.map((p, index) => (
+                <Reveal key={p.id} delay={index * 70}>
+                  <ProductCard product={p} variant="showcase" />
+                </Reveal>
+              ))}
+            </div>
+          </Reveal>
+        )}
 
-            {/* HD imagery — 2500px source, shown completely clean (no overlay) */}
-            <div className="relative min-h-52 sm:min-h-60 md:min-h-[22rem] order-first md:order-last">
-              <Image
-                src="/assets/images/about/a8.webp"
-                alt=""
-                aria-hidden="true"
-                fill
-                sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover object-center"
-              />
-              {/* Feathered seam so the photo melts into the panel */}
-              <div className="pointer-events-none absolute inset-0 hidden md:block bg-linear-to-r from-white via-white/0 to-transparent" />
-              <div className="pointer-events-none absolute inset-0 md:hidden bg-linear-to-b from-transparent via-white/0 to-white" />
+        {/* Recently Viewed Products — from the shopper's browsing history. */}
+        {recentlyViewed.filter((p) => !categoryProducts.some((c) => c.id === p.id)).length > 0 && (
+          <Reveal className="mt-10 sm:mt-14 lg:mt-16">
+            <div className="mb-5 sm:mb-6">
+              <span className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#e01a1b] mb-2">
+                <span className="h-px w-6 bg-[#e01a1b]" />
+                Recently Viewed
+              </span>
+              <h2 className="font-playfair text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a1a1a] tracking-tight">
+                Recently Viewed Products
+              </h2>
             </div>
-          </div>
-        </Reveal>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5">
+              {recentlyViewed
+                .filter((p) => !categoryProducts.some((c) => c.id === p.id))
+                .map((p, index) => (
+                  <Reveal key={p.id} delay={index * 70}>
+                    <ProductCard product={p} variant="showcase" />
+                  </Reveal>
+                ))}
+            </div>
+          </Reveal>
+        )}
       </div>
     </div>
   );

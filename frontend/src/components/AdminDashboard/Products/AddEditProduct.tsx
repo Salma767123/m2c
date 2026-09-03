@@ -1797,6 +1797,20 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
+                        HSN Code
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.hsnCode ?? ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, hsnCode: e.target.value }))}
+                        placeholder="e.g., 6302"
+                        maxLength={8}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-md text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">HSN code for GST classification</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
                         Base Color
                       </label>
                       <div className="space-y-2">
@@ -2689,20 +2703,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                           <p className="text-xs text-slate-500 mt-1">Enter any other applicable tax percentage</p>
                         </div>
                       )}
-
-                      {/* HSN / SAC code — GST classification, printed on invoices. */}
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">HSN / SAC Code</label>
-                        <input
-                          type="text"
-                          value={formData.hsnCode ?? ''}
-                          onChange={(e) => setFormData(prev => ({ ...prev, hsnCode: e.target.value }))}
-                          placeholder="e.g., 6302"
-                          maxLength={8}
-                          className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent text-sm bg-white"
-                        />
-                        <p className="text-xs text-slate-500 mt-1">HSN/SAC code for GST classification</p>
-                      </div>
                     </div>
                   </div>
                   {/* Single Price Section */}

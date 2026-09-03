@@ -311,6 +311,18 @@ const handleRazorpayWebhook = async (req, res) => {
       }
     }
 
+    // Refund lifecycle → auto-advance the matching return request.
+    // refund.processed = money settled to the customer → "Refund Completed".
+    // refund.failed = gateway couldn't complete it → flag for admin attention.
+    if (event === 'refund.processed' || event === 'refund.failed') {
+      const refund = payload?.refund?.entity;
+      if (refund?.id) {
+        const { handleRefundWebhook } = require('./returnController');
+        await handleRefundWebhook(refund.id, event === 'refund.processed' ? 'processed' : 'failed');
+        console.log(`Refund webhook ${event} handled for refund ${refund.id}`);
+      }
+    }
+
     res.json({ status: 'ok' });
 
   } catch (error) {

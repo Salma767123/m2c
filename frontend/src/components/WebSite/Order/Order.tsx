@@ -35,6 +35,8 @@ import { courierService } from "@/services/courierService"
 import { courierName, courierTrackingUrl } from "@/lib/couriers"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 import ReviewModal from "./ReviewModal"
+import ReturnRequestModal from "./ReturnRequestModal"
+import { returnService, returnStatusStyle, type ReturnRequest } from "@/services/returnService"
 
 /**
  * Smart pagination range builder — collapses long page lists to "1 … 4 5 6 … 20".
@@ -137,6 +139,21 @@ export default function OrderList() {
   const [reasonChoice, setReasonChoice] = useState('')  // selected preset reason
   const [actionReason, setActionReason] = useState('')  // free text when "Other"
   const [actionSubmitting, setActionSubmitting] = useState(false)
+  // Multi-step return/refund/replacement flow (replaces the old single-reason return modal).
+  const [returnModalOrder, setReturnModalOrder] = useState<Order | null>(null)
+  // Latest return request per order code (ORD-…) — drives the Return button state
+  // and the status badge once a return has been raised for an order.
+  const [returnsByOrder, setReturnsByOrder] = useState<Record<string, ReturnRequest>>({})
+
+  const fetchMyReturns = async () => {
+    try {
+      const res = await returnService.getMyReturns()
+      const map: Record<string, ReturnRequest> = {}
+      // findMany returns newest-first, so the first seen per order is the latest.
+      for (const r of res.data || []) if (!map[r.orderCode]) map[r.orderCode] = r
+      setReturnsByOrder(map)
+    } catch { /* non-blocking */ }
+  }
 
   const openActionModal = (order: Order, type: 'cancel' | 'return') => {
     setReasonChoice('')
@@ -191,6 +208,7 @@ export default function OrderList() {
   useEffect(() => {
     fetchOrders()
     fetchSidebarProducts()
+    fetchMyReturns()
   }, [])
 
   const fetchOrders = async () => {
@@ -352,6 +370,8 @@ export default function OrderList() {
 
     // Adjust logic for status filter to match transformed status
     if (statusFilter === "all") return true
+    // "Returned" isn't an order status — it means the order has a return request.
+    if (statusFilter === "returned") return !!returnsByOrder[order.orderNumber]
     return order.status.toLowerCase().includes(statusFilter.toLowerCase())
   })
 
@@ -492,7 +512,8 @@ export default function OrderList() {
                         { value: "processing", label: "Processing" },
                         { value: "shipped", label: "Shipped" },
                         { value: "delivered", label: "Delivered" },
-                        { value: "cancelled", label: "Cancelled" }
+                        { value: "cancelled", label: "Cancelled" },
+                        { value: "returned", label: "Returned" }
                       ]}
                       onChange={(v) => { setStatusFilter(v); setCurrentPage(1); setPastPage(1) }}
                       placeholder="Filter by status"
@@ -628,7 +649,9 @@ export default function OrderList() {
                               View Details
                             </button>
                           </Link>
-                          {order.trackingNumber && (
+                          {/* Track Order is hidden once the order is complete
+                              (delivered/received) — there's nothing left to track. */}
+                          {order.trackingNumber && order.status !== 'delivered' && (
                             <button
                               onClick={() => setTrackOrder(order)}
                               className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-[#e01a1b] text-[#e01a1b] rounded-full hover:bg-[#e01a1b] hover:text-white transition-colors"
@@ -652,22 +675,30 @@ export default function OrderList() {
                               <XCircle className="w-4 h-4" /> Cancel Order
                             </button>
                           )}
-                          {order.rawStatus === 'DELIVERED' && order.returnRequest?.status !== 'Requested' && order.returnRequest?.status !== 'Approved' && (
+                          {/* A return already exists → show its status, no Return button.
+                              Otherwise a delivered order can still be returned. */}
+                          {returnsByOrder[order.orderNumber] ? (
+                            (() => {
+                              const rr = returnsByOrder[order.orderNumber]
+                              const rst = returnStatusStyle(rr.status)
+                              return (
+                                <a
+                                  href={`/profile?tab=returns&return=${rr.id}`}
+                                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-full ${rst.bg} ${rst.text}`}
+                                  title="View return details"
+                                >
+                                  <span className={`h-1.5 w-1.5 rounded-full ${rst.dot}`} /> Return · {rr.status}
+                                </a>
+                              )
+                            })()
+                          ) : order.rawStatus === 'DELIVERED' ? (
                             <button
-                              onClick={() => openActionModal(order, 'return')}
+                              onClick={() => setReturnModalOrder(order)}
                               className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors"
                             >
                               <RotateCcw className="w-4 h-4" /> Return
                             </button>
-                          )}
-                          {order.returnRequest?.status === 'Requested' && (
-                            <span className="flex items-center px-3 py-2 text-xs font-semibold text-amber-700 bg-amber-50 rounded-full">Return Requested</span>
-                          )}
-                          {order.refundStatus && ['INITIATED', 'PROCESSED', 'MANUAL'].includes(order.refundStatus) && (
-                            <span className="flex items-center px-3 py-2 text-xs font-semibold text-green-700 bg-green-50 rounded-full">
-                              Refund {order.refundStatus === 'PROCESSED' ? 'Completed' : order.refundStatus === 'MANUAL' ? 'Being Processed' : 'Initiated'}
-                            </span>
-                          )}
+                          ) : null}
                         </div>
 
                         {/* Estimated Delivery */}
@@ -838,7 +869,9 @@ export default function OrderList() {
                               </button>
                             )
                           )}
-                          {order.trackingNumber && (
+                          {/* Track Order is hidden once the order is complete
+                              (delivered/received) — there's nothing left to track. */}
+                          {order.trackingNumber && order.status !== 'delivered' && (
                             <button
                               onClick={() => setTrackOrder(order)}
                               className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-[#e01a1b] text-[#e01a1b] rounded-full hover:bg-[#e01a1b] hover:text-white transition-colors"
@@ -862,22 +895,30 @@ export default function OrderList() {
                               <XCircle className="w-4 h-4" /> Cancel Order
                             </button>
                           )}
-                          {order.rawStatus === 'DELIVERED' && order.returnRequest?.status !== 'Requested' && order.returnRequest?.status !== 'Approved' && (
+                          {/* A return already exists → show its status, no Return button.
+                              Otherwise a delivered order can still be returned. */}
+                          {returnsByOrder[order.orderNumber] ? (
+                            (() => {
+                              const rr = returnsByOrder[order.orderNumber]
+                              const rst = returnStatusStyle(rr.status)
+                              return (
+                                <a
+                                  href={`/profile?tab=returns&return=${rr.id}`}
+                                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-full ${rst.bg} ${rst.text}`}
+                                  title="View return details"
+                                >
+                                  <span className={`h-1.5 w-1.5 rounded-full ${rst.dot}`} /> Return · {rr.status}
+                                </a>
+                              )
+                            })()
+                          ) : order.rawStatus === 'DELIVERED' ? (
                             <button
-                              onClick={() => openActionModal(order, 'return')}
+                              onClick={() => setReturnModalOrder(order)}
                               className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors"
                             >
                               <RotateCcw className="w-4 h-4" /> Return
                             </button>
-                          )}
-                          {order.returnRequest?.status === 'Requested' && (
-                            <span className="flex items-center px-3 py-2 text-xs font-semibold text-amber-700 bg-amber-50 rounded-full">Return Requested</span>
-                          )}
-                          {order.refundStatus && ['INITIATED', 'PROCESSED', 'MANUAL'].includes(order.refundStatus) && (
-                            <span className="flex items-center px-3 py-2 text-xs font-semibold text-green-700 bg-green-50 rounded-full">
-                              Refund {order.refundStatus === 'PROCESSED' ? 'Completed' : order.refundStatus === 'MANUAL' ? 'Being Processed' : 'Initiated'}
-                            </span>
-                          )}
+                          ) : null}
                         </div>
                       </Reveal>
                     ))}
@@ -1044,6 +1085,14 @@ export default function OrderList() {
         }}
         orderId={reviewModalState.orderId}
         items={reviewModalState.items}
+      />
+
+      {/* Multi-step return / refund / replacement flow */}
+      <ReturnRequestModal
+        open={!!returnModalOrder}
+        order={returnModalOrder as any}
+        onClose={() => setReturnModalOrder(null)}
+        onSubmitted={() => { fetchOrders(); fetchMyReturns() }}
       />
 
       {/* Cancel / Return confirmation modal */}

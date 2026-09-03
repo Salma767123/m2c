@@ -366,6 +366,37 @@ const updateShipmentStatusAdmin = async (req, res) => {
                     data: { orderId: shipment.orderId, shipmentId: shipment.id }
                 }).catch(() => {});
             }
+
+            // Email the vendor when the admin ASSIGNS the order to a hub (the moment they
+            // must start delivering to the admin hub). Fire-and-forget, never blocks.
+            if (assignedHubId && vendorId) {
+                (async () => {
+                    try {
+                        const { sendVendorOrderAssignedEmail } = require('../utils/email/vendorEmailSender');
+                        const vendor = await prisma.vendor.findUnique({
+                            where: { id: vendorId },
+                            select: { email: true, businessEmail: true, companyName: true, ownerName: true },
+                        });
+                        const to = vendor?.businessEmail || vendor?.email;
+                        if (!to) return;
+                        const hub = updatedShipment.hub;
+                        const hubAddress = hub
+                            ? [hub.address, [hub.city, hub.state].filter(Boolean).join(', '), hub.zipCode].filter(Boolean).join(', ')
+                            : '';
+                        await sendVendorOrderAssignedEmail({
+                            to,
+                            companyName: vendor.companyName,
+                            ownerName: vendor.ownerName,
+                            orderId: updatedShipment.order?.orderId || shipment.orderId,
+                            itemCount: updatedShipment.items?.length ?? shipment.items?.length,
+                            hubName: hub?.name,
+                            hubAddress,
+                        });
+                    } catch (e) {
+                        console.warn('[order] vendor assignment email skipped:', e.message);
+                    }
+                })();
+            }
         }
 
         res.json({ success: true, data: updatedShipment });

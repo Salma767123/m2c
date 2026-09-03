@@ -150,8 +150,15 @@ export default function Inventory() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
+  // Stock status + Last-Restocked are variant-aware, client-side filters, so the
+  // whole (search/category-scoped) set is fetched and then filtered + paginated
+  // on the client — otherwise server pagination would slice BEFORE the filter and
+  // hide matching rows on other pages (e.g. an out-of-stock item on page 2 while
+  // page 1 shows "none found"). PAGE_SIZE is the display page; FETCH_LIMIT pulls
+  // the full set (admin inventory is modest).
+  const PAGE_SIZE = 10
+  const FETCH_LIMIT = 5000
 
   // Stats
   const [stats, setStats] = useState({
@@ -192,9 +199,10 @@ export default function Inventory() {
     const fetchInventory = async () => {
       try {
         setIsLoading(true)
+        // Fetch the FULL set (status/date filters + pagination happen client-side).
         const params: any = {
-          page: currentPage,
-          limit: 10
+          page: 1,
+          limit: FETCH_LIMIT
         }
 
         if (searchTerm) params.search = searchTerm
@@ -204,7 +212,6 @@ export default function Inventory() {
 
         if (response.data.success) {
           setInventoryItems(response.data.data.items)
-          setTotalPages(response.data.data.pagination.totalPages)
           setTotalItems(response.data.data.pagination.totalItems)
         }
       } catch (error: any) {
@@ -215,7 +222,7 @@ export default function Inventory() {
     }
 
     fetchInventory()
-  }, [currentPage, searchTerm, categoryFilter])
+  }, [searchTerm, categoryFilter])
 
   // Get unique categories for filter
   const categories = ['all', ...Array.from(new Set(inventoryItems.map(item => item.category)))]
@@ -242,6 +249,16 @@ export default function Inventory() {
     return true
   })
 
+  // Client-side pagination over the FILTERED set, so pages reflect what's shown.
+  const clientTotalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
+  const pagedItems = filteredItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  // Any filter/search change resets to page 1 (so a match on a later page isn't
+  // hidden behind an out-of-range current page).
+  useEffect(() => { setCurrentPage(1) }, [searchTerm, categoryFilter, statusFilter, dateFrom, dateTo])
+  // If filtering shrinks the result below the current page, snap back into range.
+  useEffect(() => { if (currentPage > clientTotalPages) setCurrentPage(clientTotalPages) }, [currentPage, clientTotalPages])
+
   const handleUpdateStock = (item: InventoryItem) => {
     // Navigate to separate stock update page
     window.location.href = `/admin/dashboard/inventory/update-stock/${item.id}`
@@ -265,10 +282,10 @@ export default function Inventory() {
     try {
       await inventoryService.adminDeleteItem(deleteModal.item.id)
 
-      // Reload data
+      // Reload the full set (client handles filtering + pagination).
       const params: any = {
-        page: currentPage,
-        limit: 10
+        page: 1,
+        limit: FETCH_LIMIT
       }
       if (searchTerm) params.search = searchTerm
       if (categoryFilter !== 'all') params.category = categoryFilter
@@ -439,7 +456,7 @@ export default function Inventory() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredItems.map((item) => {
+                    pagedItems.map((item) => {
                       const variants = item.variants || []
                       const canExpand = variants.length > 0
                       const isExpanded = expandedItems.has(item.id)
@@ -594,12 +611,12 @@ export default function Inventory() {
               </div>
 
               {/* Pagination */}
-              {totalPages > 1 && (
+              {clientTotalPages > 1 && (
                 <div className="flex items-center justify-end gap-3 text-sm px-4 py-3 border-t border-slate-100">
                   <div className="flex items-center gap-1">
                     <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-                    {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/20' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
-                    <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
+                    {getPageRange(currentPage, clientTotalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/20' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                    <button onClick={() => setCurrentPage(prev => Math.min(clientTotalPages, prev + 1))} disabled={currentPage === clientTotalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
                   </div>
                 </div>
               )}

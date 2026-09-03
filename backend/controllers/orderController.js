@@ -1053,6 +1053,30 @@ const createOrder = async (req, res) => {
             }).catch(() => {});
         }
 
+        // Email the customer their order confirmation with the tax-invoice PDF attached.
+        // Fire-and-forget — a mail failure must never fail the order. Re-fetch the order
+        // fresh (with items) + company/invoice-logo settings so the PDF has everything.
+        (async () => {
+            try {
+                const { sendOrderConfirmationEmail } = require('../utils/email/orderEmailSender');
+                const [fullOrder, company, invSettings] = await Promise.all([
+                    prisma.order.findUnique({ where: { id: result.id }, include: { items: true } }),
+                    prisma.companyInfo.findFirst({ select: { companyName: true, gstNumber: true, registeredAddress: true, companyLogo: true } }),
+                    prisma.invoiceSettings.findFirst({ select: { invoiceLogo: true } }),
+                ]);
+                if (fullOrder?.customerEmail) {
+                    await sendOrderConfirmationEmail(fullOrder, {
+                        companyName: company?.companyName,
+                        gstNumber: company?.gstNumber,
+                        address: company?.registeredAddress,
+                        companyLogo: invSettings?.invoiceLogo || company?.companyLogo,
+                    });
+                }
+            } catch (e) {
+                console.warn('[order] confirmation email skipped:', e.message);
+            }
+        })();
+
         // Fire-and-forget: email vendors whose stock dropped to its low-stock
         // alert level because of this order (deduped per low-stock episode).
         const affectedInventoryIds = [...new Set(stockUpdates.map(u => u.inventoryItemId).filter(Boolean))];
