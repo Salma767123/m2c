@@ -6,6 +6,8 @@ import { Package, Eye, Download, Truck, CheckCircle, Clock, AlertCircle, Chevron
 import orderService, { Order as APIOrder } from '@/services/orderService'
 import reviewService from '@/services/reviewService'
 import ReviewModal from '@/components/WebSite/Order/ReviewModal'
+import ReturnRequestModal from '@/components/WebSite/Order/ReturnRequestModal'
+import { returnService, returnStatusStyle, type ReturnRequest } from '@/services/returnService'
 import Reveal from '@/components/WebSite/Shared/Reveal'
 import SelectMenu from '@/components/WebSite/Shared/SelectMenu'
 import DateField from '@/components/WebSite/Shared/DateField'
@@ -151,6 +153,18 @@ export default function OrderHistory() {
   const [reasonChoice, setReasonChoice] = useState('')
   const [actionReason, setActionReason] = useState('')
   const [actionSubmitting, setActionSubmitting] = useState(false)
+  // New multi-step return flow + per-order return status.
+  const [returnModalOrder, setReturnModalOrder] = useState<APIOrder | null>(null)
+  const [returnsByOrder, setReturnsByOrder] = useState<Record<string, ReturnRequest>>({})
+
+  const fetchMyReturns = async () => {
+    try {
+      const res = await returnService.getMyReturns()
+      const map: Record<string, ReturnRequest> = {}
+      for (const r of res.data || []) if (!map[r.orderCode]) map[r.orderCode] = r
+      setReturnsByOrder(map)
+    } catch { /* non-blocking */ }
+  }
 
   const openActionModal = (order: APIOrder, type: 'cancel' | 'return') => {
     setReasonChoice('')
@@ -195,6 +209,7 @@ export default function OrderHistory() {
 
   useEffect(() => {
     fetchOrders()
+    fetchMyReturns()
   }, [])
 
   const fetchOrders = async () => {
@@ -591,22 +606,29 @@ export default function OrderHistory() {
                         Cancel
                       </button>
                     )}
-                    {getNormalizedStatus(order.status) === 'delivered'
-                      && order.returnRequest?.status !== 'Requested'
-                      && order.returnRequest?.status !== 'Approved' && (
+                    {returnsByOrder[order.orderId] ? (
+                      (() => {
+                        const rr = returnsByOrder[order.orderId]
+                        const rst = returnStatusStyle(rr.status)
+                        return (
+                          <a
+                            href={`/profile?tab=returns&return=${rr.id}`}
+                            className={`${QUIET_BTN} flex-1 cursor-pointer sm:flex-none ${rst.bg} ${rst.text} border-transparent`}
+                            title="View return details"
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${rst.dot}`} /> Return · {rr.status}
+                          </a>
+                        )
+                      })()
+                    ) : getNormalizedStatus(order.status) === 'delivered' ? (
                       <button
-                        onClick={() => openActionModal(order, 'return')}
+                        onClick={() => setReturnModalOrder(order)}
                         className={`${QUIET_BTN} flex-1 sm:flex-none`}
                       >
                         <RotateCcw className="h-4 w-4" />
                         Return
                       </button>
-                    )}
-                    {order.returnRequest?.status === 'Requested' && (
-                      <span className={`${QUIET_BTN} flex-1 cursor-default border-amber-200 bg-amber-50 text-amber-700 sm:flex-none`}>
-                        Return Requested
-                      </span>
-                    )}
+                    ) : null}
                   </div>
                 </Reveal>
               )
@@ -680,6 +702,23 @@ export default function OrderHistory() {
         }}
         orderId={reviewModal.orderId}
         items={reviewModal.items}
+      />
+
+      {/* Multi-step return / refund / replacement flow */}
+      <ReturnRequestModal
+        open={!!returnModalOrder}
+        order={returnModalOrder ? {
+          id: returnModalOrder.id,
+          orderNumber: returnModalOrder.orderId,
+          currency: (returnModalOrder.currency as 'INR' | 'USD') || 'INR',
+          paymentStatus: returnModalOrder.paymentStatus,
+          items: (returnModalOrder.items || []).map((i: any) => ({
+            id: i.id, name: i.productName, image: i.productImage || '',
+            quantity: i.quantity, price: i.unitPrice, size: i.size, color: i.color,
+          })),
+        } : null}
+        onClose={() => setReturnModalOrder(null)}
+        onSubmitted={() => { fetchOrders(); fetchMyReturns() }}
       />
 
       {/* Cancel / Return confirmation modal */}

@@ -98,6 +98,15 @@ const PERMISSION_MODULES = [
                 ],
             },
             {
+                key: 'returns',
+                name: 'Returns & Replacements',
+                description: 'Customer return, refund and replacement requests',
+                actions: { view: true, create: false, edit: false, delete: false },
+                extra: [
+                    { key: 'manage', label: 'Approve / Reject / Process', description: 'Approve, reject and progress return, refund and replacement requests' },
+                ],
+            },
+            {
                 key: 'invoices',
                 name: 'Invoices',
                 description: 'Customer invoices',

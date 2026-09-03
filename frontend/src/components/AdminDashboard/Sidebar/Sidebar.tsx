@@ -85,6 +85,7 @@ const navigation: NavigationItem[] = [
     subItems: [
       { title: "Customer Management", href: "/admin/dashboard/users/customer-management", permission: "customer_management:view" },
       { title: "Hub to Customer", href: "/admin/dashboard/orders/hub-to-customer", permission: "hub_to_customer:view" },
+      { title: "Returns & Replacements", href: "/admin/dashboard/customers/returns", permission: "returns:view" },
       { title: "Invoices", href: "/admin/dashboard/billing/invoices", permission: "invoices:view" },
       { title: "Customer Reviews", href: "/admin/dashboard/reviews/customer", permission: "customer_reviews:view" },
     ],

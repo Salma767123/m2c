@@ -235,6 +235,92 @@ const LAYOUTS = {
     cta: { urlVar: 'dashboardUrl' },
   },
 
+  vendor_order_assigned: {
+    defaults: {
+      emoji: '📦', headerTitle: 'New Order to Fulfil',
+      headerSubtitle: 'An order has been assigned to you',
+      bodyText: 'Dear {{greetingName}},\n\nThe admin has assigned order #{{orderId}} to {{companyName}}. Please pack the item(s) and deliver them to the assigned admin hub below.',
+      buttonLabel: 'View Order', footerText: 'This is an automated order notification. Please do not reply to this email.',
+    },
+    infoRows: [
+      ['Order', 'orderId', false], ['Items to ship', 'itemCount', false],
+      ['Deliver to hub', 'hubName', false], ['Hub address', 'hubAddress', false],
+    ],
+    cta: { urlVar: 'dashboardUrl' },
+  },
+
+  order_confirmation: {
+    defaults: {
+      emoji: '✅', headerTitle: 'Order Confirmed',
+      headerSubtitle: 'Thank you for your purchase!',
+      bodyText: 'Dear {{greetingName}},\n\nYour order #{{orderId}} has been placed successfully and your payment is confirmed. Your itemised tax invoice is attached to this email as a PDF.',
+      buttonLabel: 'Track Your Order', footerText: 'Your tax invoice is attached as a PDF. This is an automated message — please do not reply.',
+    },
+    infoRows: [
+      ['Order ID', 'orderId', false], ['Order Date', 'orderDate', false],
+      ['Payment Method', 'paymentMethod', false], ['Payment Status', 'paymentStatus', false],
+    ],
+    // Order summary items + totals + delivery address, injected after the details table.
+    rawAfterTable:
+      '<p style="margin:0 0 8px;color:#374151;font-size:14px;font-weight:600;">Order summary</p>\n' +
+      '<table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 16px;">{{itemsSection}}</table>\n' +
+      '<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">' +
+      '<tr><td style="padding:4px 16px;color:#6b7280;font-size:14px;">Subtotal</td><td style="padding:4px 16px;color:#111827;font-size:14px;text-align:right;">{{subtotalDisplay}}</td></tr>' +
+      '{{discountRow}}' +
+      '<tr><td style="padding:4px 16px;color:#6b7280;font-size:14px;">Tax (GST)</td><td style="padding:4px 16px;color:#111827;font-size:14px;text-align:right;">{{taxDisplay}}</td></tr>' +
+      '<tr><td style="padding:4px 16px;color:#6b7280;font-size:14px;">Shipping</td><td style="padding:4px 16px;color:#111827;font-size:14px;text-align:right;">{{shippingDisplay}}</td></tr>' +
+      '<tr><td style="padding:10px 16px;color:#111827;font-size:16px;font-weight:800;border-top:2px solid #111827;">Grand Total</td><td style="padding:10px 16px;color:#e01a1b;font-size:16px;font-weight:800;text-align:right;border-top:2px solid #111827;">{{totalDisplay}}</td></tr>' +
+      '</table>\n' +
+      '<p style="margin:0 0 6px;color:#374151;font-size:14px;font-weight:600;">Delivering to</p>\n' +
+      '<p style="margin:0 0 24px;color:#6b7280;font-size:13px;line-height:1.6;">{{shippingAddress}}</p>',
+    cta: { urlVar: 'trackUrl' },
+  },
+
+  return_requested: {
+    defaults: {
+      emoji: '📦', headerTitle: 'Return Request Received',
+      headerSubtitle: "We've got your request and will review it shortly",
+      bodyText: "Hi {{greetingName}},\n\nWe've received your return request. Our team will review it and update you once a decision is made. You can track its status any time from your account.",
+      buttonLabel: 'View Return', footerText: 'This is an automated message. Please do not reply to this email.',
+    },
+    infoRows: [
+      ['Request ID', 'returnId', true], ['Order', 'orderCode', false],
+      ['Product', 'productName', false], ['Reason', 'reasonLabel', false],
+      ['Resolution', 'resolutionLabel', false],
+    ],
+    cta: { urlVar: 'trackUrl' },
+  },
+
+  return_status_update: {
+    defaults: {
+      emoji: '🔔', headerTitle: 'Return Update',
+      headerSubtitle: '{{statusTitle}}',
+      bodyText: 'Hi {{greetingName}},\n\n{{statusMessage}}',
+      buttonLabel: 'View Return', footerText: 'This is an automated message. Please do not reply to this email.',
+    },
+    infoRows: [
+      ['Request ID', 'returnId', true], ['Order', 'orderCode', false],
+      ['Product', 'productName', false],
+    ],
+    cta: { urlVar: 'trackUrl' },
+  },
+
+  vendor_enquiry_otp: {
+    defaults: {
+      emoji: '🔐', headerTitle: 'Verify Your Email',
+      headerSubtitle: 'Confirm your address to submit your application',
+      bodyText: 'Hi {{name}},\n\nUse the verification code below to confirm your email address and submit your vendor application. Enter it on the application form to continue.',
+      buttonLabel: '', footerText: 'This is an automated security message. Please do not reply to this email.',
+    },
+    // The code itself, shown large and centred — this is the whole point of the email.
+    rawAfterTable:
+      '<div style="margin:8px 0 4px;text-align:center;">' +
+      '<div style="display:inline-block;padding:18px 34px;background:#faf5f2;border:1px solid #f0d9d4;border-radius:12px;">' +
+      '<span style="font-family:\'Courier New\',monospace;font-size:34px;font-weight:800;letter-spacing:10px;color:#e01a1b;">{{otp}}</span>' +
+      '</div></div>',
+    note: "This code expires in 10 minutes. If you didn't request it, you can safely ignore this email.",
+  },
+
   email_verification: {
     defaults: {
       emoji: '✉️', headerTitle: 'Verify Your Email',

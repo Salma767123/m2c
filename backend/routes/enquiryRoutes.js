@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireRole, requirePermission } = require('../middleware/auth');
 const {
+    sendEnquiryOtp,
+    verifyEnquiryOtp,
     submitEnquiry,
     getAllEnquiries,
     getEnquiryById,
@@ -9,6 +11,10 @@ const {
     rejectEnquiry,
     deleteEnquiry
 } = require('../controllers/enquiryController');
+
+// Public: email verification for the vendor-enquiry form (no auth required)
+router.post('/otp/send', sendEnquiryOtp);
+router.post('/otp/verify', verifyEnquiryOtp);
 
 // Public: Submit a vendor enquiry (from contact page - no auth required)
 router.post('/submit', submitEnquiry);

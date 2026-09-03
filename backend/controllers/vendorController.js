@@ -14,6 +14,7 @@ const {
   sendNewVendorRegistrationEmailToAdmins,
   generateSecurePassword
 } = require('../utils/email/vendorEmailSender');
+const { getValidVerifiedOtp, consumeOtp } = require('./enquiryController');
 
 // FormData serializes undefined/null as "" (empty string), which JSON.parse
 // rejects with "Unexpected end of JSON input". This helper accepts whatever
@@ -335,6 +336,23 @@ const registerVendor = async (req, res) => {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedOwnerEmail = ownerEmail ? ownerEmail.trim().toLowerCase() : ownerEmail;
     const normalizedGst = gstNumber ? gstNumber.trim().toUpperCase() : '';
+
+    // Public self-registration must prove ownership of the primary email via a
+    // one-time code (sent/verified through /api/enquiries/otp/*). Admin-created
+    // vendors (authenticated request) skip this — the admin vouches for them.
+    // The code is spent only after the vendor row is actually created, below.
+    let registrationOtp = null;
+    const isAdminActor = !!req.user;
+    if (!isAdminActor) {
+      registrationOtp = await getValidVerifiedOtp(normalizedEmail, 'vendor_registration');
+      if (!registrationOtp) {
+        return res.status(403).json({
+          code: 'EMAIL_NOT_VERIFIED',
+          field: 'email',
+          error: 'Please verify your primary email address before submitting your registration.'
+        });
+      }
+    }
 
     // ── Registered vendor (GST provided) ────────────────────────────────────
     // GST Number is the PRIMARY unique identifier. Check it first and surface
@@ -1067,6 +1085,10 @@ const registerVendor = async (req, res) => {
       city: vendor.businessCity,
       state: vendor.businessState
     }).catch(() => { });
+
+    // Spend the email-verification code now that the vendor exists, so it
+    // can't be reused for another registration.
+    if (registrationOtp) await consumeOtp(registrationOtp.id);
 
     res.status(201).json({
       message: 'Vendor registration submitted successfully',

@@ -1850,6 +1850,120 @@ model VendorEnquiry {
   @@map("vendor_enquiries")
 }
 
+// One-time email verification codes. Used to prove an applicant owns the email
+// address on the public vendor-enquiry form before their enquiry is accepted.
+// The code itself is never stored in the clear — only its SHA-256 hash.
+model EmailOtp {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  email      String
+  purpose    String    @default("vendor_enquiry") // namespaces codes by flow
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)   // wrong-code guesses, capped to stop brute force
+  verified   Boolean   @default(false)
+  consumedAt DateTime?               // set the moment a verified code is spent on a submit
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([email, purpose])
+  @@map("email_otps")
+}
+
+// Customer return / refund / replacement request. One record per returned
+// order item, kept as a dedicated collection (not JSON on Order) so a customer
+// can accumulate a full return history and admins can manage them as their own
+// queue with evidence, a status timeline, and an audit trail.
+model ReturnRequest {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  returnId String @unique // human id, e.g. RET-2026-000123
+
+  // Links
+  orderId       String  @db.ObjectId // Order.id
+  orderCode     String // Order.orderId (ORD-YYYY-...)
+  orderItemId   String? @db.ObjectId
+  customerId    String  @db.ObjectId
+  customerName  String?
+  customerEmail String?
+  customerPhone String?
+
+  // Product snapshot (frozen at request time)
+  productId    String? @db.ObjectId
+  productName  String
+  productImage String?
+  variantId    String? @db.ObjectId
+  size         String?
+  color        String?
+  quantity     Int     @default(1)
+
+  // Money — itemAmount is in the order currency; itemAmountINR is the frozen
+  // INR twin used for the actual gateway refund (Razorpay settles in INR).
+  currency      String @default("INR")
+  itemAmount    Float
+  itemAmountINR Float?
+
+  // The request
+  reason         String // reason code (see returnController REASONS)
+  reasonNote     String?
+  evidenceImages String[] @default([])
+  resolution     String // 'REFUND' | 'REPLACEMENT'
+
+  // Refund preference / gateway tracking
+  refundMethod       String? // 'ORIGINAL' | 'UPI'
+  upiId              String?
+  refundAmount       Float?
+  refundId           String?
+  refundStatus       String? // gateway: INITIATED | PROCESSED | FAILED | MANUAL | NONE
+  paymentReference   String?
+  // Human label of the ORIGINAL instrument the customer paid with, fetched from
+  // the gateway at refund time (e.g. "UPI · name@bank", "Card •••• 1234").
+  paymentMethodLabel String?
+
+  // Replacement tracking
+  replacementValue         Float?
+  replacementEntitlementId String? @db.ObjectId
+
+  // Lifecycle status + timeline
+  status            String  @default("Pending Review")
+  statusHistory     Json? // [{ status, note, at, by }]
+  customerConfirmed Boolean @default(false)
+
+  // Admin decision / audit
+  adminNote       String?
+  rejectionReason String?
+  decidedById     String?   @db.ObjectId
+  decidedByName   String?
+  decidedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([orderId])
+  @@index([status])
+  @@map("return_requests")
+}
+
+// A replacement credit recorded in the customer's account once a REPLACEMENT
+// return is approved. It is redeemed against a future eligible order per M2C
+// replacement rules — never auto-added to an unrelated order.
+model ReplacementEntitlement {
+  id              String  @id @default(auto()) @map("_id") @db.ObjectId
+  customerId      String  @db.ObjectId
+  returnRequestId String  @db.ObjectId
+  returnCode      String
+  productName     String
+  productImage    String?
+  value           Float
+  currency        String  @default("INR")
+  status          String  @default("Pending") // Pending | Available | Redeemed | Cancelled
+  redeemedOrderId String? @db.ObjectId
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([customerId])
+  @@map("replacement_entitlements")
+}
+
 // ============================================
 // CONTACT/WEBSITE ENQUIRIES
 // ============================================

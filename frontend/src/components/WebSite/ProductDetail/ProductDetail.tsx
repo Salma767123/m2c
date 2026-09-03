@@ -1748,6 +1748,46 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       )}
                     </div>
 
+                    {/* Quantity — sits at the top of the shipping/logistics area. */}
+                    {availableStock > 0 && (
+                      <div className="mb-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+                        <span className="text-sm font-semibold text-gray-700">Quantity:</span>
+                        {/* The stepper is one group, so a wrap in the narrow
+                            buy box breaks after the label rather than
+                            through the middle of the control. */}
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <button
+                            onClick={handleDecrement}
+                            disabled={quantity <= 1}
+                            aria-label="Decrease quantity"
+                            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <span className="text-xl font-semibold">−</span>
+                          </button>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            max={availableStock}
+                            value={quantity || ''}
+                            onChange={handleQuantityChange}
+                            onBlur={handleQuantityBlur}
+                            aria-label="Quantity"
+                            className="w-16 sm:w-20 text-center font-bold text-base sm:text-lg border-2 border-gray-300 rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <button
+                            onClick={handleIncrement}
+                            disabled={quantity >= availableStock}
+                            aria-label="Increase quantity"
+                            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <span className="text-xl font-semibold">+</span>
+                          </button>
+                          <span className="text-sm font-medium text-gray-500">{product?.uom || 'pcs'}</span>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Smart Logistics Section */}
                     {logisticsResult && product.logisticsConfig && (
                       <div
@@ -1960,49 +2000,6 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
 
                   {availableStock > 0 && (
                     <>
-                          {/* Quantity Selector — shown below price / stock / dispatch (order-3)
-
-                              mt-4 because it had none: it sat hard against the
-                              bottom edge of the logistics card above and read as
-                              part of it. The subtotal block below already
-                              separates itself the same way. */}
-                          <div className="mt-4 mb-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 sm:mt-5">
-                            <span className="text-sm font-semibold text-gray-700">Quantity:</span>
-                            {/* The stepper is one group, so a wrap in the narrow
-                                buy box breaks after the label rather than
-                                through the middle of the control. */}
-                            <div className="flex items-center gap-2 sm:gap-3">
-                            <button
-                              onClick={handleDecrement}
-                              disabled={quantity <= 1}
-                              aria-label="Decrease quantity"
-                              className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            >
-                              <span className="text-xl font-semibold">−</span>
-                            </button>
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              min={1}
-                              max={availableStock}
-                              value={quantity || ''}
-                              onChange={handleQuantityChange}
-                              onBlur={handleQuantityBlur}
-                              aria-label="Quantity"
-                              className="w-16 sm:w-20 text-center font-bold text-base sm:text-lg border-2 border-gray-300 rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                            <button
-                              onClick={handleIncrement}
-                              disabled={quantity >= availableStock}
-                              aria-label="Increase quantity"
-                              className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            >
-                              <span className="text-xl font-semibold">+</span>
-                            </button>
-                            <span className="text-sm font-medium text-gray-500">{product?.uom || 'pcs'}</span>
-                            </div>
-                          </div>
-
                   {/* The running total, directly above the buttons instead of in a
                       separate card beside them. Quantity and the freight choice both
                       move this figure, so it belongs next to the controls that change

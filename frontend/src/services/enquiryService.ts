@@ -27,6 +27,40 @@ export interface SubmitEnquiryData {
 }
 
 class EnquiryService {
+    // Public: send an email-verification OTP (no auth). `purpose` namespaces the
+    // code — 'vendor_enquiry' (default) for the enquiry form, 'vendor_registration'
+    // for the full registration form.
+    async sendOtp(email: string, name?: string, purpose?: string): Promise<{ success: boolean; message: string }> {
+        try {
+            const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+            const response = await axiosLib.post(`${baseURL}/enquiries/otp/send`, { email, name, purpose }, {
+                headers: { 'Content-Type': 'application/json' }
+            });
+            return response.data;
+        } catch (error: unknown) {
+            const err = error as { message?: string; response?: { status?: number; data?: { message?: string } } };
+            const wrapped = new Error(err.response?.data?.message || err.message || 'Failed to send verification code') as Error & { status?: number };
+            wrapped.status = err.response?.status;
+            throw wrapped;
+        }
+    }
+
+    // Public: verify the OTP the applicant typed back in (no auth)
+    async verifyOtp(email: string, otp: string, purpose?: string): Promise<{ success: boolean; message: string }> {
+        try {
+            const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+            const response = await axiosLib.post(`${baseURL}/enquiries/otp/verify`, { email, otp, purpose }, {
+                headers: { 'Content-Type': 'application/json' }
+            });
+            return response.data;
+        } catch (error: unknown) {
+            const err = error as { message?: string; response?: { status?: number; data?: { message?: string } } };
+            const wrapped = new Error(err.response?.data?.message || err.message || 'Failed to verify code') as Error & { status?: number };
+            wrapped.status = err.response?.status;
+            throw wrapped;
+        }
+    }
+
     // Public: Submit vendor enquiry from Contact page (no auth)
     async submitEnquiry(data: SubmitEnquiryData): Promise<{ success: boolean; message: string; data: VendorEnquiry }> {
         try {
