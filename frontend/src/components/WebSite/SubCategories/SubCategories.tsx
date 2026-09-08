@@ -195,7 +195,7 @@ export default function SubCategories({ categorySlug }: { categorySlug: string }
             alt={`${category.name} Banner`}
             fill
             sizes="100vw"
-            className="object-cover"
+            className="object-cover object-center"
             priority
           />
         ) : (
@@ -251,15 +251,16 @@ export default function SubCategories({ categorySlug }: { categorySlug: string }
                 href={`/products?category=${category.slug}&subcategory=${subcategory.slug}`}
                 className="group relative flex h-full flex-col bg-white rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] hover:ring-[#e01a1b]/20 transition-all duration-500 overflow-hidden transform hover:-translate-y-1.5"
               >
-                {/* Image Section */}
-                <div className="relative h-32 shrink-0 overflow-hidden rounded-t-2xl bg-gradient-to-br from-gray-100 to-orange-200 sm:h-48 md:h-56">
+                {/* Image Section — fixed 4:3 landscape box so the crop is identical
+                    on every breakpoint (was fixed pixel heights that reshaped it). */}
+                <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-t-2xl bg-gradient-to-br from-gray-100 to-orange-200">
                   {subcategory.image ? (
                     <Image
                       src={subcategory.image}
                       alt={subcategory.name}
                       fill
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
-                      className="object-cover group-hover:scale-110 transition-transform duration-[900ms] ease-out"
+                      className="object-cover object-center group-hover:scale-110 transition-transform duration-[900ms] ease-out"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.style.display = 'none';

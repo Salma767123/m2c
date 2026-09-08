@@ -2,6 +2,25 @@ const crypto = require('crypto');
 const { prisma } = require('../config/database');
 const { generateInvoiceNo } = require('../utils/invoiceGenerator');
 const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
+
+// Prune items belonging to a CANCELLED/RETURNED shipment (reship scenario) — but
+// ONLY for live orders. A fully cancelled/returned ORDER has all its shipments
+// cancelled, so the shipment-status filter would wrongly empty it; there the
+// customer must still see everything they ordered. Include shipment.status on the
+// items query for this to work, then run each fetched order through here.
+const CANCELLED_OR_RETURNED = ['CANCELLED', 'RETURNED'];
+function pruneReshippedItems(order) {
+    if (!order || !Array.isArray(order.items)) return order;
+    if (!CANCELLED_OR_RETURNED.includes(order.status)) {
+        order.items = order.items.filter(
+            (it) => !it.shipmentId || !CANCELLED_OR_RETURNED.includes(it.shipment?.status),
+        );
+    }
+    // Drop the helper relation we only pulled for the check above.
+    order.items = order.items.map(({ shipment, ...rest }) => rest);
+    return order;
+}
+const ITEMS_WITH_SHIPMENT_STATUS = { include: { shipment: { select: { status: true } } } };
 const { notifications } = require('../utils/notificationService');
 const { checkAndAlertLowStock } = require('../utils/lowStockAlert');
 const { withRetry } = require('../utils/dbRetry');
@@ -56,7 +75,10 @@ const createOrder = async (req, res) => {
         // opt-in (`razorpayOrderId && razorpaySignature && paymentId`), which meant
         // POSTing an order with no payment fields skipped verification entirely and
         // still got written `paymentStatus: 'PAID'` below.
-        const isPrepaid = paymentMethod !== 'COD';
+        // COD and a fully-wallet-covered order carry no gateway payment, so they
+        // skip Razorpay verification. A partial-wallet order still pays the rest
+        // via Razorpay (paymentMethod stays 'razorpay').
+        const isPrepaid = paymentMethod !== 'COD' && paymentMethod !== 'WALLET';
         const needsRazorpayVerification = isPrepaid;
         if (isPrepaid && !(razorpayOrderId && razorpaySignature && paymentId)) {
             return res.status(400).json({
@@ -621,6 +643,36 @@ const createOrder = async (req, res) => {
             roundedSubtotal + roundedShipping + roundedTax - roundedDiscount
         ));
 
+        // ── Wallet redemption (store credit) ─────────────────────────────────
+        // Store credit is a TENDER applied AFTER the invoice total is final — it
+        // never touches subtotal/discount/tax. Wallet balance is INR; convert to
+        // the order currency to cap it, and remember the INR amount to debit.
+        let walletApplied = 0;      // order currency
+        let walletAppliedINR = 0;   // actually debited from the wallet
+        const requestedWallet = Math.max(0, Number(req.body?.walletApplied) || 0);
+        if (requestedWallet > 0 || paymentMethod === 'WALLET') {
+            const wallet = await prisma.wallet.findUnique({ where: { customerId: userId } });
+            const balanceINR = wallet?.balance || 0;
+            const balanceOrderCcy = currency === 'USD'
+                ? round2(orderExchangeRate ? balanceINR / orderExchangeRate : 0)
+                : balanceINR;
+            const maxRedeem = round2(Math.min(balanceOrderCcy, totalAmount));
+            const want = paymentMethod === 'WALLET' ? totalAmount : requestedWallet;
+            walletApplied = round2(Math.max(0, Math.min(want, maxRedeem)));
+            walletAppliedINR = currency === 'USD' ? round2(walletApplied * orderExchangeRate) : walletApplied;
+            if (walletAppliedINR > balanceINR) walletAppliedINR = round2(balanceINR);
+        }
+        // Net still payable via gateway after wallet.
+        const netPayable = Math.max(0, round2(totalAmount - walletApplied));
+
+        // A pure-wallet order must be fully covered by the balance.
+        if (paymentMethod === 'WALLET' && netPayable > 0.009) {
+            return res.status(400).json({
+                success: false,
+                error: 'Your wallet balance does not cover the full amount. Please choose another payment method.'
+            });
+        }
+
         // ── Payment amount reconciliation ────────────────────────────────────
         // The HMAC signature proves the payment exists and is ours — it does NOT
         // prove it was for THIS cart. Without this check, a valid signature from an
@@ -674,16 +726,18 @@ const createOrder = async (req, res) => {
                 let expected = null;
                 let paid = null;
                 let unit = currency;
+                // Compare against the NET payable (total minus any wallet credit),
+                // since that is what the Razorpay order was raised for.
                 if (Number.isFinite(quotedAmount) && quotedCurrency === currency) {
-                    expected = totalAmount;
+                    expected = netPayable;
                     paid = quotedAmount;
                 } else {
                     // Fallback for orders raised before the quote was stamped: compare
                     // in INR using this order's own rate snapshot.
                     unit = 'INR';
                     expected = currency === 'USD'
-                        ? toINR(totalAmount, currency, orderExchangeRate)
-                        : totalAmount;
+                        ? toINR(netPayable, currency, orderExchangeRate)
+                        : netPayable;
                     paid = round2(paidPaise / 100);
                 }
 
@@ -766,6 +820,10 @@ const createOrder = async (req, res) => {
                     taxINR: round2(toINR(roundedTax, currency, orderExchangeRate)),
                     shippingCostINR: round2(toINR(roundedShipping, currency, orderExchangeRate)),
                     discountINR: round2(toINR(roundedDiscount, currency, orderExchangeRate)),
+                    // Wallet tender (order currency) + INR twin + what the gateway was charged.
+                    walletApplied,
+                    walletAppliedINR: round2(walletAppliedINR),
+                    amountPaid: netPayable,
                     paymentStatus: paymentMethod === 'COD' ? 'PENDING' : 'PAID',
                     paymentMethod,
                     paymentId,
@@ -808,6 +866,21 @@ const createOrder = async (req, res) => {
                     where: { code: validatedCouponCode },
                     data: { usedCount: { increment: 1 } },
                 });
+            }
+
+            // Debit the wallet inside the transaction — a rollback (e.g. stock
+            // shortage below) also reverses the debit. debitWallet re-reads the
+            // balance and throws if it's insufficient, so it can't over-spend.
+            if (walletAppliedINR > 0) {
+                const { debitWallet } = require('../utils/wallet');
+                await debitWallet({
+                    customerId: userId,
+                    amount: walletAppliedINR,
+                    source: 'ORDER_REDEMPTION',
+                    description: `Applied to order ${orderDisplayId}`,
+                    refs: { orderId: newOrder.id, orderCode: orderDisplayId },
+                    actor: { id: userId, name: user.name, type: 'customer' },
+                }, tx);
             }
 
             // Update Stock
@@ -1114,12 +1187,13 @@ const getUserOrders = async (req, res) => {
         const orders = await prisma.order.findMany({
             where: { customerId: userId },
             include: {
-                items: ACTIVE_ITEMS_FILTER,
+                items: ITEMS_WITH_SHIPMENT_STATUS,
             },
             orderBy: {
                 createdAt: 'desc'
             }
         });
+        orders.forEach(pruneReshippedItems);
 
         res.json({
             success: true,
@@ -1150,7 +1224,7 @@ const getOrderById = async (req, res) => {
             order = await prisma.order.findUnique({
                 where: { id },
                 include: {
-                    items: ACTIVE_ITEMS_FILTER,
+                    items: ITEMS_WITH_SHIPMENT_STATUS,
                     statusHistory: true,
                     hub: { select: { name: true, city: true, state: true } },
                     shipments: { select: { hub: { select: { name: true, city: true, state: true } } } }
@@ -1163,7 +1237,7 @@ const getOrderById = async (req, res) => {
             order = await prisma.order.findUnique({
                 where: { orderId: id },
                 include: {
-                    items: ACTIVE_ITEMS_FILTER,
+                    items: ITEMS_WITH_SHIPMENT_STATUS,
                     statusHistory: true,
                     hub: { select: { name: true, city: true, state: true } },
                     shipments: { select: { hub: { select: { name: true, city: true, state: true } } } }
@@ -1177,6 +1251,9 @@ const getOrderById = async (req, res) => {
                 error: 'Order not found'
             });
         }
+
+        // Keep reship-hiding for live orders; show all items for a cancelled/returned order.
+        pruneReshippedItems(order);
 
         // Ensure user owns the order
         if (order.customerId !== userId) {
@@ -1251,6 +1328,8 @@ const cancelMyOrder = async (req, res) => {
         const userId = req.userId;
         const { id } = req.params;
         const reason = (req.body?.reason || '').toString().trim().slice(0, 300) || null;
+        // Customer picks where the refund goes: 'WALLET' (instant store credit) or 'BANK' (gateway).
+        const refundTo = req.body?.refundTo === 'WALLET' ? 'WALLET' : 'BANK';
 
         const order = await prisma.order.findUnique({ where: { id }, include: { items: true } });
         if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
@@ -1262,11 +1341,20 @@ const cancelMyOrder = async (req, res) => {
             });
         }
 
+        const { restoreStockForOrder } = require('../utils/restoreStock');
+        let stockHistoryRecords = [];
         await prisma.$transaction(async (tx) => {
             // Stop the vendor payout for a cancelled order.
             await tx.settlement.updateMany({
                 where: { orderId: order.id, status: { in: ['Pending', 'Processing'] } },
                 data: { status: 'Cancelled' },
+            });
+            // Put the reserved stock back on sale — the items never shipped.
+            stockHistoryRecords = await restoreStockForOrder(tx, order, {
+                reason: `Order cancelled: ${order.orderId}`,
+                changedBy: userId,
+                changedByType: 'customer',
+                changedByName: 'Customer',
             });
             await tx.order.update({
                 where: { id: order.id },
@@ -1307,13 +1395,39 @@ const cancelMyOrder = async (req, res) => {
             }
         });
 
+        // Persist restock audit rows (best-effort — never block the cancel).
+        if (stockHistoryRecords.length > 0) {
+            prisma.stockChangeHistory.createMany({ data: stockHistoryRecords }).catch(() => {});
+        }
+
         // Refund (fire after the state change so a gateway hiccup can't undo the cancel).
-        const { issueRefund } = require('../utils/refund');
-        const refund = await issueRefund(order);
-        const updated = await prisma.order.update({
-            where: { id: order.id },
-            data: { refundStatus: refund.refundStatus, refundId: refund.refundId, refundAmount: order.totalAmount },
-        });
+        // Only paid, non-COD orders have anything to refund.
+        const wasPaid = order.paymentStatus === 'PAID' && order.paymentMethod !== 'COD';
+        let updated;
+        if (refundTo === 'WALLET' && wasPaid) {
+            // Instant store credit — no gateway. Wallet balance is INR.
+            const creditInr = order.totalAmountINR != null ? order.totalAmountINR : order.totalAmount;
+            try {
+                const { creditWallet } = require('../utils/wallet');
+                await creditWallet({
+                    customerId: userId, amount: creditInr, source: 'REFUND',
+                    description: `Cancellation refund for ${order.orderId}`,
+                    refs: { orderId: order.id, orderCode: order.orderId },
+                    actor: { id: userId, name: 'Customer', type: 'customer' },
+                });
+            } catch (e) { console.warn('[cancel] wallet credit failed:', e?.message); }
+            updated = await prisma.order.update({
+                where: { id: order.id },
+                data: { refundStatus: 'WALLET', refundAmount: order.totalAmount },
+            });
+        } else {
+            const { issueRefund } = require('../utils/refund');
+            const refund = await issueRefund(order);
+            updated = await prisma.order.update({
+                where: { id: order.id },
+                data: { refundStatus: refund.refundStatus, refundId: refund.refundId, refundAmount: order.totalAmount },
+            });
+        }
 
         // Notify vendors so they stop processing.
         try {
@@ -1328,7 +1442,12 @@ const cancelMyOrder = async (req, res) => {
             }
         } catch { /* notifications are best-effort */ }
 
-        res.json({ success: true, data: updated, message: 'Order cancelled. Your refund has been initiated.' });
+        const refundMsg = !wasPaid
+            ? 'Order cancelled.'
+            : refundTo === 'WALLET'
+                ? 'Order cancelled. Your refund has been added to your wallet.'
+                : 'Order cancelled. Your refund has been initiated to your original payment method.';
+        res.json({ success: true, data: updated, message: refundMsg });
     } catch (error) {
         console.error('Cancel my order error:', error);
         res.status(500).json({ success: false, error: 'Failed to cancel order' });

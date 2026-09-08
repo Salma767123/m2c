@@ -29,6 +29,7 @@ import cartService, { CartItem } from "@/services/cartService"
 import orderService, { CreateOrderParams } from "@/services/orderService"
 import { stashRecentOrder } from "@/lib/recentOrder"
 import paymentService from "@/services/paymentService"
+import { walletService } from "@/services/walletService"
 import { userProfileService } from "@/services/userProfileService"
 import { userAuthService } from "@/services/userAuthService"
 import { paymentSettingsService, PublicPaymentSettings } from "@/services/paymentSettingsService"
@@ -113,6 +114,10 @@ export default function Checkout() {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [paymentSettings, setPaymentSettings] = useState<PublicPaymentSettings | null>(null)
+
+  // Wallet store credit (balance always INR).
+  const [walletBalanceInr, setWalletBalanceInr] = useState(0)
+  const [useWallet, setUseWallet] = useState(false)
 
   // Saved addresses state
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
@@ -228,6 +233,21 @@ export default function Checkout() {
   useEffect(() => {
     calculateTotals()
   }, [cartItems, formData.shippingMethod, discountAmount])
+
+  // Load the customer's wallet balance so it can be offered at checkout.
+  useEffect(() => {
+    walletService.getMyWallet()
+      .then((res) => setWalletBalanceInr(res.data?.balance || 0))
+      .catch(() => setWalletBalanceInr(0))
+  }, [])
+
+  // Wallet redemption (tender applied after the total). Balance is INR; show/cap it
+  // in the order currency. walletApplied never exceeds the balance or the total.
+  const money2 = (n: number) => Number((n || 0).toFixed(2))
+  const walletBalanceOrderCcy = getCurrency() === 'USD' ? money2(convertINRtoUSD(walletBalanceInr)) : money2(walletBalanceInr)
+  const walletApplied = useWallet ? money2(Math.min(walletBalanceOrderCcy, orderSummary.total)) : 0
+  const netPayable = Math.max(0, money2(orderSummary.total - walletApplied))
+  const walletCoversAll = walletApplied > 0 && netPayable <= 0.009
 
   const fetchCart = async () => {
     try {
@@ -722,6 +742,12 @@ export default function Checkout() {
         country: formData.country,
       }
 
+      // Wallet covers the whole order → no gateway, place it straight away.
+      if (walletCoversAll) {
+        await createOrderAfterPayment(shippingAddress, undefined, undefined, undefined, 'WALLET')
+        return
+      }
+
       // Handle Razorpay payment
       if (formData.paymentMethod === 'razorpay') {
         await handleRazorpayPayment(shippingAddress)
@@ -752,8 +778,9 @@ export default function Checkout() {
       // Create Razorpay order. Send the currency the total is actually quoted
       // in — the server converts USD → INR before charging. Hardcoding 'INR'
       // here charged a USD figure as rupees (a $9.39 order collected ₹9.39).
+      // Charge only the net payable after wallet credit.
       const orderResponse = await paymentService.createRazorpayOrder(
-        orderSummary.total,
+        netPayable,
         getCurrency()
       )
 
@@ -819,14 +846,16 @@ export default function Checkout() {
 
   const createOrderAfterPayment = async (
     shippingAddress: CreateOrderParams['shippingAddress'],
-    paymentId: string,
+    paymentId?: string,
     razorpayOrderId?: string,
     razorpaySignature?: string,
+    paymentMethodOverride?: string,
   ) => {
     try {
       const response = await orderService.createOrder({
         shippingAddress,
-        paymentMethod: formData.paymentMethod,
+        // 'WALLET' when store credit covers the whole order (no gateway payment).
+        paymentMethod: paymentMethodOverride || formData.paymentMethod,
         paymentId,
         razorpayOrderId,
         razorpaySignature,
@@ -839,6 +868,8 @@ export default function Checkout() {
         // then fails the payment-amount reconciliation.
         couponCode: couponCode || undefined,
         currency: getCurrency(),
+        // Wallet store credit applied (order currency). Server clamps + debits it.
+        walletApplied: walletApplied > 0 ? walletApplied : undefined,
       })
 
       if (response.success && response.data) {
@@ -1456,15 +1487,39 @@ export default function Checkout() {
                 </div>
               )}
 
+              {/* Wallet store credit — a tender applied after the total. */}
+              {walletBalanceInr > 0 && orderSummary.total > 0 && (
+                <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3.5">
+                  <input type="checkbox" checked={useWallet} onChange={(e) => setUseWallet(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-600" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-[13.5px] font-semibold text-emerald-900">Use M2C Wallet</span>
+                      <span className="text-[12.5px] font-medium text-emerald-700">Balance {formatPrice(walletBalanceOrderCcy)}</span>
+                    </span>
+                    <span className="mt-0.5 block text-[12px] text-emerald-800/70">
+                      {useWallet
+                        ? `−${formatPrice(walletApplied)} applied${walletCoversAll ? ' — wallet covers the full amount' : ''}`
+                        : 'Apply your store credit to this order.'}
+                    </span>
+                  </span>
+                </label>
+              )}
+
               {/* The one dark object on the page, and the only one that earns
                   it: the figure the whole checkout exists to arrive at. */}
               <div className="mt-5 rounded-2xl bg-linear-to-br from-[#2f1e1a] to-[#1f1312] px-5 py-4 text-white shadow-[0_14px_34px_-20px_rgba(70,40,25,0.85)]">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-base font-semibold sm:text-lg">Total payable</span>
+                  <span className="text-base font-semibold sm:text-lg">{useWallet && walletApplied > 0 ? 'You pay now' : 'Total payable'}</span>
                   <span className="font-playfair text-2xl font-semibold tabular-nums sm:text-[28px]">
-                    {formatPrice(orderSummary.total)}
+                    {formatPrice(useWallet ? netPayable : orderSummary.total)}
                   </span>
                 </div>
+                {useWallet && walletApplied > 0 && (
+                  <p className="mt-1 text-[12px] text-white/60">
+                    Order total {formatPrice(orderSummary.total)} · wallet −{formatPrice(walletApplied)}
+                  </p>
+                )}
                 {getRegion() === 'IN' && (
                   <p className="mt-1.5 text-[11.5px] leading-snug text-white/55">
                     Taxes are calculated based on applicable product tax rates.
@@ -1477,9 +1532,9 @@ export default function Checkout() {
                   rupees reads as a wrong amount. Same rate the server
                   uses, so the figure matches the actual charge.
                 */}
-                {getCurrency() === 'USD' && orderSummary.total > 0 && (
+                {getCurrency() === 'USD' && (useWallet ? netPayable : orderSummary.total) > 0 && (
                   <p className="mt-2 text-xs leading-relaxed text-white/55">
-                    Charged as {formatPrice(convertUSDtoINR(orderSummary.total), 'INR')} — billed in INR at today&apos;s exchange rate.
+                    Charged as {formatPrice(convertUSDtoINR(useWallet ? netPayable : orderSummary.total), 'INR')} — billed in INR at today&apos;s exchange rate.
                   </p>
                 )}
               </div>

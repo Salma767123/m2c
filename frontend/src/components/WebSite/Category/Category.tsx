@@ -225,7 +225,7 @@ export default function Category() {
                     alt={category.name}
                     fill
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 17vw"
-                    className="cg-photo object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.06]"
+                    className="cg-photo object-cover object-center transition-transform duration-[900ms] ease-out group-hover:scale-[1.06]"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';

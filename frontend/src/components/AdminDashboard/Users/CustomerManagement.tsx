@@ -30,7 +30,8 @@ import {
   Star,
   ShoppingBag,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  X
 } from 'lucide-react';
 
 
@@ -57,6 +58,13 @@ export default function CustomerManagement() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  // Additional client-side filters covering every customer dimension.
+  const [ordersFilter, setOrdersFilter] = useState('all');   // order-count tiers
+  const [spendFilter, setSpendFilter] = useState('all');     // lifetime-spend tiers (₹)
+  const [ratingFilter, setRatingFilter] = useState('all');   // reviews / rating
+  const [activityFilter, setActivityFilter] = useState('all'); // last-login recency
+  const [stateFilter, setStateFilter] = useState('all');     // billing/shipping state
+  const [sortBy, setSortBy] = useState('recent');            // result ordering
   // const [loyaltyFilter, setLoyaltyFilter] = useState<string>('all'); // TODO: Re-enable when loyalty system is implemented
   const [currentPage, setCurrentPage] = useState(1);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -104,7 +112,7 @@ export default function CustomerManagement() {
   // Reset to the first page whenever the client-side search/filter changes.
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, dateFrom, dateTo]);
+  }, [searchTerm, statusFilter, dateFrom, dateTo, ordersFilter, spendFilter, ratingFilter, activityFilter, stateFilter, sortBy]);
 
   // Always fetch the FULL customer set so the metric cards reflect global,
   // up-to-date totals. Search + status/metric filtering is applied client-side
@@ -151,19 +159,14 @@ export default function CustomerManagement() {
   ] as const;
 
   const now = new Date();
-  const filteredCustomers = customers.filter((customer) => {
-    const q = searchTerm.trim().toLowerCase();
-    if (q) {
-      const haystack = `${customer.firstName} ${customer.lastName} ${customer.email} ${customer.phone}`.toLowerCase();
-      if (!haystack.includes(q)) return false;
-    }
-    // Join-date range filter (YYYY-MM-DD strings compare lexicographically)
-    if (dateFrom || dateTo) {
-      const joined = customer.joinDate ? fmtDate(new Date(customer.joinDate)) : '';
-      if (!joined) return false;
-      if (dateFrom && joined < dateFrom) return false;
-      if (dateTo && joined > dateTo) return false;
-    }
+  const DAY_MS = 86400000;
+  const daysSince = (d: string) => {
+    const t = new Date(d).getTime();
+    return isNaN(t) ? Infinity : (now.getTime() - t) / DAY_MS;
+  };
+
+  // The status card / dropdown selection (status values + two date-based metric keys).
+  const matchesStatus = (customer: Customer) => {
     switch (statusFilter) {
       case 'active':
       case 'suspended':
@@ -178,10 +181,100 @@ export default function CustomerManagement() {
       default:
         return true; // 'all'
     }
+  };
+
+  // Distinct states present in the data, for the Location dropdown.
+  const stateOptions = [
+    { value: 'all', label: 'All States' },
+    ...Array.from(
+      new Set(
+        customers
+          .map((c) => (c.address?.state || '').trim())
+          .filter((s) => s && s.toLowerCase() !== 'n/a'),
+      ),
+    )
+      .sort((a, b) => a.localeCompare(b))
+      .map((s) => ({ value: s.toLowerCase(), label: s })),
+  ];
+
+  const filteredCustomers = customers.filter((customer) => {
+    const q = searchTerm.trim().toLowerCase();
+    if (q) {
+      const haystack = `${customer.firstName} ${customer.lastName} ${customer.email} ${customer.phone}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    // Join-date range filter (YYYY-MM-DD strings compare lexicographically)
+    if (dateFrom || dateTo) {
+      const joined = customer.joinDate ? fmtDate(new Date(customer.joinDate)) : '';
+      if (!joined) return false;
+      if (dateFrom && joined < dateFrom) return false;
+      if (dateTo && joined > dateTo) return false;
+    }
+    if (!matchesStatus(customer)) return false;
+
+    // Orders (count tiers)
+    const o = customer.totalOrders || 0;
+    if (ordersFilter === 'none' && o !== 0) return false;
+    if (ordersFilter === '1-4' && !(o >= 1 && o <= 4)) return false;
+    if (ordersFilter === '5+' && o < 5) return false;
+
+    // Lifetime spend (₹ tiers)
+    const s = customer.totalSpent || 0;
+    if (spendFilter === 'zero' && s !== 0) return false;
+    if (spendFilter === 'lt5k' && !(s > 0 && s < 5000)) return false;
+    if (spendFilter === '5k-20k' && !(s >= 5000 && s <= 20000)) return false;
+    if (spendFilter === 'gt20k' && !(s > 20000)) return false;
+
+    // Reviews / rating
+    const rc = customer.reviewsCount || 0, ar = customer.averageRating || 0;
+    if (ratingFilter === 'has_reviews' && rc === 0) return false;
+    if (ratingFilter === 'no_reviews' && rc > 0) return false;
+    if (ratingFilter === '4plus' && ar < 4) return false;
+    if (ratingFilter === 'under3' && !(rc > 0 && ar < 3)) return false;
+
+    // Activity (last-login recency)
+    if (activityFilter !== 'all') {
+      const d = daysSince(customer.lastLogin);
+      if (activityFilter === 'today' && new Date(customer.lastLogin).toDateString() !== now.toDateString()) return false;
+      if (activityFilter === 'week' && d > 7) return false;
+      if (activityFilter === 'month' && d > 30) return false;
+      if (activityFilter === 'inactive' && d <= 90) return false;
+    }
+
+    // Location (state)
+    if (stateFilter !== 'all') {
+      if ((customer.address?.state || '').trim().toLowerCase() !== stateFilter) return false;
+    }
+    return true;
   });
 
-  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / PAGE_SIZE));
-  const paginatedCustomers = filteredCustomers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  // Sort the filtered set (default: newest join first).
+  const sortedCustomers = [...filteredCustomers].sort((a, b) => {
+    switch (sortBy) {
+      case 'oldest': return new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime();
+      case 'orders_desc': return (b.totalOrders || 0) - (a.totalOrders || 0);
+      case 'spend_desc': return (b.totalSpent || 0) - (a.totalSpent || 0);
+      case 'active_desc': return new Date(b.lastLogin).getTime() - new Date(a.lastLogin).getTime();
+      case 'name_asc':
+        return (a.fullName || `${a.firstName} ${a.lastName}`).localeCompare(b.fullName || `${b.firstName} ${b.lastName}`);
+      case 'recent':
+      default: return new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime();
+    }
+  });
+
+  const anyFilterActive =
+    !!searchTerm || statusFilter !== 'all' || !!dateFrom || !!dateTo ||
+    ordersFilter !== 'all' || spendFilter !== 'all' ||
+    ratingFilter !== 'all' || activityFilter !== 'all' || stateFilter !== 'all' || sortBy !== 'recent';
+
+  const clearAllFilters = () => {
+    setSearchTerm(''); setStatusFilter('all'); setDateFrom(''); setDateTo('');
+    setOrdersFilter('all'); setSpendFilter('all');
+    setRatingFilter('all'); setActivityFilter('all'); setStateFilter('all'); setSortBy('recent');
+  };
+
+  const totalPages = Math.max(1, Math.ceil(sortedCustomers.length / PAGE_SIZE));
+  const paginatedCustomers = sortedCustomers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -259,10 +352,10 @@ export default function CustomerManagement() {
         })}
       </div>
 
-      {/* Filter Toolbar */}
+      {/* Filter Toolbar — search + all filters on one wrapping row */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex-1 relative min-w-[200px]">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="relative w-full sm:w-60 md:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4 pointer-events-none" />
             <input
               type="text"
@@ -272,17 +365,97 @@ export default function CustomerManagement() {
               className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none w-full transition-all bg-white text-sm"
             />
           </div>
-          <div className="w-44 shrink-0">
+          <div className="w-40">
             <Dropdown
               value={['active', 'suspended', 'pending'].includes(statusFilter) ? statusFilter : 'all'}
               options={[
                 { value: 'all', label: 'All Status' },
                 { value: 'active', label: 'Active' },
                 { value: 'suspended', label: 'Suspended' },
-                { value: 'pending', label: 'Pending' }
+                { value: 'pending', label: 'Pending' },
               ]}
               onChange={(value) => setStatusFilter(value as string)}
               placeholder="All Status"
+            />
+          </div>
+          <div className="w-40">
+            <Dropdown
+              value={ordersFilter}
+              options={[
+                { value: 'all', label: 'Any Orders' },
+                { value: 'none', label: 'No orders' },
+                { value: '1-4', label: '1–4 orders' },
+                { value: '5+', label: '5+ orders' },
+              ]}
+              onChange={(value) => setOrdersFilter(value as string)}
+              placeholder="Any Orders"
+            />
+          </div>
+          <div className="w-44">
+            <Dropdown
+              value={spendFilter}
+              options={[
+                { value: 'all', label: 'Any Spend' },
+                { value: 'zero', label: '₹0 spent' },
+                { value: 'lt5k', label: 'Under ₹5,000' },
+                { value: '5k-20k', label: '₹5,000 – ₹20,000' },
+                { value: 'gt20k', label: 'Over ₹20,000' },
+              ]}
+              onChange={(value) => setSpendFilter(value as string)}
+              placeholder="Any Spend"
+            />
+          </div>
+          <div className="w-40">
+            <Dropdown
+              value={ratingFilter}
+              options={[
+                { value: 'all', label: 'Any Rating' },
+                { value: 'has_reviews', label: 'Has reviews' },
+                { value: 'no_reviews', label: 'No reviews' },
+                { value: '4plus', label: '4★ & up' },
+                { value: 'under3', label: 'Under 3★' },
+              ]}
+              onChange={(value) => setRatingFilter(value as string)}
+              placeholder="Any Rating"
+            />
+          </div>
+          <div className="w-44">
+            <Dropdown
+              value={activityFilter}
+              options={[
+                { value: 'all', label: 'Any Activity' },
+                { value: 'today', label: 'Active today' },
+                { value: 'week', label: 'Active this week' },
+                { value: 'month', label: 'Active this month' },
+                { value: 'inactive', label: 'Inactive (90d+)' },
+              ]}
+              onChange={(value) => setActivityFilter(value as string)}
+              placeholder="Any Activity"
+            />
+          </div>
+          {stateOptions.length > 1 && (
+            <div className="w-44">
+              <Dropdown
+                value={stateFilter}
+                options={stateOptions}
+                onChange={(value) => setStateFilter(value as string)}
+                placeholder="All States"
+              />
+            </div>
+          )}
+          <div className="w-44">
+            <Dropdown
+              value={sortBy}
+              options={[
+                { value: 'recent', label: 'Sort: Newest' },
+                { value: 'oldest', label: 'Sort: Oldest' },
+                { value: 'orders_desc', label: 'Sort: Most orders' },
+                { value: 'spend_desc', label: 'Sort: Highest spend' },
+                { value: 'active_desc', label: 'Sort: Recently active' },
+                { value: 'name_asc', label: 'Sort: Name A–Z' },
+              ]}
+              onChange={(value) => setSortBy(value as string)}
+              placeholder="Sort"
             />
           </div>
           <div className="shrink-0">
@@ -293,6 +466,15 @@ export default function CustomerManagement() {
               placeholder="Join Date"
             />
           </div>
+          {anyFilterActive && (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+            >
+              <X className="h-4 w-4" /> Clear
+            </button>
+          )}
         </div>
       </div>
       {/* Customers Table — matches the Vendor Management table style */}

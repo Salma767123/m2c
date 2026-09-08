@@ -252,7 +252,7 @@ export default function DiscoverNav() {
                               src={cat.image}
                               alt=""
                               loading="lazy"
-                              className={`absolute inset-0 h-full w-full object-cover transition-all duration-500 ${expanded ? 'scale-105 brightness-100' : 'scale-100 brightness-[0.82]'}`}
+                              className={`absolute inset-0 h-full w-full object-cover object-center transition-all duration-500 ${expanded ? 'scale-105 brightness-100' : 'scale-100 brightness-[0.82]'}`}
                             />
                           ) : (
                             <div className="absolute inset-0 bg-gradient-to-br from-[#e6cfcf] to-[#f1ded9]" />
@@ -335,7 +335,7 @@ export default function DiscoverNav() {
                   <Link href={catHref(cat)} onClick={() => setOpen(false)} className="relative flex h-24 items-end p-3">
                     {cat.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={cat.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                      <img src={cat.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover object-center" />
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-br from-[#e6cfcf] to-[#f1ded9]" />
                     )}

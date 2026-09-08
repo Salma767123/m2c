@@ -30,6 +30,9 @@ export default function ReturnDetailPanel({
   const [busy, setBusy] = useState(false);
   const [showReject, setShowReject] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [showApprove, setShowApprove] = useState(false);
+  const [restock, setRestock] = useState(true);
+  const [dispNote, setDispNote] = useState('');
 
   const load = async () => {
     try {
@@ -62,7 +65,17 @@ export default function ReturnDetailPanel({
     }
   };
 
-  const approve = () => act(() => returnService.decideReturn(rec!.id, 'approve'), 'Return approved');
+  // Damaged/quality returns default to NOT restocking; open the approve panel with
+  // that default so the admin makes a deliberate disposition choice.
+  const openApprove = () => {
+    setRestock(rec ? !['damaged', 'quality'].includes(rec.reason) : true);
+    setDispNote('');
+    setShowApprove(true);
+  };
+  const doApprove = () => {
+    act(() => returnService.decideReturn(rec!.id, 'approve', { restock, dispositionNote: dispNote.trim() || undefined }), 'Return approved')
+      .then(() => { setShowApprove(false); setDispNote(''); });
+  };
   const markUnderReview = () => act(() => returnService.decideReturn(rec!.id, 'under_review'), 'Marked under review');
   const doReject = () => {
     if (!rejectionReason.trim()) { notifyError('A rejection reason is required.'); return; }
@@ -119,6 +132,10 @@ export default function ReturnDetailPanel({
                   <Row label="Reason" value={reasonLabel(rec.reason)} />
                   {rec.reasonNote && <Row label="Customer note" value={rec.reasonNote} />}
                   <Row label="Resolution" value={rec.resolution === 'REFUND' ? 'Refund' : 'Replacement'} />
+                  {rec.restocked != null && (
+                    <Row label="Item disposition" value={rec.restocked ? 'Restocked to inventory' : 'Damaged — not restocked'} />
+                  )}
+                  {rec.dispositionNote && <Row label="Disposition note" value={rec.dispositionNote} />}
                 </dl>
                 {rec.evidenceImages?.length > 0 && (
                   <div className="mt-3">
@@ -175,8 +192,8 @@ export default function ReturnDetailPanel({
                 <Section title="Refund information" icon={<CreditCard className="h-4 w-4" />}>
                   <dl className="space-y-2 text-sm">
                     <Row label="Refund amount" value={money(rec.refundAmount ?? rec.itemAmount, rec.currency)} strong />
-                    <Row label="Method" value={rec.refundMethod === 'UPI'
-                      ? `UPI · ${rec.upiId}`
+                    <Row label="Method" value={rec.refundMethod === 'WALLET'
+                      ? 'M2C Wallet (store credit)'
                       : rec.paymentMethodLabel ? `Original · ${rec.paymentMethodLabel}` : 'Original payment method'} />
                     <Row label="Gateway status" value={rec.refundStatus || '—'} />
                     {rec.paymentReference && <Row label="Payment reference" value={rec.paymentReference} mono />}
@@ -185,8 +202,11 @@ export default function ReturnDetailPanel({
               ) : (
                 <Section title="Replacement information" icon={<Package className="h-4 w-4" />}>
                   <dl className="space-y-2 text-sm">
+                    <Row label="Preference" value={rec.replacementMethod === 'CREDIT' ? 'Wallet credit' : 'Ship item with next order'} />
                     <Row label="Replacement value" value={money(rec.replacementValue ?? rec.itemAmount, rec.currency)} strong />
-                    <Row label="Entitlement" value={rec.replacementEntitlementId ? 'Recorded in customer account' : 'Not yet created'} />
+                    {rec.replacementMethod !== 'CREDIT' && (
+                      <Row label="Entitlement" value={rec.replacementEntitlementId ? 'Recorded in customer account' : 'Not yet created'} />
+                    )}
                   </dl>
                 </Section>
               )}
@@ -234,11 +254,41 @@ export default function ReturnDetailPanel({
                       </button>
                     </div>
                   </div>
+                ) : showApprove ? (
+                  <div>
+                    <p className="mb-2 text-[13px] font-semibold text-slate-700">Item disposition</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => setRestock(true)}
+                        className={`rounded-lg border p-2.5 text-left transition-colors ${restock ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                        <span className="block text-[13px] font-semibold text-slate-800">Restock to inventory</span>
+                        <span className="mt-0.5 block text-[11px] text-slate-500">Item is good — add units back on sale.</span>
+                      </button>
+                      <button onClick={() => setRestock(false)}
+                        className={`rounded-lg border p-2.5 text-left transition-colors ${!restock ? 'border-amber-400 bg-amber-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                        <span className="block text-[13px] font-semibold text-slate-800">Mark as damaged</span>
+                        <span className="mt-0.5 block text-[11px] text-slate-500">Don&rsquo;t restock — log to Damaged Items.</span>
+                      </button>
+                    </div>
+                    <label className="mt-2.5 block text-[12px] font-medium text-slate-600">
+                      Note {restock ? <span className="text-slate-400">(optional)</span> : <span className="text-slate-400">(recommended)</span>}
+                    </label>
+                    <textarea value={dispNote} onChange={(e) => setDispNote(e.target.value)} rows={2}
+                      placeholder={restock ? 'e.g. Inspected, unused — returned to stock.' : 'e.g. Fabric torn, not resellable.'}
+                      className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                    <div className="mt-2 flex gap-2">
+                      <button onClick={() => { setShowApprove(false); setDispNote(''); }} disabled={busy}
+                        className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                      <button onClick={doApprove} disabled={busy}
+                        className="flex-1 rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
+                        {busy ? 'Approving…' : 'Confirm Approval'}
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="flex flex-wrap items-center gap-2">
                     {decidable && (
                       <>
-                        <button onClick={approve} disabled={busy}
+                        <button onClick={openApprove} disabled={busy}
                           className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
                           <CheckCircle className="h-4 w-4" /> Approve
                         </button>

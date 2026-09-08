@@ -107,6 +107,15 @@ const PERMISSION_MODULES = [
                 ],
             },
             {
+                key: 'wallet',
+                name: 'Customer Wallets',
+                description: 'Customer store-credit wallet balances and history',
+                actions: { view: true, create: false, edit: false, delete: false },
+                extra: [
+                    { key: 'adjust', label: 'Adjust Balance', description: 'Manually credit or debit a customer wallet (with a reason)' },
+                ],
+            },
+            {
                 key: 'invoices',
                 name: 'Invoices',
                 description: 'Customer invoices',

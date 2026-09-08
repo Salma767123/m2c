@@ -24,7 +24,9 @@ import {
   Copy,
   X,
   XCircle,
-  RotateCcw
+  RotateCcw,
+  CreditCard,
+  ShieldCheck
 } from "lucide-react"
 import SelectMenu from "@/components/WebSite/Shared/SelectMenu"
 import DateField from "@/components/WebSite/Shared/DateField"
@@ -139,6 +141,8 @@ export default function OrderList() {
   const [reasonChoice, setReasonChoice] = useState('')  // selected preset reason
   const [actionReason, setActionReason] = useState('')  // free text when "Other"
   const [actionSubmitting, setActionSubmitting] = useState(false)
+  // Cancel refund destination: 'WALLET' (instant credit) or 'BANK' (gateway).
+  const [cancelRefundTo, setCancelRefundTo] = useState<'WALLET' | 'BANK'>('BANK')
   // Multi-step return/refund/replacement flow (replaces the old single-reason return modal).
   const [returnModalOrder, setReturnModalOrder] = useState<Order | null>(null)
   // Latest return request per order code (ORD-…) — drives the Return button state
@@ -158,6 +162,7 @@ export default function OrderList() {
   const openActionModal = (order: Order, type: 'cancel' | 'return') => {
     setReasonChoice('')
     setActionReason('')
+    setCancelRefundTo('BANK')
     setActionModal({ order, type })
   }
 
@@ -165,15 +170,16 @@ export default function OrderList() {
     if (!actionModal) return
     const { order, type } = actionModal
     // Final reason = the selected preset, or the free text when "Other".
+    // A reason is mandatory for both cancel and return.
     const finalReason = reasonChoice === 'Other' ? actionReason.trim() : reasonChoice
-    if (type === 'return' && !finalReason) {
-      showErrorToast('Reason required', reasonChoice === 'Other' ? 'Please describe the reason.' : 'Please select a reason for the return.')
+    if (!finalReason) {
+      showErrorToast('Reason required', reasonChoice === 'Other' ? 'Please describe the reason.' : `Please select a reason for the ${type === 'cancel' ? 'cancellation' : 'return'}.`)
       return
     }
     try {
       setActionSubmitting(true)
       if (type === 'cancel') {
-        const res = await orderService.cancelOrder(order.id, finalReason || undefined)
+        const res = await orderService.cancelOrder(order.id, finalReason || undefined, cancelRefundTo)
         showSuccessToast('Order Cancelled', res.message || 'Your refund has been initiated.')
       } else {
         const res = await orderService.requestReturn(order.id, finalReason)
@@ -1107,13 +1113,12 @@ export default function OrderList() {
               <p className="mt-1 text-sm text-slate-500">
                 Order #{actionModal.order.orderNumber}
                 {actionModal.type === 'cancel'
-                  ? ' — the order will be cancelled and your payment refunded to the original method.'
+                  ? ' — the order will be cancelled.'
                   : ' — tell us why, and our team will review your return.'}
               </p>
 
               <label className="mt-4 block text-sm font-medium text-slate-700">
-                Reason {actionModal.type === 'return' && <span className="text-red-500">*</span>}
-                {actionModal.type === 'cancel' && <span className="font-normal text-slate-400"> (optional)</span>}
+                Reason <span className="text-red-500">*</span>
               </label>
               <div className="mt-2 space-y-1.5">
                 {(actionModal.type === 'cancel' ? CANCEL_REASONS : RETURN_REASONS).map((r) => (
@@ -1146,6 +1151,46 @@ export default function OrderList() {
                   placeholder="Please describe your reason…"
                   className="mt-2 w-full resize-none rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none transition-all focus:border-[#e01a1b] focus:ring-4 focus:ring-[#e01a1b]/10 disabled:bg-slate-50"
                 />
+              )}
+
+              {/* Refund destination — cancelling a paid (online) order can refund to
+                  the M2C wallet (instant) or the original method. COD/unpaid: nothing. */}
+              {actionModal.type === 'cancel' && (
+                actionModal.order.paymentStatus === 'PAID' ? (
+                  <div className="mt-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="flex items-center gap-2 text-[13px] font-semibold text-slate-800">
+                        <CreditCard className="h-4 w-4 text-[#e01a1b]" /> Refund of {money(actionModal.order.total, actionModal.order)}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <button type="button" onClick={() => setCancelRefundTo('WALLET')}
+                        className={`flex w-full items-start gap-2.5 rounded-xl border p-3 text-left transition-colors ${cancelRefundTo === 'WALLET' ? 'border-[#e01a1b] bg-red-50/40 ring-1 ring-[#e01a1b]/20' : 'border-slate-200 hover:border-slate-300'}`}>
+                        <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2 text-[13px] font-semibold text-slate-800">Add to M2C Wallet
+                            <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">Instant</span>
+                          </span>
+                          <span className="mt-0.5 block text-[11.5px] text-slate-500">Store credit — use it on your next purchase right away.</span>
+                        </span>
+                        <span className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 ${cancelRefundTo === 'WALLET' ? 'border-[#e01a1b] bg-[#e01a1b]' : 'border-slate-300'}`} />
+                      </button>
+                      <button type="button" onClick={() => setCancelRefundTo('BANK')}
+                        className={`flex w-full items-start gap-2.5 rounded-xl border p-3 text-left transition-colors ${cancelRefundTo === 'BANK' ? 'border-[#e01a1b] bg-red-50/40 ring-1 ring-[#e01a1b]/20' : 'border-slate-200 hover:border-slate-300'}`}>
+                        <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[13px] font-semibold text-slate-800">Original payment method</span>
+                          <span className="mt-0.5 block text-[11.5px] text-slate-500">Back to the account you paid with — 5–7 business days.</span>
+                        </span>
+                        <span className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 ${cancelRefundTo === 'BANK' ? 'border-[#e01a1b] bg-[#e01a1b]' : 'border-slate-300'}`} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-4 rounded-xl bg-slate-50 p-3 text-[12.5px] text-slate-500">
+                    No online payment was captured for this order, so there&rsquo;s nothing to refund.
+                  </p>
+                )
               )}
 
               <div className="mt-5 flex items-center justify-end gap-3">

@@ -1,6 +1,8 @@
 const { prisma } = require('../config/database');
 const { uploadDataUriIfBase64 } = require('../config/cloudinary');
 const { issueRefundAmount, fetchPaymentMethodLabel } = require('../utils/refund');
+const { restoreStockForOrder } = require('../utils/restoreStock');
+const { creditWallet } = require('../utils/wallet');
 const { generateReturnId } = require('../utils/returnIdGenerator');
 const { createNotification, createNotificationForRole } = require('./notificationController');
 const { sendTemplatedEmail } = require('../utils/emailTemplateRenderer');
@@ -29,10 +31,69 @@ const STATUS = {
     CANCELLED: 'Cancelled',
 };
 
-const UPI_RE = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9]{1,64}$/;
 const publicSite = () => process.env.FRONTEND_URL || 'http://localhost:3000';
 // decidedById is an @db.ObjectId column — only persist a genuine 24-hex id.
 const asObjectId = (v) => (typeof v === 'string' && /^[a-f\d]{24}$/i.test(v) ? v : null);
+
+// Damaged/defective items are written off by default (not returned to sellable
+// stock); everything else defaults to being restocked. Admin can override.
+const defaultRestock = (reason) => !['damaged', 'quality'].includes(reason);
+
+/**
+ * Dispose of the returned physical item when a return is approved:
+ *  • restock=true  → put units back into sellable inventory (+ stock history)
+ *  • restock=false → log them in the DamagedStock ledger (full audit; not sellable)
+ * Returns { restocked, dispositionNote, historyNote } for the caller to persist.
+ */
+async function applyDisposition(rec, { restock, note, adminName, adminId }) {
+    const doRestock = typeof restock === 'boolean' ? restock : defaultRestock(rec.reason);
+    const cleanNote = note ? String(note).trim().slice(0, 500) : null;
+
+    if (doRestock) {
+        try {
+            const pseudoOrder = {
+                orderId: rec.orderCode,
+                items: [{ productId: rec.productId, variantId: rec.variantId, quantity: rec.quantity }],
+            };
+            const rows = await prisma.$transaction((tx) => restoreStockForOrder(tx, pseudoOrder, {
+                reason: `Return restocked: ${rec.returnId}`,
+                changedBy: asObjectId(adminId), changedByType: 'admin', changedByName: adminName,
+            }));
+            if (rows.length) await prisma.stockChangeHistory.createMany({ data: rows }).catch(() => {});
+        } catch (e) {
+            console.warn('[return] restock failed:', e?.message || e);
+        }
+        return { restocked: true, dispositionNote: cleanNote, historyNote: `Item restocked to inventory${cleanNote ? ` — ${cleanNote}` : ''}` };
+    }
+
+    // Not restocked → permanent Damaged Items ledger entry (the tracked audit).
+    try {
+        await prisma.damagedStock.create({
+            data: {
+                productId: rec.productId || null,
+                productName: rec.productName,
+                productImage: rec.productImage || null,
+                variantId: rec.variantId || null,
+                size: rec.size || null,
+                color: rec.color || null,
+                quantity: rec.quantity,
+                reason: REASONS[rec.reason]?.label || rec.reason,
+                note: cleanNote,
+                sourceType: 'return',
+                returnRequestId: rec.id,
+                returnCode: rec.returnId,
+                orderId: rec.orderId,
+                orderCode: rec.orderCode,
+                customerName: rec.customerName,
+                recordedById: asObjectId(adminId),
+                recordedByName: adminName,
+            },
+        });
+    } catch (e) {
+        console.warn('[return] damaged record failed:', e?.message || e);
+    }
+    return { restocked: false, dispositionNote: cleanNote, historyNote: `Item marked damaged — not restocked${cleanNote ? ` — ${cleanNote}` : ''}` };
+}
 
 // Append an entry to a return's status timeline (stored as a JSON array).
 const withHistory = (existing, status, note, by) => {
@@ -68,7 +129,7 @@ const createReturnRequest = async (req, res) => {
         const userId = req.userId;
         const {
             orderId, orderItemId, reason, reasonNote,
-            evidenceImages = [], resolution, refundMethod, upiId, confirmed,
+            evidenceImages = [], resolution, refundMethod, replacementMethod, confirmed,
         } = req.body;
 
         if (!orderId) return res.status(400).json({ success: false, message: 'Order is required' });
@@ -111,17 +172,16 @@ const createReturnRequest = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Please upload at least 2 clear photos for this reason.' });
         }
 
-        // Refund preference validation.
-        let cleanUpi = null;
+        // Resolution preference validation.
+        //  REFUND      → 'ORIGINAL' (back to bank/source) | 'WALLET' (instant store credit)
+        //  REPLACEMENT → 'CREDIT'  (wallet store credit)   | 'ITEM'   (ship with next order)
         if (resolution === 'REFUND') {
-            if (!['ORIGINAL', 'UPI'].includes(refundMethod)) {
-                return res.status(400).json({ success: false, message: 'Please choose a refund method' });
+            if (!['ORIGINAL', 'WALLET'].includes(refundMethod)) {
+                return res.status(400).json({ success: false, message: 'Please choose how to receive your refund' });
             }
-            if (refundMethod === 'UPI') {
-                cleanUpi = String(upiId || '').trim();
-                if (!UPI_RE.test(cleanUpi)) {
-                    return res.status(400).json({ success: false, message: 'Please enter a valid UPI ID (e.g. name@bank)' });
-                }
+        } else if (resolution === 'REPLACEMENT') {
+            if (!['CREDIT', 'ITEM'].includes(replacementMethod)) {
+                return res.status(400).json({ success: false, message: 'Please choose how to receive your replacement' });
             }
         }
 
@@ -164,7 +224,7 @@ const createReturnRequest = async (req, res) => {
                 evidenceImages: uploaded,
                 resolution,
                 refundMethod: resolution === 'REFUND' ? refundMethod : null,
-                upiId: cleanUpi,
+                replacementMethod: resolution === 'REPLACEMENT' ? replacementMethod : null,
                 refundAmount: resolution === 'REFUND' ? itemAmount : null,
                 replacementValue: resolution === 'REPLACEMENT' ? itemAmount : null,
                 status: STATUS.PENDING,
@@ -334,7 +394,7 @@ const getReturnByIdAdmin = async (req, res) => {
 const decideReturn = async (req, res) => {
     try {
         const { id } = req.params;
-        const { action, rejectionReason, adminNote } = req.body;
+        const { action, rejectionReason, adminNote, restock, dispositionNote } = req.body;
         const adminName = req.user?.name || req.user?.email || 'Admin';
 
         const rec = await prisma.returnRequest.findUnique({ where: { id } });
@@ -391,42 +451,73 @@ const decideReturn = async (req, res) => {
                 return res.status(400).json({ success: false, message: `Cannot approve a request that is ${rec.status}.` });
             }
 
+            // Dispose of the physical item: restock to inventory, or log as damaged.
+            const disp = await applyDisposition(rec, {
+                restock, note: dispositionNote, adminName, adminId: req.user?.id,
+            });
+
+            // Wallet credit amount is always in INR (wallet base currency).
+            const creditInr = rec.itemAmountINR != null ? rec.itemAmountINR : rec.itemAmount;
+            const walletActor = { id: asObjectId(req.user?.id), name: adminName, type: 'admin' };
+            const walletRefs = { orderId: rec.orderId, orderCode: rec.orderCode, returnRequestId: rec.id, returnCode: rec.returnId };
+            const baseDecision = { adminNote: adminNote || rec.adminNote, restocked: disp.restocked, dispositionNote: disp.dispositionNote, decidedByName: adminName, decidedById: asObjectId(req.user?.id), decidedAt: new Date() };
+
+            // ── REFUND ──
             if (rec.resolution === 'REFUND') {
-                // Approve → kick off the gateway refund → Refund Processing.
+                // WALLET → instant store credit, no gateway wait.
+                if (rec.refundMethod === 'WALLET') {
+                    await creditWallet({ customerId: rec.customerId, amount: creditInr, source: 'REFUND', description: `Refund for return ${rec.returnId}`, refs: walletRefs, actor: walletActor }).catch((e) => console.warn('[return] wallet credit failed:', e?.message));
+                    let history = withHistory(rec.statusHistory, STATUS.APPROVED, 'Return approved', adminName);
+                    history = withHistory(history, STATUS.APPROVED, disp.historyNote, adminName);
+                    history = withHistory(history, STATUS.REFUND_COMPLETED, `Refunded ₹${creditInr.toFixed(2)} to wallet`, adminName);
+                    const updated = await prisma.returnRequest.update({
+                        where: { id },
+                        data: { ...baseDecision, status: STATUS.REFUND_COMPLETED, refundStatus: 'WALLET', refundAmount: rec.refundAmount ?? rec.itemAmount, statusHistory: history },
+                    });
+                    notifyCustomer(rec, 'REFUND_COMPLETED', 'Refund added to wallet', `₹${creditInr.toFixed(2)} was added to your wallet for ${rec.returnId}.`);
+                    emailStatus(rec, 'Your refund was added to your wallet', `We've added ₹${creditInr.toFixed(2)} to your M2C wallet for return ${rec.returnId}. You can use it on your next purchase.`);
+                    return res.json({ success: true, message: 'Refund credited to wallet', data: updated });
+                }
+
+                // ORIGINAL (bank) → gateway refund → Refund Processing.
                 const order = await prisma.order.findUnique({ where: { id: rec.orderId } }).catch(() => null);
                 let refundStatus = 'MANUAL', refundId = null, paymentMethodLabel = rec.paymentMethodLabel || null;
                 if (order) {
-                    const amt = rec.itemAmountINR != null ? rec.itemAmountINR : rec.itemAmount;
-                    // Refund to original instrument only when the customer chose ORIGINAL.
-                    // For a UPI-payout choice the gateway API differs; leave to manual for now.
-                    const r = await issueRefundAmount(order, amt);
+                    const r = await issueRefundAmount(order, creditInr);
                     refundStatus = r.refundStatus; refundId = r.refundId;
-                    // Best-effort: capture the real instrument so the UI can show it.
-                    if (rec.refundMethod !== 'UPI') {
-                        const label = await fetchPaymentMethodLabel(order);
-                        if (label) paymentMethodLabel = label;
-                    }
+                    const label = await fetchPaymentMethodLabel(order);
+                    if (label) paymentMethodLabel = label;
                 }
                 let history = withHistory(rec.statusHistory, STATUS.APPROVED, 'Return approved', adminName);
+                history = withHistory(history, STATUS.APPROVED, disp.historyNote, adminName);
                 history = withHistory(history, STATUS.REFUND_PROCESSING,
                     refundStatus === 'MANUAL' ? 'Refund to be processed manually' : 'Refund initiated with payment provider', adminName);
                 const updated = await prisma.returnRequest.update({
                     where: { id },
-                    data: {
-                        status: STATUS.REFUND_PROCESSING,
-                        adminNote: adminNote || rec.adminNote,
-                        refundId, refundStatus, paymentMethodLabel,
-                        paymentReference: refundId || null,
-                        decidedByName: adminName, decidedById: asObjectId(req.user?.id), decidedAt: new Date(),
-                        statusHistory: history,
-                    },
+                    data: { ...baseDecision, status: STATUS.REFUND_PROCESSING, refundId, refundStatus, paymentMethodLabel, paymentReference: refundId || null, statusHistory: history },
                 });
                 notifyCustomer(rec, 'RETURN_APPROVED', 'Return approved', `Your refund for ${rec.returnId} is being processed.`);
-                emailStatus(rec, 'Your refund is being processed', `Good news — return ${rec.returnId} was approved and your refund of ${rec.currency === 'INR' ? '₹' : '$'}${(rec.refundAmount || rec.itemAmount).toFixed(2)} is being processed to your ${rec.refundMethod === 'UPI' ? 'UPI' : 'original payment method'}.`);
+                emailStatus(rec, 'Your refund is being processed', `Good news — return ${rec.returnId} was approved and your refund of ${rec.currency === 'INR' ? '₹' : '$'}${(rec.refundAmount || rec.itemAmount).toFixed(2)} is being processed to your original payment method.`);
                 return res.json({ success: true, message: 'Return approved, refund processing', data: updated });
             }
 
-            // REPLACEMENT: record an entitlement in the customer's account.
+            // ── REPLACEMENT ──
+            // CREDIT → put the item value into the wallet as store credit.
+            if (rec.replacementMethod === 'CREDIT') {
+                await creditWallet({ customerId: rec.customerId, amount: creditInr, source: 'REPLACEMENT', description: `Replacement credit for return ${rec.returnId}`, refs: walletRefs, actor: walletActor }).catch((e) => console.warn('[return] wallet credit failed:', e?.message));
+                let history = withHistory(rec.statusHistory, STATUS.REPLACEMENT_APPROVED, 'Replacement approved', adminName);
+                history = withHistory(history, STATUS.REPLACEMENT_APPROVED, disp.historyNote, adminName);
+                history = withHistory(history, STATUS.REPLACEMENT_COMPLETED, `Replacement credited ₹${creditInr.toFixed(2)} to wallet`, adminName);
+                const updated = await prisma.returnRequest.update({
+                    where: { id },
+                    data: { ...baseDecision, status: STATUS.REPLACEMENT_COMPLETED, statusHistory: history },
+                });
+                notifyCustomer(rec, 'REPLACEMENT_COMPLETED', 'Replacement added to wallet', `₹${creditInr.toFixed(2)} was added to your wallet for ${rec.returnId}.`);
+                emailStatus(rec, 'Your replacement credit was added to your wallet', `We've added ₹${creditInr.toFixed(2)} to your M2C wallet for return ${rec.returnId}. Use it on your next purchase.`);
+                return res.json({ success: true, message: 'Replacement credited to wallet', data: updated });
+            }
+
+            // ITEM → record an entitlement to ship with the customer's next order.
             const entitlement = await prisma.replacementEntitlement.create({
                 data: {
                     customerId: rec.customerId,
@@ -440,19 +531,14 @@ const decideReturn = async (req, res) => {
                 },
             });
             let history = withHistory(rec.statusHistory, STATUS.REPLACEMENT_APPROVED, 'Replacement approved', adminName);
-            history = withHistory(history, STATUS.REPLACEMENT_PENDING, 'Replacement entitlement added to your M2C account', adminName);
+            history = withHistory(history, STATUS.REPLACEMENT_APPROVED, disp.historyNote, adminName);
+            history = withHistory(history, STATUS.REPLACEMENT_PENDING, 'Replacement item entitlement added — ships with your next order', adminName);
             const updated = await prisma.returnRequest.update({
                 where: { id },
-                data: {
-                    status: STATUS.REPLACEMENT_PENDING,
-                    adminNote: adminNote || rec.adminNote,
-                    replacementEntitlementId: entitlement.id,
-                    decidedByName: adminName, decidedById: asObjectId(req.user?.id), decidedAt: new Date(),
-                    statusHistory: history,
-                },
+                data: { ...baseDecision, status: STATUS.REPLACEMENT_PENDING, replacementEntitlementId: entitlement.id, statusHistory: history },
             });
             notifyCustomer(rec, 'RETURN_APPROVED', 'Replacement approved', `Your replacement for ${rec.returnId} was approved.`);
-            emailStatus(rec, 'Your replacement was approved', `Return ${rec.returnId} was approved. A replacement entitlement worth ${rec.currency === 'INR' ? '₹' : '$'}${(rec.replacementValue || rec.itemAmount).toFixed(2)} has been added to your M2C account and can be used on a future eligible order.`);
+            emailStatus(rec, 'Your replacement was approved', `Return ${rec.returnId} was approved. Your replacement item will ship with your next eligible order per M2C replacement rules.`);
             return res.json({ success: true, message: 'Replacement approved', data: updated });
         }
 
@@ -513,6 +599,39 @@ const advanceReturnStatus = async (req, res) => {
     }
 };
 
+// GET /api/returns/admin/damaged — the Damaged Items ledger (admin).
+const getDamagedStock = async (req, res) => {
+    try {
+        const { search, page = 1, limit = 50 } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const where = {};
+        if (search) {
+            where.OR = [
+                { productName: { contains: search, mode: 'insensitive' } },
+                { returnCode: { contains: search, mode: 'insensitive' } },
+                { orderCode: { contains: search, mode: 'insensitive' } },
+                { sku: { contains: search, mode: 'insensitive' } },
+                { customerName: { contains: search, mode: 'insensitive' } },
+            ];
+        }
+        const [rows, total, totalUnitsAgg] = await Promise.all([
+            prisma.damagedStock.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: parseInt(limit) }),
+            prisma.damagedStock.count({ where }),
+            prisma.damagedStock.findMany({ where, select: { quantity: true } }),
+        ]);
+        const totalUnits = totalUnitsAgg.reduce((s, r) => s + (r.quantity || 0), 0);
+        res.json({
+            success: true,
+            data: rows,
+            totalUnits,
+            pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) },
+        });
+    } catch (error) {
+        console.error('Error fetching damaged stock:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch damaged items' });
+    }
+};
+
 // Small helper — in-app customer notification (fire and forget).
 function notifyCustomer(rec, type, title, message) {
     createNotification({
@@ -568,5 +687,6 @@ module.exports = {
     getReturnByIdAdmin,
     decideReturn,
     advanceReturnStatus,
+    getDamagedStock,
     handleRefundWebhook,
 };
