@@ -188,6 +188,9 @@ export interface CreateOrderParams {
      *  discount itself — the client's discount figure is advisory only. */
     couponCode?: string;
     currency?: string;
+    /** Wallet store credit to apply (in the order currency). Server clamps it to the
+     *  available balance and the order total, and debits the wallet accordingly. */
+    walletApplied?: number;
 }
 
 class OrderService {
@@ -241,9 +244,10 @@ class OrderService {
     }
 
     // Customer: cancel own pre-dispatch order (auto-refund for prepaid).
-    async cancelOrder(id: string, reason?: string): Promise<{ success: boolean; data: Order; message?: string }> {
+    // refundTo: 'WALLET' (instant store credit) | 'BANK' (gateway, default).
+    async cancelOrder(id: string, reason?: string, refundTo?: 'WALLET' | 'BANK'): Promise<{ success: boolean; data: Order; message?: string }> {
         try {
-            const response = await axios.post(`/orders/${id}/cancel`, { reason });
+            const response = await axios.post(`/orders/${id}/cancel`, { reason, refundTo });
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to cancel order');

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, Check, Loader2, Camera, Trash2, RefreshCw, Package,
-  ShieldCheck, CreditCard, Smartphone, RotateCcw, AlertCircle, ChevronLeft,
+  ShieldCheck, CreditCard, RotateCcw, AlertCircle, ChevronLeft, Wallet, Truck, Zap,
 } from 'lucide-react';
 import { formatPrice } from '@/lib/currency';
 import {
@@ -29,10 +29,9 @@ interface ModalOrder {
   paymentStatus?: string;
 }
 
-const UPI_RE = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9]{1,64}$/;
 const MAX_PHOTOS = 2;
 
-type StepId = 'reason' | 'evidence' | 'resolution' | 'refund' | 'review';
+type StepId = 'reason' | 'evidence' | 'resolution' | 'refund' | 'replacement' | 'review';
 
 export default function ReturnRequestModal({
   open, order, onClose, onSubmitted,
@@ -49,7 +48,7 @@ export default function ReturnRequestModal({
   const [photos, setPhotos] = useState<{ id: string; dataUri: string }[]>([]);
   const [resolution, setResolution] = useState<ReturnResolution | ''>('');
   const [refundMethod, setRefundMethod] = useState<RefundMethod | ''>('');
-  const [upiId, setUpiId] = useState('');
+  const [replacementMethod, setReplacementMethod] = useState<'CREDIT' | 'ITEM' | ''>('');
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<{ returnId: string } | null>(null);
@@ -73,7 +72,7 @@ export default function ReturnRequestModal({
       setStepIdx(0);
       setItemId(order && order.items.length === 1 ? order.items[0].id : '');
       setReason(''); setReasonNote(''); setPhotos([]); setResolution('');
-      setRefundMethod(''); setUpiId(''); setConfirmed(false);
+      setRefundMethod(''); setReplacementMethod(''); setConfirmed(false);
       setSubmitting(false); setSubmitted(null); setError('');
     } else if (!open) {
       wasOpenRef.current = false;
@@ -105,6 +104,7 @@ export default function ReturnRequestModal({
       { id: 'resolution', label: 'Resolution' },
     ];
     if (resolution === 'REFUND') base.push({ id: 'refund', label: 'Refund Details' });
+    else if (resolution === 'REPLACEMENT') base.push({ id: 'replacement', label: 'Replacement' });
     base.push({ id: 'review', label: 'Review' });
     return base;
   }, [resolution]);
@@ -146,8 +146,11 @@ export default function ReturnRequestModal({
       return null;
     }
     if (currentStep === 'refund') {
-      if (!refundMethod) return 'Please choose a refund method.';
-      if (refundMethod === 'UPI' && !UPI_RE.test(upiId.trim())) return 'Please enter a valid UPI ID (e.g. name@bank).';
+      if (!refundMethod) return 'Please choose where to receive your refund.';
+      return null;
+    }
+    if (currentStep === 'replacement') {
+      if (!replacementMethod) return 'Please choose how to receive your replacement.';
       return null;
     }
     if (currentStep === 'review') {
@@ -180,7 +183,7 @@ export default function ReturnRequestModal({
         evidenceImages: photos.map((p) => p.dataUri),
         resolution: resolution as ReturnResolution,
         refundMethod: resolution === 'REFUND' ? (refundMethod as RefundMethod) : undefined,
-        upiId: resolution === 'REFUND' && refundMethod === 'UPI' ? upiId.trim() : undefined,
+        replacementMethod: resolution === 'REPLACEMENT' ? (replacementMethod as 'CREDIT' | 'ITEM') : undefined,
         confirmed,
       });
       setSubmitted({ returnId: res.data.returnId });
@@ -378,68 +381,54 @@ export default function ReturnRequestModal({
                       icon={<Package className="h-5 w-5" />} title="Replacement"
                       desc="Request a replacement for the item." amount={selectedItem ? money(selectedItem.price) : undefined} brand={brand} />
                   </div>
-
-                  {resolution === 'REPLACEMENT' && selectedItem && (
-                    <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
-                      <p className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
-                        <ShieldCheck className="h-4 w-4" /> Replacement selected
-                      </p>
-                      <p className="mt-1.5 text-[13px] leading-relaxed text-emerald-900/80">
-                        We&rsquo;ll review your return request first. Once approved, your replacement entitlement will be recorded in your M2C account. When you make your next eligible purchase, this replacement can be added to that order according to M2C replacement rules.
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[13px]">
-                        <span className="text-emerald-900/70">Replacement value: <span className="font-semibold text-emerald-900">{money(selectedItem.price)}</span></span>
-                        <span className="text-emerald-900/70">Status: <span className="font-semibold text-emerald-900">Pending approval</span></span>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 
-              {/* STEP 4 — Refund details */}
+              {/* STEP 4a — Refund destination: bank or wallet */}
               {currentStep === 'refund' && (
                 <div>
                   <p className="text-sm font-semibold text-slate-800">Where should we send your refund?</p>
-                  <p className="mt-1 text-[13px] text-slate-500">This refund will be processed securely through our payment provider.</p>
+                  <p className="mt-1 text-[13px] text-slate-500">Choose the fastest option for you.</p>
 
                   <div className="mt-4 space-y-3">
-                    <button type="button" onClick={() => setRefundMethod('ORIGINAL')}
-                      className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-all ${
-                        refundMethod === 'ORIGINAL' ? 'border-[#e01a1b] bg-red-50/40 ring-1 ring-[#e01a1b]/20' : 'border-slate-200 hover:border-slate-300'
-                      }`}>
-                      <CreditCard className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold text-slate-800">Refund to original payment method</span>
-                        <span className="mt-0.5 block text-[12.5px] text-slate-500">Securely refunded to the account you paid with.</span>
-                      </span>
-                      <span className={`mt-1 h-4 w-4 shrink-0 rounded-full border-2 ${refundMethod === 'ORIGINAL' ? 'border-[#e01a1b] bg-[#e01a1b]' : 'border-slate-300'}`} />
-                    </button>
-
-                    <button type="button" onClick={() => setRefundMethod('UPI')}
-                      className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-all ${
-                        refundMethod === 'UPI' ? 'border-[#e01a1b] bg-red-50/40 ring-1 ring-[#e01a1b]/20' : 'border-slate-200 hover:border-slate-300'
-                      }`}>
-                      <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold text-slate-800">Refund to UPI</span>
-                        <span className="mt-0.5 block text-[12.5px] text-slate-500">Get the amount to any UPI ID.</span>
-                      </span>
-                      <span className={`mt-1 h-4 w-4 shrink-0 rounded-full border-2 ${refundMethod === 'UPI' ? 'border-[#e01a1b] bg-[#e01a1b]' : 'border-slate-300'}`} />
-                    </button>
-
-                    {refundMethod === 'UPI' && (
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <label className="mb-1 block text-[12.5px] font-semibold text-slate-700">UPI ID</label>
-                        <input value={upiId} onChange={(e) => setUpiId(e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#e01a1b] focus:ring-2 focus:ring-[#e01a1b]/15"
-                          placeholder="example@upi" />
-                      </div>
-                    )}
+                    <PrefCard
+                      active={refundMethod === 'WALLET'} onClick={() => setRefundMethod('WALLET')}
+                      icon={<Wallet className="h-5 w-5" />} title="Add to M2C Wallet"
+                      desc="Instant store credit — use it on your next purchase."
+                      badge={<span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700"><Zap className="h-3 w-3" /> Instant</span>} />
+                    <PrefCard
+                      active={refundMethod === 'ORIGINAL'} onClick={() => setRefundMethod('ORIGINAL')}
+                      icon={<CreditCard className="h-5 w-5" />} title="Refund to original payment method"
+                      desc="Back to the account/card/UPI you paid with — 5–7 business days." />
                   </div>
 
                   <p className="mt-4 flex items-start gap-2 rounded-xl bg-slate-50 p-3 text-[12px] text-slate-500">
                     <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                    For your security we never ask for your full card number, CVV or expiry. Refunds are handled entirely by our payment provider.
+                    For your security we never ask for your card number, CVV, expiry or bank details. Bank refunds are handled entirely by our payment provider.
+                  </p>
+                </div>
+              )}
+
+              {/* STEP 4b — Replacement: wallet credit or ship with next order */}
+              {currentStep === 'replacement' && selectedItem && (
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">How would you like your replacement?</p>
+                  <p className="mt-1 text-[13px] text-slate-500">Once approved by our team.</p>
+
+                  <div className="mt-4 space-y-3">
+                    <PrefCard
+                      active={replacementMethod === 'CREDIT'} onClick={() => setReplacementMethod('CREDIT')}
+                      icon={<Wallet className="h-5 w-5" />} title="Replacement credit to Wallet"
+                      desc={`Get ${money(selectedItem.price)} as store credit to reorder anything.`}
+                      badge={<span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700"><Zap className="h-3 w-3" /> Instant</span>} />
+                    <PrefCard
+                      active={replacementMethod === 'ITEM'} onClick={() => setReplacementMethod('ITEM')}
+                      icon={<Truck className="h-5 w-5" />} title="Ship the replacement item"
+                      desc="We'll send the same item with your next eligible order — no extra delivery charge." />
+                  </div>
+
+                  <p className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3 text-[12px] leading-relaxed text-slate-500">
+                    We&rsquo;ll review your request first. Once approved, your chosen option is recorded to your M2C account per replacement rules.
                   </p>
                 </div>
               )}
@@ -462,12 +451,15 @@ export default function ReturnRequestModal({
                     <ReviewRow label="Resolution" value={resolution === 'REFUND' ? 'Refund' : 'Replacement'} />
                     {resolution === 'REFUND' && (
                       <>
-                        <ReviewRow label="Refund method" value={refundMethod === 'UPI' ? `UPI · ${upiId.trim()}` : 'Original payment method'} />
+                        <ReviewRow label="Refund to" value={refundMethod === 'WALLET' ? 'M2C Wallet (instant)' : 'Original payment method'} />
                         <ReviewRow label="Refund amount" value={money(selectedItem.price)} strong />
                       </>
                     )}
                     {resolution === 'REPLACEMENT' && (
-                      <ReviewRow label="Replacement value" value={money(selectedItem.price)} strong />
+                      <>
+                        <ReviewRow label="Replacement" value={replacementMethod === 'CREDIT' ? 'Wallet credit (instant)' : 'Ship item with next order'} />
+                        <ReviewRow label="Replacement value" value={money(selectedItem.price)} strong />
+                      </>
                     )}
                   </dl>
 
@@ -546,6 +538,27 @@ function ResolutionCard({ active, onClick, icon, title, desc, amount, brand }: {
       <span className="text-sm font-bold text-slate-900">{title}</span>
       <span className="text-[12.5px] text-slate-500">{desc}</span>
       {amount && <span className="mt-0.5 text-[12.5px] font-semibold text-slate-700">{amount}</span>}
+    </button>
+  );
+}
+
+function PrefCard({ active, onClick, icon, title, desc, badge }: {
+  active: boolean; onClick: () => void; icon: React.ReactNode; title: string; desc: string; badge?: React.ReactNode;
+}) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-all ${
+        active ? 'border-[#e01a1b] bg-red-50/40 ring-1 ring-[#e01a1b]/20' : 'border-slate-200 hover:border-slate-300'
+      }`}>
+      <span className={`mt-0.5 shrink-0 ${active ? 'text-[#e01a1b]' : 'text-slate-500'}`}>{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-slate-800">{title}</span>
+          {badge}
+        </span>
+        <span className="mt-0.5 block text-[12.5px] text-slate-500">{desc}</span>
+      </span>
+      <span className={`mt-1 h-4 w-4 shrink-0 rounded-full border-2 ${active ? 'border-[#e01a1b] bg-[#e01a1b]' : 'border-slate-300'}`} />
     </button>
   );
 }

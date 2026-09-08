@@ -20,8 +20,13 @@ import {
   Package,
   Eye,
   Star,
-  LifeBuoy
+  LifeBuoy,
+  Wallet,
+  ArrowDownLeft,
+  ArrowUpRight
 } from 'lucide-react'
+import { formatPrice } from '@/lib/currency'
+import { walletService, WALLET_SOURCE_LABEL, type WalletSummary } from '@/services/walletService'
 
 interface CustomerViewProps {
   customerId: string
@@ -31,6 +36,8 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
   const router = useRouter()
   const [customer, setCustomer] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [wallet, setWallet] = useState<WalletSummary | null>(null)
+  const [activeTab, setActiveTab] = useState<'orders' | 'wallet' | 'support'>('orders')
 
   useEffect(() => {
     const fetchCustomer = async () => {
@@ -45,6 +52,11 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
       }
     }
     fetchCustomer()
+    // Wallet is a separate module — load it in parallel (needs wallet:view; a
+    // 403 for a non-permitted admin just leaves the section empty).
+    walletService.getWalletByCustomer(customerId)
+      .then((res) => setWallet(res.data))
+      .catch(() => setWallet(null))
   }, [customerId])
 
   if (loading) {
@@ -279,7 +291,29 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
             </Card>
           </div>
 
+          {/* Tabs: Orders · Wallet · Support Tickets */}
+          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1">
+            {([
+              { id: 'orders', label: 'Orders', icon: Package, count: customer.recentOrders?.length },
+              { id: 'wallet', label: 'Wallet', icon: Wallet, count: undefined },
+              { id: 'support', label: 'Support Tickets', icon: LifeBuoy, count: customer.supportTickets?.length },
+            ] as const).map((t) => {
+              const active = activeTab === t.id
+              return (
+                <button key={t.id} onClick={() => setActiveTab(t.id)}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    active ? 'bg-[#e01a1b] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}>
+                  <t.icon className="h-4 w-4" />
+                  {t.label}
+                  {t.count ? <span className={`rounded-full px-1.5 text-[11px] font-bold ${active ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>{t.count}</span> : null}
+                </button>
+              )
+            })}
+          </div>
+
           {/* Recent Orders */}
+          {activeTab === 'orders' && (
           <Card className="overflow-hidden rounded-2xl border-slate-200 shadow-sm">
             <CardHeader className="border-b border-slate-200 bg-slate-50">
               <CardTitle className="text-base flex items-center gap-2">
@@ -346,8 +380,64 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
               )}
             </CardContent>
           </Card>
+          )}
+
+          {/* Wallet — this customer's store credit + ledger */}
+          {activeTab === 'wallet' && (
+          <Card className="overflow-hidden rounded-2xl border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-200 bg-slate-50">
+              <CardTitle className="text-base flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-slate-600" />
+                  Wallet
+                </span>
+                <span className="text-sm font-bold text-emerald-700">{formatPrice(wallet?.balance || 0, 'INR')}</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {wallet && wallet.transactions.length > 0 ? (
+                <div className="divide-y divide-slate-200">
+                  {wallet.transactions.slice(0, 10).map((t) => {
+                    const credit = t.type === 'CREDIT'
+                    return (
+                      <div key={t.id} className="flex items-center gap-3 p-4">
+                        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${credit ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                          {credit ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-800">{WALLET_SOURCE_LABEL[t.source] || t.source}</p>
+                          <p className="truncate text-xs text-slate-500">{t.description || t.orderCode || t.returnCode || ''}</p>
+                          <p className="text-[11px] text-slate-400">
+                            {new Date(t.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                            {t.createdByName ? ` · ${t.createdByName}` : ''}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-sm font-bold ${credit ? 'text-emerald-600' : 'text-slate-700'}`}>{credit ? '+' : '−'}{formatPrice(t.amount, 'INR')}</p>
+                          <p className="text-[11px] text-slate-400">Bal {formatPrice(t.balanceAfter, 'INR')}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div className="p-3 text-center">
+                    <button onClick={() => router.push('/admin/dashboard/customers/wallets')}
+                      className="text-xs font-semibold text-[#e01a1b] hover:underline">
+                      Manage in Customer Wallets →
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 text-center text-slate-500">
+                  <Wallet className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                  <p>No wallet activity</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          )}
 
           {/* Support Tickets — raised by this customer; click through to the ticket */}
+          {activeTab === 'support' && (
           <Card className="overflow-hidden rounded-2xl border-slate-200 shadow-sm">
             <CardHeader className="border-b border-slate-200 bg-slate-50">
               <CardTitle className="text-base flex items-center gap-2">
@@ -394,6 +484,7 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
               )}
             </CardContent>
           </Card>
+          )}
         </div>
       </div>
     </div>

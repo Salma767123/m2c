@@ -86,6 +86,7 @@ const navigation: NavigationItem[] = [
       { title: "Customer Management", href: "/admin/dashboard/users/customer-management", permission: "customer_management:view" },
       { title: "Hub to Customer", href: "/admin/dashboard/orders/hub-to-customer", permission: "hub_to_customer:view" },
       { title: "Returns & Replacements", href: "/admin/dashboard/customers/returns", permission: "returns:view" },
+      { title: "Customer Wallets", href: "/admin/dashboard/customers/wallets", permission: "wallet:view" },
       { title: "Invoices", href: "/admin/dashboard/billing/invoices", permission: "invoices:view" },
       { title: "Customer Reviews", href: "/admin/dashboard/reviews/customer", permission: "customer_reviews:view" },
     ],
@@ -118,6 +119,7 @@ const navigation: NavigationItem[] = [
         subItems: [
           { title: "Categories", href: "/admin/dashboard/categories", permission: "categories:view" },
           { title: "Inventory", href: "/admin/dashboard/inventory", permission: "inventory:view" },
+          { title: "Damaged Items", href: "/admin/dashboard/inventory/damaged-items", permission: "inventory:view" },
         ],
       },
       {
@@ -244,7 +246,9 @@ export default function AdminSidebar({ isCollapsed = false, onToggleCollapse }: 
       return pathname === "/admin/dashboard/categories" || pathname.startsWith("/admin/dashboard/categories/");
     }
     if (href === "/admin/dashboard/inventory") {
-      return pathname === "/admin/dashboard/inventory" || pathname.startsWith("/admin/dashboard/inventory/");
+      // Exclude the Damaged Items subpage — it's its own leaf.
+      return (pathname === "/admin/dashboard/inventory" || pathname.startsWith("/admin/dashboard/inventory/"))
+        && !pathname.startsWith("/admin/dashboard/inventory/damaged-items");
     }
     return pathname === href;
   };

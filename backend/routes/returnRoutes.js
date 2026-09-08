@@ -13,6 +13,7 @@ router.get('/mine/:id', ctrl.getMyReturnById);
 router.post('/mine/:id/cancel', ctrl.cancelMyReturn);
 
 // ── Admin (Returns & Replacements module) ───────────────────────────────────
+router.get('/admin/damaged', requireAdminRole, requirePermission(['inventory:view', 'returns:view']), ctrl.getDamagedStock);
 router.get('/admin', requireAdminRole, requirePermission('returns:view'), ctrl.getAllReturns);
 router.get('/admin/:id', requireAdminRole, requirePermission('returns:view'), ctrl.getReturnByIdAdmin);
 router.post('/admin/:id/decision', requireAdminRole, requirePermission('returns:manage'), ctrl.decideReturn);

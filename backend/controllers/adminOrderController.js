@@ -610,6 +610,19 @@ const updateAdminOrderStatus = async (req, res) => {
                     },
                     data: { status: 'Cancelled' },
                 });
+                // Return the reserved stock to inventory — the items never shipped.
+                try {
+                    const { restoreStockForOrder } = require('../utils/restoreStock');
+                    const rows = await restoreStockForOrder(tx, order, {
+                        reason: `Order cancelled by admin: ${order.orderId}`,
+                        changedBy: adminId,
+                        changedByType: 'admin',
+                        changedByName: req.user?.name || 'Admin',
+                    });
+                    if (rows.length) await tx.stockChangeHistory.createMany({ data: rows });
+                } catch (e) {
+                    console.warn('[admin cancel] stock restore failed:', e?.message || e);
+                }
                 // Cancel every non-terminal vendor shipment too, so the per-vendor
                 // Vendor-to-Hub view reflects the cancellation and stops offering
                 // "Assign Hub / Proceed" on an order that's already cancelled.

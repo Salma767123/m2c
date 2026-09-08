@@ -1111,6 +1111,13 @@ model Order {
   shippingCostINR Float?
   discountINR     Float?
 
+  // Wallet store-credit applied at checkout (a tender, NOT a price/tax adjustment).
+  // walletApplied is in the order currency; walletAppliedINR is the INR twin actually
+  // debited from the wallet. amountPaid is what the gateway was charged (order currency).
+  walletApplied    Float? @default(0)
+  walletAppliedINR Float?
+  amountPaid       Float?
+
   // Payment Information
   paymentStatus PaymentStatus @default(PENDING)
   paymentMethod String?
@@ -1908,8 +1915,10 @@ model ReturnRequest {
   resolution     String // 'REFUND' | 'REPLACEMENT'
 
   // Refund preference / gateway tracking
-  refundMethod       String? // 'ORIGINAL' | 'UPI'
+  refundMethod       String? // 'ORIGINAL' (bank) | 'WALLET'
   upiId              String?
+  // Replacement preference: 'CREDIT' (wallet store-credit) | 'ITEM' (ship with next order)
+  replacementMethod  String?
   refundAmount       Float?
   refundId           String?
   refundStatus       String? // gateway: INITIATED | PROCESSED | FAILED | MANUAL | NONE
@@ -1934,6 +1943,11 @@ model ReturnRequest {
   decidedByName   String?
   decidedAt       DateTime?
 
+  // Disposition of the physical item on approval: restocked to sellable inventory,
+  // or set aside as damaged. null until the return is approved.
+  restocked       Boolean?
+  dispositionNote String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1941,6 +1955,80 @@ model ReturnRequest {
   @@index([orderId])
   @@index([status])
   @@map("return_requests")
+}
+
+// Customer store-credit wallet. Balance is always held in INR (the base currency);
+// USD orders/refunds convert at the rate in effect. One row per customer; the
+// balance is the running total of the WalletTransaction ledger below.
+model Wallet {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  customerId String   @unique @db.ObjectId
+  balance    Float    @default(0) // INR
+  currency   String   @default("INR")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("wallets")
+}
+
+// Immutable ledger of every wallet movement — the source of truth + full audit.
+model WalletTransaction {
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  walletId     String  @db.ObjectId
+  customerId   String  @db.ObjectId
+  type         String // CREDIT | DEBIT
+  amount       Float // INR, always positive
+  balanceAfter Float // INR balance immediately after this entry
+  source       String // REFUND | REPLACEMENT | ORDER_REDEMPTION | ORDER_REVERSAL | ADMIN_ADJUSTMENT
+  description  String?
+
+  // References (whichever apply)
+  orderId         String? @db.ObjectId
+  orderCode       String?
+  returnRequestId String? @db.ObjectId
+  returnCode      String?
+
+  // Audit — who caused it
+  createdById   String? @db.ObjectId
+  createdByName String?
+  createdByType String? // customer | admin | system
+
+  createdAt DateTime @default(now())
+
+  @@index([customerId])
+  @@index([walletId])
+  @@index([createdAt])
+  @@map("wallet_transactions")
+}
+
+// Items pulled out of sellable stock because they came back damaged/defective on
+// a return (admin chose NOT to restock). This is the "Damaged Items" ledger — a
+// permanent, fully-attributed record: what, how many, why, when, and by whom.
+model DamagedStock {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  productId       String?  @db.ObjectId
+  productName     String
+  productImage    String?
+  variantId       String?  @db.ObjectId
+  size            String?
+  color           String?
+  sku             String?
+  quantity        Int
+  reason          String   // return reason label, e.g. "Damaged or defective"
+  note            String?  // admin's disposition note
+  sourceType      String   @default("return") // return | manual
+  returnRequestId String?  @db.ObjectId
+  returnCode      String?  // RET-…
+  orderId         String?  @db.ObjectId
+  orderCode       String?  // ORD-…
+  customerName    String?
+  recordedById    String?  @db.ObjectId
+  recordedByName  String?
+  createdAt       DateTime @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+  @@map("damaged_stock")
 }
 
 // A replacement credit recorded in the customer's account once a REPLACEMENT

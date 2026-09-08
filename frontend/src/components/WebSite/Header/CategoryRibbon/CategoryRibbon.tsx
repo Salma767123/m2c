@@ -552,7 +552,7 @@ export default function CategoryRibbon() {
                       <img
                         src={activeCategory.image}
                         alt={activeCategory.name}
-                        className="absolute inset-0 h-full w-full object-cover"
+                        className="absolute inset-0 h-full w-full object-cover object-center"
                         style={{ animation: reduce ? undefined : 'm2cKen 9s ease-out both' }}
                       />
                     ) : (
@@ -571,7 +571,7 @@ export default function CategoryRibbon() {
                           key={s.id}
                           src={s.image}
                           alt=""
-                          className="absolute inset-0 h-full w-full object-cover"
+                          className="absolute inset-0 h-full w-full object-cover object-center"
                           style={{
                             clipPath: on ? 'inset(0 0 0 0)' : parked,
                             transition: reduce ? 'none' : `clip-path 520ms ${EASE}`,
@@ -720,7 +720,7 @@ export default function CategoryRibbon() {
                 {categories[mobileCat].image && (
                   <Link href={catHref(categories[mobileCat])} className="relative mb-4 block h-32 overflow-hidden rounded-2xl">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={categories[mobileCat].image} alt="" className="h-full w-full object-cover" />
+                    <img src={categories[mobileCat].image} alt="" className="h-full w-full object-cover object-center" />
                     <span className="absolute inset-0" style={{ background: `linear-gradient(to top, ${OXBLOOD}d9, transparent)` }} />
                     <span className="absolute inset-x-4 bottom-3 text-white"><span className="block text-lg font-semibold">{categories[mobileCat].name}</span></span>
                   </Link>

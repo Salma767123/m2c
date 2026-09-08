@@ -222,6 +222,7 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/returns", require("./routes/returnRoutes"));
+app.use("/api/wallet", require("./routes/walletRoutes"));
 app.use("/api/payment-settings", paymentSettingsRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin/profile", adminProfileRoutes);

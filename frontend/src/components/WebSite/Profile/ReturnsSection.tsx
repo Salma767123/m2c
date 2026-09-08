@@ -190,15 +190,18 @@ function ReturnDetailModal({ returnId, onClose, onChanged }: { returnId: string;
                 <Row label="Resolution" value={rec.resolution === 'REFUND' ? 'Refund' : 'Replacement'} />
                 {rec.resolution === 'REFUND' && (
                   <>
-                    <Row label="Refund method" value={rec.refundMethod === 'UPI'
-                      ? `UPI · ${rec.upiId}`
+                    <Row label="Refund method" value={rec.refundMethod === 'WALLET'
+                      ? 'M2C Wallet (store credit)'
                       : rec.paymentMethodLabel ? `Original · ${rec.paymentMethodLabel}` : 'Original payment method'} />
                     <Row label="Refund amount" value={money(rec.refundAmount ?? rec.itemAmount, rec.currency)} strong />
                     {rec.paymentReference && <Row label="Payment reference" value={rec.paymentReference} />}
                   </>
                 )}
                 {rec.resolution === 'REPLACEMENT' && (
-                  <Row label="Replacement value" value={money(rec.replacementValue ?? rec.itemAmount, rec.currency)} strong />
+                  <>
+                    <Row label="Replacement" value={rec.replacementMethod === 'CREDIT' ? 'Wallet credit' : 'Ship item with next order'} />
+                    <Row label="Replacement value" value={money(rec.replacementValue ?? rec.itemAmount, rec.currency)} strong />
+                  </>
                 )}
                 {rec.rejectionReason && <Row label="Reason for decision" value={rec.rejectionReason} />}
               </dl>

@@ -1,13 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { Package, Search, MessageCircle, ArrowRight, Headphones } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { categoryService } from '@/services/categoryService';
 import Reveal from '@/components/WebSite/Shared/Reveal';
 import CategoryHero from '@/components/WebSite/Shared/CategoryHero';
+import CategoryImage from '@/components/WebSite/Shared/CategoryImage';
 import TopSelling from '@/components/WebSite/Featured/TopSelling';
 import NoticeBoard from '@/components/WebSite/NoticeBoard/NoticeBoard';
 import SectionBackdrop from '@/components/WebSite/Shared/SectionBackdrop';
@@ -160,27 +160,15 @@ export default function Categories() {
                     href={`/categories/${category.slug}`}
                     className="group block text-center"
                   >
-                    {/* Category Image */}
-                    <div className="relative w-full aspect-square mb-4 overflow-hidden rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] group-hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] group-hover:-translate-y-1.5 group-hover:ring-[#e01a1b]/20 transition-all duration-500 bg-linear-to-br from-gray-100 to-gray-200">
-                      {category.image ? (
-                        <Image
-                          src={category.image}
-                          alt={category.name}
-                          fill
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                          className="object-cover group-hover:scale-110 transition-transform duration-[900ms] ease-out"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                          }}
-                        />
-                      ) : null}
-                      {!category.image && (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Package className="w-16 h-16 text-gray-400" />
-                        </div>
-                      )}
-                    </div>
+                    {/* Category Image — square tile via the shared responsive system */}
+                    <CategoryImage
+                      src={category.image}
+                      alt={category.name}
+                      ratio="square"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      className="mb-4 rounded-2xl ring-1 ring-black/5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] group-hover:shadow-[0_18px_40px_rgba(0,0,0,0.12)] group-hover:-translate-y-1.5 group-hover:ring-[#e01a1b]/20 transition-all duration-500"
+                      imgClassName="group-hover:scale-110 transition-transform duration-[900ms] ease-out"
+                    />
 
                     {/* Category Name */}
                     <h3 className="text-lg font-semibold text-[#1a1a1a] group-hover:text-[#e01a1b] transition-colors">

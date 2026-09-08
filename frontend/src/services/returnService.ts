@@ -14,7 +14,8 @@ export const reasonLabel = (code?: string) =>
     RETURN_REASONS.find((r) => r.code === code)?.label || code || '';
 
 export type ReturnResolution = 'REFUND' | 'REPLACEMENT';
-export type RefundMethod = 'ORIGINAL' | 'UPI';
+export type RefundMethod = 'ORIGINAL' | 'WALLET';
+export type ReplacementMethod = 'CREDIT' | 'ITEM';
 
 export interface ReturnStatusEntry {
     status: string;
@@ -46,7 +47,8 @@ export interface ReturnRequest {
     evidenceImages: string[];
     resolution: ReturnResolution;
     refundMethod?: RefundMethod | null;
-    upiId?: string | null;
+    replacementMethod?: ReplacementMethod | null;
+    upiId?: string | null; // legacy; unused
     refundAmount?: number | null;
     refundId?: string | null;
     refundStatus?: string | null;
@@ -60,12 +62,34 @@ export interface ReturnRequest {
     rejectionReason?: string | null;
     decidedByName?: string | null;
     decidedAt?: string | null;
+    restocked?: boolean | null;
+    dispositionNote?: string | null;
     createdAt: string;
     updatedAt: string;
     // Admin-list / detail extras
     customerReturnCount?: number;
     customerHistory?: Array<Pick<ReturnRequest, 'id' | 'returnId' | 'productName' | 'resolution' | 'status' | 'createdAt'>>;
     order?: any;
+}
+
+export interface DamagedStock {
+    id: string;
+    productId?: string | null;
+    productName: string;
+    productImage?: string | null;
+    variantId?: string | null;
+    size?: string | null;
+    color?: string | null;
+    sku?: string | null;
+    quantity: number;
+    reason: string;
+    note?: string | null;
+    sourceType: string;
+    returnCode?: string | null;
+    orderCode?: string | null;
+    customerName?: string | null;
+    recordedByName?: string | null;
+    createdAt: string;
 }
 
 export interface CreateReturnPayload {
@@ -76,7 +100,7 @@ export interface CreateReturnPayload {
     evidenceImages?: string[]; // base64 data URIs
     resolution: ReturnResolution;
     refundMethod?: RefundMethod;
-    upiId?: string;
+    replacementMethod?: ReplacementMethod;
     confirmed?: boolean;
 }
 
@@ -108,9 +132,13 @@ class ReturnService {
         const res = await axios.get(`/returns/admin/${id}`);
         return res.data;
     }
-    async decideReturn(id: string, action: 'approve' | 'reject' | 'under_review', body?: { rejectionReason?: string; adminNote?: string }) {
+    async decideReturn(id: string, action: 'approve' | 'reject' | 'under_review', body?: { rejectionReason?: string; adminNote?: string; restock?: boolean; dispositionNote?: string }) {
         const res = await axios.post(`/returns/admin/${id}/decision`, { action, ...body });
         return res.data as { success: boolean; message: string; data: ReturnRequest };
+    }
+    async getDamagedStock(params?: { search?: string; page?: number; limit?: number }) {
+        const res = await axios.get('/returns/admin/damaged', { params });
+        return res.data as { success: boolean; data: DamagedStock[]; totalUnits: number; pagination: { total: number; page: number; limit: number; totalPages: number } };
     }
     async advanceStatus(id: string, status: string, note?: string) {
         const res = await axios.post(`/returns/admin/${id}/status`, { status, note });
