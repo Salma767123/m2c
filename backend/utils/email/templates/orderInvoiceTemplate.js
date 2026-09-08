@@ -140,6 +140,9 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
   */
   const invoiceCurrency = order.currency || (currency === 'INR' ? 'INR' : 'USD');
   const sym = invoiceCurrency === 'INR' ? '₹' : '$';
+  // GST applies only on the .in region (INR). Non-INR (.com) invoices carry no
+  // tax, so their line-item table drops the Tax Type / Rate / Amount columns.
+  const showTax = invoiceCurrency === 'INR';
 
   // A GST-registered seller must head the document "TAX INVOICE" (standard
   // practice); without a GSTIN it's a plain commercial invoice. Tax only applies
@@ -235,9 +238,9 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
             <td style="${cellBase} text-align:right;">${sym}${fmt(item.unitPrice)}</td>
             <td style="${cellBase} text-align:center;">${item.quantity}</td>
             <td style="${cellBase} text-align:right;">${sym}${fmt(net)}</td>
-            <td style="${cellBase} text-align:center; color:#6b7280;">${typeCell}</td>
+            ${showTax ? `<td style="${cellBase} text-align:center; color:#6b7280;">${typeCell}</td>
             <td style="${cellBase} text-align:center; color:#6b7280;">${rateCell}</td>
-            <td style="${cellBase} text-align:right;">${amtCell}</td>
+            <td style="${cellBase} text-align:right;">${amtCell}</td>` : ''}
             <td style="${cellBase} text-align:right; font-weight:700; color:#1a1a1a;">${sym}${fmt(lineTotal)}</td>
         </tr>
     `;
@@ -292,16 +295,17 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Invoice ${escapeHtml(invoiceNo || orderId)}</title>
   <style>
-    /* Print to A4 with a clean margin; strip the on-screen card chrome. */
+    /* A4 page. On screen the card is a true A4 sheet (210×297mm); in print it
+       fills the @page content box (its own margins reset so no blank 2nd page). */
     @page { size: A4 portrait; margin: 10mm; }
     @media print {
       html, body { background: #fff !important; }
-      .invoice-card { box-shadow: none !important; border-radius: 0 !important; margin: 0 auto !important; max-width: 100% !important; }
+      .invoice-card { box-shadow: none !important; border-radius: 0 !important; margin: 0 auto !important; width: auto !important; max-width: 100% !important; min-height: auto !important; }
     }
   </style>
 </head>
 <body style="margin:0; padding:0; font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:#f3f4f6; color:#374151;">
-  <div class="invoice-card" style="max-width:780px; margin:24px auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+  <div class="invoice-card" style="width:210mm; max-width:210mm; min-height:297mm; margin:24px auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08);">
 
     <!-- ── Brand accent bar ── -->
     <div style="height:5px; background:#e01a1b; font-size:0; line-height:0;">&nbsp;</div>
@@ -382,14 +386,14 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
             const thBase = 'padding:9px 6px; font-size:9px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.4px; border-bottom:2px solid #e01a1b;';
             return `
           <tr style="background:#faf9f7;">
-            <th style="${thBase} text-align:left; width:22%;">Item</th>
-            <th style="${thBase} text-align:right; width:11%;">Unit Price</th>
-            <th style="${thBase} text-align:center; width:7%;">Qty</th>
-            <th style="${thBase} text-align:right; width:12%;">Net Amount</th>
-            <th style="${thBase} text-align:center; width:10%;">Tax Type</th>
+            <th style="${thBase} text-align:left; width:${showTax ? '22%' : '34%'};">Item</th>
+            <th style="${thBase} text-align:right; width:${showTax ? '11%' : '16%'};">Unit Price</th>
+            <th style="${thBase} text-align:center; width:${showTax ? '7%' : '8%'};">Qty</th>
+            <th style="${thBase} text-align:right; width:${showTax ? '12%' : '21%'};">Net Amount</th>
+            ${showTax ? `<th style="${thBase} text-align:center; width:10%;">Tax Type</th>
             <th style="${thBase} text-align:center; width:9%;">Tax Rate</th>
-            <th style="${thBase} text-align:right; width:13%;">Tax Amount</th>
-            <th style="${thBase} text-align:right; width:16%;">Total Amount</th>
+            <th style="${thBase} text-align:right; width:13%;">Tax Amount</th>` : ''}
+            <th style="${thBase} text-align:right; width:${showTax ? '16%' : '21%'};">Total Amount</th>
           </tr>`;
           })()}
         </thead>
