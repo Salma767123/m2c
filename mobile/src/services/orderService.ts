@@ -11,6 +11,19 @@ export interface OrderItem {
   vendorId: string;
   vendorName: string;
   sku: string;
+  /**
+   * Variant identity. Without these an order line cannot say WHICH size or
+   * colour was bought — the app already renders them on product and cart
+   * screens, and stopped carrying them at the order boundary.
+   */
+  variantId?: string;
+  size?: string;
+  color?: string;
+  colorHex?: string;
+  /** Shipping mode chosen for this line. */
+  transportType?: 'AIR' | 'SHIP' | null;
+  /** Courier partner id (resolve via lib/couriers). */
+  courier?: string | null;
 }
 
 export interface Order {
@@ -48,6 +61,48 @@ export interface Order {
   items: OrderItem[];
   createdAt: string;
   updatedAt: string;
+
+  /* ── Post-purchase state ───────────────────────────────────────────────────
+     Everything below was missing from the mobile copy, which is why the app
+     could show an order but nothing about what happened to it afterwards. */
+
+  /** Invoice number, once raised. */
+  invoiceNo?: string;
+  /** When the order was placed. Distinct from `updatedAt`, which moves on every
+   *  status change — the app was showing the latter as the order date. */
+  orderDate?: string;
+  /** INR-per-USD rate snapshotted at purchase. Null on INR/pre-snapshot orders.
+   *  Needed to re-render a USD order at the rate it was actually charged at. */
+  exchangeRate?: number | null;
+
+  /** Carrier tracking number. */
+  trackingReference?: string;
+  /** Courier partner id (resolve via lib/couriers). */
+  courier?: string | null;
+  estimatedDelivery?: string;
+  actualDelivery?: string;
+  /** Ordered status transitions — the source for an order timeline. */
+  statusHistory?: OrderStatusEvent[];
+
+  /** Cancellation / return / refund state. */
+  cancelReason?: string | null;
+  returnRequest?: {
+    reason?: string;
+    status?: 'Requested' | 'Approved' | 'Rejected';
+    requestedAt?: string;
+    decidedAt?: string;
+    note?: string;
+  } | null;
+  refundStatus?: 'INITIATED' | 'PROCESSED' | 'FAILED' | 'MANUAL' | 'NONE' | null;
+  refundAmount?: number | null;
+}
+
+/** One entry in an order's status timeline. */
+export interface OrderStatusEvent {
+  status?: string;
+  timestamp?: string;
+  note?: string;
+  updatedBy?: string;
 }
 
 export interface CreateOrderData {

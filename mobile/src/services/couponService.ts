@@ -14,6 +14,21 @@ export interface Coupon {
   usageLimit?: number;
   usedCount?: number;
   perUserLimit?: number;
+  /** Coupon grants free shipping rather than (or as well as) a discount. */
+  freeShipping?: boolean;
+  /** "Free shipping on your 1st and 3rd order" targeting. */
+  freeShippingOrderNumbers?: number[];
+  /** Restricts the coupon to these categories. Without it the app could accept
+   *  a code the category should reject. */
+  applicableCategories?: string[];
+  /** First-order-only coupon — at most one active at a time. */
+  isFirstOrder?: boolean;
+  showAsPopup?: boolean;
+  popupImage?: string;
+  popupTitle?: string;
+  popupMessage?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ApplyCouponResponse {
@@ -26,6 +41,16 @@ export interface ApplyCouponResponse {
     discountAmount: number;
     minPurchaseAmount?: number;
   };
+}
+
+/**
+ * The active "first order" coupon, shown in the offer band under the hero.
+ * Only one can be active at a time, so the endpoint returns at most one.
+ */
+export interface FirstOrderCoupon {
+  code: string;
+  description: string;
+  offer: string;
 }
 
 /** Category coupon surfaced as a popup / the top-priority promo in the offers rail. */
@@ -92,6 +117,22 @@ class CouponService {
         .filter((c: { message?: string }) => c.message && c.message.trim());
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * The admin's active first-order coupon, or null when none is running.
+   * Mirrors the web service exactly — the offer band hides itself on null, so
+   * a failed request and "no campaign" land on the same quiet result.
+   */
+  async getFirstOrderCoupon(): Promise<FirstOrderCoupon | null> {
+    try {
+      const response = await axios.get('/coupons/first-order', { timeout: 5000 });
+      return response.data?.success && response.data.data
+        ? (response.data.data as FirstOrderCoupon)
+        : null;
+    } catch {
+      return null;
     }
   }
 

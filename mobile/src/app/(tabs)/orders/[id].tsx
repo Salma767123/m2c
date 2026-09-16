@@ -31,6 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from '@/lib/axios';
 import { orderService, Order } from '@/services/orderService';
+import { courierName } from '@/lib/couriers';
 import { showErrorToast, showSuccessToast } from '@/lib/toast-utils';
 import ReviewModal from '@/components/WebSite/Review/ReviewModal';
 import { reviewService } from '@/services/reviewService';
@@ -306,13 +307,39 @@ export default function OrderDetailsScreen() {
               </Text>
               <Text style={{ fontSize: 12, color: '#6b7280' }}>
                 {isDelivered
-                  ? `Delivered on ${orderService.formatDate(order.updatedAt)}`
-                  : (order as any).estimatedDelivery
-                    ? orderService.formatDate((order as any).estimatedDelivery)
+                  ? // actualDelivery is when it ARRIVED. updatedAt moves on every
+                    // status change, so it was only right until the next edit —
+                    // an admin note days later silently became the delivery date.
+                    `Delivered on ${orderService.formatDate(order.actualDelivery || order.updatedAt)}`
+                  : order.estimatedDelivery
+                    ? orderService.formatDate(order.estimatedDelivery)
                     : 'To be updated'}
               </Text>
             </View>
           </View>
+
+          {/* Tracking — the app had no way to show a consignment number at all. */}
+          {order.trackingReference || order.courier ? (
+            <>
+              <View style={{ height: 1, backgroundColor: '#f3f4f6', marginBottom: 12 }} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#f5f3ff', alignItems: 'center', justifyContent: 'center' }}>
+                  <Package size={14} color="#7c3aed" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#111827' }}>
+                    {courierName(order.courier) || 'Tracking'}
+                  </Text>
+                  {order.trackingReference ? (
+                    <Text selectable style={{ fontSize: 12, color: '#6b7280' }}>
+                      {order.trackingReference}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            </>
+          ) : null}
+
           <View style={{ height: 1, backgroundColor: '#f3f4f6', marginBottom: 12 }} />
 
           {/* Address */}

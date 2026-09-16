@@ -5,9 +5,33 @@ import axios, {
 } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Prefer EXPO_PUBLIC_API_URL so it's available at runtime in Expo.
-// Fallback chain: env var → LAN dev IP → localhost.
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+// Every backend route is mounted under `/api`, while services call paths like
+// `/auth/forgot-password`. Normalise the configured base so it always ends in
+// exactly one `/api` — whether or not EXPO_PUBLIC_API_URL already includes it —
+// otherwise requests miss the prefix and the backend returns "Route not found".
+//
+// This is the web's rule, ported (frontend/src/lib/axios.ts). Mobile took the
+// raw env string verbatim, so a value with or without the suffix silently
+// decided whether the whole API worked. It also makes the app survive a stale
+// value cached into the bundle: Expo inlines EXPO_PUBLIC_* at build time, so a
+// `.env` edit does not reach a running Metro without `--clear`.
+const API_BASE_URL = (() => {
+  const configured = process.env.EXPO_PUBLIC_API_URL;
+  if (!configured) {
+    if (__DEV__) {
+      console.warn(
+        "EXPO_PUBLIC_API_URL is not set — every API call will fail. Set it in mobile/.env and restart Metro with --clear.",
+      );
+    }
+    return undefined;
+  }
+  const raw = configured.replace(/\/+$/, "");
+  return /\/api$/.test(raw) ? raw : `${raw}/api`;
+})();
+
+/** The normalised API base. Exported so nothing has to re-derive it from the
+ *  env var and get the `/api` suffix wrong a second time. */
+export { API_BASE_URL };
 
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -78,8 +102,14 @@ axiosInstance.interceptors.response.use(
           if (__DEV__) console.warn("Access forbidden:", data?.error || "Insufficient permissions");
           break;
         case 404:
-          // 404 is routine (e.g. empty cart lookup) — warn only in dev.
-          if (__DEV__) console.warn("Not found:", error.config?.url);
+          // 404 here is usually a business outcome, not a missing route — an
+          // empty cart lookup, or "no account with this email" from
+          // forgot-password. Logging the bare path as "Not found" made a
+          // routine answer read as a routing failure and sent a debugging
+          // session after the wrong thing, so the server's message goes in too.
+          if (__DEV__) {
+            console.warn(`404 ${error.config?.url} —`, data?.error || "no message");
+          }
           break;
         case 500:
           console.error("Server error:", data?.error || "Internal server error");

@@ -8,10 +8,15 @@ export interface Address {
 
 export interface UserProfile {
   id: string;
+  /** Honorific — matches the web's Title select. */
+  title: string;
   firstName: string;
+  middleName: string;
   lastName: string;
   email: string;
   phone: string;
+  /** WhatsApp contact, stored separately from `phone` on the backend. */
+  whatsappNumber: string;
   gender: 'male' | 'female' | 'other';
   address: Address;
   joinDate: string;

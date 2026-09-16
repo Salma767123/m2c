@@ -13,12 +13,19 @@ export interface ManufacturerInfo {
 export interface PublicProduct {
   id: string;
   name: string;
+  /** URL-friendly identifier. The web routes and shares by slug; mobile routes
+   *  by id, so a link shared out of the app could not be slug-based. */
+  slug?: string;
   description: string;
   category: string;
   subCategory?: string;
   basePrice: number;
   adminFixedPrice?: number;
   originalPrice?: number;
+  /** Region-specific strike-through prices. `originalPrice` alone cannot serve
+   *  both storefronts, because the pre-discount price differs per region. */
+  originalPriceINR?: number;
+  originalPriceUSD?: number;
   discount?: number;
   gstPercentage?: number;
   rating?: number;

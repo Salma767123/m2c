@@ -10,7 +10,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
-  Star, Heart, Truck, Package,
+  Heart, Truck, Package,
   ChevronDown, ShoppingCart, Tag, Check,
   Plane, Ship as ShipIcon, AlertTriangle, Info, Box,
   User, Award, Clock, X, Copy,
@@ -23,6 +23,7 @@ import {
 import { PublicProduct, publicProductService } from '@/services/publicProductService';
 import { cartService } from '@/services/cartService';
 import { couponService, type PopupCoupon } from '@/services/couponService';
+import { FaceRatingRow } from '@/components/WebSite/Shared/FaceRating';
 import { offerService } from '@/services/offerService';
 import { getCouriers, type Courier, transportModeLabel, isSurfaceRegion } from '@/lib/couriers';
 import { courierService } from '@/services/courierService';
@@ -122,16 +123,6 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
   const fmt = (n: number) => fmtCurrency(n);
   // Shipping costs are stored in INR server-side — convert for USD storefronts.
   const fmtShip = (inr: number) => fmt(getCurrency() === 'USD' ? convertINRtoUSD(inr) : inr);
-
-  const renderStars = (rating: number) =>
-    [0, 1, 2, 3, 4].map(i => (
-      <Star
-        key={i}
-        size={16}
-        color={i < Math.floor(rating) ? '#f59e0b' : '#e5e7eb'}
-        fill={i < Math.floor(rating) ? '#f59e0b' : 'transparent'}
-      />
-    ));
 
   const goReviews = () => scrollRef.current?.scrollTo({ y: Math.max(0, reviewsY.current - 8), animated: true });
   const onReviewsLayout = (e: LayoutChangeEvent) => { reviewsY.current = e.nativeEvent.layout.y; };
@@ -462,23 +453,26 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
   if (careList.length > 0) tabs.push({ id: 'care', label: 'Care Instructions' });
   if (product.dispatchTimeline) tabs.push({ id: 'shipping', label: 'Shipping' });
 
+  // Manufacturer info, bound once and NOT with a `!` assertion. Most products
+  // carry none, so every read has to tolerate null — the non-null assertions
+  // that used to be scattered through this file told TypeScript otherwise and
+  // hid a crash that only surfaced at runtime.
+  const maker = product.manufacturerInfo ?? null;
+  const showMaker = hasManufacturerInfo(maker);
+  const makerName = showMaker ? manufacturerDisplayName(maker) : '';
+
   // ── "Why choose this?" — derived from real data (mirrors web rail) ──────
   const whyChoose: { icon: any; color: string; bg: string; iconBg: string; title: string; desc: string }[] = [];
   if (product.dispatchTimeline) whyChoose.push({ icon: Truck, color: '#16a34a', bg: '#f0fdf4', iconBg: '#dcfce7', title: 'Fast Dispatch', desc: 'Fast delivery' });
   if (logisticsResult && logisticsResult.totalShippingCost === 0) whyChoose.push({ icon: ShipIcon, color: '#2563eb', bg: '#eff6ff', iconBg: '#dbeafe', title: 'Free Shipping', desc: 'No shipping charge on this item' });
   if (product.hasVariants && visibleVariants.length > 0) whyChoose.push({ icon: Box, color: '#7c3aed', bg: '#f5f3ff', iconBg: '#ede9fe', title: 'Multiple Options', desc: `${visibleVariants.length} variant${visibleVariants.length === 1 ? '' : 's'} to choose from` });
   if (currentStock > 0) whyChoose.push({ icon: Check, color: '#059669', bg: '#ecfdf3', iconBg: '#d1fae5', title: 'In Stock', desc: `${currentStock} unit${currentStock === 1 ? '' : 's'} available now` });
-  if (hasManufacturerInfo(product.manufacturerInfo)) {
-    const m = product.manufacturerInfo!;
-    const detail = (m.experience && m.experience.trim())
-      ? `${m.experience} of experience`
-      : (m.role && m.role.trim() ? m.role : `Crafted by ${manufacturerDisplayName(m)}`);
+  if (showMaker && maker) {
+    const detail = (maker.experience && maker.experience.trim())
+      ? `${maker.experience} of experience`
+      : (maker.role && maker.role.trim() ? maker.role : `Crafted by ${manufacturerDisplayName(maker)}`);
     whyChoose.push({ icon: Award, color: '#E01A1B', bg: '#FCE8E8', iconBg: '#ffe4e4', title: 'Trusted Manufacturer', desc: detail });
   }
-
-  const makerName = hasManufacturerInfo(product.manufacturerInfo)
-    ? manufacturerDisplayName(product.manufacturerInfo)
-    : '';
 
   return (
     <View className="flex-1 bg-gray-50">
@@ -637,11 +631,13 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
           </Pressable>
         </View>
 
-        {/* Star rating row + "See all reviews" */}
+        {/* FaceRating row + "See all reviews" — matches the web product detail */}
         <View className="flex-row items-center mb-4 flex-wrap" style={{ gap: 8 }}>
-          <View className="flex-row gap-0.5 mr-1">{renderStars(product.rating || 0)}</View>
-          <Text className="text-[13px] font-bold text-gray-800">{(product.rating ?? 0).toFixed(1)}</Text>
-          <Text className="text-[13px] text-gray-400 ml-1">({product.reviews ?? 0})</Text>
+          <FaceRatingRow
+            rating={Number(product.rating) || 0}
+            reviewCount={Number(product.reviews) || 0}
+            size={15}
+          />
           {product.reviews != null && product.reviews > 0 ? (
             <Pressable onPress={goReviews} accessibilityRole="link" accessibilityLabel="See all reviews">
               <Text className="text-[13px] font-semibold text-[#E01A1B] ml-1">See all reviews</Text>
@@ -1302,7 +1298,7 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
       ) : null}
 
       {/* ── Meet the Maker — manufacturer info ──────────────────────────────── */}
-      {hasManufacturerInfo(product.manufacturerInfo) ? (
+      {showMaker && maker ? (
         <View className="bg-white mt-2 mx-5 rounded-2xl" style={s.railCard}>
           <View className="px-5 pt-5 pb-4">
             <Text className="text-[17px] font-semibold text-gray-900" style={s.serif}>Meet the Maker</Text>
@@ -1311,8 +1307,8 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
             <Pressable onPress={() => setShowMakerModal(true)} accessibilityRole="button" accessibilityLabel="Open manufacturer profile">
               <View className="flex-row items-center" style={{ gap: 12 }}>
                 <View style={s.makerAvatarWrap}>
-                  {product.manufacturerInfo!.photo ? (
-                    <Image source={{ uri: product.manufacturerInfo!.photo }} style={s.makerAvatar} contentFit="cover" transition={200} />
+                  {maker.photo ? (
+                    <Image source={{ uri: maker.photo }} style={s.makerAvatar} contentFit="cover" transition={200} />
                   ) : (
                     <View style={[s.makerAvatar, { backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }]}>
                       <User size={28} color="#d1d5db" />
@@ -1322,25 +1318,25 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
                 <View style={{ flex: 1, minWidth: 0 }}>
                   {makerName ? <Text className="text-[15px] font-semibold text-gray-900" style={s.serif}>{makerName}</Text> : null}
                   <View className="flex-row flex-wrap mt-1.5" style={{ gap: 6 }}>
-                    {product.manufacturerInfo!.role && product.manufacturerInfo!.role.trim() ? (
+                    {maker.role && maker.role.trim() ? (
                       <View className="flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-[#E01A1B]/[0.06]">
                         <Award size={11} color={Palette.primary} />
-                        <Text className="text-[11px] font-semibold text-[#E01A1B]">{product.manufacturerInfo!.role}</Text>
+                        <Text className="text-[11px] font-semibold text-[#E01A1B]">{maker.role}</Text>
                       </View>
                     ) : null}
-                    {product.manufacturerInfo!.experience && product.manufacturerInfo!.experience.trim() ? (
+                    {maker.experience && maker.experience.trim() ? (
                       <View className="flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100">
                         <Clock size={11} color="#374151" />
-                        <Text className="text-[11px] font-semibold text-gray-700">{product.manufacturerInfo!.experience}</Text>
+                        <Text className="text-[11px] font-semibold text-gray-700">{maker.experience}</Text>
                       </View>
                     ) : null}
                   </View>
                 </View>
                 <ChevronDown size={16} color="#9ca3af" style={{ transform: [{ rotate: '-90deg' }] }} />
               </View>
-              {product.manufacturerInfo!.description && product.manufacturerInfo!.description.trim() ? (
+              {maker.description && maker.description.trim() ? (
                 <Text className="text-[13px] text-gray-600 leading-relaxed mt-3" numberOfLines={3}>
-                  {product.manufacturerInfo!.description}
+                  {maker.description}
                 </Text>
               ) : null}
             </Pressable>
@@ -1511,64 +1507,71 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
         </View>
       ) : null}
 
-      {/* ── Manufacturer "Meet the Maker" modal ─────────────────────────────── */}
-      <Modal visible={showMakerModal} transparent animationType="fade" onRequestClose={() => setShowMakerModal(false)}>
-        <View style={s.makerOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowMakerModal(false)} />
-          <View style={s.makerModal} onStartShouldSetResponder={() => true}>
-            {/* Brand header band with overlapping avatar */}
-            <View style={s.makerBand}>
-              <Pressable onPress={() => setShowMakerModal(false)} style={s.makerModalClose} accessibilityLabel="Close">
-                <X size={18} color={Palette.primary} />
-              </Pressable>
-              <View style={s.makerBandAvatar}>
-                {product.manufacturerInfo!.photo ? (
-                  <Image source={{ uri: product.manufacturerInfo!.photo }} style={s.makerBandAvatarImg} contentFit="cover" transition={200} />
-                ) : (
-                  <View style={[s.makerBandAvatarImg, { backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }]}>
-                    <User size={28} color="#d1d5db" />
+      {/* ── Manufacturer "Meet the Maker" modal ─────────────────────────────────
+          Gated on showMaker, not just on `visible`. React Native's <Modal>
+          builds its children on EVERY render — `visible` controls presentation,
+          not construction — so an unguarded body here ran against a null
+          manufacturerInfo on every product that has none, which is most of
+          them. That is what threw "Cannot read property 'photo' of null". */}
+      {showMaker && maker ? (
+        <Modal visible={showMakerModal} transparent animationType="fade" onRequestClose={() => setShowMakerModal(false)}>
+          <View style={s.makerOverlay}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowMakerModal(false)} />
+            <View style={s.makerModal} onStartShouldSetResponder={() => true}>
+              {/* Brand header band with overlapping avatar */}
+              <View style={s.makerBand}>
+                <Pressable onPress={() => setShowMakerModal(false)} style={s.makerModalClose} accessibilityLabel="Close">
+                  <X size={18} color={Palette.primary} />
+                </Pressable>
+                <View style={s.makerBandAvatar}>
+                  {maker.photo ? (
+                    <Image source={{ uri: maker.photo }} style={s.makerBandAvatarImg} contentFit="cover" transition={200} />
+                  ) : (
+                    <View style={[s.makerBandAvatarImg, { backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }]}>
+                      <User size={28} color="#d1d5db" />
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              <View style={s.makerModalBody}>
+                <Text className="text-[11px] uppercase tracking-[0.16em] text-[#E01A1B] font-semibold text-center mt-2">
+                  The hands behind this product
+                </Text>
+                {makerName ? <Text className="text-xl font-semibold text-gray-900 text-center mt-1" style={s.serif}>{makerName}</Text> : null}
+
+                {(maker.role?.trim() || maker.experience?.trim()) ? (
+                  <View className="flex-row flex-wrap justify-center mt-3" style={{ gap: 8 }}>
+                    {maker.role && maker.role.trim() ? (
+                      <View className="flex-row items-center gap-1.5 px-3 py-1 rounded-full bg-[#E01A1B]/[0.06]">
+                        <Award size={12} color={Palette.primary} />
+                        <Text className="text-xs font-semibold text-[#E01A1B]">{maker.role}</Text>
+                      </View>
+                    ) : null}
+                    {maker.experience && maker.experience.trim() ? (
+                      <View className="flex-row items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100">
+                        <Clock size={12} color="#374151" />
+                        <Text className="text-xs font-semibold text-gray-700">{maker.experience}</Text>
+                      </View>
+                    ) : null}
                   </View>
-                )}
+                ) : null}
+
+                {maker.description && maker.description.trim() ? (
+                  <>
+                    <View className="flex-row items-center gap-3 my-4">
+                      <View style={s.makerDivider} />
+                      <Text className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">About</Text>
+                      <View style={s.makerDivider} />
+                    </View>
+                    <Text className="text-sm text-gray-600 leading-relaxed">{maker.description}</Text>
+                  </>
+                ) : null}
               </View>
             </View>
-
-            <View style={s.makerModalBody}>
-              <Text className="text-[11px] uppercase tracking-[0.16em] text-[#E01A1B] font-semibold text-center mt-2">
-                The hands behind this product
-              </Text>
-              {makerName ? <Text className="text-xl font-semibold text-gray-900 text-center mt-1" style={s.serif}>{makerName}</Text> : null}
-
-              {(product.manufacturerInfo!.role?.trim() || product.manufacturerInfo!.experience?.trim()) ? (
-                <View className="flex-row flex-wrap justify-center mt-3" style={{ gap: 8 }}>
-                  {product.manufacturerInfo!.role && product.manufacturerInfo!.role.trim() ? (
-                    <View className="flex-row items-center gap-1.5 px-3 py-1 rounded-full bg-[#E01A1B]/[0.06]">
-                      <Award size={12} color={Palette.primary} />
-                      <Text className="text-xs font-semibold text-[#E01A1B]">{product.manufacturerInfo!.role}</Text>
-                    </View>
-                  ) : null}
-                  {product.manufacturerInfo!.experience && product.manufacturerInfo!.experience.trim() ? (
-                    <View className="flex-row items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100">
-                      <Clock size={12} color="#374151" />
-                      <Text className="text-xs font-semibold text-gray-700">{product.manufacturerInfo!.experience}</Text>
-                    </View>
-                  ) : null}
-                </View>
-              ) : null}
-
-              {product.manufacturerInfo!.description && product.manufacturerInfo!.description.trim() ? (
-                <>
-                  <View className="flex-row items-center gap-3 my-4">
-                    <View style={s.makerDivider} />
-                    <Text className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">About</Text>
-                    <View style={s.makerDivider} />
-                  </View>
-                  <Text className="text-sm text-gray-600 leading-relaxed">{product.manufacturerInfo!.description}</Text>
-                </>
-              ) : null}
-            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      ) : null}
     </View>
   );
 }

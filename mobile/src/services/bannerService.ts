@@ -5,6 +5,22 @@ export interface BannerImage {
   imageUrl: string;
   altText?: string;
   displayOrder: number;
+  isActive?: boolean;
+  /**
+   * Optional click-through target. The backend has always sent these three and
+   * the app read none of them, so every banner in the app was decoration while
+   * the same banner on the web navigated. Backend comment: "When set, clicking
+   * the banner on the storefront navigates the shopper to the linked
+   * product/category page."
+   *   linkType  = 'product' | 'category' (null = not clickable)
+   *   linkValue = the target's slug
+   *   linkLabel = the target's display name, cached for the admin views
+   */
+  linkType?: 'product' | 'category' | null;
+  linkValue?: string | null;
+  linkLabel?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface BannerResponse {

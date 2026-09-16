@@ -8,6 +8,10 @@ export interface SavedAddress {
   type: AddressType;
   name: string;
   phone: string;
+  /** Optional secondary mobile (E.164). Backend: Address.phone2 */
+  phone2?: string;
+  /** Optional landline — free-form digits/space/dash. Backend: Address.landline */
+  landline?: string;
   address: string;
   addressLine2?: string;
   city: string;
@@ -23,6 +27,8 @@ export interface AddressPayload {
   type: AddressType;
   name: string;
   phone: string;
+  phone2?: string;
+  landline?: string;
   address: string;
   addressLine2?: string;
   city: string;

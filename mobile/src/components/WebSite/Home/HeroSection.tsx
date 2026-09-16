@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Pressable, ScrollView, useWindowDimensions, Animated } from 'react-native';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { bannerService, BannerImage } from '@/services/bannerService';
 import { Palette } from '@/constants/theme';
 
@@ -13,7 +14,23 @@ type Slide = {
   uri?: string;
   source?: number;
   altText?: string;
+  /** Click-through target, when the admin set one on the banner. */
+  linkType?: 'product' | 'category' | null;
+  linkValue?: string | null;
 };
+
+/**
+ * Where a banner sends the shopper. Mirrors the web's targets: a category goes
+ * to the filtered product list, a product to its detail page. Returns null when
+ * the banner has no link, which is what keeps it non-interactive.
+ */
+function bannerHref(slide: Slide): string | null {
+  if (!slide.linkType || !slide.linkValue) return null;
+  if (slide.linkType === 'category') {
+    return `/(any)/products?category=${encodeURIComponent(slide.linkValue)}`;
+  }
+  return `/(any)/products/${encodeURIComponent(slide.linkValue)}`;
+}
 
 const fallbackSlides: Slide[] = [
   { id: 1, source: require('../../../../assets/images/hero/hs1.webp'), altText: 'Hero slide 1' },
@@ -46,6 +63,8 @@ export default function HeroSection() {
             id: banner.id,
             uri: banner.imageUrl,
             altText: banner.altText,
+            linkType: banner.linkType,
+            linkValue: banner.linkValue,
           }));
           setSlides(dynamicSlides);
         }
@@ -122,8 +141,9 @@ export default function HeroSection() {
         onMomentumScrollEnd={handleMomentumScrollEnd}
         scrollEventThrottle={16}
       >
-        {slides.map((slide) => (
-          <View key={slide.id} style={{ width, alignItems: 'center' }}>
+        {slides.map((slide) => {
+          const href = bannerHref(slide);
+          const banner = (
             <View
               style={{
                 width: bannerWidth,
@@ -141,8 +161,27 @@ export default function HeroSection() {
                 accessibilityLabel={slide.altText}
               />
             </View>
-          </View>
-        ))}
+          );
+
+          return (
+            <View key={slide.id} style={{ width, alignItems: 'center' }}>
+              {/* A banner without a link stays a plain image — wrapping every
+                  slide in a Pressable would advertise a tap that does nothing. */}
+              {href ? (
+                <Pressable
+                  onPress={() => router.push(href as any)}
+                  accessibilityRole="link"
+                  accessibilityLabel={slide.altText || 'Promotional banner'}
+                  style={({ pressed }) => [pressed && { opacity: 0.92 }]}
+                >
+                  {banner}
+                </Pressable>
+              ) : (
+                banner
+              )}
+            </View>
+          );
+        })}
       </ScrollView>
 
       {/* Pagination — animated stories-style progress bar */}

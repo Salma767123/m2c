@@ -10,6 +10,7 @@ import ProductDetail from '@/components/WebSite/Home/ProductDetail';
 import { useCart } from '@/context/CartContext';
 import { ProductDetailSkeleton } from '@/components/ui/Skeleton';
 import { useWishlist } from '@/context/WishlistContext';
+import { Palette } from '@/constants/theme';
 
 // Truncate to N words, append "..." if excess
 function truncateWords(text: string, maxWords = 10): string {
@@ -43,9 +44,10 @@ const TopBar = ({
   };
 
   return (
+    <>
     <View
-      className="bg-[#111827] pb-3.5 px-4 flex-row items-center justify-between"
-      style={{ paddingTop: insets.top + 12 }}
+      className="pb-3.5 px-4 flex-row items-center justify-between"
+      style={{ paddingTop: insets.top + 12, backgroundColor: Palette.headerSurface }}
     >
       <Pressable
         onPress={async () => {
@@ -93,10 +95,18 @@ const TopBar = ({
           })}
           className="p-1 relative"
         >
-          <Heart size={22} color="#ffffff" />
+          <Heart size={22} color={Palette.onBrand} />
           {wishlistCount > 0 && (
-            <View className="absolute -top-1 -right-1 bg-red-500 min-w-[16px] h-4 rounded-full items-center justify-center px-1 border border-[#111827]">
-              <Text className="text-white text-[9px] font-bold">{wishlistCount > 99 ? '99+' : wishlistCount}</Text>
+            // White-on-red, not red-on-red. The header is brand red now, so a
+            // red badge would disappear into it — the same rule the main Header
+            // states: on brand chrome, accents are white or near-white, never red.
+            <View
+              className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full items-center justify-center px-1"
+              style={{ backgroundColor: Palette.onBrand, borderWidth: 1.5, borderColor: Palette.headerSurface }}
+            >
+              <Text className="text-[9px] font-bold" style={{ color: Palette.primary }}>
+                {wishlistCount > 99 ? '99+' : wishlistCount}
+              </Text>
             </View>
           )}
         </Pressable>
@@ -113,15 +123,25 @@ const TopBar = ({
           })}
           className="p-1 relative"
         >
-          <ShoppingCart size={22} color="#ffffff" />
+          <ShoppingCart size={22} color={Palette.onBrand} />
           {itemCount > 0 && (
-            <View className="absolute -top-1 -right-1 bg-amber-500 min-w-[16px] h-4 rounded-full items-center justify-center px-1 border border-[#111827]">
-              <Text className="text-[#111827] text-[9px] font-bold">{itemCount > 99 ? '99+' : itemCount}</Text>
+            // Cart keeps amber so "items waiting" stays its own signal, distinct
+            // from the wishlist badge — again matching the main Header.
+            <View
+              className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full items-center justify-center px-1"
+              style={{ backgroundColor: Palette.warning, borderWidth: 1.5, borderColor: Palette.headerSurface }}
+            >
+              <Text className="text-[9px] font-bold" style={{ color: Palette.surfaceInverse }}>
+                {itemCount > 99 ? '99+' : itemCount}
+              </Text>
             </View>
           )}
         </Pressable>
       </View>
     </View>
+    {/* Darker bottom edge, so the bar reads as an object — same as the main Header. */}
+    <View style={{ height: 3, backgroundColor: Palette.headerEdge }} />
+    </>
   );
 };
 

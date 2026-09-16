@@ -1,9 +1,13 @@
+// ThemeProvider/DarkTheme/DefaultTheme come from React Navigation, not expo-router —
+// expo-router re-exports neither. Importing them from 'expo-router' makes all three
+// `undefined`, and <ThemeProvider> then renders a JSX element with an undefined type,
+// which crashes NativeWind's JSX wrapper ("Cannot read property 'displayName' of
+// undefined" in maybeHijackSafeAreaProvider) before the app draws a single frame.
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LogBox } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'expo-router';
 import {
   configureReanimatedLogger,
   ReanimatedLogLevel,
@@ -12,6 +16,8 @@ import '../../global.css';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { CartProvider } from '@/context/CartContext';
 import { WishlistProvider } from '@/context/WishlistContext';
+import { userAuthService } from '@/services/userAuthService';
+import axiosInstance from '@/lib/axios';
 import { setExchangeRate } from '@/lib/currency';
 import NotificationBanner from '@/components/General/NotificationBanner';
 
@@ -62,6 +68,16 @@ export default function RootLayout() {
     data: {} as Record<string, string>,
   });
 
+  // "Remember me" gate. This has to settle BEFORE the cart and wishlist
+  // providers mount, because they hydrate from the stored token on their first
+  // render — start them first and an unremembered session would fetch one last
+  // time with a token we are about to throw away. Two AsyncStorage reads, so
+  // the held frame is not perceptible.
+  const [sessionChecked, setSessionChecked] = useState(false);
+  useEffect(() => {
+    userAuthService.endSessionIfNotRemembered().finally(() => setSessionChecked(true));
+  }, []);
+
   // Navigate to order details when notification is tapped
   const handleNotificationNav = useCallback(
     (data: Record<string, string>) => {
@@ -76,10 +92,13 @@ export default function RootLayout() {
   useEffect(() => {
     const loadExchangeRate = async () => {
       try {
-        const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
-        const res = await fetch(`${API_URL}/exchange-rate`);
-        const data = await res.json();
-        if (data.success && data.data?.rate) {
+        // Through the shared instance, so this inherits the normalised base
+        // URL. Building it from the raw env var here meant a base without the
+        // `/api` suffix 404'd, and the catch below turned that into a silent
+        // fallback to the default rate — i.e. wrong prices, no error anywhere.
+        const res = await axiosInstance.get('/exchange-rate');
+        const data = res.data;
+        if (data?.success && data.data?.rate) {
           setExchangeRate(data.data.rate);
         }
       } catch {
@@ -118,6 +137,8 @@ export default function RootLayout() {
     };
   }, [handleNotificationNav]);
 
+  if (!sessionChecked) return null;
+
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <CartProvider>
@@ -140,7 +161,7 @@ export default function RootLayout() {
           />
         </WishlistProvider>
       </CartProvider>
-      <StatusBar style="dark" backgroundColor="transparent" translucent={true} />
+      <StatusBar style="dark" />
     </ThemeProvider>
   );
 }

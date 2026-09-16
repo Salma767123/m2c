@@ -14,12 +14,17 @@ import { Mail, Phone, MapPin, Clock, Send, Store, X } from 'lucide-react-native'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { enquiryService } from '@/services/enquiryService';
 import { contactEnquiryService } from '@/services/contactEnquiryService';
+import { HEAR_ABOUT_US_OPTIONS } from '@/lib/enquirySources';
 
 interface ContactFormData {
   name: string;
   email: string;
   subject: string;
   message: string;
+  /** Acquisition channel. Required, matching the web's contact form. */
+  hearAboutUs: string;
+  /** Only sent when hearAboutUs === 'other'. */
+  hearAboutUsOther: string;
 }
 
 interface VendorFormData {
@@ -42,6 +47,8 @@ export default function Contact() {
     email: '',
     subject: '',
     message: '',
+    hearAboutUs: '',
+    hearAboutUsOther: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -63,6 +70,17 @@ export default function Contact() {
       return;
     }
 
+    // Both checks mirror the web's contact form: the channel is required, and
+    // picking "Other" without saying what it was records nothing useful.
+    if (!formData.hearAboutUs) {
+      showErrorToast('Required Fields', 'Please tell us how you heard about us');
+      return;
+    }
+    if (formData.hearAboutUs === 'other' && !formData.hearAboutUsOther.trim()) {
+      showErrorToast('Required Fields', 'Please tell us where you heard about us');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await contactEnquiryService.submitEnquiry({
@@ -70,8 +88,18 @@ export default function Contact() {
         email: formData.email,
         subject: formData.subject,
         message: formData.message,
+        hearAboutUs: formData.hearAboutUs || undefined,
+        hearAboutUsOther:
+          formData.hearAboutUs === 'other' ? formData.hearAboutUsOther.trim() : undefined,
       });
-      setFormData({ name: '', email: '', subject: '', message: '' });
+      setFormData({
+        name: '',
+        email: '',
+        subject: '',
+        message: '',
+        hearAboutUs: '',
+        hearAboutUsOther: '',
+      });
       showSuccessToast('Message Sent!', 'Thank you for your message! We will get back to you soon.');
     } catch (error: any) {
       showErrorToast(
@@ -289,6 +317,69 @@ export default function Contact() {
               style={[inputBaseStyle, { minHeight: 120 }]}
               className={inputClass}
             />
+          </View>
+
+          {/* How did you hear about us? — chip list rather than the web's
+              <select>, which has no good native equivalent here. Same slugs, so
+              the admin enquiry views and the source report group these exactly
+              as they group web submissions. */}
+          <View className="mb-5">
+            <Text className="text-sm font-semibold text-gray-700 mb-2">
+              How did you hear about us? <Text className="text-red-500">*</Text>
+            </Text>
+            <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+              {HEAR_ABOUT_US_OPTIONS.map((opt) => {
+                const active = formData.hearAboutUs === opt.value;
+                return (
+                  <Pressable
+                    key={opt.value}
+                    onPress={() =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        hearAboutUs: opt.value,
+                        // Drop stale free text when moving away from "Other".
+                        hearAboutUsOther:
+                          opt.value === 'other' ? prev.hearAboutUsOther : '',
+                      }))
+                    }
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={opt.label}
+                    className={`px-3.5 rounded-xl border ${
+                      active
+                        ? 'bg-brand-500 border-brand-500'
+                        : 'bg-white border-gray-300'
+                    }`}
+                    style={({ pressed }) => [
+                      { minHeight: 40, justifyContent: 'center' },
+                      pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <Text
+                      className={`text-xs font-semibold ${
+                        active ? 'text-white' : 'text-gray-700'
+                      }`}
+                    >
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {formData.hearAboutUs === 'other' ? (
+              <TextInput
+                value={formData.hearAboutUsOther}
+                onChangeText={(text) =>
+                  setFormData({ ...formData, hearAboutUsOther: text })
+                }
+                placeholder="e.g. Saw your stall at a local market"
+                placeholderTextColor={placeholderColor}
+                accessibilityLabel="Where did you hear about us"
+                style={[inputBaseStyle, { marginTop: 10 }]}
+                className={inputClass}
+              />
+            ) : null}
           </View>
 
           <Pressable

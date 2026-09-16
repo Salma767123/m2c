@@ -7,7 +7,6 @@
     "icon": "./assets/images/1024.png",
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
@@ -19,12 +18,7 @@
         "foregroundImage": "./assets/images/1024.png",
         "backgroundImage": "./assets/images/1024.png",
         "monochromeImage": "./assets/images/1024.png"
-      },
-      "edgeToEdgeEnabled": true
-    },
-    "notification": {
-      "icon": "./assets/notification-icon.png",
-      "color": "#111827"
+      }
     },
     "web": {
       "bundler": "metro",

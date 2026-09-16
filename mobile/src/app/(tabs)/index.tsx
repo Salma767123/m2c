@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { ScrollView, RefreshControl, View } from 'react-native';
 import HeroSection from '@/components/WebSite/Home/HeroSection';
+import PromoStrip from '@/components/WebSite/Home/PromoStrip';
 import CategoryStrip from '@/components/WebSite/Home/CategoryStrip';
 import NoticeBoard from '@/components/WebSite/Home/NoticeBoard';
 import BrandPromo from '@/components/WebSite/Home/BrandPromo';
@@ -37,19 +38,23 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#374151" />
         }
       >
-        {/* Roughly the web's running order, with two phone-specific changes:
-            CategoriesSection moves up (a category grid earns its place high on a
-            phone), and NoticeBoard sits AFTER it rather than directly under the
-            hero — back to back, the two horizontally-scrolling strips read as one
-            component. */}
+        {/* The web's running order, one for one (frontend/src/app/page.tsx):
+            Hero → PromoStrip → NoticeBoard → Featured → BrandPromo → TopSelling
+            → BestSeller → Categories → ValueSection → Footer.
+
+            Two deliberate differences remain. CategoryStrip leads, standing in
+            for the category ribbon the web keeps inside its header — a phone
+            header has no room for it. And DownloadApp is omitted: the web uses
+            it to send people here, and this IS here. */}
         <CategoryStrip key={`strip-${refreshNonce}`} />
         <HeroSection key={`hero-${refreshNonce}`} />
-        <CategoriesSection key={`cats-${refreshNonce}`} />
+        <PromoStrip key={`promo-${refreshNonce}`} />
         <NoticeBoard key={`notice-${refreshNonce}`} />
         <FeaturedProductsSection key={`feat-${refreshNonce}`} />
         <BrandPromo />
         <TopSellingSection key={`top-${refreshNonce}`} />
         <BestSellerSection key={`best-${refreshNonce}`} />
+        <CategoriesSection key={`cats-${refreshNonce}`} />
         <ValueSection />
         <Footer />
       </ScrollView>

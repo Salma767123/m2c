@@ -7,6 +7,10 @@ export interface ContactEnquiry {
   phone?: string;
   subject: string;
   message: string;
+  /** Acquisition channel slug — see lib/enquirySources.ts. */
+  hearAboutUs?: string;
+  /** Free text captured when hearAboutUs is "other". */
+  hearAboutUsOther?: string;
   createdAt: string;
 }
 
@@ -17,6 +21,8 @@ class ContactEnquiryService {
     phone?: string;
     subject: string;
     message: string;
+    hearAboutUs?: string;
+    hearAboutUsOther?: string;
   }): Promise<{ success: boolean; message: string; data?: ContactEnquiry }> {
     const response = await axios.post('/contact-enquiries/submit', data);
     return response.data;

@@ -26,14 +26,15 @@ import { Platform } from 'react-native';
    Primary actions, selected states, focus rings. Deliberately distinct from
    `Error` below so an "active selection" never reads as a validation failure. */
 export const Brand = {
-  50: '#E01A1B',
-  100: '#E01A1B',
-  200: '#E01A1B',
-  400: '#E01A1B',
-  500: '#E01A1B',
-  600: '#E01A1B',
-  700: '#E01A1B',
-  800: '#E01A1B',
+  50: '#fff1f1',
+  100: '#ffdede',
+  200: '#ffc1c1',
+  400: '#f24344',
+  500: '#e01a1b',
+  600: '#c41617',
+  700: '#a31314',
+  /** Darkest step — body copy on brand-50/100 tints. */
+  800: '#7d0f10',
 } as const;
 
 /* ── Success green ── completion states, valid badges, delivered orders. */
@@ -53,8 +54,8 @@ export const Tertiary = {
 /* ── Error red ── validation failures, destructive confirmations, cancelled
    orders. Slightly darker / cooler than brand red. */
 export const Error = {
-  50: '#E01A1B',
-  500: '#E01A1B',
+  50: '#ffdad6',
+  500: '#ba1a1a',
 } as const;
 
 /* ── Warning amber ── pending / awaiting-action states. Not in DESIGN.md's four

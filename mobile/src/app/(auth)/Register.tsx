@@ -1,9 +1,10 @@
 import React, { useCallback, useState } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 import { User, Mail, Phone, Lock, UserPlus, Check } from 'lucide-react-native';
 import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { useGoogleAuth } from '@/lib/googleAuth';
 import { Palette } from '@/constants/theme';
 import {
   AuthShell,
@@ -33,6 +34,14 @@ export default function RegisterScreen() {
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Same shared flow the Login screen uses. Google is one identity operation:
+  // the call signs an existing user in and creates the account for a new one.
+  const {
+    available: googleAvailable,
+    loading: googleLoading,
+    signIn: handleGoogleSignUp,
+  } = useGoogleAuth();
 
   const setError = (key: string, message: string) =>
     setErrors((prev) => ({ ...prev, [key]: message }));
@@ -256,6 +265,42 @@ export default function RegisterScreen() {
         onPress={handleSubmit}
         icon={<UserPlus size={18} color="#FFFFFF" strokeWidth={2.5} />}
       />
+
+      {/* Google sign-up — the web offers this on the register tab as well as
+          login, and mobile previously offered it only on login. */}
+      {googleAvailable ? (
+        <>
+          <View className="flex-row items-center my-5">
+            <View className="flex-1 h-px bg-gray-300" />
+            <Text className="mx-4 text-xs text-gray-500 font-medium">
+              Or sign up with
+            </Text>
+            <View className="flex-1 h-px bg-gray-300" />
+          </View>
+
+          <TouchableOpacity
+            disabled={googleLoading}
+            onPress={handleGoogleSignUp}
+            className={`rounded-xl py-3.5 items-center justify-center flex-row border border-gray-300 ${
+              googleLoading ? 'bg-gray-100' : 'bg-white'
+            }`}
+            accessibilityRole="button"
+            accessibilityLabel="Continue with Google"
+          >
+            {googleLoading ? (
+              <ActivityIndicator size="small" color="#4285F4" />
+            ) : (
+              <Image
+                source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+                style={{ width: 20, height: 20 }}
+              />
+            )}
+            <Text className="font-bold text-sm ml-3 text-gray-700">
+              {googleLoading ? 'Signing in...' : 'Continue with Google'}
+            </Text>
+          </TouchableOpacity>
+        </>
+      ) : null}
     </AuthShell>
   );
 }

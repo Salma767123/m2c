@@ -10,9 +10,14 @@ import { AuthShell, AuthField, AuthButton, AuthSwitch, EMAIL_RE } from '@/compon
 /**
  * Request a password-reset email.
  *
- * The success state deliberately does NOT confirm whether the address exists —
- * the backend responds the same either way, and echoing "no such account" here
- * would turn this screen into an account-enumeration oracle.
+ * The success state is worded so it does not confirm the address exists
+ * ("If an account exists for…"). Be aware that the wording is currently the
+ * only thing protecting that: the backend answers an unknown address with
+ * 404 "User not found with this email" rather than the generic success this
+ * comment used to claim, so the error path still reveals which addresses have
+ * accounts. The web behaves identically, so this is a backend-side fix
+ * (return the same 200 either way) rather than something to paper over in one
+ * client — changing it here alone would only move the leak, not close it.
  */
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');

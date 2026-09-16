@@ -18,37 +18,18 @@ import {
   ShoppingBag,
   Eye,
   EyeOff,
+  Check,
+  AlertCircle,
+  X,
 } from "lucide-react-native";
-import Constants from "expo-constants";
 import { userAuthService } from "@/services/userAuthService";
 import { companyInfoService } from "@/services/companyInfoService";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
+import { useGoogleAuth } from "@/lib/googleAuth";
 
 const STATIC_LOGO = require("../../../assets/images/logo4.png");
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
-
-const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || "";
-
-// Expo Go can't load native modules. Lazy-require so the app still boots there;
-// Google Sign-In is disabled in Expo Go and works only in dev-client / release builds.
-const IS_EXPO_GO = Constants.appOwnership === "expo";
-let GoogleSignin: any = null;
-let isSuccessResponse: ((r: any) => boolean) | null = null;
-let isErrorWithCode: ((e: any) => boolean) | null = null;
-let statusCodes: any = null;
-if (!IS_EXPO_GO) {
-  try {
-    const mod = require("@react-native-google-signin/google-signin");
-    GoogleSignin = mod.GoogleSignin;
-    isSuccessResponse = mod.isSuccessResponse;
-    isErrorWithCode = mod.isErrorWithCode;
-    statusCodes = mod.statusCodes;
-  } catch {
-    // Module not installed in this binary — Google Sign-In stays hidden.
-  }
-}
-const GOOGLE_SIGNIN_AVAILABLE = !!GoogleSignin;
 
 // Firebase push notifications — fails gracefully in Expo Go
 let registerForPushNotifications: (() => Promise<string | null>) | null = null;
@@ -67,9 +48,20 @@ export default function LoginScreen() {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  // Matches the web's LoginForm: the box decides whether the session survives
+  // a restart, so it defaults to off rather than silently opting everyone in.
+  const [rememberMe, setRememberMe] = useState(false);
+  // Set when the server answers a password login with GOOGLE_ACCOUNT — the
+  // credentials aren't wrong, the account simply has no password to check.
+  const [googleAccountEmail, setGoogleAccountEmail] = useState<string | null>(null);
+
+  const {
+    available: GOOGLE_SIGNIN_AVAILABLE,
+    loading: googleLoading,
+    signIn: handleGoogleSignIn,
+  } = useGoogleAuth();
 
   // Load dynamic company logo (cached first, then fresh from API)
   useEffect(() => {
@@ -88,63 +80,6 @@ export default function LoginScreen() {
   // items migrate to the server copy before navigation.
   const hydrateAfterLogin = async () => {
     await Promise.all([refreshCart(), refreshWishlist()]);
-  };
-
-  useEffect(() => {
-    if (GOOGLE_SIGNIN_AVAILABLE) {
-      GoogleSignin.configure({ webClientId: GOOGLE_CLIENT_ID });
-    }
-  }, []);
-
-  const handleGoogleSignIn = async () => {
-    if (!GOOGLE_SIGNIN_AVAILABLE) {
-      showErrorToast(
-        "Unavailable in Expo Go",
-        "Google Sign-In needs a dev build. Use email/password or run with a dev client.",
-      );
-      return;
-    }
-    setGoogleLoading(true);
-    try {
-      await GoogleSignin.hasPlayServices();
-      const response = await GoogleSignin.signIn();
-
-      if (isSuccessResponse!(response)) {
-        const { user } = response.data;
-
-        const result = await userAuthService.googleLogin({
-          googleId: user.id,
-          email: user.email,
-          name: user.name || user.email.split("@")[0],
-          image: user.photo || undefined,
-        });
-
-        if (result.success && result.data) {
-          await userAuthService.storeAuthData(
-            result.data.token,
-            result.data.user,
-            true,
-          );
-          await hydrateAfterLogin();
-          registerForPushNotifications?.().catch(() => {});
-          showSuccessToast("Welcome!", `Signed in as ${result.data.user.name}`);
-          router.replace("/(tabs)");
-        }
-      }
-    } catch (error: any) {
-      if (isErrorWithCode!(error)) {
-        if (error.code === statusCodes.SIGN_IN_CANCELLED) return;
-        if (error.code === statusCodes.IN_PROGRESS) return;
-        if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-          showErrorToast("Error", "Google Play Services not available.");
-          return;
-        }
-      }
-      console.error("Google sign-in error:", error);
-      showErrorToast("Login Failed", error.message || "Google sign-in failed.");
-    } finally {
-      setGoogleLoading(false);
-    }
   };
 
   const validateEmail = useCallback((value: string) => {
@@ -166,8 +101,11 @@ export default function LoginScreen() {
       setPasswordError("Please enter your password");
       return false;
     }
-    if (value.length < 6) {
-      setPasswordError("Password must be at least 6 characters");
+    // 8, matching the web's LoginForm and the 8 that Register enforces on both
+    // clients. Mobile previously accepted 6 here, so a password this app would
+    // refuse to create was still allowed through its own sign-in form.
+    if (value.length < 8) {
+      setPasswordError("Password must be at least 8 characters");
       return false;
     }
     setPasswordError("");
@@ -181,6 +119,8 @@ export default function LoginScreen() {
 
     if (!isEmailValid || !isPasswordValid) return;
 
+    setGoogleAccountEmail(null);
+
     try {
       setSubmitting(true);
 
@@ -193,7 +133,7 @@ export default function LoginScreen() {
         await userAuthService.storeAuthData(
           response.data.token,
           response.data.user,
-          true,
+          rememberMe,
         );
         await hydrateAfterLogin();
         registerForPushNotifications?.().catch(() => {});
@@ -204,6 +144,20 @@ export default function LoginScreen() {
         router.replace("/(tabs)");
       }
     } catch (error: any) {
+      // A Google-created account has no password to check, so "invalid
+      // credentials" is the wrong answer — it sends the user off to reset a
+      // password that does not exist. The web surfaces this as its own panel;
+      // so does this screen now.
+      const errorCode = error?.data?.code;
+      if (errorCode === "GOOGLE_ACCOUNT") {
+        setGoogleAccountEmail(normalizedEmail);
+        showErrorToast(
+          "Google Account",
+          "This account was created with Google sign-in. Please use the Google button to log in.",
+        );
+        return;
+      }
+
       console.error("Login error:", error);
       showErrorToast(
         "Login Failed",
@@ -212,7 +166,7 @@ export default function LoginScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [email, password, validateEmail, validatePassword]);
+  }, [email, password, rememberMe, validateEmail, validatePassword]);
 
   return (
     <View className="flex-1 bg-black" style={{ paddingTop: insets.top }}>
@@ -266,6 +220,59 @@ export default function LoginScreen() {
               </View>
             </View>
 
+            {/* Google Account Notice — mirrors the web's panel. Shown only
+                after the server tells us this address is a Google account. */}
+            {googleAccountEmail ? (
+              <View className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-3">
+                <View className="flex-row">
+                  <AlertCircle size={16} color="#2563eb" strokeWidth={2} />
+                  <View className="flex-1 ml-2.5">
+                    <Text className="text-xs font-bold text-blue-900 mb-1">
+                      Google Account Detected
+                    </Text>
+                    <Text className="text-xs text-blue-800 leading-4">
+                      The account{" "}
+                      <Text className="font-semibold">{googleAccountEmail}</Text>{" "}
+                      was created using Google sign-in. Please continue with
+                      Google to log in.
+                    </Text>
+
+                    {GOOGLE_SIGNIN_AVAILABLE ? (
+                      <TouchableOpacity
+                        disabled={googleLoading}
+                        onPress={handleGoogleSignIn}
+                        className="mt-2.5 flex-row items-center justify-center rounded-lg border border-gray-300 bg-white py-2.5"
+                        accessibilityRole="button"
+                        accessibilityLabel="Continue with Google"
+                      >
+                        {googleLoading ? (
+                          <ActivityIndicator size="small" color="#4285F4" />
+                        ) : (
+                          <Image
+                            source={{
+                              uri: "https://developers.google.com/identity/images/g-logo.png",
+                            }}
+                            style={{ width: 16, height: 16 }}
+                          />
+                        )}
+                        <Text className="ml-2 text-xs font-bold text-gray-700">
+                          Continue with Google
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setGoogleAccountEmail(null)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Dismiss"
+                  >
+                    <X size={14} color="#60a5fa" strokeWidth={2.5} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : null}
+
             {/* Email Input */}
             <View className="mb-4">
               <Text className="text-xs font-semibold text-gray-800 mb-2">
@@ -285,6 +292,8 @@ export default function LoginScreen() {
                   onChangeText={(value) => {
                     setEmail(value.toLowerCase());
                     if (emailError) setEmailError("");
+                    // The notice belongs to the address that triggered it.
+                    if (googleAccountEmail) setGoogleAccountEmail(null);
                   }}
                   onBlur={() => validateEmail(email)}
                   placeholder="Enter your email"
@@ -343,18 +352,43 @@ export default function LoginScreen() {
               )}
             </View>
 
-            {/* Forgot password */}
-            <TouchableOpacity
-              onPress={() => router.push("/(auth)/ForgotPassword")}
-              className="self-end -mt-3 mb-4"
-              activeOpacity={0.7}
-              accessibilityRole="link"
-              accessibilityLabel="Forgot your password"
-            >
-              <Text className="text-xs font-semibold text-brand-500">
-                Forgot password?
-              </Text>
-            </TouchableOpacity>
+            {/* Remember me + Forgot password — the web pairs these on one row. */}
+            <View className="-mt-3 mb-4 flex-row items-center justify-between">
+              <TouchableOpacity
+                onPress={() => setRememberMe((v) => !v)}
+                className="flex-row items-center"
+                activeOpacity={0.7}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: rememberMe }}
+                accessibilityLabel="Remember me"
+                hitSlop={6}
+              >
+                <View
+                  className={`w-4 h-4 rounded items-center justify-center mr-2 border ${
+                    rememberMe
+                      ? "bg-brand-500 border-brand-500"
+                      : "bg-white border-gray-300"
+                  }`}
+                >
+                  {rememberMe ? (
+                    <Check size={11} color="#FFFFFF" strokeWidth={3} />
+                  ) : null}
+                </View>
+                <Text className="text-xs text-gray-600">Remember me</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push("/(auth)/ForgotPassword")}
+                activeOpacity={0.7}
+                accessibilityRole="link"
+                accessibilityLabel="Forgot your password"
+                hitSlop={6}
+              >
+                <Text className="text-xs font-semibold text-brand-500">
+                  Forgot password?
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Sign In Button */}
             <TouchableOpacity

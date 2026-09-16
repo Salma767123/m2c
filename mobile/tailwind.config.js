@@ -11,28 +11,24 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Brand red — the real ladder from frontend/src/app/globals.css.
+        // Every step here was previously #E01A1B, so `bg-brand-50` (a pale pink
+        // tint) painted a solid red block, and `text-brand-800` on it was red on
+        // red. A ladder whose steps are all identical is not a ladder.
         brand: {
-          50: "#E01A1B",
-          100: "#E01A1B",
-          200: "#E01A1B",
-          400: "#E01A1B",
-          500: "#E01A1B",
-          600: "#E01A1B",
-          700: "#E01A1B",
-          800: "#E01A1B",
+          50: "#fff1f1",
+          100: "#ffdede",
+          200: "#ffc1c1",
+          400: "#f24344",
+          500: "#e01a1b",
+          600: "#c41617",
+          700: "#a31314",
+          800: "#7d0f10",
         },
-        red: {
-          50: "#E01A1B",
-          100: "#E01A1B",
-          200: "#E01A1B",
-          300: "#E01A1B",
-          400: "#E01A1B",
-          500: "#E01A1B",
-          600: "#E01A1B",
-          700: "#E01A1B",
-          800: "#E01A1B",
-          900: "#E01A1B",
-        },
+        // NOTE: `red` is deliberately NOT overridden — the web doesn't override
+        // it either, so `bg-red-50` / `border-red-200` keep Tailwind's own soft
+        // reds for error surfaces. Flattening them to brand red turned every
+        // soft error card into a solid red slab.
         success: {
           50: "#ecfdf3",
           500: "#16a34a",
@@ -42,9 +38,13 @@ module.exports = {
           50: "#f5f7ff",
           500: "#0074c8",
         },
+        // Error red — distinct from brand red on purpose. globals.css: "Kept
+        // distinct from --color-error-* so 'active selection' never reads as a
+        // validation failure." Mobile had them identical, collapsing exactly
+        // the distinction the web set out to preserve.
         error: {
-          50: "#E01A1B",
-          500: "#E01A1B",
+          50: "#ffdad6",
+          500: "#ba1a1a",
         },
         warning: {
           50: "#fffbeb",

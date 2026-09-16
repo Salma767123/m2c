@@ -10,11 +10,12 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { X, Star, Send, Package } from 'lucide-react-native';
+import { X, Send, Package } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { reviewService } from '@/services/reviewService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { Palette } from '@/constants/theme';
+import { FacePicker, type FaceValue } from '@/components/WebSite/Shared/FaceRating';
 
 interface OrderItem {
   productId: string;
@@ -64,7 +65,7 @@ export default function ReviewModal({
       return;
     }
     if (rating === 0) {
-      showErrorToast('Rate Product', 'Please select a star rating');
+      showErrorToast('Rating required', 'Please select a face rating');
       return;
     }
 
@@ -177,32 +178,14 @@ export default function ReviewModal({
             </View>
           ) : null}
 
-          {/* Star Rating */}
+          {/* Face Rating — mirrors the web's FacePicker */}
           <View style={s.section}>
             <Text style={s.sectionTitle}>Your Rating</Text>
-            <View style={s.starsRow}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Pressable
-                  key={star}
-                  onPress={() => setRating(star)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${star} star${star > 1 ? 's' : ''}`}
-                  style={s.starBtn}
-                >
-                  <Star
-                    size={36}
-                    color={star <= rating ? '#f59e0b' : '#e5e7eb'}
-                    fill={star <= rating ? '#f59e0b' : 'transparent'}
-                    strokeWidth={1.5}
-                  />
-                </Pressable>
-              ))}
-            </View>
-            {rating > 0 ? (
-              <Text style={s.ratingLabel}>
-                {['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'][rating]}
-              </Text>
-            ) : null}
+            <FacePicker
+              value={rating as FaceValue}
+              onChange={(v) => setRating(v)}
+              size={44}
+            />
           </View>
 
           {/* Comment */}

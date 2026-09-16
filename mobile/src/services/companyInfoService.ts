@@ -4,6 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export interface PublicCompanyInfo {
   companyName: string;
   companyLogo: string | null;
+  /** Alternate logo, typically for dark backgrounds. */
+  secondaryLogo: string | null;
   companyEmail: string | null;
   companyPhone: string | null;
   companyWebsite: string | null;
@@ -22,6 +24,7 @@ const CACHE_KEY = 'companyInfo_public';
 const DEFAULT_INFO: PublicCompanyInfo = {
   companyName: 'M2C MarkDowns Private Limited',
   companyLogo: null,
+  secondaryLogo: null,
   companyEmail: null,
   companyPhone: null,
   companyWebsite: null,

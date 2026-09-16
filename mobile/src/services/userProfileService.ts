@@ -1,9 +1,27 @@
 import axios from '@/lib/axios';
 
+/**
+ * Fields the backend's PUT /auth/profile accepts (authController.js:1234).
+ *
+ * These were missing from the mobile copy of this interface, so the typed
+ * service silently dropped them in both directions — the same failure the web
+ * hit once with `image` and documented in its own version of this file. If the
+ * backend accepts a field and the user can edit it, it belongs here.
+ */
 export interface UpdateUserProfileData {
   name: string;
+  email?: string;
+  /** Honorific — Mr, Mrs, Ms, Miss, Mx, Dr. */
+  title?: string;
+  middleName?: string;
+  gender?: string;
   phoneNumber?: string;
+  /** WhatsApp contact, separate from the phone number. */
+  whatsappNumber?: string;
+  /** Avatar URL. Google sign-in already stores one. */
+  image?: string;
   address?: string;
+  addressLine2?: string;
   city?: string;
   state?: string;
   zipCode?: string;
@@ -16,8 +34,14 @@ export interface UserProfileResponse {
     id: string;
     email: string;
     name: string;
+    title?: string;
+    middleName?: string;
+    gender?: string;
     phoneNumber?: string;
+    whatsappNumber?: string;
+    image?: string;
     address?: string;
+    addressLine2?: string;
     city?: string;
     state?: string;
     zipCode?: string;

@@ -1,21 +1,23 @@
-﻿import React, { memo, useCallback, useEffect, useState } from "react";
+﻿import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, ActivityIndicator, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { Heart, ShoppingCart } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { cartService } from "@/services/cartService";
 import { userAuthService } from "@/services/userAuthService";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { Product as ServiceProduct } from "@/services/productService";
 import { PublicProduct } from "@/services/publicProductService";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
+import { ActiveOffer } from "@/lib/offers";
 import {
   getRegionalPrice,
   getRegionalOriginalPrice,
+  isVisibleInRegion,
   formatPrice as fmtCurrency,
 } from "@/lib/currency";
+import { FaceRatingRow } from "@/components/WebSite/Shared/FaceRating";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 interface MockProduct {
@@ -42,7 +44,7 @@ function getPrimaryImage(product: Product): string | undefined {
     return undefined;
   const first = product.images[0];
   if (typeof first === "object" && first !== null && "url" in first) {
-    const imgs = product.images as Array<{ url: string; isPrimary: boolean }>;
+    const imgs = product.images as { url: string; isPrimary: boolean }[];
     return imgs.find((i) => i.isPrimary && i.url?.trim())?.url ||
       imgs.find((i) => i.url?.trim())?.url;
   }
@@ -74,8 +76,20 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
   } = useWishlist();
 
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [isAdded, setIsAdded] = useState(false);
   const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // "Added" is a 1.8s confirmation on the CTA. Kept in a ref so unmounting
+  // mid-countdown — tapping through to the product, or the list re-filtering —
+  // cancels it instead of setting state on a component that is gone.
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (addedTimer.current) clearTimeout(addedTimer.current);
+    },
+    [],
+  );
 
   const isInWishlist = isInGlobalWishlist(product.id);
 
@@ -94,11 +108,39 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
 
   const imageUrl = getPrimaryImage(product);
   const displayPrice = getDisplayPrice(product);
-  const originalPrice = getRegionalOriginalPrice(product as any);
+  const regionalOriginalPrice = getRegionalOriginalPrice(product as any);
+  const activeOffer: ActiveOffer | undefined = (product as PublicProduct).activeOffer;
+  const effectivePrice = activeOffer ? activeOffer.offerPrice : displayPrice;
+  const strikePrice = activeOffer
+    ? activeOffer.originalPrice
+    : regionalOriginalPrice ?? undefined;
+
+  // Percent off, derived from the two prices actually on screen.
+  const discountPct =
+    strikePrice && effectivePrice && strikePrice > effectivePrice
+      ? Math.round((1 - effectivePrice / strikePrice) * 100)
+      : null;
+
+  // Fallback for payloads that carry only `discount`. That field is a flat
+  // CURRENCY amount, not a percent, so it gets its own label — rendering it as
+  // "12% OFF" when it means "₹12 off" is the kind of wrong that sells at the
+  // wrong price. Formatted through fmtCurrency so USD storefronts read right.
+  const rawDiscount = (product as any).discount;
+  const discountAmount =
+    discountPct === null && typeof rawDiscount === "number" && rawDiscount > 0
+      ? rawDiscount
+      : null;
+
   const isActuallyInStock = isServiceProduct(product)
     ? (product.totalStock ?? 0) > 0
     : (product as any).inStock !== false;
   const hasVariants = isServiceProduct(product) ? !!(product as any).hasVariants : false;
+
+  // Region visibility decides whether this card renders at all, but the check
+  // CANNOT short-circuit here: the three useCallback hooks below would then be
+  // skipped on hidden products and React would see a different hook count
+  // between renders. Evaluated now, applied after every hook has run.
+  const hiddenInRegion = !isVisibleInRegion((product as any).priceVisibility);
 
   const openDetails = useCallback(() => {
     router.push(`(any)/products/${product.id}` as any);
@@ -127,6 +169,9 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
         await addToGlobalCart(product.id, 1);
         showSuccessToast("Added to Cart!", `${product.name} has been added to your cart.`);
       }
+      setIsAdded(true);
+      if (addedTimer.current) clearTimeout(addedTimer.current);
+      addedTimer.current = setTimeout(() => setIsAdded(false), 1800);
     } catch (e: any) {
       showErrorToast("Failed", e.message || "Unable to add item to cart");
     } finally {
@@ -180,11 +225,13 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
     router,
   ]);
 
+  if (hiddenInRegion) return null;
+
   return (
     <Pressable
       onPress={openDetails}
       accessibilityRole="button"
-      accessibilityLabel={`${product.name}, ${fmtCurrency(displayPrice)}${
+      accessibilityLabel={`${product.name}, ${fmtCurrency(effectivePrice)}${
         !isActuallyInStock ? ", out of stock" : ""
       }`}
       style={({ pressed }) => [s.card, pressed && { opacity: 0.96 }]}
@@ -215,9 +262,9 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
         </Pressable>
 
         {/* Discount badge — top RIGHT */}
-        {product.discount && product.discount > 0 ? (
+        {discountPct ? (
           <View style={s.discountPill}>
-            <Text style={s.discountText}>₹{product.discount} OFF</Text>
+            <Text style={s.discountText}>{discountPct}% OFF</Text>
           </View>
         ) : null}
 
@@ -236,10 +283,19 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
           {product.name}
         </Text>
 
-        {/* Price row */}
+        {/* FaceRating — shows face + rating when rating >= 3.5, otherwise review count */}
+        <FaceRatingRow
+          rating={Number((product as any).rating) || 0}
+          reviewCount={Number((product as any).reviews) || 0}
+          size={13}
+        />
+
+        {/* Price row — effective price from activeOffer if present */}
         <View style={s.priceRow}>
-          <Text style={s.price}>{fmtCurrency(displayPrice)}</Text>
-          {originalPrice ? <Text style={s.originalPrice}>{fmtCurrency(originalPrice)}</Text> : null}
+          <Text style={s.price}>{fmtCurrency(effectivePrice)}</Text>
+          {strikePrice && strikePrice > effectivePrice ? (
+            <Text style={s.originalPrice}>{fmtCurrency(strikePrice)}</Text>
+          ) : null}
         </View>
 
         {/* Add to Cart */}
@@ -250,6 +306,8 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
         >
           {isAddingToCart ? (
             <ActivityIndicator size="small" color="#ffffff" />
+          ) : isAdded ? (
+            <Text style={s.ctaText}>Added</Text>
           ) : (
             <Text style={s.ctaText}>
               {!isActuallyInStock ? "Out of Stock" : hasVariants ? "Choose Options" : "Add to Cart"}

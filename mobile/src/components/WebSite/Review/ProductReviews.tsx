@@ -12,13 +12,16 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  Star, Search, ThumbsUp, Check, X,
+  Search, ThumbsUp, Check, X,
   ChevronLeft, ChevronRight, PenLine,
 } from 'lucide-react-native';
+import { FaceIcon, positiveFace, FaceRatingRow, type FaceValue } from '@/components/WebSite/Shared/FaceRating';
 import { reviewService, type Review } from '@/services/reviewService';
 import { userAuthService } from '@/services/userAuthService';
 import { getCountryName, getCountryFlag } from '@/components/WebSite/CheckOut/CheckoutProcess/constants';
 import { Palette } from '@/constants/theme';
+
+const FACE_VALUES: FaceValue[] = [5, 4, 3, 2, 1];
 
 interface ProductReviewsProps {
   productId: string;
@@ -90,15 +93,13 @@ export default function ProductReviews({ productId, rating = 0, reviewCount = 0 
         <Text style={s.avgText}>{avg.toFixed(1)}</Text>
         <Text style={s.avgDenom}>/5</Text>
       </View>
-      <View style={s.chartStars}>
-        {[1, 2, 3, 4, 5].map((i) => (
-          <Star key={i} size={16} color={i <= Math.round(avg) ? '#f59e0b' : '#e5e7eb'} fill={i <= Math.round(avg) ? '#f59e0b' : 'transparent'} strokeWidth={1.5} />
-        ))}
-      </View>
-      <Text style={s.chartCount}>
-        {total} rating{total === 1 ? '' : 's'}{withText > 0 ? ` • ${withText} review${withText === 1 ? '' : 's'}` : ''}
-      </Text>
-      <View style={s.distWrap}>
+        <View style={s.chartBottom}>
+          <FaceRatingRow rating={avg} reviewCount={total} size={15} />
+          <Text style={s.chartCount}>
+            {total} rating{total === 1 ? '' : 's'}{withText > 0 ? ` • ${withText} review${withText === 1 ? '' : 's'}` : ''}
+          </Text>
+        </View>
+        <View style={s.distWrap}>
         {dist.map(({ star, count }) => {
           const active = starFilter === star;
           return (
@@ -166,7 +167,7 @@ export default function ProductReviews({ productId, rating = 0, reviewCount = 0 
               ) : (
                 <View style={s.starChipInner}>
                   <Text style={[s.starChipText, active && s.starChipTextActive]}>{sVal}</Text>
-                  <Star size={12} color={active ? Palette.primary : '#f59e0b'} fill={active ? Palette.primary : '#f59e0b'} strokeWidth={1.5} />
+                  <FaceIcon value={sVal as 1|2|3|4|5} size={12} muted={!active} />
                 </View>
               )}
             </Pressable>
@@ -211,7 +212,7 @@ export default function ProductReviews({ productId, rating = 0, reviewCount = 0 
       ) : reviews.length === 0 ? (
         <View style={s.empty}>
           <View style={s.emptyStars}>
-            {[1, 2, 3, 4, 5].map((i) => <Star key={i} size={24} color="#e5e7eb" />)}
+            {FACE_VALUES.map((v) => <FaceIcon key={v} value={v} size={24} muted />)}
           </View>
           <Text style={s.emptyTitle}>No reviews yet</Text>
           <Text style={s.emptySub}>Be the first customer to review this product.</Text>
@@ -334,9 +335,14 @@ const ReviewCard = memo(function ReviewCard({
           </View>
           <View style={s.metaRow}>
             <View style={s.metaStars}>
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Star key={i} size={13} color={i <= review.rating ? '#f59e0b' : '#e5e7eb'} fill={i <= review.rating ? '#f59e0b' : 'transparent'} strokeWidth={1.5} />
-              ))}
+              {(() => {
+                const face = positiveFace(review.rating || 0);
+                if (face) {
+                  return <FaceIcon value={face} size={13} />;
+                }
+                const val = Math.round(review.rating || 0) as 1 | 2 | 3 | 4 | 5;
+                return val > 0 ? <FaceIcon value={val} size={13} muted /> : null;
+              })()}
             </View>
             <Text style={s.metaDate}>{dateStr}</Text>
             {countryName ? <Text style={s.metaCountry}>{flag ? `${flag} ` : ''}{countryName}</Text> : null}
@@ -396,6 +402,7 @@ const s = StyleSheet.create({
   avgText: { fontSize: 40, fontWeight: '800', color: '#111827', lineHeight: 44 },
   avgDenom: { fontSize: 13, color: '#9ca3af' },
   chartStars: { flexDirection: 'row', gap: 3, marginTop: 6 },
+  chartBottom: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
   chartCount: { fontSize: 12, color: '#6b7280', marginTop: 4 },
   distWrap: { marginTop: 10, gap: 4 },
   distRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

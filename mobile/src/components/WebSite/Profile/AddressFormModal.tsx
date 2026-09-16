@@ -30,6 +30,11 @@ type FormState = {
   type: AddressType;
   name: string;
   phone: string;
+  /** Optional extra contacts the backend has always stored — the web collects
+   *  both (Profile/AddressFormModal.tsx); mobile did not, so a courier calling
+   *  ahead only ever had the one number. */
+  phone2: string;
+  landline: string;
   address: string;
   addressLine2: string;
   country: string;
@@ -51,6 +56,8 @@ const emptyForm: FormState = {
   type: 'home',
   name: '',
   phone: '',
+  phone2: '',
+  landline: '',
   address: '',
   addressLine2: '',
   country: DEFAULT_COUNTRY_ISO,
@@ -93,6 +100,8 @@ export default function AddressFormModal({
         type: editing.type,
         name: editing.name || '',
         phone: editing.phone ? formatPhoneAsYouType(editing.phone, iso) : '',
+        phone2: editing.phone2 ? formatPhoneAsYouType(editing.phone2, iso) : '',
+        landline: editing.landline || '',
         address: editing.address || '',
         addressLine2: editing.addressLine2 || '',
         country: iso,
@@ -124,6 +133,20 @@ export default function AddressFormModal({
   if (!form.phone.trim()) errors.phone = 'Phone number is required';
   else if (!validatePhone(form.phone, countryIso)) {
     errors.phone = `Enter a valid phone number for ${country?.name ?? 'the selected country'}`;
+  }
+
+  // Both optional: empty is always valid, but a value that IS entered has to be
+  // usable — a half-typed alternate number is worse than none, because a courier
+  // would try it.
+  if (form.phone2.trim() && !validatePhone(form.phone2, countryIso)) {
+    errors.phone2 = `Enter a valid phone number for ${country?.name ?? 'the selected country'}`;
+  }
+
+  // Landline stays free-form (digits, spaces, hyphens, brackets, optional +) to
+  // match the backend's own description of the column — national landline
+  // formats vary too much for libphonenumber to be helpful here.
+  if (form.landline.trim() && !/^\+?[\d\s\-()]{6,20}$/.test(form.landline.trim())) {
+    errors.landline = 'Enter a valid landline number';
   }
 
   if (!form.address.trim()) errors.address = 'Address is required';
@@ -174,6 +197,10 @@ export default function AddressFormModal({
         type: form.type,
         name: form.name.trim(),
         phone: toE164(form.phone, form.country),
+        // Omitted rather than sent empty, so clearing a field actually clears it
+        // instead of storing "".
+        phone2: form.phone2.trim() ? toE164(form.phone2, form.country) : undefined,
+        landline: form.landline.trim() || undefined,
         address: form.address.trim(),
         addressLine2: form.addressLine2.trim() || undefined,
         city: form.city.trim(),
@@ -308,6 +335,36 @@ export default function AddressFormModal({
               keyboardType="phone-pad"
               accessibilityLabel="Phone number, required"
               hasError={!!fieldError('phone')}
+            />
+            <ErrorText text={fieldError('phone')} />
+          </View>
+
+          {/* Secondary phone — optional, same country rules as the primary. */}
+          <View>
+            <FieldLabel label="Secondary Phone (Optional)" />
+            <FormInput
+              value={form.phone2}
+              onChangeText={(t) => setField('phone2', formatPhoneAsYouType(t, countryIso))}
+              onBlur={() => handleBlur('phone2')}
+              placeholder={phoneExample || 'Alternate number'}
+              keyboardType="phone-pad"
+              accessibilityLabel="Secondary phone number, optional"
+              hasError={!!fieldError('phone2')}
+            />
+            <ErrorText text={fieldError('phone2')} />
+          </View>
+
+          {/* Landline — optional, free-form. */}
+          <View>
+            <FieldLabel label="Landline (Optional)" />
+            <FormInput
+              value={form.landline}
+              onChangeText={(t) => setField('landline', t)}
+              onBlur={() => handleBlur('landline')}
+              placeholder="e.g. 044 2345 6789"
+              keyboardType="phone-pad"
+              accessibilityLabel="Landline number, optional"
+              hasError={!!fieldError('landline')}
             />
             <ErrorText text={fieldError('phone')} />
           </View>

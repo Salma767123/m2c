@@ -238,8 +238,9 @@ export default function NoticeBoard() {
     <View style={s.wrap}>
       <View style={s.head}>
         <Sparkles size={14} color={Palette.primary} />
+        {/* Wording matches the web's notice board heading exactly. */}
         <Text style={s.headTitle} numberOfLines={1} maxFontSizeMultiplier={TEXT_SCALE_CAP}>
-          Promos &amp; Offers
+          What&apos;s happening
         </Text>
         <View style={s.spacer} />
         <Pressable
@@ -250,7 +251,7 @@ export default function NoticeBoard() {
           style={s.allLink}
         >
           <Text style={s.allLinkText} numberOfLines={1} maxFontSizeMultiplier={TEXT_SCALE_CAP}>
-            View all
+            All offers
           </Text>
           <ArrowRight size={12} color={Palette.primary} />
         </Pressable>

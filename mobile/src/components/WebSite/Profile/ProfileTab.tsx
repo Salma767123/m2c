@@ -113,7 +113,13 @@ const FormField = React.forwardRef<TextInput, {
   error?: string;
   returnKeyType?: 'next' | 'done';
   onSubmitEditing?: () => void;
-  textContentType?: 'none' | 'emailAddress' | 'telephoneNumber' | 'givenName' | 'familyName';
+  textContentType?:
+    | 'none'
+    | 'emailAddress'
+    | 'telephoneNumber'
+    | 'givenName'
+    | 'middleName'
+    | 'familyName';
 }>(function FormField(
   {
     label,
@@ -278,6 +284,75 @@ function GenderSelector({
   );
 }
 
+/**
+ * Honorific picker. Same six options the web's Title select offers, laid out as
+ * a wrapping chip row because a phone has no room for a labelled dropdown here.
+ * Optional — tapping the active chip clears it.
+ */
+const TITLE_OPTIONS = ['Mr', 'Mrs', 'Ms', 'Miss', 'Mx', 'Dr'] as const;
+
+function TitleSelector({
+  value,
+  onChange,
+  isEditing,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  isEditing: boolean;
+}) {
+  return (
+    <View style={{ marginBottom: 16 }}>
+      <Text
+        style={{
+          fontSize: 12,
+          fontWeight: '700',
+          color: '#6b7280',
+          marginBottom: 6,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+        }}
+      >
+        Title
+      </Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {TITLE_OPTIONS.map((opt) => {
+          const active = value === opt;
+          return (
+            <Pressable
+              key={opt}
+              // Tapping the selected chip clears it — the field is optional and
+              // there is no other way back to "none" once one is chosen.
+              onPress={() => { if (isEditing) onChange(active ? '' : opt); }}
+              disabled={!isEditing}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active, disabled: !isEditing }}
+              accessibilityLabel={`Title ${opt}`}
+            >
+              <View
+                style={{
+                  minHeight: 40,
+                  paddingHorizontal: 16,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  borderColor: active ? '#111827' : isEditing ? '#d1d5db' : '#f3f4f6',
+                  backgroundColor: active ? '#111827' : isEditing ? '#fff' : '#f9fafb',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: !isEditing && !active ? 0.6 : 1,
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '700', color: active ? '#fff' : '#4b5563' }}>
+                  {opt}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function ProfileTab({
   editedProfile,
   setEditedProfile,
@@ -286,8 +361,10 @@ export default function ProfileTab({
 }: ProfileTabProps) {
   // Refs for "next field" keyboard chaining
   const firstNameRef = useRef<TextInput>(null);
+  const middleNameRef = useRef<TextInput>(null);
   const lastNameRef = useRef<TextInput>(null);
   const phoneRef = useRef<TextInput>(null);
+  const whatsappRef = useRef<TextInput>(null);
 
   const handleInputChange = (field: keyof UserProfile, value: string) => {
     setEditedProfile({ ...editedProfile, [field]: value });
@@ -297,6 +374,11 @@ export default function ProfileTab({
     <View>
       {/* ── Personal Information ── */}
       <SectionCard title="Personal Information" icon={User} iconColor="#111827" delay={100}>
+        <TitleSelector
+          value={editedProfile.title}
+          onChange={(v) => handleInputChange('title', v)}
+          isEditing={isEditing}
+        />
         <FormField
           ref={firstNameRef}
           label="First Name"
@@ -307,6 +389,18 @@ export default function ProfileTab({
           autoCapitalize="words"
           textContentType="givenName"
           error={errors.firstName}
+          returnKeyType="next"
+          onSubmitEditing={() => middleNameRef.current?.focus()}
+        />
+        <FormField
+          ref={middleNameRef}
+          label="Middle Name"
+          value={editedProfile.middleName}
+          onChangeText={(v) => handleInputChange('middleName', v)}
+          isEditing={isEditing}
+          placeholder="Enter your middle name"
+          autoCapitalize="words"
+          textContentType="middleName"
           returnKeyType="next"
           onSubmitEditing={() => lastNameRef.current?.focus()}
         />
@@ -345,6 +439,19 @@ export default function ProfileTab({
           leadingIcon={Phone}
           textContentType="telephoneNumber"
           error={errors.phone}
+          returnKeyType="next"
+          onSubmitEditing={() => whatsappRef.current?.focus()}
+        />
+        <FormField
+          ref={whatsappRef}
+          label="WhatsApp Number"
+          value={editedProfile.whatsappNumber}
+          onChangeText={(v) => handleInputChange('whatsappNumber', v)}
+          isEditing={isEditing}
+          placeholder="Enter your WhatsApp number"
+          keyboardType="phone-pad"
+          leadingIcon={Phone}
+          textContentType="telephoneNumber"
           returnKeyType="done"
         />
         <GenderSelector

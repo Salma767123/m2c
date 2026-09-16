@@ -27,7 +27,7 @@ import {
   HelpCircle,
   LifeBuoy,
 } from 'lucide-react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { router } from 'expo-router';
 import ProfileTab from './ProfileTab';
 import type { UserProfile } from './types';
@@ -60,10 +60,13 @@ export default function Profile() {
 
   const [userProfile, setUserProfile] = useState<UserProfile>({
     id: '',
+    title: '',
     firstName: '',
+    middleName: '',
     lastName: '',
     email: '',
     phone: '',
+    whatsappNumber: '',
     gender: 'male',
     address: { addressLine1: '', city: '', state: '', zipCode: '', country: '' },
     joinDate: '',
@@ -102,11 +105,16 @@ export default function Profile() {
         const parts = (d.name || '').trim().split(' ');
         const profile: UserProfile = {
           id: d.id,
+          title: d.title || '',
           firstName: parts[0] || '',
+          middleName: d.middleName || '',
           lastName: parts.slice(1).join(' ') || '',
           email: d.email,
           phone: d.phoneNumber || '',
-          gender: 'male',
+          whatsappNumber: d.whatsappNumber || '',
+          // Was hardcoded to 'male', so the picker showed "Male" for everyone
+          // regardless of what was stored and the real value was never read.
+          gender: (d.gender as UserProfile['gender']) || 'male',
           address: {
             addressLine1: d.address || '',
             city: d.city || '',
@@ -173,9 +181,17 @@ export default function Profile() {
       const name = `${editedProfile.firstName} ${editedProfile.lastName}`.trim();
       // Profile update only covers personal info. Addresses are managed
       // separately in the Saved Addresses screen.
+      // `name` stays first + last to match the web; middleName is its own
+      // column on the backend rather than part of the joined name.
+      // gender was being collected by the picker and then dropped here, so the
+      // choice never left the device.
       const res = await userProfileService.updateProfile({
         name,
+        title: editedProfile.title || undefined,
+        middleName: editedProfile.middleName.trim() || undefined,
+        gender: editedProfile.gender,
         phoneNumber: editedProfile.phone.trim(),
+        whatsappNumber: editedProfile.whatsappNumber.trim() || undefined,
       });
       if (res.success) {
         setUserProfile(editedProfile);

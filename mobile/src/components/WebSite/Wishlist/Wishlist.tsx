@@ -20,7 +20,6 @@ import {
   Package,
   AlertCircle,
   Share2,
-  Star,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
@@ -33,6 +32,7 @@ import { useCart } from '@/context/CartContext';
 import { WishlistSkeleton } from '@/components/ui/Skeleton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getRegionalPrice, getRegionalOriginalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
+import { FaceRatingRow } from '@/components/WebSite/Shared/FaceRating';
 import { sharedWishlistUrl, productUrl } from '@/lib/shareLinks';
 import { Palette, Radius } from '@/constants/theme';
 
@@ -427,22 +427,12 @@ export default function Wishlist() {
                     {displayName}
                   </Text>
 
-                  {/* Rating — only when the product actually has one. */}
-                  {item.product.rating != null && item.product.rating > 0 ? (
-                    <View style={ws.ratingRow}>
-                      {[0, 1, 2, 3, 4].map((i) => (
-                        <Star
-                          key={i}
-                          size={11}
-                          color={i < Math.floor(item.product!.rating || 0) ? '#facc15' : '#d1d5db'}
-                          fill={i < Math.floor(item.product!.rating || 0) ? '#facc15' : 'transparent'}
-                        />
-                      ))}
-                      <Text style={ws.ratingText}>
-                        {item.product.rating} ({item.product.reviews || 0})
-                      </Text>
-                    </View>
-                  ) : null}
+                  {/* FaceRating — matches the web card: face for loved items, else review count */}
+                  <FaceRatingRow
+                    rating={Number(item.product.rating) || 0}
+                    reviewCount={Number(item.product.reviews) || 0}
+                    size={13}
+                  />
 
                   {/* Price row + stock label + Add to Cart */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
