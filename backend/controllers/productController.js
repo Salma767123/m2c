@@ -2243,6 +2243,9 @@ const updateProductByAdmin = async (req, res) => {
         ...(updateData.gstPercentage !== undefined && {
           gstPercentage: parseFloat(updateData.gstPercentage)
         }),
+        ...(updateData.hsnCode !== undefined && {
+          hsnCode: updateData.hsnCode ? String(updateData.hsnCode).trim() : null
+        }),
         ...(updateData.adminFixedPrice !== undefined && {
           adminFixedPrice: updateData.adminFixedPrice ? parseFloat(updateData.adminFixedPrice) : null
         }),

@@ -145,6 +145,11 @@ const createReturnRequest = async (req, res) => {
             include: { items: true },
         });
         if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+        // Returns / refunds / replacements are a .in (INR) feature only — not offered
+        // on the international .com (USD) storefront.
+        if (order.currency === 'USD') {
+            return res.status(400).json({ success: false, message: 'Returns, refunds and replacements are not available for international orders.' });
+        }
         if (order.status !== 'DELIVERED') {
             return res.status(400).json({ success: false, message: 'Returns can only be requested for delivered orders' });
         }

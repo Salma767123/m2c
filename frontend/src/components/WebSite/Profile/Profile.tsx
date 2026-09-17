@@ -27,6 +27,7 @@ import LogoutConfirmModal from '@/components/WebSite/Shared/LogoutConfirmModal';
 // import Notifications from '@/components/WebSite/Profile/Notifications';
 import type { UserProfile } from '@/components/WebSite/Profile/types';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { getRegion } from '@/lib/currency';
 import { userProfileService } from '@/services/userProfileService';
 import { userAuthService } from '@/services/userAuthService';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -139,7 +140,9 @@ const Profile = () => {
    */
   useEffect(() => {
     const t = searchParams?.get('tab');
-    if (t && ['profile', 'addresses', 'orders', 'returns', 'wallet', 'support'].includes(t)) {
+    const allowed = ['profile', 'addresses', 'orders', 'wallet', 'support'];
+    if (getRegion() === 'IN') allowed.push('returns'); // returns tab is .in only
+    if (t && allowed.includes(t)) {
       setActiveTab(t);
     }
   }, [searchParams]);
@@ -444,7 +447,8 @@ const Profile = () => {
     { id: 'profile', label: 'Profile Information', icon: User },
     { id: 'addresses', label: 'Saved Addresses', icon: MapPin },
     { id: 'orders', label: 'Order History', icon: Package },
-    { id: 'returns', label: 'Returns & Replacements', icon: RotateCcw },
+    // Returns / refunds / replacements are a .in (INR) feature only — hidden on .com.
+    ...(getRegion() === 'IN' ? [{ id: 'returns', label: 'Returns & Replacements', icon: RotateCcw }] : []),
     { id: 'wallet', label: 'My Wallet', icon: Wallet },
     { id: 'support', label: 'Support', icon: LifeBuoy },
   ];

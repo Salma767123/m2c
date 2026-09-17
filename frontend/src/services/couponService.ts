@@ -32,6 +32,64 @@ export interface Coupon {
     updatedAt?: string;
 }
 
+/** Per-coupon analytics returned by GET /coupons/report (Excel download). */
+export interface CouponReportRedemption {
+    orderId: string;
+    date: string;
+    customerName: string;
+    customerEmail: string;
+    currency: string;
+    discount: number;
+    discountINR: number;
+    orderTotal: number;
+    orderTotalINR: number;
+    orderStatus: string;
+}
+export interface CouponReportByDate {
+    date: string;
+    redemptions: number;
+    discountINR: number;
+}
+export interface CouponReportRow {
+    id: string;
+    code: string;
+    description: string;
+    discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+    discountValue: number;
+    minPurchaseAmount: number;
+    maxDiscountAmount: number | null;
+    startDate: string;
+    expiryDate: string;
+    usageLimit: number | null;
+    usedCount: number;
+    perUserLimit: number | null;
+    isActive: boolean;
+    isFirstOrder: boolean;
+    freeShipping: boolean;
+    status: 'Active' | 'Inactive' | 'Expired';
+    createdAt: string;
+    updatedAt: string;
+    redemptionsCount: number;
+    uniqueCustomers: number;
+    totalDiscountINR: number;
+    firstUsedAt: string | null;
+    lastUsedAt: string | null;
+    byDate: CouponReportByDate[];
+    redemptions: CouponReportRedemption[];
+}
+export interface CouponReport {
+    generatedAt: string;
+    totals: {
+        coupons: number;
+        active: number;
+        inactive: number;
+        expired: number;
+        totalRedemptions: number;
+        totalDiscountINR: number;
+    };
+    coupons: CouponReportRow[];
+}
+
 /** The active first-order coupon shown in the storefront promo strip (or null). */
 export interface FirstOrderCoupon {
     code: string;
@@ -164,6 +222,19 @@ class CouponService {
             const errorMessage = error && typeof error === 'object' && 'response' in error 
                 ? (error as { response?: { data?: { error?: string } } }).response?.data?.error || 'Failed to fetch coupons'
                 : 'Failed to fetch coupons';
+            throw new Error(errorMessage);
+        }
+    }
+
+    // Full analytics report used by the "Download Report" Excel export.
+    async getCouponReport(): Promise<{ success: boolean; data: CouponReport }> {
+        try {
+            const response = await axios.get('/coupons/report');
+            return response.data;
+        } catch (error: unknown) {
+            const errorMessage = error && typeof error === 'object' && 'response' in error
+                ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to generate report'
+                : 'Failed to generate report';
             throw new Error(errorMessage);
         }
     }

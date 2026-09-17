@@ -167,16 +167,21 @@ const CouponModal = ({
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
+      <div className={`bg-white rounded-2xl shadow-2xl w-full max-h-[90vh] overflow-hidden ${mode === 'view' ? 'max-w-4xl' : 'max-w-7xl'}`}>
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-slate-50">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900">
-              {mode === 'create' ? 'Create New Coupon' : mode === 'edit' ? 'Edit Coupon' : 'Coupon Details'}
-            </h2>
-            <p className="text-sm text-slate-600 mt-1">
-              {mode === 'view' ? 'View coupon information' : 'Fill in the coupon details'}
-            </p>
+        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-200">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[#e01a1b]/10 text-[#e01a1b]">
+              <Tag className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+                {mode === 'create' ? 'Create New Coupon' : mode === 'edit' ? 'Edit Coupon' : 'Coupon Details'}
+              </h2>
+              <p className="text-sm text-slate-500 mt-0.5">
+                {mode === 'view' ? 'View coupon information' : 'Fill in the coupon details'}
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -189,155 +194,129 @@ const CouponModal = ({
         {/* Body */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
           {mode === 'view' && coupon ? (
-            // View Mode
-            <div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Left Column - Basic Info */}
-                <div className="space-y-4">
-                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Tag className="w-5 h-5 text-slate-700" />
-                      <h3 className="font-semibold text-slate-900">Basic Information</h3>
+            // View Mode — matches the app's card standard (white rounded-2xl cards,
+            // icon chips, uppercase labels), balanced so no column sprawls.
+            <div className="space-y-5">
+              {/* Hero — the two facts that identify a coupon: its code and its value. */}
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#f0d9d6] bg-gradient-to-r from-[#e01a1b]/[0.05] to-white p-5">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Coupon Code</p>
+                  <p className="mt-1 font-mono text-2xl font-bold tracking-wide text-slate-900">{coupon.code}</p>
+                  {coupon.description && <p className="mt-1 text-sm text-slate-500">{coupon.description}</p>}
+                </div>
+                <div className="flex items-center gap-5">
+                  <div className="text-right">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Discount</p>
+                    <p className="mt-0.5 text-3xl font-extrabold leading-none text-[#e01a1b]">
+                      {coupon.discountType === 'PERCENTAGE' ? `${coupon.discountValue}%` : `₹${coupon.discountValue}`}
+                    </p>
+                  </div>
+                  {getStatusBadge(coupon.isActive, coupon.expiryDate)}
+                </div>
+              </div>
+
+              {/* Detail cards — three equal columns. */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {/* Discount Details */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="mb-3 flex items-center gap-2.5">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#e01a1b]/10 text-[#e01a1b]"><Percent className="h-4 w-4" /></span>
+                    <h3 className="text-sm font-semibold text-slate-900">Discount Details</h3>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Type</p>
+                      <p className="mt-0.5 text-sm text-slate-900">{coupon.discountType === 'PERCENTAGE' ? 'Percentage' : 'Fixed Amount'}</p>
                     </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Coupon Code</label>
-                        <div className="text-slate-900 font-mono text-lg font-bold">{coupon.code}</div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Status</label>
-                        {getStatusBadge(coupon.isActive, coupon.expiryDate)}
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Description</label>
-                        <div className="text-slate-900 text-sm">{coupon.description || '-'}</div>
-                      </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Minimum Purchase</p>
+                      <p className="mt-0.5 text-sm text-slate-900">₹{coupon.minPurchaseAmount || 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Maximum Discount</p>
+                      <p className="mt-0.5 text-sm text-slate-900">{coupon.maxDiscountAmount ? `₹${coupon.maxDiscountAmount}` : 'No cap'}</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Center Column - Discount Details */}
-                <div className="space-y-4">
-                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Percent className="w-5 h-5 text-slate-700" />
-                      <h3 className="font-semibold text-slate-900">Discount Details</h3>
+                {/* Usage Statistics */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="mb-3 flex items-center gap-2.5">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-500"><TrendingUp className="h-4 w-4" /></span>
+                    <h3 className="text-sm font-semibold text-slate-900">Usage Statistics</h3>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Used</p>
+                        <p className="mt-0.5 text-2xl font-bold leading-none text-slate-900">{coupon.usedCount || 0}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Limit</p>
+                        <p className="mt-0.5 text-sm font-medium text-slate-700">{coupon.usageLimit || 'Unlimited'}</p>
+                      </div>
                     </div>
-                    <div className="space-y-3">
+                    {coupon.usageLimit ? (
                       <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Discount Type</label>
-                        <div className="text-slate-900 capitalize">{coupon.discountType === 'PERCENTAGE' ? 'Percentage' : 'Fixed Amount'}</div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Discount Value</label>
-                        <div className="text-slate-900 text-2xl font-bold">
-                          {coupon.discountType === 'PERCENTAGE'
-                            ? `${coupon.discountValue}%`
-                            : `₹${coupon.discountValue}`}
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-2 rounded-full bg-[#e01a1b] transition-all" style={{ width: `${Math.min(100, ((coupon.usedCount || 0) / coupon.usageLimit) * 100)}%` }} />
                         </div>
+                        <p className="mt-1 text-[11px] text-slate-500">{Math.round(((coupon.usedCount || 0) / coupon.usageLimit) * 100)}% used</p>
                       </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Minimum Purchase</label>
-                        <div className="text-slate-900">₹{coupon.minPurchaseAmount || 0}</div>
-                      </div>
-                      {coupon.maxDiscountAmount ? (
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-600 mb-1">Maximum Discount</label>
-                          <div className="text-slate-900">₹{coupon.maxDiscountAmount}</div>
-                        </div>
-                      ) : null}
-                    </div>
+                    ) : null}
                   </div>
                 </div>
 
-                {/* Right Column - Usage & Validity */}
-                <div className="space-y-4">
-                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <TrendingUp className="w-5 h-5 text-slate-700" />
-                      <h3 className="font-semibold text-slate-900">Usage Statistics</h3>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Usage Limit</label>
-                        <div className="text-slate-900">{coupon.usageLimit || 'Unlimited'}</div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Used Count</label>
-                        <div className="text-slate-900 text-2xl font-bold">{coupon.usedCount || 0}</div>
-                      </div>
-                      {coupon.usageLimit ? (
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-600 mb-1">Usage Progress</label>
-                          <div className="w-full bg-slate-200 rounded-full h-3">
-                            <div
-                              className="bg-brand-500 h-3 rounded-full transition-all"
-                              style={{ width: `${((coupon.usedCount || 0) / coupon.usageLimit) * 100}%` }}
-                            />
-                          </div>
-                          <div className="text-xs text-slate-600 mt-1">
-                            {Math.round(((coupon.usedCount || 0) / coupon.usageLimit) * 100)}% used
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
+                {/* Validity Period */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="mb-3 flex items-center gap-2.5">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-500"><Calendar className="h-4 w-4" /></span>
+                    <h3 className="text-sm font-semibold text-slate-900">Validity Period</h3>
                   </div>
-
-                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Calendar className="w-5 h-5 text-slate-700" />
-                      <h3 className="font-semibold text-slate-900">Validity Period</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Start Date</p>
+                      <p className="mt-0.5 text-sm text-slate-900">{formatDate(coupon.startDate)}</p>
                     </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Start Date</label>
-                        <div className="text-slate-900">{formatDate(coupon.startDate)}</div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Expiry Date</label>
-                        <div className="text-slate-900">{formatDate(coupon.expiryDate)}</div>
-                      </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Expiry Date</p>
+                      <p className="mt-0.5 text-sm text-slate-900">{formatDate(coupon.expiryDate)}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Promotional Popup Info (View Mode) */}
+              {/* Promotional Popup */}
               {coupon.showAsPopup && (
-                <div className="mt-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Megaphone className="w-5 h-5 text-slate-700" />
-                    <h3 className="font-semibold text-slate-900">Promotional Popup</h3>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                      Enabled
-                    </span>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="mb-3 flex items-center gap-2.5">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-500"><Megaphone className="h-4 w-4" /></span>
+                    <h3 className="text-sm font-semibold text-slate-900">Promotional Popup</h3>
+                    <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-semibold text-green-700">Enabled</span>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,16rem)_1fr]">
                     {coupon.popupImage && (
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Popup Image</label>
-                        <img src={coupon.popupImage} alt="Popup" className="w-full max-w-xs h-32 object-cover rounded-lg border border-slate-200" />
-                      </div>
+                      <img src={coupon.popupImage} alt="Popup" className="h-32 w-full rounded-xl border border-slate-200 object-cover" />
                     )}
                     <div className="space-y-3">
                       {coupon.popupTitle && (
                         <div>
-                          <label className="block text-xs font-semibold text-slate-600 mb-1">Popup Title</label>
-                          <div className="text-slate-900 text-sm">{coupon.popupTitle}</div>
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Popup Title</p>
+                          <p className="mt-0.5 text-sm text-slate-900">{coupon.popupTitle}</p>
                         </div>
                       )}
                       {coupon.popupMessage && (
                         <div>
-                          <label className="block text-xs font-semibold text-slate-600 mb-1">Popup Message</label>
-                          <div className="text-slate-900 text-sm">{coupon.popupMessage}</div>
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Popup Message</p>
+                          <p className="mt-0.5 text-sm text-slate-700">{coupon.popupMessage}</p>
                         </div>
                       )}
                       {coupon.applicableCategories && coupon.applicableCategories.length > 0 && (
                         <div>
-                          <label className="block text-xs font-semibold text-slate-600 mb-1">Applicable Categories</label>
-                          <div className="flex flex-wrap gap-1">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Applicable Categories</p>
+                          <div className="mt-1 flex flex-wrap gap-1.5">
                             {coupon.applicableCategories.map((cat, idx) => (
-                              <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                              <span key={idx} className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-700">
                                 {cat}
                               </span>
                             ))}
@@ -348,7 +327,6 @@ const CouponModal = ({
                   </div>
                 </div>
               )}
-
             </div>
           ) : (
             // Create/Edit Mode - Form Layout
@@ -886,10 +864,10 @@ const CouponModal = ({
 
         {/* Footer for View Mode */}
         {mode === 'view' && (
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-200 bg-slate-50">
+          <div className="flex items-center justify-end gap-3 border-t border-slate-200 p-5 sm:p-6">
             <button
               onClick={onClose}
-              className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors font-medium"
+              className="rounded-full border border-slate-300 px-6 py-2.5 font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
               Close
             </button>

@@ -119,6 +119,7 @@ const updateInvoiceSettings = async (req, res) => {
             financialYearStart,       // ISO date string (manual mode only)
             formatTemplate,
             invoiceLogo,              // Cloudinary URL, data URI (new upload), or "" to clear
+            signature,                // authorised-signature image — same handling as invoiceLogo
         } = req.body;
 
         let settings = await prisma.invoiceSettings.findFirst();
@@ -137,6 +138,9 @@ const updateInvoiceSettings = async (req, res) => {
         // and "" clears the logo (falls back to the company logo on invoices).
         if (invoiceLogo !== undefined) {
             updateData.invoiceLogo = invoiceLogo ? await uploadDataUriIfBase64(invoiceLogo, { folder: 'invoice' }) : null;
+        }
+        if (signature !== undefined) {
+            updateData.signature = signature ? await uploadDataUriIfBase64(signature, { folder: 'invoice' }) : null;
         }
 
         const isAuto = autoFinancialYear ?? settings.autoFinancialYear;

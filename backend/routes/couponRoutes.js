@@ -2,6 +2,7 @@ const express = require('express');
 const {
     createCoupon,
     getCoupons,
+    getCouponReport,
     getCoupon,
     updateCoupon,
     deleteCoupon,
@@ -40,6 +41,9 @@ router.delete('/free-shipping/:id', authenticateToken, requireAdminRole, require
 // Admin routes (require admin authentication) - /:id route MUST come after specific routes
 router.post('/', authenticateToken, requireAdminRole, requirePermission('coupons:create'), createCoupon);
 router.get('/', authenticateToken, requireAdminRole, requirePermission('coupons:view'), getCoupons);
+// Analytics report for the Excel download — must precede '/:id' so "report" isn't
+// treated as a coupon id.
+router.get('/report', authenticateToken, requireAdminRole, requirePermission('coupons:view'), getCouponReport);
 router.get('/:id', authenticateToken, requireAdminRole, requirePermission('coupons:view'), getCoupon);
 router.put('/:id', authenticateToken, requireAdminRole, requirePermission('coupons:edit'), updateCoupon);
 router.delete('/:id', authenticateToken, requireAdminRole, requirePermission('coupons:delete'), deleteCoupon);
