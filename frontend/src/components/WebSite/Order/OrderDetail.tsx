@@ -37,6 +37,7 @@ import orderService, { Order as APIOrder } from "@/services/orderService"
 import productService from "@/services/productService"
 import ProductCard from "@/components/WebSite/ProductCard/ProductCard"
 import ReviewModal from "./ReviewModal"
+import ReturnRequestModal from "./ReturnRequestModal"
 import reviewService from "@/services/reviewService"
 import { getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants"
 
@@ -151,8 +152,9 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
   const [reviewModalState, setReviewModalState] = useState<{ isOpen: boolean, orderId: string, items: any[] }>({ isOpen: false, orderId: '', items: [] })
   const [hasReviewed, setHasReviewed] = useState(false)
   const [similarProducts, setSimilarProducts] = useState<any[]>([])
-  // Cancel / return confirmation modal.
+  // Cancel confirmation modal (returns use the dedicated multi-step ReturnRequestModal below).
   const [actionModal, setActionModal] = useState<'cancel' | 'return' | null>(null)
+  const [returnModalOpen, setReturnModalOpen] = useState(false)
   const [reasonChoice, setReasonChoice] = useState('')  // selected preset reason
   const [actionReason, setActionReason] = useState('')   // free text when "Other"
   const [actionSubmitting, setActionSubmitting] = useState(false)
@@ -512,7 +514,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                   && orderDetails.returnRequest?.status !== 'Requested'
                   && orderDetails.returnRequest?.status !== 'Approved' && (
                   <button
-                    onClick={() => openActionModal('return')}
+                    onClick={() => setReturnModalOpen(true)}
                     className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                   >
                     <RotateCcw className="w-4 h-4" /> Return
@@ -1037,7 +1039,29 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
         items={reviewModalState.items}
       />
 
-      {/* Cancel / Return confirmation modal */}
+      {/* Multi-step return / refund / replacement flow */}
+      <ReturnRequestModal
+        open={returnModalOpen}
+        order={{
+          id: orderDetails.id,
+          orderNumber: orderDetails.orderId,
+          currency: orderDetails.currency === 'USD' ? 'USD' : 'INR',
+          paymentStatus: orderDetails.paymentStatus,
+          items: orderDetails.items.map((it) => ({
+            id: it.id,
+            name: it.productName,
+            image: it.productImage,
+            quantity: it.quantity,
+            price: it.unitPrice,
+            size: it.size,
+            color: it.color,
+          })),
+        }}
+        onClose={() => setReturnModalOpen(false)}
+        onSubmitted={() => { setReturnModalOpen(false); fetchOrder() }}
+      />
+
+      {/* Cancel confirmation modal */}
       {actionModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]" onClick={() => !actionSubmitting && setActionModal(null)}>
           <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5" onClick={(e) => e.stopPropagation()}>

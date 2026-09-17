@@ -620,7 +620,7 @@ export default function OrderHistory() {
                           </a>
                         )
                       })()
-                    ) : getNormalizedStatus(order.status) === 'delivered' ? (
+                    ) : getNormalizedStatus(order.status) === 'delivered' && order.currency !== 'USD' ? (
                       <button
                         onClick={() => setReturnModalOrder(order)}
                         className={`${QUIET_BTN} flex-1 sm:flex-none`}

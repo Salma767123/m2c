@@ -5,7 +5,10 @@ import { Card, CardContent } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
 import { Search, ChevronLeft, ChevronRight, PackageX, AlertTriangle } from 'lucide-react';
 import { openDoc } from '@/lib/docViewerBus';
+import { hasPermission } from '@/lib/auth';
+import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { returnService, type DamagedStock } from '@/services/returnService';
+import ReturnDetailPanel from './ReturnDetailPanel';
 
 const PER_PAGE = 20;
 const fmtDateTime = (d?: string) => d
@@ -20,6 +23,8 @@ export default function DamagedItems() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalUnits, setTotalUnits] = useState(0);
   const [total, setTotal] = useState(0);
+  const [detailReturnId, setDetailReturnId] = useState<string | null>(null);
+  const canManage = hasPermission('returns:manage');
 
   const load = useCallback(async () => {
     try {
@@ -88,10 +93,13 @@ export default function DamagedItems() {
             <div>Recorded</div>
           </div>
           {rows.map((r) => (
-            <div key={r.id} className="grid grid-cols-1 gap-3 border-b border-slate-50 px-4 py-3 last:border-0 hover:bg-slate-50/60 lg:grid-cols-[2fr_0.6fr_1.3fr_1.5fr_1.2fr_1.1fr] lg:items-center">
+            <div key={r.id}
+              onClick={() => r.returnRequestId && setDetailReturnId(r.returnRequestId)}
+              className={`grid grid-cols-1 gap-3 border-b border-slate-50 px-4 py-3 last:border-0 hover:bg-slate-50/60 lg:grid-cols-[2fr_0.6fr_1.3fr_1.5fr_1.2fr_1.1fr] lg:items-center ${r.returnRequestId ? 'cursor-pointer' : ''}`}
+              title={r.returnRequestId ? 'View full details' : undefined}>
               <div className="flex items-center gap-3">
                 {r.productImage
-                  ? <img src={r.productImage} alt="" className="h-10 w-10 shrink-0 cursor-pointer rounded-lg object-cover" onClick={() => openDoc(r.productImage!, r.productName, true)} />
+                  ? <img src={r.productImage} alt="" className="h-10 w-10 shrink-0 cursor-zoom-in rounded-lg object-cover" onClick={(e) => { e.stopPropagation(); openDoc(r.productImage!, r.productName, true); }} />
                   : <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-400"><PackageX className="h-4 w-4" /></span>}
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-semibold text-slate-800">{r.productName}</p>
@@ -121,6 +129,18 @@ export default function DamagedItems() {
           <span className="text-sm text-slate-500">Page {page} of {totalPages}</span>
           <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
         </div>
+      )}
+
+      {/* Full return context for a damaged item — order, customer, product, evidence & timeline. */}
+      {detailReturnId && (
+        <ReturnDetailPanel
+          id={detailReturnId}
+          canManage={canManage}
+          onClose={() => setDetailReturnId(null)}
+          onChanged={load}
+          notifySuccess={(m) => showSuccessToast('Updated', m)}
+          notifyError={(m) => showErrorToast('Failed', m)}
+        />
       )}
     </div>
   );

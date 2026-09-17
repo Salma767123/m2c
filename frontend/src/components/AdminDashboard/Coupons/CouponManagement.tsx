@@ -15,7 +15,8 @@ import {
   Loader2,
   Truck,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Download
 } from 'lucide-react';
 import Dropdown from '@/components/UI/Dropdown';
 import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar';
@@ -62,6 +63,113 @@ const CouponManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; code: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  // Build and download a multi-sheet Excel report of every coupon: a Summary of
+  // each coupon + its usage, a Usage-by-Date breakdown, and the full Redemptions
+  // detail. Data comes from the backend /coupons/report analytics endpoint.
+  const handleDownloadReport = async () => {
+    try {
+      setDownloading(true);
+      const [{ data: report }, XLSX] = await Promise.all([
+        couponService.getCouponReport(),
+        import('xlsx'),
+      ]);
+
+      const inr = (n: number) => Math.round((n || 0) * 100) / 100;
+      const dt = (v?: string | null) => (v ? new Date(v).toLocaleString('en-IN') : '—');
+      const day = (v?: string | null) => (v ? new Date(v).toLocaleDateString('en-IN') : '—');
+      const typeLabel = (t: string, val: number) => (t === 'PERCENTAGE' ? `${val}%` : `₹${val}`);
+
+      // 1) Summary — one row per coupon with metadata + rolled-up usage.
+      const summary = report.coupons.map((c) => ({
+        'Coupon Code': c.code,
+        'Description': c.description || '—',
+        'Discount': typeLabel(c.discountType, c.discountValue),
+        'Discount Type': c.discountType === 'PERCENTAGE' ? 'Percentage' : 'Fixed Amount',
+        'Min Purchase (₹)': inr(c.minPurchaseAmount),
+        'Max Discount (₹)': c.maxDiscountAmount != null ? inr(c.maxDiscountAmount) : '—',
+        'Status': c.status as string,
+        'Active Flag': c.isActive ? 'Yes' : 'No',
+        'First-Order Only': c.isFirstOrder ? 'Yes' : 'No',
+        'Free Shipping': c.freeShipping ? 'Yes' : 'No',
+        'Valid From': day(c.startDate),
+        'Valid Until': day(c.expiryDate),
+        'Usage Limit': c.usageLimit ?? 'Unlimited',
+        'Per-User Limit': c.perUserLimit ?? 'Unlimited',
+        'Times Used': c.redemptionsCount,
+        'Unique Customers': c.uniqueCustomers,
+        'Total Discount Given (₹)': inr(c.totalDiscountINR),
+        'First Used': dt(c.firstUsedAt),
+        'Last Used': dt(c.lastUsedAt),
+        'Created On': dt(c.createdAt),
+        'Last Updated': dt(c.updatedAt),
+      }));
+
+      // Totals row appended to the summary for an at-a-glance overview.
+      summary.push({
+        'Coupon Code': 'TOTAL',
+        'Description': `${report.totals.coupons} coupons · ${report.totals.active} active · ${report.totals.inactive} inactive · ${report.totals.expired} expired`,
+        'Discount': '', 'Discount Type': '', 'Min Purchase (₹)': '' as unknown as number,
+        'Max Discount (₹)': '', 'Status': '', 'Active Flag': '', 'First-Order Only': '',
+        'Free Shipping': '', 'Valid From': '', 'Valid Until': '', 'Usage Limit': '',
+        'Per-User Limit': '', 'Times Used': report.totals.totalRedemptions,
+        'Unique Customers': '' as unknown as number,
+        'Total Discount Given (₹)': inr(report.totals.totalDiscountINR),
+        'First Used': '', 'Last Used': '', 'Created On': '', 'Last Updated': '',
+      });
+
+      // 2) Usage by Date — per coupon, redemptions + discount for each day used.
+      const byDate: Array<Record<string, string | number>> = [];
+      for (const c of report.coupons) {
+        for (const d of c.byDate) {
+          byDate.push({
+            'Coupon Code': c.code,
+            'Date': day(d.date),
+            'Redemptions': d.redemptions,
+            'Discount Given (₹)': inr(d.discountINR),
+          });
+        }
+      }
+      if (byDate.length === 0) byDate.push({ 'Coupon Code': '—', 'Date': '—', 'Redemptions': 0, 'Discount Given (₹)': 0 });
+
+      // 3) Redemptions — the full order-level detail behind every coupon use.
+      const redemptions: Array<Record<string, string | number>> = [];
+      for (const c of report.coupons) {
+        for (const r of c.redemptions) {
+          redemptions.push({
+            'Coupon Code': c.code,
+            'Order ID': r.orderId,
+            'Date': dt(r.date),
+            'Customer': r.customerName || '—',
+            'Email': r.customerEmail || '—',
+            'Currency': r.currency,
+            'Discount': r.discount,
+            'Discount (₹)': inr(r.discountINR),
+            'Order Total': r.orderTotal,
+            'Order Total (₹)': inr(r.orderTotalINR),
+            'Order Status': String(r.orderStatus || '').replace(/_/g, ' '),
+          });
+        }
+      }
+      if (redemptions.length === 0) redemptions.push({ 'Coupon Code': '—', 'Order ID': 'No redemptions yet', 'Date': '—', 'Customer': '—', 'Email': '—', 'Currency': '—', 'Discount': 0, 'Discount (₹)': 0, 'Order Total': 0, 'Order Total (₹)': 0, 'Order Status': '—' });
+
+      const wb = XLSX.utils.book_new();
+      const wsSummary = XLSX.utils.json_to_sheet(summary);
+      wsSummary['!cols'] = Object.keys(summary[0] || {}).map(() => ({ wch: 18 }));
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(byDate), 'Usage by Date');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(redemptions), 'Redemptions');
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `coupon-report-${stamp}.xlsx`);
+      showSuccessToast('Report ready', 'The coupon report has been downloaded.');
+    } catch (e: unknown) {
+      showErrorToast('Download failed', e instanceof Error ? e.message : 'Could not generate the report.');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const initialFormData: Partial<Coupon> = {
     code: '',
@@ -253,6 +361,17 @@ const CouponManagement = () => {
           <p className="text-sm text-slate-500">Create and manage discount coupons</p>
         </div>
         <div className="flex items-center gap-3">
+          {hasPermission('coupons:view') && (
+            <button
+              onClick={handleDownloadReport}
+              disabled={downloading}
+              className="px-4 py-2 bg-white text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              title="Download an Excel report of all coupons and their usage"
+            >
+              {downloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+              {downloading ? 'Preparing…' : 'Download Report'}
+            </button>
+          )}
           {hasPermission(['coupons:edit', 'coupons:create']) && (
             <button
               onClick={() => setShowFreeShippingModal(true)}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Pencil, Trash2, Percent, Calendar, Tag, Loader2, X, ImageIcon, Upload, CheckCircle, Clock, XCircle, PauseCircle, PlayCircle, ChevronDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, Percent, Calendar, Tag, Loader2, X, ImageIcon, Upload, CheckCircle, Clock, XCircle, PauseCircle, PlayCircle, ChevronDown, Download } from 'lucide-react'
 import { offerService, type Offer, type OfferInput, type OfferStatus } from '@/services/offerService'
 import { categoryService } from '@/services/categoryService'
 import { adminProductService, type AdminProduct } from '@/services/adminProductService'
@@ -234,6 +234,126 @@ export default function OfferManagement() {
     }
   }
 
+  // Build and download a multi-sheet Excel report: Summary (each offer + usage &
+  // sales), Usage by Date, and the line-level Redemptions detail.
+  const [downloading, setDownloading] = useState(false)
+  const handleDownloadReport = async () => {
+    try {
+      setDownloading(true)
+      const [report, XLSX] = await Promise.all([offerService.getOfferReport(), import('xlsx')])
+
+      const inr = (n: number) => Math.round((n || 0) * 100) / 100
+      const dt = (v?: string | null) => (v ? new Date(v).toLocaleString('en-IN') : '—')
+      const day = (v?: string | null) => (v ? new Date(v).toLocaleDateString('en-IN') : '—')
+      const discountLabel = (o: (typeof report.offers)[number]) => {
+        switch (o.type) {
+          case 'PERCENTAGE': return `${o.discountPercent}% off`
+          case 'FLAT': return `₹${o.discountFlatINR} off/unit`
+          case 'QUANTITY': return `Buy ${o.minQty}+ → ${o.discountPercent}% off`
+          case 'BOGO': return `Buy ${o.minQty} get ${o.getQty} free`
+          case 'THRESHOLD': return `Spend ₹${o.minCartValueINR} → ${o.discountPercent}% off`
+          default: return '—'
+        }
+      }
+      const scopeLabel = (o: (typeof report.offers)[number]) =>
+        o.scope === 'PRODUCT' ? `Specific products (${o.productIds.length})`
+          : o.scope === 'CATEGORY' ? `Categories (${o.categoryNames.join(', ') || '—'})`
+            : 'Whole store'
+
+      // 1) Summary — one row per offer: config + usage + sales rollup.
+      const summary = report.offers.map((o) => ({
+        'Offer': o.title,
+        'Description': o.description || '—',
+        'Type': TYPE_LABELS[o.type],
+        'Discount': discountLabel(o),
+        'Scope': scopeLabel(o),
+        'Region': REGION_LABELS[o.region],
+        'Priority': o.priority,
+        'Status': o.status as string,
+        'Active Flag': o.isActive ? 'Yes' : 'No',
+        'Starts': day(o.startsAt),
+        'Ends': day(o.endsAt),
+        'Times Applied': o.redemptionsCount,
+        'Orders': o.ordersCount,
+        'Unique Customers': o.uniqueCustomers,
+        'Units Sold': o.unitsSold,
+        'Total Discount Given (₹)': inr(o.totalDiscountINR),
+        'Gross Sales (₹)': inr(o.grossSalesINR),
+        'First Used': dt(o.firstUsedAt),
+        'Last Used': dt(o.lastUsedAt),
+        'Created On': dt(o.createdAt),
+        'Last Updated': dt(o.updatedAt),
+      }))
+      summary.push({
+        'Offer': 'TOTAL',
+        'Description': `${report.totals.offers} offers · ${report.totals.active} active · ${report.totals.scheduled} scheduled · ${report.totals.paused} paused · ${report.totals.expired} expired`,
+        'Type': '', 'Discount': '', 'Scope': '', 'Region': '', 'Priority': '' as unknown as number,
+        'Status': '', 'Active Flag': '', 'Starts': '', 'Ends': '',
+        'Times Applied': report.totals.totalRedemptions, 'Orders': '' as unknown as number,
+        'Unique Customers': '' as unknown as number, 'Units Sold': report.totals.totalUnitsSold,
+        'Total Discount Given (₹)': inr(report.totals.totalDiscountINR),
+        'Gross Sales (₹)': inr(report.totals.totalGrossSalesINR),
+        'First Used': '', 'Last Used': '', 'Created On': '', 'Last Updated': '',
+      })
+
+      // 2) Usage by Date — per offer, each day it applied.
+      const byDate: Array<Record<string, string | number>> = []
+      for (const o of report.offers) {
+        for (const d of o.byDate) {
+          byDate.push({
+            'Offer': o.title,
+            'Date': day(d.date),
+            'Times Applied': d.redemptions,
+            'Units Sold': d.unitsSold,
+            'Discount Given (₹)': inr(d.discountINR),
+            'Sales (₹)': inr(d.salesINR),
+          })
+        }
+      }
+      if (byDate.length === 0) byDate.push({ 'Offer': '—', 'Date': '—', 'Times Applied': 0, 'Units Sold': 0, 'Discount Given (₹)': 0, 'Sales (₹)': 0 })
+
+      // 3) Redemptions — line-level detail behind every application.
+      const redemptions: Array<Record<string, string | number>> = []
+      for (const o of report.offers) {
+        for (const r of o.redemptions) {
+          redemptions.push({
+            'Offer': o.title,
+            'Order ID': r.orderId,
+            'Date': dt(r.date),
+            'Customer': r.customerName || '—',
+            'Email': r.customerEmail || '—',
+            'Product': r.productName,
+            'Qty': r.quantity,
+            'Currency': r.currency,
+            'Original Unit Price': r.originalUnitPrice,
+            'Sold Unit Price': r.unitPrice,
+            'Line Discount': r.lineDiscount,
+            'Line Discount (₹)': inr(r.lineDiscountINR),
+            'Line Sales': r.lineTotal,
+            'Line Sales (₹)': inr(r.lineTotalINR),
+            'Order Status': String(r.orderStatus || '').replace(/_/g, ' '),
+          })
+        }
+      }
+      if (redemptions.length === 0) redemptions.push({ 'Offer': '—', 'Order ID': 'No applications yet', 'Date': '—', 'Customer': '—', 'Email': '—', 'Product': '—', 'Qty': 0, 'Currency': '—', 'Original Unit Price': 0, 'Sold Unit Price': 0, 'Line Discount': 0, 'Line Discount (₹)': 0, 'Line Sales': 0, 'Line Sales (₹)': 0, 'Order Status': '—' })
+
+      const wb = XLSX.utils.book_new()
+      const wsSummary = XLSX.utils.json_to_sheet(summary)
+      wsSummary['!cols'] = Object.keys(summary[0] || {}).map(() => ({ wch: 18 }))
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(byDate), 'Usage by Date')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(redemptions), 'Redemptions')
+
+      const stamp = new Date().toISOString().slice(0, 10)
+      XLSX.writeFile(wb, `offer-report-${stamp}.xlsx`)
+      showSuccessToast('Report ready', 'The offer report has been downloaded.')
+    } catch (e) {
+      showErrorToast('Download failed', e instanceof Error ? e.message : 'Could not generate the report.')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   // Activate / pause an offer straight from the row.
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const handleToggleActive = async (o: Offer) => {
@@ -260,12 +380,23 @@ export default function OfferManagement() {
             Automatic, code-less promotions. Applied on the selling price at checkout — vendor payouts are never affected.
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="inline-flex items-center gap-2 bg-[#e01a1b] text-white px-4 py-2 rounded-lg hover:bg-[#c01718] transition-colors text-sm font-medium"
-        >
-          <Plus className="w-4 h-4" /> Create Offer
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleDownloadReport}
+            disabled={downloading}
+            className="inline-flex items-center gap-2 bg-white text-slate-700 border border-slate-300 px-4 py-2 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+            title="Download an Excel report of all offers, their usage and sales"
+          >
+            {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {downloading ? 'Preparing…' : 'Download Report'}
+          </button>
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center gap-2 bg-[#e01a1b] text-white px-4 py-2 rounded-lg hover:bg-[#c01718] transition-colors text-sm font-medium"
+          >
+            <Plus className="w-4 h-4" /> Create Offer
+          </button>
+        </div>
       </div>
 
       {/* Metric cards — click a card to filter the table by that status */}

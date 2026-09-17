@@ -125,6 +125,7 @@ export default function InvoiceSettings() {
                 formatTemplate: settings.formatTemplate,
                 // URL passes through; a fresh data URI uploads; "" clears it.
                 invoiceLogo: settings.invoiceLogo ?? '',
+                signature: settings.signature ?? '',
             };
 
             if (settings.autoFinancialYear) {
@@ -166,6 +167,18 @@ export default function InvoiceSettings() {
         if (cropSrc?.startsWith("blob:")) URL.revokeObjectURL(cropSrc);
         setCropSrc(null);
         setCropFileName("");
+    };
+
+    // ── Authorised signature: pick → data URI (uploaded to Cloudinary on Save) ──
+    const handleSignatureSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) { showErrorToast("Invalid file", "Please choose an image."); return; }
+        if (file.size > 5 * 1024 * 1024) { showErrorToast("Too large", "Image must be under 5MB."); return; }
+        const reader = new FileReader();
+        reader.onloadend = () => setSettings((s) => (s ? { ...s, signature: reader.result as string } : s));
+        reader.readAsDataURL(file);
+        e.target.value = ""; // allow re-selecting the same file
     };
 
     // ── Invoice number preview ────────────────────────────────────────────────
@@ -348,6 +361,53 @@ export default function InvoiceSettings() {
                                     </button>
                                 )}
                                 <p className="text-xs text-slate-400">PNG or JPG · crop after selecting · saved on “Save Settings”.</p>
+                            </div>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* ── Authorised Signature ── */}
+            <Card>
+                <CardContent className="p-6">
+                    <div className="mb-1 flex items-center gap-2">
+                        <ImageIcon className="w-5 h-5 text-[#e01a1b]" />
+                        <h2 className="text-lg font-bold text-slate-900">Authorised Signature</h2>
+                    </div>
+                    <p className="text-sm text-slate-500 mb-5">
+                        Printed in the “Authorised Signatory” block on every invoice (.in and .com). Use a transparent PNG for best results.
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-5">
+                        <div className="flex h-24 w-48 items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50">
+                            {settings.signature ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={settings.signature} alt="Authorised signature" className="max-h-full max-w-full object-contain" />
+                            ) : (
+                                <span className="flex flex-col items-center gap-1 text-slate-400">
+                                    <ImageIcon className="h-6 w-6" />
+                                    <span className="text-[11px]">No signature</span>
+                                </span>
+                            )}
+                        </div>
+
+                        {hasPermission("settings:edit") && (
+                            <div className="flex flex-col gap-2">
+                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-[#e01a1b] hover:text-[#e01a1b]">
+                                    <Upload className="h-4 w-4" />
+                                    {settings.signature ? "Replace signature" : "Upload signature"}
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleSignatureSelect} />
+                                </label>
+                                {settings.signature && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSettings((s) => (s ? { ...s, signature: "" } : s))}
+                                        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-[#e01a1b]"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" /> Remove
+                                    </button>
+                                )}
+                                <p className="text-xs text-slate-400">PNG or JPG · saved on “Save Settings”.</p>
                             </div>
                         )}
                     </div>

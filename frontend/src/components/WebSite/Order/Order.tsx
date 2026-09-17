@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { formatPrice, getRegionalPrice } from "@/lib/currency"
+import { formatPrice, getRegionalPrice, getRegion } from "@/lib/currency"
 import { FaceIcon } from '@/components/WebSite/Shared/FaceRating';
 import {
   Package,
@@ -519,7 +519,8 @@ export default function OrderList() {
                         { value: "shipped", label: "Shipped" },
                         { value: "delivered", label: "Delivered" },
                         { value: "cancelled", label: "Cancelled" },
-                        { value: "returned", label: "Returned" }
+                        // "Returned" filter is a .in (INR) feature only.
+                        ...(getRegion() === "IN" ? [{ value: "returned", label: "Returned" }] : []),
                       ]}
                       onChange={(v) => { setStatusFilter(v); setCurrentPage(1); setPastPage(1) }}
                       placeholder="Filter by status"
@@ -697,7 +698,7 @@ export default function OrderList() {
                                 </a>
                               )
                             })()
-                          ) : order.rawStatus === 'DELIVERED' ? (
+                          ) : order.rawStatus === 'DELIVERED' && order.currency !== 'USD' ? (
                             <button
                               onClick={() => setReturnModalOrder(order)}
                               className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors"
@@ -917,7 +918,7 @@ export default function OrderList() {
                                 </a>
                               )
                             })()
-                          ) : order.rawStatus === 'DELIVERED' ? (
+                          ) : order.rawStatus === 'DELIVERED' && order.currency !== 'USD' ? (
                             <button
                               onClick={() => setReturnModalOrder(order)}
                               className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors"

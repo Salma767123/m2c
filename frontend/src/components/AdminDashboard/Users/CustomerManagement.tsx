@@ -31,7 +31,9 @@ import {
   ShoppingBag,
   ChevronLeft,
   ChevronRight,
-  X
+  X,
+  ChevronDown,
+  SlidersHorizontal
 } from 'lucide-react';
 
 
@@ -65,6 +67,7 @@ export default function CustomerManagement() {
   const [activityFilter, setActivityFilter] = useState('all'); // last-login recency
   const [stateFilter, setStateFilter] = useState('all');     // billing/shipping state
   const [sortBy, setSortBy] = useState('recent');            // result ordering
+  const [panelOpen, setPanelOpen] = useState(true);          // collapse metrics + filters
   // const [loyaltyFilter, setLoyaltyFilter] = useState<string>('all'); // TODO: Re-enable when loyalty system is implemented
   const [currentPage, setCurrentPage] = useState(1);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -324,6 +327,25 @@ export default function CustomerManagement() {
           <p className="text-sm text-slate-500">Manage customer accounts and their status</p>
         </div>
       </div>
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {sortedCustomers.length} of {customers.length} customers{anyFilterActive ? ' (filtered)' : ''}
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Stats Cards — click a card to filter the table below by that metric */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {statCards.map(({ key, title, value, subtitle, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -477,6 +499,9 @@ export default function CustomerManagement() {
           )}
         </div>
       </div>
+        </div>
+      )}
+
       {/* Customers Table — matches the Vendor Management table style */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">

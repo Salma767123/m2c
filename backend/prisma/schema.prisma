@@ -2249,6 +2249,9 @@ model InvoiceSettings {
   // Cloudinary URL of the logo printed on every invoice. Falls back to the company
   // logo when unset.
   invoiceLogo             String?
+  // Cloudinary URL of the authorised digital signature printed in the invoice's
+  // "Authorised Signature" block. Optional.
+  signature               String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

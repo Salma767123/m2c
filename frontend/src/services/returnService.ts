@@ -85,6 +85,7 @@ export interface DamagedStock {
     reason: string;
     note?: string | null;
     sourceType: string;
+    returnRequestId?: string | null;
     returnCode?: string | null;
     orderCode?: string | null;
     customerName?: string | null;

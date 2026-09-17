@@ -12,6 +12,7 @@ export interface InvoiceSettingsData {
     financialYearStartDay: number;   // 1–31
     formatTemplate: string;
     invoiceLogo?: string | null;     // Cloudinary URL shown on invoices
+    signature?: string | null;       // Cloudinary URL of the authorised signature
     createdAt: string;
     updatedAt: string;
 }
@@ -26,6 +27,7 @@ export interface UpdateInvoiceSettingsData {
     financialYearStartDay?: number;    // 1–31, auto mode
     formatTemplate?: string;
     invoiceLogo?: string;              // data URI (new upload), URL, or "" to clear
+    signature?: string;                // data URI (new upload), URL, or "" to clear
 }
 
 class InvoiceSettingsService {

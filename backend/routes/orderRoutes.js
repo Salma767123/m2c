@@ -14,18 +14,62 @@ const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
 // so the invoice prints the real per-item rate instead of a blended average.
 // In-memory only — never persisted (the product's rate may have moved since).
 async function attachItemGst(order) {
-    const missing = (order?.items || []).filter((it) => it.gstPercentage == null && it.productId);
-    if (missing.length === 0) return;
-    const ids = [...new Set(missing.map((it) => it.productId))];
+    const items = (order?.items || []).filter((it) => it.productId);
+    if (items.length === 0) return;
+    const ids = [...new Set(items.map((it) => it.productId))];
     const products = await prisma.product.findMany({
         where: { id: { in: ids } },
-        select: { id: true, gstPercentage: true },
+        // hsnCode is NOT frozen on the order item, so it's always pulled live here.
+        select: { id: true, gstPercentage: true, hsnCode: true },
     });
-    const rateById = new Map(products.map((p) => [p.id, p.gstPercentage]));
-    for (const it of missing) {
-        const r = rateById.get(it.productId);
-        if (r != null) it.gstPercentage = r;
+    const byId = new Map(products.map((p) => [p.id, p]));
+    for (const it of items) {
+        const p = byId.get(it.productId);
+        if (!p) continue;
+        if (it.gstPercentage == null && p.gstPercentage != null) it.gstPercentage = p.gstPercentage;
+        if (it.hsnCode == null && p.hsnCode) it.hsnCode = p.hsnCode;
     }
+}
+
+// Build the adminSettings object the invoice template expects — shared by the
+// admin and customer invoice routes so both stay identical. Also backfills each
+// line's GST rate + HSN code from the product.
+async function buildInvoiceHeader(order) {
+    await attachItemGst(order);
+    const [company, invSettings] = await Promise.all([
+        prisma.companyInfo.findFirst({
+            select: {
+                companyName: true, companyEmail: true, companyPhone: true, gstNumber: true, panNumber: true,
+                registeredAddress: true, addressLine2: true, addressLine3: true, landmark: true,
+                city: true, state: true, zipCode: true, country: true,
+                companyLogo: true, companyWebsite: true,
+            },
+        }),
+        prisma.invoiceSettings.findFirst({ select: { invoiceLogo: true, signature: true } }),
+    ]);
+    const signature = invSettings?.signature || null;
+    if (!company) {
+        return { ...(invSettings?.invoiceLogo ? { companyLogo: invSettings.invoiceLogo } : {}), signature };
+    }
+    return {
+        companyName: company.companyName,
+        // Dedicated invoice logo wins; fall back to the company logo when unset.
+        companyLogo: invSettings?.invoiceLogo || company.companyLogo,
+        gstNumber: company.gstNumber,
+        panNumber: company.panNumber,
+        address: company.registeredAddress,
+        addressLine2: company.addressLine2,
+        addressLine3: company.addressLine3,
+        landmark: company.landmark,
+        city: company.city,
+        state: company.state,
+        zipCode: company.zipCode,
+        country: company.country,
+        companyWebsite: company.companyWebsite,
+        email: company.companyEmail,
+        phone: company.companyPhone,
+        signature,
+    };
 }
 
 // Apply base auth middleware to all routes
@@ -58,27 +102,7 @@ router.get('/admin/:id/invoice', requireAdminRole, requirePermission(['invoices:
         const order = await prisma.order.findUnique({ where, include: { items: ACTIVE_ITEMS_FILTER } });
         if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
 
-        // Backfill per-line GST rate for legacy orders so the invoice prints real rates.
-        await attachItemGst(order);
-
-        // Fetch company info for invoice header (logo, name, GST, etc.)
-        const [company, invSettings] = await Promise.all([
-            prisma.companyInfo.findFirst({
-                select: { companyName: true, gstNumber: true, registeredAddress: true, state: true, country: true, companyLogo: true, companyWebsite: true }
-            }),
-            prisma.invoiceSettings.findFirst({ select: { invoiceLogo: true } }),
-        ]);
-
-        const html = getOrderInvoiceHTML(order, company ? {
-            companyName: company.companyName,
-            // Dedicated invoice logo wins; fall back to the company logo when unset.
-            companyLogo: invSettings?.invoiceLogo || company.companyLogo,
-            gstNumber: company.gstNumber,
-            address: company.registeredAddress,
-            state: company.state,
-            country: company.country,
-            companyWebsite: company.companyWebsite,
-        } : (invSettings?.invoiceLogo ? { companyLogo: invSettings.invoiceLogo } : {}));
+        const html = getOrderInvoiceHTML(order, await buildInvoiceHeader(order));
         res.setHeader('Content-Type', 'text/html');
         res.send(html);
     } catch (err) {
@@ -135,23 +159,7 @@ router.get('/:id/invoice', async (req, res) => {
         if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
         if (order.customerId !== userId) return res.status(403).json({ success: false, error: 'Unauthorized' });
 
-        const [company, invSettings] = await Promise.all([
-            prisma.companyInfo.findFirst({
-                select: { companyName: true, gstNumber: true, registeredAddress: true, state: true, country: true, companyLogo: true, companyWebsite: true }
-            }),
-            prisma.invoiceSettings.findFirst({ select: { invoiceLogo: true } }),
-        ]);
-
-        const html = getOrderInvoiceHTML(order, company ? {
-            companyName: company.companyName,
-            // Dedicated invoice logo wins; fall back to the company logo when unset.
-            companyLogo: invSettings?.invoiceLogo || company.companyLogo,
-            gstNumber: company.gstNumber,
-            address: company.registeredAddress,
-            state: company.state,
-            country: company.country,
-            companyWebsite: company.companyWebsite,
-        } : (invSettings?.invoiceLogo ? { companyLogo: invSettings.invoiceLogo } : {}));
+        const html = getOrderInvoiceHTML(order, await buildInvoiceHeader(order));
         res.setHeader('Content-Type', 'text/html');
         res.send(html);
     } catch (err) {
