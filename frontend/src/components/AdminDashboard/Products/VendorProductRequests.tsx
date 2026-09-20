@@ -13,7 +13,7 @@ import PriceNegotiationModal from './PriceNegotiationModal'
 import Pagination from '@/components/UI/Pagination'
 import {
   Eye, Check, X, Search, Package, UserPlus, UserCog, CheckCircle,
-  Clock, ShoppingBag, AlertTriangle, XCircle, Handshake,
+  Clock, ShoppingBag, AlertTriangle, XCircle, Handshake, ChevronDown, SlidersHorizontal,
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { adminProductService } from '@/services/adminProductService'
@@ -162,6 +162,7 @@ export default function VendorProductRequests() {
     total: 0, pending: 0, qcSubmitted: 0, qcApproved: 0, approved: 0, rejected: 0, reinspection: 0,
   })
   const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalCount: 0, limit: 10 })
+  const [panelOpen, setPanelOpen] = useState(true)
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [searchTerm, setSearchTerm] = useState('')
@@ -311,6 +312,25 @@ export default function VendorProductRequests() {
           </div>
         </div>
 
+        {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setPanelOpen((v) => !v)}
+            aria-expanded={panelOpen}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+          >
+            <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+            Overview &amp; Filters
+            <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+          </button>
+          <span className="text-xs text-slate-500">
+            Showing {requests.length} of {pagination.totalCount} requests
+          </span>
+        </div>
+
+        {panelOpen && (
+          <div className="space-y-4">
         {/* ── Metric Cards ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {metricCards.map(({ key, label, subtitle, count, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -383,6 +403,8 @@ export default function VendorProductRequests() {
             </div>
           </div>
         </div>
+          </div>
+        )}
 
         {/* ── Table ── */}
         <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">

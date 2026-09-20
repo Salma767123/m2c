@@ -169,6 +169,46 @@ app.get("/api/jobs/inspection-schedule-sweep", async (req, res) => {
   }
 });
 
+// Vercel Cron entry point for offer/coupon "ending soon" customer notifications.
+// Same auth contract as the jobs above.
+app.get("/api/jobs/promo-ending-soon", async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return res.status(503).json({ success: false, error: "CRON_SECRET is not configured" });
+  }
+  if (req.headers.authorization !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+  try {
+    const { notifyEndingPromos } = require("./jobs/promoEndingSoon");
+    const result = await notifyEndingPromos();
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    console.error("Promo ending-soon run failed:", error);
+    res.status(500).json({ success: false, error: "Promo ending-soon check failed" });
+  }
+});
+
+// Vercel Cron entry point for the vendor order-acceptance overdue sweep.
+// Same auth contract as the jobs above.
+app.get("/api/jobs/vendor-acceptance-sweep", async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return res.status(503).json({ success: false, error: "CRON_SECRET is not configured" });
+  }
+  if (req.headers.authorization !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+  try {
+    const { runVendorAcceptanceSweep } = require("./jobs/vendorAcceptanceSweep");
+    const result = await runVendorAcceptanceSweep();
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    console.error("Vendor-acceptance sweep failed:", error);
+    res.status(500).json({ success: false, error: "Vendor-acceptance sweep failed" });
+  }
+});
+
 // Import routes
 const authRoutes = require("./routes/auth/authRoutes");
 const vendorRoutes = require("./routes/vendorRoutes");
@@ -442,6 +482,10 @@ if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
       startOverdueSettlementCheck();
       const { startInspectionScheduleSweep } = require('./jobs/inspectionReminders');
       startInspectionScheduleSweep();
+      const { startPromoEndingSoonCheck } = require('./jobs/promoEndingSoon');
+      startPromoEndingSoonCheck();
+      const { startVendorAcceptanceSweep } = require('./jobs/vendorAcceptanceSweep');
+      startVendorAcceptanceSweep();
     } catch (error) {
       console.error('Failed to start cron jobs:', error.message);
     }

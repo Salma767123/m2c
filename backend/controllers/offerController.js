@@ -54,6 +54,7 @@ function buildOfferData(body) {
     startsAt,
     endsAt,
     isActive,
+    targetCustomerIds,
   } = body;
 
   if (!title || !String(title).trim()) return { error: 'Title is required' };
@@ -133,6 +134,10 @@ function buildOfferData(body) {
       startsAt: start,
       endsAt: end,
       isActive: isActive === undefined ? true : !!isActive,
+      // Customer targeting (empty = everyone); 24-hex ObjectIds only, deduped.
+      targetCustomerIds: Array.isArray(targetCustomerIds)
+        ? [...new Set(targetCustomerIds.filter((v) => typeof v === 'string' && /^[0-9a-fA-F]{24}$/.test(v)))]
+        : [],
     },
   };
 }
@@ -166,6 +171,22 @@ const createOffer = async (req, res) => {
     if (built.error) return res.status(400).json({ success: false, message: built.error });
     built.data.bannerImage = await resolveBanner(req.body.bannerImage);
     const offer = await prisma.offer.create({ data: built.data });
+
+    // Notify targeted customers about their exclusive offer.
+    if (Array.isArray(offer.targetCustomerIds) && offer.targetCustomerIds.length > 0) {
+      try {
+        const { createNotification } = require('./notificationController');
+        await Promise.all(offer.targetCustomerIds.map((uid) => createNotification({
+          userId: uid,
+          role: 'USER',
+          type: 'OFFER_ASSIGNED',
+          title: 'A special offer, just for you ✨',
+          message: `${offer.title} — automatically applied at checkout.`,
+          data: { offerId: offer.id },
+        }).catch(() => {})));
+      } catch (e) { console.error('Offer notify error:', e?.message || e); }
+    }
+
     res.status(201).json({ success: true, data: { ...offer, status: statusOf(offer) } });
   } catch (error) {
     console.error('Create offer error:', error);
@@ -241,6 +262,9 @@ const getActiveOffers = async (req, res) => {
     });
 
     const visible = offers
+      // Customer-targeted offers are private to those customers — never surface
+      // them in the public storefront feed (they still auto-apply at checkout).
+      .filter((o) => !(Array.isArray(o.targetCustomerIds) && o.targetCustomerIds.length > 0))
       .filter((o) => (currency ? offerMatchesCurrency(o, currency) : true))
       .filter((o) => isOfferLive(o, now))
       .map((o) => ({

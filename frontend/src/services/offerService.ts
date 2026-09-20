@@ -30,6 +30,8 @@ export interface Offer {
   startsAt: string
   endsAt: string
   isActive: boolean
+  /** Customer ids this offer is restricted to (empty/undefined = everyone). */
+  targetCustomerIds?: string[]
   status?: OfferStatus
   createdAt?: string
   updatedAt?: string
@@ -134,6 +136,7 @@ export type OfferInput = Partial<
     | 'startsAt'
     | 'endsAt'
     | 'isActive'
+    | 'targetCustomerIds'
   >
 >
 

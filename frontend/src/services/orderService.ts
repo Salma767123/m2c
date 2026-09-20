@@ -10,6 +10,9 @@ export interface OrderItem {
     totalPrice: number;
     /** GST rate charged on this line, frozen at checkout (per-product). */
     gstPercentage?: number | null;
+    /** Whether this product is eligible for return (live flag from the product).
+     *  Attached server-side on order fetch; absent → treat as returnable. */
+    returnable?: boolean;
     /** Unit price before the automatic offer (set only when an offer applied),
      *  so the order view can show how much the offer saved. */
     originalUnitPrice?: number;
@@ -59,6 +62,10 @@ export interface VendorShipment {
     vendorId: string;
     vendorName: string;
     status: string;
+    /** Vendor order-acceptance gate. */
+    acceptedAt?: string | null;
+    acceptanceDeadline?: string | null;
+    acceptanceMins?: number | null;
     vendorCarrier?: string;
     vendorTrackingId?: string;
     vendorShippedAt?: string;
@@ -245,9 +252,10 @@ class OrderService {
 
     // Customer: cancel own pre-dispatch order (auto-refund for prepaid).
     // refundTo: 'WALLET' (instant store credit) | 'BANK' (gateway, default).
-    async cancelOrder(id: string, reason?: string, refundTo?: 'WALLET' | 'BANK'): Promise<{ success: boolean; data: Order; message?: string }> {
+    async cancelOrder(id: string, reason?: string): Promise<{ success: boolean; data: Order; message?: string }> {
         try {
-            const response = await axios.post(`/orders/${id}/cancel`, { reason, refundTo });
+            // Refunds always go to the M2C Wallet — no destination choice.
+            const response = await axios.post(`/orders/${id}/cancel`, { reason });
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to cancel order');
@@ -282,6 +290,15 @@ class OrderService {
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to fetch vendor order');
+        }
+    }
+
+    async acceptVendorOrder(id: string): Promise<{ success: boolean; data: VendorShipment; message?: string }> {
+        try {
+            const response = await axios.post(`/orders/vendor/${id}/accept`, {});
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error?.response?.data?.error || error.message || 'Failed to accept order');
         }
     }
 
@@ -402,9 +419,10 @@ class OrderService {
     async cancelAdminOrder(
         id: string,
         cancelReason: string,
+        restock: boolean = false,
     ): Promise<{ success: boolean; data: Order }> {
         try {
-            const response = await axios.put(`/orders/admin/${id}/cancel`, { cancelReason });
+            const response = await axios.put(`/orders/admin/${id}/cancel`, { cancelReason, restock });
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to cancel order');

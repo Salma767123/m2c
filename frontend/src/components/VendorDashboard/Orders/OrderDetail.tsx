@@ -26,7 +26,9 @@ const carriers = [
 const getStatusColor = (status: string) => {
   switch (status) {
     case "ORDER_CREATED":
-      return "bg-slate-50 text-slate-700 border border-slate-200";
+      return "bg-amber-50 text-amber-700 border border-amber-200";
+    case "ACCEPTED_BY_VENDOR":
+      return "bg-cyan-50 text-cyan-700 border border-cyan-200";
     case "VENDOR_PROCESSING":
       return "bg-blue-50 text-blue-700 border border-blue-200";
     case "PACKED_BY_VENDOR":
@@ -109,6 +111,25 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
     handleUpdateStatus("PACKED_BY_VENDOR");
   };
 
+  const handleAcceptOrder = async () => {
+    if (!shipment) return;
+    if (updatingRef.current) return;
+    updatingRef.current = true;
+    setIsUpdatingStatus(true);
+    try {
+      const res = await orderService.acceptVendorOrder(shipment.id);
+      if (res.success) {
+        showSuccessToast("Order accepted", "The admin can now assign a hub and proceed.");
+        setShipment(res.data);
+      }
+    } catch (error: any) {
+      showErrorToast(error.message || "Failed to accept order");
+    } finally {
+      updatingRef.current = false;
+      setIsUpdatingStatus(false);
+    }
+  };
+
   const handleReship = async () => {
     if (!shipment) return;
     try {
@@ -183,7 +204,20 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           </div>
         </div>
         <div className="flex gap-3">
-          {(status === "ORDER_CREATED" || status === "VENDOR_PROCESSING") && (
+          {status === "ORDER_CREATED" && (
+            <button
+              onClick={handleAcceptOrder}
+              disabled={isUpdatingStatus}
+              className={`px-4 py-2.5 rounded-lg transition-colors font-semibold flex items-center gap-2 ${!isUpdatingStatus
+                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                  : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                }`}
+            >
+              {isUpdatingStatus && <RefreshCw className="h-4 w-4 animate-spin" />}
+              {isUpdatingStatus ? "Accepting..." : "Accept Order"}
+            </button>
+          )}
+          {(status === "ACCEPTED_BY_VENDOR" || status === "VENDOR_PROCESSING") && (
             <button
               onClick={handleMarkAsPacked}
               disabled={!shipment.assignedHubId || isUpdatingStatus}
@@ -191,7 +225,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
                   ? "bg-purple-600 text-white hover:bg-purple-700"
                   : "bg-slate-200 text-slate-400 cursor-not-allowed"
                 }`}
-              title={!shipment.assignedHubId ? "Wait for admin to assign a hub" : ""}
+              title={!shipment.assignedHubId ? "Waiting for admin to assign a hub" : ""}
             >
               {isUpdatingStatus && <RefreshCw className="h-4 w-4 animate-spin" />}
               {isUpdatingStatus ? "Updating Status..." : "Mark as Packed"}

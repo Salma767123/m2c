@@ -16,7 +16,9 @@ import {
   Truck,
   ChevronLeft,
   ChevronRight,
-  Download
+  Download,
+  ChevronDown,
+  SlidersHorizontal
 } from 'lucide-react';
 import Dropdown from '@/components/UI/Dropdown';
 import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar';
@@ -50,6 +52,7 @@ function getPageRange(current: number, total: number): Array<number | '...'> {
 }
 
 const CouponManagement = () => {
+  const [panelOpen, setPanelOpen] = useState(true);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -393,6 +396,25 @@ const CouponManagement = () => {
         </div>
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filteredCoupons.length} of {coupons.length} coupons
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Stats Cards — click a card to filter the table below by that status */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {[
@@ -463,6 +485,8 @@ const CouponManagement = () => {
           </div>
         </div>
       </div>
+        </div>
+      )}
 
       {/* Coupons Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">

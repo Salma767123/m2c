@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
 import {
   Search, ChevronLeft, ChevronRight, RotateCcw, Package, CreditCard,
-  Eye, Image as ImageIcon, Clock, CheckCircle, XCircle,
+  Eye, Image as ImageIcon, Clock, CheckCircle, XCircle, ChevronDown, SlidersHorizontal,
 } from 'lucide-react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { hasPermission } from '@/lib/auth';
@@ -38,6 +38,7 @@ export default function ReturnManagement() {
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   const canManage = hasPermission('returns:manage');
 
@@ -122,6 +123,25 @@ export default function ReturnManagement() {
         </div>
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filtered.length} of {returns.length} returns
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Metric cards — click a card to filter (click the active one to clear) */}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
         {STAT_CARDS.map(({ key, label, subtitle, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -184,6 +204,8 @@ export default function ReturnManagement() {
           />
         </div>
       </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="py-20 text-center text-slate-400">Loading…</div>

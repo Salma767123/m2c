@@ -21,6 +21,26 @@ function pruneReshippedItems(order) {
     return order;
 }
 const ITEMS_WITH_SHIPMENT_STATUS = { include: { shipment: { select: { status: true } } } };
+
+// Attach each order item's live product return-eligibility flag (`returnable`).
+// OrderItems are frozen snapshots and don't carry it, so the storefront can't tell
+// whether a return is allowed without this. In-memory only — never persisted.
+// Defaults to true when the product is missing (e.g. deleted) to match the schema.
+async function attachItemReturnable(orders) {
+    const list = Array.isArray(orders) ? orders : [orders];
+    const ids = [...new Set(list.flatMap((o) => (o?.items || []).map((it) => it.productId).filter(Boolean)))];
+    if (ids.length === 0) return;
+    const products = await prisma.product.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, returnable: true },
+    });
+    const byId = new Map(products.map((p) => [p.id, p.returnable !== false]));
+    for (const o of list) {
+        for (const it of (o?.items || [])) {
+            it.returnable = it.productId && byId.has(it.productId) ? byId.get(it.productId) : true;
+        }
+    }
+}
 const { notifications } = require('../utils/notificationService');
 const { checkAndAlertLowStock } = require('../utils/lowStockAlert');
 const { withRetry } = require('../utils/dbRetry');
@@ -214,6 +234,14 @@ const createOrder = async (req, res) => {
             }),
         ]);
 
+        // Customer targeting: a targeted offer applies ONLY for the customers it
+        // names. Drop the rest so this buyer can never receive someone else's
+        // private offer; untargeted offers (the norm) stay in for everyone.
+        const scopedOffers = activeOffers.filter(
+            (o) => !(Array.isArray(o.targetCustomerIds) && o.targetCustomerIds.length > 0)
+                || o.targetCustomerIds.includes(userId)
+        );
+
         // THRESHOLD offers ("spend ₹X, get Y% off") fire on the whole-cart value, which
         // isn't known until the lines are priced. A lightweight pre-pass sums the INR
         // selling price of every buyable line so we know which threshold offers qualify
@@ -225,7 +253,7 @@ const createOrder = async (req, res) => {
             const v = cart.items[i].variantId && p.variants?.length > 0 ? p.variants[0] : null;
             preSubtotalINR += resolveUnitPrice(v || p, 'INR', null) * cart.items[i].quantity;
         }
-        const thresholdEligibleIds = qualifyingThresholdIds(activeOffers, preSubtotalINR, currency, orderNow);
+        const thresholdEligibleIds = qualifyingThresholdIds(scopedOffers, preSubtotalINR, currency, orderNow);
 
         // Cross-product BOGO ("buy A get B free") is delivered as free-gift lines that the
         // cart auto-added/chose (isFreeGift, price 0). Re-validate them here: the buy
@@ -239,7 +267,7 @@ const createOrder = async (req, res) => {
             giftBuyLines.push({ product: p, quantity: cart.items[i].quantity, isFreeGift: false });
         }
         const qualifyingGiftOfferIds = new Set(
-            qualifyingCrossBogo(activeOffers, giftBuyLines, currency, orderNow).map((q) => q.offer.id)
+            qualifyingCrossBogo(scopedOffers, giftBuyLines, currency, orderNow).map((q) => q.offer.id)
         );
 
         for (let i = 0; i < cart.items.length; i++) {
@@ -288,7 +316,7 @@ const createOrder = async (req, res) => {
             // changed since the gift was granted — reject so nothing free slips through.
             const isGift = !!item.isFreeGift;
             if (isGift) {
-                const giftOffer = activeOffers.find((o) => o.id === item.giftOfferId);
+                const giftOffer = scopedOffers.find((o) => o.id === item.giftOfferId);
                 const valid = giftOffer
                     && qualifyingGiftOfferIds.has(item.giftOfferId)
                     && offerAppliesToFreeSet(giftOffer, product);
@@ -320,7 +348,7 @@ const createOrder = async (req, res) => {
                     quantity: item.quantity,
                     currency,
                     rate: orderExchangeRate,
-                    offers: activeOffers,
+                    offers: scopedOffers,
                     now: orderNow,
                     thresholdEligibleIds,
                 });
@@ -623,6 +651,7 @@ const createOrder = async (req, res) => {
                 ? toINR(roundedSubtotal, currency, orderExchangeRate)
                 : roundedSubtotal,
             couponGrantsFreeShipping,
+            region: currency, // 'INR'|'USD' — normalized inside isVisibleInRegion
         });
         const roundedShipping = freeShipping
             ? 0
@@ -1042,6 +1071,9 @@ const createOrder = async (req, res) => {
                         vendorId: vid,
                         vendorName: group.vendorName,
                         status: 'ORDER_CREATED',
+                        // Vendor has 6 hours to accept before the overdue sweep alerts
+                        // admin + vendor.
+                        acceptanceDeadline: new Date(Date.now() + 6 * 60 * 60 * 1000),
                     },
                 });
                 await tx.orderItem.updateMany({
@@ -1194,6 +1226,7 @@ const getUserOrders = async (req, res) => {
             }
         });
         orders.forEach(pruneReshippedItems);
+        await attachItemReturnable(orders);
 
         res.json({
             success: true,
@@ -1263,6 +1296,8 @@ const getOrderById = async (req, res) => {
             });
         }
 
+        await attachItemReturnable(order);
+
         // Timeline places (city/state only):
         //   processing → the vendor's warehouse/factory (where the goods are stored)
         //   shipped    → the admin hub the order was routed through
@@ -1328,8 +1363,6 @@ const cancelMyOrder = async (req, res) => {
         const userId = req.userId;
         const { id } = req.params;
         const reason = (req.body?.reason || '').toString().trim().slice(0, 300) || null;
-        // Customer picks where the refund goes: 'WALLET' (instant store credit) or 'BANK' (gateway).
-        const refundTo = req.body?.refundTo === 'WALLET' ? 'WALLET' : 'BANK';
 
         const order = await prisma.order.findUnique({ where: { id }, include: { items: true } });
         if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
@@ -1400,12 +1433,13 @@ const cancelMyOrder = async (req, res) => {
             prisma.stockChangeHistory.createMany({ data: stockHistoryRecords }).catch(() => {});
         }
 
-        // Refund (fire after the state change so a gateway hiccup can't undo the cancel).
-        // Only paid, non-COD orders have anything to refund.
+        // Refund policy: ALWAYS to the M2C Wallet as instant store credit — never
+        // back to the gateway. The captured amount stays with M2C; the customer
+        // withdraws from the wallet separately if they want cash. Only paid,
+        // non-COD orders have anything to refund.
         const wasPaid = order.paymentStatus === 'PAID' && order.paymentMethod !== 'COD';
         let updated;
-        if (refundTo === 'WALLET' && wasPaid) {
-            // Instant store credit — no gateway. Wallet balance is INR.
+        if (wasPaid) {
             const creditInr = order.totalAmountINR != null ? order.totalAmountINR : order.totalAmount;
             try {
                 const { creditWallet } = require('../utils/wallet');
@@ -1421,12 +1455,7 @@ const cancelMyOrder = async (req, res) => {
                 data: { refundStatus: 'WALLET', refundAmount: order.totalAmount },
             });
         } else {
-            const { issueRefund } = require('../utils/refund');
-            const refund = await issueRefund(order);
-            updated = await prisma.order.update({
-                where: { id: order.id },
-                data: { refundStatus: refund.refundStatus, refundId: refund.refundId, refundAmount: order.totalAmount },
-            });
+            updated = order;
         }
 
         // Notify vendors so they stop processing.
@@ -1442,11 +1471,9 @@ const cancelMyOrder = async (req, res) => {
             }
         } catch { /* notifications are best-effort */ }
 
-        const refundMsg = !wasPaid
-            ? 'Order cancelled.'
-            : refundTo === 'WALLET'
-                ? 'Order cancelled. Your refund has been added to your wallet.'
-                : 'Order cancelled. Your refund has been initiated to your original payment method.';
+        const refundMsg = wasPaid
+            ? 'Order cancelled. Your refund has been added to your M2C Wallet.'
+            : 'Order cancelled.';
         res.json({ success: true, data: updated, message: refundMsg });
     } catch (error) {
         console.error('Cancel my order error:', error);

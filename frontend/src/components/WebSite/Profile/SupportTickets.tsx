@@ -133,6 +133,20 @@ export default function SupportTickets() {
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [loading, setLoading] = useState(true)
   const [activeId, setActiveId] = useState<string | null>(null)
+  // Prefill passed from elsewhere (e.g. the .com "Contact Support" button on a
+  // delivered order) via sessionStorage — opens the create form pre-populated.
+  const [prefill, setPrefill] = useState<{ subject?: string; description?: string; category?: string } | null>(null)
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('m2c_support_prefill')
+      if (raw) {
+        sessionStorage.removeItem('m2c_support_prefill')
+        setPrefill(JSON.parse(raw))
+        setView('create')
+      }
+    } catch { /* sessionStorage may be unavailable */ }
+  }, [])
 
   const loadTickets = async () => {
     try {
@@ -152,7 +166,7 @@ export default function SupportTickets() {
   const backToList = () => { setView('list'); setActiveId(null); loadTickets() }
 
   if (view === 'create') {
-    return <CreateTicket onCancel={() => setView('list')} onCreated={backToList} />
+    return <CreateTicket prefill={prefill} onCancel={() => { setPrefill(null); setView('list') }} onCreated={() => { setPrefill(null); backToList() }} />
   }
   if (view === 'detail' && activeId) {
     return <TicketDetail ticketId={activeId} onBack={backToList} />
@@ -224,8 +238,8 @@ export default function SupportTickets() {
 // ---------------------------------------------------------------------------
 // Create ticket
 // ---------------------------------------------------------------------------
-function CreateTicket({ onCancel, onCreated }: { onCancel: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState({ subject: '', category: 'order', otherCategory: '', priority: 'medium', description: '' })
+function CreateTicket({ onCancel, onCreated, prefill }: { onCancel: () => void; onCreated: () => void; prefill?: { subject?: string; description?: string; category?: string } | null }) {
+  const [form, setForm] = useState({ subject: prefill?.subject || '', category: prefill?.category || 'order', otherCategory: '', priority: 'medium', description: prefill?.description || '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
 

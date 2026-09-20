@@ -20,6 +20,7 @@ import {
   ShoppingCart,
   Star,
   Store,
+  PackageX,
 } from "lucide-react";
 
 interface SubMenuItem {
@@ -54,6 +55,11 @@ const navigation: NavigationItem[] = [
     title: "Orders",
     icon: ShoppingCart,
     href: "/vendor/dashboard/orders",
+  },
+  {
+    title: "Defective Returns",
+    icon: PackageX,
+    href: "/vendor/dashboard/defective-returns",
   },
   {
     title: "Earnings",

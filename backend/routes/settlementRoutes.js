@@ -5,6 +5,7 @@ const {
     getSettlementById,
     updateSettlementStatus,
     updateSettlementDueDate,
+    getSettlementReviewContext,
     getVendorSettlements
 } = require('../controllers/settlementController');
 
@@ -16,6 +17,7 @@ router.use(authenticateToken);
 // Admin Routes — settlements are part of the Billing module
 router.get('/admin', requireAdminRole, requirePermission('settlement:view'), getAllSettlements);
 router.get('/admin/:id', requireAdminRole, requirePermission('settlement:view'), getSettlementById);
+router.get('/admin/:id/review-context', requireAdminRole, requirePermission('settlement:view'), getSettlementReviewContext);
 router.put('/admin/:id/status', requireAdminRole, requirePermission('settlement:mark_paid'), updateSettlementStatus);
 router.put('/admin/:id/due-date', requireAdminRole, requirePermission('settlement:set_due_date'), updateSettlementDueDate);
 

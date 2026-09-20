@@ -390,6 +390,10 @@ export interface VendorProfile {
   references: any[];
   rating?: number | null;
   ratingCount?: number;
+  // Rolling average time-to-accept an order, in minutes (null until the vendor
+  // has accepted at least one order).
+  avgAcceptanceMins?: number | null;
+  acceptedOrdersCount?: number;
   latestInspection?: {
     id: string;
     status: string;

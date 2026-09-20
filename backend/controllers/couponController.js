@@ -1,6 +1,7 @@
 const { prisma } = require('../config/database');
 const { evaluateCoupon } = require('../utils/couponPricing');
 const { resolveBase64InValue } = require('../config/cloudinary');
+const { isVisibleInRegion } = require('../utils/regionVisibility');
 
 // Create a new coupon (Admin only)
 const createCoupon = async (req, res) => {
@@ -26,7 +27,12 @@ const createCoupon = async (req, res) => {
             applicableCategories,
             applicableProducts,
             isFirstOrder,
+            targetCustomerIds,
         } = req.body;
+        // Normalise the customer-targeting list (24-hex ObjectIds only, deduped).
+        const targetIds = Array.isArray(targetCustomerIds)
+            ? [...new Set(targetCustomerIds.filter((v) => typeof v === 'string' && /^[0-9a-fA-F]{24}$/.test(v)))]
+            : [];
 
         // Check if coupon code already exists
         const existingCoupon = await prisma.coupon.findUnique({
@@ -80,8 +86,25 @@ const createCoupon = async (req, res) => {
                 applicableCategories: applicableCategories || [],
                 applicableProducts: applicableProducts || [],
                 isFirstOrder: isFirstOrder || false,
+                targetCustomerIds: targetIds,
             }
         });
+
+        // Notify targeted customers that a coupon is waiting for them.
+        if (targetIds.length > 0) {
+            try {
+                const { createNotification } = require('./notificationController');
+                const pct = coupon.discountType === 'PERCENTAGE' ? `${coupon.discountValue}%` : `₹${coupon.discountValue}`;
+                await Promise.all(targetIds.map((uid) => createNotification({
+                    userId: uid,
+                    role: 'USER',
+                    type: 'COUPON_ASSIGNED',
+                    title: 'You’ve got a coupon! 🎉',
+                    message: `Use code ${coupon.code} for ${pct} off your order.`,
+                    data: { couponCode: coupon.code, couponId: coupon.id },
+                }).catch(() => {})));
+            } catch (e) { console.error('Coupon notify error:', e?.message || e); }
+        }
 
         res.status(201).json({
             success: true,
@@ -292,7 +315,7 @@ const applyCoupon = async (req, res) => {
 // Apply free shipping offer (separate function)
 const applyFreeShippingOffer = async (req, res) => {
     try {
-        const { userId, cartTotal } = req.body;
+        const { userId, cartTotal, region, currency } = req.body;
 
         if (!userId) {
             return res.status(400).json({
@@ -313,6 +336,11 @@ const applyFreeShippingOffer = async (req, res) => {
 
         // Check each offer
         for (const offer of activeOffers) {
+            // Region gate — an offer only applies on the storefront it targets.
+            if (!isVisibleInRegion(offer.region, region || currency)) {
+                continue;
+            }
+
             // Check minimum order value
             if (offer.minOrderValue > 0 && cartTotal < offer.minOrderValue) {
                 continue;
@@ -423,6 +451,36 @@ const getPromotionalCoupons = async (req, res) => {
 // Get the active first-order coupon for the storefront promo strip (Public).
 // Returns the single active, non-expired first-order coupon, or null so the strip
 // hides itself — never hardcoded.
+// Public: active coupons for the storefront's "Coupons & Offers" product filter.
+// Returns only what the filter needs (code + where it applies) — never usage
+// counts, per-user limits or other internal fields.
+const getActiveCoupons = async (req, res) => {
+    try {
+        const now = new Date();
+        const coupons = await prisma.coupon.findMany({
+            where: {
+                isActive: true,
+                startDate: { lte: now },
+                expiryDate: { gt: now },
+            },
+            select: {
+                id: true,
+                code: true,
+                description: true,
+                discountType: true,
+                discountValue: true,
+                applicableCategories: true,
+                applicableProducts: true,
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        res.json({ success: true, data: coupons });
+    } catch (error) {
+        console.error('Get active coupons error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch coupons' });
+    }
+};
+
 const getFirstOrderCoupon = async (req, res) => {
     try {
         const now = new Date();
@@ -473,19 +531,23 @@ function getOrdinalSuffix(n) {
 // ============================================
 
 // Create a new free shipping offer (Admin only)
+const VALID_REGIONS = ['IN_ONLY', 'COM_ONLY', 'BOTH'];
+
 const createFreeShippingOffer = async (req, res) => {
     try {
         const {
             minOrderValue,
             orderNumbers,
-            isActive
+            isActive,
+            region
         } = req.body;
 
         const offer = await prisma.freeShippingOffer.create({
             data: {
                 minOrderValue: minOrderValue || 0,
                 orderNumbers: orderNumbers || [],
-                isActive: isActive !== undefined ? isActive : true
+                isActive: isActive !== undefined ? isActive : true,
+                region: VALID_REGIONS.includes(region) ? region : 'BOTH'
             }
         });
 
@@ -587,6 +649,10 @@ const updateFreeShippingOffer = async (req, res) => {
         delete updateData.id;
         delete updateData.createdAt;
         delete updateData.updatedAt;
+        // Only accept a valid region value if supplied.
+        if (updateData.region !== undefined && !VALID_REGIONS.includes(updateData.region)) {
+            delete updateData.region;
+        }
 
         const offer = await prisma.freeShippingOffer.update({
             where: { id },
@@ -632,7 +698,7 @@ const deleteFreeShippingOffer = async (req, res) => {
 // Check if free shipping applies for a user's order
 const checkFreeShipping = async (req, res) => {
     try {
-        const { userId, cartTotal } = req.body;
+        const { userId, cartTotal, region, currency } = req.body;
 
         if (!userId) {
             return res.status(400).json({
@@ -652,6 +718,11 @@ const checkFreeShipping = async (req, res) => {
 
         // Check each offer
         for (const offer of activeOffers) {
+            // Region gate — an offer only applies on the storefront it targets.
+            if (!isVisibleInRegion(offer.region, region || currency)) {
+                continue;
+            }
+
             // Check minimum order value
             if (offer.minOrderValue > 0 && cartTotal < offer.minOrderValue) {
                 continue;
@@ -891,6 +962,7 @@ module.exports = {
     applyFreeShippingOffer,
     getPromotionalCoupons,
     getFirstOrderCoupon,
+    getActiveCoupons,
     getPopupCoupons,
     // Free shipping offer functions
     createFreeShippingOffer,

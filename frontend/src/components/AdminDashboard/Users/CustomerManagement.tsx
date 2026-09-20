@@ -33,8 +33,14 @@ import {
   ChevronRight,
   X,
   ChevronDown,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Ticket,
+  Percent
 } from 'lucide-react';
+import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { couponService, type Coupon } from '@/services/couponService';
+import CouponModal from '@/components/AdminDashboard/Coupons/CouponModal';
+import { OfferModal } from '@/components/AdminDashboard/Offers/OfferManagement';
 
 
 const PAGE_SIZE = 10;
@@ -71,6 +77,45 @@ export default function CustomerManagement() {
   // const [loyaltyFilter, setLoyaltyFilter] = useState<string>('all'); // TODO: Re-enable when loyalty system is implemented
   const [currentPage, setCurrentPage] = useState(1);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // ── Bulk selection → create a coupon / offer for the selected customers ──
+  const emptyCouponForm: Partial<Coupon> = {
+    code: '', description: '', discountType: 'PERCENTAGE', discountValue: 0,
+    minPurchaseAmount: 0, maxDiscountAmount: 0, usageLimit: 0,
+    startDate: new Date().toISOString(),
+    expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    isActive: true, freeShipping: false, freeShippingOrderNumbers: [],
+  };
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [couponModalOpen, setCouponModalOpen] = useState(false);
+  const [offerModalOpen, setOfferModalOpen] = useState(false);
+  const [couponForm, setCouponForm] = useState<Partial<Coupon>>(emptyCouponForm);
+
+  const toggleSelect = (id: string) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const openCouponForSelected = () => {
+    setCouponForm({ ...emptyCouponForm });
+    setCouponModalOpen(true);
+  };
+
+  const handleCreateTargetedCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await couponService.createCoupon({ ...couponForm, targetCustomerIds: [...selectedIds] });
+      if (res.success) {
+        showSuccessToast('Coupon created', `Sent to ${selectedIds.size} customer${selectedIds.size === 1 ? '' : 's'}.`);
+        setCouponModalOpen(false);
+        clearSelection();
+      }
+    } catch (err: any) {
+      showErrorToast('Error', err?.message || 'Failed to create coupon');
+    }
+  };
 
   const fetchCustomersRef = useRef<() => void>(() => {});
 
@@ -228,12 +273,11 @@ export default function CustomerManagement() {
     if (spendFilter === '5k-20k' && !(s >= 5000 && s <= 20000)) return false;
     if (spendFilter === 'gt20k' && !(s > 20000)) return false;
 
-    // Reviews / rating
+    // Reviews / rating. Star buckets round the average rating; '0' = no reviews.
     const rc = customer.reviewsCount || 0, ar = customer.averageRating || 0;
     if (ratingFilter === 'has_reviews' && rc === 0) return false;
-    if (ratingFilter === 'no_reviews' && rc > 0) return false;
-    if (ratingFilter === '4plus' && ar < 4) return false;
-    if (ratingFilter === 'under3' && !(rc > 0 && ar < 3)) return false;
+    if (ratingFilter === '0' && rc > 0) return false;
+    if (['1', '2', '3', '4', '5'].includes(ratingFilter) && (rc === 0 || Math.round(ar) !== Number(ratingFilter))) return false;
 
     // Activity (last-login recency)
     if (activityFilter !== 'all') {
@@ -433,9 +477,12 @@ export default function CustomerManagement() {
               options={[
                 { value: 'all', label: 'Any Rating' },
                 { value: 'has_reviews', label: 'Has reviews' },
-                { value: 'no_reviews', label: 'No reviews' },
-                { value: '4plus', label: '4★ & up' },
-                { value: 'under3', label: 'Under 3★' },
+                { value: '5', label: '★★★★★  5 stars' },
+                { value: '4', label: '★★★★☆  4 stars' },
+                { value: '3', label: '★★★☆☆  3 stars' },
+                { value: '2', label: '★★☆☆☆  2 stars' },
+                { value: '1', label: '★☆☆☆☆  1 star' },
+                { value: '0', label: '0  (No reviews)' },
               ]}
               onChange={(value) => setRatingFilter(value as string)}
               placeholder="Any Rating"
@@ -502,12 +549,59 @@ export default function CustomerManagement() {
         </div>
       )}
 
+      {/* Bulk-action bar — appears when one or more customers are selected. Lets
+          the admin create a coupon or an automatic offer scoped to just them. */}
+      {selectedIds.size > 0 && (
+        <div className="sticky top-2 z-20 mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50/80 px-4 py-3 shadow-sm backdrop-blur">
+          <div className="flex items-center gap-3">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500 text-sm font-bold text-white">{selectedIds.size}</span>
+            <span className="text-sm font-medium text-slate-700">
+              customer{selectedIds.size === 1 ? '' : 's'} selected
+            </span>
+            <button onClick={clearSelection} className="text-xs font-semibold text-slate-500 hover:text-slate-700 underline">Clear</button>
+          </div>
+          <div className="flex items-center gap-2">
+            {hasPermission('coupons:create') && (
+              <button
+                onClick={openCouponForSelected}
+                className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 transition-colors"
+              >
+                <Ticket className="h-4 w-4" /> Create Coupon
+              </button>
+            )}
+            {hasPermission('coupons:create') && (
+              <button
+                onClick={() => setOfferModalOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg border border-brand-300 bg-white px-4 py-2 text-sm font-semibold text-brand-600 hover:bg-brand-50 transition-colors"
+              >
+                <Percent className="h-4 w-4" /> Create Offer
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Customers Table — matches the Vendor Management table style */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50 [&_th]:!text-brand-500/60 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11 [&_th]:px-4">
               <TableRow>
+                <TableHead className="w-10">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all on this page"
+                    className="h-4 w-4 accent-brand-500 cursor-pointer align-middle"
+                    checked={paginatedCustomers.length > 0 && paginatedCustomers.every((c) => selectedIds.has(c.id))}
+                    ref={(el) => { if (el) el.indeterminate = paginatedCustomers.some((c) => selectedIds.has(c.id)) && !paginatedCustomers.every((c) => selectedIds.has(c.id)); }}
+                    onChange={(e) => setSelectedIds((prev) => {
+                      const next = new Set(prev);
+                      if (e.target.checked) paginatedCustomers.forEach((c) => next.add(c.id));
+                      else paginatedCustomers.forEach((c) => next.delete(c.id));
+                      return next;
+                    })}
+                  />
+                </TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Status</TableHead>
@@ -521,7 +615,7 @@ export default function CustomerManagement() {
             <TableBody>
               {filteredCustomers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12">
+                  <TableCell colSpan={8} className="text-center py-12">
                     <div className="text-slate-500">
                       <p className="text-lg font-medium">No customers found</p>
                       <p className="text-sm">Try adjusting your search or filter criteria</p>
@@ -530,7 +624,16 @@ export default function CustomerManagement() {
                 </TableRow>
               ) : (
                 paginatedCustomers.map((customer) => (
-                  <TableRow key={customer.id} className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0">
+                  <TableRow key={customer.id} className={`hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0 ${selectedIds.has(customer.id) ? 'bg-brand-50/40' : ''}`}>
+                    <TableCell className="w-10">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${customer.firstName} ${customer.lastName}`}
+                        className="h-4 w-4 accent-brand-500 cursor-pointer align-middle"
+                        checked={selectedIds.has(customer.id)}
+                        onChange={() => toggleSelect(customer.id)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center">
@@ -629,6 +732,28 @@ export default function CustomerManagement() {
         </div>
         )}
       </div>
+
+      {/* Coupon creation for the selected customers (reuses the standard modal) */}
+      <CouponModal
+        isOpen={couponModalOpen}
+        onClose={() => setCouponModalOpen(false)}
+        mode="create"
+        coupon={null}
+        formData={couponForm}
+        setFormData={setCouponForm}
+        onSubmit={handleCreateTargetedCoupon}
+        targetCount={selectedIds.size}
+      />
+
+      {/* Offer creation for the selected customers (reuses the Offers modal) */}
+      {offerModalOpen && (
+        <OfferModal
+          offer={null}
+          targetCustomerIds={[...selectedIds]}
+          onClose={() => setOfferModalOpen(false)}
+          onSaved={() => { setOfferModalOpen(false); clearSelection(); }}
+        />
+      )}
     </div>
   );
 }

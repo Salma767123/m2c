@@ -1,5 +1,38 @@
 import axios from "@/lib/axios";
 
+export interface SettlementCustomerReview {
+    id: string;
+    productName: string;
+    rating: number;
+    comment: string;
+    images: string[];
+    createdAt: string;
+}
+
+export interface SettlementReviewContext {
+    settlement: {
+        id: string;
+        settlementNumber: string;
+        vendorId: string;
+        vendorName: string;
+        orderId: string;
+        orderDisplayId: string;
+        customerName: string;
+        status: string;
+    };
+    shipmentId: string | null;
+    vendorAcceptedAt: string | null;
+    acceptanceMins: number | null;
+    existingReview: {
+        rating: number | null;
+        reviewComments: string | null;
+        qualityCheckNotes: string | null;
+        approved: boolean | null;
+        reviewedAt: string | null;
+    } | null;
+    customerReviews: SettlementCustomerReview[];
+}
+
 export interface Settlement {
     id: string;
     settlementNumber: string;
@@ -86,6 +119,18 @@ export const settlementService = {
             return response.data;
         } catch (error: any) {
             throw error.data || { success: false, error: 'Failed to fetch settlement details' };
+        }
+    },
+
+    // Context for the vendor-delivery review shown when a settlement is settled:
+    // the vendor's shipment id + accept time, any existing review, and the
+    // customer's product reviews for this order.
+    getReviewContext: async (id: string): Promise<{ success: boolean; data: SettlementReviewContext }> => {
+        try {
+            const response = await axios.get(`/settlements/admin/${id}/review-context`);
+            return response.data;
+        } catch (error: any) {
+            throw error.data || { success: false, error: 'Failed to load review context' };
         }
     },
 

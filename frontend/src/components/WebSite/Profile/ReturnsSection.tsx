@@ -190,11 +190,8 @@ function ReturnDetailModal({ returnId, onClose, onChanged }: { returnId: string;
                 <Row label="Resolution" value={rec.resolution === 'REFUND' ? 'Refund' : 'Replacement'} />
                 {rec.resolution === 'REFUND' && (
                   <>
-                    <Row label="Refund method" value={rec.refundMethod === 'WALLET'
-                      ? 'M2C Wallet (store credit)'
-                      : rec.paymentMethodLabel ? `Original · ${rec.paymentMethodLabel}` : 'Original payment method'} />
+                    <Row label="Refund method" value="M2C Wallet (store credit)" />
                     <Row label="Refund amount" value={money(rec.refundAmount ?? rec.itemAmount, rec.currency)} strong />
-                    {rec.paymentReference && <Row label="Payment reference" value={rec.paymentReference} />}
                   </>
                 )}
                 {rec.resolution === 'REPLACEMENT' && (

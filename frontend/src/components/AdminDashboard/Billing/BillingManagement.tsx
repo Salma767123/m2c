@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Eye, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Eye, Download, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -102,6 +102,7 @@ export default function BillingManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   const statusOptions = ["All", "Pending", "Processed", "Paid"];
 
@@ -143,6 +144,25 @@ export default function BillingManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filteredBillings.length} of {mockBillings.length} billings
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
@@ -186,6 +206,8 @@ export default function BillingManagement() {
           </div>
         </div>
       </div>
+        </div>
+      )}
 
       {/* Billings Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">

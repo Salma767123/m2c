@@ -13,6 +13,7 @@ import {
   Edit, Eye, CheckCircle, XCircle, Search, Plus,
   RotateCcw,
   Building2, Clock, AlertTriangle, Bell,
+  ChevronDown, SlidersHorizontal,
 } from 'lucide-react'
 import Pagination from '@/components/UI/Pagination'
 import VendorService, { VendorProfile, VendorFilters } from '@/services/vendorService'
@@ -88,6 +89,18 @@ const getInspectionBadge = (vendorStatus: string, latestInspection?: VendorProfi
 // derived from real fields on the vendor list response — no invented signals.
 type VendorAlertTone = 'review' | 'approval' | 'rejection' | 'pending' | 'bank'
 type VendorAlert = { text: string; tone: VendorAlertTone }
+
+// Minutes → compact "2h 15m" / "45m" / "<1m". Null until the vendor has accepted
+// at least one order.
+const formatAcceptanceTime = (mins?: number | null): string => {
+  if (mins == null || !isFinite(mins)) return '—'
+  if (mins < 1) return '<1m'
+  const total = Math.round(mins)
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  if (h === 0) return `${m}m`
+  return m === 0 ? `${h}h` : `${h}h ${m}m`
+}
 
 const ALERT_DOT: Record<VendorAlertTone, string> = {
   review: 'bg-blue-500',
@@ -186,6 +199,7 @@ interface ModalState {
 const CLOSED_MODAL: ModalState = { isOpen: false, vendor: null }
 
 export default function VendorsTable() {
+  const [panelOpen, setPanelOpen] = useState(true)
   const [vendors, setVendors] = useState<VendorProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -480,6 +494,25 @@ export default function VendorsTable() {
         )}
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {displayedVendors.length} of {vendors.length} vendors
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* ── 2. Metric Cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {metricCards.map(({ key, label, subtitle, count, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -573,6 +606,8 @@ export default function VendorsTable() {
           </div>
         </div>
       </div>
+        </div>
+      )}
 
       {/* ── 4. Vendors Table ── */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
@@ -604,10 +639,11 @@ export default function VendorsTable() {
                     <TableHead className="w-[16%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Vendor</TableHead>
                     <TableHead className="w-[13%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
                     <TableHead className="w-[15%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact</TableHead>
-                    <TableHead className="w-[11%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Status</TableHead>
-                    <TableHead className="w-[13%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Inspection</TableHead>
-                    <TableHead className="w-[10%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center whitespace-nowrap">Join Date</TableHead>
-                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-right whitespace-nowrap">Actions</TableHead>
+                    <TableHead className="w-[10%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Status</TableHead>
+                    <TableHead className="w-[12%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Inspection</TableHead>
+                    <TableHead className="w-[10%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center whitespace-nowrap">Avg. Accept</TableHead>
+                    <TableHead className="w-[9%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center whitespace-nowrap">Join Date</TableHead>
+                    <TableHead className="w-[11%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-right whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -684,6 +720,20 @@ export default function VendorsTable() {
                         <div className="flex justify-center">
                           {getInspectionBadge(vendor.status, vendor.latestInspection)}
                         </div>
+                      </TableCell>
+
+                      {/* Avg. order-acceptance time */}
+                      <TableCell className="py-3 px-3 align-middle text-center whitespace-nowrap">
+                        {vendor.avgAcceptanceMins != null ? (
+                          <div className="flex flex-col items-center leading-tight">
+                            <span className="text-sm font-semibold text-slate-800">{formatAcceptanceTime(vendor.avgAcceptanceMins)}</span>
+                            {vendor.acceptedOrdersCount ? (
+                              <span className="text-[10px] text-slate-400">{vendor.acceptedOrdersCount} order{vendor.acceptedOrdersCount === 1 ? '' : 's'}</span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">—</span>
+                        )}
                       </TableCell>
 
                       {/* Join Date */}

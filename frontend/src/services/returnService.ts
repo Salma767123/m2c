@@ -91,6 +91,26 @@ export interface DamagedStock {
     customerName?: string | null;
     recordedByName?: string | null;
     createdAt: string;
+    // ── Return-to-vendor (RTV) ──
+    vendorId?: string | null;
+    vendorName?: string | null;
+    vendorCode?: string | null;
+    vendorReturnStatus?: 'AT_HUB' | 'SENT_TO_VENDOR' | 'RECEIVED_BY_VENDOR' | 'CLOSED';
+    courier?: string | null;
+    trackingNumber?: string | null;
+    sentToVendorAt?: string | null;
+    sentByName?: string | null;
+    vendorReceivedAt?: string | null;
+    vendorReturnNote?: string | null;
+}
+
+export type RtvStatus = 'AT_HUB' | 'SENT_TO_VENDOR' | 'RECEIVED_BY_VENDOR' | 'CLOSED';
+export interface DamagedStatusCounts {
+    ALL: number;
+    AT_HUB: number;
+    SENT_TO_VENDOR: number;
+    RECEIVED_BY_VENDOR: number;
+    CLOSED: number;
 }
 
 export interface CreateReturnPayload {
@@ -137,9 +157,24 @@ class ReturnService {
         const res = await axios.post(`/returns/admin/${id}/decision`, { action, ...body });
         return res.data as { success: boolean; message: string; data: ReturnRequest };
     }
-    async getDamagedStock(params?: { search?: string; page?: number; limit?: number }) {
+    async getDamagedStock(params?: { search?: string; status?: string; page?: number; limit?: number }) {
         const res = await axios.get('/returns/admin/damaged', { params });
-        return res.data as { success: boolean; data: DamagedStock[]; totalUnits: number; pagination: { total: number; page: number; limit: number; totalPages: number } };
+        return res.data as { success: boolean; data: DamagedStock[]; totalUnits: number; statusCounts: DamagedStatusCounts; pagination: { total: number; page: number; limit: number; totalPages: number } };
+    }
+    // Advance a damaged item through the return-to-vendor lifecycle.
+    async updateVendorReturn(id: string, body: { action: 'send' | 'receive' | 'close' | 'reset'; courier?: string; trackingNumber?: string; note?: string }) {
+        const res = await axios.patch(`/returns/admin/damaged/${id}/rtv`, body);
+        return res.data as { success: boolean; message: string; data: DamagedStock };
+    }
+
+    // ── Vendor: defective items shipped back to them ──
+    async getVendorDefectiveReturns(params?: { search?: string; status?: string; page?: number; limit?: number }) {
+        const res = await axios.get('/returns/vendor/defective', { params });
+        return res.data as { success: boolean; data: DamagedStock[]; totalUnits: number; statusCounts: DamagedStatusCounts; pagination: { total: number; page: number; limit: number; totalPages: number } };
+    }
+    async acknowledgeDefectiveReturn(id: string, note?: string) {
+        const res = await axios.patch(`/returns/vendor/defective/${id}/acknowledge`, { note });
+        return res.data as { success: boolean; message: string; data: DamagedStock };
     }
     async advanceStatus(id: string, status: string, note?: string) {
         const res = await axios.post(`/returns/admin/${id}/status`, { status, note });

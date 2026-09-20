@@ -276,6 +276,23 @@ const LAYOUTS = {
     cta: { urlVar: 'trackUrl' },
   },
 
+  order_courier_changed: {
+    defaults: {
+      emoji: '🚚', headerTitle: 'Update to Your Delivery',
+      headerSubtitle: 'Your courier partner has changed',
+      bodyText: "Dear {{greetingName}},\n\nWe're sorry for the inconvenience. The courier partner you selected ({{oldCourier}}) is currently not available for your order #{{orderId}}, so to avoid any delay we've shipped it with {{newCourier}} instead.\n\nYour tracking ID is below — you can use it to live-track your order any time.",
+      buttonLabel: 'Track Your Order',
+      footerText: 'This is an automated message. Please do not reply to this email.',
+    },
+    infoRows: [
+      ['Order', 'orderId', false],
+      ['Originally selected', 'oldCourier', false],
+      ['New courier partner', 'newCourier', false],
+      ['Tracking ID', 'trackingId', true],
+    ],
+    cta: { urlVar: 'trackUrl' },
+  },
+
   return_requested: {
     defaults: {
       emoji: '📦', headerTitle: 'Return Request Received',

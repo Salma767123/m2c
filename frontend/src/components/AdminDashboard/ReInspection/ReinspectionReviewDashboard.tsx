@@ -21,6 +21,8 @@ import {
   IconSearch,
   IconLoader2,
   IconEye,
+  IconChevronDown,
+  IconAdjustmentsHorizontal,
 } from '@tabler/icons-react';
 import { formatCheckerName } from '@/lib/checkerUtils';
 import Pagination from '@/components/UI/Pagination';
@@ -49,6 +51,7 @@ function formatDate(dateStr: string | null) {
 
 export default function ReinspectionReviewDashboard() {
   const router = useRouter();
+  const [panelOpen, setPanelOpen] = useState(true);          // collapse metrics + filters
   const [activeTab, setActiveTab] = useState<'factory' | 'product'>('factory');
   const [stats, setStats] = useState<ReviewDashboardStats | null>(null);
   const [factoryInspections, setFactoryInspections] = useState<FactoryInspectionReview[]>([]);
@@ -156,8 +159,25 @@ export default function ReinspectionReviewDashboard() {
         </Button>
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <IconAdjustmentsHorizontal size={16} className="text-slate-500" />
+          Overview &amp; Filters
+          <IconChevronDown size={16} className={`text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {(activeTab === 'factory' ? filteredFactory : filteredProduct).length} of {(activeTab === 'factory' ? factoryInspections : productInspections).length} inspections
+        </span>
+      </div>
+
       {/* Stats Cards — the Factory/Product cards jump to that tab */}
-      {stats && (
+      {panelOpen && stats && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: 'Total Pending',   subtitle: 'Awaiting review', value: stats.totalPendingReview,                              Icon: IconClock,         iconBg: 'bg-brand-50',   iconColor: 'text-brand-500',   countColor: 'text-slate-900',  tab: null,        activeClass: '' },
@@ -231,6 +251,7 @@ export default function ReinspectionReviewDashboard() {
 
       {/* Filter bar + table */}
       <div className="space-y-4">
+        {panelOpen && (
         <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] items-start">
           <div className="relative">
             <IconSearch size={16} className="absolute left-4 top-3.5 text-slate-400 pointer-events-none" />
@@ -257,6 +278,7 @@ export default function ReinspectionReviewDashboard() {
             />
           </div>
         </div>
+        )}
 
         <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">

@@ -6,6 +6,7 @@ import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
+import { getRegion } from '@/lib/currency'
 import { ArrowLeft, Save, X, Upload, Package, Image as ImageIcon, ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
 import CareInstructionModal, { CareIcon, CARE_INSTRUCTIONS, CATEGORY_COLORS } from './CareInstructionModal'
 import ResultModal from '@/components/UI/ResultModal'
@@ -167,6 +168,7 @@ interface ProductFormData {
   discount?: number
   gstPercentage?: number
   hsnCode?: string
+  returnable?: boolean
 
   // Basic Product Info - Size & Color
   singleUnitSize?: string
@@ -264,6 +266,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     discount: undefined,
     gstPercentage: undefined,
     hsnCode: '',
+    returnable: true,
 
     // Basic Product Info - Size & Color
     singleUnitSize: '',
@@ -672,6 +675,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               discount: product.discount,
               gstPercentage: product.gstPercentage,
               hsnCode: product.hsnCode || '',
+              returnable: (product as any).returnable !== false,
 
               // Basic Product Info - Size & Color
               singleUnitSize: (product as any).singleUnitSize || '',
@@ -1676,6 +1680,27 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       />
                       <p className="text-xs text-slate-500 mt-1">HSN code for GST classification</p>
                     </div>
+                    {/* Returns are a .in-only feature — hide this control on .com. */}
+                    {getRegion() === 'IN' && (
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Return Applicable
+                      </label>
+                      <Dropdown
+                        label=""
+                        value={formData.returnable === false ? 'no' : 'yes'}
+                        options={[
+                          { value: 'yes', label: 'Yes — returns allowed' },
+                          { value: 'no', label: 'No — no returns' },
+                        ]}
+                        placeholder="Select"
+                        onChange={(value) => setFormData(prev => ({ ...prev, returnable: value === 'yes' }))}
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        When Yes, customers can raise a return within 7 days of delivery. When No, the return option is hidden for this product.
+                      </p>
+                    </div>
+                    )}
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
                         Base Color

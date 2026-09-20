@@ -3,12 +3,42 @@ const { isCourierAvailable, courierName } = require('../utils/couriers');
 const { recomputeAndPersistOrderStatus } = require('../utils/computeOrderStatus');
 const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
 const { withWriteRetry } = require('../utils/dbRetry');
+const { creditWallet } = require('../utils/wallet');
 
 const SETTLEMENT_DUE_DAYS = 30;
+
+/**
+ * Refund an order to the customer's M2C Wallet as instant store credit — the only
+ * refund path (no gateway refunds; the captured amount stays with M2C, and the
+ * customer withdraws from the wallet separately). No-op for COD/unpaid orders.
+ * Sets order.refundStatus = 'WALLET'. Never throws.
+ */
+async function refundOrderToWallet(order, actor = {}) {
+    const wasPaid = order.paymentStatus === 'PAID' && order.paymentMethod !== 'COD';
+    if (!wasPaid) return;
+    const creditInr = order.totalAmountINR != null ? order.totalAmountINR : order.totalAmount;
+    try {
+        await creditWallet({
+            customerId: order.customerId,
+            amount: creditInr,
+            source: 'REFUND',
+            description: `Refund for order ${order.orderId}`,
+            refs: { orderId: order.id, orderCode: order.orderId },
+            actor: { id: actor?.id, name: actor?.name || actor?.email || 'Admin', type: 'admin' },
+        });
+    } catch (e) {
+        console.warn('[refundOrderToWallet] wallet credit failed:', e?.message || e);
+    }
+    await prisma.order.update({
+        where: { id: order.id },
+        data: { refundStatus: 'WALLET', refundAmount: order.totalAmount },
+    }).catch(() => {});
+}
 
 // Allowed OrderStatus values (mirrors the Prisma enum).
 const ALLOWED_ORDER_STATUSES = new Set([
     'ORDER_CREATED',
+    'ACCEPTED_BY_VENDOR',
     'VENDOR_PROCESSING',
     'PACKED_BY_VENDOR',
     'IN_TRANSIT_TO_ADMIN_HUB',
@@ -26,7 +56,8 @@ const TERMINAL_STATUSES = new Set(['CANCELLED', 'RETURNED']);
 
 // Legal forward transitions for shipment-level status updates.
 const SHIPMENT_TRANSITIONS = {
-    ORDER_CREATED:           ['VENDOR_PROCESSING', 'CANCELLED'],
+    ORDER_CREATED:           ['ACCEPTED_BY_VENDOR', 'CANCELLED'],
+    ACCEPTED_BY_VENDOR:      ['VENDOR_PROCESSING', 'CANCELLED'],
     VENDOR_PROCESSING:       ['PACKED_BY_VENDOR', 'CANCELLED'],
     PACKED_BY_VENDOR:        ['IN_TRANSIT_TO_ADMIN_HUB', 'CANCELLED'],
     IN_TRANSIT_TO_ADMIN_HUB: ['RECEIVED_AT_ADMIN_HUB', 'CANCELLED'],
@@ -41,7 +72,8 @@ const SHIPMENT_TRANSITIONS = {
 
 // Legal forward transitions for order-level status (hub-to-customer phase).
 const ORDER_TRANSITIONS = {
-    ORDER_CREATED:           ['VENDOR_PROCESSING', 'CANCELLED'],
+    ORDER_CREATED:           ['ACCEPTED_BY_VENDOR', 'VENDOR_PROCESSING', 'CANCELLED'],
+    ACCEPTED_BY_VENDOR:      ['VENDOR_PROCESSING', 'CANCELLED'],
     VENDOR_PROCESSING:       ['PACKED_BY_VENDOR', 'CANCELLED'],
     PACKED_BY_VENDOR:        ['IN_TRANSIT_TO_ADMIN_HUB', 'CANCELLED'],
     IN_TRANSIT_TO_ADMIN_HUB: ['RECEIVED_AT_ADMIN_HUB', 'CANCELLED'],
@@ -235,11 +267,18 @@ const updateShipmentStatusAdmin = async (req, res) => {
             }
         }
 
-        // Hub assignment only allowed early in the flow
-        if (assignedHubId && !['ORDER_CREATED', 'VENDOR_PROCESSING'].includes(shipment.status)) {
+        // The vendor must accept the order before a hub can be assigned.
+        if (assignedHubId && shipment.status === 'ORDER_CREATED') {
             return res.status(409).json({
                 success: false,
-                error: `Hub can only be assigned while the shipment is in ORDER_CREATED or VENDOR_PROCESSING (current: ${shipment.status}).`,
+                error: 'The vendor has not accepted this order yet. A hub can be assigned only after the vendor accepts.',
+            });
+        }
+        // Hub assignment only allowed early in the flow (post-acceptance).
+        if (assignedHubId && !['ACCEPTED_BY_VENDOR', 'VENDOR_PROCESSING'].includes(shipment.status)) {
+            return res.status(409).json({
+                success: false,
+                error: `Hub can only be assigned while the shipment is in ACCEPTED_BY_VENDOR or VENDOR_PROCESSING (current: ${shipment.status}).`,
             });
         }
 
@@ -259,7 +298,9 @@ const updateShipmentStatusAdmin = async (req, res) => {
             return res.json({ success: true, data: current });
         }
 
-        const nextStatus = status || shipment.status;
+        // Assigning a hub advances the shipment into VENDOR_PROCESSING (the vendor
+        // has already accepted), unless an explicit status was supplied.
+        const nextStatus = status || (assignedHubId ? 'VENDOR_PROCESSING' : shipment.status);
         const updatedShipment = await withWriteRetry(() => prisma.$transaction(async (tx) => {
             // Optimistic locking
             const fresh = await tx.vendorShipment.findUnique({
@@ -504,10 +545,14 @@ const updateAdminOrderStatus = async (req, res) => {
     try {
         const adminId = req.userId || req.adminId;
         const { id } = req.params;
-        const { status, courier, trackingReference, cancelReason } = req.body;
+        const { status, courier, trackingReference, cancelReason, restock } = req.body;
         const courierId = courier != null ? String(courier).trim() : '';
         const trackingId = trackingReference != null ? String(trackingReference).trim() : '';
         const cancelReasonText = cancelReason != null ? String(cancelReason).trim() : '';
+        // Cancellation no longer auto-restocks. Stock returns to inventory ONLY when
+        // the admin explicitly approves it (restock === true); otherwise the units
+        // are written off with the cancellation reason on record.
+        const shouldRestock = restock === true;
 
         if (status !== undefined && status !== null && status !== '') {
             if (typeof status !== 'string' || !ALLOWED_ORDER_STATUSES.has(status)) {
@@ -569,6 +614,15 @@ const updateAdminOrderStatus = async (req, res) => {
             }
         }
 
+        // Did the admin dispatch with a courier different from the one the customer
+        // chose at checkout? (Per-line courier is snapshotted on each OrderItem.)
+        // If so, the customer gets an apology email + in-app notification below.
+        const customerCouriers = [...new Set((order.items || []).map((i) => i.courier).filter(Boolean))];
+        const courierChanged = status === 'SHIPPED_TO_CUSTOMER'
+            && customerCouriers.length > 0
+            && !customerCouriers.includes(courierId);
+        const originalCourierId = customerCouriers[0] || null;
+
         const updatedOrder = await prisma.$transaction(async (tx) => {
             // Optimistic locking — re-read inside transaction
             const fresh = await tx.order.findUnique({
@@ -610,18 +664,22 @@ const updateAdminOrderStatus = async (req, res) => {
                     },
                     data: { status: 'Cancelled' },
                 });
-                // Return the reserved stock to inventory — the items never shipped.
-                try {
-                    const { restoreStockForOrder } = require('../utils/restoreStock');
-                    const rows = await restoreStockForOrder(tx, order, {
-                        reason: `Order cancelled by admin: ${order.orderId}`,
-                        changedBy: adminId,
-                        changedByType: 'admin',
-                        changedByName: req.user?.name || 'Admin',
-                    });
-                    if (rows.length) await tx.stockChangeHistory.createMany({ data: rows });
-                } catch (e) {
-                    console.warn('[admin cancel] stock restore failed:', e?.message || e);
+                // Return the reserved stock to inventory ONLY when the admin approved
+                // it. When they didn't, the units stay written off (not restocked) —
+                // the cancellation reason is the record of why.
+                if (shouldRestock) {
+                    try {
+                        const { restoreStockForOrder } = require('../utils/restoreStock');
+                        const rows = await restoreStockForOrder(tx, order, {
+                            reason: `Order cancelled by admin (stock restored): ${order.orderId}`,
+                            changedBy: adminId,
+                            changedByType: 'admin',
+                            changedByName: req.user?.name || 'Admin',
+                        });
+                        if (rows.length) await tx.stockChangeHistory.createMany({ data: rows });
+                    } catch (e) {
+                        console.warn('[admin cancel] stock restore failed:', e?.message || e);
+                    }
                 }
                 // Cancel every non-terminal vendor shipment too, so the per-vendor
                 // Vendor-to-Hub view reflects the cancellation and stops offering
@@ -710,7 +768,7 @@ const updateAdminOrderStatus = async (req, res) => {
                             comment: status === 'SHIPPED_TO_CUSTOMER'
                                 ? `Admin shipped to customer via ${courierName(courierId) || courierId} · Tracking ${trackingId}`
                                 : nextStatus === 'CANCELLED'
-                                    ? `Admin cancelled the order${cancelReasonText ? ` — ${cancelReasonText}` : ''}`
+                                    ? `Admin cancelled the order${cancelReasonText ? ` — ${cancelReasonText}` : ''} · Stock ${shouldRestock ? 'restored to inventory' : 'not restocked'}`
                                     : `Admin updated status to ${nextStatus}`,
                         },
                     },
@@ -738,15 +796,11 @@ const updateAdminOrderStatus = async (req, res) => {
                     where: { orderId: order.id, status: { in: ['Pending', 'Processing'] } },
                     data: { status: 'Cancelled' },
                 });
-                const { issueRefund } = require('../utils/refund');
-                const refund = await issueRefund(order);
+                await refundOrderToWallet(order, req.user);
                 const prevReturn = order.returnRequest && typeof order.returnRequest === 'object' ? order.returnRequest : {};
                 await prisma.order.update({
                     where: { id: order.id },
                     data: {
-                        refundStatus: refund.refundStatus,
-                        refundId: refund.refundId,
-                        refundAmount: order.totalAmount,
                         returnRequest: { ...prevReturn, status: 'Approved', decidedAt: new Date().toISOString() },
                     },
                 });
@@ -755,22 +809,12 @@ const updateAdminOrderStatus = async (req, res) => {
             }
         }
 
-        // Admin cancelling the order (→ CANCELLED): issue the customer's refund
+        // Admin cancelling the order (→ CANCELLED): refund to the customer's wallet
         // automatically, exactly like a customer-initiated cancel. Settlements were
-        // already cancelled inside the transaction above. issueRefund never throws
-        // (returns MANUAL for COD/unpaid, FAILED if the gateway declines).
+        // already cancelled inside the transaction above.
         if (status === 'CANCELLED' && !order.refundStatus) {
             try {
-                const { issueRefund } = require('../utils/refund');
-                const refund = await issueRefund(order);
-                await prisma.order.update({
-                    where: { id: order.id },
-                    data: {
-                        refundStatus: refund.refundStatus,
-                        refundId: refund.refundId,
-                        refundAmount: order.totalAmount,
-                    },
-                });
+                await refundOrderToWallet(order, req.user);
             } catch (e) {
                 console.error('Cancel refund error:', e?.message || e);
             }
@@ -782,6 +826,17 @@ const updateAdminOrderStatus = async (req, res) => {
             if (notifHelper && notifications[notifHelper]) {
                 notifications[notifHelper](order.customerId, order.orderId).catch(() => {});
             }
+        }
+
+        // Courier changed at dispatch → apologise to the customer by email, with the
+        // reason and the tracking ID for live tracking.
+        if (courierChanged && order.customerEmail) {
+            const { sendCourierChangedEmail } = require('../utils/email/orderEmailSender');
+            sendCourierChangedEmail(order, {
+                oldCourier: courierName(originalCourierId) || originalCourierId,
+                newCourier: courierName(courierId) || courierId,
+                trackingId,
+            }).catch(() => {});
         }
 
         // In-app notifications for vendor on key order status changes
@@ -811,7 +866,9 @@ const updateAdminOrderStatus = async (req, res) => {
             // In-app notifications for customer on key order status changes
             if (order.customerId) {
                 const customerStatusMessages = {
-                    'SHIPPED_TO_CUSTOMER': { title: 'Order Shipped!', message: `Your order #${order.orderId} is on its way via ${courierName(courierId) || 'our courier partner'}. Tracking ID: ${trackingId}` },
+                    'SHIPPED_TO_CUSTOMER': courierChanged
+                        ? { title: 'Delivery Update — Courier Changed', message: `We're sorry — ${courierName(originalCourierId) || 'your selected courier'} wasn't available, so your order #${order.orderId} now ships via ${courierName(courierId) || 'our courier partner'}. Live-track it with Tracking ID: ${trackingId}` }
+                        : { title: 'Order Shipped!', message: `Your order #${order.orderId} is on its way via ${courierName(courierId) || 'our courier partner'}. Tracking ID: ${trackingId}` },
                     'DELIVERED': { title: 'Order Delivered', message: `Your order #${order.orderId} has been delivered. Enjoy your purchase!` },
                     'CANCELLED': { title: 'Order Cancelled', message: `Your order #${order.orderId} has been cancelled.` },
                     'RETURNED': { title: 'Refund Processed', message: `Your order #${order.orderId} has been returned and a refund will be processed.` },
@@ -901,12 +958,10 @@ const decideReturn = async (req, res) => {
             });
         });
 
-        const { issueRefund } = require('../utils/refund');
-        const refund = await issueRefund(order);
+        await refundOrderToWallet(order, req.user);
         const updated = await prisma.order.update({
             where: { id: order.id },
             data: {
-                refundStatus: refund.refundStatus, refundId: refund.refundId, refundAmount: order.totalAmount,
                 returnRequest: { ...rr, status: 'Approved', decidedAt: new Date().toISOString(), note },
             },
         });
@@ -914,12 +969,12 @@ const decideReturn = async (req, res) => {
         if (order.customerId) {
             createNotification({
                 userId: order.customerId, role: 'USER', type: 'RETURN_APPROVED',
-                title: 'Return Approved', message: `Your return for order #${order.orderId} was approved. Your refund is being processed.`,
+                title: 'Return Approved', message: `Your return for order #${order.orderId} was approved. Your refund has been added to your M2C Wallet.`,
                 data: { orderId: order.id },
             }).catch(() => {});
         }
 
-        res.json({ success: true, data: updated, message: 'Return approved and refund initiated' });
+        res.json({ success: true, data: updated, message: 'Return approved and refund added to wallet' });
     } catch (error) {
         console.error('Decide return error:', error);
         res.status(500).json({ success: false, error: 'Failed to process return decision' });
@@ -934,7 +989,10 @@ const decideReturn = async (req, res) => {
 // widening the shared status endpoint's ship/deliver transitions.
 const cancelAdminOrder = async (req, res) => {
     const cancelReason = req.body?.cancelReason;
-    req.body = { status: 'CANCELLED', cancelReason };
+    // Whether to return the units to inventory. Defaults to false — a cancellation
+    // does not restock unless the admin explicitly approves it.
+    const restock = req.body?.restock === true;
+    req.body = { status: 'CANCELLED', cancelReason, restock };
     return updateAdminOrderStatus(req, res);
 };
 

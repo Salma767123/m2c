@@ -5,6 +5,7 @@ import { X, Truck, Info, Plus, Trash2, Package } from 'lucide-react';
 import { couponService, FreeShippingOffer } from '@/services/couponService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
+import Dropdown from '@/components/UI/Dropdown';
 import { hasPermission } from '@/lib/auth';
 
 const getOrdinalSuffix = (n: number) => {
@@ -12,6 +13,9 @@ const getOrdinalSuffix = (n: number) => {
   const v = n % 100;
   return s[(v - 20) % 10] || s[v] || s[0];
 };
+
+const regionLabel = (r?: string) =>
+  r === 'IN_ONLY' ? 'India (.in)' : r === 'COM_ONLY' ? 'International (.com)' : 'All regions';
 
 interface FreeShippingModalProps {
   isOpen: boolean;
@@ -35,6 +39,7 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
   const [orderNumbers, setOrderNumbers] = useState('');
   const [minOrderValue, setMinOrderValue] = useState<number>(0);
   const [isActive, setIsActive] = useState(true);
+  const [region, setRegion] = useState<'BOTH' | 'IN_ONLY' | 'COM_ONLY'>('BOTH');
 
   useEffect(() => {
     if (isOpen) loadFreeShippingCoupons();
@@ -60,6 +65,7 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
     setOrderNumbers('');
     setMinOrderValue(0);
     setIsActive(true);
+    setRegion('BOTH');
   };
 
   const startEdit = (offer: FreeShippingOffer) => {
@@ -67,6 +73,7 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
     setOrderNumbers((offer.orderNumbers || []).join(', '));
     setMinOrderValue(offer.minOrderValue || 0);
     setIsActive(offer.isActive);
+    setRegion(offer.region || 'BOTH');
   };
 
   const handleSave = async () => {
@@ -81,6 +88,7 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
         minOrderValue,
         orderNumbers: nums,
         isActive,
+        region,
       };
 
       if (editingId) {
@@ -168,6 +176,9 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
                         }`}>
                           {offer.isActive ? 'Active' : 'Inactive'}
                         </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          {regionLabel(offer.region)}
+                        </span>
                       </div>
                       <div className="text-xs text-slate-600 mt-1">
                         {offer.orderNumbers && offer.orderNumbers.length > 0
@@ -235,10 +246,30 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
                 </div>
               </div>
 
+              {/* Region — which storefront the offer applies to */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                  Applicable Region
+                </label>
+                <Dropdown
+                  value={region}
+                  options={[
+                    { value: 'BOTH', label: 'Both — India (.in) & International (.com)' },
+                    { value: 'IN_ONLY', label: 'India (.in) only' },
+                    { value: 'COM_ONLY', label: 'International (.com) only' },
+                  ]}
+                  onChange={(value) => setRegion(value as 'BOTH' | 'IN_ONLY' | 'COM_ONLY')}
+                  placeholder="Select region"
+                />
+                <div className="mt-1.5 text-xs text-slate-600">
+                  Free shipping applies only to orders placed on the selected storefront.
+                </div>
+              </div>
+
               {/* Minimum Order Value */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  Minimum Order Value <span className="text-slate-400 text-xs">($)</span>
+                  Minimum Order Value <span className="text-slate-400 text-xs">(₹, in INR)</span>
                 </label>
                 <input
                   type="number"

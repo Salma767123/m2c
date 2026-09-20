@@ -137,6 +137,7 @@ model User {
   // Multiple addresses support
   addresses Address[]
   reviews   Review[]
+  experienceReviews ExperienceReview[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -531,6 +532,13 @@ model Vendor {
   ratingCount  Int           @default(0)
   adminReviews AdminReview[]
 
+  // Order-acceptance aggregates — updated each time the vendor accepts an order.
+  // `avgAcceptanceMins` is the rolling average time-to-accept (minutes), kept as
+  // total/count so it updates incrementally without rescanning shipments.
+  acceptedOrdersCount Int    @default(0)
+  totalAcceptanceMins Float  @default(0)
+  avgAcceptanceMins   Float?
+
   // System fields
   applicationStep Int       @default(1) // Current step in application process
   completedSteps  Int[]     @default([]) // Array of completed step numbers
@@ -852,6 +860,11 @@ model Product {
   gstPercentage Float? // GST Percentage for the product
   hsnCode       String? // HSN / SAC code for GST classification (e.g. "6302")
 
+  // Whether the customer can raise a return for this product (within 7 days of
+  // delivery). When false, the return option is hidden for this product on the
+  // storefront. Defaults to true so existing products stay returnable.
+  returnable Boolean @default(true)
+
   // Single Unit Pricing Configuration
   singleUnitSize     String?
   singleUnitColor    String?
@@ -1161,6 +1174,7 @@ model Order {
   // Status History
   statusHistory OrderStatusHistory[]
   reviews       Review[]
+  experienceReviews ExperienceReview[]
   settlements   Settlement[]
 
   // Timestamps
@@ -1330,6 +1344,16 @@ model VendorShipment {
   // Independent status lifecycle per vendor
   status OrderStatus @default(ORDER_CREATED)
 
+  // Vendor acceptance gate — the vendor must accept the order before an admin can
+  // assign a hub and proceed. `acceptanceDeadline` = createdAt + 6h; if it lapses
+  // while still unaccepted the overdue sweep notifies admin + vendor once
+  // (`acceptanceOverdueNotifiedAt` dedupes it). `acceptanceMins` is how long the
+  // vendor took to accept, in minutes — the source for the vendor's rolling average.
+  acceptedAt                  DateTime?
+  acceptanceDeadline          DateTime?
+  acceptanceMins              Float?
+  acceptanceOverdueNotifiedAt DateTime?
+
   // Per-shipment shipping details
   vendorCarrier    String?
   vendorTrackingId String?
@@ -1392,6 +1416,11 @@ model Coupon {
   usedCount  Int  @default(0)
 
   perUserLimit Int? @default(1) // How many times a single user can use this
+
+  // Customer targeting. Empty = available to everyone (the normal case). When
+  // non-empty, the coupon is redeemable ONLY by these customer ids — used by the
+  // "create for selected customers" flow in Customer Management.
+  targetCustomerIds String[] @default([]) @db.ObjectId
 
   isActive Boolean @default(true)
 
@@ -1476,6 +1505,10 @@ model Offer {
 
   // Which storefront the offer runs on. Reuses the product visibility enum so an
   // IN_ONLY offer never applies to a .com (USD) order and vice-versa.
+  // Customer targeting. Empty = applies for everyone (normal, code-less offer).
+  // Non-empty = only these customers get it (created from Customer Management).
+  targetCustomerIds String[] @default([]) @db.ObjectId
+
   region PriceVisibility @default(BOTH)
 
   // Higher wins when several offers match the same product. Ties broken by deepest
@@ -1545,6 +1578,10 @@ model FreeShippingOffer {
   orderNumbers  Int[]   @default([]) // Which order numbers get free shipping (e.g., [3, 5, 10] = 3rd, 5th, 10th orders)
   isActive      Boolean @default(true)
 
+  // Which storefront the offer applies to. IN_ONLY → .in (INR) only, COM_ONLY →
+  // .com (USD) only, BOTH → everywhere. Mirrors the product/offer region model.
+  region PriceVisibility @default(BOTH)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1571,6 +1608,7 @@ enum PaymentStatus {
 // Enums for Order Management
 enum OrderStatus {
   ORDER_CREATED
+  ACCEPTED_BY_VENDOR
   VENDOR_PROCESSING
   PACKED_BY_VENDOR
   IN_TRANSIT_TO_ADMIN_HUB
@@ -1595,6 +1633,10 @@ model PaymentSettings {
   razorpayKeyId         String?
   razorpayKeySecret     String?
   razorpayWebhookSecret String?
+  // RazorpayX source account number for automated wallet-withdrawal payouts
+  // (the business's RazorpayX account money is paid FROM). Reuses the keys above
+  // for auth. When blank, withdrawals fall back to manual admin payout.
+  razorpayxAccountNumber String?
 
   // PayU Settings
   payuEnabled      Boolean @default(false)
@@ -2001,6 +2043,49 @@ model WalletTransaction {
   @@map("wallet_transactions")
 }
 
+// A customer-initiated payout of wallet store-credit to their bank/UPI. Self-service
+// (no admin approval): the wallet is debited the moment the request is made, and the
+// linked WalletTransaction (source WITHDRAWAL) records that debit. Admin/finance then
+// fulfils the payout and marks it Completed (or Failed → the amount is credited back).
+model WalletWithdrawal {
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  withdrawalId String  @unique // WD-YYYY-NNNNNN
+  customerId   String  @db.ObjectId
+  amount       Float // INR, debited from the wallet
+  currency     String  @default("INR")
+
+  method        String // 'UPI' | 'BANK'
+  upiId         String?
+  accountName   String?
+  accountNumber String? // beneficiary account (payout destination)
+  ifsc          String?
+  bankName      String?
+
+  status       String  @default("Processing") // Processing | Completed | Failed
+  walletTxnId  String? @db.ObjectId // the debit ledger entry
+  reversalTxnId String? @db.ObjectId // credit-back ledger entry if Failed
+  note         String? // customer note / admin payout reference
+  failureReason String?
+
+  // RazorpayX automated payout tracking (null when paid out manually).
+  payoutId     String? // pout_… id from RazorpayX
+  payoutMode   String? // UPI | IMPS | NEFT
+  payoutStatus String? // raw gateway status: queued|pending|processing|processed|reversed|failed
+  autoPayout   Boolean @default(false)
+
+  // Payout fulfilment audit
+  processedById   String?   @db.ObjectId
+  processedByName String?
+  processedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+  @@map("wallet_withdrawals")
+}
+
 // Items pulled out of sellable stock because they came back damaged/defective on
 // a return (admin chose NOT to restock). This is the "Damaged Items" ledger — a
 // permanent, fully-attributed record: what, how many, why, when, and by whom.
@@ -2026,8 +2111,26 @@ model DamagedStock {
   recordedByName  String?
   createdAt       DateTime @default(now())
 
+  // ── Return-to-vendor (RTV) lifecycle ──
+  // A defective item received at the admin hub is sent back to the vendor who
+  // supplied it. The item is attributed to that vendor at write time, then moves
+  // AT_HUB → SENT_TO_VENDOR → RECEIVED_BY_VENDOR, with a full dispatch audit.
+  vendorId           String?   @db.ObjectId
+  vendorName         String?
+  vendorCode         String?
+  vendorReturnStatus String    @default("AT_HUB") // AT_HUB | SENT_TO_VENDOR | RECEIVED_BY_VENDOR | CLOSED
+  courier            String?   // carrier used to ship back to the vendor
+  trackingNumber     String?
+  sentToVendorAt     DateTime?
+  sentById           String?   @db.ObjectId
+  sentByName         String?
+  vendorReceivedAt   DateTime?
+  vendorReturnNote   String?   // dispatch / disposition note for the RTV
+
   @@index([productId])
   @@index([createdAt])
+  @@index([vendorId])
+  @@index([vendorReturnStatus])
   @@map("damaged_stock")
 }
 
@@ -2150,8 +2253,33 @@ model Review {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, productId, orderId])
+  // A customer may review a given product only once in their lifetime. The
+  // orderId still records which purchase the review came from, but a repeat
+  // purchase of the same product does not unlock a second product review.
+  @@unique([userId, productId])
   @@map("reviews")
+}
+
+// Purchase-experience feedback — asked on every order (delivery, packaging,
+// overall M2C shopping experience), independent of the per-product review.
+// One per customer per order.
+model ExperienceReview {
+  id         String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String       @db.ObjectId
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId    String       @db.ObjectId
+  order      Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  rating     Int          @default(5)
+  comment    String?
+  images     String[]     @default([])
+  isApproved Boolean      @default(false)
+  status     ReviewStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, orderId])
+  @@map("experience_reviews")
 }
 
 enum ReviewStatus {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { Star, Search, Eye, Trash2, CheckCircle, XCircle, RefreshCw, MessageSquare, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Star, Search, Eye, Trash2, CheckCircle, XCircle, RefreshCw, MessageSquare, Clock, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Check, Save } from "lucide-react";
 import DeleteConfirmModal from "../../UI/DeleteConfirmModal";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
@@ -10,6 +10,7 @@ import Dropdown from "../../UI/Dropdown";
 import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalendar";
 import reviewService, { AdminReview } from "@/services/reviewService";
 import { hasPermission } from "@/lib/auth";
+import ExperienceReviews from "./ExperienceReviews";
 
 const PAGE_SIZE = 10;
 
@@ -26,14 +27,64 @@ function getPageRange(current: number, total: number): Array<number | '…'> {
 }
 
 export default function CustomerReviews() {
+  // Two moderation streams: per-product reviews, and per-order purchase
+  // experience feedback (delivery / packaging / overall M2C service).
+  const [tab, setTab] = useState<'product' | 'experience'>('product');
+
+  return (
+    <div className="p-6">
+      <div className="mb-5">
+        <h1 className="text-xl font-bold text-slate-900">Customer Reviews</h1>
+        <p className="text-sm text-slate-500">Manage and moderate customer feedback</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="mb-6 inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+        <button
+          type="button"
+          onClick={() => setTab('product')}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+            tab === 'product' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Product Reviews
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('experience')}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+            tab === 'experience' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Purchase Experience
+        </button>
+      </div>
+
+      {tab === 'product' ? <ProductReviews /> : <ExperienceReviews />}
+    </div>
+  );
+}
+
+function ProductReviews() {
   const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [ratingFilter, setRatingFilter] = useState<string>("all"); // 'all' | '1'..'5'
   const [selectedReview, setSelectedReview] = useState<AdminReview | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
+  // Moderation is a pick-then-save flow: the admin selects a status, then Save
+  // commits it. Seeded from the open review's current status.
+  const [pendingStatus, setPendingStatus] = useState<'APPROVED' | 'REJECTED'>('APPROVED');
+
+  useEffect(() => {
+    if (selectedReview) {
+      setPendingStatus(selectedReview.status === 'APPROVED' || selectedReview.isApproved ? 'APPROVED' : 'REJECTED');
+    }
+  }, [selectedReview?.id]);
   const [currentPage, setCurrentPage] = useState(1);
   const [stats, setStats] = useState({
     total: 0,
@@ -150,18 +201,22 @@ export default function CustomerReviews() {
 
   // Client-side review-date range filter (status/search are handled server-side).
   const displayedReviews = reviews.filter((review) => {
-    if (!dateFrom && !dateTo) return true;
-    const rd = review.createdAt ? fmtDate(new Date(review.createdAt)) : "";
-    if (!rd) return false;
-    if (dateFrom && rd < dateFrom) return false;
-    if (dateTo && rd > dateTo) return false;
+    // Star-rating filter (exact star match).
+    if (ratingFilter !== "all" && Math.round(review.rating || 0) !== Number(ratingFilter)) return false;
+    // Review-date range.
+    if (dateFrom || dateTo) {
+      const rd = review.createdAt ? fmtDate(new Date(review.createdAt)) : "";
+      if (!rd) return false;
+      if (dateFrom && rd < dateFrom) return false;
+      if (dateTo && rd > dateTo) return false;
+    }
     return true;
   });
 
-  // Reset to first page when the date range changes.
+  // Reset to first page when the date range or rating filter changes.
   useEffect(() => {
     setCurrentPage(1);
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, ratingFilter]);
 
   const applyStatus = (key: string) => setFilterStatus((prev) => (prev === key ? "all" : key));
 
@@ -206,12 +261,26 @@ export default function CustomerReviews() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-slate-900">Customer Reviews</h1>
-        <p className="text-sm text-slate-500">Manage and moderate customer product reviews</p>
+    <div>
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {displayedReviews.length} of {reviews.length} reviews
+        </span>
       </div>
 
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
         {metricCards.map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -262,7 +331,22 @@ export default function CustomerReviews() {
                 className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
               />
             </div>
-            <div className="w-full md:w-48">
+            <div className="w-full md:w-44">
+              <Dropdown
+                value={ratingFilter}
+                options={[
+                  { value: "all", label: "All Ratings" },
+                  { value: "5", label: "★★★★★  (5)" },
+                  { value: "4", label: "★★★★☆  (4)" },
+                  { value: "3", label: "★★★☆☆  (3)" },
+                  { value: "2", label: "★★☆☆☆  (2)" },
+                  { value: "1", label: "★☆☆☆☆  (1)" },
+                ]}
+                onChange={(val) => setRatingFilter(val as string)}
+                placeholder="Filter by rating"
+              />
+            </div>
+            <div className="w-full md:w-44">
               <Dropdown
                 value={filterStatus}
                 options={[
@@ -293,6 +377,8 @@ export default function CustomerReviews() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      )}
 
       {/* Reviews Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
@@ -413,7 +499,7 @@ export default function CustomerReviews() {
                       <MessageSquare className="h-12 w-12 text-slate-300 mx-auto mb-3" />
                       <p className="text-slate-500 font-medium">No reviews found</p>
                       <p className="text-slate-400 text-sm mt-1">
-                        {searchTerm || filterStatus !== "all" || dateFrom || dateTo
+                        {searchTerm || filterStatus !== "all" || ratingFilter !== "all" || dateFrom || dateTo
                           ? "Try adjusting your search or filter criteria"
                           : "Customer reviews will appear here once submitted"}
                       </p>
@@ -542,51 +628,82 @@ export default function CustomerReviews() {
                 </div>
               )}
 
-              {/* Status */}
-              <div>
-                <label className="text-sm font-semibold text-slate-700 block mb-2">Status</label>
-                <div>{getStatusBadge(selectedReview)}</div>
-              </div>
+              {/* Moderation — pick a visibility, then Save. The chosen option is
+                  clearly highlighted (filled + check); the current saved status
+                  shows as a badge, and Save only enables when the pick differs. */}
+              {(() => {
+                const current = selectedReview.status || (selectedReview.isApproved ? 'APPROVED' : 'REJECTED');
+                const note = pendingStatus === 'APPROVED'
+                  ? 'Approved reviews are published and visible to customers on the product page.'
+                  : 'Rejected reviews are hidden and never shown to customers.';
+                const busy = actionLoading === selectedReview.id;
+                const dirty = pendingStatus !== current;
 
-              {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t border-slate-200">
-                {selectedReview.isApproved ? (
-                  <button
-                    onClick={() => {
-                      handleReject(selectedReview.id);
-                    }}
-                    disabled={actionLoading === selectedReview.id}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                  >
-                    <XCircle className="h-4 w-4" />
-                    Reject
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      handleApprove(selectedReview.id);
-                    }}
-                    disabled={actionLoading === selectedReview.id}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                  >
-                    <CheckCircle className="h-4 w-4" />
-                    Approve
-                  </button>
-                )}
-              </div>
+                const Option = ({ value, label, icon: Icon, activeCls }: {
+                  value: 'APPROVED' | 'REJECTED'; label: string;
+                  icon: typeof CheckCircle; activeCls: string;
+                }) => {
+                  const selected = pendingStatus === value;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => setPendingStatus(value)}
+                      aria-pressed={selected}
+                      className={`relative flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
+                        selected ? activeCls : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" /> {label}
+                      {selected && (
+                        <span className="absolute -top-2 -right-2 grid h-5 w-5 place-items-center rounded-full bg-current text-white shadow">
+                          <Check className="h-3 w-3" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                };
 
-              <div className="flex gap-3 pt-4 border-t border-slate-200">
+                return (
+                  <div className="rounded-xl border border-slate-200 p-4">
+                    <div className="flex items-center justify-between gap-3 mb-1">
+                      <p className="text-sm font-semibold text-slate-800">Moderation</p>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                        Current: {getStatusBadge(selectedReview)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-3">Choose a visibility, then Save.</p>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <Option value="APPROVED" label="Approve" icon={CheckCircle}
+                        activeCls="border-green-500 bg-green-50 text-green-700" />
+                      <Option value="REJECTED" label="Reject" icon={XCircle}
+                        activeCls="border-red-500 bg-red-50 text-red-700" />
+                    </div>
+                    <p className="mt-2.5 text-xs text-slate-500">{note}</p>
+                    <button
+                      onClick={() => (pendingStatus === 'APPROVED' ? handleApprove(selectedReview.id) : handleReject(selectedReview.id))}
+                      disabled={busy || !dirty}
+                      className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#e01a1b] text-white text-sm font-semibold hover:bg-[#c41617] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {busy ? <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <Save className="h-4 w-4" />}
+                      {busy ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}
+                    </button>
+                  </div>
+                );
+              })()}
+
+              {/* Footer — destructive action kept apart from Close */}
+              <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-200">
                 <button
                   onClick={() => handleDeleteClick(selectedReview)}
                   disabled={actionLoading === selectedReview.id}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
                 >
                   <Trash2 className="h-4 w-4" />
-                  Delete
+                  Delete review
                 </button>
                 <button
                   onClick={() => setSelectedReview(null)}
-                  className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+                  className="px-6 py-2 text-sm font-semibold border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
                 >
                   Close
                 </button>

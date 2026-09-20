@@ -7,7 +7,7 @@ import { Badge } from '@/components/UI/Badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
 import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar'
-import { Plus, Edit, Trash2, Eye, Search, Filter, ChevronLeft, ChevronRight, GripVertical, Folders, CheckCircle, XCircle, GitMerge, Layers, Package } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, Search, Filter, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, GripVertical, Folders, CheckCircle, XCircle, GitMerge, Layers, Package } from 'lucide-react'
 import Link from 'next/link'
 import { categoryService, Category, CategoryStats } from '@/services/categoryService'
 import { hasPermission } from '@/lib/auth'
@@ -68,6 +68,7 @@ export default function CategoryLists() {
   const [dateTo, setDateTo] = useState('')
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [currentPage, setCurrentPage] = useState(1)
+  const [panelOpen, setPanelOpen] = useState(true)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
   const { toast } = useToast()
@@ -455,6 +456,25 @@ export default function CategoryLists() {
         )}
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filteredCategories.length} of {categories.length} categories
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Summary Stats — styled like the Vendor Product Requests metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
@@ -515,6 +535,8 @@ export default function CategoryLists() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      )}
 
       {/* Categories Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">

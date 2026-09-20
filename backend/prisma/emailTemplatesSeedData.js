@@ -437,3 +437,27 @@ module.exports = [
     "footerText": "This is an automated message. Please do not reply to this email."
   }
 ];
+
+// Courier-change apology (customer). Body HTML is composed from the shared layout
+// registry so it matches the other transactional emails and stays editable in the
+// admin UI once seeded.
+const { buildBodyHtml, getEditableDefaults } = require('../utils/email/templateLayout');
+const _courierDefaults = getEditableDefaults('order_courier_changed');
+module.exports.push({
+  key: 'order_courier_changed',
+  category: 'NOTIFICATIONS',
+  name: 'Courier Partner Changed (Customer)',
+  description: "Apology sent to the customer when the admin ships with a different courier than the one the customer selected. Includes the reason and the tracking ID for live tracking.",
+  subject: '🚚 Update to your delivery — courier changed for order #{{orderId}}',
+  bodyHtml: buildBodyHtml('order_courier_changed', {}),
+  fromName: null,
+  variables: ['greetingName', 'orderId', 'oldCourier', 'newCourier', 'trackingId', 'trackUrl'],
+  isSecurity: false,
+  sortOrder: 12,
+  emoji: _courierDefaults.emoji,
+  headerTitle: _courierDefaults.headerTitle,
+  headerSubtitle: _courierDefaults.headerSubtitle,
+  bodyText: _courierDefaults.bodyText,
+  buttonLabel: _courierDefaults.buttonLabel,
+  footerText: _courierDefaults.footerText,
+});

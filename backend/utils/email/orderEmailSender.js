@@ -72,4 +72,26 @@ async function sendOrderConfirmationEmail(order, company = {}) {
   });
 }
 
-module.exports = { sendOrderConfirmationEmail };
+/**
+ * Apology email sent to the customer when the admin ships the order with a
+ * courier partner different from the one the customer selected at checkout.
+ */
+async function sendCourierChangedEmail(order, { oldCourier, newCourier, trackingId }) {
+  const to = order?.customerEmail;
+  if (!to) return { sent: false, reason: 'no_recipient' };
+
+  return sendTemplatedEmail({
+    key: 'order_courier_changed',
+    to,
+    data: {
+      greetingName: order.customerName || 'Customer',
+      orderId: order.orderId || '',
+      oldCourier: oldCourier || 'your selected courier',
+      newCourier: newCourier || 'an alternative courier',
+      trackingId: trackingId || '',
+      trackUrl: `${publicSite()}/order/${order.orderId || ''}`,
+    },
+  });
+}
+
+module.exports = { sendOrderConfirmationEmail, sendCourierChangedEmail };
