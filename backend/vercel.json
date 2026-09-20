@@ -16,14 +16,6 @@
     {
       "path": "/api/jobs/overdue-settlements",
       "schedule": "30 3 * * *"
-    },
-    {
-      "path": "/api/jobs/promo-ending-soon",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/jobs/vendor-acceptance-sweep",
-      "schedule": "*/15 * * * *"
     }
   ]
 }
