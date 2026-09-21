@@ -1,7 +1,8 @@
 ﻿import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, ActivityIndicator, StyleSheet } from "react-native";
 import { Image } from "expo-image";
-import { Heart, ShoppingCart } from "lucide-react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { Heart, ShoppingCart, Sparkles } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { userAuthService } from "@/services/userAuthService";
@@ -17,7 +18,6 @@ import {
   isVisibleInRegion,
   formatPrice as fmtCurrency,
 } from "@/lib/currency";
-import { FaceRatingRow } from "@/components/WebSite/Shared/FaceRating";
 import { Fonts } from "@/constants/theme";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -120,17 +120,21 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
   const discountPct =
     strikePrice && effectivePrice && strikePrice > effectivePrice
       ? Math.round((1 - effectivePrice / strikePrice) * 100)
+      : typeof (product as any).discount === "number" && (product as any).discount > 0
+        ? (product as any).discount
+        : null;
+
+  // Actual money saved, auto-calculated from the effective vs. original price.
+  const savingsAmount =
+    strikePrice && effectivePrice && strikePrice > effectivePrice
+      ? strikePrice - effectivePrice
       : null;
 
-  // Fallback for payloads that carry only `discount`. That field is a flat
-  // CURRENCY amount, not a percent, so it gets its own label — rendering it as
-  // "12% OFF" when it means "₹12 off" is the kind of wrong that sells at the
-  // wrong price. Formatted through fmtCurrency so USD storefronts read right.
-  const rawDiscount = (product as any).discount;
-  const discountAmount =
-    discountPct === null && typeof rawDiscount === "number" && rawDiscount > 0
-      ? rawDiscount
-      : null;
+  // The rating chip on the image's bottom-left corner, and the "New" badge that
+  // takes its place when a product has no reviews yet.
+  const ratingValue = Number((product as any).rating) || 0;
+  const reviewCount = Number((product as any).reviews) || 0;
+  const hasReviews = reviewCount > 0;
 
   const isActuallyInStock = isServiceProduct(product)
     ? (product.totalStock ?? 0) > 0
@@ -242,6 +246,16 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
     >
       {/* ── Image area ─────────────────────────────────────────────── */}
       <View style={s.imageWrap}>
+        {/* `radial-gradient(120% 100% at 50% 0%, #faf9f7, #ece9e4)`. React Native
+            has no radial gradient, but the web's is centred on the top edge, so
+            it reads mostly top-to-bottom — which a linear one gives exactly.
+            Shows through transparent product PNGs and while an image loads. */}
+        <LinearGradient
+          colors={["#faf9f7", "#ece9e4"]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
         {imageUrl ? (
           <Image source={{ uri: imageUrl }} style={s.image} contentFit="cover" transition={300} />
         ) : (
@@ -250,27 +264,54 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
           </View>
         )}
 
-        {/* Wishlist — top LEFT */}
+        {/* Discount — top LEFT, as on the web. */}
+        {discountPct ? (
+          <View style={s.discountPill}>
+            <Text style={s.discountText}>−{discountPct}%</Text>
+          </View>
+        ) : null}
+
+        {/* Rating — pinned to the image's bottom-left corner. A product with no
+            reviews yet gets the "New" badge in the same place, so the corner is
+            never empty. */}
+        {hasReviews ? (
+          <LinearGradient
+            colors={["#F5A524", "#F59E0B"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={s.ratingChip}
+          >
+            <Text style={s.ratingScore}>{ratingValue.toFixed(1)}</Text>
+            <Sparkles size={10} color="#ffffff" fill="#ffffff" strokeWidth={1.5} />
+            <Text style={s.ratingCount}>{reviewCount}</Text>
+          </LinearGradient>
+        ) : (
+          <LinearGradient
+            colors={["#6366F1", "#8B5CF6"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={s.newChip}
+          >
+            <Text style={s.newText}>New</Text>
+          </LinearGradient>
+        )}
+
+        {/* Wishlist — top RIGHT. */}
         <Pressable
           onPress={handleToggleWishlist}
           disabled={isTogglingWishlist}
           hitSlop={6}
-          style={s.heartChip}
+          accessibilityRole="button"
+          accessibilityLabel={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+          style={[s.heartChip, isInWishlist && s.heartChipOn]}
         >
           <Heart
-            size={15}
-            color={isInWishlist ? "#E01A1B" : "#111827"}
-            fill={isInWishlist ? "#E01A1B" : "transparent"}
+            size={16}
+            color={isInWishlist ? "#ffffff" : "#E01A1B"}
+            fill={isInWishlist ? "#ffffff" : "rgba(224,26,27,0.1)"}
             strokeWidth={2.2}
           />
         </Pressable>
-
-        {/* Discount badge — top RIGHT */}
-        {discountPct ? (
-          <View style={s.discountPill}>
-            <Text style={s.discountText}>{discountPct}% OFF</Text>
-          </View>
-        ) : null}
 
         {!isActuallyInStock && (
           <View style={s.outOfStockOverlay}>
@@ -298,19 +339,20 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
             {product.name}
           </Text>
 
-          {/* FaceRating — shows face + rating when rating >= 3.5, otherwise review count */}
-          <FaceRatingRow
-            rating={Number((product as any).rating) || 0}
-            reviewCount={Number((product as any).reviews) || 0}
-            size={13}
-          />
         </View>
 
-        {/* Price row — effective price from activeOffer if present */}
+        {/* Price row — effective price from activeOffer if present.
+            Wraps rather than nowrap: at ~163px of card "Save $2.65" had nowhere
+            to go but inside itself, breaking after "Save" and leaving a bare
+            amount on its own line reading like a third price. */}
         <View style={s.priceRow}>
           <Text style={s.price}>{fmtCurrency(effectivePrice)}</Text>
           {strikePrice && strikePrice > effectivePrice ? (
             <Text style={s.originalPrice}>{fmtCurrency(strikePrice)}</Text>
+          ) : null}
+          {/* Savings stays — it is the whole pitch of a markdowns store. */}
+          {savingsAmount ? (
+            <Text style={s.savings}>Save {fmtCurrency(savingsAmount)}</Text>
           ) : null}
         </View>
 
@@ -321,13 +363,13 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
           style={[s.cta, !isActuallyInStock && s.ctaDisabled]}
         >
           {isAddingToCart ? (
-            <ActivityIndicator size="small" color="#ffffff" />
+            <ActivityIndicator size="small" color="#7a0f10" />
           ) : (
             <>
               {/* The web pairs the label with a cart glyph at h-3.5 (14px). */}
               <ShoppingCart
                 size={14}
-                color={isActuallyInStock ? "#ffffff" : "#9ca3af"}
+                color={isActuallyInStock ? "#7a0f10" : "#a89a8d"}
                 strokeWidth={2}
               />
               <Text style={[s.ctaText, !isActuallyInStock && s.ctaTextDisabled]}>
@@ -370,35 +412,98 @@ const s = StyleSheet.create({
   },
   // aspect-[5/4]. Was 1.15, so every product image on the home page was
   // cropped to a slightly different frame than the site shows.
-  imageWrap: { position: "relative", width: "100%", aspectRatio: 1.25, backgroundColor: "#f3f1ee" },
+  // aspect-[5/4].
+  imageWrap: { position: "relative", width: "100%", aspectRatio: 1.25, overflow: "hidden" },
   image: { width: "100%", height: "100%" },
   imageFallback: { alignItems: "center", justifyContent: "center" },
 
+  /* `absolute top-1.5 right-1.5 h-7 w-7` — 28px on a phone rather than 32,
+     because it sits over the photo of a card only ~163px wide. */
   heartChip: {
     position: "absolute",
-    top: 8,
-    left: 8,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "rgba(255,255,255,0.92)",
+    top: 6,
+    right: 6,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "rgba(224,26,27,0.3)",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
+    // Android paints elevation only.
+    elevation: 2,
   },
+  heartChipOn: { backgroundColor: "#e01a1b", borderColor: "#e01a1b" },
+  /* `absolute top-1.5 left-1.5 bg-[#22c55e] rounded-md` with a green glow. */
   discountPill: {
     position: "absolute",
-    top: 8,
-    right: 8,
-    backgroundColor: "#16a34a",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    top: 6,
+    left: 6,
+    backgroundColor: "#22c55e",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 6,
+    shadowColor: "#22c55e",
+    shadowOpacity: 0.7,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 3,
   },
-  discountText: { fontFamily: Fonts.sansBold, color: "#fff", fontSize: 10, fontWeight: "800" },
+  discountText: {
+    fontFamily: Fonts.sansBold,
+    color: "#fff",
+    fontSize: 9,
+    // Outfit is static: the weight must name the loaded file (Outfit_700Bold).
+    fontWeight: "700",
+  },
+
+  /* Rating — image bottom-left, amber gradient, "4.5 * 12". */
+  ratingChip: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 6,
+    shadowColor: "#f59e0b",
+    shadowOpacity: 0.5,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  ratingScore: { fontFamily: Fonts.sansBold, fontSize: 9.5, fontWeight: "700", color: "#ffffff" },
+  ratingCount: { fontFamily: Fonts.sans, fontSize: 9.5, color: "rgba(255,255,255,0.85)" },
+
+  /* ...and the badge that takes that corner when there are no reviews yet. */
+  newChip: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    shadowColor: "#6366f1",
+    shadowOpacity: 0.5,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  newText: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 9,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    color: "#ffffff",
+  },
 
   outOfStockOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -435,7 +540,14 @@ const s = StyleSheet.create({
     minHeight: 35.8,
   },
 
-  priceRow: { flexDirection: "row", alignItems: "baseline", gap: 6, marginBottom: 10 },
+  priceRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    columnGap: 8,
+    rowGap: 2,
+    marginBottom: 10,
+  },
   // Showcase deliberately drops the price's weight (600, not extrabold): "In
   // the grid the price is the hero — correct for a listing. In a handpicked
   // showcase the product is."
@@ -445,6 +557,14 @@ const s = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: -0.4,
     color: "#1a1a1a",
+  },
+  /* Showcase drops the green pill and sets the savings as plain text, so the
+     card carries one accent colour instead of three. */
+  savings: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#16a34a",
   },
   originalPrice: {
     fontFamily: Fonts.sans,
@@ -464,23 +584,32 @@ const s = StyleSheet.create({
      36pt rather than the web's 28/32: this is the primary action on the card,
      and the project's own ctaPill.ts puts the thumb floor at 44. A listing
      card cannot spare 44, but it can spare more than 28. */
+  /* The web's showcase button: calm at rest, not a solid red slab. Its comment
+     says why — "four solid red slabs side by side were the loudest shape in the
+     section, louder than the products they were selling". There is no hover on
+     a phone, so this is the resting state and the only state. */
   cta: {
-    height: 36,
+    height: 32,
     borderRadius: 8,
-    backgroundColor: "#e01a1b",
+    backgroundColor: "#fbf4ec",
+    borderWidth: 1,
+    borderColor: "#e2d1bd",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 5,
   },
-  ctaDisabled: { backgroundColor: "#f3f4f6" },
+  ctaDisabled: { backgroundColor: "#f5f0ea", borderColor: "#e8ded2" },
   ctaText: {
     fontFamily: Fonts.sansSemibold,
-    color: "#ffffff",
-    fontSize: 12.5,
+    // `text-[#7a0f10]` — the oxblood the web sets on its calm showcase button.
+    // Left white when the fill changed from solid red to the #fbf4ec ground,
+    // which put white text on cream.
+    color: "#7a0f10",
+    fontSize: 11.5,
     fontWeight: "600",
   },
-  ctaTextDisabled: { color: "#9ca3af" },
+  ctaTextDisabled: { color: "#a89a8d" },
 });
 
 
