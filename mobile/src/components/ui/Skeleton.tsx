@@ -274,5 +274,5 @@ const sk = StyleSheet.create({
   profileForm: { marginTop: 20 },
 
   // Checkout
-  checkoutSummary: { marginTop: 24, padding: 16, backgroundColor: '#f9fafb', borderRadius: 14 },
+  checkoutSummary: { marginTop: 24, padding: 16, backgroundColor: '#faf6f2', borderRadius: 14 },
 });

@@ -56,9 +56,12 @@ export interface UserProfileResponse {
 
 class UserProfileService {
   // Get current user profile
-  async getProfile(): Promise<UserProfileResponse> {
+  async getProfile(suppressErrorToast = false): Promise<UserProfileResponse> {
     try {
-      const response = await axios.get('/auth/me');
+      // The Profile page shows its own "Load Failed" toast, so opt out of the
+      // global interceptor toast to avoid double-toasting the same error — same
+      // pattern the web service uses.
+       const response = await axios.get('/auth/me', suppressErrorToast ? ({ suppressErrorToast: true } as Record<string, unknown>) : undefined);
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to fetch profile');

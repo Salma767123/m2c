@@ -63,7 +63,6 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isBuying, setIsBuying] = useState(false);
   const [showMakerModal, setShowMakerModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>('description');
   const [showAllDetails, setShowAllDetails] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState<PublicProduct[]>([]);
   const [promoOffers, setPromoOffers] = useState<PublicOffer[]>([]);
@@ -447,11 +446,6 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
     ? (product.fabricSpecifications as any).careInstructions
     : [];
 
-  const tabs: { id: string; label: string }[] = [];
-  if (product.description || (product.tags && product.tags.length)) tabs.push({ id: 'description', label: 'Description' });
-  if (specItems.length > 0) tabs.push({ id: 'specs', label: 'Specifications' });
-  if (careList.length > 0) tabs.push({ id: 'care', label: 'Care Instructions' });
-  if (product.dispatchTimeline) tabs.push({ id: 'shipping', label: 'Shipping' });
 
   // Manufacturer info, bound once and NOT with a `!` assertion. Most products
   // carry none, so every read has to tolerate null — the non-null assertions
@@ -475,7 +469,10 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
   }
 
   return (
-    <View className="flex-1 bg-gray-50">
+    /* `bg-[#f9f5f2]` — the warm ground the web gives this page, the same one
+       the cart uses. `bg-gray-50` is a cool neutral, and every card and band on
+       this screen is warm, so it sat on a ground that disagreed with it. */
+    <View className="flex-1" style={{ backgroundColor: '#f9f5f2' }}>
       <PromotionalPopup category={product.category} />
 
       <ScrollView
@@ -606,7 +603,15 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
 
         {/* Product name + Wishlist */}
         <View className="flex-row items-start justify-between mb-3">
-          <Text className="text-[22px] font-extrabold text-gray-900 leading-[28px] flex-1 mr-3" style={s.serif}>
+          {/* font-playfair text-lg font-semibold tracking-tight text-[#1a1a1a].
+              Was 22px extrabold in gray-900: `font-extrabold` against the
+              600-weight Poppins file makes Android synthesise a fake bold,
+              and gray-900 is the blue-tinted neutral rather than the web's
+              warm near-black. */}
+          <Text
+            className="flex-1 mr-3"
+            style={[s.serif, s.productName]}
+          >
             {product.name}
           </Text>
           <Pressable
@@ -1115,108 +1120,120 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
         </View>
       ) : null}
 
-      {/* ── Tabbed product information ──────────────────────────────────────── */}
-      {tabs.length > 0 ? (
-        <View className="bg-white mt-2">
-          {/* Tab bar */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabBar}>
-            {tabs.map((t) => {
-              const isActive = t.id === activeTab;
-              return (
-                <Pressable key={t.id} onPress={() => setActiveTab(t.id)} accessibilityRole="button" accessibilityState={{ selected: isActive }} style={s.tab}>
-                  <Text style={[s.tabText, isActive && s.tabTextActive]}>{t.label}</Text>
-                  {isActive ? <View style={s.tabUnderline} /> : null}
+      {/* ── Product information ─────────────────────────────────────────────
+          Stacked, separately-titled sections — the web's arrangement. These
+          were four tabs here, which hid three quarters of the page's content
+          behind a control most people never touch. The web gives each block its
+          own masthead and lets the page scroll:
+
+            Product description · Specifications · How to care for it ·
+            Getting it to you
+
+          Each renders only when it has content, so a product with no care
+          instructions simply has no care section rather than an empty tab. */}
+
+      {product.description || (product.tags && product.tags.length) ? (
+        <View style={s.infoSection}>
+          <Text style={[s.serif, s.infoHeading]}>Product description</Text>
+          {product.description ? (
+            <>
+              <Text style={[s.descriptionText, !showAllDetails && s.descriptionClamped]}>
+                {product.description}
+              </Text>
+              {product.description.length > 260 ? (
+                <Pressable
+                  onPress={() => setShowAllDetails((v) => !v)}
+                  accessibilityRole="button"
+                  style={{ alignSelf: 'flex-start', marginTop: 6 }}
+                >
+                  <Text className="text-[13px] font-semibold text-[#E01A1B]">
+                    {showAllDetails ? 'Read less' : 'Read more'}
+                  </Text>
                 </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          {/* Tab content */}
-          <View className="px-5 py-5">
-            {activeTab === 'description' && (
-              <View>
-                {product.description ? (
-                  <>
-                    <Text style={[s.descriptionText, !showAllDetails && s.descriptionClamped]}>
-                      {product.description}
-                    </Text>
-                    {product.description.length > 260 ? (
-                      <Pressable onPress={() => setShowAllDetails((v) => !v)} accessibilityRole="button" style={{ alignSelf: 'flex-start', marginTop: 6 }}>
-                        <Text className="text-[13px] font-semibold text-[#E01A1B]">{showAllDetails ? 'Read less' : 'Read more'}</Text>
-                      </Pressable>
-                    ) : null}
-                  </>
-                ) : null}
-                {product.tags && product.tags.length > 0 ? (
-                  <View className="flex-row flex-wrap gap-2 mt-4">
-                    {product.tags.map((tag, i) => (
-                      <View key={i} className="flex-row items-center gap-1 rounded-full bg-[#E01A1B]/[0.06] px-3 py-1">
-                        <Check size={12} color={Palette.primary} strokeWidth={3} />
-                        <Text className="text-xs font-semibold text-[#E01A1B]">{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            )}
-
-            {activeTab === 'specs' && (
-              <View style={{ gap: 4 }}>
-                {specItems.map((item, i) => (
-                  <View key={i} className="flex-row items-center py-2.5" style={i > 0 ? s.specRowBorder : undefined}>
-                    <Text className="text-[13px] text-gray-500 whitespace-nowrap">{item.label}</Text>
-                    <View style={s.specDots} />
-                    <Text className="text-[13px] font-semibold text-gray-900 text-right">{item.value}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {activeTab === 'care' && (
-              <View className="flex-row flex-wrap" style={{ gap: 10 }}>
-                {careList.map((instruction, index) => (
-                  <View key={index} className="flex-row items-center gap-2 bg-white px-2.5 py-2 rounded-full" style={s.carePill}>
-                    <View style={s.careStepBadge}>
-                      <Text className="text-[#E01A1B] text-[10px] font-bold">{index + 1}</Text>
-                    </View>
-                    <Text className="text-[13px] font-semibold text-gray-700">{instruction}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {activeTab === 'shipping' && product.dispatchTimeline && (
-              <View style={{ gap: 12 }}>
-                <View className="flex-row items-center gap-3 rounded-xl bg-white p-3.5" style={s.shipBox}>
-                  <View className="w-9 h-9 rounded-full bg-[#E01A1B]/10 items-center justify-center">
-                    <Truck size={16} color={Palette.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text className="text-[13px] font-semibold text-gray-900">Dispatch in {product.dispatchTimeline.totalDays} days</Text>
-                    <Text className="text-[12px] text-gray-500">
-                      {product.dispatchTimeline.processingDays} days processing + {product.dispatchTimeline.shippingDays} days shipping
-                    </Text>
-                  </View>
+              ) : null}
+            </>
+          ) : null}
+          {product.tags && product.tags.length > 0 ? (
+            <View className="flex-row flex-wrap gap-2 mt-4">
+              {product.tags.map((tag, i) => (
+                <View key={i} className="flex-row items-center gap-1 rounded-full bg-[#E01A1B]/[0.06] px-3 py-1">
+                  <Check size={12} color={Palette.primary} strokeWidth={3} />
+                  <Text className="text-xs font-semibold text-[#E01A1B]">{tag}</Text>
                 </View>
-                {logisticsResult ? (
-                  <View className="flex-row" style={{ gap: 12 }}>
-                    <View className="flex-1 bg-gray-50 rounded-xl p-3 items-center">
-                      <Text className="text-[11px] text-gray-500 mb-0.5">Delivery Time</Text>
-                      <Text className="text-sm font-bold text-gray-900">{logisticsResult.deliveryDays} days</Text>
-                    </View>
-                    <View className="flex-1 bg-gray-50 rounded-xl p-3 items-center">
-                      <Text className="text-[11px] text-gray-500 mb-0.5">Shipping</Text>
-                      <Text className="text-sm font-bold text-gray-900">
-                        {logisticsResult.totalShippingCost === 0 ? 'FREE' : fmtShip(logisticsResult.totalShippingCost)}
-                      </Text>
-                    </View>
-                  </View>
-                ) : null}
+              ))}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {specItems.length > 0 ? (
+        <View style={s.infoSection}>
+          <Text style={[s.serif, s.infoHeading]}>Specifications</Text>
+          <View style={{ gap: 4 }}>
+            {specItems.map((item, i) => (
+              <View key={i} className="flex-row items-center py-2.5" style={i > 0 ? s.specRowBorder : undefined}>
+                <Text className="text-[13px] text-gray-500 whitespace-nowrap">{item.label}</Text>
+                <View style={s.specDots} />
+                <Text className="text-[13px] font-semibold text-gray-900 text-right">{item.value}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {careList.length > 0 ? (
+        <View style={s.infoSection}>
+          {/* The web sets an italic eyebrow above this one — "Keep it fresh" —
+              which is the only place on the page it uses that device. */}
+          <Text style={[s.serif, s.infoEyebrow]}>Keep it fresh</Text>
+          <Text style={[s.serif, s.infoHeading, { marginTop: 2 }]}>How to care for it</Text>
+          <View className="flex-row flex-wrap" style={{ gap: 10 }}>
+            {careList.map((instruction, index) => (
+              <View key={index} className="flex-row items-center gap-2 bg-white px-2.5 py-2 rounded-full" style={s.carePill}>
+                <View style={s.careStepBadge}>
+                  <Text className="text-[#E01A1B] text-[10px] font-bold">{index + 1}</Text>
+                </View>
+                <Text className="text-[13px] font-semibold text-gray-700">{instruction}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {product.dispatchTimeline ? (
+        <View style={s.infoSection}>
+          <Text style={[s.serif, s.infoHeading]}>Getting it to you</Text>
+          <View style={{ gap: 12 }}>
+            <View className="flex-row items-center gap-3 rounded-xl bg-white p-3.5" style={s.shipBox}>
+              <View className="w-9 h-9 rounded-full bg-[#E01A1B]/10 items-center justify-center">
+                <Truck size={16} color={Palette.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text className="text-[13px] font-semibold text-gray-900">
+                  Dispatch in {product.dispatchTimeline.totalDays} days
+                </Text>
                 <Text className="text-[12px] text-gray-500">
-                  Shipping method and final delivery estimate are confirmed in the purchase panel above.
+                  {product.dispatchTimeline.processingDays} days processing + {product.dispatchTimeline.shippingDays} days shipping
                 </Text>
               </View>
-            )}
+            </View>
+            {logisticsResult ? (
+              <View className="flex-row" style={{ gap: 12 }}>
+                <View className="flex-1 bg-gray-50 rounded-xl p-3 items-center">
+                  <Text className="text-[11px] text-gray-500 mb-0.5">Delivery Time</Text>
+                  <Text className="text-sm font-bold text-gray-900">{logisticsResult.deliveryDays} days</Text>
+                </View>
+                <View className="flex-1 bg-gray-50 rounded-xl p-3 items-center">
+                  <Text className="text-[11px] text-gray-500 mb-0.5">Shipping</Text>
+                  <Text className="text-sm font-bold text-gray-900">
+                    {logisticsResult.totalShippingCost === 0 ? 'FREE' : fmtShip(logisticsResult.totalShippingCost)}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+            <Text className="text-[12px] text-gray-500">
+              Shipping method and final delivery estimate are confirmed in the purchase panel above.
+            </Text>
           </View>
         </View>
       ) : null}
@@ -1709,6 +1726,36 @@ const variantStyles = StyleSheet.create({
 
 const s = StyleSheet.create({
   serif: { fontFamily: (Fonts as any).serif },
+  /* Each information block is its own white section with the page's warm
+     ground showing between them, rather than four panels behind one tab bar. */
+  infoSection: {
+    backgroundColor: '#ffffff',
+    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  /* font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] */
+  infoHeading: {
+    fontSize: 20,
+    fontWeight: '600',
+    letterSpacing: -0.5,
+    color: '#1a1a1a',
+    marginBottom: 14,
+  },
+  /* The web's one italic eyebrow, above "How to care for it". */
+  infoEyebrow: {
+    fontSize: 15,
+    fontStyle: 'italic',
+    letterSpacing: 0.3,
+    color: '#b08a5e',
+  },
+  productName: {
+    fontSize: 18,
+    fontWeight: '600',
+    lineHeight: 24,
+    letterSpacing: -0.45,
+    color: '#1a1a1a',
+  },
   eyebrowLine: { width: 20, height: 2, backgroundColor: Palette.primary },
 
   // Hero
@@ -1761,11 +1808,6 @@ const s = StyleSheet.create({
   },
 
   // Tabs
-  tabBar: { paddingHorizontal: 16 },
-  tab: { position: 'relative', paddingHorizontal: 14, paddingVertical: 14 },
-  tabText: { fontSize: 13, fontWeight: '600', color: '#6b7280' },
-  tabTextActive: { color: Palette.primary },
-  tabUnderline: { position: 'absolute', left: 12, right: 12, bottom: 0, height: 2.5, borderRadius: 2, backgroundColor: Palette.primary },
 
   // Description / specs
   descriptionText: { fontSize: 13, color: '#4b5563', lineHeight: 21 },

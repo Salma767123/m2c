@@ -18,6 +18,7 @@ import {
   User,
   ShoppingCart,
   Menu,
+  Sparkles,
   Heart,
   X,
   Clock,
@@ -35,7 +36,8 @@ import Sidebar from '../Sidebar/Sidebar';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { getRegionalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
-import { Palette, Radius, Shadow } from '@/constants/theme';
+import { Palette, Radius, Shadow, Fonts } from '@/constants/theme';
+import DiscoverSheet from './DiscoverSheet';
 
 /* ── Hoisted constants (allocated once) ───────────────────────────────────── */
 const RECENT_SEARCHES_KEY = 'recent_searches';
@@ -55,6 +57,7 @@ export function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [discoverVisible, setDiscoverVisible] = useState(false);
 
   // Suggestions state
   const [suggestions, setSuggestions] = useState<PublicProduct[]>([]);
@@ -202,7 +205,17 @@ export function Header() {
             </View>
 
             <View style={s.topBarRight}>
-             
+              {/* DISCOVER — the web's single discovery entry point, which mobile
+                  did not have at all. The sparkle is the web's own trigger mark. */}
+              <Pressable
+                onPress={() => setDiscoverVisible(true)}
+                accessibilityLabel="Discover — browse the marketplace"
+                accessibilityRole="button"
+                style={s.iconBtn}
+              >
+                <Sparkles size={22} color={Palette.onBrand} />
+              </Pressable>
+
               <Pressable
                 onPress={() => router.push('/(tabs)/wishlist' as any)}
                 accessibilityLabel="View wishlist"
@@ -405,6 +418,7 @@ export function Header() {
       ) : null}
 
       <Sidebar visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
+      <DiscoverSheet visible={discoverVisible} onClose={() => setDiscoverVisible(false)} />
     </>
   );
 }
@@ -496,8 +510,8 @@ const s = StyleSheet.create({
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 2 },
 iconBtn: { padding: 8, position: 'relative' },
 
-  brandName: { fontSize: 15, fontWeight: '700', color: Palette.onBrand, letterSpacing: 0.3, marginLeft: 8 ,marginTop: -2},
-  brandSub: { fontSize: 10, color: Palette.onBrand, fontWeight: '500', marginLeft: 8 ,marginTop: -2 },
+  brandName: { fontFamily: Fonts.sansBold, fontSize: 15, fontWeight: '700', color: Palette.onBrand, letterSpacing: 0.3, marginLeft: 8 ,marginTop: -2},
+  brandSub: { fontFamily: Fonts.sansMedium, fontSize: 10, color: Palette.onBrand, fontWeight: '500', marginLeft: 8 ,marginTop: -2 },
 
   /* Darker red hairline along the bottom edge. On the web the accent strip is
      red against a dark bar; with the bar itself red that inverts — the edge has
@@ -520,8 +534,8 @@ iconBtn: { padding: 8, position: 'relative' },
   // white-on-red, cart keeps amber so "items waiting" stays its own signal.
   badgeBrand: { backgroundColor: Palette.onBrand },
   badgeAmber: { backgroundColor: Palette.warning },
-  badgeText: { color: Palette.primary, fontSize: 9, fontWeight: '800' },
-  badgeTextDark: { color: Palette.surfaceInverse, fontSize: 9, fontWeight: '800' },
+  badgeText: { fontFamily: Fonts.sansBold, color: Palette.primary, fontSize: 9, fontWeight: '800' },
+  badgeTextDark: { fontFamily: Fonts.sansBold, color: Palette.surfaceInverse, fontSize: 9, fontWeight: '800' },
 
   // Search bar
   // Extra bottom padding vs. the old square bar: the corner curve eats into the
@@ -542,6 +556,7 @@ iconBtn: { padding: 8, position: 'relative' },
     paddingHorizontal: 10,
     paddingVertical: 0,
     color: Palette.onBrand,
+    fontFamily: Fonts.sans,
     fontSize: 15,
     height: 46,
   },
@@ -557,7 +572,7 @@ iconBtn: { padding: 8, position: 'relative' },
   },
   // Plain white — this sits on the red bar, where any step of the brand ramp
   // (including primaryOnDark) is near-invisible.
-  cancelText: { color: Palette.onBrand, fontSize: 13, fontWeight: '600' },
+  cancelText: { fontFamily: Fonts.sansSemibold, color: Palette.onBrand, fontSize: 13, fontWeight: '600' },
 
   // Overlay
   overlay: {
@@ -579,7 +594,7 @@ iconBtn: { padding: 8, position: 'relative' },
     paddingVertical: 12,
     paddingHorizontal: 2,
   },
-  sectionTitle: { fontSize: 12, fontWeight: '700', color: Palette.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle: { fontFamily: Fonts.sansBold, fontSize: 12, fontWeight: '700', color: Palette.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
   sectionSpacer: { flex: 1 },
 
   // Loading
@@ -587,7 +602,7 @@ iconBtn: { padding: 8, position: 'relative' },
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingVertical: 20,
   },
-  loadingText: { fontSize: 13, color: Palette.textMuted },
+  loadingText: { fontFamily: Fonts.sans, fontSize: 13, color: Palette.textMuted },
 
   // Suggestion rows
   suggRow: {
@@ -609,10 +624,10 @@ iconBtn: { padding: 8, position: 'relative' },
     alignItems: 'center', justifyContent: 'center',
   },
   suggInfo: { flex: 1, marginLeft: 12 },
-  suggName: { fontSize: 14, fontWeight: '600', color: Palette.ink },
+  suggName: { fontFamily: Fonts.sansSemibold, fontSize: 14, fontWeight: '600', color: Palette.ink },
   suggMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  suggPrice: { fontSize: 13, fontWeight: '700', color: Palette.ink },
-  suggCategory: { fontSize: 11, color: Palette.textSubtle },
+  suggPrice: { fontFamily: Fonts.sansBold, fontSize: 13, fontWeight: '700', color: Palette.ink },
+  suggCategory: { fontFamily: Fonts.sans, fontSize: 11, color: Palette.textSubtle },
   suggSearchBtn: {
     width: 36, height: 36,
     alignItems: 'center', justifyContent: 'center',
@@ -627,20 +642,20 @@ iconBtn: { padding: 8, position: 'relative' },
     paddingVertical: 14,
     paddingHorizontal: 2,
   },
-  viewAllText: { flex: 1, fontSize: 13, fontWeight: '600', color: Palette.primary },
+  viewAllText: { fontFamily: Fonts.sansSemibold, flex: 1, fontSize: 13, fontWeight: '600', color: Palette.primary },
 
   // No results
   noResultsWrap: {
     alignItems: 'center', paddingVertical: 40, gap: 8,
   },
-  noResultsText: { fontSize: 14, color: Palette.textMuted, textAlign: 'center' },
+  noResultsText: { fontFamily: Fonts.sans, fontSize: 14, color: Palette.textMuted, textAlign: 'center' },
   noResultsBtn: {
     marginTop: 8,
     backgroundColor: Palette.primary,
     paddingHorizontal: 20, height: 40, borderRadius: Radius.md,
     alignItems: 'center', justifyContent: 'center',
   },
-  noResultsBtnText: { color: Palette.onPrimary, fontSize: 13, fontWeight: '700' },
+  noResultsBtnText: { fontFamily: Fonts.sansBold, color: Palette.onPrimary, fontSize: 13, fontWeight: '700' },
 
   // Recent searches
   recentRow: {
@@ -653,10 +668,10 @@ iconBtn: { padding: 8, position: 'relative' },
     borderBottomWidth: 1,
     borderBottomColor: Palette.outlineSubtle,
   },
-  recentText: { flex: 1, fontSize: 14, color: Palette.text },
+  recentText: { fontFamily: Fonts.sans, flex: 1, fontSize: 14, color: Palette.text },
 
   // Empty state
   emptyWrap: { alignItems: 'center', paddingVertical: 48, gap: 8 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: Palette.text },
-  emptyDesc: { fontSize: 13, color: Palette.textSubtle, textAlign: 'center' },
+  emptyTitle: { fontFamily: Fonts.sansBold, fontSize: 16, fontWeight: '700', color: Palette.text },
+  emptyDesc: { fontFamily: Fonts.sans, fontSize: 13, color: Palette.textSubtle, textAlign: 'center' },
 });

@@ -9,7 +9,7 @@ import { couponService } from '@/services/couponService';
 import { publicProductService, type PublicProduct } from '@/services/publicProductService';
 import type { PublicOffer } from '@/lib/offers';
 import { formatPrice, getRegionalPrice } from '@/lib/currency';
-import { Palette, Radius, Shadow } from '@/constants/theme';
+import { Palette, Radius, Shadow, Fonts } from '@/constants/theme';
 import { extractCouponCode } from '@/lib/coupons';
 
 /**
@@ -302,7 +302,14 @@ function PromoCard({ card }: { card: Card }) {
       onPress={() => router.push(card.route)}
       accessibilityRole="button"
       accessibilityLabel={`${card.eyebrow} ${card.headline ?? ''}. ${card.title}. ${card.cta}`}
-      style={({ pressed }) => [s.card, pressed && s.pressed]}
+      /* Plain array, not a style FUNCTION. `s.card` carries this card's width
+         and height; when the function fails to apply, the card collapses to
+         nothing, the gradient inside has no box to fill, and the white headline
+         — which is server data, so it is often a badge like "NEW" — ends up as
+         white text on the page's light ground. `android_ripple` covers the
+         press feedback the `pressed` branch gave. */
+      android_ripple={{ color: 'rgba(255,255,255,0.12)' }}
+      style={s.card}
     >
       <LinearGradient
         colors={card.tone.gradient}
@@ -374,16 +381,35 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     marginBottom: 10,
   },
+  /* 11px bold uppercase, tracking 0.12em, on the web's warm near-black.
+     Was Palette.text (#374151) — a blue-grey, where the web sets #1a1416. */
   headTitle: {
+    fontFamily: Fonts.sansBold,
     fontSize: 11,
-    fontWeight: '800',
-    color: Palette.text,
+    fontWeight: '700',
+    color: '#1a1416',
     textTransform: 'uppercase',
-    letterSpacing: 1.2,
+    letterSpacing: 1.32, // 0.12em
   },
   spacer: { flex: 1 },
-  allLink: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  allLinkText: { fontSize: 11.5, fontWeight: '700', color: Palette.primary },
+  /* The web's control is an outlined pill — `rounded-full border
+     border-[#e01a1b]/25 px-2.5 py-1` — not a bare text link. */
+  allLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(224,26,27,0.25)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  allLinkText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 11,
+    fontWeight: '600',
+    color: Palette.primary,
+  },
 
   track: { paddingHorizontal: SIDE_PAD, gap: CARD_GAP },
 
@@ -393,7 +419,6 @@ const s = StyleSheet.create({
     borderRadius: Radius.lg,
     ...Shadow.cardHover,
   },
-  pressed: { opacity: 0.94, transform: [{ scale: 0.995 }] },
 
   panel: {
     flex: 1,
@@ -427,6 +452,7 @@ const s = StyleSheet.create({
   // Copy stops well short of the disc so nothing collides with it.
   body: { paddingLeft: 18, paddingRight: DISC * 0.62, gap: 2 },
   eyebrow: {
+    fontFamily: Fonts.sansBold,
     fontSize: 10,
     fontWeight: '700',
     color: 'rgba(255,255,255,0.85)',
@@ -434,6 +460,7 @@ const s = StyleSheet.create({
     letterSpacing: 1.1,
   },
   headline: {
+    fontFamily: Fonts.sansBold,
     fontSize: 27,
     lineHeight: 32,
     fontWeight: '900',
@@ -443,6 +470,7 @@ const s = StyleSheet.create({
   /** Invisible placeholder keeping the headline row's height when there's no value. */
   headlineEmpty: { color: 'transparent', height: 32 },
   title: {
+    fontFamily: Fonts.sansSemibold,
     fontSize: 12.5,
     lineHeight: 17,
     fontWeight: '600',
@@ -462,6 +490,7 @@ const s = StyleSheet.create({
     bottom: 10,
   },
   ctaText: {
+    fontFamily: Fonts.sansBold,
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 15,

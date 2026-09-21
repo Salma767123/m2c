@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { MailCheck, CircleAlert, LogIn } from 'lucide-react-native';
+import { MailCheck, CircleAlert } from 'lucide-react-native';
 import { userAuthService } from '@/services/userAuthService';
 import { Palette } from '@/constants/theme';
 import { AuthShell, AuthButton, AuthSwitch } from '@/components/WebSite/Auth/AuthKit';
@@ -51,7 +51,6 @@ export default function VerifyEmailScreen() {
       <AuthShell
         title="Verifying Email"
         subtitle="This will only take a moment"
-        icon={<MailCheck size={20} color="#FFFFFF" />}
       >
         <View className="items-center py-8">
           <ActivityIndicator size="large" color={Palette.primary} />
@@ -67,7 +66,6 @@ export default function VerifyEmailScreen() {
     <AuthShell
       title={ok ? 'Email Verified' : 'Verification Failed'}
       subtitle={ok ? 'Your account is ready' : 'This link did not work'}
-      icon={ok ? <MailCheck size={20} color="#FFFFFF" /> : <CircleAlert size={20} color="#FFFFFF" />}
       footer={
         ok ? undefined : (
           <AuthSwitch
@@ -96,7 +94,6 @@ export default function VerifyEmailScreen() {
       <AuthButton
         label={ok ? 'Continue to Sign In' : 'Back to Sign In'}
         onPress={() => router.replace('/(auth)/Login')}
-        icon={<LogIn size={18} color="#FFFFFF" strokeWidth={2.5} />}
       />
     </AuthShell>
   );

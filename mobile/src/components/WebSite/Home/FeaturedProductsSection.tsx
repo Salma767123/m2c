@@ -1,18 +1,30 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, Dimensions } from 'react-native';
 import { RefreshCw, PackageSearch } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import ProductCard from '../ProductCard/ProductCard';
+import { PRODUCT_CARD_WIDTH } from '../ProductCard/metrics';
+import { UnrollReveal } from '@/components/WebSite/Shared/Reveal';
+
 import { publicProductService, PublicProduct } from '@/services/publicProductService';
 import { Palette } from '@/constants/theme';
-import SectionHeading, { type SectionKey } from './SectionHeading';
+import SectionHeading, { SectionCta, type SectionKey } from './SectionHeading';
 
-const LIMIT = 4;
+// From frontend Featured/Products.tsx. A longer stagger than the other rails
+// on purpose: this entrance reads as a wave travelling across the grid, where
+// theirs are a quick rise.
+const UNROLL_MS = 950;
+const UNROLL_STAGGER_MS = 170;
+
+// Matches frontend Featured/Products.tsx: FEATURED_COUNT = 6.
+const LIMIT = 6;
 const H_MARGIN = 12;
 const CARD_PAD = 14;
 const GRID_GAP = 12;
 const screenWidth = Dimensions.get('window').width;
-const CARD_WIDTH = Math.floor((screenWidth - H_MARGIN * 2 - CARD_PAD * 2 - GRID_GAP) / 2);
+// One shared width for every product grid in the app.
+const CARD_WIDTH = PRODUCT_CARD_WIDTH;
 
 type LoadState = 'loading' | 'ready' | 'empty' | 'error';
 
@@ -57,10 +69,15 @@ export default function FeaturedProductsSection() {
         <ErrorState onRetry={() => fetchProducts()} />
       ) : (
         <Grid>
-          {products.map((p) => (
-            <View key={p.id} style={{ width: CARD_WIDTH }}>
+          {products.map((p, i) => (
+            <UnrollReveal
+              key={p.id}
+              duration={UNROLL_MS}
+              delay={i * UNROLL_STAGGER_MS}
+              style={{ width: CARD_WIDTH, borderRadius: 16 }}
+            >
               <ProductCard product={p} />
-            </View>
+            </UnrollReveal>
           ))}
         </Grid>
       )}
@@ -68,7 +85,7 @@ export default function FeaturedProductsSection() {
   );
 }
 
-// ─── Section card shell (white floating card + header) ──────────────────────
+// ─── Section card shell (linen ground + header) ────────────────────────────────
 function SectionCard({
   section,
   children,
@@ -77,26 +94,32 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <View
+    <LinearGradient
+      /* Warm linen ground from frontend Featured/Products.tsx GROUND constant:
+         border-y border-[#ece0d2] bg-linear-to-b from-[#faf6f0] via-[#f4ebe0] to-[#f8f2ea] */
+      colors={['#faf6f0', '#f4ebe0', '#f8f2ea']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
       style={{
         marginTop: 10,
         marginHorizontal: H_MARGIN,
-        backgroundColor: '#ffffff',
         borderRadius: 20,
         padding: CARD_PAD,
-        borderWidth: 1,
-        borderColor: '#eceef1',
-        shadowColor: '#0f172a',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        borderTopWidth: 1,
+        borderBottomWidth: 1,
+        borderLeftWidth: 0,
+        borderRightWidth: 0,
+        borderColor: '#ece0d2',
       }}
     >
-      <SectionHeading section={section} onPressCta={goToAll} />
+      <SectionHeading section={section} />
 
       {children}
-    </View>
+
+      {/* Below the rail, matching the web: it hides the masthead link on a
+          phone and puts a solid pill under the grid instead. */}
+      <SectionCta section={section} onPress={goToAll} />
+    </LinearGradient>
   );
 }
 
@@ -117,16 +140,23 @@ function CardSkeleton() {
         borderRadius: 16,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: '#f3f4f6',
+        borderColor: '#e3d7c9',
+        /* Mirrors ProductCard showcase shadow so the skeleton and the real card
+           sit at the same elevation — no jump when fetch resolves. */
+        shadowColor: '#4a3226',
+        shadowOpacity: 0.45,
+        shadowOffset: { width: 0, height: 10 },
+        shadowRadius: 13,
+        elevation: 3,
       }}
     >
-      <View style={{ aspectRatio: 1, backgroundColor: '#f3f4f6' }} />
-      <View style={{ padding: 12 }}>
-        <View style={{ height: 8, width: '33%', backgroundColor: '#f3f4f6', borderRadius: 4, marginBottom: 8 }} />
-        <View style={{ height: 14, width: '100%', backgroundColor: '#f3f4f6', borderRadius: 4, marginBottom: 6 }} />
-        <View style={{ height: 14, width: '80%', backgroundColor: '#f3f4f6', borderRadius: 4, marginBottom: 10 }} />
-        <View style={{ height: 20, width: '50%', backgroundColor: '#f3f4f6', borderRadius: 4, marginBottom: 12 }} />
-        <View style={{ height: 40, width: '100%', backgroundColor: '#f3f4f6', borderRadius: 12 }} />
+      {/* Frontend skeleton: aspect-[5/4] with bg-[#efe6db]. Was square (1:1). */}
+      <View style={{ aspectRatio: 1.25, backgroundColor: '#efe6db' }} />
+      {/* Frontend skeleton: space-y-3 p-3.5 with #e6dacc placeholders. */}
+      <View style={{ padding: 14 }}>
+        <View style={{ height: 16, width: '75%', backgroundColor: '#e6dacc', borderRadius: 4, marginBottom: 12 }} />
+        <View style={{ height: 24, width: '50%', backgroundColor: '#e6dacc', borderRadius: 4, marginBottom: 12 }} />
+        <View style={{ height: 40, width: '100%', backgroundColor: '#f0e8de', borderRadius: 8 }} />
       </View>
     </View>
   );
@@ -146,7 +176,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
           marginBottom: 12,
         }}
       >
-        <PackageSearch size={26} color="#E01A1B" strokeWidth={1.5} />
+        <PackageSearch size={26} color="#ffffff" strokeWidth={1.5} />
       </View>
       <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 4 }}>
         {"Couldn't load products"}

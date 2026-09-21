@@ -1,24 +1,29 @@
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-import { User, Mail, Phone, Lock, UserPlus, Check } from 'lucide-react-native';
 import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { useGoogleAuth } from '@/lib/googleAuth';
-import { Palette } from '@/constants/theme';
 import {
   AuthShell,
   AuthField,
+  AuthRow,
   AuthButton,
+  AuthCheckbox,
+  AuthDivider,
   AuthSwitch,
+  GoogleButton,
   StrengthMeter,
   EMAIL_RE,
 } from '@/components/WebSite/Auth/AuthKit';
+import { Fonts } from '@/constants/theme';
 
 /**
- * Account creation. Mirrors the web RegisterForm field-for-field (first/last
- * name, email, phone, password + confirm, terms) and posts the same payload —
- * `name` is the two name fields joined, which is what the backend expects.
+ * Account creation — the web's RegisterForm at phone width.
+ *
+ * Mirrors the site field-for-field (first/last name, email, phone, password +
+ * confirm, terms) and posts the same payload: `name` is the two name fields
+ * joined, which is what the backend expects.
  *
  * On success the backend emails a verification link; the user cannot sign in
  * until they follow it, so we route back to Login with that message rather than
@@ -34,6 +39,12 @@ export default function RegisterScreen() {
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const lastNameRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
 
   // Same shared flow the Login screen uses. Google is one identity operation:
   // the call signs an existing user in and creates the account for a new one.
@@ -52,8 +63,8 @@ export default function RegisterScreen() {
   const validate = useCallback(() => {
     const next: Record<string, string> = {};
 
-    if (!firstName.trim()) next.firstName = 'Please enter your first name';
-    if (!lastName.trim()) next.lastName = 'Please enter your last name';
+    if (!firstName.trim()) next.firstName = 'Enter your first name';
+    if (!lastName.trim()) next.lastName = 'Enter your last name';
 
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail) next.email = 'Please enter your email address';
@@ -72,12 +83,42 @@ export default function RegisterScreen() {
     else if (confirmPassword !== password) next.confirmPassword = 'Passwords do not match';
 
     setErrors(next);
-    return Object.keys(next).length === 0;
+    // Returns the map, not a boolean: the caller needs to know WHICH field
+    // failed so it can focus it.
+    return next;
   }, [firstName, lastName, email, phone, password, confirmPassword]);
 
+  /**
+   * Focus the first field that failed.
+   *
+   * This form is six fields deep, so on a phone the field that failed is often
+   * scrolled off screen when the toast appears — leaving "fix the highlighted
+   * fields" pointing at something the user cannot see. Focusing it makes
+   * KeyboardAwareScrollView bring it into view, and puts the cursor where the
+   * work is.
+   */
+  const focusFirstError = (errs: Record<string, string>) => {
+    const order: [string, React.RefObject<TextInput | null> | null][] = [
+      ['firstName', null], // already at the top of the form
+      ['lastName', lastNameRef],
+      ['email', emailRef],
+      ['phone', phoneRef],
+      ['password', passwordRef],
+      ['confirmPassword', confirmRef],
+    ];
+    for (const [key, ref] of order) {
+      if (errs[key]) {
+        ref?.current?.focus();
+        return;
+      }
+    }
+  };
+
   const handleSubmit = useCallback(async () => {
-    if (!validate()) {
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
       showErrorToast('Check your details', 'Please fix the highlighted fields and try again.');
+      focusFirstError(errs);
       return;
     }
     if (!agreed) {
@@ -95,10 +136,7 @@ export default function RegisterScreen() {
       });
 
       if (response.success) {
-        showSuccessToast(
-          'Account Created',
-          'Check your email to verify your account, then sign in.',
-        );
+        showSuccessToast('Account Created', 'Check your email to verify your account, then sign in.');
         router.replace('/(auth)/Login');
       } else {
         showErrorToast('Registration Failed', response.message || 'Something went wrong.');
@@ -115,66 +153,80 @@ export default function RegisterScreen() {
 
   return (
     <AuthShell
-      title="Create Account"
-      subtitle="Join M2C in a few seconds"
-      icon={<UserPlus size={20} color="#FFFFFF" />}
+      mode="register"
+      title="Join Our Community"
+      subtitle="Create your account to start shopping and enjoy exclusive member benefits"
       footer={
         <AuthSwitch
           prompt="Already have an account?"
-          action="Sign In"
+          action="Sign in"
           onPress={() => router.replace('/(auth)/Login')}
         />
       }
     >
-      <AuthField
-        label="First Name"
-        icon={<User size={18} color={Palette.textMuted} strokeWidth={2} />}
-        value={firstName}
-        onChangeText={(v) => {
-          setFirstName(v);
-          clearError('firstName');
-        }}
-        onBlur={() => !firstName.trim() && setError('firstName', 'Please enter your first name')}
-        placeholder="First name"
-        error={errors.firstName}
-        autoCapitalize="words"
-        textContentType="givenName"
-      />
+      <AuthRow>
+        <AuthField
+          compact
+          label="First Name"
+          value={firstName}
+          onChangeText={(v) => {
+            setFirstName(v);
+            clearError('firstName');
+          }}
+          onBlur={() => !firstName.trim() && setError('firstName', 'Enter your first name')}
+          placeholder="First name"
+          error={errors.firstName}
+          autoCapitalize="words"
+          textContentType="givenName"
+          autoComplete="given-name"
+          returnKeyType="next"
+          onSubmitEditing={() => lastNameRef.current?.focus()}
+          submitBehavior="submit"
+        />
+        <AuthField
+          compact
+          ref={lastNameRef}
+          label="Last Name"
+          value={lastName}
+          onChangeText={(v) => {
+            setLastName(v);
+            clearError('lastName');
+          }}
+          onBlur={() => !lastName.trim() && setError('lastName', 'Enter your last name')}
+          placeholder="Last name"
+          error={errors.lastName}
+          autoCapitalize="words"
+          textContentType="familyName"
+          autoComplete="family-name"
+          returnKeyType="next"
+          onSubmitEditing={() => emailRef.current?.focus()}
+          submitBehavior="submit"
+        />
+      </AuthRow>
 
       <AuthField
-        label="Last Name"
-        icon={<User size={18} color={Palette.textMuted} strokeWidth={2} />}
-        value={lastName}
-        onChangeText={(v) => {
-          setLastName(v);
-          clearError('lastName');
-        }}
-        onBlur={() => !lastName.trim() && setError('lastName', 'Please enter your last name')}
-        placeholder="Last name"
-        error={errors.lastName}
-        autoCapitalize="words"
-        textContentType="familyName"
-      />
-
-      <AuthField
+        ref={emailRef}
         label="Email Address"
-        icon={<Mail size={18} color={Palette.textMuted} strokeWidth={2} />}
         value={email}
         onChangeText={(v) => {
           setEmail(v.toLowerCase());
           clearError('email');
         }}
-        placeholder="Enter your email"
+        placeholder="Enter your email address"
         error={errors.email}
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="email-address"
         textContentType="emailAddress"
+        autoComplete="email"
+        returnKeyType="next"
+        onSubmitEditing={() => phoneRef.current?.focus()}
+        submitBehavior="submit"
       />
 
       <AuthField
+        ref={phoneRef}
         label="Phone Number"
-        icon={<Phone size={18} color={Palette.textMuted} strokeWidth={2} />}
         value={phone}
         onChangeText={(v) => {
           setPhone(v);
@@ -184,12 +236,16 @@ export default function RegisterScreen() {
         error={errors.phone}
         keyboardType="phone-pad"
         textContentType="telephoneNumber"
+        autoComplete="tel"
+        returnKeyType="next"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+        submitBehavior="submit"
       />
 
       <View>
         <AuthField
+          ref={passwordRef}
           label="Password"
-          icon={<Lock size={18} color={Palette.textMuted} strokeWidth={2} />}
           value={password}
           onChangeText={(v) => {
             setPassword(v);
@@ -200,17 +256,21 @@ export default function RegisterScreen() {
           secure
           autoCapitalize="none"
           textContentType="newPassword"
+          autoComplete="new-password"
+          returnKeyType="next"
+          onSubmitEditing={() => confirmRef.current?.focus()}
+          submitBehavior="submit"
         />
         {!errors.password ? (
-          <View className="-mt-2 mb-3">
+          <View style={{ marginTop: -10, marginBottom: 12 }}>
             <StrengthMeter value={password} />
           </View>
         ) : null}
       </View>
 
       <AuthField
+        ref={confirmRef}
         label="Confirm Password"
-        icon={<Lock size={18} color={Palette.textMuted} strokeWidth={2} />}
         value={confirmPassword}
         onChangeText={(v) => {
           setConfirmPassword(v);
@@ -221,84 +281,50 @@ export default function RegisterScreen() {
         secure
         autoCapitalize="none"
         textContentType="newPassword"
+        autoComplete="new-password"
+        returnKeyType="go"
+        onSubmitEditing={handleSubmit}
       />
 
       {/* Terms */}
-      <TouchableOpacity
-        onPress={() => setAgreed((a) => !a)}
-        className="flex-row items-start mb-5"
-        activeOpacity={0.7}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: agreed }}
-        accessibilityLabel="Agree to terms and conditions"
-      >
-        <View
-          className={`w-5 h-5 rounded-md items-center justify-center mr-3 mt-0.5 border ${
-            agreed ? 'bg-brand-500 border-brand-500' : 'bg-white border-gray-300'
-          }`}
+      <View style={{ marginBottom: 20 }}>
+        <AuthCheckbox
+          align="start"
+          checked={agreed}
+          onToggle={() => setAgreed((a) => !a)}
+          label="Agree to terms and conditions"
         >
-          {agreed ? <Check size={13} color="#FFFFFF" strokeWidth={3} /> : null}
-        </View>
-        <Text className="flex-1 text-xs text-gray-600 leading-4">
-          I agree to the{' '}
-          <Text
-            className="font-semibold text-brand-500"
-            onPress={() => router.push('/(any)/terms')}
-          >
-            Terms of Service
-          </Text>{' '}
-          and{' '}
-          <Text
-            className="font-semibold text-brand-500"
-            onPress={() => router.push('/(any)/privacy')}
-          >
-            Privacy Policy
+          <Text style={{ fontFamily: Fonts.sans, flex: 1, fontSize: 12, lineHeight: 18, color: '#374151' }}>
+            I agree to the{' '}
+            <Text
+              style={{ fontFamily: Fonts.sansSemibold, fontWeight: '600', color: '#e01a1b' }}
+              onPress={() => router.push('/(any)/terms')}
+            >
+              Terms of Service
+            </Text>{' '}
+            and{' '}
+            <Text
+              style={{ fontFamily: Fonts.sansSemibold, fontWeight: '600', color: '#e01a1b' }}
+              onPress={() => router.push('/(any)/privacy')}
+            >
+              Privacy Policy
+            </Text>
+            .
           </Text>
-          .
-        </Text>
-      </TouchableOpacity>
+        </AuthCheckbox>
+      </View>
 
       <AuthButton
         label="Create Account"
         busyLabel="Creating account..."
         busy={submitting}
         onPress={handleSubmit}
-        icon={<UserPlus size={18} color="#FFFFFF" strokeWidth={2.5} />}
       />
 
-      {/* Google sign-up — the web offers this on the register tab as well as
-          login, and mobile previously offered it only on login. */}
       {googleAvailable ? (
         <>
-          <View className="flex-row items-center my-5">
-            <View className="flex-1 h-px bg-gray-300" />
-            <Text className="mx-4 text-xs text-gray-500 font-medium">
-              Or sign up with
-            </Text>
-            <View className="flex-1 h-px bg-gray-300" />
-          </View>
-
-          <TouchableOpacity
-            disabled={googleLoading}
-            onPress={handleGoogleSignUp}
-            className={`rounded-xl py-3.5 items-center justify-center flex-row border border-gray-300 ${
-              googleLoading ? 'bg-gray-100' : 'bg-white'
-            }`}
-            accessibilityRole="button"
-            accessibilityLabel="Continue with Google"
-          >
-            {googleLoading ? (
-              <ActivityIndicator size="small" color="#4285F4" />
-            ) : (
-              <Image
-                source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
-                style={{ width: 20, height: 20 }}
-              />
-            )}
-            <Text className="font-bold text-sm ml-3 text-gray-700">
-              {googleLoading ? 'Signing in...' : 'Continue with Google'}
-            </Text>
-          </TouchableOpacity>
+          <AuthDivider label="Or continue with" />
+          <GoogleButton busy={googleLoading} onPress={handleGoogleSignUp} />
         </>
       ) : null}
     </AuthShell>

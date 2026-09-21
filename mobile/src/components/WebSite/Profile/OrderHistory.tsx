@@ -24,6 +24,7 @@ import {
   ShoppingBag,
   Star,
 } from 'lucide-react-native';
+import EmptyState from '@/components/WebSite/Shared/EmptyState';
 import { router } from 'expo-router';
 import orderService, { Order as APIOrder } from '@/services/orderService';
 import { OrdersSkeleton } from '@/components/ui/Skeleton';
@@ -268,7 +269,13 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
             </TouchableOpacity>
 
             {order.status === 'received' && (
+              /* Routes to the order, which is where the review modal lives.
+                 This button had no onPress at all — it looked tappable and did
+                 nothing. */
               <TouchableOpacity
+                onPress={() => router.push(`/(tabs)/orders/${order.id}?review=1` as any)}
+                accessibilityRole="button"
+                accessibilityLabel="Write a review for this order"
                 style={{
                   flexDirection: 'row', alignItems: 'center', gap: 6,
                   backgroundColor: '#fefce8', borderWidth: 1, borderColor: '#fde68a',
@@ -282,7 +289,12 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
             )}
 
             {order.trackingNumber && (
+              /* The order screen renders the courier and tracking reference;
+                 this button previously had no handler. */
               <TouchableOpacity
+                onPress={() => router.push(`/(tabs)/orders/${order.id}` as any)}
+                accessibilityRole="button"
+                accessibilityLabel="Track this order"
                 style={{
                   flexDirection: 'row', alignItems: 'center', gap: 6,
                   backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe',
@@ -419,26 +431,14 @@ export default function OrderHistory() {
   // ── Empty ──────────────────────────────────────────────────────────────────
   if (orders.length === 0) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: '#f8f9fa' }}>
-        <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-          <ShoppingBag size={44} color="#d1d5db" />
-        </View>
-        <Text style={{ fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 8, textAlign: 'center' }}>
-          No Orders Yet
-        </Text>
-        <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 22, marginBottom: 32 }}>
-          You haven't placed any orders yet.{'\n'}Start shopping to see your history here.
-        </Text>
-        <TouchableOpacity
+      <View style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
+        <EmptyState
+          icon={ShoppingBag}
+          title="No Orders Yet"
+          subtitle={"You haven't placed any orders yet.\nStart shopping to see your history here."}
+          ctaLabel="Start Shopping"
           onPress={() => router.push('/(tabs)')}
-          style={{
-            backgroundColor: '#1a1a2e', borderRadius: 16,
-            paddingHorizontal: 32, paddingVertical: 15,
-          }}
-          activeOpacity={0.85}
-        >
-          <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15 }}>Start Shopping</Text>
-        </TouchableOpacity>
+        />
       </View>
     );
   }

@@ -18,8 +18,15 @@ import { CartProvider } from '@/context/CartContext';
 import { WishlistProvider } from '@/context/WishlistContext';
 import { userAuthService } from '@/services/userAuthService';
 import axiosInstance from '@/lib/axios';
+import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
+import { FONT_ASSETS } from '@/lib/fonts';
 import { setExchangeRate } from '@/lib/currency';
 import NotificationBanner from '@/components/General/NotificationBanner';
+
+// Hold the native splash until the fonts are in memory, so the app never paints
+// a frame in Roboto and then swaps to Outfit.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Conditionally import Firebase messaging — fails gracefully in Expo Go
 let setupBackgroundHandler: (() => void) | null = null;
@@ -77,6 +84,16 @@ export default function RootLayout() {
   useEffect(() => {
     userAuthService.endSessionIfNotRemembered().finally(() => setSessionChecked(true));
   }, []);
+
+  // `error` matters as much as `loaded`: a font that fails to decode must not
+  // hold the splash forever. Either outcome releases it — a missing face falls
+  // back to the platform font, which is the old behaviour, not a broken app.
+  const [fontsLoaded, fontError] = useFonts(FONT_ASSETS);
+  const ready = sessionChecked && (fontsLoaded || !!fontError);
+
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync().catch(() => {});
+  }, [ready]);
 
   // Navigate to order details when notification is tapped
   const handleNotificationNav = useCallback(
@@ -137,7 +154,7 @@ export default function RootLayout() {
     };
   }, [handleNotificationNav]);
 
-  if (!sessionChecked) return null;
+  if (!ready) return null;
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

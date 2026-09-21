@@ -14,10 +14,17 @@ export interface UserProfile {
   middleName: string;
   lastName: string;
   email: string;
+  /** Phone number digits only — country code lives in `phoneCode`. */
   phone: string;
-  /** WhatsApp contact, stored separately from `phone` on the backend. */
-  whatsappNumber: string;
-  gender: 'male' | 'female' | 'other';
+  /** Country dial code, e.g. "+91". Split from `phone` for the UI, same as web. */
+  phoneCode: string;
+  /** WhatsApp number digits only — country code lives in `whatsappCode`. */
+  whatsapp: string;
+  /** Country dial code for WhatsApp. */
+  whatsappCode: string;
+  /** Avatar URL. Absent until the account sets one; the loader maps it to ''. */
+  image?: string;
+  gender: 'male' | 'female' | 'other' | '';
   address: Address;
   joinDate: string;
   preferences: {

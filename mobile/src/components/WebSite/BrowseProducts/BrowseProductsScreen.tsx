@@ -17,9 +17,11 @@ import {
   ChevronRight,
   LayoutGrid,
 } from 'lucide-react-native';
+import EmptyState from '@/components/WebSite/Shared/EmptyState';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { publicProductService, PublicProduct } from '@/services/publicProductService';
 import ProductCard from '@/components/WebSite/ProductCard/ProductCard';
+import { CARD_GRID_PADDING, CARD_GAP } from '@/components/WebSite/ProductCard/metrics';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 10;
@@ -270,27 +272,13 @@ export default function BrowseProductsScreen() {
 
   // ── Empty / Error ─────────────────────────────────────────────────────────
   const EmptyView = (
-    <View className="flex-1 items-center justify-center py-24 px-8">
-      <View
-        className="w-20 h-20 rounded-full bg-gray-100 items-center justify-center mb-5"
-        style={{ borderWidth: 1, borderColor: '#e5e5e5' }}
-      >
-        <Package size={34} color="#d1d5db" />
-      </View>
-      <Text className="text-lg font-black text-gray-900 text-center mb-2">
-        {error ? 'Something went wrong' : 'No Products Found'}
-      </Text>
-      <Text className="text-sm text-gray-400 text-center leading-5">
-        {error ?? "We couldn't find any products in this section right now."}
-      </Text>
-      <TouchableOpacity
-        onPress={onRefresh}
-        className="mt-6 bg-brand-500 px-7 py-3 rounded-xl"
-        activeOpacity={0.85}
-      >
-        <Text className="text-white font-bold text-sm">Retry</Text>
-      </TouchableOpacity>
-    </View>
+    <EmptyState
+      icon={Package}
+      title={error ? 'Something went wrong' : 'No Products Found'}
+      subtitle={error ?? "We couldn't find any products in this section right now."}
+      ctaLabel="Retry"
+      onPress={onRefresh}
+    />
   );
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -368,7 +356,7 @@ export default function BrowseProductsScreen() {
           data={products}
           keyExtractor={(item) => item.id}
           numColumns={2}
-          columnWrapperStyle={{ paddingHorizontal: 12, gap: 8 }}
+          columnWrapperStyle={{ paddingHorizontal: CARD_GRID_PADDING, gap: CARD_GAP }}
           contentContainerStyle={{ paddingBottom: 30, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -380,6 +368,11 @@ export default function BrowseProductsScreen() {
             />
           }
           ListHeaderComponent={products.length > 0 ? ListHeader : null}
+          /* No vendor band here. The web renders <VendorPartnerCTA /> on
+             Products.tsx — its /products listing — which maps to this app's
+             (any)/products screen, not to this one. This is the collections
+             browse screen (Featured / Best Sellers / Top Selling) and has no
+             web counterpart, so it carries no band. */
           ListFooterComponent={products.length > 0 ? PaginationBar : null}
           ListEmptyComponent={EmptyView}
           renderItem={({ item }) => (

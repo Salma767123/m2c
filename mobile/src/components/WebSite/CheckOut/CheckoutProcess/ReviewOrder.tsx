@@ -29,9 +29,9 @@ function InfoCard({
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="summary"
       style={{
-        backgroundColor: '#fff',
+        backgroundColor: '#fffdfbf',
         borderWidth: 1,
-        borderColor: '#f3f4f6',
+        borderColor: '#e5dbd0',
         borderRadius: 16,
         overflow: 'hidden',
       }}
@@ -45,8 +45,8 @@ function InfoCard({
           paddingHorizontal: 16,
           paddingVertical: 12,
           borderBottomWidth: 1,
-          borderBottomColor: '#f3f4f6',
-          backgroundColor: '#f9fafb',
+          borderBottomColor: '#e5dbd0',
+          backgroundColor: '#faf6f2',
         }}
       >
         <View
@@ -61,7 +61,7 @@ function InfoCard({
         >
           <Icon size={16} color={iconColor} />
         </View>
-        <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>{title}</Text>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: '#1a1a1a' }}>{title}</Text>
       </View>
       {/* Card body */}
       <View style={{ padding: 16 }}>{children}</View>
@@ -76,78 +76,78 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
   return (
     <View style={{ gap: 14 }}>
       {/* Shipping summary */}
-      <InfoCard
-        title="Shipping To"
-        icon={MapPin}
-        iconColor="#3b82f6"
-        iconBg="#eff6ff"
-        accessibilityLabel={`Shipping to ${formData.firstName} ${formData.lastName}, ${formData.address}, ${formData.city}, ${formData.state}`}
-      >
-        {/* Name */}
-        <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 6 }}>
-          {formData.firstName} {formData.lastName}
-        </Text>
+       <InfoCard
+         title="Shipping To"
+         icon={MapPin}
+         iconColor="#c41617"
+         iconBg="#fdf6f4"
+         accessibilityLabel={`Shipping to ${formData.firstName} ${formData.lastName}, ${formData.address}, ${formData.city}, ${formData.state}`}
+       >
+         {/* Name */}
+         <Text style={{ fontSize: 16, fontWeight: '700', color: '#1a1a1a', marginBottom: 6 }}>
+           {formData.firstName} {formData.lastName}
+         </Text>
 
-        {/* Address block */}
-        <View style={{ backgroundColor: '#f8fafc', borderRadius: 10, padding: 12, marginBottom: 12 }}>
-          <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }}>
-            {formData.address}
-          </Text>
-          {formData.addressLine2 ? (
-            <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }}>
-              {formData.addressLine2}
-            </Text>
-          ) : null}
-          <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }}>
-            {[formData.city, getStateName(formData.state, formData.country), formData.zipCode]
-              .filter(Boolean)
-              .join(', ')}
-          </Text>
-          <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 4, fontWeight: '600' }}>
-            {getCountryName(formData.country)} {getCountryFlag(formData.country)}
-          </Text>
-        </View>
+         {/* Address block */}
+         <View style={{ backgroundColor: '#faf6f2', borderRadius: 10, padding: 12, marginBottom: 12 }}>
+           <Text style={{ fontSize: 13, color: '#6b625b', lineHeight: 20 }}>
+             {formData.address}
+           </Text>
+           {formData.addressLine2 ? (
+             <Text style={{ fontSize: 13, color: '#6b625b', lineHeight: 20 }}>
+               {formData.addressLine2}
+             </Text>
+           ) : null}
+           <Text style={{ fontSize: 13, color: '#6b625b', lineHeight: 20 }}>
+             {[formData.city, getStateName(formData.state, formData.country), formData.zipCode]
+               .filter(Boolean)
+               .join(', ')}
+           </Text>
+           <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 4, fontWeight: '600' }}>
+             {getCountryName(formData.country)} {getCountryFlag(formData.country)}
+           </Text>
+         </View>
 
-        {/* Contact details — labeled */}
-        <View style={{ gap: 10 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
-              <Mail size={14} color="#6b7280" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>Email</Text>
-              <Text style={{ fontSize: 13, color: '#374151', fontWeight: '500' }}>{formData.email}</Text>
-            </View>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
-              <Phone size={14} color="#6b7280" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>Phone</Text>
-              <Text style={{ fontSize: 13, color: '#374151', fontWeight: '500' }}>
-                {formatPhoneForDisplay(formData.phone, formData.country)}
-              </Text>
-            </View>
-          </View>
-        </View>
+         {/* Contact details — labeled */}
+         <View style={{ gap: 10 }}>
+           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+             <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#f0e8de', alignItems: 'center', justifyContent: 'center' }}>
+               <Mail size={14} color="#9ca3af" />
+             </View>
+             <View style={{ flex: 1 }}>
+               <Text style={{ fontSize: 10, fontWeight: '700', color: '#a2968b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Email</Text>
+               <Text style={{ fontSize: 13, color: '#6b625b', fontWeight: '500' }}>{formData.email}</Text>
+             </View>
+           </View>
+           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+             <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#f0e8de', alignItems: 'center', justifyContent: 'center' }}>
+               <Phone size={14} color="#9ca3af" />
+             </View>
+             <View style={{ flex: 1 }}>
+               <Text style={{ fontSize: 10, fontWeight: '700', color: '#a2968b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Phone</Text>
+               <Text style={{ fontSize: 13, color: '#6b625b', fontWeight: '500' }}>
+                 {formatPhoneForDisplay(formData.phone, formData.country)}
+               </Text>
+             </View>
+           </View>
+         </View>
       </InfoCard>
 
       {/* Payment method */}
-      <InfoCard
-        title="Payment Method"
-        icon={paymentIcon}
-        iconColor="#8b5cf6"
-        iconBg="#faf5ff"
-        accessibilityLabel={`Payment method: ${paymentName}`}
-      >
+       <InfoCard
+         title="Payment Method"
+         icon={paymentIcon}
+         iconColor="#c41617"
+         iconBg="#fdf6f4"
+         accessibilityLabel={`Payment method: ${paymentName}`}
+       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>{paymentName}</Text>
-            <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Cards, UPI, Net Banking, Wallets</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#1a1a1a' }}>{paymentName}</Text>
+            <Text style={{ fontSize: 12, color: '#6b625b', marginTop: 2 }}>Cards, UPI, Net Banking, Wallets</Text>
           </View>
-          <View style={{ backgroundColor: '#f3f4f6', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: '#374151' }}>Secure</Text>
+          <View style={{ backgroundColor: '#f0e8de', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b625b' }}>Secure</Text>
           </View>
         </View>
       </InfoCard>
@@ -157,9 +157,9 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
         accessible
         accessibilityLabel="Estimated delivery: 5 to 7 business days"
         style={{
-          backgroundColor: '#eff6ff',
+          backgroundColor: '#fdf6f4',
           borderWidth: 1,
-          borderColor: '#bfdbfe',
+          borderColor: '#f4e2de',
           borderRadius: 16,
           padding: 16,
           flexDirection: 'row',
@@ -167,12 +167,12 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
           gap: 12,
         }}
       >
-        <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#dbeafe', alignItems: 'center', justifyContent: 'center' }}>
-          <CalendarDays size={20} color="#2563eb" />
+        <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#f4e2de', alignItems: 'center', justifyContent: 'center' }}>
+          <CalendarDays size={20} color="#e01a1b" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: '#1e40af' }}>Estimated Delivery</Text>
-          <Text style={{ fontSize: 13, color: '#3b82f6', marginTop: 2 }}>5 – 7 business days</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: '#1a1a1a' }}>Estimated Delivery</Text>
+          <Text style={{ fontSize: 13, color: '#5a524b', marginTop: 2 }}>5 – 7 business days</Text>
         </View>
       </View>
 

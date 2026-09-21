@@ -10,6 +10,19 @@ module.exports = {
   presets: [require("nativewind/preset")],
   theme: {
     extend: {
+      // Brand faces, matching frontend/src/app/layout.tsx. These are static
+      // instances, so each weight is its own family name — `font-sans-bold`
+      // rather than `font-sans font-bold`, which on Android would synthesise a
+      // fake bold from the regular file instead of using the real one.
+      fontFamily: {
+        sans: ["Outfit_400Regular"],
+        "sans-medium": ["Outfit_500Medium"],
+        "sans-semibold": ["Outfit_600SemiBold"],
+        "sans-bold": ["Outfit_700Bold"],
+        heading: ["Poppins_600SemiBold"],
+        "heading-medium": ["Poppins_500Medium"],
+        "heading-bold": ["Poppins_700Bold"],
+      },
       colors: {
         // Brand red — the real ladder from frontend/src/app/globals.css.
         // Every step here was previously #E01A1B, so `bg-brand-50` (a pale pink

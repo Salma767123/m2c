@@ -39,9 +39,11 @@ import { paymentSettingsService, PublicPaymentSettings } from '@/services/paymen
 import { userProfileService } from '@/services/userProfileService';
 import { addressService, MAX_SAVED_ADDRESSES, type SavedAddress } from '@/services/addressService';
 import { userAuthService } from '@/services/userAuthService';
+import { couponService } from '@/services/couponService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { CheckoutSkeleton } from '@/components/ui/Skeleton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Fonts } from '@/constants/theme';
 import {
   DEFAULT_COUNTRY_ISO,
   EMAIL_REGEX,
@@ -104,6 +106,8 @@ export default function Checkout() {
 
   const [discountAmount, setDiscountAmount] = useState(0);
 
+  const [showAllItems, setShowAllItems] = useState(false);
+
   // Saved addresses
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -114,6 +118,7 @@ export default function Checkout() {
   // Bag add-on (persisted from Cart page)
   const [bagName, setBagName] = useState('');
   const [bagCost, setBagCost] = useState(0);
+  const [freeShippingApplied, setFreeShippingApplied] = useState(false);
 
   const [orderSummary, setOrderSummary] = useState({
     subtotal: 0,
@@ -301,6 +306,37 @@ export default function Checkout() {
       console.error('Failed to parse coupon', e);
     }
   };
+
+  /**
+   * Whether an admin free-shipping offer applies to this order.
+   *
+   * Deliberately the same call the cart makes
+   * (couponService.applyFreeShippingOffer → /coupons/apply-free-shipping), so
+   * the two screens cannot disagree about whether the customer qualified.
+   * A failure means "no offer", which is also what the cart assumes.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    const subtotal = orderSummary.subtotal;
+    if (subtotal <= 0) return;
+
+    (async () => {
+      try {
+        const userData = await userAuthService.getUserData();
+        if (!userData?.id || cancelled) return;
+        const res = await couponService.applyFreeShippingOffer(userData.id, subtotal);
+        if (!cancelled && res.success && (res.data as any)?.freeShipping) {
+          setFreeShippingApplied(true);
+        }
+      } catch {
+        /* no offer available — expected */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orderSummary.subtotal]);
 
   const calculateTotals = () => {
     const subtotal = cartItems.reduce((sum, item) => {
@@ -767,6 +803,9 @@ export default function Checkout() {
         shippingCost: orderSummary.shipping,
         tax: orderSummary.tax,
         discount: orderSummary.discount,
+        // The web sends this; mobile was creating orders that qualified for
+        // free shipping without recording that they had.
+        freeShipping: freeShippingApplied,
         currency: getCurrency(),
       };
 
@@ -802,95 +841,72 @@ export default function Checkout() {
     { id: 3, name: 'Review', icon: CheckCircle },
   ];
 
+  // Step indicator: warm palette from frontend Checkout.tsx.
+  //   completed = green (#1f7a4d), active = red (#e01a1b), inactive = warm grey (#f1e9e2 / #a2968b)
   const renderStepIndicator = () => (
     <View
       style={{
-        backgroundColor: '#ffffff',
-        borderRadius: 20,
-        paddingHorizontal: 20,
-        paddingVertical: 18,
-        marginBottom: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        elevation: 3,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 32,
+        gap: 12,
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        {steps.map((step, index) => {
-          const isActive = currentStep === step.id;
-          const isCompleted = currentStep > step.id;
-          const isLast = index === steps.length - 1;
+      {steps.map((step, index) => {
+        const isCompleted = currentStep > step.id;
+        const isActive = currentStep === step.id;
+        const isLast = index === steps.length - 1;
 
-          return (
-            <React.Fragment key={step.id}>
+        const circleBg = isCompleted ? '#1f7a4d' : isActive ? '#e01a1b' : '#f1e9e2';
+        const circleText = isCompleted || isActive ? '#ffffff' : '#a2968b';
+        const textColor = isCompleted ? '#6b625b' : isActive ? '#1a1a1a' : '#a2968b';
+        const connectorColor = isCompleted ? '#1f7a4d' : '#eadfd4';
+
+        return (
+          <React.Fragment key={step.id}>
+            <View style={{ alignItems: 'center', flex: 1 }}>
               <View
-                style={{ alignItems: 'center', flex: 1 }}
-                accessibilityLabel={`Step ${step.id}: ${step.name}, ${isCompleted ? 'completed' : isActive ? 'current step' : 'upcoming'}`}
-                accessibilityRole="text"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: circleBg,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                {/* Step circle */}
-                <View
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 24,
-                    backgroundColor: isActive || isCompleted ? '#E01A1B' : '#f3f4f6',
-                    borderWidth: isActive ? 2 : 0,
-                    borderColor: '#E01A1B',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 8,
-                    shadowColor: isActive || isCompleted ? '#000' : 'transparent',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.15,
-                    shadowRadius: 6,
-                    elevation: isActive || isCompleted ? 4 : 0,
-                  }}
-                >
-                  {isCompleted ? (
-                    <CheckCircle size={24} color="#ffffff" />
-                  ) : (
-                    <step.icon size={22} color={isActive ? '#ffffff' : '#9ca3af'} />
-                  )}
-                </View>
-
-                {/* Step label */}
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: isActive || isCompleted ? '700' : '600',
-                    color: isActive || isCompleted ? '#E01A1B' : '#94a3b8',
-                    textAlign: 'center',
-                  }}
-                >
-                  {step.name}
-                </Text>
+                {isCompleted ? (
+                  <CheckCircle size={16} color="#ffffff" />
+                ) : (
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: circleText }}>{step.id}</Text>
+                )}
               </View>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: isActive ? '700' : '600',
+                  color: textColor,
+                  marginTop: 6,
+                  textAlign: 'center',
+                }}
+              >
+                {step.name}
+              </Text>
+            </View>
 
-              {/* Connector line */}
-              {!isLast && (
-                <View
-                  style={{
-                    height: 2,
-                    flex: 0.5,
-                    backgroundColor: isCompleted ? '#E01A1B' : '#cbd5e1',
-                    marginBottom: 32,
-                    marginHorizontal: 4,
-                  }}
-                />
-              )}
-            </React.Fragment>
-          );
-        })}
-      </View>
+            {!isLast && (
+              <View style={{ flex: 1, height: 2, backgroundColor: connectorColor, marginHorizontal: 4 }} />
+            )}
+          </React.Fragment>
+        );
+      })}
     </View>
   );
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      <View style={{ flex: 1, backgroundColor: '#faf6f2' }}>
         <CheckoutSkeleton />
       </View>
     );
@@ -899,7 +915,7 @@ export default function Checkout() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-slate-50"
+      style={{ flex: 1, backgroundColor: '#faf6f2' }}
     >
       {/* Header — white, matches app */}
       <View
@@ -909,7 +925,7 @@ export default function Checkout() {
           paddingTop: safeInsets.top + 8,
           paddingBottom: 8,
           borderBottomWidth: 1,
-          borderBottomColor: '#e5e7eb',
+          borderBottomColor: '#e5dbd0',
           flexDirection: 'row',
           alignItems: 'center',
         }}
@@ -923,13 +939,38 @@ export default function Checkout() {
           hitSlop={8}
           style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
         >
-          <ArrowLeft size={22} color="#111827" />
+          <ArrowLeft size={22} color="#1a1a1a" />
         </Pressable>
         <View style={{ flex: 1, marginLeft: 4 }}>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Checkout</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-            <Lock size={12} color="#E01A1B" />
-            <Text style={{ fontSize: 13, color: '#E01A1B', fontWeight: '600' }}>Secure payment</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            {/* Lock icon in gradient circle, matching the web checkout header */}
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                backgroundColor: '#ffffff',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: '#f2d9d3',
+                shadowColor: '#fff',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.5,
+                shadowRadius: 2,
+                elevation: 1,
+              }}
+            >
+              <Lock size={18} color="#E01A1B" />
+            </View>
+            <View>
+              <Text style={{ fontSize: 18, fontWeight: '600', color: '#1a1a1a', fontFamily: Fonts.heading }}>
+                Checkout
+              </Text>
+              <Text style={{ fontSize: 13, color: '#6b625b', marginTop: 2 }}>
+                Complete your purchase securely
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -941,51 +982,54 @@ export default function Checkout() {
       >
         {renderStepIndicator()}
 
-        {/* Main Checkout Card */}
-        <View
-          className="bg-white rounded-[24px] overflow-hidden mb-4 shadow-md"
-        >
-          {/* Card Header */}
-          <LinearGradient
-            colors={['#E01A1B', '#E01A1B']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
+        {/* Step heading — eyebrow + name, matching the web masthead */}
+        <View style={{ marginBottom: 20 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ width: 24, height: 1, backgroundColor: '#e01a1b' }} />
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: '700',
+                color: '#c41617',
+                textTransform: 'uppercase',
+                letterSpacing: 1.98,
+              }}
+            >
+              Step {currentStep} of {steps.length}
+            </Text>
+          </View>
+          <Text
             style={{
-              paddingHorizontal: 20,
-              paddingVertical: 14,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              borderBottomWidth: 1,
-              borderBottomColor: '#E01A1B',
+              fontSize: 20,
+              fontWeight: '600',
+              color: '#1a1a1a',
+              marginTop: 8,
+              fontFamily: Fonts.heading,
+              letterSpacing: -0.5,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 12,
-                  backgroundColor: '#ffffff',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {currentStep === 1 ? <Truck size={18} color="#E01A1B" /> : null}
-                {currentStep === 2 ? <CreditCard size={18} color="#E01A1B" /> : null}
-                {currentStep === 3 ? <CheckCircle size={18} color="#E01A1B" /> : null}
-              </View>
-              <View>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#fffff4' }}>
-                  {currentStep === 1 ? 'Shipping' : currentStep === 2 ? 'Payment' : 'Review'}
-                </Text>
-                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>
-                  Step {currentStep} of {steps.length}
-                </Text>
-              </View>
-            </View>
-          </LinearGradient>
+            {currentStep === 1 && 'Shipping Information'}
+            {currentStep === 2 && 'Payment Information'}
+            {currentStep === 3 && 'Review Your Order'}
+          </Text>
+        </View>
 
+        {/* Main Checkout Card */}
+        <View
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: 16,
+            overflow: 'hidden',
+            marginBottom: 16,
+            shadowColor: '#785032',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.03,
+            shadowRadius: 4,
+            elevation: 1,
+            borderWidth: 1,
+            borderColor: '#efe4d6',
+          }}
+        >
           {/* Card Content */}
           <View style={{ padding: 24 }}>
             {error && (
@@ -993,10 +1037,10 @@ export default function Checkout() {
                 style={{
                   marginBottom: 20,
                   padding: 16,
-                  backgroundColor: '#fef2f2',
+                  backgroundColor: '#fdf1ef',
                   borderRadius: 16,
                   borderWidth: 1.5,
-                  borderColor: '#fecaca',
+                  borderColor: '#f2d0cd',
                   flexDirection: 'row',
                   alignItems: 'flex-start',
                   gap: 12,
@@ -1014,7 +1058,7 @@ export default function Checkout() {
                 >
                   <Text style={{ color: '#dc2626', fontSize: 16, fontWeight: '700' }}>!</Text>
                 </View>
-                <Text style={{ flex: 1, fontSize: 13, color: '#dc2626', lineHeight: 20, fontWeight: '600' }}>
+                <Text style={{ flex: 1, fontSize: 13, color: '#c41617', lineHeight: 20, fontWeight: '600' }}>
                   {error}
                 </Text>
               </View>
@@ -1031,6 +1075,7 @@ export default function Checkout() {
                     onSelect={handleSelectSavedAddress}
                     onChooseNew={handleChooseNewAddress}
                     onEdit={handleEditAddress}
+                    disabled={placingOrder}
                   />
                 ) : null}
 
@@ -1038,247 +1083,320 @@ export default function Checkout() {
                 {useNewAddress ? (
                   <>
                     {savedAddresses.length > 0 ? (
-                      <View style={{ borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 16 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }}>
-                            {editingAddressId ? 'Edit shipping address' : 'Enter new shipping address'}
-                          </Text>
-                          {editingAddressId ? (
-                            <Pressable
-                              onPress={() => {
-                                setEditingAddressId(null);
-                                setUseNewAddress(false);
-                                if (selectedAddressId) {
-                                  const addr = savedAddresses.find((a) => a.id === selectedAddressId);
-                                  if (addr) applySavedAddressToForm(addr);
-                                }
-                              }}
-                              accessibilityRole="button"
-                              accessibilityLabel="Cancel editing"
-                            >
-                              <View style={{ paddingHorizontal: 16, minHeight: 44, backgroundColor: '#f1f5f9', borderRadius: 10, borderWidth: 1, borderColor: '#cbd5e1', alignItems: 'center', justifyContent: 'center' }}>
-                                <Text style={{ fontSize: 13, fontWeight: '600', color: '#475569' }}>Cancel</Text>
-                              </View>
-                            </Pressable>
-                          ) : null}
-                        </View>
-                      </View>
-                    ) : null}
-                    <ShippingForm formData={formData} updateFormData={updateFormData} showAllErrors={shippingSubmitCount > 0} submitAttempt={shippingSubmitCount} />
-                    {/* Save to address book checkbox */}
-                    {!editingAddressId && savedAddresses.length < MAX_SAVED_ADDRESSES ? (
-                      <Pressable
-                        onPress={() => setSaveNewAddressToBook(!saveNewAddressToBook)}
-                        accessibilityRole="checkbox"
-                        accessibilityState={{ checked: saveNewAddressToBook }}
-                        accessibilityLabel="Save this address to my address book"
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 }}>
-                          <View style={{
-                            width: 20, height: 20, borderRadius: 4,
-                            borderWidth: 2, borderColor: saveNewAddressToBook ? '#E01A1B' : '#cbd5e1',
-                            backgroundColor: saveNewAddressToBook ? '#E01A1B' : '#fff',
-                            alignItems: 'center', justifyContent: 'center',
-                          }}>
-                            {saveNewAddressToBook ? <Check size={14} color="#fff" strokeWidth={3} /> : null}
+                  <View style={{ borderTopWidth: 1, borderTopColor: '#f0e8df', paddingTop: 16 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#1a1a1a', fontFamily: Fonts.heading }}>
+                        {editingAddressId ? 'Edit shipping address' : 'Enter new shipping address'}
+                      </Text>
+                      {editingAddressId ? (
+                        <Pressable
+                          onPress={() => {
+                            setEditingAddressId(null);
+                            setUseNewAddress(false);
+                            if (selectedAddressId) {
+                              const addr = savedAddresses.find((a) => a.id === selectedAddressId);
+                              if (addr) applySavedAddressToForm(addr);
+                            }
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel="Cancel editing"
+                        >
+                          <View style={{ paddingHorizontal: 16, minHeight: 44, backgroundColor: '#f3ece5', borderRadius: 10, borderWidth: 1, borderColor: '#e5dbd0', alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: '#4a423c' }}>Cancel</Text>
                           </View>
-                          <Text style={{ fontSize: 13, color: '#475569', flex: 1 }}>
-                            Save this address to my address book
-                            <Text style={{ color: '#94a3b8' }}> ({savedAddresses.length}/{MAX_SAVED_ADDRESSES} used)</Text>
-                          </Text>
-                        </View>
-                      </Pressable>
-                    ) : null}
-                  </>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  </View>
                 ) : null}
+                <ShippingForm formData={formData} updateFormData={updateFormData} disabled={placingOrder} showAllErrors={shippingSubmitCount > 0} submitAttempt={shippingSubmitCount} />
+                {/* Save to address book checkbox */}
+                {!editingAddressId && savedAddresses.length < MAX_SAVED_ADDRESSES ? (
+                  <Pressable
+                    onPress={() => setSaveNewAddressToBook(!saveNewAddressToBook)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: saveNewAddressToBook }}
+                    accessibilityLabel="Save this address to my address book"
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 }}>
+                      <View style={{
+                        width: 20, height: 20, borderRadius: 4,
+                        borderWidth: 2, borderColor: saveNewAddressToBook ? '#E01A1B' : '#e5dbd0',
+                        backgroundColor: saveNewAddressToBook ? '#E01A1B' : '#fff',
+                        alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {saveNewAddressToBook ? <Check size={14} color="#fff" strokeWidth={3} /> : null}
+                      </View>
+                      <Text style={{ fontSize: 13, color: '#4a423c', flex: 1 }}>
+                        Save this address to my address book
+                        <Text style={{ color: '#8a807a' }}> ({savedAddresses.length}/{MAX_SAVED_ADDRESSES} used)</Text>
+                      </Text>
+                    </View>
+                  </Pressable>
+                ) : null}
+              </>
+            ) : null}
               </View>
             )}
             {currentStep === 2 && (
-              <PaymentForm
-                formData={formData}
-                updateFormData={updateFormData}
-                paymentSettings={paymentSettings}
-              />
+               <PaymentForm
+                 formData={formData}
+                 updateFormData={updateFormData}
+                 paymentSettings={paymentSettings}
+                 disabled={placingOrder}
+               />
             )}
             {currentStep === 3 && <ReviewOrder formData={formData} />}
 
             {/* Navigation Buttons */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                marginTop: 28,
-                paddingTop: 24,
-                borderTopWidth: 1,
-                borderTopColor: '#f1f5f9',
-                gap: 12,
-              }}
-            >
-              <Pressable
-                onPress={() => setCurrentStep(Math.max(1, currentStep - 1))}
-                disabled={currentStep === 1 || placingOrder}
-                accessibilityRole="button"
-                accessibilityLabel="Go to previous step"
-                accessibilityState={{ disabled: currentStep === 1 || placingOrder }}
-                style={{ flex: 1 }}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  marginTop: 28,
+                  paddingTop: 24,
+                  borderTopWidth: 1,
+                  borderTopColor: '#f0e8df',
+                  gap: 12,
+                }}
               >
-                <View
-                  style={{
-                    height: 52,
-                    borderRadius: 14,
-                    borderWidth: 1,
-                    borderColor: '#e5e7eb',
-                    backgroundColor: '#ffffff',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: currentStep === 1 || placingOrder ? 0.4 : 1,
-                  }}
-                >
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>Previous</Text>
-                </View>
-              </Pressable>
+                {/* Previous: hidden on first step, matching the web */}
+                {currentStep > 1 ? (
+                  <Pressable
+                    onPress={() => setCurrentStep(Math.max(1, currentStep - 1))}
+                    disabled={placingOrder}
+                    accessibilityRole="button"
+                    accessibilityLabel="Go to previous step"
+                    accessibilityState={{ disabled: placingOrder }}
+                    style={{ flex: 1 }}
+                  >
+                    <View
+                      style={{
+                        height: 52,
+                        borderRadius: 999,
+                        borderWidth: 1,
+                        borderColor: '#e5dbd0',
+                        backgroundColor: '#ffffff',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: placingOrder ? 0.4 : 1,
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#6b625b' }}>
+                        Previous
+                      </Text>
+                    </View>
+                  </Pressable>
+                ) : (
+                  <View style={{ flex: 1 }} />
+                )}
 
-              <Pressable
-                onPress={handleContinue}
-                disabled={placingOrder}
-                accessibilityRole="button"
-                accessibilityLabel={currentStep === 3 ? (placingOrder ? 'Processing order' : 'Place order') : 'Continue to next step'}
-                accessibilityState={{ disabled: placingOrder }}
-                style={{ flex: 1.5 }}
-              >
-                <View
-                  style={{
-                    height: 52,
-                    borderRadius: 999,
-                    backgroundColor: placingOrder ? '#9ca3af' : '#E01A1B',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    shadowColor: placingOrder ? 'transparent' : '#E01A1B',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 8,
-                    elevation: 4,
-                  }}
+                <Pressable
+                  onPress={handleContinue}
+                  disabled={placingOrder}
+                  accessibilityRole="button"
+                  accessibilityLabel={currentStep === 3 ? (placingOrder ? 'Processing order' : 'Place order') : 'Continue to next step'}
+                  accessibilityState={{ disabled: placingOrder }}
+                  style={{ flex: 1.5 }}
                 >
-                  {placingOrder ? <ActivityIndicator size="small" color="#ffffff" /> : null}
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#ffffff' }}>
-                    {currentStep === 3
-                      ? placingOrder
-                        ? 'Processing...'
-                        : 'Place Order'
-                      : 'Continue'}
-                  </Text>
-                </View>
-              </Pressable>
-            </View>
+                  <View
+                    style={{
+                      height: 52,
+                      borderRadius: 999,
+                      backgroundColor: placingOrder ? '#9ca3af' : '#E01A1B',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      shadowColor: placingOrder ? 'transparent' : '#e01a1b',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 8,
+                      elevation: 2,
+                    }}
+                  >
+                    {placingOrder ? <ActivityIndicator size="small" color="#ffffff" /> : null}
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#ffffff' }}>
+                      {currentStep === 3
+                        ? placingOrder
+                          ? 'Processing...'
+                          : 'Place Order'
+                        : 'Continue'}
+                    </Text>
+                  </View>
+                </Pressable>
+              </View>
           </View>
         </View>
 
-        {/* ── Order Summary ─────────────────────────────────────────────── */}
+        {/* ── The order ──────────────────────────────────────────────────
+            A card: white, with a warm hairline and a soft shadow, sticky from
+            lg so it follows you down the steps. */}
         <View
           style={{
             backgroundColor: '#ffffff',
-            borderRadius: 24,
+            borderRadius: 16,
             overflow: 'hidden',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.08,
-            shadowRadius: 16,
-            elevation: 6,
+            shadowColor: '#785032',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.03,
+            shadowRadius: 4,
+            elevation: 1,
             marginBottom: 16,
+            borderWidth: 1,
+            borderColor: '#efe4d6',
           }}
         >
-          {/* Summary header */}
+          {/* Weave texture — subtle grid pattern, matching the web's absolute inset-0 opacity-[0.03] */}
           <View
             style={{
-              backgroundColor: '#f9fafb',
-              paddingHorizontal: 20,
-              paddingVertical: 14,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              borderBottomWidth: 1,
-              borderBottomColor: '#e5e7eb',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'transparent',
+              opacity: 0.03,
+              pointerEvents: 'none',
             }}
+            pointerEvents="none"
           >
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>
-              Order Summary
-            </Text>
-            <View
-              style={{
-                backgroundColor: '#e5e7eb',
-                borderRadius: 12,
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-              }}
-            >
-              <Text style={{ color: '#374151', fontSize: 12, fontWeight: '700' }}>
-                {cartItems.length} item{cartItems.length !== 1 ? 's' : ''}
-              </Text>
-            </View>
+            {[...Array(10)].map((_, i) => (
+              <View
+                key={`w-h-${i}`}
+                style={{
+                  position: 'absolute',
+                  left: i * 20,
+                  top: 0,
+                  bottom: 0,
+                  width: 1,
+                  backgroundColor: '#8a6a49',
+                }}
+              />
+            ))}
+            {[...Array(15)].map((_, i) => (
+              <View
+                key={`w-v-${i}`}
+                style={{
+                  position: 'absolute',
+                  top: i * 12,
+                  left: 0,
+                  right: 0,
+                  height: 1,
+                  backgroundColor: '#8a6a49',
+                }}
+              />
+            ))}
           </View>
 
-          <View style={{ padding: 24 }}>
-            {/* ── Cart Items Preview ─────────────────────────────────────── */}
+          <View style={{ position: 'relative', padding: 24 }}>
+            {/* Summary header */}
+            <View
+              style={{
+                paddingHorizontal: 4,
+                paddingBottom: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: '#eee2d2',
+                marginBottom: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: '600', color: '#1a1a1a', fontFamily: Fonts.heading, letterSpacing: -0.3 }}>
+                Order Summary
+              </Text>
+              <View
+                style={{
+                  backgroundColor: '#e5e7eb',
+                  borderRadius: 12,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                }}
+              >
+                <Text style={{ color: '#6b625b', fontSize: 12, fontWeight: '700' }}>
+                  {cartItems.length} item{cartItems.length !== 1 ? 's' : ''}
+                </Text>
+              </View>
+            </View>
+
+            {/* Cart Items Preview */}
             <View style={{ marginBottom: 20 }}>
-              {cartItems.map((item, idx) => {
+              {(showAllItems ? cartItems : cartItems.slice(0, 3)).map((item, idx) => {
                 const hasVariantImg =
                   (item.variant as any)?.images && (item.variant as any).images.length > 0;
                 const displayImg = hasVariantImg
                   ? (item.variant as any).images[0]
                   : item.product?.images?.[0]?.url;
 
-                const isLastItem = idx === cartItems.length - 1;
+                const isLastItem = idx === (showAllItems ? cartItems.length - 1 : Math.min(cartItems.length - 1, 2));
 
                 return (
                   <View
                     key={item.id}
                     style={{
                       flexDirection: 'row',
-                      gap: 14,
+                      gap: 12,
                       paddingBottom: 16,
                       marginBottom: isLastItem ? 0 : 16,
                       borderBottomWidth: isLastItem ? 0 : 1,
                       borderBottomColor: '#f1f5f9',
                     }}
                   >
-                    {/* Product image */}
+                    {/* Product image — 56px to match web's 14×14mm thumbnail */}
                     <View
                       accessible
                       accessibilityLabel={`Image of ${item.product?.name || 'product'}`}
                       style={{
-                        width: 80,
-                        height: 80,
-                        borderRadius: 14,
+                        width: 56,
+                        height: 56,
+                        borderRadius: 8,
                         backgroundColor: '#f9fafb',
                         overflow: 'hidden',
                         alignItems: 'center',
                         justifyContent: 'center',
                         borderWidth: 1,
-                        borderColor: '#f3f4f6',
+                        borderColor: '#ece0cf',
                       }}
                     >
                       {displayImg ? (
                         <Image
                           source={{ uri: displayImg }}
-                          style={{ width: 80, height: 80 }}
-                          resizeMode="contain"
+                          style={{ width: 56, height: 56 }}
+                          resizeMode="cover"
                         />
                       ) : (
-                        <Package size={26} color="#d1d5db" />
+                        <Package size={20} color="#d1d5db" />
                       )}
+
+                      {/* Quantity badge — overlapping the image corner, like the web */}
+                      <View
+                        style={{
+                          position: 'absolute',
+                          top: -4,
+                          right: -4,
+                          minWidth: 20,
+                          height: 20,
+                          borderRadius: 10,
+                          backgroundColor: '#2f1e1a',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          paddingHorizontal: 4,
+                          borderWidth: 2,
+                          borderColor: '#ffffff',
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#ffffff' }}>{item.quantity}</Text>
+                      </View>
                     </View>
 
                     {/* Details */}
                     <View style={{ flex: 1, justifyContent: 'center' }}>
                       <Text
                         style={{
-                          fontSize: 15,
-                          fontWeight: '700',
-                          color: '#111827',
-                          marginBottom: 6,
+                          fontSize: 14,
+                          fontWeight: '500',
+                          color: '#1a1a1a',
                           lineHeight: 20,
                         }}
                         numberOfLines={2}
@@ -1286,10 +1404,10 @@ export default function Checkout() {
                         {item.product?.name || 'Product'}
                       </Text>
 
-                      {/* Qty + variant row */}
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
+                      {/* Variant info */}
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
                         <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                          <Text style={{ fontSize: 11, color: '#6b7280', fontWeight: '600' }}>
+                          <Text style={{ fontSize: 11, color: '#6b625b', fontWeight: '600' }}>
                             Qty: {item.quantity}
                           </Text>
                         </View>
@@ -1298,45 +1416,56 @@ export default function Checkout() {
                             {(item.variant as any).colorHex && (
                               <View
                                 style={{
-                                  width: 12,
-                                  height: 12,
-                                  borderRadius: 6,
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: 5,
                                   backgroundColor: (item.variant as any).colorHex,
                                   borderWidth: 1,
                                   borderColor: '#e5e7eb',
                                 }}
                               />
                             )}
-                            <Text style={{ fontSize: 11, color: '#6b7280', fontWeight: '600' }}>
+                            <Text style={{ fontSize: 11, color: '#6b625b', fontWeight: '600' }}>
                               {(item.variant as any).color}
                             </Text>
                           </View>
                         )}
                         {(item.variant as any)?.size && (
                           <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                            <Text style={{ fontSize: 11, color: '#6b7280', fontWeight: '600' }}>
+                            <Text style={{ fontSize: 11, color: '#6b625b', fontWeight: '600' }}>
                               {(item.variant as any).size}
                             </Text>
                           </View>
                         )}
                       </View>
 
+                      {/* Offer badge, matching web */}
+                      {(item.product as any)?.activeOffer && (
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: '800',
+                            color: '#c41617',
+                            backgroundColor: '#fdf1ef',
+                            borderRadius: 999,
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            marginTop: 4,
+                            alignSelf: 'flex-start',
+                          }}
+                        >
+                          {(item.product as any).activeOffer.badge}
+                        </Text>
+                      )}
+
                       {/* Stock warnings */}
                       {item.product?.inStock === false && (
-                        <View style={{ backgroundColor: '#fef2f2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, alignSelf: 'flex-start' }}>
+                        <View style={{ backgroundColor: '#fef2f2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, alignSelf: 'flex-start', marginTop: 4 }}>
                           <Text style={{ fontSize: 11, color: '#dc2626', fontWeight: '700' }}>
                             Out of Stock
                           </Text>
                         </View>
                       )}
-                      {item.product?.availableStock !== undefined &&
-                        item.quantity > item.product.availableStock && (
-                          <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, alignSelf: 'flex-start' }}>
-                            <Text style={{ fontSize: 11, color: '#d97706', fontWeight: '700' }}>
-                              Only {item.product.availableStock} available
-                            </Text>
-                          </View>
-                        )}
                     </View>
 
                     {/* Line total */}
@@ -1348,10 +1477,11 @@ export default function Checkout() {
                       return (
                         <Text
                           style={{
-                            fontSize: 16,
-                            fontWeight: '800',
-                            color: '#111827',
+                            fontSize: 14,
+                            fontWeight: '700',
+                            color: '#1a1a1a',
                             alignSelf: 'center',
+                            fontFamily: Fonts.sansSemibold,
                           }}
                         >
                           {fmtCurrency(linePrice * item.quantity)}
@@ -1361,28 +1491,88 @@ export default function Checkout() {
                   </View>
                 );
               })}
+
+              {/* Show all / show fewer toggle, matching the web button */}
+              {!showAllItems && cartItems.length > 3 && (
+                <Pressable
+                  onPress={() => setShowAllItems(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Show all ${cartItems.length} items`}
+                >
+                  <View
+                    style={{
+                      minHeight: 44,
+                      alignSelf: 'stretch',
+                      marginTop: 4,
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      backgroundColor: '#f8f2eb',
+                      borderRadius: 999,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexDirection: 'row',
+                      gap: 6,
+                      borderWidth: 1,
+                      borderColor: '#e8dccd',
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#4a423c' }}>
+                      Show all {cartItems.length} items
+                    </Text>
+                  </View>
+                </Pressable>
+              )}
+              {showAllItems && cartItems.length > 3 && (
+                <Pressable
+                  onPress={() => setShowAllItems(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Show fewer items"
+                >
+                  <View
+                    style={{
+                      minHeight: 44,
+                      alignSelf: 'stretch',
+                      marginTop: 4,
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      backgroundColor: '#f8f2eb',
+                      borderRadius: 999,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexDirection: 'row',
+                      gap: 6,
+                      borderWidth: 1,
+                      borderColor: '#e8dccd',
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#4a423c' }}>
+                      Show fewer items
+                    </Text>
+                  </View>
+                </Pressable>
+              )}
             </View>
 
             {/* ── Price breakdown ───────────────────────────────────────── */}
             <View
               style={{
                 borderTopWidth: 2,
-                borderTopColor: '#f1f5f9',
+                borderTopColor: '#eee2d2',
                 paddingTop: 18,
                 gap: 12,
               }}
             >
               {/* Subtotal */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 15, color: '#6b7280', fontWeight: '600' }}>Subtotal</Text>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
+                <Text style={{ fontSize: 15, color: '#6b625b', fontWeight: '600' }}>Subtotal</Text>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1a1a1a', fontFamily: Fonts.sansSemibold }}>
                   {fmtCurrency(orderSummary.subtotal)}
                 </Text>
               </View>
 
               {/* Shipping */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 15, color: '#6b7280', fontWeight: '600' }}>Shipping</Text>
+                <Text style={{ fontSize: 15, color: '#6b625b', fontWeight: '600' }}>Shipping</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   {orderSummary.shipping === 0 && (
                     <View style={{ backgroundColor: '#dcfce7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
@@ -1392,8 +1582,9 @@ export default function Checkout() {
                   <Text
                     style={{
                       fontSize: 15,
-                      fontWeight: '700',
-                      color: orderSummary.shipping === 0 ? '#16a34a' : '#111827',
+                      fontWeight: '600',
+                      color: orderSummary.shipping === 0 ? '#16a34a' : '#1a1a1a',
+                      fontFamily: Fonts.sansSemibold,
                     }}
                   >
                     {orderSummary.shipping === 0 ? fmtCurrency(0) : fmtCurrency(orderSummary.shipping)}
@@ -1403,8 +1594,8 @@ export default function Checkout() {
 
               {/* GST */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 15, color: '#6b7280', fontWeight: '600' }}>Tax (GST)</Text>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
+                <Text style={{ fontSize: 15, color: '#6b625b', fontWeight: '600' }}>Tax (GST)</Text>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1a1a1a', fontFamily: Fonts.sansSemibold }}>
                   {fmtCurrency(orderSummary.tax)}
                 </Text>
               </View>
@@ -1426,12 +1617,12 @@ export default function Checkout() {
                         style={{ flexDirection: 'row', justifyContent: 'space-between' }}
                       >
                         <Text
-                          style={{ fontSize: 11, color: '#6b7280', flex: 1, marginRight: 8, fontWeight: '600' }}
+                          style={{ fontSize: 11, color: '#6b625b', flex: 1, marginRight: 8, fontWeight: '600' }}
                           numberOfLines={1}
                         >
                           {item.product.name} ({item.product.gstPercentage}%)
                         </Text>
-                        <Text style={{ fontSize: 11, color: '#6b7280', fontWeight: '700' }}>
+                        <Text style={{ fontSize: 11, color: '#6b625b', fontWeight: '700' }}>
                           {fmtCurrency(itemTax)}
                         </Text>
                       </View>
@@ -1443,8 +1634,8 @@ export default function Checkout() {
               {/* Bag add-on */}
               {orderSummary.bagCost > 0 && (
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 15, color: '#6b7280', fontWeight: '600' }}>Bag ({bagName})</Text>
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
+                  <Text style={{ fontSize: 15, color: '#6b625b', fontWeight: '600' }}>Bag ({bagName})</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: '#1a1a1a', fontFamily: Fonts.sansSemibold }}>
                     {fmtCurrency(orderSummary.bagCost)}
                   </Text>
                 </View>
@@ -1457,51 +1648,65 @@ export default function Checkout() {
                     flexDirection: 'row',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    backgroundColor: '#f0fdf4',
+                    backgroundColor: '#fdf1ef',
                     padding: 12,
                     borderRadius: 12,
                     borderWidth: 1,
-                    borderColor: '#bbf7d0',
+                    borderColor: '#f4dcd7',
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <CheckCircle size={16} color="#16a34a" />
-                    <Text style={{ fontSize: 15, color: '#16a34a', fontWeight: '700' }}>Discount</Text>
+                    <CheckCircle size={16} color="#1f7a4d" />
+                    <Text style={{ fontSize: 15, color: '#1f7a4d', fontWeight: '700' }}>Discount</Text>
                   </View>
-                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#16a34a' }}>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#1f7a4d' }}>
                     -{fmtCurrency(orderSummary.discount)}
                   </Text>
                 </View>
               )}
 
-              {/* Total row */}
+              {/* Total row — dark warm gradient, matching the web's one dark object */}
               <View
                 style={{
-                  borderTopWidth: 2,
-                  borderTopColor: '#e5e7eb',
-                  paddingTop: 16,
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginTop: 6,
-                  backgroundColor: '#f8fafc',
-                  padding: 16,
-                  borderRadius: 14,
+                  marginTop: 16,
+                  borderRadius: 16,
+                  overflow: 'hidden',
                 }}
               >
-                <View>
-                  <Text style={{ fontSize: 14, color: '#6b7280', fontWeight: '600', marginBottom: 2 }}>
-                    Total Amount
-                  </Text>
-                  <Text style={{ fontSize: 18, fontWeight: '900', color: '#111827', letterSpacing: -0.5 }}>
-                    {fmtCurrency(orderSummary.total)}
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ fontSize: 11, color: '#6b7280', fontWeight: '600' }}>
-                    incl. all taxes
-                  </Text>
-                </View>
+                <LinearGradient
+                  colors={['#2f1e1a', '#1f1312']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{
+                    padding: 16,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <View>
+                    <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: '600' }}>
+                      Total
+                    </Text>
+                    <Text style={{ fontSize: 22, fontWeight: '700', color: '#ffffff', marginTop: 2, fontFamily: Fonts.heading, letterSpacing: -0.5 }}>
+                      {fmtCurrency(orderSummary.total)}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', fontWeight: '600' }}>
+                      incl. all taxes
+                    </Text>
+                  </View>
+                </LinearGradient>
+                <View
+                  style={{
+                    shadowColor: '#462819',
+                    shadowOffset: { width: 0, height: 14 },
+                    shadowOpacity: 0.4,
+                    shadowRadius: 34,
+                    elevation: 8,
+                  }}
+                />
               </View>
             </View>
 
@@ -1509,16 +1714,15 @@ export default function Checkout() {
             <View
               style={{
                 borderTopWidth: 1,
-                borderTopColor: '#f1f5f9',
+                borderTopColor: '#eee2d2',
                 paddingTop: 20,
                 marginTop: 20,
                 gap: 12,
               }}
             >
               {[
-                { icon: Lock, color: '#16a34a', bg: '#f0fdf4', label: 'SSL Encrypted — your data is safe' },
+                { icon: Lock, color: '#1f7a4d', bg: '#f0fdf4', label: 'SSL Encrypted — your data is safe' },
                 { icon: Shield, color: '#2563eb', bg: '#eff6ff', label: 'Money Back Guarantee' },
-                { icon: Truck, color: '#7c3aed', bg: '#faf5ff', label: 'Free shipping on this order' },
               ].map(({ icon: Icon, color, bg, label }) => (
                 <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   <View
@@ -1533,7 +1737,7 @@ export default function Checkout() {
                   >
                     <Icon size={16} color={color} />
                   </View>
-                  <Text style={{ fontSize: 13, color: '#6b7280', flex: 1, fontWeight: '600' }}>
+                  <Text style={{ fontSize: 13, color: '#6b625b', flex: 1, fontWeight: '600' }}>
                     {label}
                   </Text>
                 </View>
@@ -1567,7 +1771,7 @@ export default function Checkout() {
               hitSlop={6}
             >
               <View style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-                <X size={22} color="#6b7280" />
+                <X size={22} color="#6b625b" />
               </View>
             </Pressable>
           </View>
@@ -1580,7 +1784,7 @@ export default function Checkout() {
             renderLoading={() => (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                 <ActivityIndicator size="large" color="#E01A1B" />
-                <Text style={{ color: '#6b7280', marginTop: 16, fontSize: 14, fontWeight: '600' }}>Loading payment gateway...</Text>
+                <Text style={{ color: '#6b625b', marginTop: 16, fontSize: 14, fontWeight: '600' }}>Loading payment gateway...</Text>
               </View>
             )}
           />

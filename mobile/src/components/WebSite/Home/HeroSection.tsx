@@ -172,7 +172,7 @@ export default function HeroSection() {
                   onPress={() => router.push(href as any)}
                   accessibilityRole="link"
                   accessibilityLabel={slide.altText || 'Promotional banner'}
-                  style={({ pressed }) => [pressed && { opacity: 0.92 }]}
+                  android_ripple={{ color: 'rgba(255,255,255,0.12)' }}
                 >
                   {banner}
                 </Pressable>

@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Lock, ShieldCheck, CircleAlert } from 'lucide-react-native';
+import { CircleAlert } from 'lucide-react-native';
 import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { Palette } from '@/constants/theme';
@@ -78,7 +78,6 @@ export default function ResetPasswordScreen() {
       <AuthShell
         title="Link Not Valid"
         subtitle="This reset link is missing or expired"
-        icon={<CircleAlert size={20} color="#FFFFFF" />}
         footer={
           <AuthSwitch
             prompt="Need a new link?"
@@ -100,7 +99,6 @@ export default function ResetPasswordScreen() {
         <AuthButton
           label="Request a New Link"
           onPress={() => router.replace('/(auth)/ForgotPassword')}
-          icon={<Lock size={18} color="#FFFFFF" strokeWidth={2.5} />}
         />
       </AuthShell>
     );
@@ -110,7 +108,6 @@ export default function ResetPasswordScreen() {
     <AuthShell
       title="Set New Password"
       subtitle="Choose something you'll remember"
-      icon={<ShieldCheck size={20} color="#FFFFFF" />}
       footer={
         <AuthSwitch
           prompt="Changed your mind?"
@@ -122,7 +119,6 @@ export default function ResetPasswordScreen() {
       <View>
         <AuthField
           label="New Password"
-          icon={<Lock size={18} color={Palette.textMuted} strokeWidth={2} />}
           value={password}
           onChangeText={(v) => {
             setPassword(v);
@@ -143,7 +139,6 @@ export default function ResetPasswordScreen() {
 
       <AuthField
         label="Confirm New Password"
-        icon={<Lock size={18} color={Palette.textMuted} strokeWidth={2} />}
         value={confirmPassword}
         onChangeText={(v) => {
           setConfirmPassword(v);
@@ -161,7 +156,6 @@ export default function ResetPasswordScreen() {
         busyLabel="Updating..."
         busy={submitting}
         onPress={handleSubmit}
-        icon={<ShieldCheck size={18} color="#FFFFFF" strokeWidth={2.5} />}
       />
     </AuthShell>
   );

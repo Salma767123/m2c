@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import { Search, SlidersHorizontal } from 'lucide-react-native';
+import EmptyState from '@/components/WebSite/Shared/EmptyState';
 import ProductCard from '../ProductCard/ProductCard';
+import { PRODUCT_CARD_WIDTH } from '../ProductCard/metrics';
 
 interface Product {
   id: string;
@@ -211,17 +213,15 @@ export function SearchResults({
             <Text className="text-gray-500">Searching products...</Text>
           </View>
         ) : filteredAndSortedResults.length === 0 ? (
-          <View className="flex-1 items-center justify-center py-20">
-            <Search size={48} color="#d1d5db" />
-            <Text className="text-lg font-bold text-gray-900 mt-4 mb-2">No results found</Text>
-            <Text className="text-gray-500 text-center">
-              Try adjusting your search terms or filters
-            </Text>
-          </View>
+          <EmptyState
+            icon={Search}
+            title="No results found"
+            subtitle="Try adjusting your search terms or filters"
+          />
         ) : (
           <View className="flex-row flex-wrap justify-between">
             {filteredAndSortedResults.map((product) => (
-              <View key={product.id} className="w-[48%] mb-4">
+              <View key={product.id} style={{ width: PRODUCT_CARD_WIDTH, marginBottom: 16 }}>
                 <ProductCard product={product} />
               </View>
             ))}

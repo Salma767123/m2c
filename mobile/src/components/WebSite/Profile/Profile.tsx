@@ -6,29 +6,26 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  StatusBar,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   User,
   LogOut,
-  Save,
-  X,
-  Edit3,
-  Mail,
-  Phone,
-  MapPin,
-  Calendar,
-  ShoppingCart,
-  Heart,
+  Camera,
   Package,
-  ChevronRight,
-  HelpCircle,
+  Heart,
+  MapPin,
+  ShoppingCart,
   LifeBuoy,
+  HelpCircle,
+  ChevronRight,
 } from 'lucide-react-native';
-import { useFocusEffect } from 'expo-router';
-import { router } from 'expo-router';
+import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
+import { useFocusEffect, useRouter } from 'expo-router';
 import ProfileTab from './ProfileTab';
 import type { UserProfile } from './types';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
@@ -37,8 +34,25 @@ import { userProfileService } from '@/services/userProfileService';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { ProfileSkeleton } from '@/components/ui/Skeleton';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Palette } from '@/constants/theme';
+import { Palette, Fonts } from '@/constants/theme';
+
+// Warm palette — 1:1 with the web storefront so the two clients read as the
+// same product. The mobile theme's neutral ramp is cooler (slate); these warm
+// grays come straight from the web Profile.tsx.
+const WARM = {
+  pageGround: '#faf7f3',
+  cardBorder: '#efe4d8',
+  rule: '#f2e9df',
+  textMuted: '#5f5550',
+  textSubtle: '#a89a8d',
+  red: '#e01a1b',
+  redDark: '#7a0f10',
+  activeBg: '#fdf3f0',
+  activeText: '#7a0f10',
+  disabledBg: '#faf7f3',
+  disabledBorder: '#eee6dc',
+  disabledText: '#5f5550',
+} as const;
 
 // Firebase push notifications — fails gracefully in Expo Go
 let unregisterPushNotifications: (() => Promise<void>) | null = null;
@@ -50,6 +64,22 @@ try {
   // Firebase not available
 }
 
+// ── Phone code helpers (mirror the web's splitPhone / joinPhone) ──────────────
+// Stored value is "+<code> <number>" — split for the UI, joined on save.
+const splitPhone = (v?: string): { code: string; num: string } => {
+  const s = (v || '').trim();
+  if (s.startsWith('+')) {
+    const sp = s.indexOf(' ');
+    if (sp > 0) return { code: s.slice(0, sp), num: s.slice(sp + 1).trim() };
+  }
+  return { code: '+91', num: s };
+};
+
+const joinPhone = (code?: string, num?: string) => {
+  const n = (num || '').trim();
+  return n ? `${(code || '+91').trim()} ${n}` : '';
+};
+
 export default function Profile() {
   const { clearCart } = useCart();
   const { clearWishlist } = useWishlist();
@@ -57,6 +87,7 @@ export default function Profile() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   const [userProfile, setUserProfile] = useState<UserProfile>({
     id: '',
@@ -66,7 +97,10 @@ export default function Profile() {
     lastName: '',
     email: '',
     phone: '',
-    whatsappNumber: '',
+    phoneCode: '+91',
+    whatsapp: '',
+    whatsappCode: '+91',
+    image: '',
     gender: 'male',
     address: { addressLine1: '', city: '', state: '', zipCode: '', country: '' },
     joinDate: '',
@@ -82,27 +116,15 @@ export default function Profile() {
     scrollRef.current?.scrollTo({ y: Math.max(0, formYRef.current - 12), animated: true });
   };
 
-  useFocusEffect(
-    React.useCallback(() => {
-      checkAuthAndLoad();
-    }, []),
-  );
-
-  const checkAuthAndLoad = async () => {
-    try {
-      const auth = await userAuthService.isAuthenticated();
-      setIsAuthenticated(auth);
-      if (auth) await loadProfile();
-    } catch { /* ignore */ }
-    finally { setIsLoading(false); }
-  };
-
   const loadProfile = async () => {
     try {
-      const res = await userProfileService.getProfile();
+      const res = await userProfileService.getProfile(true);
       if (res.success && res.data) {
         const d = res.data;
         const parts = (d.name || '').trim().split(' ');
+        const ph = splitPhone(d.phoneNumber);
+        const wa = splitPhone(d.whatsappNumber);
+
         const profile: UserProfile = {
           id: d.id,
           title: d.title || '',
@@ -110,11 +132,13 @@ export default function Profile() {
           middleName: d.middleName || '',
           lastName: parts.slice(1).join(' ') || '',
           email: d.email,
-          phone: d.phoneNumber || '',
-          whatsappNumber: d.whatsappNumber || '',
-          // Was hardcoded to 'male', so the picker showed "Male" for everyone
-          // regardless of what was stored and the real value was never read.
+          phone: ph.num,
+          phoneCode: ph.code,
+          whatsapp: wa.num,
+          whatsappCode: wa.code,
+          // Gender was hardcoded to 'male'; now read from stored value.
           gender: (d.gender as UserProfile['gender']) || 'male',
+          image: d.image || '',
           address: {
             addressLine1: d.address || '',
             city: d.city || '',
@@ -128,10 +152,28 @@ export default function Profile() {
         setUserProfile(profile);
         setEditedProfile(profile);
       }
-    } catch (e: any) {
+     } catch (e: any) {
       showErrorToast('Load Failed', e.message || 'Unable to load profile');
     }
   };
+
+  const checkAuthAndLoad = async () => {
+    try {
+      const auth = await userAuthService.isAuthenticated();
+      setIsAuthenticated(auth);
+      if (auth) await loadProfile();
+    } catch { /* ignore */ }
+    finally { setIsLoading(false); }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      checkAuthAndLoad();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
+
+  const router = useRouter();
 
   // Inline validation — returns a map of field → error message
   const validate = (): Partial<Record<'firstName' | 'phone', string>> => {
@@ -178,32 +220,87 @@ export default function Profile() {
     setErrors({});
     try {
       setIsSaving(true);
-      const name = `${editedProfile.firstName} ${editedProfile.lastName}`.trim();
+      const fullName = `${editedProfile.firstName} ${editedProfile.lastName}`.trim();
       // Profile update only covers personal info. Addresses are managed
-      // separately in the Saved Addresses screen.
-      // `name` stays first + last to match the web; middleName is its own
-      // column on the backend rather than part of the joined name.
-      // gender was being collected by the picker and then dropped here, so the
-      // choice never left the device.
-      const res = await userProfileService.updateProfile({
-        name,
+      // separately in the Saved Addresses screen. Phone/WhatsApp are stored
+      // with their country code prefix — join now to match the web.
+      const updateData = {
+        name: fullName,
         title: editedProfile.title || undefined,
         middleName: editedProfile.middleName.trim() || undefined,
         gender: editedProfile.gender,
-        phoneNumber: editedProfile.phone.trim(),
-        whatsappNumber: editedProfile.whatsappNumber.trim() || undefined,
-      });
+        phoneNumber: joinPhone(editedProfile.phoneCode, editedProfile.phone),
+        whatsappNumber: joinPhone(editedProfile.whatsappCode, editedProfile.whatsapp) || undefined,
+      };
+
+      const res = await userProfileService.updateProfile(updateData);
+
       if (res.success) {
         setUserProfile(editedProfile);
         setIsEditing(false);
-        showSuccessToast('Saved', 'Profile updated successfully');
+        showSuccessToast('Profile Updated', 'Your profile has been updated successfully');
       } else {
         showErrorToast('Failed', res.error || 'Unable to update');
       }
     } catch (e: any) {
-      showErrorToast('Failed', e.message || 'Unable to save');
+      showErrorToast('Failed', e.message || 'Unable to save profile');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Mirror the new photo into the stored auth session so the sidebar avatar
+  // updates instantly (same mechanism login uses on the web).
+  const syncStoredImage = async (image: string) => {
+    try {
+      const raw = await userAuthService.getUserData();
+      if (raw) {
+        raw.image = image;
+        await AsyncStorage.setItem('userData', JSON.stringify(raw));
+      }
+    } catch {
+      // non-fatal — avatar will refresh on next reload
+    }
+  };
+
+  const handleAvatarChange = async () => {
+    if (!isEditing) return;
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        showErrorToast('Permission needed', 'We need photo access to change your profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+
+      setIsUploadingPhoto(true);
+      // Build a data URL the same way the web does — the backend accepts
+      // base64 image data on PUT /auth/profile.
+      const dataUrl = `data:image/jpeg;base64,${asset.base64}`;
+      const fullName = `${userProfile.firstName} ${userProfile.lastName}`.trim() || userProfile.email;
+      const response = await userProfileService.updateProfile({ name: fullName, image: dataUrl });
+
+      if (response.success) {
+        const newImg = response.data?.image || '';
+        setUserProfile((p) => ({ ...p, image: newImg }));
+        setEditedProfile((p) => ({ ...p, image: newImg }));
+        await syncStoredImage(newImg);
+        showSuccessToast('Photo updated', 'Your profile photo has been updated successfully.');
+      }
+    } catch {
+      showErrorToast('Upload failed', 'Unable to update your photo.');
+    } finally {
+      setIsUploadingPhoto(false);
     }
   };
 
@@ -232,7 +329,7 @@ export default function Profile() {
     return `${f}${l}` || '?';
   };
 
-  const joinDate = () => {
+  const memberSince = () => {
     try {
       const d = new Date(userProfile.joinDate);
       if (isNaN(d.getTime())) return 'Recently';
@@ -243,29 +340,29 @@ export default function Profile() {
   // ── Loading ─────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-        <ScreenHeader />
+      <View style={{ flex: 1, backgroundColor: WARM.pageGround }}>
+        <ScreenHeader icon={User} title="My Profile" />
         <ProfileSkeleton />
       </View>
     );
   }
 
-  // ── Not authenticated ───────────────────────────────────────────────────
+  // ── Not authenticated ─────────────────────────────────────────────────────
   if (!isAuthenticated) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-        <ScreenHeader />
+      <View style={{ flex: 1, backgroundColor: WARM.pageGround }}>
+        <ScreenHeader icon={User} title="My Profile" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
             <User size={40} color="#d1d5db" />
           </View>
-          <Text style={{ fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 6 }}>Login Required</Text>
-          <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24 }}>
+          <Text style={{ fontFamily: Fonts.sansBold, fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 6 }}>Login Required</Text>
+          <Text style={{ fontFamily: Fonts.sans, fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24 }}>
             Sign in to view and manage your profile.
           </Text>
           <Pressable onPress={() => router.push('/(auth)/Login' as any)} accessibilityRole="button">
             <View style={{ backgroundColor: Palette.primary, paddingHorizontal: 28, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Login to Continue</Text>
+              <Text style={{ fontFamily: Fonts.sansBold, color: '#fff', fontSize: 15, fontWeight: '700' }}>Login to Continue</Text>
             </View>
           </Pressable>
         </View>
@@ -276,16 +373,10 @@ export default function Profile() {
   // ── Main ────────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#f8fafc' }}
+      style={{ flex: 1, backgroundColor: WARM.pageGround }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScreenHeader
-        isEditing={isEditing}
-        isSaving={isSaving}
-        onEdit={handleEdit}
-        onSave={handleSave}
-        onCancel={handleCancel}
-      />
+      <ScreenHeader icon={User} title="My Profile" />
 
       <ScrollView
         ref={scrollRef}
@@ -294,66 +385,119 @@ export default function Profile() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
-        {/* Profile card */}
+        {/* Profile card — mirrors the web sidebar identity card: centred stack,
+            avatar with camera overlay, name, member since. */}
         <View
           style={{
             margin: 16,
-            backgroundColor: '#fff',
-            borderRadius: 16,
+            backgroundColor: Palette.surface,
+            borderRadius: 24,
             borderWidth: 1,
-            borderColor: '#e5e7eb',
+            borderColor: WARM.cardBorder,
             padding: 20,
-            shadowColor: '#0f172a',
-            shadowOffset: { width: 0, height: 2 },
+            shadowColor: WARM.redDark,
+            shadowOffset: { width: 0, height: 10 },
             shadowOpacity: 0.05,
-            shadowRadius: 8,
+            shadowRadius: 30,
             elevation: 2,
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {/* Avatar — photo when available, initials fallback like the web. */}
             <View
               style={{
-                width: 60,
-                height: 60,
-                borderRadius: 18,
+                width: 72,
+                height: 72,
+                borderRadius: 36,
                 backgroundColor: Palette.primary,
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: 16,
+                overflow: 'hidden',
               }}
             >
-              <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>{initials()}</Text>
+              {userProfile.image ? (
+                <Image
+                  source={{ uri: userProfile.image }}
+                  style={{ width: '100%', height: '100%' }}
+                  contentFit="cover"
+                  transition={150}
+                />
+              ) : (
+                <Text style={{ fontFamily: Fonts.heading, color: Palette.onPrimary, fontSize: 23, fontWeight: '600' }}>{initials()}</Text>
+              )}
             </View>
+
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>
-                {userProfile.firstName} {userProfile.lastName}
+              {/* The web sets this name as its page h1 — `font-playfair
+                  font-semibold tracking-tight text-[#1a1a1a]`. It was Outfit
+                  Bold in Palette.ink (#111827), the blue-tinted neutral. */}
+              <Text
+                style={{
+                  fontFamily: Fonts.heading,
+                  fontSize: 18,
+                  fontWeight: '600',
+                  letterSpacing: -0.4,
+                  color: '#1a1a1a',
+                }}
+              >
+                {[userProfile.title, userProfile.firstName, userProfile.middleName, userProfile.lastName]
+                  .map((p) => (p || '').trim())
+                  .filter(Boolean)
+                  .join(' ') || 'My Account'}
               </Text>
-              <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>{userProfile.email}</Text>
+              <Text style={{ fontFamily: Fonts.sans, fontSize: 13, color: WARM.textMuted, marginTop: 2 }}>{userProfile.email}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 }}>
-                <Calendar size={12} color="#6b7280" />
-                <Text style={{ fontSize: 12, color: '#6b7280' }}>Member since {joinDate()}</Text>
+                <Text style={{ fontFamily: Fonts.sansSemibold, fontSize: 11, color: WARM.textSubtle, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' }}>
+                  Member since {memberSince()}
+                </Text>
               </View>
             </View>
-          </View>
 
-          {/* Quick info pills */}
-          <View style={{ flexDirection: 'row', marginTop: 16, gap: 8 }}>
-            <InfoPill icon={<Phone size={11} color="#6b7280" />} label={userProfile.phone || 'No phone'} />
-            <InfoPill icon={<MapPin size={11} color="#6b7280" />} label={userProfile.address.city || 'No location'} />
+            {/* Camera button — only visible when editing, like the web's avatar
+                button that opens the pick → crop → upload flow. */}
+            {isEditing && (
+              <Pressable
+                onPress={handleAvatarChange}
+                disabled={isUploadingPhoto}
+                accessibilityRole="button"
+                accessibilityLabel={userProfile.image ? 'Change profile picture' : 'Add a profile picture'}
+                style={{
+                  position: 'absolute',
+                  bottom: -4,
+                  right: -4,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: Palette.primary,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: isUploadingPhoto ? 0.6 : 1,
+                }}
+              >
+                {isUploadingPhoto ? (
+                  <ActivityIndicator size={14} color={Palette.onPrimary} />
+                ) : (
+                  <Camera size={16} color={Palette.onPrimary} />
+                )}
+              </Pressable>
+            )}
           </View>
         </View>
 
-        {/* Quick links */}
-        <View style={{ marginHorizontal: 16, marginBottom: 14, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#e5e7eb', overflow: 'hidden' }}>
-          <MenuItem icon={<Package size={18} color="#111827" />} label="My Orders" onPress={() => router.push('/(tabs)/orders' as any)} />
-          <MenuItem icon={<MapPin size={18} color="#111827" />} label="Saved Addresses" onPress={() => router.push('/(any)/saved-addresses' as any)} />
-          <MenuItem icon={<Heart size={18} color="#111827" />} label="My Wishlist" onPress={() => router.push('/(tabs)/wishlist' as any)} />
-          <MenuItem icon={<ShoppingCart size={18} color="#111827" />} label="My Cart" onPress={() => router.push('/(tabs)/cart' as any)} />
-          <MenuItem icon={<LifeBuoy size={18} color="#111827" />} label="My Support Tickets" onPress={() => router.push('/(any)/support' as any)} />
-          <MenuItem icon={<HelpCircle size={18} color="#111827" />} label="Contact Us" onPress={() => router.push('/(any)/contact' as any)} last />
+        {/* Quick links — mirrors the web sidebar nav tabs: Orders, Addresses,
+            Wishlist, Cart, Support, Contact. */}
+        <View style={{ marginHorizontal: 16, marginBottom: 14, backgroundColor: Palette.surface, borderRadius: 16, borderWidth: 1, borderColor: WARM.cardBorder, overflow: 'hidden' }}>
+          <MenuItem icon={<Package size={18} color={Palette.primary} />} label="My Orders" onPress={() => router.push('/(tabs)/orders' as any)} />
+          <MenuItem icon={<MapPin size={18} color={Palette.primary} />} label="Saved Addresses" onPress={() => router.push('/(any)/saved-addresses' as any)} />
+          <MenuItem icon={<Heart size={18} color={Palette.primary} />} label="My Wishlist" onPress={() => router.push('/(tabs)/wishlist' as any)} />
+          <MenuItem icon={<ShoppingCart size={18} color={Palette.primary} />} label="My Cart" onPress={() => router.push('/(tabs)/cart' as any)} />
+          <MenuItem icon={<LifeBuoy size={18} color={Palette.primary} />} label="My Support Tickets" onPress={() => router.push('/(any)/support' as any)} />
+          <MenuItem icon={<HelpCircle size={18} color={Palette.primary} />} label="Contact Us" onPress={() => router.push('/(any)/contact' as any)} last />
         </View>
 
-        {/* Profile form */}
+        {/* Profile form — Edit/Save/Cancel now live on the card header, matching
+            the web ProfileTab. */}
         <View onLayout={(e) => { formYRef.current = e.nativeEvent.layout.y; }}>
           <ProfileTab
             editedProfile={editedProfile}
@@ -362,7 +506,12 @@ export default function Profile() {
               if (Object.keys(errors).length > 0) setErrors({});
             }}
             isEditing={isEditing}
+            isSaving={isSaving}
             errors={errors}
+            onEdit={handleEdit}
+            onSave={handleSave}
+            onCancel={handleCancel}
+            onGoToAddresses={() => router.push('/(any)/saved-addresses' as any)}
           />
         </View>
 
@@ -374,16 +523,16 @@ export default function Profile() {
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: '#fff',
+                backgroundColor: Palette.surface,
                 borderRadius: 14,
                 borderWidth: 1,
-                borderColor: '#E01A1B',
+                borderColor: Palette.primary,
                 height: 52,
                 gap: 8,
               }}
             >
-              <LogOut size={18} color="#E01A1B" />
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#E01A1B' }}>Sign Out</Text>
+              <LogOut size={18} color={Palette.primary} />
+              <Text style={{ fontFamily: Fonts.sansBold, fontSize: 15, fontWeight: '700', color: Palette.primary }}>Sign Out</Text>
             </View>
           </Pressable>
         </View>
@@ -393,61 +542,6 @@ export default function Profile() {
 }
 
 // ─── Header ───────────────────────────────────────────────────────────────────
-function ScreenHeader({
-  isEditing,
-  isSaving,
-  onEdit,
-  onSave,
-  onCancel,
-}: {
-  isEditing?: boolean;
-  isSaving?: boolean;
-  onEdit?: () => void;
-  onSave?: () => void;
-  onCancel?: () => void;
-}) {
-  const insets = useSafeAreaInsets();
-  return (
-    <View
-      style={{
-        backgroundColor: '#fff',
-        paddingHorizontal: 16,
-        paddingTop: insets.top + 12,
-        paddingBottom: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: '#e5e7eb',
-        flexDirection: 'row',
-        alignItems: 'center',
-      }}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 24, fontWeight: '800', color: '#111827' }}>My Profile</Text>
-      </View>
-      {isEditing ? (
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Pressable onPress={onSave} disabled={isSaving} accessibilityRole="button" accessibilityLabel="Save profile" accessibilityState={{ disabled: isSaving }}>
-            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: Palette.primary, alignItems: 'center', justifyContent: 'center', opacity: isSaving ? 0.6 : 1 }}>
-              {isSaving ? <ActivityIndicator size={14} color="#fff" /> : <Save size={18} color="#fff" />}
-            </View>
-          </Pressable>
-          <Pressable onPress={onCancel} disabled={isSaving} accessibilityRole="button" accessibilityLabel="Cancel editing">
-            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
-              <X size={18} color="#111827" />
-            </View>
-          </Pressable>
-        </View>
-      ) : onEdit ? (
-        <Pressable onPress={onEdit} accessibilityRole="button" accessibilityLabel="Edit profile">
-          <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
-            <Edit3 size={18} color="#111827" />
-          </View>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
 // ─── Menu item ────────────────────────────────────────────────────────────────
 function MenuItem({ icon, label, onPress, last }: { icon: React.ReactNode; label: string; onPress: () => void; last?: boolean }) {
   return (
@@ -459,36 +553,15 @@ function MenuItem({ icon, label, onPress, last }: { icon: React.ReactNode; label
           paddingHorizontal: 16,
           paddingVertical: 14,
           borderBottomWidth: last ? 0 : 1,
-          borderBottomColor: '#f3f4f6',
+          borderBottomColor: WARM.cardBorder,
         }}
       >
-        <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+        <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: Palette.primaryContainer, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
           {icon}
         </View>
-        <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: '#111827' }}>{label}</Text>
-        <ChevronRight size={16} color="#9ca3af" />
+        <Text style={{ fontFamily: Fonts.sansSemibold, flex: 1, fontSize: 15, fontWeight: '600', color: Palette.ink }}>{label}</Text>
+        <ChevronRight size={16} color={Palette.textSubtle} />
       </View>
     </Pressable>
-  );
-}
-
-// ─── Info pill ────────────────────────────────────────────────────────────────
-function InfoPill({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f9fafb',
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        gap: 5,
-        flex: 1,
-      }}
-    >
-      {icon}
-      <Text style={{ fontSize: 12, color: '#374151', fontWeight: '500' }} numberOfLines={1}>{label}</Text>
-    </View>
   );
 }

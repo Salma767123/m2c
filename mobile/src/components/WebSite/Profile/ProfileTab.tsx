@@ -1,22 +1,50 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, TextInput, Animated, Pressable } from 'react-native';
-import { router } from 'expo-router';
+import { View, Text, TextInput, Animated, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import {
   User,
   Info,
   ChevronRight,
   Mail,
   Phone,
-  Lock,
   AlertCircle,
+  Save,
+  X,
+  SquarePen,
+  MessageCircle,
 } from 'lucide-react-native';
+import CountryCodeSelect from './CountryCodeSelect';
 import type { UserProfile } from './types';
+import { Palette, Fonts } from '@/constants/theme';
+
+// Warm palette — 1:1 with the web ProfileTab.tsx so both clients read as one.
+const WARM = {
+  pageGround: '#faf7f3',
+  cardBorder: '#efe4d8',
+  rule: '#f2e9df',
+  textMuted: '#5f5550',
+  textSubtle: '#a89a8d',
+  ink: '#1a1a1a',
+  red: '#e01a1b',
+  redDark: '#7a0f10',
+  redLight: '#fdf3f0',
+  disabledBg: '#faf7f3',
+  disabledBorder: '#eee6dc',
+  disabledText: '#5f5550',
+} as const;
+
+const TITLE_OPTIONS = ['Mr', 'Mrs', 'Ms', 'Miss', 'Mx', 'Dr'] as const;
 
 interface ProfileTabProps {
   editedProfile: UserProfile;
   setEditedProfile: (profile: UserProfile) => void;
   isEditing: boolean;
+  isSaving: boolean;
   errors?: Partial<Record<'firstName' | 'phone', string>>;
+  onEdit: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+  /** Switches the account page to the Saved Addresses screen. */
+  onGoToAddresses: () => void;
 }
 
 // ── Reusable Section Card ──
@@ -24,12 +52,24 @@ function SectionCard({
   title,
   icon: Icon,
   iconColor,
+  showEditControls,
+  isEditing,
+  isSaving,
+  onEdit,
+  onSave,
+  onCancel,
   children,
   delay = 0,
 }: {
   title: string;
   icon: any;
   iconColor: string;
+  showEditControls: boolean;
+  isEditing: boolean;
+  isSaving: boolean;
+  onEdit: () => void;
+  onSave: () => void;
+  onCancel: () => void;
   children: React.ReactNode;
   delay?: number;
 }) {
@@ -41,56 +81,84 @@ function SectionCard({
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, delay, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 400, delay, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [fadeAnim, slideAnim, delay]);
 
   return (
     <Animated.View
-      style={{
-        opacity: fadeAnim,
-        transform: [{ translateY: slideAnim }],
-        marginHorizontal: 16,
-        marginTop: 16,
-        backgroundColor: '#ffffff',
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
-        shadowColor: '#0f172a',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-        overflow: 'hidden',
-      }}
+      style={[
+        styles.card,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+          backgroundColor: Palette.surface,
+          borderColor: WARM.cardBorder,
+          shadowColor: WARM.redDark,
+        },
+      ]}
     >
-      {/* Section Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 16,
-          paddingVertical: 14,
-          borderBottomWidth: 1,
-          borderBottomColor: '#f3f4f6',
-        }}
-      >
-        <View
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            backgroundColor: '#f3f4f6',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginRight: 10,
-          }}
-        >
-          <Icon size={16} color={iconColor} />
+      {/* Card header — label + edit controls, just like the web ProfileTab. */}
+      <View style={[styles.cardHeader, { borderBottomColor: WARM.rule }]}>
+        <View>
+          <View style={styles.cardHeaderLabel}>
+            <View style={[styles.cardHeaderDot, { backgroundColor: WARM.red }]} />
+            <Text style={[styles.cardHeaderLabelText, { color: WARM.textSubtle }]}>Personal information</Text>
+          </View>
+          <View style={styles.cardHeaderTitleRow}>
+            <Icon size={20} color={iconColor} style={{ marginRight: 8 }} />
+            <Text style={[styles.cardHeaderTitle, { color: Palette.ink }]}>{title}</Text>
+          </View>
         </View>
-        <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>{title}</Text>
+
+        {showEditControls ? (
+          !isEditing ? (
+            <Pressable
+              onPress={onEdit}
+              accessibilityRole="button"
+              accessibilityLabel="Edit profile"
+              style={[styles.editBtn, { backgroundColor: WARM.redLight, borderColor: '#e8d2cb' }]}
+            >
+              <SquarePen size={16} color={WARM.redDark} />
+              <Text style={[styles.editBtnText, { color: WARM.redDark }]}>Edit profile</Text>
+            </Pressable>
+          ) : (
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Pressable
+                onPress={onSave}
+                disabled={isSaving}
+                accessibilityRole="button"
+                accessibilityLabel="Save changes"
+                accessibilityState={{ disabled: isSaving }}
+                style={[
+                  styles.saveBtn,
+                  { backgroundColor: WARM.red },
+                  isSaving && { opacity: 0.6 },
+                ]}
+              >
+                {isSaving ? (
+                  <ActivityIndicator size={14} color={Palette.onPrimary} />
+                ) : (
+                  <Save size={16} color={Palette.onPrimary} />
+                )}
+                <Text style={[styles.saveBtnText, { color: Palette.onPrimary }]}>
+                  {isSaving ? 'Saving…' : 'Save'}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={onCancel}
+                disabled={isSaving}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel editing"
+                style={[styles.cancelBtn, { borderColor: WARM.cardBorder }]}
+              >
+                <X size={16} color={WARM.textMuted} />
+                <Text style={[styles.cancelBtnText, { color: WARM.textMuted }]}>Cancel</Text>
+              </Pressable>
+            </View>
+          )
+        ) : null}
       </View>
 
-      {/* Section Content */}
-      <View style={{ padding: 16 }}>{children}</View>
+      <View style={styles.cardContent}>{children}</View>
     </Animated.View>
   );
 }
@@ -106,9 +174,6 @@ const FormField = React.forwardRef<TextInput, {
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   accessibilityLabel?: string;
   isLast?: boolean;
-  /** Never editable, regardless of isEditing — e.g. account email. */
-  readOnly?: boolean;
-  readOnlyHint?: string;
   leadingIcon?: any;
   error?: string;
   returnKeyType?: 'next' | 'done';
@@ -131,8 +196,6 @@ const FormField = React.forwardRef<TextInput, {
     autoCapitalize,
     accessibilityLabel,
     isLast = false,
-    readOnly = false,
-    readOnlyHint,
     leadingIcon: LeadingIcon,
     error,
     returnKeyType,
@@ -141,42 +204,26 @@ const FormField = React.forwardRef<TextInput, {
   },
   ref,
 ) {
-  const canEdit = isEditing && !readOnly;
+  const canEdit = isEditing;
   const hasError = !!error;
 
   return (
     <View style={{ marginBottom: isLast ? 0 : 16 }}>
-      <Text
-        style={{
-          fontSize: 12,
-          fontWeight: '700',
-          color: '#6b7280',
-          marginBottom: 6,
-          textTransform: 'uppercase',
-          letterSpacing: 0.5,
-        }}
-      >
+      <Text style={[styles.fieldLabel, { color: canEdit ? WARM.textSubtle : WARM.textMuted }]}>
         {label}
       </Text>
 
       <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          minHeight: 50,
-          borderRadius: 12,
-          borderWidth: 1.5,
-          borderColor: hasError
-            ? '#E01A1B'
-            : canEdit
-              ? '#d1d5db'
-              : '#f3f4f6',
-          backgroundColor: canEdit ? '#ffffff' : '#f9fafb',
-          paddingHorizontal: 12,
-        }}
+        style={[
+          styles.fieldRow,
+          {
+            borderColor: hasError ? WARM.red : canEdit ? '#d1d5db' : WARM.disabledBorder,
+            backgroundColor: canEdit ? Palette.surface : WARM.disabledBg,
+          },
+        ]}
       >
         {LeadingIcon ? (
-          <LeadingIcon size={16} color={hasError ? '#E01A1B' : '#9ca3af'} style={{ marginRight: 8 }} />
+          <LeadingIcon size={16} color={hasError ? WARM.red : WARM.textSubtle} style={{ marginRight: 8 }} />
         ) : null}
 
         <TextInput
@@ -185,7 +232,7 @@ const FormField = React.forwardRef<TextInput, {
           onChangeText={onChangeText}
           editable={canEdit}
           placeholder={placeholder}
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={WARM.textSubtle}
           keyboardType={keyboardType || 'default'}
           autoCapitalize={autoCapitalize || 'sentences'}
           accessibilityLabel={accessibilityLabel || label}
@@ -193,26 +240,18 @@ const FormField = React.forwardRef<TextInput, {
           onSubmitEditing={onSubmitEditing}
           blurOnSubmit={returnKeyType === 'done'}
           textContentType={textContentType}
-          style={{
-            flex: 1,
-            paddingVertical: 13,
-            fontSize: 14,
-            fontWeight: '600',
-            color: canEdit ? '#111827' : '#4b5563',
-          }}
+          style={[
+            styles.fieldInput,
+            { color: canEdit ? Palette.ink : WARM.disabledText },
+          ]}
         />
-
-        {readOnly ? <Lock size={14} color="#9ca3af" /> : null}
       </View>
 
-      {/* Inline error OR read-only hint */}
       {hasError ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 }}>
-          <AlertCircle size={12} color="#E01A1B" />
-          <Text style={{ fontSize: 11, color: '#E01A1B', fontWeight: '600', flex: 1 }}>{error}</Text>
+          <AlertCircle size={12} color={WARM.red} />
+          <Text style={[styles.errorText, { color: WARM.red }]}>{error}</Text>
         </View>
-      ) : readOnly && readOnlyHint ? (
-        <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 5 }}>{readOnlyHint}</Text>
       ) : null}
     </View>
   );
@@ -235,18 +274,7 @@ function GenderSelector({
   ];
   return (
     <View>
-      <Text
-        style={{
-          fontSize: 12,
-          fontWeight: '700',
-          color: '#6b7280',
-          marginBottom: 6,
-          textTransform: 'uppercase',
-          letterSpacing: 0.5,
-        }}
-      >
-        Gender
-      </Text>
+      <Text style={[styles.fieldLabel, { color: WARM.textSubtle }]}>Gender</Text>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {options.map((opt) => {
           const active = value === opt.value;
@@ -261,18 +289,16 @@ function GenderSelector({
               style={{ flex: 1 }}
             >
               <View
-                style={{
-                  minHeight: 50,
-                  borderRadius: 12,
-                  borderWidth: 1.5,
-                  borderColor: active ? '#111827' : isEditing ? '#d1d5db' : '#f3f4f6',
-                  backgroundColor: active ? '#111827' : isEditing ? '#fff' : '#f9fafb',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: !isEditing && !active ? 0.6 : 1,
-                }}
+                style={[
+                  styles.genderOption,
+                  {
+                    borderColor: active ? Palette.ink : isEditing ? '#d1d5db' : WARM.disabledBorder,
+                    backgroundColor: active ? Palette.ink : isEditing ? Palette.surface : WARM.disabledBg,
+                    opacity: !isEditing && !active ? 0.6 : 1,
+                  },
+                ]}
               >
-                <Text style={{ fontSize: 14, fontWeight: '700', color: active ? '#fff' : '#4b5563' }}>
+                <Text style={[styles.genderOptionText, { color: active ? Palette.onPrimary : WARM.disabledText }]}>
                   {opt.label}
                 </Text>
               </View>
@@ -283,13 +309,6 @@ function GenderSelector({
     </View>
   );
 }
-
-/**
- * Honorific picker. Same six options the web's Title select offers, laid out as
- * a wrapping chip row because a phone has no room for a labelled dropdown here.
- * Optional — tapping the active chip clears it.
- */
-const TITLE_OPTIONS = ['Mr', 'Mrs', 'Ms', 'Miss', 'Mx', 'Dr'] as const;
 
 function TitleSelector({
   value,
@@ -302,16 +321,7 @@ function TitleSelector({
 }) {
   return (
     <View style={{ marginBottom: 16 }}>
-      <Text
-        style={{
-          fontSize: 12,
-          fontWeight: '700',
-          color: '#6b7280',
-          marginBottom: 6,
-          textTransform: 'uppercase',
-          letterSpacing: 0.5,
-        }}
-      >
+      <Text style={[styles.fieldLabel, { color: isEditing ? WARM.textSubtle : WARM.disabledText }]}>
         Title
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -320,8 +330,6 @@ function TitleSelector({
           return (
             <Pressable
               key={opt}
-              // Tapping the selected chip clears it — the field is optional and
-              // there is no other way back to "none" once one is chosen.
               onPress={() => { if (isEditing) onChange(active ? '' : opt); }}
               disabled={!isEditing}
               accessibilityRole="radio"
@@ -329,19 +337,16 @@ function TitleSelector({
               accessibilityLabel={`Title ${opt}`}
             >
               <View
-                style={{
-                  minHeight: 40,
-                  paddingHorizontal: 16,
-                  borderRadius: 12,
-                  borderWidth: 1.5,
-                  borderColor: active ? '#111827' : isEditing ? '#d1d5db' : '#f3f4f6',
-                  backgroundColor: active ? '#111827' : isEditing ? '#fff' : '#f9fafb',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: !isEditing && !active ? 0.6 : 1,
-                }}
+                style={[
+                  styles.titleChip,
+                  {
+                    borderColor: active ? Palette.ink : isEditing ? '#d1d5db' : WARM.disabledBorder,
+                    backgroundColor: active ? Palette.ink : isEditing ? Palette.surface : WARM.disabledBg,
+                    opacity: !isEditing && !active ? 0.6 : 1,
+                  },
+                ]}
               >
-                <Text style={{ fontSize: 14, fontWeight: '700', color: active ? '#fff' : '#4b5563' }}>
+                <Text style={[styles.titleChipText, { color: active ? Palette.onPrimary : WARM.disabledText }]}>
                   {opt}
                 </Text>
               </View>
@@ -353,11 +358,108 @@ function TitleSelector({
   );
 }
 
+/** Renders a label + CountryCodeSelect + number input, matching the web's
+ *  phone/WhatsApp field layout (country code on the left, number on the right). */
+const PhoneField = React.forwardRef<TextInput, {
+  label: string;
+  icon: any;
+  code: string;
+  number: string;
+  onCodeChange: (v: string) => void;
+  onNumberChange: (v: string) => void;
+  isEditing: boolean;
+  isLast?: boolean;
+  error?: string;
+  placeholder: string;
+  returnKeyType?: 'next' | 'done';
+  onSubmitEditing?: () => void;
+}>(function PhoneField(
+  {
+    label,
+    icon: Icon,
+    code,
+    number,
+    onCodeChange,
+    onNumberChange,
+    isEditing,
+    isLast = false,
+    error,
+    placeholder,
+    returnKeyType,
+    onSubmitEditing,
+  },
+  ref,
+) {
+  const hasError = !!error;
+  return (
+    <View style={{ marginBottom: isLast ? 0 : 16 }}>
+      <Text style={[styles.fieldLabel, { color: hasError ? WARM.red : isEditing ? WARM.textSubtle : WARM.disabledText }]}>
+        {label}
+      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
+        {/* Country code selector — width-fixed, squared left, open right. */}
+        <View style={{ width: 96, flexShrink: 0 }}>
+          <CountryCodeSelect
+            value={code || '+91'}
+            onChange={onCodeChange}
+            disabled={!isEditing}
+          />
+        </View>
+        {/* Number input — drops left border/radius so the pair reads as one field. */}
+        <View
+          style={[
+            styles.fieldRow,
+            {
+              borderLeftWidth: 0,
+              borderTopLeftRadius: 0,
+              borderBottomLeftRadius: 0,
+              minWidth: 0,
+              flex: 1,
+              borderColor: hasError ? WARM.red : isEditing ? '#d1d5db' : WARM.disabledBorder,
+              backgroundColor: isEditing ? Palette.surface : WARM.disabledBg,
+            },
+          ]}
+        >
+          <Icon size={16} color={hasError ? WARM.red : WARM.textSubtle} style={{ marginRight: 8, marginTop: 2 }} />
+          <TextInput
+            ref={ref}
+            value={number}
+            onChangeText={onNumberChange}
+            editable={isEditing}
+            placeholder={placeholder}
+            placeholderTextColor={WARM.textSubtle}
+            keyboardType="phone-pad"
+            textContentType="telephoneNumber"
+            returnKeyType={returnKeyType}
+            onSubmitEditing={onSubmitEditing}
+            style={[
+              styles.fieldInput,
+              styles.fieldInputNoBorder,
+              { color: isEditing ? Palette.ink : WARM.disabledText, paddingLeft: 0 },
+            ]}
+          />
+        </View>
+      </View>
+      {hasError ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 }}>
+          <AlertCircle size={12} color={WARM.red} />
+          <Text style={[styles.errorText, { color: WARM.red }]}>{error}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+});
+
 export default function ProfileTab({
   editedProfile,
   setEditedProfile,
   isEditing,
+  isSaving,
   errors = {},
+  onEdit,
+  onSave,
+  onCancel,
+  onGoToAddresses,
 }: ProfileTabProps) {
   // Refs for "next field" keyboard chaining
   const firstNameRef = useRef<TextInput>(null);
@@ -372,8 +474,18 @@ export default function ProfileTab({
 
   return (
     <View>
-      {/* ── Personal Information ── */}
-      <SectionCard title="Personal Information" icon={User} iconColor="#111827" delay={100}>
+      {/* ── Personal Information card — Edit/Save/Cancel on the header, like web */}
+      <SectionCard
+        title="Profile Information"
+        icon={User}
+        iconColor={Palette.primary}
+        showEditControls
+        isEditing={isEditing}
+        isSaving={isSaving}
+        onEdit={onEdit}
+        onSave={onSave}
+        onCancel={onCancel}
+      >
         <TitleSelector
           value={editedProfile.title}
           onChange={(v) => handleInputChange('title', v)}
@@ -425,33 +537,31 @@ export default function ProfileTab({
           keyboardType="email-address"
           autoCapitalize="none"
           leadingIcon={Mail}
-          readOnly
-          readOnlyHint="Your email is used to sign in and can't be changed here."
+          textContentType="emailAddress"
         />
-        <FormField
-          ref={phoneRef}
+        <PhoneField
           label="Phone Number"
-          value={editedProfile.phone}
-          onChangeText={(v) => handleInputChange('phone', v)}
+          icon={Phone}
+          code={editedProfile.phoneCode || '+91'}
+          number={editedProfile.phone}
+          onCodeChange={(v) => handleInputChange('phoneCode', v)}
+          onNumberChange={(v) => handleInputChange('phone', v)}
           isEditing={isEditing}
-          placeholder="Enter your phone number"
-          keyboardType="phone-pad"
-          leadingIcon={Phone}
-          textContentType="telephoneNumber"
           error={errors.phone}
+          placeholder="Phone number"
           returnKeyType="next"
           onSubmitEditing={() => whatsappRef.current?.focus()}
         />
-        <FormField
+        <PhoneField
           ref={whatsappRef}
           label="WhatsApp Number"
-          value={editedProfile.whatsappNumber}
-          onChangeText={(v) => handleInputChange('whatsappNumber', v)}
+          icon={MessageCircle}
+          code={editedProfile.whatsappCode || '+91'}
+          number={editedProfile.whatsapp || ''}
+          onCodeChange={(v) => handleInputChange('whatsappCode', v)}
+          onNumberChange={(v) => handleInputChange('whatsapp', v)}
           isEditing={isEditing}
-          placeholder="Enter your WhatsApp number"
-          keyboardType="phone-pad"
-          leadingIcon={Phone}
-          textContentType="telephoneNumber"
+          placeholder="WhatsApp number"
           returnKeyType="done"
         />
         <GenderSelector
@@ -461,9 +571,9 @@ export default function ProfileTab({
         />
       </SectionCard>
 
-      {/* ── Saved Addresses info box (matches web) ── */}
+      {/* ── Saved Addresses info box (matches web footnote) ── */}
       <Pressable
-        onPress={() => router.push('/(any)/saved-addresses' as any)}
+        onPress={onGoToAddresses}
         accessibilityRole="button"
         accessibilityLabel="Manage saved addresses"
       >
@@ -485,10 +595,10 @@ export default function ProfileTab({
             <Info size={18} color="#2563eb" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: '#1e40af' }}>
+            <Text style={{ fontFamily: Fonts.sansBold, fontSize: 13, fontWeight: '700', color: '#1e40af' }}>
               Looking for your shipping addresses?
             </Text>
-            <Text style={{ fontSize: 12, color: '#3b82f6', marginTop: 1 }}>
+            <Text style={{ fontFamily: Fonts.sans, fontSize: 12, color: '#3b82f6', marginTop: 1 }}>
               Manage your saved addresses here.
             </Text>
           </View>
@@ -498,3 +608,160 @@ export default function ProfileTab({
     </View>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  card: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 30,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  cardHeaderLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  cardHeaderDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 4,
+  },
+  cardHeaderLabelText: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  cardHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardHeaderTitle: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  cardContent: {
+    padding: 20,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingLeft: 16,
+    paddingRight: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+  },
+  editBtnText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  saveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingLeft: 16,
+    paddingRight: 16,
+    borderRadius: 24,
+  },
+  saveBtnText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cancelBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 10,
+    paddingLeft: 16,
+    paddingRight: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+  },
+  cancelBtnText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  fieldLabel: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  fieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 50,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+  },
+  fieldInput: {
+    flex: 1,
+    paddingVertical: 13,
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  fieldInputNoBorder: {
+    borderWidth: 0,
+    paddingHorizontal: 0,
+    minHeight: '100%',
+  },
+  errorText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 5,
+    flex: 1,
+  },
+  genderOption: {
+    minHeight: 50,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  genderOptionText: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  titleChip: {
+    minHeight: 40,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titleChipText: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+});

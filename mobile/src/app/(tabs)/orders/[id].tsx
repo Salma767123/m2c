@@ -6,12 +6,11 @@ import {
   Pressable,
   ActivityIndicator,
   Modal,
-  StatusBar,
+  StyleSheet,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { WebView } from 'react-native-webview';
 import {
-  ArrowLeft,
   Package,
   Truck,
   CheckCircle,
@@ -25,9 +24,10 @@ import {
   FileText,
   X,
   Star,
+  RotateCcw,
 } from 'lucide-react-native';
+import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from '@/lib/axios';
 import { orderService, Order } from '@/services/orderService';
@@ -41,7 +41,8 @@ import {
   getStateName,
   formatPhoneForDisplay,
 } from '@/components/WebSite/CheckOut/CheckoutProcess/constants';
-import { Palette } from '@/constants/theme';
+import { Palette, Fonts } from '@/constants/theme';
+import OrderActionModal, { type OrderAction } from '@/components/WebSite/Order/OrderActionModal';
 import { formatPrice } from '@/lib/currency';
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
@@ -85,19 +86,74 @@ const STEP_INDEX: Record<CustomerStatus, number> = {
 };
 const getStepIndex = (s: string) => STEP_INDEX[normalizeStatus(s)];
 
+/**
+ * Raw statuses a customer may still cancel from — up to, but not including,
+ * dispatch. Taken from the web's OrderDetail.tsx.
+ *
+ * These are the un-normalised backend statuses on purpose. `normalizeStatus`
+ * collapses all six of these into "processing" for display, so testing the
+ * normalised value would also offer Cancel on states that are already past the
+ * point of no return.
+ */
+const CANCELLABLE_STATUSES = new Set([
+  'ORDER_CREATED',
+  'VENDOR_PROCESSING',
+  'PACKED_BY_VENDOR',
+  'IN_TRANSIT_TO_ADMIN_HUB',
+  'RECEIVED_AT_ADMIN_HUB',
+  'APPROVED_BY_ADMIN_HUB',
+]);
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function OrderDetailsScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, review } = useLocalSearchParams<{ id: string; review?: string }>();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [invoiceHtml, setInvoiceHtml] = useState<string | null>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [hasReviewed, setHasReviewed] = useState(false);
+  const [actionModal, setActionModal] = useState<OrderAction | null>(null);
+  const [actionSubmitting, setActionSubmitting] = useState(false);
+
+  // Cancel / return. Refetches on success rather than patching local state, so
+  // the status card, the timeline and the refund fields all come from the
+  // server's view of the order instead of a guess at what it became.
+  const handleOrderAction = async (reason: string) => {
+    if (!actionModal || !id) return;
+    try {
+      setActionSubmitting(true);
+      if (actionModal === 'cancel') {
+        const res = await orderService.cancelOrder(id, reason || undefined);
+        showSuccessToast('Order Cancelled', res.message || 'Your refund has been initiated.');
+      } else {
+        const res = await orderService.requestReturn(id, reason);
+        showSuccessToast('Return Requested', res.message || 'We will review it shortly.');
+      }
+      setActionModal(null);
+      await fetchOrder();
+    } catch (e: any) {
+      showErrorToast('Failed', e?.message || 'Please try again.');
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     if (id) fetchOrder();
   }, [id]);
+
+  /**
+   * Opened from Order History's "Write Review" button, which arrives with
+   * ?review=1. Waits for the order so the modal is not opened on an order that
+   * turns out not to be delivered, or that the user has already reviewed.
+   */
+  useEffect(() => {
+    if (review !== '1' || !order) return;
+    if (hasReviewed) return;
+    if (normalizeStatus(order.status) !== 'delivered') return;
+    setShowReviewModal(true);
+  }, [review, order, hasReviewed]);
 
   const fetchOrder = async () => {
     try {
@@ -141,7 +197,10 @@ export default function OrderDetailsScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-        <Header title="Order Details" />
+        <ScreenHeader
+        onBack={() => (router.canGoBack() ? router.back() : router.push('/(tabs)/orders' as any))}
+        title="Order Details"
+      />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="large" color="#111827" />
           <Text style={{ color: '#6b7280', marginTop: 12, fontSize: 13 }}>Loading order…</Text>
@@ -153,7 +212,10 @@ export default function OrderDetailsScreen() {
   if (!order) {
     return (
       <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-        <Header title="Order Details" />
+        <ScreenHeader
+        onBack={() => (router.canGoBack() ? router.back() : router.push('/(tabs)/orders' as any))}
+        title="Order Details"
+      />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
             <Package size={32} color="#d1d5db" />
@@ -189,9 +251,21 @@ export default function OrderDetailsScreen() {
   const isDelivered = normalizeStatus(order.status) === 'delivered';
   const activeStep = getStepIndex(order.status);
 
+  // Cancel up to (but not including) dispatch, and return only on a delivered
+  // order that has no live request — both rules copied from the web.
+  const canCancel = CANCELLABLE_STATUSES.has(order.status);
+  const returnStatus = order.returnRequest?.status;
+  const canReturn =
+    order.status === 'DELIVERED' && returnStatus !== 'Requested' && returnStatus !== 'Approved';
+  const returnPending = returnStatus === 'Requested';
+
   return (
     <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-      <Header title="Order Details" subtitle={`#${order.orderId}`} />
+      <ScreenHeader
+        onBack={() => (router.canGoBack() ? router.back() : router.push('/(tabs)/orders' as any))}
+        title="Order Details"
+        subtitle={`#${order.orderId}`}
+      />
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 14 }} showsVerticalScrollIndicator={false}>
 
@@ -211,6 +285,42 @@ export default function OrderDetailsScreen() {
               <Text style={{ fontSize: 11, fontWeight: '700', color: s.fg }}>{order.paymentStatus}</Text>
             </View>
           </View>
+
+          {/* Customer actions — cancel before dispatch, return after delivery.
+              Same gating as the web's OrderDetail.tsx. */}
+          {canCancel || canReturn || returnPending ? (
+            <View style={a.actionRow}>
+              {canCancel ? (
+                <Pressable
+                  onPress={() => setActionModal('cancel')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel this order"
+                  style={({ pressed }) => [a.actionBtn, a.actionDanger, pressed && a.actionPressed]}
+                >
+                  <XCircle size={15} color={Palette.primary} strokeWidth={2.25} />
+                  <Text style={a.actionDangerText}>Cancel Order</Text>
+                </Pressable>
+              ) : null}
+
+              {canReturn ? (
+                <Pressable
+                  onPress={() => setActionModal('return')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Request a return"
+                  style={({ pressed }) => [a.actionBtn, a.actionNeutral, pressed && a.actionPressed]}
+                >
+                  <RotateCcw size={15} color="#334155" strokeWidth={2.25} />
+                  <Text style={a.actionNeutralText}>Return</Text>
+                </Pressable>
+              ) : null}
+
+              {returnPending ? (
+                <View style={a.returnPill}>
+                  <Text style={a.returnPillText}>Return Requested</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         {/* Timeline */}
@@ -547,44 +657,19 @@ export default function OrderDetailsScreen() {
           onReviewSubmitted={() => { setHasReviewed(true); }}
         />
       ) : null}
+
+      {/* Cancel / return */}
+      <OrderActionModal
+        action={actionModal}
+        submitting={actionSubmitting}
+        onSubmit={handleOrderAction}
+        onClose={() => setActionModal(null)}
+      />
     </View>
   );
 }
 
 // ─── Header ───────────────────────────────────────────────────────────────────
-function Header({ title, subtitle }: { title: string; subtitle?: string }) {
-  const headerInsets = useSafeAreaInsets();
-  return (
-    <View
-      style={{
-        backgroundColor: '#fff',
-        paddingHorizontal: 8,
-        paddingTop: headerInsets.top + 8,
-        paddingBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#e5e7eb',
-        flexDirection: 'row',
-        alignItems: 'center',
-      }}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <Pressable
-        onPress={() => (router.canGoBack() ? router.back() : router.push('/(tabs)/orders' as any))}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-        hitSlop={8}
-        style={{ padding: 8 }}
-      >
-        <ArrowLeft size={22} color="#111827" />
-      </Pressable>
-      <View style={{ flex: 1, marginLeft: 4 }}>
-        <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>{title}</Text>
-        {subtitle ? <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 1 }}>{subtitle}</Text> : null}
-      </View>
-    </View>
-  );
-}
-
 // ─── Section card ─────────────────────────────────────────────────────────────
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -614,3 +699,54 @@ function Row({ label, value, valueColor, small }: { label: string; value: string
     </View>
   );
 }
+
+/* Customer action row on the status card (cancel / return). */
+const a = StyleSheet.create({
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    paddingTop: 14,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    minHeight: 38,
+  },
+  actionPressed: { opacity: 0.85 },
+  actionDanger: { borderColor: Palette.primary, backgroundColor: '#fff5f5' },
+  actionDangerText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: Palette.primary,
+  },
+  actionNeutral: { borderColor: '#cbd5e1', backgroundColor: '#ffffff' },
+  actionNeutralText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  returnPill: {
+    borderRadius: 999,
+    backgroundColor: '#fffbeb',
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+    minHeight: 38,
+  },
+  returnPillText: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#b45309',
+  },
+});

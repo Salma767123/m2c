@@ -217,7 +217,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
                   accessibilityRole="button"
                   accessibilityLabel={isAuth ? 'View my account' : 'Sign in'}
                   android_ripple={{ color: 'rgba(255,255,255,0.12)' }}
-                  style={({ pressed }) => [s.accountCardShadow, pressed && s.accountCardPressed]}
+                  style={[s.accountCardShadow]}
                 >
                   <LinearGradient
                     colors={[Palette.primary, Palette.primaryPressed]}
@@ -320,7 +320,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
                     accessibilityRole="button"
                     accessibilityLabel="View all categories"
                     android_ripple={{ color: 'rgba(255,255,255,0.14)' }}
-                    style={({ pressed }) => [s.ctaShadow, pressed && s.ctaPressed]}
+                    style={[s.ctaShadow]}
                   >
                     <LinearGradient
                       colors={[Palette.primary, Palette.primaryPressed]}

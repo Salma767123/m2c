@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { Mail, KeyRound, MailCheck, Send } from 'lucide-react-native';
+import { MailCheck } from 'lucide-react-native';
 import { userAuthService } from '@/services/userAuthService';
 import { showErrorToast } from '@/lib/toast-utils';
 import { Palette } from '@/constants/theme';
@@ -58,7 +58,6 @@ export default function ForgotPasswordScreen() {
       <AuthShell
         title="Check Your Email"
         subtitle="Reset instructions sent"
-        icon={<MailCheck size={20} color="#FFFFFF" />}
         footer={
           <AuthSwitch
             prompt="Remembered it?"
@@ -88,7 +87,6 @@ export default function ForgotPasswordScreen() {
           busyLabel="Sending..."
           busy={submitting}
           onPress={handleSubmit}
-          icon={<Send size={18} color="#FFFFFF" strokeWidth={2.5} />}
         />
       </AuthShell>
     );
@@ -98,7 +96,6 @@ export default function ForgotPasswordScreen() {
     <AuthShell
       title="Forgot Password"
       subtitle="We'll email you a reset link"
-      icon={<KeyRound size={20} color="#FFFFFF" />}
       footer={
         <AuthSwitch
           prompt="Remembered it?"
@@ -114,7 +111,6 @@ export default function ForgotPasswordScreen() {
 
       <AuthField
         label="Email Address"
-        icon={<Mail size={18} color={Palette.textMuted} strokeWidth={2} />}
         value={email}
         onChangeText={(v) => {
           setEmail(v.toLowerCase());
@@ -134,7 +130,6 @@ export default function ForgotPasswordScreen() {
         busyLabel="Sending..."
         busy={submitting}
         onPress={handleSubmit}
-        icon={<Send size={18} color="#FFFFFF" strokeWidth={2.5} />}
       />
     </AuthShell>
   );

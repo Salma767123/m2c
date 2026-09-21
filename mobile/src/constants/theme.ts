@@ -249,17 +249,25 @@ export const Shadow = {
  * Type scale — the 9 levels from DESIGN.md. `letterSpacing` is in points on RN
  * (the web spec is in em), so each value is the em figure × its font size.
  */
+/**
+ * The web's nine type levels, now carrying a real face per level.
+ *
+ * Display and headline levels take Poppins, body and label take Outfit — the
+ * same split the web makes. `fontFamily` has to name the specific weight file
+ * (these are static instances, not one family with weight axes), so the family
+ * and the weight below always agree.
+ */
 export const Typography = {
-  displayLg: { fontSize: 48, lineHeight: 56, letterSpacing: -0.96, fontWeight: '700' },
-  headlineLg: { fontSize: 32, lineHeight: 40, letterSpacing: -0.32, fontWeight: '600' },
-  headlineMd: { fontSize: 24, lineHeight: 32, fontWeight: '600' },
-  headlineSm: { fontSize: 20, lineHeight: 28, fontWeight: '600' },
-  bodyLg: { fontSize: 18, lineHeight: 28, fontWeight: '400' },
-  bodyMd: { fontSize: 16, lineHeight: 24, fontWeight: '400' },
-  bodySm: { fontSize: 14, lineHeight: 20, fontWeight: '400' },
-  labelLg: { fontSize: 14, lineHeight: 20, letterSpacing: 0.28, fontWeight: '600' },
-  labelMd: { fontSize: 12, lineHeight: 16, letterSpacing: 0.48, fontWeight: '600' },
-  labelSm: { fontSize: 11, lineHeight: 14, letterSpacing: 0.55, fontWeight: '500' },
+  displayLg: { fontFamily: 'Poppins_700Bold', fontSize: 48, lineHeight: 56, letterSpacing: -0.96, fontWeight: '700' },
+  headlineLg: { fontFamily: 'Poppins_600SemiBold', fontSize: 32, lineHeight: 40, letterSpacing: -0.32, fontWeight: '600' },
+  headlineMd: { fontFamily: 'Poppins_600SemiBold', fontSize: 24, lineHeight: 32, fontWeight: '600' },
+  headlineSm: { fontFamily: 'Poppins_600SemiBold', fontSize: 20, lineHeight: 28, fontWeight: '600' },
+  bodyLg: { fontFamily: 'Outfit_400Regular', fontSize: 18, lineHeight: 28, fontWeight: '400' },
+  bodyMd: { fontFamily: 'Outfit_400Regular', fontSize: 16, lineHeight: 24, fontWeight: '400' },
+  bodySm: { fontFamily: 'Outfit_400Regular', fontSize: 14, lineHeight: 20, fontWeight: '400' },
+  labelLg: { fontFamily: 'Outfit_600SemiBold', fontSize: 14, lineHeight: 20, letterSpacing: 0.28, fontWeight: '600' },
+  labelMd: { fontFamily: 'Outfit_600SemiBold', fontSize: 12, lineHeight: 16, letterSpacing: 0.48, fontWeight: '600' },
+  labelSm: { fontFamily: 'Outfit_500Medium', fontSize: 11, lineHeight: 14, letterSpacing: 0.55, fontWeight: '500' },
 } as const;
 
 /**
@@ -285,23 +293,36 @@ export const Colors = {
   },
 };
 
+/**
+ * Brand faces, matching the web (frontend/src/app/layout.tsx): Outfit for body
+ * and UI, Poppins for headings. `serif` is deliberately the heading face rather
+ * than an actual serif — the web's heading token is named `--font-playfair` for
+ * historical reasons but resolves to Poppins, and the one place mobile used
+ * `Fonts.serif` was styling a heading, so it was reaching for the same thing.
+ *
+ * Only `mono` still falls back to the platform, because no brand mono exists.
+ */
 export const Fonts = Platform.select({
-  ios: {
-    sans: 'system-ui',
-    serif: 'ui-serif',
-    rounded: 'ui-rounded',
-    mono: 'ui-monospace',
-  },
   default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
+    sans: 'Outfit_400Regular',
+    sansMedium: 'Outfit_500Medium',
+    sansSemibold: 'Outfit_600SemiBold',
+    sansBold: 'Outfit_700Bold',
+    heading: 'Poppins_600SemiBold',
+    // Kept as an alias so existing `Fonts.serif` call sites land on the heading
+    // face instead of the platform serif they were getting.
+    serif: 'Poppins_600SemiBold',
+    rounded: 'Outfit_500Medium',
+    mono: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace',
   },
   web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
+    sans: 'Outfit_400Regular',
+    sansMedium: 'Outfit_500Medium',
+    sansSemibold: 'Outfit_600SemiBold',
+    sansBold: 'Outfit_700Bold',
+    heading: 'Poppins_600SemiBold',
+    serif: 'Poppins_600SemiBold',
+    rounded: 'Outfit_500Medium',
     mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
   },
 });

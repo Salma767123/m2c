@@ -7,7 +7,7 @@ import {
   RefreshControl,
   StyleSheet,
   useWindowDimensions,
-  StatusBar,
+  TouchableOpacity,
 } from 'react-native';
 import { Image } from 'expo-image';
 import {
@@ -16,21 +16,29 @@ import {
   AlertCircle,
   RefreshCw,
   Search,
-  Layers,
+  LifeBuoy,
+  MessageCircle,
+  LayoutGrid,
 } from 'lucide-react-native';
+import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { categoryService, type Category } from '@/services/categoryService';
 import { useCart } from '@/context/CartContext';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Palette, Radius, Shadow } from '@/constants/theme';
+import { Palette, Radius, Fonts } from '@/constants/theme';
 import SectionHeading from '@/components/WebSite/Home/SectionHeading';
+import { CARD_GUTTER, CARD_GAP } from '@/components/WebSite/ProductCard/metrics';
 import TopSellingSection from '@/components/WebSite/Home/TopSellingSection';
 import NoticeBoard from '@/components/WebSite/Home/NoticeBoard';
 
 const BANNER = require('../../../../assets/images/categories/cb5.jpg');
 
-const GRID_PAD = 16;
-const GRID_GAP = 12;
+/* One inset for the whole app. The web uses px-4 here, but mobile's own pages
+   settled on CARD_GUTTER (26) — the 12pt margin plus 14pt padding its floating
+   sections already reached — and a page that changes inset as you navigate to
+   it reads as a different app, not a different screen. */
+const GRID_PAD = CARD_GUTTER;
+const GRID_GAP = CARD_GAP;
 const BANNER_H = 172;
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -92,12 +100,11 @@ export default function Categories() {
     <>
       <CategoryBanner />
       <View style={s.introWrap}>
+        {/* Eyebrow + "Browse Our Collections" + blurb, the same three lines the
+            web sets here. The count pill that used to sit under them is gone —
+            the web has no such chip, and the page already opens on a banner
+            that says what this screen is. */}
         <SectionHeading section="browseCollections" />
-        <View style={s.listCountPill}>
-          <Text style={s.listCountText}>
-            {categories.length} {categories.length === 1 ? 'category' : 'categories'}
-          </Text>
-        </View>
       </View>
     </>
   );
@@ -112,7 +119,7 @@ export default function Categories() {
 
   return (
     <View style={s.screen}>
-      <ScreenHeader itemCount={itemCount} />
+      <CategoriesHeader itemCount={itemCount} />
 
       {loading ? (
         <View style={s.skeletonWrap}>
@@ -176,55 +183,46 @@ export default function Categories() {
 }
 
 // ─── Header ───────────────────────────────────────────────────────────────────
-function ScreenHeader({ itemCount }: { itemCount: number }) {
-  const insets = useSafeAreaInsets();
+function CategoriesHeader({ itemCount }: { itemCount: number }) {
   return (
-    <View style={[s.header, { paddingTop: insets.top + 8 }]}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <View style={s.headerLeft}>
-        <Text style={s.headerTitle}>Categories</Text>
-      </View>
-      <View style={s.headerActions}>
-        <Pressable
-          onPress={() => router.push('/(any)/products' as any)}
-          accessibilityRole="button"
-          accessibilityLabel="Search products"
-          accessibilityHint="Opens product search"
-          hitSlop={6}
-          style={s.headerBtn}
-        >
-          <View style={s.headerBtnCircle}>
-            <Search size={18} color="#111827" strokeWidth={2} />
-          </View>
-        </Pressable>
-        <Pressable
-          onPress={() => router.push('/(tabs)/cart' as any)}
-          accessibilityRole="button"
-          accessibilityLabel={`Cart, ${itemCount} items`}
-          accessibilityHint="Opens your shopping cart"
-          hitSlop={6}
-          style={s.headerBtn}
-        >
-          <View style={s.headerBtnCircle}>
-            <ShoppingCart size={18} color="#111827" strokeWidth={2} />
-            {itemCount > 0 ? (
-              <View style={s.headerBadge}>
-                <Text style={s.headerBadgeText}>
-                  {itemCount > 99 ? '99+' : itemCount}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </Pressable>
-      </View>
-    </View>
+    <ScreenHeader
+      icon={LayoutGrid}
+      title="Categories"
+      subtitle="Browse everything we carry"
+      right={
+        <>
+          <Pressable
+            onPress={() => router.push('/(any)/products' as any)}
+            accessibilityRole="button"
+            accessibilityLabel="Search products"
+            accessibilityHint="Opens product search"
+            hitSlop={6}
+          >
+            <View style={s.headerBtnCircle}>
+              <Search size={18} color="#111827" strokeWidth={2} />
+            </View>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/(tabs)/cart' as any)}
+            accessibilityRole="button"
+            accessibilityLabel={`Cart, ${itemCount} items`}
+            accessibilityHint="Opens your shopping cart"
+            hitSlop={6}
+          >
+            <View style={s.headerBtnCircle}>
+              <ShoppingCart size={18} color="#111827" strokeWidth={2} />
+              {itemCount > 0 ? (
+                <View style={s.headerBadge}>
+                  <Text style={s.headerBadgeText}>{itemCount > 99 ? '99+' : itemCount}</Text>
+                </View>
+              ) : null}
+            </View>
+          </Pressable>
+        </>
+      }
+    />
   );
 }
-
-// ─── Hero banner ─────────────────────────────────────────────────────────────
-// The web page opens with a photo banner under a black/60 scrim carrying the
-// eyebrow / title / subtitle. Same asset (cb5.jpg, 1366×480) copied into the app
-// so both clients open on the same image.
 function CategoryBanner() {
   return (
     <View style={s.banner}>
@@ -249,32 +247,72 @@ function CategoryBanner() {
 }
 
 // ─── Need Help card ──────────────────────────────────────────────────────────
+/**
+ * The web's support card, which mobile had reduced to a title, a paragraph and
+ * two plain buttons on a flat panel. Three of its four devices were missing:
+ * the warm gradient ground, the LifeBuoy mark, and the short red seam under the
+ * title — the web's note calls that seam "the one piece of brand colour that
+ * stops the three lines reading as one centred stack", which is exactly how the
+ * mobile version read.
+ */
 function NeedHelpCard() {
   return (
     <View style={s.helpWrap}>
-      <View style={s.helpCard}>
+      <LinearGradient
+        colors={['#fdf8f6', '#ffffff', '#faece8']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={s.helpCard}
+      >
+        {/* LifeBuoy in its own tinted chip, as on the web. */}
+        <LinearGradient
+          colors={['#fdf1ef', '#f9e3df']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={s.helpIcon}
+        >
+          <LifeBuoy size={30} color={Palette.primary} strokeWidth={1.6} />
+        </LinearGradient>
+
         <Text style={s.helpTitle}>Need Help?</Text>
+        <View style={s.helpSeam} />
+
         <Text style={s.helpBody}>
           Use our search feature or contact our support team for assistance
           finding specific products.
         </Text>
-        <Pressable
+
+        {/* TouchableOpacity with a plain array style, not a Pressable taking a
+            style FUNCTION.
+
+            "Search Products" is a white label on a red fill. When the function
+            style does not apply, the fill is lost and the label is white text
+            on this card's near-white gradient — invisible. "Contact Support"
+            below it survived the same failure only because its label is red,
+            which is why that button was readable and this one was not.
+            ActionButton elsewhere in this file uses the plain form and renders
+            correctly, so this follows it. */}
+        <TouchableOpacity
           onPress={() => router.push('/(any)/products' as any)}
           accessibilityRole="button"
           accessibilityLabel="Search products"
-          style={({ pressed }) => [s.helpPrimary, pressed && s.helpPressed]}
+          activeOpacity={0.85}
+          style={s.helpPrimary}
         >
+          <Search size={16} color={Palette.onPrimary} strokeWidth={2.25} />
           <Text style={s.helpPrimaryText}>Search Products</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => router.push('/(any)/support' as any)}
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => router.push('/(any)/contact' as any)}
           accessibilityRole="button"
           accessibilityLabel="Contact support"
-          style={({ pressed }) => [s.helpGhost, pressed && s.helpPressed]}
+          activeOpacity={0.85}
+          style={s.helpGhost}
         >
+          <MessageCircle size={16} color={Palette.primary} strokeWidth={2.25} />
           <Text style={s.helpGhostText}>Contact Support</Text>
-        </Pressable>
-      </View>
+        </TouchableOpacity>
+      </LinearGradient>
     </View>
   );
 }
@@ -304,32 +342,36 @@ const CategoryCard = memo(function CategoryCard({
       android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
       style={{ width: cardWidth }}
     >
-      <View style={c.card}>
-        {/* Image — square, padded so the full image shows */}
-        <View style={c.imageWrap}>
-          {category.image ? (
-            <Image
-              source={{ uri: category.image }}
-              style={c.image}
-              contentFit="contain"
-              transition={250}
-            />
-          ) : (
-            <View style={c.imagePlaceholder}>
-              <Package size={34} color="#cbd5e1" strokeWidth={1.5} />
-            </View>
-          )}
-        </View>
-
-        {/* Info */}
-        <View style={c.info}>
-          <Text style={c.name} numberOfLines={1}>{category.name}</Text>
-          <View style={c.metaRow}>
-            <Layers size={12} color="#6b7280" strokeWidth={2.25} />
-            <Text style={c.metaText} numberOfLines={1}>{meta}</Text>
+      {/* The web's card is not a card: a rounded square image tile, then the
+          name centred beneath it on the page ground. Mobile had boxed the whole
+          thing — image and text inside one bordered white panel with the text
+          left-aligned and an icon beside the count — which reads as a different
+          component, not a smaller one. */}
+      <View style={c.tile}>
+        {category.image ? (
+          <Image
+            source={{ uri: category.image }}
+            style={c.image}
+            /* object-cover on the web. `contain` left the tile part-empty and
+               the photo floating inside it. */
+            contentFit="cover"
+            transition={250}
+          />
+        ) : (
+          <View style={c.imagePlaceholder}>
+            <Package size={40} color="#9ca3af" strokeWidth={1.5} />
           </View>
-        </View>
+        )}
       </View>
+
+      <Text style={c.name} numberOfLines={2}>
+        {category.name}
+      </Text>
+      {count > 0 ? (
+        <Text style={c.metaText} numberOfLines={1}>
+          {count} {count === 1 ? 'subcategory' : 'subcategories'}
+        </Text>
+      ) : null}
     </Pressable>
   );
 });
@@ -392,42 +434,15 @@ function ActionButton({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
+  /* `bg-gray-50` — #f9fafb. Was #f8fafc, Tailwind's slate-50, which is the
+     same value shifted blue; on a page whose every other surface is warm it
+     read as a cool cast behind them. */
   screen: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f9fafb',
   },
 
   // Header
-  header: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  headerLeft: { flex: 1 },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#111827',
-    letterSpacing: -0.3,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  headerBtn: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   headerBtnCircle: {
     width: 38,
     height: 38,
@@ -505,70 +520,101 @@ const s = StyleSheet.create({
   },
 
   introWrap: { paddingTop: 20, paddingBottom: 6 },
-  listCountPill: {
-    alignSelf: 'flex-start',
-    backgroundColor: Palette.outlineSubtle,
-    borderRadius: Radius.DEFAULT,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginTop: 2,
-    marginBottom: 10,
-  },
-  listCountText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Palette.textMuted,
-  },
 
   footerWrap: { marginHorizontal: -GRID_PAD, paddingTop: 8 },
 
   // Need Help
   helpWrap: { paddingHorizontal: 12, paddingTop: 18 },
+  /* rounded-3xl with the web's warm ring, over the gradient ground. */
   helpCard: {
-    backgroundColor: Palette.background,
-    borderRadius: Radius.lg,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: Palette.outline,
-    padding: 20,
+    borderColor: '#f0dcd6',
+    padding: 24,
     alignItems: 'center',
-    ...Shadow.cardRest,
+    shadowColor: '#1a1416',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.35,
+    shadowRadius: 22,
+    elevation: 5,
   },
-  helpTitle: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: Palette.ink,
-    letterSpacing: -0.3,
-    marginBottom: 8,
-  },
-  helpBody: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: Palette.textMuted,
-    textAlign: 'center',
-    marginBottom: 18,
-  },
-  /* Stacked, not side by side — the same width problem the BrandPromo CTAs hit. */
-  helpPrimary: {
-    alignSelf: 'stretch',
-    height: 46,
-    borderRadius: Radius.full,
-    backgroundColor: Palette.primary,
+  helpIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#f0d5cf',
+    marginBottom: 20,
   },
-  helpPrimaryText: { fontSize: 14, fontWeight: '800', color: Palette.onPrimary },
+  helpTitle: {
+    fontFamily: Fonts.heading,
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    letterSpacing: -0.55,
+    textAlign: 'center',
+  },
+  /* The 3px × 48 seam under the title. */
+  helpSeam: {
+    width: 48,
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: Palette.primary,
+    marginTop: 16,
+  },
+  helpBody: {
+    fontFamily: Fonts.sans,
+    fontSize: 14,
+    lineHeight: 21,
+    color: '#4b5563',
+    textAlign: 'center',
+    marginTop: 20,
+    marginBottom: 24,
+  },
+  /* Stacked, not side by side — the web pairs them from `sm:` up, which is
+     wider than a phone, and the same width problem the BrandPromo CTAs hit. */
+  helpPrimary: {
+    alignSelf: 'stretch',
+    minHeight: 48,
+    borderRadius: Radius.full,
+    backgroundColor: Palette.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: Palette.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  helpPrimaryText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Palette.onPrimary,
+  },
   helpGhost: {
     alignSelf: 'stretch',
-    height: 46,
+    minHeight: 48,
     borderRadius: Radius.full,
     borderWidth: 1,
     borderColor: Palette.primary,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+    gap: 8,
+    marginTop: 12,
   },
-  helpGhostText: { fontSize: 14, fontWeight: '700', color: Palette.primary },
-  helpPressed: { opacity: 0.88 },
+  helpGhostText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Palette.primary,
+  },
 
   // Centered states
   centeredWrap: {
@@ -625,55 +671,49 @@ const s = StyleSheet.create({
 
 // ─── Card styles ──────────────────────────────────────────────────────────────
 const c = StyleSheet.create({
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#eceef1',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  imageWrap: {
+  /* `aspect-square rounded-2xl ring-1 ring-black/5` with the soft resting
+     shadow the web gives the tile. The name sits outside it, on the page. */
+  tile: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#f7f8fa',
-    padding: 10,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#f1f2f4',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+    marginBottom: 12, // mb-4
   },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
+  image: { width: '100%', height: '100%' },
   imagePlaceholder: {
     width: '100%',
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  info: {
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 12,
-  },
+
+  /* text-lg font-semibold text-[#1a1a1a], centred. Was 14px bold #111827 and
+     left-aligned inside the old panel. */
   name: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111827',
-    lineHeight: 18,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 5,
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 12,
+    fontFamily: Fonts.heading,
+    fontSize: 16,
     fontWeight: '600',
+    lineHeight: 21,
+    letterSpacing: -0.35,
+    color: '#1a1a1a',
+    textAlign: 'center',
+  },
+  /* text-sm text-gray-500 mt-1 */
+  metaText: {
+    fontFamily: Fonts.sans,
+    fontSize: 13,
     color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 3,
   },
 });
 

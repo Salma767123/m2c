@@ -1,12 +1,13 @@
 {
   "expo": {
     "name": "m2c",
-    "slug": "karneyaar",
+    "slug": "m2c-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/1024.png",
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
@@ -14,11 +15,16 @@
       "package": "com.m2c.mobile",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#000000",
+        "backgroundColor": "#f7f7f5",
         "foregroundImage": "./assets/images/1024.png",
         "backgroundImage": "./assets/images/1024.png",
         "monochromeImage": "./assets/images/1024.png"
-      }
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#111827"
     },
     "web": {
       "bundler": "metro",
@@ -32,7 +38,21 @@
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-logo.png",
+          "imageWidth": 230,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "image": "./assets/images/splash-logo.png",
+            "backgroundColor": "#ffffff"
+          }
+        }
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -41,15 +61,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "18bc3f13-ca9e-4913-8ab7-56edc5560292"
+        "projectId": "cee6f82f-40a4-4073-840b-50507415e9c8"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
+    "owner": "karneyar-2002",
     "updates": {
-      "url": "https://u.expo.dev/b8eb8431-f0db-4428-acf6-2960e0539eee"
-    },
-    "owner": "karneyaars-team"
+      "url": "https://u.expo.dev/cee6f82f-40a4-4073-840b-50507415e9c8"
+    }
   }
 }

@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { ScrollView, RefreshControl, View } from 'react-native';
+import { RefreshControl, View } from 'react-native';
+import { RevealScrollView } from '@/components/WebSite/Shared/Reveal';
 import HeroSection from '@/components/WebSite/Home/HeroSection';
 import PromoStrip from '@/components/WebSite/Home/PromoStrip';
 import CategoryStrip from '@/components/WebSite/Home/CategoryStrip';
@@ -9,6 +10,7 @@ import CategoriesSection from '@/components/WebSite/Home/CategoriesSection';
 import FeaturedProductsSection from '@/components/WebSite/Home/FeaturedProductsSection';
 import BestSellerSection from '@/components/WebSite/Home/BestSellerSection';
 import TopSellingSection from '@/components/WebSite/Home/TopSellingSection';
+import DownloadApp from '@/components/WebSite/Home/DownloadApp';
 import ValueSection from '@/components/WebSite/Home/ValueSection';
 import Header from '@/components/WebSite/Header/Header';
 import Footer from '@/components/WebSite/Footer/Footer';
@@ -28,7 +30,7 @@ export default function HomeScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: '#eceef1' }}>
       <Header />
-      <ScrollView
+      <RevealScrollView
         className="flex-1"
         style={{ backgroundColor: '#eceef1' }}
         contentContainerStyle={{ paddingBottom: 0 }}
@@ -40,12 +42,11 @@ export default function HomeScreen() {
       >
         {/* The web's running order, one for one (frontend/src/app/page.tsx):
             Hero → PromoStrip → NoticeBoard → Featured → BrandPromo → TopSelling
-            → BestSeller → Categories → ValueSection → Footer.
+            → BestSeller → Categories → DownloadApp → ValueSection → Footer.
 
-            Two deliberate differences remain. CategoryStrip leads, standing in
+            One deliberate difference remains: CategoryStrip leads, standing in
             for the category ribbon the web keeps inside its header — a phone
-            header has no room for it. And DownloadApp is omitted: the web uses
-            it to send people here, and this IS here. */}
+            header has no room for it. */}
         <CategoryStrip key={`strip-${refreshNonce}`} />
         <HeroSection key={`hero-${refreshNonce}`} />
         <PromoStrip key={`promo-${refreshNonce}`} />
@@ -55,9 +56,10 @@ export default function HomeScreen() {
         <TopSellingSection key={`top-${refreshNonce}`} />
         <BestSellerSection key={`best-${refreshNonce}`} />
         <CategoriesSection key={`cats-${refreshNonce}`} />
+        <DownloadApp />
         <ValueSection />
         <Footer />
-      </ScrollView>
+      </RevealScrollView>
     </View>
   );
 }

@@ -12,6 +12,7 @@ import {
 import { ArrowRight } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { couponService, type FirstOrderCoupon } from '@/services/couponService';
+import { Fonts } from '@/constants/theme';
 
 /**
  * The offer band between the hero and the notice board — the mobile counterpart
@@ -159,6 +160,7 @@ const s = StyleSheet.create({
     paddingVertical: 8,
   },
   eyebrow: {
+    fontFamily: Fonts.sansBold,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.3, // ≈ 0.12em at 11px
@@ -166,6 +168,7 @@ const s = StyleSheet.create({
     color: GOLD,
   },
   body: {
+    fontFamily: Fonts.sans,
     fontSize: 12,
     color: 'rgba(255,255,255,0.9)',
   },
@@ -177,6 +180,7 @@ const s = StyleSheet.create({
     paddingVertical: 2,
   },
   codeText: {
+    fontFamily: Fonts.sansBold,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.7,
@@ -188,6 +192,7 @@ const s = StyleSheet.create({
     gap: 4,
   },
   linkText: {
+    fontFamily: Fonts.sansSemibold,
     fontSize: 11.5,
     fontWeight: '600',
     color: '#ffffff',

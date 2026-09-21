@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, Modal, type TextInputProps } from 'react-native';
 import { ChevronDown, Check, Search, X } from 'lucide-react-native';
 import { CheckoutFormData } from '../Checkout';
+import { Fonts } from '@/constants/theme';
 import CountrySelect from './CountrySelect';
 import {
   EMAIL_REGEX,
@@ -19,6 +20,7 @@ import {
 interface ShippingFormProps {
   formData: CheckoutFormData;
   updateFormData: <K extends keyof CheckoutFormData>(field: K, value: CheckoutFormData[K]) => void;
+  disabled?: boolean;
   onValidityChange?: (isValid: boolean) => void;
   showAllErrors?: boolean;
   submitAttempt?: number;
@@ -159,11 +161,11 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
     <View style={{ gap: 20 }}>
       {/* Pre-filled banner */}
       {isPreFilled ? (
-        <View style={{ backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#3b82f6', marginTop: 5 }} />
+        <View style={{ backgroundColor: '#fdf6f4', borderWidth: 1, borderColor: '#f4e2de', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#e01a1b', marginTop: 5 }} />
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: '#1e40af' }}>Address auto-filled from your profile</Text>
-            <Text style={{ fontSize: 11, color: '#3b82f6', marginTop: 2 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#1a1a1a' }}>Address auto-filled from your profile</Text>
+            <Text style={{ fontSize: 11, color: '#6b625b', marginTop: 2 }}>
               Filled: {preFilledFields.join(', ')}. Edit any field if needed.
             </Text>
           </View>
@@ -213,7 +215,6 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
             accessibilityLabel="Last name, required"
             hasError={touched.lastName && !!errors.lastName}
           />
-          <ErrorText text={touched.lastName ? errors.lastName : undefined} />
         </View>
       </View>
 
@@ -316,10 +317,10 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
                   pickerStyle,
                   touched.state && errors.state ? { borderColor: '#ef4444' } : {},
                 ]}>
-                  <Text style={{ flex: 1, fontSize: 14, color: formData.state ? '#111827' : '#9ca3af', fontWeight: formData.state ? '600' : '400' }}>
-                    {formData.state ? selectedStateName || formData.state : 'Select State'}
-                  </Text>
-                  <ChevronDown size={16} color="#6b7280" />
+                 <Text style={{ flex: 1, fontSize: 14, color: formData.state ? '#1a1a1a' : '#9ca3af', fontWeight: formData.state ? '600' : '400' }}>
+                   {formData.state ? selectedStateName || formData.state : 'Select State'}
+                 </Text>
+                 <ChevronDown size={16} color="#9ca3af" />
                 </View>
               </Pressable>
             ) : (
@@ -358,22 +359,22 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
 
       {/* State Picker Modal */}
       <Modal visible={statePickerVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+        <View style={{ flex: 1, backgroundColor: '#fffdfbf' }}>
           {/* Modal Header */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' }}>
-            <Text style={{ fontSize: 17, fontWeight: '700', color: '#111827' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#e5dbd0' }}>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: '#1a1a1a' }}>
               Select State {country ? `· ${country.name}` : ''}
             </Text>
             <Pressable onPress={() => setStatePickerVisible(false)} accessibilityRole="button" accessibilityLabel="Close state picker" hitSlop={4}>
               <View style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-                <X size={20} color="#6b7280" />
+                <X size={20} color="#9ca3af" />
               </View>
             </Pressable>
           </View>
 
           {/* Search */}
           <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f4f6', borderRadius: 12, paddingHorizontal: 12, height: 44, gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0e8de', borderRadius: 12, paddingHorizontal: 12, height: 44, gap: 8 }}>
               <Search size={16} color="#9ca3af" />
               <TextInput
                 value={stateSearch}
@@ -381,7 +382,7 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
                 placeholder="Search states..."
                 placeholderTextColor="#9ca3af"
                 autoFocus
-                style={{ flex: 1, fontSize: 14, color: '#111827' }}
+                style={{ flex: 1, fontSize: 14, color: '#1a1a1a' }}
               />
             </View>
           </View>
@@ -408,24 +409,24 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
                     justifyContent: 'space-between',
                     paddingHorizontal: 20,
                     paddingVertical: 14,
-                    backgroundColor: isSelected ? '#FCE8E8' : '#fff',
+                    backgroundColor: isSelected ? '#fdf6f4' : '#fff',
                     borderBottomWidth: 1,
                     borderBottomColor: '#f3f4f6',
                   }}>
                     <View>
-                      <Text style={{ fontSize: 15, fontWeight: isSelected ? '700' : '500', color: isSelected ? '#E01A1B' : '#111827' }}>
+                      <Text style={{ fontSize: 15, fontWeight: isSelected ? '700' : '500', color: isSelected ? '#c41617' : '#1a1a1a' }}>
                         {state.name}
                       </Text>
-                      <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>{state.isoCode}</Text>
+                      <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 1 }}>{state.isoCode}</Text>
                     </View>
-                    {isSelected ? <Check size={18} color="#E01A1B" strokeWidth={2.5} /> : null}
+                    {isSelected ? <Check size={18} color="#c41617" strokeWidth={2.5} /> : null}
                   </View>
                 </Pressable>
               );
             })}
             {filteredStates.length === 0 ? (
               <View style={{ padding: 40, alignItems: 'center' }}>
-                <Text style={{ fontSize: 14, color: '#6b7280' }}>No states found</Text>
+                <Text style={{ fontSize: 14, color: '#9ca3af' }}>No states found</Text>
               </View>
             ) : null}
           </ScrollView>
@@ -438,7 +439,7 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
 // ─── Shared sub-components ──────────────────────────────────────────────────
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
-    <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 }}>
+    <Text style={{ fontSize: 13, fontWeight: '600', color: '#4a423c', marginBottom: 6 }}>
       {label}{required ? <Text style={{ color: '#ef4444' }}> *</Text> : null}
     </Text>
   );
@@ -463,11 +464,11 @@ function FormInput({ hasError, style, onFocus, onBlur, ...rest }: TextInputProps
           paddingVertical: 14,
           minHeight: 48,
           borderWidth: 1.5,
-          borderColor: hasError ? '#ef4444' : focused ? '#111827' : '#e2e8f0',
+          borderColor: hasError ? '#ef4444' : focused ? '#e01a1b' : '#e5dbd0',
           borderRadius: 12,
-          backgroundColor: focused ? '#fff' : '#f8fafc',
+          backgroundColor: focused ? '#fff' : '#faf6f2',
           fontSize: 14,
-          color: '#111827',
+          color: '#1a1a1a',
           fontWeight: '500',
         },
         style,
@@ -481,9 +482,9 @@ const pickerStyle = {
   paddingHorizontal: 14,
   paddingVertical: 14,
   borderWidth: 1.5,
-  borderColor: '#e2e8f0',
+  borderColor: '#e5dbd0',
   borderRadius: 12,
-  backgroundColor: '#f8fafc',
+  backgroundColor: '#faf6f2',
   flexDirection: 'row' as const,
   alignItems: 'center' as const,
   minHeight: 48,

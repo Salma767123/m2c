@@ -21,6 +21,7 @@ import {
   MessageSquare,
   CircleAlert,
 } from 'lucide-react-native';
+import EmptyState from '@/components/WebSite/Shared/EmptyState';
 import { supportService, type SupportTicket } from '@/services/supportService';
 import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
@@ -199,13 +200,12 @@ function TicketList({
             ))}
           </>
         ) : tickets.length === 0 ? (
-          <View style={s.empty}>
-            <MessageSquare size={44} color={Palette.outlineVariant} />
-            <Text style={s.emptyTitle}>No tickets yet</Text>
-            <Text style={s.emptySub}>
-              Raise a ticket and we&apos;ll get back to you as soon as we can.
-            </Text>
-          </View>
+          <EmptyState
+            fill={false}
+            icon={MessageSquare}
+            title="No tickets yet"
+            subtitle="Raise a ticket and we'll get back to you as soon as we can."
+          />
         ) : (
           tickets.map((t) => {
             const sm = statusMeta(t.status);

@@ -18,6 +18,7 @@ import {
   formatPrice as fmtCurrency,
 } from "@/lib/currency";
 import { FaceRatingRow } from "@/components/WebSite/Shared/FaceRating";
+import { Fonts } from "@/constants/theme";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 interface MockProduct {
@@ -234,7 +235,10 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
       accessibilityLabel={`${product.name}, ${fmtCurrency(effectivePrice)}${
         !isActuallyInStock ? ", out of stock" : ""
       }`}
-      style={({ pressed }) => [s.card, pressed && { opacity: 0.96 }]}
+      /* Plain style: s.card carries this card's white fill, border and
+         radius, so a dropped style function strips the card itself. */
+      android_ripple={{ color: "rgba(15,23,42,0.06)" }}
+      style={s.card}
     >
       {/* ── Image area ─────────────────────────────────────────────── */}
       <View style={s.imageWrap}>
@@ -279,16 +283,28 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
 
       {/* ── Info area ──────────────────────────────────────────────── */}
       <View style={s.info}>
-        <Text numberOfLines={1} style={s.name}>
-          {product.name}
-        </Text>
+        {/* Name + rating grow, so the price and the button stay bottom-aligned
+            across a row no matter how many lines each name takes. The web does
+            the same thing — "Meta block grows so the price + action stay
+            bottom-aligned across cards".
 
-        {/* FaceRating — shows face + rating when rating >= 3.5, otherwise review count */}
-        <FaceRatingRow
-          rating={Number((product as any).rating) || 0}
-          reviewCount={Number((product as any).reviews) || 0}
-          size={13}
-        />
+            Without it, a two-line name next to a one-line name pushed that
+            card's price and Add to Cart button roughly 20pt lower than its
+            neighbour's, which is visible on every row with mixed name lengths. */}
+        <View style={s.meta}>
+          {/* Two lines, matching the web's `line-clamp-2`. At one line a name as
+              ordinary as "Multi Mono Checked Terry Towel" truncated mid-word. */}
+          <Text numberOfLines={2} style={s.name}>
+            {product.name}
+          </Text>
+
+          {/* FaceRating — shows face + rating when rating >= 3.5, otherwise review count */}
+          <FaceRatingRow
+            rating={Number((product as any).rating) || 0}
+            reviewCount={Number((product as any).reviews) || 0}
+            size={13}
+          />
+        </View>
 
         {/* Price row — effective price from activeOffer if present */}
         <View style={s.priceRow}>
@@ -306,12 +322,24 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
         >
           {isAddingToCart ? (
             <ActivityIndicator size="small" color="#ffffff" />
-          ) : isAdded ? (
-            <Text style={s.ctaText}>Added</Text>
           ) : (
-            <Text style={s.ctaText}>
-              {!isActuallyInStock ? "Out of Stock" : hasVariants ? "Choose Options" : "Add to Cart"}
-            </Text>
+            <>
+              {/* The web pairs the label with a cart glyph at h-3.5 (14px). */}
+              <ShoppingCart
+                size={14}
+                color={isActuallyInStock ? "#ffffff" : "#9ca3af"}
+                strokeWidth={2}
+              />
+              <Text style={[s.ctaText, !isActuallyInStock && s.ctaTextDisabled]}>
+                {isAdded
+                  ? "Added"
+                  : !isActuallyInStock
+                    ? "Unavailable"
+                    : hasVariants
+                      ? "Choose Options"
+                      : "Add to Cart"}
+              </Text>
+            </>
           )}
         </Pressable>
       </View>
@@ -320,20 +348,29 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
 }
 
 const s = StyleSheet.create({
+  /* Geometry and colour are the web's `showcase` variant — the one the home
+     page actually renders (frontend ProductCard.tsx). Mobile had been built to
+     the `grid` variant instead, which is why the cards read differently from
+     the site: grid is a cool-neutral listing card, showcase is a warm one
+     designed to sit on the home page's linen ground. The warm ring and the
+     resting shadow are the web's stated reason — "a white card on a near-white
+     page has nothing separating it from the surface". */
   card: {
     flex: 1,
     backgroundColor: "#ffffff",
     borderRadius: 16,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#f1f5f9",
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-    elevation: 2,
+    borderColor: "#e3d7c9",
+    shadowColor: "#4a3226",
+    shadowOpacity: 0.45,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 13,
+    elevation: 3,
   },
-  imageWrap: { position: "relative", width: "100%", aspectRatio: 1.15, backgroundColor: "#fff" },
+  // aspect-[5/4]. Was 1.15, so every product image on the home page was
+  // cropped to a slightly different frame than the site shows.
+  imageWrap: { position: "relative", width: "100%", aspectRatio: 1.25, backgroundColor: "#f3f1ee" },
   image: { width: "100%", height: "100%" },
   imageFallback: { alignItems: "center", justifyContent: "center" },
 
@@ -361,7 +398,7 @@ const s = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 6,
   },
-  discountText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  discountText: { fontFamily: Fonts.sansBold, color: "#fff", fontSize: 10, fontWeight: "800" },
 
   outOfStockOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -370,25 +407,82 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   outOfStockPill: { backgroundColor: "rgba(31,41,55,0.9)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
-  outOfStockText: { color: "#fff", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
+  outOfStockText: { fontFamily: Fonts.sansBold, color: "#fff", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
 
-  info: { padding: 10 },
-  name: { fontSize: 13.5, fontWeight: "700", color: "#111827", marginBottom: 8 },
+  // `flex: 1` so the info block takes whatever height is left under the image;
+  // `meta` then grows inside it and the price + CTA settle at the bottom.
+  info: { padding: 10, flex: 1 },
+  meta: { flexGrow: 1 },
+  // Poppins 600 at 13px, not Outfit Bold at 13.5 — the web sets product names
+  // in the display face (`font-playfair`, which resolves to Poppins) and drops
+  // the weight to 600 in showcase. `leading-snug` and `tracking-tight`
+  // resolved against 13px give 17.9 and -0.325.
+  name: {
+    fontFamily: Fonts.heading,
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 17.9,
+    letterSpacing: -0.325,
+    color: "#1a1a1a",
+    marginBottom: 8,
+    /* Always two lines tall, whether the name needs one or two.
+       The `meta` flexGrow above bottom-aligns the price and button, but that
+       only works when the cards themselves are stretched to a common height —
+       true in the wrapped grid rows, NOT inside a horizontal rail, where each
+       card is only as tall as its own content. Reserving the second line makes
+       every card identical by construction instead of by layout, so the prices
+       and the Add to Cart buttons line up in both. 2 × 17.9 lineHeight. */
+    minHeight: 35.8,
+  },
 
   priceRow: { flexDirection: "row", alignItems: "baseline", gap: 6, marginBottom: 10 },
-  price: { fontSize: 16, fontWeight: "800", color: "#111827" },
-  originalPrice: { fontSize: 12, color: "#9ca3af", textDecorationLine: "line-through" },
+  // Showcase deliberately drops the price's weight (600, not extrabold): "In
+  // the grid the price is the hero — correct for a listing. In a handpicked
+  // showcase the product is."
+  price: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 16,
+    fontWeight: "600",
+    letterSpacing: -0.4,
+    color: "#1a1a1a",
+  },
+  originalPrice: {
+    fontFamily: Fonts.sans,
+    fontSize: 11,
+    color: "#8a7d72",
+    textDecorationLine: "line-through",
+  },
 
+  /* One Add to Cart button, everywhere.
+     The web has two: a solid red one on its listing grid and a calm cream one
+     in the home showcase, because on a desktop "four solid red slabs side by
+     side were the loudest shape in the section". Carrying both into the app
+     meant the same button changed colour depending on which screen you reached
+     it from, which on a phone — where you meet one card at a time rather than
+     a full row at once — reads as inconsistency rather than as restraint.
+
+     36pt rather than the web's 28/32: this is the primary action on the card,
+     and the project's own ctaPill.ts puts the thumb floor at 44. A listing
+     card cannot spare 44, but it can spare more than 28. */
   cta: {
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: "#E01A1B",
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: "#e01a1b",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 6,
   },
-  ctaDisabled: { backgroundColor: "#e5e7eb" },
-  ctaText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  ctaDisabled: { backgroundColor: "#f3f4f6" },
+  ctaText: {
+    fontFamily: Fonts.sansSemibold,
+    color: "#ffffff",
+    fontSize: 12.5,
+    fontWeight: "600",
+  },
+  ctaTextDisabled: { color: "#9ca3af" },
 });
+
 
 const ProductCard = memo(ProductCardImpl);
 ProductCard.displayName = "ProductCard";

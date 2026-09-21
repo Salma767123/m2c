@@ -18,6 +18,15 @@ export interface Courier {
   logo?: string | null;
   isActive?: boolean;
   sortOrder?: number;
+  /**
+   * Public tracking-website URL, optionally containing a `{tracking}` token.
+   *
+   * The backend sends this on /couriers/active (courierController) and the web
+   * carries it; mobile's type dropped the field, so the runtime registry threw
+   * it away and the app could never link a consignment to the courier's own
+   * tracking page.
+   */
+  trackingUrl?: string | null;
 }
 
 export const COURIERS: Courier[] = [
@@ -102,6 +111,29 @@ export function courierName(id?: string | null): string {
 /**
  * Get courier object by ID — runtime registry first, then the static fallback.
  */
+/**
+ * Resolve a courier's public tracking page for one consignment.
+ *
+ * Returns null when the courier has no tracking URL configured, which the
+ * caller should treat as "show the tracking id, offer no link".
+ *
+ * Mirrors frontend/src/lib/couriers.ts — courierTrackingUrl.
+ */
+export function courierTrackingUrl(
+  id?: string | null,
+  trackingId?: string | null,
+): string | null {
+  const raw = getCourierById(id)?.trackingUrl;
+  if (!raw || !raw.trim()) return null;
+  const tid = (trackingId || '').trim();
+  let url = raw.trim();
+  // Substitute the tracking id where the admin placed the {tracking} token.
+  if (url.includes('{tracking}')) url = url.replace(/\{tracking\}/g, encodeURIComponent(tid));
+  // Force an absolute URL — a bare "www.example.com" would not open natively.
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  return url;
+}
+
 export function getCourierById(id?: string | null): Courier | undefined {
   if (!id) return undefined;
   return RUNTIME[id] || COURIERS.find((c) => c.id === id);

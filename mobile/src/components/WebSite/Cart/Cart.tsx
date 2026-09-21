@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   StyleSheet,
-  StatusBar,
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
@@ -37,6 +36,7 @@ import {
   Star,
   Shield,
 } from 'lucide-react-native';
+import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cartService } from '@/services/cartService';
@@ -51,8 +51,17 @@ import type { StockSyncResult } from '@/lib/stockSync';
 import { CartSkeleton } from '@/components/ui/Skeleton';
 import BagSelector from './BagSelector';
 import type { BagType } from '@/services/bagTypeService';
-import { Palette, Radius } from '@/constants/theme';
+import EmptyState from '@/components/WebSite/Shared/EmptyState';
+import { Palette, Radius, Fonts } from '@/constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { extractCouponCode } from '@/lib/coupons';
+
+/* `bg-[#f9f5f2]` — the warm ground the web gives this page. Mobile had
+   #f8fafc, Tailwind's slate-50, so the cart sat on a cool cast while every
+   card on it is warm. */
+const CART_GROUND = '#f9f5f2';
+
 
 /*
   NOTE ON ASSUMPTIONS (courier naming)
@@ -554,8 +563,8 @@ export default function Cart() {
   // ── Loading ─────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-        <ScreenHeader count={0} />
+      <View style={{ flex: 1, backgroundColor: CART_GROUND }}>
+        <ScreenHeader icon={ShoppingCart} title="My Cart" subtitle="Review your items before checkout" />
         <CartSkeleton />
       </View>
     );
@@ -564,49 +573,27 @@ export default function Cart() {
   // ── Empty ───────────────────────────────────────────────────────────────
   if (cartItems.length === 0) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-        <ScreenHeader count={0} />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <View
-            style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#E01A1B', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}
-          >
-            <ShoppingCart size={40} color="#ffffff" />
-          </View>
-          <Text style={{ fontSize: 20, fontWeight: '800', color: '#1a1a1a', marginBottom: 6 }}>
-            Your cart is empty
-          </Text>
-          <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
-            Add some items to get started
-          </Text>
-          <Pressable onPress={() => router.push('/(tabs)')} accessibilityRole="button" accessibilityLabel="Continue shopping, browse products">
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: BRAND,
-                paddingHorizontal: 28,
-                height: 50,
-                borderRadius: 999,
-                gap: 8,
-                shadowColor: BRAND,
-                shadowOffset: { width: 0, height: 6 },
-                shadowOpacity: 0.3,
-                shadowRadius: 12,
-                elevation: 4,
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Continue Shopping</Text>
-            </View>
-          </Pressable>
-        </View>
+      <View style={{ flex: 1, backgroundColor: CART_GROUND }}>
+        <ScreenHeader icon={ShoppingCart} title="My Cart" subtitle="Review your items before checkout" />
+        <EmptyState
+          icon={ShoppingCart}
+          title="Your cart is empty"
+          subtitle="Add some items to get started"
+          ctaLabel="Continue Shopping"
+          onPress={() => router.push('/(tabs)')}
+        />
       </View>
     );
   }
 
   // ── Main ────────────────────────────────────────────────────────────────
   return (
-    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-      <ScreenHeader count={cartItems.length} />
+    <View style={{ flex: 1, backgroundColor: CART_GROUND }}>
+      <ScreenHeader
+        icon={ShoppingCart}
+        title="My Cart"
+        subtitle={`${cartItems.length} ${cartItems.length === 1 ? 'item' : 'items'} in your cart`}
+      />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 140, gap: 10 }}
@@ -1084,42 +1071,6 @@ function applyOfferPrice(price: number, offer: any, quantity: number): number {
 }
 
 // ─── Header ───────────────────────────────────────────────────────────────────
-function ScreenHeader({ count }: { count: number }) {
-  const insets = useSafeAreaInsets();
-  return (
-    <View
-      style={{
-        backgroundColor: '#fff',
-        paddingHorizontal: 16,
-        paddingTop: insets.top + 12,
-        paddingBottom: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: '#e5e7eb',
-      }}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-          {/* Brand-red cart icon — matches web's text-[#E01A1B] header icon */}
-          {/* <ShoppingCart size={26} color={BRAND} /> */}
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 22, fontWeight: '800', color: '#1a1a1a' }}>Shopping Cart</Text>
-            <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>
-              Review your items and proceed to checkout
-            </Text>
-          </View>
-        </View>
-        {count > 0 ? (
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ fontSize: 20, fontWeight: '800', color: '#1a1a1a' }}>{count}</Text>
-            <Text style={{ fontSize: 11, color: '#6b7280' }}>{count === 1 ? 'Item' : 'Items'}</Text>
-          </View>
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
 function SummaryRow({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>

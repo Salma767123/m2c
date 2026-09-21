@@ -12,6 +12,7 @@ interface AddressSelectorProps {
   onSelect: (id: string) => void;
   onChooseNew: () => void;
   onEdit?: (id: string) => void;
+  disabled?: boolean;
 }
 
 const TYPE_META: Record<string, { label: string; Icon: typeof Home }> = {
@@ -27,6 +28,7 @@ export default function AddressSelector({
   onSelect,
   onChooseNew,
   onEdit,
+  disabled,
 }: AddressSelectorProps) {
   if (addresses.length === 0) return null;
 
@@ -34,8 +36,8 @@ export default function AddressSelector({
     <View style={{ gap: 12 }}>
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }}>Ship to a saved address</Text>
-        <Text style={{ fontSize: 12, color: '#64748b' }}>{addresses.length} saved</Text>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: '#1a1a1a' }}>Ship to a saved address</Text>
+        <Text style={{ fontSize: 12, color: '#8a807a' }}>{addresses.length} saved</Text>
       </View>
 
       {/* Address cards */}
@@ -47,27 +49,28 @@ export default function AddressSelector({
         return (
           <Pressable
             key={addr.id}
-            onPress={() => onSelect(addr.id)}
+            onPress={() => { if (!disabled) onSelect(addr.id); }}
             accessibilityRole="radio"
-            accessibilityState={{ selected }}
+            accessibilityState={{ selected, disabled: disabled ?? false }}
             accessibilityLabel={`${meta.label} address: ${addr.name}, ${addr.address}, ${addr.city}`}
           >
-            <View
-              style={{
-                borderWidth: selected ? 2 : 1.5,
-                borderColor: selected ? '#1f2937' : '#e2e8f0',
-                borderRadius: 14,
-                padding: 14,
-                backgroundColor: selected ? '#fafafa' : '#fff',
-              }}
-            >
+             <View
+               style={{
+                 borderWidth: selected ? 2 : 1.5,
+                 borderColor: selected ? '#e01a1b' : '#e5dbd0',
+                 borderRadius: 14,
+                 padding: 14,
+                 backgroundColor: selected ? '#fef2f2' : '#fffdfbf',
+                 opacity: disabled ? 0.6 : 1,
+               }}
+             >
               {/* Top row — type badge + default + check + edit */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   {/* Type badge */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f1f5f9', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                    <Icon size={11} color="#475569" />
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: '#475569' }}>{meta.label}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#faf6f2', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#f0e8df' }}>
+                    <Icon size={11} color="#4a423c" />
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: '#4a423c' }}>{meta.label}</Text>
                   </View>
                   {/* Default badge */}
                   {addr.isDefault ? (
@@ -86,8 +89,8 @@ export default function AddressSelector({
                       accessibilityLabel={`Edit ${meta.label} address`}
                       hitSlop={4}
                     >
-                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}>
-                        <Pencil size={14} color="#475569" />
+                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#f3ece5', alignItems: 'center', justifyContent: 'center' }}>
+                        <Pencil size={14} color="#6b625b" />
                       </View>
                     </Pressable>
                   ) : null}
@@ -100,13 +103,13 @@ export default function AddressSelector({
               </View>
 
               {/* Name + Phone */}
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }} numberOfLines={1}>{addr.name}</Text>
-              <Text style={{ fontSize: 12, color: '#475569', marginTop: 1 }}>
-                {formatPhoneForDisplay(addr.phone, addr.country)}
-              </Text>
+               <Text style={{ fontSize: 14, fontWeight: '700', color: '#1a1a1a' }} numberOfLines={1}>{addr.name}</Text>
+               <Text style={{ fontSize: 12, color: '#6b625b', marginTop: 1 }}>
+                 {formatPhoneForDisplay(addr.phone, addr.country)}
+               </Text>
 
-              {/* Address */}
-              <Text style={{ fontSize: 12, color: '#334155', marginTop: 4, lineHeight: 17 }} numberOfLines={2}>
+               {/* Address */}
+               <Text style={{ fontSize: 12, color: '#4a423c', marginTop: 4, lineHeight: 17 }} numberOfLines={2}>
                 {[
                   addr.address,
                   addr.addressLine2,
@@ -122,28 +125,29 @@ export default function AddressSelector({
 
       {/* Use new address tile */}
       <Pressable
-        onPress={onChooseNew}
+        onPress={() => { if (!disabled) onChooseNew(); }}
         accessibilityRole="radio"
-        accessibilityState={{ selected: useNewAddress }}
+        accessibilityState={{ selected: useNewAddress, disabled: disabled ?? false }}
         accessibilityLabel="Use a new shipping address"
       >
           <View
             style={{
               borderWidth: useNewAddress ? 2 : 1.5,
-              borderColor: useNewAddress ? '#E01A1B' : '#cbd5e1',
+              borderColor: useNewAddress ? '#E01A1B' : '#e5dbd0',
               borderStyle: 'dashed',
               borderRadius: 14,
               padding: 20,
-              backgroundColor: '#fff',
+              backgroundColor: '#fffdfbf',
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
               minHeight: 60,
+              opacity: disabled ? 0.6 : 1,
             }}
           >
-          <Plus size={18} color={useNewAddress ? '#E01A1B' : '#64748b'} />
-          <Text style={{ fontSize: 14, fontWeight: '600', color: useNewAddress ? '#E01A1B' : '#64748b' }}>
+          <Plus size={18} color={useNewAddress ? '#E01A1B' : '#6b625b'} />
+          <Text style={{ fontSize: 14, fontWeight: '600', color: useNewAddress ? '#E01A1B' : '#6b625b' }}>
             Use a new address
           </Text>
         </View>

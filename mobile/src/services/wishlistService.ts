@@ -86,10 +86,13 @@ class WishlistService {
   /**
    * Mint a public share token for the signed-in user's wishlist.
    *
-   * The token resolves to a WEB page (`/wishlist/shared/:token`) — there is no
-   * mobile screen for someone else's wishlist, and a recipient without the app
-   * installed needs a link that just opens. Requires auth: a guest wishlist
-   * lives only in AsyncStorage and has nothing to share.
+   * The shared link deliberately points at the WEB page
+   * (`/wishlist/shared/:token`): a recipient without the app installed needs a
+   * link that just opens. The app can also render that token itself — see
+   * `getSharedWishlist` and app/(any)/wishlist/shared/[token].tsx.
+   *
+   * Requires auth: a guest wishlist lives only in AsyncStorage and has nothing
+   * to share.
    */
   async getShareToken(): Promise<string> {
     try {
@@ -97,6 +100,26 @@ class WishlistService {
       return response.data.shareToken;
     } catch (error: any) {
       throw new Error(error?.message || 'Failed to generate share link');
+    }
+  }
+
+  /**
+   * Read a wishlist someone else shared, by its public token.
+   *
+   * Public route — no auth header is required and none should be implied: the
+   * caller is usually not the owner. Mobile could MINT a share token but had no
+   * way to OPEN one, so a link sent phone-to-phone could only be read on the web.
+   *
+   * Same endpoint and unwrapping as frontend wishlistService.getSharedWishlist.
+   */
+  async getSharedWishlist(
+    token: string,
+  ): Promise<{ ownerName: string; items: WishlistItem[]; count: number }> {
+    try {
+      const response = await axios.get(`/wishlist/shared/${token}`);
+      return response.data.data;
+    } catch (error: any) {
+      throw extractError(error, 'Wishlist not found');
     }
   }
 

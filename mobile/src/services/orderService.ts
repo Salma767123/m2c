@@ -154,6 +154,15 @@ export interface CreateOrderParams {
   // Razorpay signature payload — when present, the server verifies the
   // HMAC signature inline during order creation (lets the client skip
   // the separate /payments/razorpay/verify round trip).
+  /**
+   * Set when a free-shipping offer applied to this order.
+   *
+   * The web sends this (frontend CreateOrderParams) and mobile did not, so an
+   * order that qualified for free shipping was created without saying so —
+   * the cart showed the customer a zeroed shipping line the order itself never
+   * recorded.
+   */
+  freeShipping?: boolean;
   razorpayOrderId?: string;
   razorpaySignature?: string;
   shippingCost?: number;
@@ -190,6 +199,39 @@ class OrderService {
       return response.data;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to fetch order details');
+    }
+  }
+
+  /**
+   * Customer: cancel an order before it is dispatched.
+   *
+   * Same endpoint and payload as the web (frontend orderService.cancelOrder).
+   * The app carried `cancelReason`, `refundStatus` and `refundAmount` on the
+   * Order type but had no way to reach this route, so a customer could place
+   * an order from the phone and then had to use the website to cancel it.
+   */
+  async cancelOrder(
+    orderId: string,
+    reason?: string,
+  ): Promise<{ success: boolean; data: Order; message?: string }> {
+    try {
+      const response = await axios.post(`/orders/${orderId}/cancel`, { reason });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to cancel order');
+    }
+  }
+
+  /** Customer: request a return on a delivered order (an admin approves it). */
+  async requestReturn(
+    orderId: string,
+    reason: string,
+  ): Promise<{ success: boolean; data: Order; message?: string }> {
+    try {
+      const response = await axios.post(`/orders/${orderId}/return`, { reason });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to submit return request');
     }
   }
 

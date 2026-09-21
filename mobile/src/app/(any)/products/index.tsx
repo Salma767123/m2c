@@ -12,12 +12,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
-  StatusBar,
+  StyleSheet,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  ArrowLeft,
   Search,
   ShoppingCart,
   SlidersHorizontal,
@@ -28,8 +27,12 @@ import {
   PackageSearch,
   RefreshCw,
 } from 'lucide-react-native';
+import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
+import EmptyState from '@/components/WebSite/Shared/EmptyState';
 
 import ProductCard from '@/components/WebSite/ProductCard/ProductCard';
+import { CARD_GRID_PADDING, CARD_GAP } from '@/components/WebSite/ProductCard/metrics';
+import VendorPartnerCTA from '@/components/WebSite/VendorPartnerCTA/VendorPartnerCTA';
 import {
   publicProductService,
   PublicProduct,
@@ -37,7 +40,7 @@ import {
 } from '@/services/publicProductService';
 import { categoryService, Category } from '@/services/categoryService';
 import { useCart } from '@/context/CartContext';
-import { Palette } from '@/constants/theme';
+import { Fonts, Palette } from '@/constants/theme';
 
 // ─── Types & constants ────────────────────────────────────────────────────
 type LoadState = 'initial' | 'ready' | 'empty' | 'error';
@@ -455,9 +458,9 @@ export default function ProductsScreen() {
           </View>
         )}
         numColumns={products.length <= 1 ? 1 : 2}
-        columnWrapperStyle={products.length > 1 ? { gap: 12 } : undefined}
+        columnWrapperStyle={products.length > 1 ? { gap: CARD_GAP } : undefined}
         contentContainerStyle={{
-          paddingHorizontal: 16,
+          paddingHorizontal: CARD_GRID_PADDING,
           paddingTop: 8,
           paddingBottom: 32,
           gap: 12,
@@ -505,6 +508,10 @@ export default function ProductsScreen() {
         showsVerticalScrollIndicator={false}
       />
 
+      {/* The web closes this listing with the vendor band — Products.tsx
+          renders <VendorPartnerCTA /> last. */}
+      {products.length > 0 ? <VendorPartnerCTA /> : null}
+
       <SortModal
         visible={showSort}
         value={filters.sort}
@@ -535,75 +542,59 @@ const keyExtractor = (p: PublicProduct) => p.id;
 // ─── Sub-components ───────────────────────────────────────────────────────
 
 function Header({ itemCount }: { itemCount: number }) {
-  const headerInsets = useSafeAreaInsets();
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingTop: headerInsets.top + 8,
-        paddingBottom: 8,
-        backgroundColor: '#ffffff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e5e7eb',
-      }}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <Pressable
-        onPress={() => (router.canGoBack() ? router.back() : router.push('/(tabs)'))}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-        hitSlop={8}
-        style={{ padding: 8 }}
-      >
-        <ArrowLeft size={22} color="#111827" />
-      </Pressable>
-      <Text
-        style={{
-          flex: 1,
-          fontSize: 18,
-          fontWeight: '700',
-          color: '#111827',
-          marginLeft: 4,
-        }}
-      >
-        Products
-      </Text>
-      <Pressable
-        onPress={() => router.push('/(tabs)/cart' as any)}
-        accessibilityRole="button"
-        accessibilityLabel={`Cart with ${itemCount} items`}
-        hitSlop={8}
-        style={{ padding: 8 }}
-      >
-        <View>
-          <ShoppingCart size={22} color="#111827" />
-          {itemCount > 0 ? (
-            <View
-              style={{
-                position: 'absolute',
-                top: -4,
-                right: -6,
-                backgroundColor: '#dc2626',
-                minWidth: 16,
-                height: 16,
-                borderRadius: 8,
-                paddingHorizontal: 4,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
-                {itemCount > 99 ? '99+' : itemCount}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      </Pressable>
-    </View>
+    <ScreenHeader
+      onBack={() => (router.canGoBack() ? router.back() : router.push('/(tabs)'))}
+      title="Products"
+      right={
+        <Pressable
+          onPress={() => router.push('/(tabs)/cart' as any)}
+          accessibilityRole="button"
+          accessibilityLabel={`Cart with ${itemCount} items`}
+          hitSlop={8}
+        >
+          <View style={ph.cartCircle}>
+            <ShoppingCart size={18} color="#111827" strokeWidth={2} />
+            {itemCount > 0 ? (
+              <View style={ph.badge}>
+                <Text style={ph.badgeText}>{itemCount > 99 ? '99+' : itemCount}</Text>
+              </View>
+            ) : null}
+          </View>
+        </Pressable>
+      }
+    />
   );
 }
+
+const ph = StyleSheet.create({
+  cartCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    backgroundColor: '#E01A1B',
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    fontFamily: Fonts.sansBold,
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+});
 
 function SearchBar({
   value,
@@ -1003,47 +994,13 @@ function ListEmpty({
   }
   // empty
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 48 }}>
-      <View
-        style={{
-          width: 64,
-          height: 64,
-          borderRadius: 32,
-          backgroundColor: '#f3f4f6',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 12,
-        }}
-      >
-        <Search size={28} color="#6b7280" strokeWidth={1.5} />
-      </View>
-      <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 4 }}>
-        No products found
-      </Text>
-      <Text
-        style={{ color: '#6b7280', fontSize: 13, textAlign: 'center', marginBottom: 16 }}
-      >
-        Try adjusting your filters or search terms.
-      </Text>
-      {hasActiveFilters ? (
-        <Pressable onPress={onClearAll} accessibilityRole="button" accessibilityLabel="Clear all filters">
-          <View
-            style={{
-              backgroundColor: Palette.primary,
-              paddingHorizontal: 20,
-              height: 40,
-              borderRadius: 10,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14 }}>
-              Clear all filters
-            </Text>
-          </View>
-        </Pressable>
-      ) : null}
-    </View>
+    <EmptyState
+      icon={Search}
+      title="No products found"
+      subtitle="Try adjusting your filters or search terms."
+      ctaLabel={hasActiveFilters ? 'Clear all filters' : undefined}
+      onPress={hasActiveFilters ? onClearAll : undefined}
+    />
   );
 }
 

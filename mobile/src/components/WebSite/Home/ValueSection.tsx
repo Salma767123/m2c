@@ -1,129 +1,173 @@
 import React from 'react';
-import { View, Text, Dimensions, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Leaf, Award, Wind, Sun, Home } from 'lucide-react-native';
-import SectionHeading from './SectionHeading';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { ArrowRight, Award, Leaf, Ruler, Sun, Wind } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { Reveal } from '@/components/WebSite/Shared/Reveal';
+import { CARD_GUTTER } from '@/components/WebSite/ProductCard/metrics';
+import { Fonts } from '@/constants/theme';
 
-const { width: SCREEN_W } = Dimensions.get('window');
-const H_PAD = 24;
-const GAP = 14;
-const TILE_W = (SCREEN_W - H_PAD * 2 - GAP) / 2;
+/**
+ * "The M2C standard" — the five product guarantees above the footer.
+ *
+ * Ported from frontend/src/components/WebSite/Footer/ValueSection.tsx, which
+ * mobile had diverged from in almost every respect:
+ *
+ *   ground   two-column grid of near-black gradient tiles → the web is a white
+ *            section with a warm top rule and no tiles at all
+ *   heading  a full SectionHeading ("Our Promise" / "Why Choose M2C
+ *            MarkDowns" / a blurb) → the web has NO h2 here, only an eyebrow
+ *            reading "The M2C standard"
+ *   layout   centred cards → a list: a circular mark on the left, title and
+ *            copy on the right
+ *   copy     paraphrased → the site's exact strings
+ *
+ * The web draws its five marks as hand-built SVG (a cotton boll, a struck-
+ * through flask, and so on). Those are bespoke artwork rather than an icon set,
+ * so this uses the nearest lucide equivalents and keeps the chip, the colours
+ * and the layout identical — the shapes differ, the treatment does not.
+ */
+type Item = { icon: typeof Leaf; title: string; copy: string };
 
-type Feature = {
-  icon: React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
-  title: string;
-  description: string;
-};
-
-const features: Feature[] = [
-  {
-    icon: Leaf,
-    title: '100% Cotton',
-    description: 'Pure, natural fibers for ultimate comfort and breathability.',
-  },
-  {
-    icon: Award,
-    title: 'OEKO-TEX Certified',
-    description: 'Tested for harmful substances. Safe for you and your family.',
-  },
-  {
-    icon: Wind,
-    title: 'Breathable Fabric',
-    description: 'Temperature-regulating weave keeps you cool all night.',
-  },
-  {
-    icon: Sun,
-    title: 'Fade-Resistant',
-    description: 'Colors stay vibrant wash after wash, year after year.',
-  },
-  {
-    icon: Home,
-    title: 'Designed for USA Homes',
-    description: 'Perfect fit for standard American mattress sizes.',
-  },
+/** Titles and copy verbatim from the web's `labels`. */
+const ITEMS: Item[] = [
+  { icon: Leaf,  title: '100% Cotton',        copy: 'Pure cotton throughout. Never blended with polyester.' },
+  { icon: Award, title: 'OEKO-TEX Certified', copy: 'Independently tested free of harmful substances.' },
+  { icon: Wind,  title: 'Breathable Weave',   copy: 'Temperature-regulating, so you stay cool all night.' },
+  { icon: Sun,   title: 'Fade-Resistant',     copy: 'Color holds wash after wash, year after year.' },
+  { icon: Ruler, title: 'Made for US Sizes',  copy: 'Cut to standard American mattress and pillow sizes.' },
 ];
+
+const DEEP = '#c41617';
 
 export default function ValueSection() {
   return (
-    <View style={s.wrap}>
-      {/* Header — eyebrow + title + description, centred like the web section. */}
-      <View style={s.header}>
-        <SectionHeading section="promise" center />
-      </View>
+    <View style={s.section}>
+      {/* Eyebrow only — the web sets no heading in this section. */}
+      <Reveal distance={14} duration={620}>
+        <View style={s.eyebrowRow}>
+          <View style={s.eyebrowRule} />
+          <Text style={s.eyebrow}>The M2C standard</Text>
+        </View>
+      </Reveal>
 
-      {/* 2-column grid of black cards — same panel treatment as the notice
-          board carousel, so the promise section stays on-brand. */}
-      <View style={s.grid}>
-        {features.map((feature, i) => {
-          const fullWidth = i === features.length - 1 && features.length % 2 === 1;
+      <View style={s.list}>
+        {ITEMS.map((item, i) => {
+          const Icon = item.icon;
           return (
-            <View
-              key={feature.title}
-              style={[s.tile, fullWidth && { width: TILE_W * 2 + GAP }]}
-            >
-              <LinearGradient
-                colors={['#1f2937', '#000000']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={s.tileInner}
-              >
-                <View style={s.iconWrap}>
-                  <feature.icon size={26} color="#ffffff" strokeWidth={2.25} />
+            // 70ms apart — the web's beat: "close enough to read as one
+            // movement across the row, far enough apart that you see five
+            // things and not a single block fading."
+            <Reveal key={item.title} distance={14} duration={620} delay={180 + i * 70}>
+              <View style={s.row}>
+                <View style={s.chip}>
+                  <Icon size={22} color={DEEP} strokeWidth={1.8} />
                 </View>
-                <Text style={s.title}>{feature.title}</Text>
-                <Text style={s.description}>{feature.description}</Text>
-              </LinearGradient>
-            </View>
+                <View style={s.rowText}>
+                  <Text style={s.title}>{item.title}</Text>
+                  <Text style={s.copy}>{item.copy}</Text>
+                </View>
+              </View>
+            </Reveal>
           );
         })}
       </View>
+
+      {/* The web keeps its masthead control for desktop and puts this one under
+          the list at phone width. */}
+      <Reveal distance={14} duration={620} delay={540}>
+        <View style={s.ctaRow}>
+          <Pressable
+            onPress={() => router.push('/(any)/products' as any)}
+            accessibilityRole="button"
+            accessibilityLabel="Shop the collection"
+            style={[s.cta]}
+          >
+            <Text style={s.ctaText}>Shop the collection</Text>
+            <ArrowRight size={16} color="#ffffff" strokeWidth={2.25} />
+          </Pressable>
+        </View>
+      </Reveal>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: {
+  /* `border-t border-[#efe4d8] bg-white py-10` — a full-bleed white section
+     closing the page, with a rule above it and none below (the footer takes
+     over from there).
+
+     Inset is CARD_GUTTER, the same 26 the product grids, the category tiles
+     and the Best Seller band all use, so the five guarantees line up with
+     everything above them instead of sitting 6pt further in. */
+  section: {
     backgroundColor: '#ffffff',
-    paddingTop: 24,
-    paddingBottom: 36,
-    marginTop: 10,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#efe4d8',
+    paddingVertical: 40,
+    paddingHorizontal: CARD_GUTTER,
   },
-  header: { paddingHorizontal: H_PAD, marginBottom: 20 },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: GAP,
-    paddingHorizontal: H_PAD,
+
+  eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 28 },
+  eyebrowRule: { height: 1, width: 24, backgroundColor: DEEP },
+  eyebrow: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1.98, // 0.18em
+    color: DEEP,
   },
-  tile: { width: TILE_W },
-  tileInner: {
-    borderRadius: 18,
-    padding: 18,
-    minHeight: 172,
-  },
-  iconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+
+  list: { gap: 28 }, // gap-y-7
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+  /* h-11 w-11 rounded-full border-[#f0dcd6] bg-[#fdf3f0] */
+  chip: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#f0dcd6',
+    backgroundColor: '#fdf3f0',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
   },
+  rowText: { flex: 1, minWidth: 0 },
   title: {
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '800',
-    color: '#ffffff',
-    marginBottom: 6,
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 14.5,
+    fontWeight: '600',
+    color: '#1a1a1a',
   },
-  description: {
-    fontSize: 12.5,
-    lineHeight: 18,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.82)',
+  copy: {
+    fontFamily: Fonts.sans,
+    fontSize: 13,
+    lineHeight: 21, // leading-relaxed
+    color: '#5f5550',
+    marginTop: 4,
+  },
+
+  ctaRow: { alignItems: 'center', marginTop: 32 },
+  cta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 999,
+    backgroundColor: '#e01a1b',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    shadowColor: '#e01a1b',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  ctaPressed: { backgroundColor: DEEP },
+  ctaText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1.56, // 0.12em
+    color: '#ffffff',
   },
 });

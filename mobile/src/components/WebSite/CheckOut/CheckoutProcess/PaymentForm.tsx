@@ -8,12 +8,14 @@ interface PaymentFormProps {
   formData: CheckoutFormData;
   updateFormData: (field: keyof CheckoutFormData, value: string | boolean) => void;
   paymentSettings: PublicPaymentSettings | null;
+  disabled?: boolean;
 }
 
 export default function PaymentForm({
   formData,
   updateFormData,
   paymentSettings,
+  disabled,
 }: PaymentFormProps) {
   const availablePaymentMethods: { id: string; name: string; description: string; icon: any }[] = [];
 
@@ -55,9 +57,7 @@ export default function PaymentForm({
     <View className="gap-5">
       {/* Method selector */}
       <View>
-        <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-          Select Payment Method
-        </Text>
+        <Text className="text-sm font-medium text-[#4a423c] mb-4">Payment Method</Text>
         <View className="gap-3">
           {availablePaymentMethods.map((method) => {
             const Icon = method.icon;
@@ -67,48 +67,43 @@ export default function PaymentForm({
                 key={method.id}
                 onPress={() => updateFormData('paymentMethod', method.id as any)}
                 activeOpacity={0.75}
+                disabled={disabled}
                 accessibilityRole="radio"
-                accessibilityState={{ selected: isSelected }}
+                accessibilityState={{ selected: isSelected, disabled: disabled ?? false }}
                 accessibilityLabel={`${method.name}: ${method.description}${isSelected ? ', selected' : ''}`}
                 className={`flex-row items-center p-4 border-2 rounded-2xl gap-3 ${
                   isSelected
-                    ? 'border-[#E01A1B] bg-[#E01A1B]/5'
-                    : 'border-gray-200 bg-white'
+                    ? 'border-[#e01a1b] bg-[#fef2f2]'
+                    : 'border-[#e5dbd0] bg-white'
                 }`}
               >
                 {/* Radio */}
                 <View
                   className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
-                    isSelected ? 'border-[#E01A1B]' : 'border-gray-300'
+                    isSelected ? 'border-[#e01a1b]' : 'border-[#d1c7bb]'
                   }`}
                 >
                   {isSelected && (
-                    <View className="w-3 h-3 rounded-full bg-[#E01A1B]" />
+                    <View className="w-3 h-3 rounded-full bg-[#e01a1b]" />
                   )}
                 </View>
 
                 {/* Icon */}
                 <View
                   className={`w-10 h-10 rounded-xl items-center justify-center ${
-                    isSelected ? 'bg-[#E01A1B]' : 'bg-gray-100'
+                    isSelected ? 'bg-[#e01a1b]' : 'bg-[#f0e8de]'
                   }`}
                 >
-                  <Icon size={18} color={isSelected ? '#ffffff' : '#6b7280'} />
+                  <Icon size={18} color={isSelected ? '#ffffff' : '#6b625b'} />
                 </View>
 
                 {/* Label */}
                 <View className="flex-1">
-                  <Text className={`font-bold text-sm ${isSelected ? 'text-[#E01A1B]' : 'text-gray-800'}`}>
+                  <Text className={`font-bold text-sm ${isSelected ? 'text-[#e01a1b]' : 'text-[#1a1a1a]'}`}>
                     {method.name}
                   </Text>
-                  <Text className="text-xs text-gray-400 mt-0.5">{method.description}</Text>
+                  <Text className="text-xs text-[#6b625b] mt-0.5">{method.description}</Text>
                 </View>
-
-                {isSelected && (
-                  <View className="bg-amber-400 rounded-lg px-2 py-1">
-                    <Text className="text-xs font-bold text-[#E01A1B]">Selected</Text>
-                  </View>
-                )}
               </TouchableOpacity>
             );
           })}
@@ -117,19 +112,19 @@ export default function PaymentForm({
 
       {/* Gateway-specific info */}
       {formData.paymentMethod === 'razorpay' && (
-        <View className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-          <Text className="text-sm font-bold text-blue-900 mb-1">Razorpay Secure Gateway</Text>
-          <Text className="text-xs text-blue-700 leading-5">
-            You'll be redirected to Razorpay's secure page to complete payment via card, UPI, net banking, or wallet.
+        <View className="border-l-2 border-[#e01a1b] bg-[#fdf6f4] rounded-2xl p-4 ring-1 ring-[#f4e2de]">
+          <Text className="text-sm font-semibold text-[#1a1a1a] mb-1">Razorpay Payment</Text>
+          <Text className="text-sm text-[#5a524b] leading-5">
+            You will be redirected to Razorpay&apos;s secure payment gateway to complete your payment using cards, UPI, net banking, or wallets.
           </Text>
         </View>
       )}
 
       {formData.paymentMethod === 'payu' && (
         <View className="bg-purple-50 border border-purple-200 rounded-2xl p-4">
-          <Text className="text-sm font-bold text-purple-900 mb-1">PayU Secure Gateway</Text>
+          <Text className="text-sm font-medium text-purple-900 mb-1">PayU Payment</Text>
           <Text className="text-xs text-purple-700 leading-5">
-            You'll be redirected to PayU's secure page to complete payment via card, UPI, net banking, or wallet.
+            You will be redirected to PayU&apos;s secure payment gateway to complete your payment using cards, UPI, net banking, or wallets.
           </Text>
         </View>
       )}
@@ -140,9 +135,9 @@ export default function PaymentForm({
           <Shield size={18} color="#16a34a" />
         </View>
         <View className="flex-1">
-          <Text className="text-sm font-bold text-green-900">256-bit SSL Encrypted</Text>
+          <Text className="text-sm font-bold text-green-900">Secure Payment</Text>
           <Text className="text-xs text-green-700 mt-0.5">
-            Your payment info is fully encrypted and secure
+            Your payment information is encrypted and secure
           </Text>
         </View>
       </View>

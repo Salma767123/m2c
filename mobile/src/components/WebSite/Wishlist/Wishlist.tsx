@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   StyleSheet,
-  StatusBar,
   Share,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -21,6 +20,7 @@ import {
   AlertCircle,
   Share2,
 } from 'lucide-react-native';
+import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
 import { router } from 'expo-router';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { wishlistService, WishlistItem } from '@/services/wishlistService';
@@ -30,11 +30,16 @@ import { userAuthService } from '@/services/userAuthService';
 import { useWishlist } from '@/context/WishlistContext';
 import { useCart } from '@/context/CartContext';
 import { WishlistSkeleton } from '@/components/ui/Skeleton';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getRegionalPrice, getRegionalOriginalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
 import { FaceRatingRow } from '@/components/WebSite/Shared/FaceRating';
 import { sharedWishlistUrl, productUrl } from '@/lib/shareLinks';
-import { Palette, Radius } from '@/constants/theme';
+import { Palette, Radius, Fonts } from '@/constants/theme';
+import EmptyState from '@/components/WebSite/Shared/EmptyState';
+
+/* `bg-[#f9f5f2]` — the warm ground the web gives this page, the same one
+   the cart and product detail use. Mobile had #f8fafc, Tailwind's slate-50:
+   a cool cast behind cards that are all warm. */
+const WISHLIST_GROUND = '#f9f5f2';
 
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -219,8 +224,8 @@ export default function Wishlist() {
   // ── States ──────────────────────────────────────────────────────────────
   if (isLoading && !refreshing) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-        <ScreenHeader count={0} itemCount={itemCount} />
+      <View style={{ flex: 1, backgroundColor: WISHLIST_GROUND }}>
+        <WishlistHeader count={0} itemCount={itemCount} />
         <WishlistSkeleton />
       </View>
     );
@@ -228,15 +233,14 @@ export default function Wishlist() {
 
   if (!isAuthenticated) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-        <ScreenHeader count={0} itemCount={itemCount} />
-        <CenteredMessage
-          icon={<Heart size={40} color="#d1d5db" />}
+      <View style={{ flex: 1, backgroundColor: WISHLIST_GROUND }}>
+        <WishlistHeader count={0} itemCount={itemCount} />
+        <EmptyState
+          icon={Heart}
           title="Login Required"
-          body="Please log in to view and manage your wishlist."
-          action={
-            <ActionBtn label="Login to Continue" onPress={() => router.push('/(auth)/Login' as any)} />
-          }
+          subtitle="Please log in to view and manage your wishlist."
+          ctaLabel="Login to Continue"
+          onPress={() => router.push('/(auth)/Login' as any)}
         />
       </View>
     );
@@ -244,19 +248,15 @@ export default function Wishlist() {
 
   if (wishlistItems.length === 0) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-        <ScreenHeader count={0} itemCount={itemCount} />
-        <CenteredMessage
-          icon={<Heart size={40} color="#d1d5db" />}
+      <View style={{ flex: 1, backgroundColor: WISHLIST_GROUND }}>
+        <WishlistHeader count={0} itemCount={itemCount} />
+        <EmptyState
+          icon={Heart}
           title="Your Wishlist is Empty"
-          body="Save items you love to your wishlist and never lose track of them."
-          action={
-            <ActionBtn
-              label="Start Shopping"
-              icon={<ArrowRight size={16} color="#fff" />}
-              onPress={() => router.push('/(tabs)')}
-            />
-          }
+          subtitle="Save items you love to your wishlist and never lose track of them."
+          ctaLabel="Start Shopping"
+          ctaIcon={ArrowRight}
+          onPress={() => router.push('/(tabs)')}
         />
       </View>
     );
@@ -264,8 +264,8 @@ export default function Wishlist() {
 
   // ── Main ────────────────────────────────────────────────────────────────
   return (
-    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-      <ScreenHeader
+    <View style={{ flex: 1, backgroundColor: WISHLIST_GROUND }}>
+      <WishlistHeader
         count={wishlistItems.length}
         itemCount={itemCount}
         onShare={shareWishlist}
@@ -401,7 +401,7 @@ export default function Wishlist() {
                       <View
                         style={{ position: 'absolute', top: 4, left: 4, backgroundColor: Palette.primary, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 }}
                       >
-                        <Text style={{ color: '#fff', fontSize: 8, fontWeight: '800' }}>
+                        <Text style={{ fontFamily: Fonts.sansBold, color: '#fff', fontSize: 8, fontWeight: '800' }}>
                           {displayDiscount}%
                         </Text>
                       </View>
@@ -411,17 +411,17 @@ export default function Wishlist() {
 
                 {/* Info + actions */}
                 <View style={{ flex: 1 }}>
-                  {/* Category pill — brand-tinted, matching the web card. */}
+                  {/* `truncate text-[10px] font-semibold uppercase
+                      tracking-[0.12em] text-[#a1948a]` — the web sets this as
+                      plain text, not a pill. */}
                   {item.product.category ? (
-                    <View style={ws.categoryPill}>
-                      <Text style={ws.categoryText} numberOfLines={1}>
-                        {item.product.category}
-                      </Text>
-                    </View>
+                    <Text style={ws.categoryText} numberOfLines={1}>
+                      {item.product.category}
+                    </Text>
                   ) : null}
 
                   <Text
-                    style={{ fontSize: 13, fontWeight: '700', color: '#111827', lineHeight: 17 }}
+                    style={{ fontFamily: Fonts.sansBold, fontSize: 13, fontWeight: '700', color: '#111827', lineHeight: 17 }}
                     numberOfLines={2}
                   >
                     {displayName}
@@ -438,11 +438,11 @@ export default function Wishlist() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
                     <View>
                       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                        <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>
+                        <Text style={{ fontFamily: Fonts.sansBold, fontSize: 14, fontWeight: '800', color: '#111827' }}>
                           {fmt(displayPrice)}
                         </Text>
                         {displayOriginalPrice ? (
-                          <Text style={{ fontSize: 10, color: '#E01A1B', textDecorationLine: 'line-through' }}>
+                          <Text style={{ fontFamily: Fonts.sans, fontSize: 10, color: '#E01A1B', textDecorationLine: 'line-through' }}>
                             {fmt(displayOriginalPrice)}
                           </Text>
                         ) : null}
@@ -507,7 +507,7 @@ export default function Wishlist() {
                       accessibilityLabel={`Remove ${displayName} from wishlist`}
                       style={ws.actionDanger}
                     >
-                      <Trash2 size={12} color={Palette.onBrand} strokeWidth={2.25} />
+                      <Trash2 size={12} color={Palette.error} strokeWidth={2.25} />
                     </Pressable>
                   </View>
                 </View>
@@ -563,7 +563,7 @@ function WishlistTips() {
 }
 
 // ─── Header ───────────────────────────────────────────────────────────────────
-function ScreenHeader({
+function WishlistHeader({
   count,
   itemCount,
   onShare,
@@ -575,175 +575,94 @@ function ScreenHeader({
   onShare?: () => void;
   isSharing?: boolean;
 }) {
-  const insets = useSafeAreaInsets();
   return (
-    <View
-      style={{
-        backgroundColor: '#ffffff',
-        paddingHorizontal: 16,
-        paddingTop: insets.top + 12,
-        paddingBottom: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: '#e5e7eb',
-        flexDirection: 'row',
-        alignItems: 'center',
-      }}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 24, fontWeight: '800', color: '#111827' }}>
-          My Wishlist
-        </Text>
-        <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>
-          {count > 0 ? `${count} saved ${count === 1 ? 'item' : 'items'}` : 'Your saved items'}
-        </Text>
-      </View>
-      {onShare ? (
-        <Pressable
-          onPress={onShare}
-          disabled={isSharing}
-          accessibilityRole="button"
-          accessibilityLabel="Share my wishlist"
-          accessibilityState={{ busy: !!isSharing, disabled: !!isSharing }}
-          hitSlop={6}
-          style={{ marginRight: 10 }}
-        >
-          <View
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: Palette.onBrand,
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: isSharing ? 0.6 : 1,
-            }}
-          >
-            {isSharing ? (
-              <ActivityIndicator size="small" color={Palette.primary} />
-            ) : (
-              <Share2 size={18} color={Palette.primary} />
-            )}
-          </View>
-        </Pressable>
-      ) : null}
-      <Pressable
-        onPress={() => router.push('/(tabs)/cart' as any)}
-        accessibilityRole="button"
-        accessibilityLabel={`Cart, ${itemCount} items`}
-        hitSlop={6}
-      >
-        <View
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-            backgroundColor: '#f3f4f6',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <ShoppingCart size={18} color="#111827" />
-          {itemCount > 0 ? (
-            <View
-              style={{
-                position: 'absolute',
-                top: -2,
-                right: -4,
-                backgroundColor: '#E01A1B',
-                minWidth: 16,
-                height: 16,
-                borderRadius: 8,
-                paddingHorizontal: 4,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+    <ScreenHeader
+      icon={Heart}
+      eyebrow="Your saved things"
+      title="My Wishlist"
+      subtitle={count > 0 ? `${count} saved ${count === 1 ? 'item' : 'items'}` : 'Your saved items'}
+      right={
+        <>
+          {onShare ? (
+            <Pressable
+              onPress={onShare}
+              disabled={isSharing}
+              accessibilityRole="button"
+              accessibilityLabel="Share my wishlist"
+              accessibilityState={{ busy: !!isSharing, disabled: !!isSharing }}
+              hitSlop={6}
             >
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
-                {itemCount > 99 ? '99+' : itemCount}
-              </Text>
-            </View>
+              {/* Was Palette.onBrand — a white disc on a white header, while the
+                  cart disc beside it was #f3f4f6. */}
+              <View style={[ws.headerBtn, { opacity: isSharing ? 0.6 : 1 }]}>
+                {isSharing ? (
+                  <ActivityIndicator size="small" color={Palette.primary} />
+                ) : (
+                  <Share2 size={18} color={Palette.primary} />
+                )}
+              </View>
+            </Pressable>
           ) : null}
-        </View>
-      </Pressable>
-    </View>
+          <Pressable
+            onPress={() => router.push('/(tabs)/cart' as any)}
+            accessibilityRole="button"
+            accessibilityLabel={`Cart, ${itemCount} items`}
+            hitSlop={6}
+          >
+            <View style={ws.headerBtn}>
+              <ShoppingCart size={18} color="#111827" />
+              {itemCount > 0 ? (
+                <View style={ws.headerBadge}>
+                  <Text style={ws.headerBadgeText}>{itemCount > 99 ? '99+' : itemCount}</Text>
+                </View>
+              ) : null}
+            </View>
+          </Pressable>
+        </>
+      }
+    />
   );
 }
 
-// ─── Centered message (empty / auth) ──────────────────────────────────────────
-function CenteredMessage({
-  icon,
-  title,
-  body,
-  action,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  body: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-      <View
-        style={{
-          width: 88,
-          height: 88,
-          borderRadius: 44,
-          backgroundColor: '#f3f4f6',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 20,
-        }}
-      >
-        {icon}
-      </View>
-      <Text style={{ fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 6, textAlign: 'center' }}>
-        {title}
-      </Text>
-      <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 20, marginBottom: action ? 24 : 0 }}>
-        {body}
-      </Text>
-      {action ?? null}
-    </View>
-  );
-}
-
-function ActionBtn({ label, icon, onPress }: { label: string; icon?: React.ReactNode; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button">
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: Palette.primary,
-          paddingHorizontal: 28,
-          height: 50,
-          borderRadius: 14,
-          gap: 8,
-        }}
-      >
-        <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{label}</Text>
-        {icon ?? null}
-      </View>
-    </Pressable>
-  );
-}
-
-// ─── Hoisted styles for sync UI ──────────────────────────────────────────────
 const ws = StyleSheet.create({
-  // ── Item metadata (parity with the web card) ──
-  categoryPill: {
-    alignSelf: 'flex-start',
-    backgroundColor: Palette.primaryContainer,
-    borderRadius: Radius.full,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    marginBottom: 4,
+  headerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  categoryText: { fontSize: 9, fontWeight: '700', color: Palette.onBrand },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 1.5, marginTop: 4 },
-  ratingText: { fontSize: 10, color: Palette.onBrand, marginLeft: 4 },
-  addedOn: { fontSize: 9.5, color: Palette.textSubtle, marginTop: 6 },
+  headerBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    backgroundColor: '#E01A1B',
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerBadgeText: {
+    fontFamily: Fonts.sansBold,
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+
+  // ── Item metadata (parity with the web card) ──
+  categoryText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    color: '#a1948a',
+    marginBottom: 3,
+  },
+  addedOn: { fontFamily: Fonts.sans, fontSize: 9.5, color: Palette.textSubtle, marginTop: 6 },
 
   // ── Per-item actions ──
   actionsRow: {
@@ -765,7 +684,7 @@ const ws = StyleSheet.create({
     borderRadius: Radius.full,
     backgroundColor: Palette.primary,
   },
-  actionPrimaryText: { fontSize: 11, fontWeight: '700', color: Palette.onPrimary },
+  actionPrimaryText: { fontFamily: Fonts.sansBold, fontSize: 11, fontWeight: '700', color: Palette.onPrimary },
   actionDisabled: { backgroundColor: Palette.outlineSubtle },
   actionDisabledText: { color: Palette.textSubtle },
   actionNeutral: {
@@ -799,7 +718,7 @@ const ws = StyleSheet.create({
     borderWidth: 1,
     borderColor: Palette.outline,
   },
-  topActionGhostText: { fontSize: 12.5, fontWeight: '700', color: Palette.text },
+  topActionGhostText: { fontFamily: Fonts.sansBold, fontSize: 12.5, fontWeight: '700', color: Palette.text },
   topActionPrimary: {
     flex: 1,
     flexDirection: 'row',
@@ -810,7 +729,7 @@ const ws = StyleSheet.create({
     borderRadius: Radius.md,
     backgroundColor: Palette.primary,
   },
-  topActionPrimaryText: { fontSize: 12.5, fontWeight: '700', color: Palette.onPrimary },
+  topActionPrimaryText: { fontFamily: Fonts.sansBold, fontSize: 12.5, fontWeight: '700', color: Palette.onPrimary },
 
   // ── Tips ──
   tipsCard: {
@@ -821,7 +740,7 @@ const ws = StyleSheet.create({
     borderColor: Palette.outline,
     padding: 16,
   },
-  tipsTitle: { fontSize: 15, fontWeight: '800', color: Palette.ink, marginBottom: 12 },
+  tipsTitle: { fontFamily: Fonts.sansBold, fontSize: 15, fontWeight: '800', color: Palette.ink, marginBottom: 12 },
   tipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
   tipIcon: {
     width: 32,
@@ -831,15 +750,15 @@ const ws = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tipTitle: { fontSize: 12.5, fontWeight: '700', color: Palette.ink },
-  tipBody: { fontSize: 11.5, lineHeight: 16, color: Palette.onBrand, marginTop: 1 },
+  tipTitle: { fontFamily: Fonts.sansBold, fontSize: 12.5, fontWeight: '700', color: Palette.ink },
+  tipBody: { fontFamily: Fonts.sans, fontSize: 11.5, lineHeight: 16, color: '#6b625b', marginTop: 1 },
 
   // Syncing indicator
   syncingRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingVertical: 10, backgroundColor: '#eff6ff', borderRadius: 12, marginBottom: 4,
   },
-  syncingText: { fontSize: 12, fontWeight: '600', color: '#2563eb' },
+  syncingText: { fontFamily: Fonts.sansSemibold, fontSize: 12, fontWeight: '600', color: '#2563eb' },
 
   // Stock banners (per-item)
   bannerRow: {
@@ -849,10 +768,10 @@ const ws = StyleSheet.create({
   },
   bannerOos: { backgroundColor: '#E01A1B' },
   bannerLow: { backgroundColor: '#fff7ed' },
-  bannerTextOos: { fontSize: 10, fontWeight: '700', color: '#E01A1B' },
-  bannerTextLow: { fontSize: 10, fontWeight: '700', color: '#9a3412' },
+  bannerTextOos: { fontFamily: Fonts.sansBold, fontSize: 10, fontWeight: '700', color: '#E01A1B' },
+  bannerTextLow: { fontFamily: Fonts.sansBold, fontSize: 10, fontWeight: '700', color: '#9a3412' },
 
   // Price change labels
-  priceUp: { fontSize: 9, fontWeight: '600', color: '#E01A1B', marginTop: 1 },
-  priceDown: { fontSize: 9, fontWeight: '600', color: '#16a34a', marginTop: 1 },
+  priceUp: { fontFamily: Fonts.sansSemibold, fontSize: 9, fontWeight: '600', color: '#E01A1B', marginTop: 1 },
+  priceDown: { fontFamily: Fonts.sansSemibold, fontSize: 9, fontWeight: '600', color: '#16a34a', marginTop: 1 },
 });

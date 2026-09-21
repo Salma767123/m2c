@@ -1,15 +1,19 @@
 ﻿import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
+  ActivityIndicator,
+  Linking,
+  Modal,
+  Platform,
   View,
   Text,
   Pressable,
   ScrollView,
   RefreshControl,
-  StatusBar,
   TextInput,
   StyleSheet,
 } from 'react-native';
 import { Image } from 'expo-image';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   Package,
   Truck,
@@ -17,18 +21,34 @@ import {
   Clock,
   XCircle,
   ChevronRight,
-  ShoppingCart,
+  ChevronDown,
   Search,
   X,
+  Download,
+  RotateCcw,
+  Copy,
+  ExternalLink,
+  Calendar,
 } from 'lucide-react-native';
+import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
 import { router } from 'expo-router';
 import { orderService, Order } from '@/services/orderService';
 import { userAuthService } from '@/services/userAuthService';
-import { showErrorToast } from '@/lib/toast-utils';
+import { showErrorToast, showSuccessToast } from '@/lib/toast-utils';
 import { OrdersSkeleton } from '@/components/ui/Skeleton';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Palette, Radius } from '@/constants/theme';
+import { Palette, Radius, Fonts } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
+import { WebView } from 'react-native-webview';
+import * as Clipboard from 'expo-clipboard';
+import axios from '@/lib/axios';
+import { courierName, courierTrackingUrl } from '@/lib/couriers';
+import OrderActionModal, { type OrderAction } from '@/components/WebSite/Order/OrderActionModal';
+import EmptyState from '@/components/WebSite/Shared/EmptyState';
+
+/* `bg-slate-50` — #f8fafc. The order list is one of the few pages the web
+   keeps on a cool ground rather than a warm one, so this follows it rather
+   than the warm #f9f5f2 the cart and product pages use. */
+const ORDERS_GROUND = '#f8fafc';
 
 // ─── Status styling ───────────────────────────────────────────────────────────
 type CustomerStatus = 'processing' | 'shipped' | 'delivered' | 'cancelled';
@@ -66,6 +86,21 @@ const STATUS_FILTERS = [
 type StatusFilter = (typeof STATUS_FILTERS)[number]['value'];
 
 /**
+ * Statuses a customer may still cancel from — everything up to dispatch.
+ *
+ * Verbatim from frontend Order.tsx (and the same set orders/[id].tsx already
+ * uses), so the list and the detail screen agree on when Cancel is offered.
+ */
+const CANCELLABLE_STATUSES = new Set([
+  'ORDER_CREATED',
+  'VENDOR_PROCESSING',
+  'PACKED_BY_VENDOR',
+  'IN_TRANSIT_TO_ADMIN_HUB',
+  'RECEIVED_AT_ADMIN_HUB',
+  'APPROVED_BY_ADMIN_HUB',
+]);
+
+/**
  * Money for an order row.
  *
  * Bound to the ORDER's own currency, not the app region. Two reasons, both of
@@ -84,10 +119,25 @@ export default function OrdersScreen() {
   const [tab, setTab] = useState<'active' | 'history'>('active');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  /* Date range. Held as YYYY-MM-DD strings exactly as the web does, so the
+     range test below can stay a copy of its `withinDates`. */
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isAuth, setIsAuth] = useState(false);
+
+  /* Everything below backs the per-order actions the web list card carries and
+     mobile's did not: the card ended at "View Details", so cancelling, returning,
+     pulling an invoice or reading a tracking id all required opening the order
+     first. The detail screen already had them; the list did not. */
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [actionModal, setActionModal] = useState<{ order: Order; type: OrderAction } | null>(null);
+  const [actionSubmitting, setActionSubmitting] = useState(false);
+  const [trackOrder, setTrackOrder] = useState<Order | null>(null);
+  const [invoiceHtml, setInvoiceHtml] = useState<string | null>(null);
+  const [loadingInvoice, setLoadingInvoice] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -116,6 +166,56 @@ export default function OrdersScreen() {
     fetchOrders();
   }, []);
 
+  /** Show every line of an order inline, as the web's chevron toggle does. */
+  const toggleExpand = useCallback((orderId: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  }, []);
+
+  /**
+   * Cancel / return, then refetch so the card's status and action set update
+   * without the user pulling to refresh.
+   */
+  const submitAction = useCallback(
+    async (reason: string) => {
+      if (!actionModal) return;
+      setActionSubmitting(true);
+      try {
+        if (actionModal.type === 'cancel') {
+          const res = await orderService.cancelOrder(actionModal.order.id, reason || undefined);
+          showSuccessToast('Order Cancelled', res.message || 'Your order has been cancelled.');
+        } else {
+          const res = await orderService.requestReturn(actionModal.order.id, reason);
+          showSuccessToast('Return Requested', res.message || 'We will review it shortly.');
+        }
+        setActionModal(null);
+        await fetchOrders();
+      } catch (err: any) {
+        showErrorToast('Failed', err?.message || 'Could not complete that. Please try again.');
+      } finally {
+        setActionSubmitting(false);
+      }
+    },
+    [actionModal],
+  );
+
+  /** Same endpoint and WebView presentation as orders/[id].tsx. */
+  const downloadInvoice = useCallback(async (orderId: string) => {
+    setLoadingInvoice(true);
+    try {
+      const res = await axios.get(`/orders/${orderId}/invoice`, { responseType: 'text' });
+      setInvoiceHtml(typeof res.data === 'string' ? res.data : String(res.data));
+    } catch {
+      showErrorToast('Failed', 'Could not generate invoice. Please try again.');
+    } finally {
+      setLoadingInvoice(false);
+    }
+  }, []);
+
   /**
    * Search + status filter, matching the web list's semantics exactly:
    * search matches the order number OR any item name; the status filter is a
@@ -125,29 +225,58 @@ export default function OrdersScreen() {
    * filters actually leave behind — otherwise a tab could advertise "3" and then
    * render an empty list.
    */
+  /**
+   * Copy of the web's `withinDates`. Both bounds are inclusive: `from` opens at
+   * local midnight, `to` closes at the last millisecond of that day, so picking
+   * the same date for both keeps that day's orders.
+   */
+  const withinDates = useCallback(
+    (iso?: string) => {
+      if (!iso) return true;
+      const t = new Date(iso).getTime();
+      if (fromDate && t < new Date(`${fromDate}T00:00:00`).getTime()) return false;
+      if (toDate && t > new Date(`${toDate}T23:59:59.999`).getTime()) return false;
+      return true;
+    },
+    [fromDate, toDate],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return orders.filter((o) => {
       const matchesSearch =
         !q ||
         o.orderId?.toLowerCase().includes(q) ||
-        (o.items ?? []).some((it: any) => it?.name?.toLowerCase().includes(q));
+        // An order line's name field is `productName`. This read `it.name`,
+        // which is never set on mobile's OrderItem, so searching by product
+        // silently matched nothing and only order numbers ever hit.
+        (o.items ?? []).some((it) => it?.productName?.toLowerCase().includes(q));
       if (!matchesSearch) return false;
+      if (!withinDates(o.orderDate || o.createdAt)) return false;
       if (statusFilter === 'all') return true;
       return normalizeStatus(o.status).includes(statusFilter);
     });
-  }, [orders, search, statusFilter]);
+  }, [orders, search, statusFilter, withinDates]);
 
   const active = filtered.filter((o) => !['delivered', 'cancelled'].includes(normalizeStatus(o.status)));
   const history = filtered.filter((o) => ['delivered', 'cancelled'].includes(normalizeStatus(o.status)));
   const display = tab === 'active' ? active : history;
-  const isFiltering = search.trim().length > 0 || statusFilter !== 'all';
+  const isFiltering =
+    search.trim().length > 0 || statusFilter !== 'all' || fromDate !== '' || toDate !== '';
+
+  /** The web's clearFilters — resets every control in the bar, not just search. */
+  const clearFilters = useCallback(() => {
+    setSearch('');
+    setStatusFilter('all');
+    setFromDate('');
+    setToDate('');
+  }, []);
 
   // ── Loading ─────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f4f5f7' }}>
-        <ScreenHeader total={0} />
+      <View style={{ flex: 1, backgroundColor: ORDERS_GROUND }}>
+        <ScreenHeader icon={Package} title="My Orders" subtitle="Track and manage your orders" trailing={{ value: 0, label: 'Total Orders' }} />
         <OrdersSkeleton />
       </View>
     );
@@ -156,10 +285,10 @@ export default function OrdersScreen() {
   // ── Auth required ───────────────────────────────────────────────────────
   if (!isAuth) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f4f5f7' }}>
-        <ScreenHeader total={0} />
+      <View style={{ flex: 1, backgroundColor: ORDERS_GROUND }}>
+        <ScreenHeader icon={Package} title="My Orders" subtitle="Track and manage your orders" trailing={{ value: 0, label: 'Total Orders' }} />
         <EmptyState
-          icon={<Package size={40} color="#cbd5e1" />}
+          icon={Package}
           title="Login Required"
           subtitle="Sign in to view and track your orders."
           ctaLabel="Login to Continue"
@@ -170,64 +299,99 @@ export default function OrdersScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#f4f5f7' }}>
-      <ScreenHeader total={orders.length} />
+    <View style={{ flex: 1, backgroundColor: ORDERS_GROUND }}>
+      <ScreenHeader icon={Package} title="My Orders" subtitle="Track and manage your orders" trailing={{ value: filtered.length, label: 'Total Orders' }} />
 
-      {/* Search — matches order number or any item name, same as the web list. */}
-      <View style={os.searchWrap}>
-        <View style={os.searchBar}>
-          <Search size={16} color={Palette.textSubtle} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search by order ID or product"
-            placeholderTextColor={Palette.textSubtle}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="search"
-            style={os.searchInput}
-            accessibilityLabel="Search orders"
-          />
-          {search.length > 0 ? (
-            <Pressable
-              onPress={() => setSearch('')}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-            >
-              <X size={15} color={Palette.textSubtle} />
-            </Pressable>
-          ) : null}
+      {/* One white card holding every control, as the web does: what, which
+          status, and when. Each field carries the same small uppercase label so
+          the row lines up and nothing sits in an unlabelled band. */}
+      <View style={os.filterCard}>
+        <View>
+          <Text style={os.fieldLabel}>Search</Text>
+          <View style={os.searchBar}>
+            <Search size={16} color={Palette.textSubtle} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Order no. or product…"
+              placeholderTextColor={Palette.textSubtle}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+              style={os.searchInput}
+              accessibilityLabel="Search orders"
+            />
+            {search.length > 0 ? (
+              <Pressable
+                onPress={() => setSearch('')}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+              >
+                <X size={15} color={Palette.textSubtle} />
+              </Pressable>
+            ) : null}
+          </View>
         </View>
+
+        {/* Status. The web uses a dropdown; chips keep the current selection
+            visible without a tap and give a proper touch target. */}
+        <View style={{ marginTop: 12 }}>
+          <Text style={os.fieldLabel}>Status</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8 }}
+            style={{ flexGrow: 0 }}
+          >
+            {STATUS_FILTERS.map((f) => {
+              const isActive = statusFilter === f.value;
+              return (
+                <Pressable
+                  key={f.value}
+                  onPress={() => setStatusFilter(f.value)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isActive }}
+                  accessibilityLabel={`Filter by ${f.label}`}
+                  style={[os.filterChip, isActive && os.filterChipActive]}
+                >
+                  <Text style={[os.filterChipText, isActive && os.filterChipTextActive]}>
+                    {f.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+          <DateField
+            label="From"
+            value={fromDate}
+            onChange={setFromDate}
+            maximumDate={toDate ? new Date(`${toDate}T00:00:00`) : undefined}
+          />
+          <DateField
+            label="To"
+            value={toDate}
+            onChange={setToDate}
+            minimumDate={fromDate ? new Date(`${fromDate}T00:00:00`) : undefined}
+          />
+        </View>
+
+        {isFiltering ? (
+          <Pressable
+            onPress={clearFilters}
+            accessibilityRole="button"
+            accessibilityLabel="Clear all filters"
+            style={os.clearBtn}
+          >
+            <Text style={os.clearBtnText}>Clear</Text>
+          </Pressable>
+        ) : null}
       </View>
 
-      {/* Status filter — the web uses a dropdown; chips suit a touch target
-          better and keep the current selection visible without a tap. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={os.filterTrack}
-        style={{ flexGrow: 0 }}
-      >
-        {STATUS_FILTERS.map((f) => {
-          const isActive = statusFilter === f.value;
-          return (
-            <Pressable
-              key={f.value}
-              onPress={() => setStatusFilter(f.value)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: isActive }}
-              accessibilityLabel={`Filter by ${f.label}`}
-              style={[os.filterChip, isActive && os.filterChipActive]}
-            >
-              <Text style={[os.filterChipText, isActive && os.filterChipTextActive]}>
-                {f.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
+      {/* Segmented tab control */}
       {/* Segmented tab control */}
       <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>
         <View
@@ -249,30 +413,22 @@ export default function OrdersScreen() {
            the filtered case offers a way back out of the filters instead. */
         isFiltering ? (
           <EmptyState
-            icon={<Search size={40} color="#cbd5e1" />}
-            title="No Matching Orders"
-            subtitle={
-              search.trim()
-                ? `No orders match “${search.trim()}”. Try a different order ID or product name.`
-                : 'No orders match the selected status.'
-            }
+            icon={Package}
+            title="No Orders Found"
+            subtitle="Try adjusting your search, status or dates"
             ctaLabel="Clear Filters"
-            onPress={() => {
-              setSearch('');
-              setStatusFilter('all');
-            }}
+            onPress={clearFilters}
           />
         ) : (
           <EmptyState
-            icon={<ShoppingCart size={40} color="#cbd5e1" />}
-            title={tab === 'active' ? 'No Active Orders' : 'No Order History'}
+            icon={Package}
+            title="No Orders Found"
             subtitle={
               tab === 'active'
-                ? 'Your active orders will appear here once you place one.'
+                ? "You haven't placed any orders yet"
                 : 'Completed and cancelled orders will appear here.'
             }
             ctaLabel="Start Shopping"
-            ctaIcon={<ShoppingCart size={16} color="#fff" />}
             onPress={() => router.push('/(tabs)' as any)}
           />
         )
@@ -283,35 +439,222 @@ export default function OrdersScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111827" />}
         >
           {display.map((order) => (
-            <OrderCard key={order.id} order={order} />
+            <OrderCard
+              key={order.id}
+              order={order}
+              expanded={expanded.has(order.id)}
+              onToggleExpand={() => toggleExpand(order.id)}
+              onTrack={() => setTrackOrder(order)}
+              onInvoice={() => downloadInvoice(order.id)}
+              invoiceBusy={loadingInvoice}
+              onCancel={() => setActionModal({ order, type: 'cancel' })}
+              onReturn={() => setActionModal({ order, type: 'return' })}
+            />
           ))}
         </ScrollView>
       )}
+
+      {/* Cancel / return — the same sheet the detail screen uses, so the reason
+          lists stay identical no matter where the customer acts from. */}
+      <OrderActionModal
+        action={actionModal?.type ?? null}
+        submitting={actionSubmitting}
+        onSubmit={submitAction}
+        onClose={() => setActionModal(null)}
+      />
+
+      <TrackOrderModal order={trackOrder} onClose={() => setTrackOrder(null)} />
+
+      {/* Invoice — the backend returns rendered HTML. */}
+      <Modal
+        visible={invoiceHtml !== null}
+        animationType="slide"
+        onRequestClose={() => setInvoiceHtml(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
+          <View style={os.invoiceBar}>
+            <Text style={os.invoiceTitle}>Invoice</Text>
+            <Pressable
+              onPress={() => setInvoiceHtml(null)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Close invoice"
+            >
+              <X size={22} color={Palette.text} />
+            </Pressable>
+          </View>
+          {invoiceHtml ? (
+            <WebView originWhitelist={['*']} source={{ html: invoiceHtml }} style={{ flex: 1 }} />
+          ) : null}
+        </View>
+      </Modal>
     </View>
   );
 }
 
-// ─── Header ───────────────────────────────────────────────────────────────────
-function ScreenHeader({ total }: { total: number }) {
-  const insets = useSafeAreaInsets();
+// ─── Track Order modal ────────────────────────────────────────────────────────
+/**
+ * Ports the web list's track dialog: courier partner, the consignment id with a
+ * copy button, and a link out to the courier's own page when one is configured.
+ */
+function TrackOrderModal({ order, onClose }: { order: Order | null; onClose: () => void }) {
+  if (!order) return null;
+
+  const tracking = order.trackingReference || '';
+  const url = courierTrackingUrl(order.courier, tracking);
+  const name = order.courier ? courierName(order.courier) : 'Courier';
+
+  const copy = async () => {
+    await Clipboard.setStringAsync(tracking);
+    showSuccessToast('Copied', 'Tracking ID copied');
+  };
+
   return (
-    <View
-      style={{
-        backgroundColor: '#fff',
-        paddingHorizontal: 16,
-        paddingTop: insets.top + 14,
-        paddingBottom: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eceef1',
-      }}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <Text style={{ fontSize: 26, fontWeight: '800', color: '#0f172a', letterSpacing: -0.5 }}>
-        My Orders
-      </Text>
-      <Text style={{ fontSize: 13, color: '#64748b', marginTop: 3 }}>
-        {total > 0 ? `${total} ${total === 1 ? 'order' : 'orders'} in total` : 'Track and manage your purchases'}
-      </Text>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      <View style={os.trackBackdrop}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
+        <View style={os.trackSheet}>
+          <View style={os.trackAccent} />
+          <View style={os.trackHead}>
+            <View style={os.trackIcon}>
+              <Truck size={20} color={Palette.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={os.trackTitle}>Track Order</Text>
+              <Text style={os.trackSub}>#{order.orderId}</Text>
+            </View>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
+              <X size={20} color="#94a3b8" />
+            </Pressable>
+          </View>
+
+          <View style={{ paddingHorizontal: 20, paddingBottom: 20, gap: 12 }}>
+            <View style={os.trackBox}>
+              <Text style={os.trackLabel}>Courier Partner</Text>
+              <Text style={os.trackValue}>{name}</Text>
+            </View>
+
+            <View style={os.trackBox}>
+              <Text style={os.trackLabel}>Tracking ID</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <Text style={[os.trackValue, { flex: 1, marginTop: 0 }]} selectable>
+                  {tracking}
+                </Text>
+                <Pressable
+                  onPress={copy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Copy tracking ID"
+                  style={os.copyBtn}
+                >
+                  <Copy size={13} color="#475569" />
+                  <Text style={os.copyText}>Copy</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {url ? (
+              <Pressable
+                onPress={() => Linking.openURL(url)}
+                accessibilityRole="link"
+                accessibilityLabel={`Track on ${name} website`}
+                style={os.trackCta}
+              >
+                <Text style={os.trackCtaText}>Track on {name} website</Text>
+                <ExternalLink size={15} color="#ffffff" />
+              </Pressable>
+            ) : (
+              <Text style={os.trackNote}>
+                Use the tracking ID on {name}&apos;s website to see live status.
+              </Text>
+            )}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Header ───────────────────────────────────────────────────────────────────
+// ─── Date field ───────────────────────────────────────────────────────────────
+/**
+ * One FROM / TO control, backed by the platform's own date dialog.
+ *
+ * The web uses a native `<input type="date">` precisely so the calendar is the
+ * operating system's; this is the same bargain on the phone.
+ *
+ * Values are held as `YYYY-MM-DD` strings, matching the web's state, so the
+ * range check below can stay identical to `withinDates` in Order.tsx.
+ */
+function DateField({
+  label,
+  value,
+  onChange,
+  minimumDate,
+  maximumDate,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  minimumDate?: Date;
+  maximumDate?: Date;
+}) {
+  const [open, setOpen] = useState(false);
+
+  // Parse as LOCAL midnight. `new Date('2026-09-21')` parses as UTC and can
+  // land on the previous day west of Greenwich.
+  const asDate = (v: string): Date | null => {
+    if (!v) return null;
+    const [y, m, d] = v.split('-').map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d);
+  };
+
+  const toIso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  const current = asDate(value);
+
+  return (
+    <View style={{ flex: 1, minWidth: 0 }}>
+      <Text style={os.fieldLabel}>{label}</Text>
+      <Pressable
+        onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`${label} date, ${current ? value : 'any date'}`}
+        style={os.dateBtn}
+      >
+        <Calendar size={15} color={Palette.textSubtle} />
+        <Text style={[os.dateText, !current && os.datePlaceholder]} numberOfLines={1}>
+          {current
+            ? current.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+            : 'Any date'}
+        </Text>
+        {current ? (
+          <Pressable
+            onPress={() => onChange('')}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Clear ${label} date`}
+          >
+            <X size={13} color={Palette.textSubtle} />
+          </Pressable>
+        ) : null}
+      </Pressable>
+
+      {open ? (
+        <DateTimePicker
+          value={current ?? new Date()}
+          mode="date"
+          // Android's dialog dismisses itself; iOS keeps the spinner mounted.
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          minimumDate={minimumDate}
+          maximumDate={maximumDate}
+          onChange={(event, picked) => {
+            setOpen(Platform.OS === 'ios' && event.type !== 'dismissed');
+            if (event.type === 'set' && picked) onChange(toIso(picked));
+          }}
+        />
+      ) : null}
     </View>
   );
 }
@@ -352,7 +695,7 @@ function SegTab({
           elevation: active ? 2 : 0,
         }}
       >
-        <Text style={{ fontSize: 14, fontWeight: '700', color: active ? '#0f172a' : '#64748b' }}>
+        <Text style={{ fontFamily: Fonts.sansBold, fontSize: 14, fontWeight: '700', color: active ? '#0f172a' : '#64748b' }}>
           {label}
         </Text>
         <View
@@ -366,7 +709,7 @@ function SegTab({
             justifyContent: 'center',
           }}
         >
-          <Text style={{ fontSize: 11, fontWeight: '800', color: active ? '#fff' : '#475569' }}>
+          <Text style={{ fontFamily: Fonts.sansBold, fontSize: 11, fontWeight: '800', color: active ? '#fff' : '#475569' }}>
             {count}
           </Text>
         </View>
@@ -376,225 +719,323 @@ function SegTab({
 }
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
-function OrderCard({ order }: { order: Order }) {
+function OrderCard({
+  order,
+  expanded,
+  onToggleExpand,
+  onTrack,
+  onInvoice,
+  invoiceBusy,
+  onCancel,
+  onReturn,
+}: {
+  order: Order;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onTrack: () => void;
+  onInvoice: () => void;
+  invoiceBusy: boolean;
+  onCancel: () => void;
+  onReturn: () => void;
+}) {
   const status = getStatus(order.status);
-  const Icon = status.icon;
-  const firstItem: any = order.items[0];
-  const extraCount = order.items.length - 1;
+  const items = order.items || [];
+  const firstItem = items[0];
+  const extraCount = items.length - 1;
+  const shown = expanded ? items : items.slice(0, 1);
+
+  // Gating copied from the web list card (and matching orders/[id].tsx).
+  const canCancel = CANCELLABLE_STATUSES.has(order.status);
+  const returnStatus = order.returnRequest?.status;
+  const canReturn =
+    order.status === 'DELIVERED' && returnStatus !== 'Requested' && returnStatus !== 'Approved';
+  const returnPending = returnStatus === 'Requested';
+  const refund = order.refundStatus;
+  const showRefund = !!refund && ['INITIATED', 'PROCESSED', 'MANUAL'].includes(refund);
+  const normalized = normalizeStatus(order.status);
+  const showEta =
+    !!order.estimatedDelivery && normalized !== 'delivered' && normalized !== 'cancelled';
+
+  const openDetail = () => router.push(`/(tabs)/orders/${order.id}` as any);
 
   return (
-    <Pressable
-      onPress={() => router.push(`/(tabs)/orders/${order.id}` as any)}
-      accessibilityRole="button"
-      accessibilityLabel={`Order ${order.orderId}, ${status.label}, total ${money(order.totalAmount, order.currency)}`}
-      android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
-      style={({ pressed }) => ({
-        opacity: pressed ? 0.9 : 1,
-        transform: [{ scale: pressed ? 0.985 : 1 }],
-      })}
-    >
-      <View
-        style={{
-          backgroundColor: '#fff',
-          borderRadius: 18,
-          borderWidth: 1,
-          borderColor: '#eceef1',
-          shadowColor: '#0f172a',
-          shadowOffset: { width: 0, height: 3 },
-          shadowOpacity: 0.06,
-          shadowRadius: 10,
-          elevation: 2,
-          overflow: 'hidden',
-        }}
+    /* The card root is a plain View, not a Pressable. It used to wrap the whole
+       card, which would leave every action button below as a nested pressable
+       competing with the parent for the touch. The tappable region is now the
+       summary only, and the actions sit outside it. */
+    <View style={os.card}>
+      <Pressable
+        onPress={openDetail}
+        accessibilityRole="button"
+        accessibilityLabel={`Order ${order.orderId}, ${status.label}, total ${money(order.totalAmount, order.currency)}`}
+        android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
       >
-        {/* ── Header: order id + date / status ── */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 16,
-            paddingTop: 14,
-            paddingBottom: 12,
-          }}
-        >
+        {/* Header: order id + date / status */}
+        <View style={os.cardHead}>
           <View style={{ flex: 1, marginRight: 12 }}>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: '#0f172a', letterSpacing: -0.2 }}>
-              #{order.orderId}
-            </Text>
-            <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-              {orderService.formatDate(order.createdAt)}
+            <Text style={os.orderNo}>#{order.orderId}</Text>
+            <Text style={os.orderDate}>
+              {orderService.formatDate(order.orderDate || order.createdAt)}
             </Text>
           </View>
-          {/* Status pill with dot */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 5,
-              backgroundColor: status.bg,
-              paddingHorizontal: 10,
-              paddingVertical: 6,
-              borderRadius: 20,
-            }}
-          >
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: status.dot }} />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: status.fg }}>{status.label}</Text>
+          <View style={[os.statusPill, { backgroundColor: status.bg }]}>
+            <View style={[os.statusDot, { backgroundColor: status.dot }]} />
+            <Text style={[os.statusText, { color: status.fg }]}>{status.label}</Text>
           </View>
         </View>
 
-        {/* ── Item preview ── */}
+        {/* Item preview */}
         {firstItem ? (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginHorizontal: 16,
-              backgroundColor: '#f7f8fa',
-              borderRadius: 14,
-              padding: 10,
-            }}
+          <View style={{ marginHorizontal: 16, gap: 8 }}>
+            {shown.map((it, i) => (
+              <View key={it.id || `${it.productId}-${i}`} style={os.itemRow}>
+                <View style={os.itemThumb}>
+                  {it.productImage ? (
+                    <Image
+                      source={{ uri: it.productImage }}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="contain"
+                    />
+                  ) : (
+                    <Package size={22} color="#94a3b8" />
+                  )}
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={os.itemName} numberOfLines={1}>
+                    {it.productName}
+                  </Text>
+                  <Text style={os.itemMeta}>
+                    Qty: {it.quantity}
+                    {/* Variant identity — the order line carries size and colour
+                        and the card was dropping both. */}
+                    {it.size ? `  ·  ${it.size}` : ''}
+                    {it.color ? `  ·  ${it.color}` : ''}
+                    {!expanded && extraCount > 0
+                      ? `  ·  +${extraCount} more ${extraCount === 1 ? 'item' : 'items'}`
+                      : ''}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </Pressable>
+
+      {/* Expand / collapse the remaining lines, as the web's chevron toggle does. */}
+      {extraCount > 0 ? (
+        <Pressable
+          onPress={onToggleExpand}
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          accessibilityLabel={expanded ? 'Show fewer items' : `Show all ${items.length} items`}
+          style={os.expandRow}
+        >
+          <Text style={os.expandText}>
+            {expanded ? 'Show less' : `Show all ${items.length} items`}
+          </Text>
+          <ChevronDown
+            size={15}
+            color={Palette.primary}
+            style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }}
+          />
+        </Pressable>
+      ) : null}
+
+      {/* Estimated delivery */}
+      {showEta ? (
+        <View style={os.etaBox}>
+          <Text style={os.etaText}>
+            Estimated delivery: {orderService.formatDate(order.estimatedDelivery!)}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Total */}
+      <View style={os.totalRow}>
+        <View>
+          <Text style={os.totalLabel}>Total</Text>
+          <Text style={os.totalValue}>{money(order.totalAmount, order.currency)}</Text>
+        </View>
+      </View>
+
+      {/* Actions */}
+      <View style={os.actionRow}>
+        <Pressable
+          onPress={openDetail}
+          accessibilityRole="button"
+          accessibilityLabel="View details"
+          style={[os.actionBtn, os.actionPrimary]}
+        >
+          <Text style={os.actionPrimaryText}>View Details</Text>
+          <ChevronRight size={15} color="#fff" strokeWidth={2.5} />
+        </Pressable>
+
+        {order.trackingReference ? (
+          <Pressable
+            onPress={onTrack}
+            accessibilityRole="button"
+            accessibilityLabel="Track order"
+            style={[os.actionBtn, os.actionOutlineBrand]}
           >
-            <View
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 12,
-                overflow: 'hidden',
-                backgroundColor: '#ffffff',
-                borderWidth: 1,
-                borderColor: '#eceef1',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {firstItem.productImage ? (
-                <Image
-                  source={{ uri: firstItem.productImage }}
-                  style={{ width: '100%', height: '100%' }}
-                  contentFit="contain"
-                />
-              ) : (
-                <Package size={22} color="#94a3b8" />
-              )}
-            </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }} numberOfLines={1}>
-                {firstItem.productName}
-              </Text>
-              <Text style={{ fontSize: 12, color: '#64748b', marginTop: 3 }}>
-                Qty: {firstItem.quantity}
-                {extraCount > 0 ? `  ·  +${extraCount} more ${extraCount === 1 ? 'item' : 'items'}` : ''}
-              </Text>
-            </View>
+            <Truck size={14} color={Palette.primary} />
+            <Text style={os.actionOutlineBrandText}>Track Order</Text>
+          </Pressable>
+        ) : null}
+
+        <Pressable
+          onPress={onInvoice}
+          disabled={invoiceBusy}
+          accessibilityRole="button"
+          accessibilityLabel="Download invoice"
+          accessibilityState={{ disabled: invoiceBusy, busy: invoiceBusy }}
+          style={[os.actionBtn, os.actionMuted, invoiceBusy && { opacity: 0.6 }]}
+        >
+          {invoiceBusy ? (
+            <ActivityIndicator size="small" color="#334155" />
+          ) : (
+            <Download size={14} color="#334155" />
+          )}
+          <Text style={os.actionMutedText}>Invoice</Text>
+        </Pressable>
+
+        {canCancel ? (
+          <Pressable
+            onPress={onCancel}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel order"
+            style={[os.actionBtn, os.actionOutlineDanger]}
+          >
+            <XCircle size={14} color="#dc2626" />
+            <Text style={os.actionOutlineDangerText}>Cancel</Text>
+          </Pressable>
+        ) : null}
+
+        {canReturn ? (
+          <Pressable
+            onPress={onReturn}
+            accessibilityRole="button"
+            accessibilityLabel="Request a return"
+            style={[os.actionBtn, os.actionOutlineNeutral]}
+          >
+            <RotateCcw size={14} color="#334155" />
+            <Text style={os.actionOutlineNeutralText}>Return</Text>
+          </Pressable>
+        ) : null}
+
+        {returnPending ? (
+          <View style={[os.statePill, { backgroundColor: '#fffbeb' }]}>
+            <Text style={[os.statePillText, { color: '#b45309' }]}>Return Requested</Text>
           </View>
         ) : null}
 
-        {/* ── Footer: total + view details ── */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 16,
-            paddingTop: 14,
-            paddingBottom: 14,
-            marginTop: 12,
-            borderTopWidth: 1,
-            borderTopColor: '#f1f3f5',
-          }}
-        >
-          <View>
-            <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              Total
-            </Text>
-            <Text style={{ fontSize: 19, fontWeight: '800', color: '#0f172a', marginTop: 1, letterSpacing: -0.3 }}>
-              {money(order.totalAmount, order.currency)}
+        {showRefund ? (
+          <View style={[os.statePill, { backgroundColor: '#f0fdf4' }]}>
+            <Text style={[os.statePillText, { color: '#15803d' }]}>
+              Refund{' '}
+              {refund === 'PROCESSED'
+                ? 'Completed'
+                : refund === 'MANUAL'
+                  ? 'Being Processed'
+                  : 'Initiated'}
             </Text>
           </View>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: Palette.primary,
-              paddingLeft: 16,
-              paddingRight: 12,
-              height: 40,
-              borderRadius: 11,
-              gap: 3,
-            }}
-          >
-            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>View Details</Text>
-            <ChevronRight size={16} color="#fff" strokeWidth={2.5} />
-          </View>
-        </View>
+        ) : null}
       </View>
-    </Pressable>
-  );
-}
-
-// ─── Empty / Auth State ─────────────────────────────────────────────────────────
-function EmptyState({
-  icon,
-  title,
-  subtitle,
-  ctaLabel,
-  ctaIcon,
-  onPress,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  ctaLabel: string;
-  ctaIcon?: React.ReactNode;
-  onPress: () => void;
-}) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-      <View
-        style={{
-          width: 96,
-          height: 96,
-          borderRadius: 28,
-          backgroundColor: '#fff',
-          borderWidth: 1,
-          borderColor: '#eceef1',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 20,
-        }}
-      >
-        {icon}
-      </View>
-      <Text style={{ fontSize: 19, fontWeight: '800', color: '#0f172a', marginBottom: 6, textAlign: 'center' }}>
-        {title}
-      </Text>
-      <Text style={{ fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 21, marginBottom: 24 }}>
-        {subtitle}
-      </Text>
-      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={ctaLabel}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: Palette.primary,
-            paddingHorizontal: 28,
-            height: 52,
-            borderRadius: 14,
-            gap: 8,
-          }}
-        >
-          {ctaIcon}
-          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{ctaLabel}</Text>
-        </View>
-      </Pressable>
     </View>
   );
 }
 
-// ─── Filter bar styles ────────────────────────────────────────────────────────
+// ─── Styles ────────────────────────────────────────────────────────
 const os = StyleSheet.create({
+  // ── Header ──────────────────────────────────────────────────────────────
+  header: {
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eceef1',
+  },
+  /* `font-playfair text-2xl font-semibold tracking-tight text-[#1a1a1a]` */
+  headerTitle: {
+    fontFamily: Fonts.heading,
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    letterSpacing: -0.5,
+  },
+  headerSub: { fontFamily: Fonts.sans, fontSize: 13, color: '#475569', marginTop: 1 },
+  headerCount: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    letterSpacing: -0.4,
+  },
+  headerCountLabel: { fontFamily: Fonts.sans, fontSize: 11.5, color: '#475569' },
+
+  // ── Filter card ─────────────────────────────────────────────────────────
+  filterCard: {
+    margin: 16,
+    marginBottom: 4,
+    padding: 14,
+    backgroundColor: Palette.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  /* `text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400` */
+  fieldLabel: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    color: '#94a3b8',
+    marginBottom: 6,
+  },
+  dateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    height: 42,
+    paddingHorizontal: 11,
+    borderRadius: Radius.md,
+    backgroundColor: Palette.surface,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  dateText: {
+    flex: 1,
+    fontFamily: Fonts.sans,
+    fontSize: 13,
+    color: Palette.ink,
+  },
+  datePlaceholder: { color: Palette.textSubtle },
+  clearBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    paddingHorizontal: 16,
+    height: 38,
+    justifyContent: 'center',
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: Palette.surface,
+  },
+  clearBtnText: {
+    fontFamily: Fonts.sansMedium,
+    fontSize: 13.5,
+    fontWeight: '500',
+    color: '#475569',
+  },
+
   searchWrap: { paddingHorizontal: 16, paddingTop: 14 },
   searchBar: {
     flexDirection: 'row',
@@ -609,13 +1050,13 @@ const os = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    fontFamily: Fonts.sans,
     fontSize: 13.5,
     color: Palette.ink,
     paddingVertical: 0,
     includeFontPadding: false,
   },
 
-  filterTrack: { paddingHorizontal: 16, paddingTop: 10, gap: 8 },
   filterChip: {
     paddingHorizontal: 14,
     height: 32,
@@ -626,6 +1067,298 @@ const os = StyleSheet.create({
     borderColor: Palette.outline,
   },
   filterChipActive: { backgroundColor: Palette.primary, borderColor: Palette.primary },
-  filterChipText: { fontSize: 12.5, fontWeight: '600', color: Palette.text },
+  filterChipText: { fontFamily: Fonts.sansSemibold, fontSize: 12.5, fontWeight: '600', color: Palette.text },
   filterChipTextActive: { color: Palette.onPrimary },
+
+  // ── Order card ──────────────────────────────────────────────────────────
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#eceef1',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    // Android paints elevation only.
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  cardHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 12,
+  },
+  orderNo: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+    letterSpacing: -0.2,
+  },
+  orderDate: { fontFamily: Fonts.sans, fontSize: 12, color: '#64748b', marginTop: 2 },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontFamily: Fonts.sansBold, fontSize: 12, fontWeight: '700' },
+
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f7f8fa',
+    borderRadius: 14,
+    padding: 10,
+  },
+  itemThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#eceef1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemName: { fontFamily: Fonts.sansBold, fontSize: 14, fontWeight: '700', color: '#0f172a' },
+  itemMeta: { fontFamily: Fonts.sans, fontSize: 12, color: '#64748b', marginTop: 3 },
+
+  expandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  expandText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: Palette.primary,
+  },
+
+  /* `bg-[#e01a1b]/5 border border-[#e01a1b]/20 text-[#c41617]` */
+  etaBox: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(224,26,27,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(224,26,27,0.2)',
+  },
+  etaText: { fontFamily: Fonts.sans, fontSize: 12.5, color: '#c41617' },
+
+  totalRow: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f3f5',
+  },
+  totalLabel: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  totalValue: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginTop: 1,
+    letterSpacing: -0.3,
+  },
+
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 14,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 38,
+    paddingHorizontal: 14,
+    borderRadius: Radius.full,
+  },
+  actionPrimary: { backgroundColor: Palette.primary, paddingRight: 10 },
+  actionPrimaryText: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  actionOutlineBrand: { borderWidth: 1, borderColor: Palette.primary },
+  actionOutlineBrandText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: Palette.primary,
+  },
+  /* `bg-slate-100 text-slate-700` */
+  actionMuted: { backgroundColor: '#f1f5f9' },
+  actionMutedText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  /* `border-red-300 text-red-600` */
+  actionOutlineDanger: { borderWidth: 1, borderColor: '#fca5a5' },
+  actionOutlineDangerText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#dc2626',
+  },
+  /* `border-slate-300 text-slate-700` */
+  actionOutlineNeutral: { borderWidth: 1, borderColor: '#cbd5e1' },
+  actionOutlineNeutralText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  statePill: {
+    justifyContent: 'center',
+    height: 38,
+    paddingHorizontal: 12,
+    borderRadius: Radius.full,
+  },
+  statePillText: { fontFamily: Fonts.sansSemibold, fontSize: 12, fontWeight: '600' },
+
+  // ── Invoice modal ───────────────────────────────────────────────────────
+  invoiceBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.outline,
+  },
+  invoiceTitle: {
+    fontFamily: Fonts.heading,
+    fontSize: 17,
+    fontWeight: '600',
+    color: Palette.ink,
+  },
+
+  // ── Track modal ─────────────────────────────────────────────────────────
+  trackBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15,23,42,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  trackSheet: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  trackAccent: { height: 4, backgroundColor: Palette.primary },
+  trackHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  trackIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(224,26,27,0.1)',
+  },
+  trackTitle: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  trackSub: { fontFamily: Fonts.sans, fontSize: 12.5, color: '#64748b', marginTop: 1 },
+  trackBox: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    backgroundColor: '#f8fafc',
+    padding: 14,
+  },
+  trackLabel: {
+    fontFamily: Fonts.sans,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    color: '#64748b',
+  },
+  trackValue: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0f172a',
+    marginTop: 4,
+  },
+  copyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  copyText: {
+    fontFamily: Fonts.sansMedium,
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#475569',
+  },
+  trackCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: Palette.primary,
+    borderRadius: Radius.full,
+    paddingVertical: 14,
+  },
+  trackCtaText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  trackNote: {
+    fontFamily: Fonts.sans,
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+  },
 });

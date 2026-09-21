@@ -7,7 +7,6 @@ import {
   RefreshControl,
   StyleSheet,
   useWindowDimensions,
-  StatusBar,
 } from 'react-native';
 import { Image } from 'expo-image';
 import {
@@ -18,11 +17,12 @@ import {
   ChevronRight,
   Layers,
 } from 'lucide-react-native';
+import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
+import EmptyState from '@/components/WebSite/Shared/EmptyState';
 import { useRouter } from 'expo-router';
 import { categoryService, Category } from '@/services/categoryService';
 import { useCart } from '@/context/CartContext';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Palette } from '@/constants/theme';
+import { Palette, Fonts } from '@/constants/theme';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Subcategory {
@@ -141,34 +141,16 @@ export function SubCategories({ categorySlug }: Props) {
     return (
       <View style={scr.root}>
         <Header title="Category" itemCount={itemCount} />
-        <View style={scr.centeredWrap}>
-          <View style={scr.errorIcon}>
-            <AlertCircle size={32} color="#E01A1B" strokeWidth={1.75} />
-          </View>
-          <Text style={scr.errorTitle}>{error || 'Category Not Found'}</Text>
-          <Text style={scr.errorDesc}>{"We couldn't find what you're looking for."}</Text>
-          <View style={scr.errorBtns}>
-            <Pressable
-              onPress={() => router.push('/(tabs)/categories' as any)}
-              accessibilityRole="button"
-              accessibilityLabel="Back to categories"
-            >
-              <View style={scr.primaryBtn}>
-                <ArrowLeft size={16} color="#fff" />
-                <Text style={scr.primaryBtnText}>Categories</Text>
-              </View>
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/(any)/products' as any)}
-              accessibilityRole="button"
-              accessibilityLabel="Browse all products"
-            >
-              <View style={scr.secondaryBtn}>
-                <Text style={scr.secondaryBtnText}>Browse All</Text>
-              </View>
-            </Pressable>
-          </View>
-        </View>
+        <EmptyState
+          icon={AlertCircle}
+          title={error || 'Category Not Found'}
+          subtitle={"We couldn't find what you're looking for."}
+          ctaLabel="Categories"
+          ctaIcon={ArrowLeft}
+          onPress={() => router.push('/(tabs)/categories' as any)}
+          secondaryLabel="Browse All"
+          onSecondaryPress={() => router.push('/(any)/products' as any)}
+        />
       </View>
     );
   }
@@ -262,100 +244,34 @@ export function SubCategories({ categorySlug }: Props) {
 
 // ─── Header ───────────────────────────────────────────────────────────────────
 function Header({ title, itemCount }: { title: string; itemCount: number }) {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   return (
-    <View style={[hdr.container, { paddingTop: insets.top + 8 }]}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      {/* Back button */}
-      <Pressable
-        onPress={() => (router.canGoBack() ? router.back() : router.push('/(tabs)/categories' as any))}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-        accessibilityHint="Returns to categories list"
-        hitSlop={8}
-        style={hdr.backBtn}
-      >
-        <View style={hdr.backCircle}>
-          <ArrowLeft size={18} color="#111827" strokeWidth={2.5} />
-        </View>
-      </Pressable>
-
-      {/* Title */}
-      <View style={hdr.titleWrap}>
-        <Text style={hdr.title} numberOfLines={1}>
-          {title}
-        </Text>
-      </View>
-
-      {/* Cart */}
-      <Pressable
-        onPress={() => router.push('/(tabs)/cart' as any)}
-        accessibilityRole="button"
-        accessibilityLabel={`Cart with ${itemCount} items`}
-        accessibilityHint="Opens your shopping cart"
-        hitSlop={8}
-        style={hdr.cartBtn}
-      >
-        <View style={hdr.cartCircle}>
-          <ShoppingCart size={18} color="#111827" strokeWidth={2} />
-          {itemCount > 0 ? (
-            <View style={hdr.badge}>
-              <Text style={hdr.badgeText}>
-                {itemCount > 99 ? '99+' : itemCount}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      </Pressable>
-    </View>
+    <ScreenHeader
+      onBack={() => (router.canGoBack() ? router.back() : router.push('/(tabs)/categories' as any))}
+      title={title}
+      right={
+        <Pressable
+          onPress={() => router.push('/(tabs)/cart' as any)}
+          accessibilityRole="button"
+          accessibilityLabel={`Cart with ${itemCount} items`}
+          accessibilityHint="Opens your shopping cart"
+          hitSlop={8}
+        >
+          <View style={hdr.cartCircle}>
+            <ShoppingCart size={18} color="#111827" strokeWidth={2} />
+            {itemCount > 0 ? (
+              <View style={hdr.badge}>
+                <Text style={hdr.badgeText}>{itemCount > 99 ? '99+' : itemCount}</Text>
+              </View>
+            ) : null}
+          </View>
+        </Pressable>
+      }
+    />
   );
 }
 
 const hdr = StyleSheet.create({
-  container: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#f3f4f6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titleWrap: {
-    flex: 1,
-    marginHorizontal: 8,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    letterSpacing: -0.3,
-  },
-  cartBtn: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   cartCircle: {
     width: 36,
     height: 36,
@@ -380,6 +296,7 @@ const hdr = StyleSheet.create({
   },
   badgeText: {
     color: '#ffffff',
+    fontFamily: Fonts.sansBold,
     fontSize: 9,
     fontWeight: '800',
     lineHeight: 11,
@@ -428,7 +345,7 @@ const SubCategoryCard = memo(function SubCategoryCard({
 
         {/* Info */}
         <View style={card.info}>
-          <Text style={card.name} numberOfLines={1}>{subcategory.name}</Text>
+          <Text style={card.name} numberOfLines={2}>{subcategory.name}</Text>
           <View style={card.metaRow}>
             <Layers size={12} color="#6b7280" strokeWidth={2.25} />
             <Text style={card.metaText} numberOfLines={1}>{meta}</Text>
@@ -490,6 +407,7 @@ const list = StyleSheet.create({
     paddingVertical: 5,
   },
   statsText: {
+    fontFamily: Fonts.sansSemibold,
     fontSize: 12,
     fontWeight: '600',
     color: '#6b7280',
@@ -504,6 +422,7 @@ const list = StyleSheet.create({
     gap: 2,
   },
   viewAllText: {
+    fontFamily: Fonts.sansBold,
     fontSize: 12,
     fontWeight: '700',
     color: '#ffffff',
@@ -523,12 +442,14 @@ const list = StyleSheet.create({
     marginBottom: 16,
   },
   emptyTitle: {
+    fontFamily: Fonts.sansBold,
     fontSize: 16,
     fontWeight: '700',
     color: '#111827',
     marginBottom: 4,
   },
   emptyDesc: {
+    fontFamily: Fonts.sans,
     fontSize: 13,
     color: '#6b7280',
     textAlign: 'center',
@@ -546,13 +467,16 @@ const list = StyleSheet.create({
   emptyBtnText: {
     color: '#ffffff',
     fontWeight: '700',
+    fontFamily: Fonts.sansBold,
     fontSize: 14,
   },
 });
 
 // ─── Screen-level styles ────────────────────────────────────────────────────
 const scr = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f8fafc' },
+  /* `bg-white` — the web's subcategory page is white, not a tinted ground.
+     Mobile had #f8fafc (slate-50), a cool cast behind warm cards. */
+  root: { flex: 1, backgroundColor: '#ffffff' },
   flatListContent: { paddingHorizontal: GRID_PAD, paddingBottom: 32 },
   flatListGrow: { flexGrow: 1 },
   columnWrapper: { gap: GRID_GAP, marginBottom: GRID_GAP },
@@ -561,19 +485,19 @@ const scr = StyleSheet.create({
     width: 72, height: 72, borderRadius: 24,
     backgroundColor: '#E01A1B', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
   },
-  errorTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 4 },
-  errorDesc: { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 20 },
+  errorTitle: { fontFamily: Fonts.sansBold, fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 4 },
+  errorDesc: { fontFamily: Fonts.sans, fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 20 },
   errorBtns: { flexDirection: 'row', gap: 10 },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: Palette.primary,
     paddingHorizontal: 18, height: 44, borderRadius: 12, gap: 6,
   },
-  primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  primaryBtnText: { fontFamily: Fonts.sansBold, color: '#fff', fontWeight: '700', fontSize: 14 },
   secondaryBtn: {
     flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#e5e7eb',
     backgroundColor: '#fff', paddingHorizontal: 18, height: 44, borderRadius: 12,
   },
-  secondaryBtnText: { color: '#111827', fontWeight: '600', fontSize: 14 },
+  secondaryBtnText: { fontFamily: Fonts.sansSemibold, color: '#111827', fontWeight: '600', fontSize: 14 },
 });
 
 // ─── SubCategory card styles (compact grid) ─────────────────────────────────
@@ -611,11 +535,16 @@ const card = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 12,
   },
+  /* The web sets subcategory names in the display face — `font-playfair
+     text-[13px] font-semibold text-[#1a1a1a]` — where this was Outfit Bold in
+     the blue-tinted gray-900. Two lines, matching its `line-clamp-2`. */
   name: {
+    fontFamily: Fonts.heading,
     fontSize: 14,
-    fontWeight: '700',
-    color: '#111827',
-    lineHeight: 18,
+    fontWeight: '600',
+    letterSpacing: -0.35,
+    color: '#1a1a1a',
+    lineHeight: 19,
   },
   metaRow: {
     flexDirection: 'row',
@@ -624,6 +553,7 @@ const card = StyleSheet.create({
     gap: 4,
   },
   metaText: {
+    fontFamily: Fonts.sansSemibold,
     fontSize: 12,
     fontWeight: '600',
     color: '#6b7280',
