@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X, XCircle, Copy, MapPin, ExternalLink, Mail, Phone } from "lucide-react";
+import { ArrowLeft, Package, CreditCard, Building2, Truck, X, XCircle, Copy, MapPin, ExternalLink, Mail, Phone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Dropdown from "@/components/UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
@@ -24,6 +24,7 @@ import { hubService, Hub } from "@/services/hubService";
 // shipment to the customer. After that it's a Return, not a Cancel.
 const CANCELLABLE_ORDER_STATUSES = new Set([
   "ORDER_CREATED",
+  "ACCEPTED_BY_VENDOR",
   "VENDOR_PROCESSING",
   "PACKED_BY_VENDOR",
   "IN_TRANSIT_TO_ADMIN_HUB",
@@ -55,12 +56,8 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedHub, setSelectedHub] = useState("");
 
-  // Review form state
-  const [rating, setRating] = useState(0);
-  const [hoveredRating, setHoveredRating] = useState(0);
-  const [review, setReview] = useState("");
+  // Rejection form state (vendor rating now lives in the settlement flow).
   const [notice, setNotice] = useState("");
-  const [isApproved, setIsApproved] = useState(true);
   const [rejectionReason, setRejectionReason] = useState("");
   const [returnToVendor, setReturnToVendor] = useState(false);
 
@@ -74,11 +71,18 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
   const [cancelChoice, setCancelChoice] = useState("");
   const [cancelOther, setCancelOther] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  // Restock decision: a cancellation does NOT return stock to inventory unless
+  // the admin explicitly approves it here. Default = do not restock.
+  const [cancelRestock, setCancelRestock] = useState<boolean | null>(null);
 
   const handleCancelOrder = async () => {
     const reason = cancelChoice === "Other" ? cancelOther.trim() : cancelChoice;
     if (!reason) {
       showErrorToast("Please select or enter a cancellation reason.");
+      return;
+    }
+    if (cancelRestock === null) {
+      showErrorToast("Please choose whether to return the stock to inventory.");
       return;
     }
     const orderPk = shipment?.order?.id;
@@ -88,13 +92,14 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
     }
     try {
       setCancelling(true);
-      const res = await orderService.cancelAdminOrder(orderPk, reason);
+      const res = await orderService.cancelAdminOrder(orderPk, reason, cancelRestock === true);
       if (res.success) {
         const paid = ["PAID", "SUCCESS", "CAPTURED"].includes(String(shipment?.order?.paymentStatus || "").toUpperCase());
-        showSuccessToast("Order cancelled" + (paid ? " — refund initiated" : ""));
+        showSuccessToast("Order cancelled" + (paid ? " — refund initiated" : "") + (cancelRestock ? " · stock restored" : " · stock not restocked"));
         setShowCancelModal(false);
         setCancelChoice("");
         setCancelOther("");
+        setCancelRestock(null);
         await fetchShipmentDetails();
       }
     } catch (error: any) {
@@ -187,53 +192,56 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
     handleUpdateStatus("RECEIVED_AT_ADMIN_HUB");
   };
 
-  const handleSubmitReview = async () => {
+  // Approve the delivery at the hub — no vendor review here. The vendor review now
+  // happens later, at settlement completion (Billing → Settlements). Approving just
+  // moves the shipment forward so it can be shipped to the customer.
+  const handleApproveShipment = async () => {
     if (!shipment) return;
-    if (rating === 0) {
-      showErrorToast("Please provide a rating");
-      return;
+    if (processingRef.current) return;
+    processingRef.current = true;
+    setIsProcessing(true);
+    try {
+      const res = await orderService.updateAdminShipmentStatus(shipment.id, "APPROVED_BY_ADMIN_HUB");
+      if (res.success) {
+        await fetchShipmentDetails();
+        showSuccessToast("Shipment approved", "Proceed to ship it to the customer.");
+        setTimeout(() => router.push("/admin/dashboard/orders/hub-to-customer"), 1200);
+      }
+    } catch (error: any) {
+      showErrorToast(error.message || "Failed to approve shipment");
+    } finally {
+      processingRef.current = false;
+      setIsProcessing(false);
     }
-    if (!review.trim()) {
-      showErrorToast("Please provide a review");
-      return;
-    }
-    if (!isApproved && !rejectionReason.trim()) {
+  };
+
+  // Reject the delivery at the hub — reason required. (Vendor rating is not part of
+  // this step anymore; it's captured at settlement time.)
+  const handleRejectShipment = async () => {
+    if (!shipment) return;
+    if (!rejectionReason.trim()) {
       showErrorToast("Please provide a rejection reason");
       return;
     }
-    if (processingRef.current) return; // block duplicate submissions
+    if (processingRef.current) return;
     processingRef.current = true;
     setIsProcessing(true);
-
     try {
       await adminReviewService.createOrUpdateShipmentReview(shipment.id, {
-        rating,
-        reviewComments: review.trim(),
+        reviewComments: rejectionReason.trim(),
         qualityCheckNotes: notice.trim() || undefined,
-        approved: isApproved,
-        rejectionReason: !isApproved ? rejectionReason.trim() : undefined,
-        returnToVendor: !isApproved ? returnToVendor : undefined,
+        approved: false,
+        rejectionReason: rejectionReason.trim(),
+        returnToVendor,
       });
-
-      const nextStatus = isApproved ? "APPROVED_BY_ADMIN_HUB" : "REJECTED_BY_ADMIN_HUB";
-
-      // Update status without showing its own toast — we show a specific message below
-      if (!shipment) return;
-      const res = await orderService.updateAdminShipmentStatus(shipment.id, nextStatus);
+      const res = await orderService.updateAdminShipmentStatus(shipment.id, "REJECTED_BY_ADMIN_HUB");
       if (res.success) {
         await fetchShipmentDetails();
       }
-
       setShowReviewModal(false);
-      showSuccessToast(isApproved ? "Shipment approved successfully" : "Shipment rejected");
-
-      if (isApproved) {
-        setTimeout(() => {
-          router.push("/admin/dashboard/orders/hub-to-customer");
-        }, 1500);
-      }
+      showSuccessToast("Shipment rejected");
     } catch (error: any) {
-      showErrorToast(error.message || "Failed to submit review");
+      showErrorToast(error.message || "Failed to reject shipment");
     } finally {
       processingRef.current = false;
       setIsProcessing(false);
@@ -290,7 +298,12 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           </div>
         </div>
         <div className="flex gap-3">
-          {!orderIsTerminal && shipment.status === "ORDER_CREATED" && hasPermission('vendor_to_hub:update_status') && (
+          {!orderIsTerminal && shipment.status === "ORDER_CREATED" && (
+            <span className="px-4 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-sm font-medium">
+              Waiting for vendor to accept
+            </span>
+          )}
+          {!orderIsTerminal && shipment.status === "ACCEPTED_BY_VENDOR" && hasPermission('vendor_to_hub:update_status') && (
             <button
               onClick={handleProceed}
               className="px-6 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-medium"
@@ -308,12 +321,22 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
             </button>
           )}
           {!orderIsTerminal && shipment.status === "RECEIVED_AT_ADMIN_HUB" && hasPermission('vendor_to_hub:edit') && (
-            <button
-              onClick={() => setShowReviewModal(true)}
-              className="px-6 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-medium"
-            >
-              Review Delivery & Approve
-            </button>
+            <>
+              <button
+                onClick={handleApproveShipment}
+                disabled={isProcessing}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isProcessing ? "Approving..." : "Approve Shipment"}
+              </button>
+              <button
+                onClick={() => setShowReviewModal(true)}
+                disabled={isProcessing}
+                className="px-6 py-2 rounded-lg border border-red-300 bg-white text-red-600 hover:bg-red-50 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Reject
+              </button>
+            </>
           )}
           {CANCELLABLE_ORDER_STATUSES.has(shipment.order?.status || shipment.status) && hasPermission('vendor_to_hub:update_status') && (
             <button
@@ -346,7 +369,8 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           </div>
           <div>
             <p className="text-sm text-slate-600">Status</p>
-            <p className={`text-base font-medium mt-1 ${shipment.status === "ORDER_CREATED" ? "text-yellow-600" :
+            <p className={`text-base font-medium mt-1 ${shipment.status === "ORDER_CREATED" ? "text-amber-600" :
+              shipment.status === "ACCEPTED_BY_VENDOR" ? "text-cyan-600" :
               shipment.status === "VENDOR_PROCESSING" ? "text-blue-600" :
                 shipment.status === "PACKED_BY_VENDOR" ? "text-purple-600" :
                   shipment.status === "IN_TRANSIT_TO_ADMIN_HUB" ? "text-indigo-600" :
@@ -371,13 +395,31 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           </div>
           */}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-4 border-t border-slate-200">
+        {/* Subtotal → Discount → Taxable → Tax → Shipping → Total: the coupon
+            reduces the taxable base (GST is charged on the post-coupon net). */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6 pt-4 border-t border-slate-200">
           <div>
             <p className="text-sm text-slate-600">Subtotal</p>
             <p className="text-base font-medium text-slate-900 mt-1">
               {money(order?.subtotal)}
             </p>
           </div>
+          {(order?.discount ?? 0) > 0 && (
+            <div>
+              <p className="text-sm text-slate-600">Discount</p>
+              <p className="text-base font-medium text-green-600 mt-1">
+                −{money(order?.discount)}
+              </p>
+            </div>
+          )}
+          {(order?.discount ?? 0) > 0 && (
+            <div>
+              <p className="text-sm text-slate-600">Taxable amount</p>
+              <p className="text-base font-medium text-slate-900 mt-1">
+                {money(Math.max(0, (order?.subtotal ?? 0) - (order?.discount ?? 0)))}
+              </p>
+            </div>
+          )}
           <div>
             <p className="text-sm text-slate-600">Tax</p>
             <p className="text-base font-medium text-slate-900 mt-1">
@@ -388,12 +430,6 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
             <p className="text-sm text-slate-600">Shipping</p>
             <p className="text-base font-medium text-slate-900 mt-1">
               {money(order?.shippingCost)}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-600">Discount</p>
-            <p className="text-base font-medium text-green-600 mt-1">
-              -{money(order?.discount)}
             </p>
           </div>
           <div>
@@ -805,8 +841,8 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-slate-200 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Review Vendor Delivery</h2>
-                <p className="text-sm text-slate-600 mt-1">Provide feedback on the received shipment</p>
+                <h2 className="text-xl font-bold text-slate-900">Reject Vendor Delivery</h2>
+                <p className="text-sm text-slate-600 mt-1">Tell the vendor why this shipment is being rejected</p>
               </div>
               <button
                 onClick={() => setShowReviewModal(false)}
@@ -818,57 +854,27 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
 
             <div className="p-6 space-y-6">
               <div className="bg-slate-50 p-4 rounded-lg">
-                <h3 className="text-sm font-semibold text-slate-900 mb-3">Reviewing Delivery From Vendor</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">Delivery From Vendor</h3>
                 <p className="text-sm text-slate-600">Order ID: {shipment.order?.orderId || shipment.shipmentId}</p>
                 <p className="text-sm text-slate-600">Vendor: {shipment.vendorName}</p>
+                <p className="text-xs text-slate-400 mt-2">The vendor rating is captured later, at settlement completion.</p>
               </div>
 
-              {/* Rating */}
+              {/* Rejection reason */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Rating <span className="text-red-500">*</span>
-                </label>
-                <div className="flex gap-2">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setRating(star)}
-                      onMouseEnter={() => setHoveredRating(star)}
-                      onMouseLeave={() => setHoveredRating(0)}
-                      className="focus:outline-none transition-transform hover:scale-110"
-                    >
-                      <Star
-                        className={`h-8 w-8 ${star <= (hoveredRating || rating)
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "text-slate-300"
-                          }`}
-                      />
-                    </button>
-                  ))}
-                  {rating > 0 && (
-                    <span className="ml-2 text-sm text-slate-600 self-center">
-                      {rating} out of 5
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Review */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Review <span className="text-red-500">*</span>
+                  Rejection Reason <span className="text-red-500">*</span>
                 </label>
                 <textarea
-                  value={review}
-                  onChange={(e) => setReview(e.target.value)}
-                  placeholder="Describe the quality of the product received, packaging, condition, etc."
-                  rows={4}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent resize-none"
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="Explain why the shipment is being rejected..."
+                  rows={3}
+                  className="w-full px-4 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
                 />
               </div>
 
-              {/* Notice */}
+              {/* Optional notes */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Quality Check Notes (Optional)
@@ -882,59 +888,15 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                 />
               </div>
 
-              {/* Approval Decision */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Decision</label>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsApproved(true)}
-                    className={`flex-1 py-2.5 px-4 rounded-lg border-2 text-sm font-medium transition-colors ${isApproved
-                      ? "border-green-500 bg-green-50 text-green-800"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                    }`}
-                  >
-                    Approve
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsApproved(false)}
-                    className={`flex-1 py-2.5 px-4 rounded-lg border-2 text-sm font-medium transition-colors ${!isApproved
-                      ? "border-red-500 bg-red-50 text-red-800"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                    }`}
-                  >
-                    Reject
-                  </button>
-                </div>
-              </div>
-
-              {/* Rejection fields — shown only when rejecting */}
-              {!isApproved && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Rejection Reason <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      value={rejectionReason}
-                      onChange={(e) => setRejectionReason(e.target.value)}
-                      placeholder="Explain why the shipment is being rejected..."
-                      rows={3}
-                      className="w-full px-4 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
-                    />
-                  </div>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={returnToVendor}
-                      onChange={(e) => setReturnToVendor(e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
-                    />
-                    <span className="text-sm text-slate-700">Return items to vendor</span>
-                  </label>
-                </>
-              )}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={returnToVendor}
+                  onChange={(e) => setReturnToVendor(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                />
+                <span className="text-sm text-slate-700">Return items to vendor</span>
+              </label>
             </div>
 
             <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
@@ -945,14 +907,11 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                 Cancel
               </button>
               <button
-                onClick={handleSubmitReview}
+                onClick={handleRejectShipment}
                 disabled={isProcessing}
-                className={`px-6 py-2 rounded-lg transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed ${isApproved
-                  ? "bg-green-600 text-white hover:bg-green-700"
-                  : "bg-red-600 text-white hover:bg-red-700"
-                }`}
+                className="px-6 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {isProcessing ? "Submitting..." : isApproved ? "Approve Shipment" : "Reject Shipment"}
+                {isProcessing ? "Submitting..." : "Reject Shipment"}
               </button>
             </div>
           </div>
@@ -997,10 +956,32 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                 className="mt-2 w-full rounded-lg border border-slate-200 p-2.5 text-sm text-slate-700 focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400"
               />
             )}
+
+            {/* Restock decision — cancellation does not add stock back unless approved here. */}
+            <label className="mb-1.5 mt-4 block text-xs font-medium uppercase tracking-wide text-slate-500">Return stock to inventory?</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setCancelRestock(true)}
+                className={`rounded-lg border-2 px-3 py-2.5 text-left text-sm font-semibold transition-all ${cancelRestock === true ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+              >
+                Yes, add back
+                <span className="mt-0.5 block text-[11px] font-normal text-slate-400">Units return to sellable stock</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCancelRestock(false)}
+                className={`rounded-lg border-2 px-3 py-2.5 text-left text-sm font-semibold transition-all ${cancelRestock === false ? "border-red-500 bg-red-50 text-red-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+              >
+                No, write off
+                <span className="mt-0.5 block text-[11px] font-normal text-slate-400">Stock is not restocked</span>
+              </button>
+            </div>
+
             <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setShowCancelModal(false)}
+                onClick={() => { setShowCancelModal(false); setCancelRestock(null); }}
                 disabled={cancelling}
                 className="rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
               >
@@ -1009,7 +990,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               <button
                 type="button"
                 onClick={handleCancelOrder}
-                disabled={cancelling || !cancelChoice || (cancelChoice === "Other" && !cancelOther.trim())}
+                disabled={cancelling || !cancelChoice || (cancelChoice === "Other" && !cancelOther.trim()) || cancelRestock === null}
                 className="inline-flex items-center gap-2 rounded-full bg-red-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {cancelling ? "Cancelling…" : "Cancel Order"}

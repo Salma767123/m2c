@@ -183,7 +183,7 @@ export default function CategoryHero({
         {image && (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
 
             {/* ── Scrim ───────────────────────────────────────────────
                 Three layers that each do one job, replacing the flat wash that

@@ -455,7 +455,7 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
             <input
               id="vendor-search"
               type="text"
-              placeholder="Search by name, vendor ID, city, or state..."
+              placeholder="Search by vendor ID, name, city, or state..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               className="w-full pl-12 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white shadow-xs"
@@ -668,7 +668,7 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
                           {vendor.name}
                         </p>
                         <p className="text-[10px] font-mono text-slate-400 mt-1 uppercase tracking-wider">
-                          {vendor.vendorCode || `VND-${vendor.id.substring(0, 8).toUpperCase()}`}
+                          {vendor.vendorCode || '—'}
                         </p>
                       </div>
                     </TableCell>

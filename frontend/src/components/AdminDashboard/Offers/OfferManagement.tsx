@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, Percent, Calendar, Tag, Loader2, X, ImageIcon, Upload, CheckCircle, Clock, XCircle, PauseCircle } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Plus, Pencil, Trash2, Percent, Calendar, Tag, Loader2, X, ImageIcon, Upload, CheckCircle, Clock, XCircle, PauseCircle, PlayCircle, ChevronDown, Download, SlidersHorizontal, Users } from 'lucide-react'
 import { offerService, type Offer, type OfferInput, type OfferStatus } from '@/services/offerService'
 import { categoryService } from '@/services/categoryService'
 import { adminProductService, type AdminProduct } from '@/services/adminProductService'
@@ -9,6 +9,104 @@ import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import type { OfferType, OfferScope, OfferRegion } from '@/lib/offers'
 import Dropdown from '@/components/UI/Dropdown'
 import Pagination from '@/components/UI/Pagination'
+
+/**
+ * Multi-select category dropdown used by the product pickers — a button that opens
+ * a searchable checklist with a "Select all" row. Empty selection means "all".
+ */
+function CategoryMultiSelect({
+  categories,
+  selected,
+  onChange,
+  accent = 'red',
+}: {
+  categories: string[]
+  selected: string[]
+  onChange: (next: string[]) => void
+  accent?: 'red' | 'green'
+}) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  const accentCls = accent === 'green' ? 'accent-[#157f4a]' : 'accent-[#e01a1b]'
+  const filtered = categories.filter((c) => c.toLowerCase().includes(q.trim().toLowerCase()))
+  const allOn = filtered.length > 0 && filtered.every((c) => selected.includes(c))
+  const toggle = (c: string) =>
+    onChange(selected.includes(c) ? selected.filter((x) => x !== c) : [...selected, c])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => { setOpen((o) => !o); setQ('') }}
+        className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-left hover:border-gray-400 transition-colors"
+      >
+        <span className={selected.length ? 'text-gray-800' : 'text-gray-400'}>
+          {selected.length
+            ? `${selected.length} categor${selected.length === 1 ? 'y' : 'ies'} selected`
+            : `All categories (${categories.length})`}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+          <div className="p-2 border-b border-gray-100">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search categories…"
+              autoFocus
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-[#e01a1b]"
+            />
+          </div>
+          {filtered.length > 0 && (
+            <label className="flex items-center gap-2 px-3 py-2 text-sm border-b border-gray-100 bg-gray-50/70 hover:bg-gray-100 cursor-pointer">
+              <input
+                type="checkbox"
+                className={`w-4 h-4 rounded ${accentCls}`}
+                checked={allOn}
+                onChange={() =>
+                  onChange(
+                    allOn
+                      ? selected.filter((c) => !filtered.includes(c))
+                      : Array.from(new Set([...selected, ...filtered])),
+                  )
+                }
+              />
+              <span className="font-semibold text-gray-700">
+                {allOn ? 'Deselect all' : 'Select all'}{q ? ' (matching)' : ''}
+              </span>
+            </label>
+          )}
+          <div className="max-h-52 overflow-y-auto">
+            {filtered.map((c) => (
+              <label key={c} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className={`w-4 h-4 rounded ${accentCls}`}
+                  checked={selected.includes(c)}
+                  onChange={() => toggle(c)}
+                />
+                <span className="text-gray-700">{c}</span>
+              </label>
+            ))}
+            {filtered.length === 0 && <p className="px-3 py-2 text-xs text-gray-400">No categories found</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const TYPE_LABELS: Record<OfferType, string> = {
   PERCENTAGE: 'Percentage off',
@@ -60,6 +158,7 @@ function discountSummary(o: Offer): string {
 }
 
 export default function OfferManagement() {
+  const [panelOpen, setPanelOpen] = useState(true)
   const [offers, setOffers] = useState<Offer[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -136,6 +235,141 @@ export default function OfferManagement() {
     }
   }
 
+  // Build and download a multi-sheet Excel report: Summary (each offer + usage &
+  // sales), Usage by Date, and the line-level Redemptions detail.
+  const [downloading, setDownloading] = useState(false)
+  const handleDownloadReport = async () => {
+    try {
+      setDownloading(true)
+      const [report, XLSX] = await Promise.all([offerService.getOfferReport(), import('xlsx')])
+
+      const inr = (n: number) => Math.round((n || 0) * 100) / 100
+      const dt = (v?: string | null) => (v ? new Date(v).toLocaleString('en-IN') : '—')
+      const day = (v?: string | null) => (v ? new Date(v).toLocaleDateString('en-IN') : '—')
+      const discountLabel = (o: (typeof report.offers)[number]) => {
+        switch (o.type) {
+          case 'PERCENTAGE': return `${o.discountPercent}% off`
+          case 'FLAT': return `₹${o.discountFlatINR} off/unit`
+          case 'QUANTITY': return `Buy ${o.minQty}+ → ${o.discountPercent}% off`
+          case 'BOGO': return `Buy ${o.minQty} get ${o.getQty} free`
+          case 'THRESHOLD': return `Spend ₹${o.minCartValueINR} → ${o.discountPercent}% off`
+          default: return '—'
+        }
+      }
+      const scopeLabel = (o: (typeof report.offers)[number]) =>
+        o.scope === 'PRODUCT' ? `Specific products (${o.productIds.length})`
+          : o.scope === 'CATEGORY' ? `Categories (${o.categoryNames.join(', ') || '—'})`
+            : 'Whole store'
+
+      // 1) Summary — one row per offer: config + usage + sales rollup.
+      const summary = report.offers.map((o) => ({
+        'Offer': o.title,
+        'Description': o.description || '—',
+        'Type': TYPE_LABELS[o.type],
+        'Discount': discountLabel(o),
+        'Scope': scopeLabel(o),
+        'Region': REGION_LABELS[o.region],
+        'Priority': o.priority,
+        'Status': o.status as string,
+        'Active Flag': o.isActive ? 'Yes' : 'No',
+        'Starts': day(o.startsAt),
+        'Ends': day(o.endsAt),
+        'Times Applied': o.redemptionsCount,
+        'Orders': o.ordersCount,
+        'Unique Customers': o.uniqueCustomers,
+        'Units Sold': o.unitsSold,
+        'Total Discount Given (₹)': inr(o.totalDiscountINR),
+        'Gross Sales (₹)': inr(o.grossSalesINR),
+        'First Used': dt(o.firstUsedAt),
+        'Last Used': dt(o.lastUsedAt),
+        'Created On': dt(o.createdAt),
+        'Last Updated': dt(o.updatedAt),
+      }))
+      summary.push({
+        'Offer': 'TOTAL',
+        'Description': `${report.totals.offers} offers · ${report.totals.active} active · ${report.totals.scheduled} scheduled · ${report.totals.paused} paused · ${report.totals.expired} expired`,
+        'Type': '', 'Discount': '', 'Scope': '', 'Region': '', 'Priority': '' as unknown as number,
+        'Status': '', 'Active Flag': '', 'Starts': '', 'Ends': '',
+        'Times Applied': report.totals.totalRedemptions, 'Orders': '' as unknown as number,
+        'Unique Customers': '' as unknown as number, 'Units Sold': report.totals.totalUnitsSold,
+        'Total Discount Given (₹)': inr(report.totals.totalDiscountINR),
+        'Gross Sales (₹)': inr(report.totals.totalGrossSalesINR),
+        'First Used': '', 'Last Used': '', 'Created On': '', 'Last Updated': '',
+      })
+
+      // 2) Usage by Date — per offer, each day it applied.
+      const byDate: Array<Record<string, string | number>> = []
+      for (const o of report.offers) {
+        for (const d of o.byDate) {
+          byDate.push({
+            'Offer': o.title,
+            'Date': day(d.date),
+            'Times Applied': d.redemptions,
+            'Units Sold': d.unitsSold,
+            'Discount Given (₹)': inr(d.discountINR),
+            'Sales (₹)': inr(d.salesINR),
+          })
+        }
+      }
+      if (byDate.length === 0) byDate.push({ 'Offer': '—', 'Date': '—', 'Times Applied': 0, 'Units Sold': 0, 'Discount Given (₹)': 0, 'Sales (₹)': 0 })
+
+      // 3) Redemptions — line-level detail behind every application.
+      const redemptions: Array<Record<string, string | number>> = []
+      for (const o of report.offers) {
+        for (const r of o.redemptions) {
+          redemptions.push({
+            'Offer': o.title,
+            'Order ID': r.orderId,
+            'Date': dt(r.date),
+            'Customer': r.customerName || '—',
+            'Email': r.customerEmail || '—',
+            'Product': r.productName,
+            'Qty': r.quantity,
+            'Currency': r.currency,
+            'Original Unit Price': r.originalUnitPrice,
+            'Sold Unit Price': r.unitPrice,
+            'Line Discount': r.lineDiscount,
+            'Line Discount (₹)': inr(r.lineDiscountINR),
+            'Line Sales': r.lineTotal,
+            'Line Sales (₹)': inr(r.lineTotalINR),
+            'Order Status': String(r.orderStatus || '').replace(/_/g, ' '),
+          })
+        }
+      }
+      if (redemptions.length === 0) redemptions.push({ 'Offer': '—', 'Order ID': 'No applications yet', 'Date': '—', 'Customer': '—', 'Email': '—', 'Product': '—', 'Qty': 0, 'Currency': '—', 'Original Unit Price': 0, 'Sold Unit Price': 0, 'Line Discount': 0, 'Line Discount (₹)': 0, 'Line Sales': 0, 'Line Sales (₹)': 0, 'Order Status': '—' })
+
+      const wb = XLSX.utils.book_new()
+      const wsSummary = XLSX.utils.json_to_sheet(summary)
+      wsSummary['!cols'] = Object.keys(summary[0] || {}).map(() => ({ wch: 18 }))
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(byDate), 'Usage by Date')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(redemptions), 'Redemptions')
+
+      const stamp = new Date().toISOString().slice(0, 10)
+      XLSX.writeFile(wb, `offer-report-${stamp}.xlsx`)
+      showSuccessToast('Report ready', 'The offer report has been downloaded.')
+    } catch (e) {
+      showErrorToast('Download failed', e instanceof Error ? e.message : 'Could not generate the report.')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  // Activate / pause an offer straight from the row.
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const handleToggleActive = async (o: Offer) => {
+    try {
+      setTogglingId(o.id)
+      await offerService.setOfferActive(o.id, !o.isActive)
+      showSuccessToast(o.isActive ? 'Offer paused' : 'Offer activated')
+      load()
+    } catch (e) {
+      showErrorToast(e instanceof Error ? e.message : 'Failed to update offer')
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -147,14 +381,44 @@ export default function OfferManagement() {
             Automatic, code-less promotions. Applied on the selling price at checkout — vendor payouts are never affected.
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="inline-flex items-center gap-2 bg-[#e01a1b] text-white px-4 py-2 rounded-lg hover:bg-[#c01718] transition-colors text-sm font-medium"
-        >
-          <Plus className="w-4 h-4" /> Create Offer
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleDownloadReport}
+            disabled={downloading}
+            className="inline-flex items-center gap-2 bg-white text-slate-700 border border-slate-300 px-4 py-2 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+            title="Download an Excel report of all offers, their usage and sales"
+          >
+            {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {downloading ? 'Preparing…' : 'Download Report'}
+          </button>
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center gap-2 bg-[#e01a1b] text-white px-4 py-2 rounded-lg hover:bg-[#c01718] transition-colors text-sm font-medium"
+          >
+            <Plus className="w-4 h-4" /> Create Offer
+          </button>
+        </div>
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {displayedOffers.length} of {offers.length} offers
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Metric cards — click a card to filter the table by that status */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         {statCards.map(({ key, title, value, subtitle, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -181,6 +445,8 @@ export default function OfferManagement() {
           )
         })}
       </div>
+        </div>
+      )}
 
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
         {loading ? (
@@ -234,6 +500,16 @@ export default function OfferManagement() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleToggleActive(o)}
+                          disabled={togglingId === o.id}
+                          className={`p-1.5 rounded disabled:opacity-50 ${o.isActive ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50'}`}
+                          title={o.isActive ? 'Pause offer' : 'Activate offer'}
+                        >
+                          {togglingId === o.id
+                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                            : o.isActive ? <PauseCircle className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />}
+                        </button>
                         <button onClick={() => openEdit(o)} className="p-1.5 text-gray-500 hover:text-[#e01a1b] hover:bg-red-50 rounded" title="Edit">
                           <Pencil className="w-4 h-4" />
                         </button>
@@ -286,7 +562,8 @@ function toLocalInput(iso?: string) {
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16)
 }
 
-function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose: () => void; onSaved: () => void }) {
+export function OfferModal({ offer, onClose, onSaved, targetCustomerIds }: { offer: Offer | null; onClose: () => void; onSaved: () => void; targetCustomerIds?: string[] }) {
+  const targetCount = targetCustomerIds?.length || 0
   const [form, setForm] = useState<OfferInput>(
     offer
       ? {
@@ -300,28 +577,48 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
   const [categories, setCategories] = useState<string[]>([])
   const [products, setProducts] = useState<AdminProduct[]>([])
   const [productQuery, setProductQuery] = useState('')
+  const [freeProductQuery, setFreeProductQuery] = useState('')
+  // Category filters for the two product pickers — narrow the product list to the
+  // chosen categories first, then pick products. Empty = all categories.
+  const [productCatFilter, setProductCatFilter] = useState<string[]>([])
+  const [freeProductCatFilter, setFreeProductCatFilter] = useState<string[]>([])
 
   const set = <K extends keyof OfferInput>(k: K, v: OfferInput[K]) => setForm((f) => ({ ...f, [k]: v }))
 
-  // Load pickers lazily when the scope needs them.
+  // Load pickers lazily when either the BUY scope or the CROSS-BOGO FREE scope needs them.
+  const needsProducts = form.scope === 'PRODUCT' || form.freeScope === 'PRODUCT'
+  // The product pickers now offer a category filter, so categories are needed
+  // whenever products are — not only for the CATEGORY scope.
+  const needsCategories = form.scope === 'CATEGORY' || form.freeScope === 'CATEGORY' || needsProducts
   useEffect(() => {
-    if (form.scope === 'CATEGORY' && categories.length === 0) {
+    if (needsCategories && categories.length === 0) {
       categoryService
         .getCategories({})
         .then((r) => setCategories(Array.from(new Set(r.data.map((c) => c.name))).sort()))
         .catch(() => {})
     }
-    if (form.scope === 'PRODUCT' && products.length === 0) {
+    if (needsProducts && products.length === 0) {
       adminProductService
         .getAllProducts({ limit: 500, approvalStatus: 'APPROVED' })
         .then((r) => setProducts(r.data?.products || []))
         .catch(() => {})
     }
-  }, [form.scope, categories.length, products.length])
+  }, [needsCategories, needsProducts, categories.length, products.length])
 
+  // Match on product name OR SKU, and narrow to the picker's category filter.
+  const matchProduct = (p: AdminProduct, q: string, cats: string[]) => {
+    if (cats.length > 0 && !cats.includes(p.category)) return false
+    const s = q.trim().toLowerCase()
+    if (!s) return true
+    return p.name.toLowerCase().includes(s) || String(p.baseSku || '').toLowerCase().includes(s)
+  }
   const filteredProducts = useMemo(
-    () => products.filter((p) => p.name.toLowerCase().includes(productQuery.toLowerCase())).slice(0, 60),
-    [products, productQuery]
+    () => products.filter((p) => matchProduct(p, productQuery, productCatFilter)).slice(0, 60),
+    [products, productQuery, productCatFilter]
+  )
+  const filteredFreeProducts = useMemo(
+    () => products.filter((p) => matchProduct(p, freeProductQuery, freeProductCatFilter)).slice(0, 60),
+    [products, freeProductQuery, freeProductCatFilter]
   )
 
   const toggleId = (list: string[] | undefined, id: string): string[] => {
@@ -332,12 +629,20 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
   const submit = async () => {
     if (!form.title?.trim()) return showErrorToast('Title is required')
     if (!form.endsAt) return showErrorToast('End date is required')
+    if (form.type === 'BOGO' && form.bogoMode === 'CROSS') {
+      if (form.scope === 'STORE') return showErrorToast('Pick a buy product or category for a cross-product BOGO')
+      if (!form.freeScope) return showErrorToast('Choose the free item type (product or category)')
+      if (form.freeScope === 'PRODUCT' && !(form.freeProductIds || []).length) return showErrorToast('Select at least one free product')
+      if (form.freeScope === 'CATEGORY' && !(form.freeCategoryNames || []).length) return showErrorToast('Select at least one free category')
+    }
     setSaving(true)
     try {
       const payload: OfferInput = {
         ...form,
         startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : undefined,
         endsAt: new Date(form.endsAt).toISOString(),
+        // Customer targeting — only sent when creating from a customer selection.
+        ...(targetCount > 0 ? { targetCustomerIds } : {}),
       }
       if (offer) {
         await offerService.updateOffer(offer.id, payload)
@@ -370,6 +675,7 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
 
   const t = form.type
   const showPercent = t === 'PERCENTAGE' || t === 'QUANTITY' || t === 'THRESHOLD'
+  const isCrossBogo = t === 'BOGO' && form.bogoMode === 'CROSS'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -382,6 +688,14 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
         </div>
 
         <div className="p-6 space-y-5">
+          {targetCount > 0 && (
+            <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700">
+              <Users className="h-4 w-4 shrink-0" />
+              <span>
+                This offer will apply to <span className="font-bold">{targetCount}</span> selected customer{targetCount === 1 ? '' : 's'} only — they’ll get an app notification.
+              </span>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
             <input
@@ -438,13 +752,39 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
               options={(Object.keys(TYPE_LABELS) as OfferType[]).map((k) => ({ value: k, label: TYPE_LABELS[k] }))}
             />
             <Dropdown
-              label="Applies to *"
+              label={isCrossBogo ? 'Buy — applies to *' : 'Applies to *'}
               value={form.scope || 'STORE'}
               onChange={(v) => set('scope', v as OfferScope)}
               disabled={form.type === 'THRESHOLD'}
-              options={(Object.keys(SCOPE_LABELS) as OfferScope[]).map((k) => ({ value: k, label: SCOPE_LABELS[k] }))}
+              options={(Object.keys(SCOPE_LABELS) as OfferScope[])
+                // A cross-product BOGO must have a specific buy set — hide "Whole store".
+                .filter((k) => !(isCrossBogo && k === 'STORE'))
+                .map((k) => ({ value: k, label: SCOPE_LABELS[k] }))}
             />
           </div>
+
+          {/* BOGO: how the free item is chosen. */}
+          {t === 'BOGO' && (
+            <Dropdown
+              label="Free item by"
+              value={form.bogoMode || 'SAME'}
+              onChange={(v) => {
+                set('bogoMode', v as 'SAME' | 'CROSS')
+                if (v === 'SAME') {
+                  set('freeScope', null)
+                  set('freeProductIds', [])
+                  set('freeCategoryNames', [])
+                } else if (form.scope === 'STORE') {
+                  // cross needs a specific buy set — nudge off "Whole store"
+                  set('scope', 'PRODUCT')
+                }
+              }}
+              options={[
+                { value: 'SAME', label: 'Quantity — same item (buy N, get M of it free)' },
+                { value: 'CROSS', label: 'Product / Category — buy one item, get a different one free' },
+              ]}
+            />
+          )}
 
           {/* Discount magnitude */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -536,10 +876,39 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
             )}
           </div>
 
+          {/* BOGO explainer — spells out the deal so there's no "is this working?" doubt. */}
+          {t === 'BOGO' && (
+            <div className="rounded-lg border border-[#f0d5cf] bg-[#fdf6f4] px-3 py-2.5 text-xs leading-relaxed text-[#7a5a52]">
+              <span className="font-semibold text-[#c41617]">
+                Buy {form.minQty || 0} &amp; get {form.getQty || 0} free
+              </span>{' '}
+              {isCrossBogo ? (
+                <>
+                  — the customer buys from the <span className="font-semibold">buy set</span> and
+                  gets a <span className="font-semibold">different</span> item from the{' '}
+                  <span className="font-semibold">free set</span> free. They must add the free item
+                  to the cart themselves; the cheapest qualifying one is discounted.
+                </>
+              ) : (
+                <>
+                  — the free item is the <span className="font-semibold">same product</span> the
+                  customer buys.{' '}
+                  {form.scope === 'STORE'
+                    ? 'Applies to every product in the store (counted per product).'
+                    : form.scope === 'PRODUCT'
+                      ? 'Applies only to the products you select below.'
+                      : 'Applies only to products in the categories you select below.'}
+                </>
+              )}
+            </div>
+          )}
+
           {/* Scope targeting */}
           {form.scope === 'CATEGORY' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Target categories</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t === 'BOGO' ? (isCrossBogo ? 'Buy categories' : 'Buy & free categories (same item)') : 'Target categories'}
+              </label>
               <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
                 {categories.map((c) => {
                   const on = (form.categoryNames || []).includes(c)
@@ -562,13 +931,21 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
           {form.scope === 'PRODUCT' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Target products{' '}
+                {t === 'BOGO' ? (isCrossBogo ? 'Buy products' : 'Buy & free products (same item)') : 'Target products'}{' '}
                 <span className="text-xs text-gray-400">({(form.productIds || []).length} selected)</span>
               </label>
+
+              {/* Step 1 — pick categories to narrow the list (optional). */}
+              <p className="text-xs font-medium text-gray-500 mb-1">Filter by category</p>
+              <div className="mb-2">
+                <CategoryMultiSelect categories={categories} selected={productCatFilter} onChange={setProductCatFilter} accent="red" />
+              </div>
+
+              {/* Step 2 — pick products (from the filtered categories). */}
               <input
                 value={productQuery}
                 onChange={(e) => setProductQuery(e.target.value)}
-                placeholder="Search products…"
+                placeholder="Search by product name or SKU…"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:border-[#e01a1b]"
               />
               <div className="max-h-52 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
@@ -577,13 +954,103 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
                   return (
                     <label key={p.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
                       <input type="checkbox" checked={on} onChange={() => set('productIds', toggleId(form.productIds, p.id))} />
-                      <span className="text-gray-800">{p.name}</span>
-                      <span className="text-xs text-gray-400 ml-auto">{p.category}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-gray-800">{p.name}</span>
+                        {p.baseSku && <span className="block truncate text-[11px] font-mono text-gray-400">SKU: {p.baseSku}</span>}
+                      </span>
+                      <span className="text-xs text-gray-400 ml-auto shrink-0">{p.category}</span>
                     </label>
                   )
                 })}
-                {products.length === 0 && <div className="px-3 py-2 text-xs text-gray-400">Loading products…</div>}
+                {filteredProducts.length === 0 && (
+                  <div className="px-3 py-2 text-xs text-gray-400">
+                    {products.length === 0 ? 'Loading products…' : 'No products match your filters'}
+                  </div>
+                )}
               </div>
+            </div>
+          )}
+
+          {/* ── CROSS BOGO: the FREE (get) set — a different product/category ── */}
+          {isCrossBogo && (
+            <div className="rounded-lg border border-[#e6f2ea] bg-[#f6fbf8] p-3 space-y-3">
+              <p className="text-sm font-semibold text-[#157f4a]">Free item — what the customer gets</p>
+              <Dropdown
+                label="Free item is a *"
+                value={form.freeScope || ''}
+                onChange={(v) => set('freeScope', v as OfferScope)}
+                placeholder="Choose product or category"
+                options={[
+                  { value: 'PRODUCT', label: 'Specific products' },
+                  { value: 'CATEGORY', label: 'Categories' },
+                ]}
+              />
+
+              {form.freeScope === 'CATEGORY' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Free categories <span className="text-xs text-gray-400">({(form.freeCategoryNames || []).length} selected)</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
+                    {categories.map((c) => {
+                      const on = (form.freeCategoryNames || []).includes(c)
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => set('freeCategoryNames', toggleId(form.freeCategoryNames, c))}
+                          className={`px-2.5 py-1 rounded-full text-xs border ${on ? 'bg-[#157f4a] text-white border-[#157f4a]' : 'bg-white text-gray-600 border-gray-300'}`}
+                        >
+                          {c}
+                        </button>
+                      )
+                    })}
+                    {categories.length === 0 && <span className="text-xs text-gray-400">Loading categories…</span>}
+                  </div>
+                </div>
+              )}
+
+              {form.freeScope === 'PRODUCT' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Free products <span className="text-xs text-gray-400">({(form.freeProductIds || []).length} selected)</span>
+                  </label>
+
+                  {/* Step 1 — filter by category (optional). */}
+                  <p className="text-xs font-medium text-gray-500 mb-1">Filter by category</p>
+                  <div className="mb-2">
+                    <CategoryMultiSelect categories={categories} selected={freeProductCatFilter} onChange={setFreeProductCatFilter} accent="green" />
+                  </div>
+
+                  {/* Step 2 — pick products. */}
+                  <input
+                    value={freeProductQuery}
+                    onChange={(e) => setFreeProductQuery(e.target.value)}
+                    placeholder="Search by product name or SKU…"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:border-[#157f4a]"
+                  />
+                  <div className="max-h-52 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100 bg-white">
+                    {filteredFreeProducts.map((p) => {
+                      const on = (form.freeProductIds || []).includes(p.id)
+                      return (
+                        <label key={p.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
+                          <input type="checkbox" checked={on} onChange={() => set('freeProductIds', toggleId(form.freeProductIds, p.id))} />
+                          <span className="min-w-0">
+                            <span className="block truncate text-gray-800">{p.name}</span>
+                            {p.baseSku && <span className="block truncate text-[11px] font-mono text-gray-400">SKU: {p.baseSku}</span>}
+                          </span>
+                          <span className="text-xs text-gray-400 ml-auto shrink-0">{p.category}</span>
+                        </label>
+                      )
+                    })}
+                    {filteredFreeProducts.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-gray-400">
+                        {products.length === 0 ? 'Loading products…' : 'No products match your filters'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

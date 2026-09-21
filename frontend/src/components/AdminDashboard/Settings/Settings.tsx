@@ -18,6 +18,7 @@ import { paymentSettingsService } from "@/services/paymentSettingsService";
 import { adminProfileService } from "@/services/adminProfileService";
 import { companyInfoService } from "@/services/companyInfoService";
 import { hasPermission, getStoredAuth, storeAuth } from "@/lib/auth";
+import { getCountries, getStates, normalizeCountryToIso } from "@/components/WebSite/CheckOut/CheckoutProcess/constants";
 
 type UserRole = "super_admin" | "admin" | "employee";
 
@@ -98,9 +99,12 @@ export default function Settings() {
     companyPhone: "+91 80-1234-5678",
     companyWebsite: "https://www.m2c.com",
     registeredAddress: "123 Business Park, Tech City",
+    addressLine2: "",
+    addressLine3: "",
+    landmark: "",
     city: "Bangalore",
     state: "Karnataka",
-    country: "India",
+    country: "IN",
     zipCode: "560001",
     bankName: "HDFC Bank",
     bankAccountNumber: "1234567890",
@@ -116,7 +120,8 @@ export default function Settings() {
     enabled: false,
     keyId: "",
     keySecret: "",
-    webhookSecret: ""
+    webhookSecret: "",
+    xAccountNumber: ""
   });
 
   // PayU settings state (only for super_admin)
@@ -204,9 +209,13 @@ export default function Settings() {
               companyPhone: companyResponse.data.companyPhone || "",
               companyWebsite: companyResponse.data.companyWebsite || "",
               registeredAddress: companyResponse.data.registeredAddress || "",
+              addressLine2: companyResponse.data.addressLine2 || "",
+              addressLine3: companyResponse.data.addressLine3 || "",
+              landmark: companyResponse.data.landmark || "",
               city: companyResponse.data.city || "",
               state: companyResponse.data.state || "",
-              country: companyResponse.data.country || "",
+              // Normalise legacy free-text country ("India") to an ISO code for the dropdown.
+              country: normalizeCountryToIso(companyResponse.data.country) || "",
               zipCode: companyResponse.data.zipCode || "",
               bankName: companyResponse.data.bankName || "",
               bankAccountNumber: companyResponse.data.bankAccountNumber || "",
@@ -235,7 +244,8 @@ export default function Settings() {
               enabled: response.data.razorpayEnabled,
               keyId: response.data.razorpayKeyId || "",
               keySecret: response.data.razorpayKeySecret || "",
-              webhookSecret: response.data.razorpayWebhookSecret || ""
+              webhookSecret: response.data.razorpayWebhookSecret || "",
+              xAccountNumber: (response.data as any).razorpayxAccountNumber || ""
             });
 
             setPayuSettings({
@@ -346,6 +356,9 @@ export default function Settings() {
       } else if (formId === 'address-form') {
         response = await companyInfoService.updateAddress({
           registeredAddress: companyInfo.registeredAddress,
+          addressLine2: companyInfo.addressLine2,
+          addressLine3: companyInfo.addressLine3,
+          landmark: companyInfo.landmark,
           city: companyInfo.city,
           state: companyInfo.state,
           country: companyInfo.country,
@@ -481,7 +494,8 @@ export default function Settings() {
         enabled: razorpaySettings.enabled,
         keyId: razorpaySettings.keyId,
         keySecret: razorpaySettings.keySecret,
-        webhookSecret: razorpaySettings.webhookSecret
+        webhookSecret: razorpaySettings.webhookSecret,
+        xAccountNumber: razorpaySettings.xAccountNumber
       });
 
       if (response.success) {
@@ -1321,16 +1335,53 @@ export default function Settings() {
                 <h3 className="text-lg font-semibold text-slate-900">Registered Address</h3>
               </div>
               <form id="address-form" onSubmit={handleCompanyInfoUpdate}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="sm:col-span-2 md:col-span-3">
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Street Address <span className="text-red-500">*</span>
+                      Address Line 1 <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={companyInfo.registeredAddress}
                       onChange={(e) => setCompanyInfo({ ...companyInfo, registeredAddress: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
+                      placeholder="Building / street"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Address Line 2</label>
+                    <input
+                      type="text"
+                      value={companyInfo.addressLine2}
+                      onChange={(e) => setCompanyInfo({ ...companyInfo, addressLine2: e.target.value })}
+                      disabled={currentUser.role !== "super_admin"}
+                      placeholder="Area / locality (optional)"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Address Line 3</label>
+                    <input
+                      type="text"
+                      value={companyInfo.addressLine3}
+                      onChange={(e) => setCompanyInfo({ ...companyInfo, addressLine3: e.target.value })}
+                      disabled={currentUser.role !== "super_admin"}
+                      placeholder="Optional"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Landmark</label>
+                    <input
+                      type="text"
+                      value={companyInfo.landmark}
+                      onChange={(e) => setCompanyInfo({ ...companyInfo, landmark: e.target.value })}
+                      disabled={currentUser.role !== "super_admin"}
+                      placeholder="Nearby landmark (optional)"
                       className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
                     />
                   </div>
@@ -1346,30 +1397,31 @@ export default function Settings() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">State</label>
-                    <input
-                      type="text"
-                      value={companyInfo.state}
-                      onChange={(e) => setCompanyInfo({ ...companyInfo, state: e.target.value })}
-                      disabled={currentUser.role !== "super_admin"}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
-                    />
-                  </div>
-
+                  {/* Country first: choosing it repopulates the State dropdown below. */}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Country</label>
-                    <input
-                      type="text"
+                    <Dropdown
                       value={companyInfo.country}
-                      onChange={(e) => setCompanyInfo({ ...companyInfo, country: e.target.value })}
+                      onChange={(v) => setCompanyInfo({ ...companyInfo, country: v as string, state: "" })}
                       disabled={currentUser.role !== "super_admin"}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100"
+                      placeholder="Select country"
+                      options={getCountries().map((c) => ({ value: c.isoCode, label: `${c.flag} ${c.name}` }))}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">ZIP Code</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">State</label>
+                    <Dropdown
+                      value={companyInfo.state}
+                      onChange={(v) => setCompanyInfo({ ...companyInfo, state: v as string })}
+                      disabled={currentUser.role !== "super_admin" || !companyInfo.country || getStates(companyInfo.country).length === 0}
+                      placeholder={companyInfo.country ? "Select state" : "Select a country first"}
+                      options={getStates(companyInfo.country).map((s) => ({ value: s.name, label: s.name }))}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">PIN Code</label>
                     <input
                       type="text"
                       value={companyInfo.zipCode}
@@ -1646,6 +1698,19 @@ export default function Settings() {
                           {isRazorpayWebhookMasked && (
                             <p className="text-xs text-slate-500 mt-1">Secret is hidden. Enter a new value to update.</p>
                           )}
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-slate-700 mb-2">RazorpayX Account Number <span className="font-normal text-slate-400">(for automated wallet payouts)</span></label>
+                          <input
+                            type="text"
+                            value={razorpaySettings.xAccountNumber}
+                            onChange={(e) => setRazorpaySettings({ ...razorpaySettings, xAccountNumber: e.target.value })}
+                            disabled={currentUser.role !== "super_admin"}
+                            placeholder="e.g. 2323230000000000"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100 font-mono text-sm"
+                          />
+                          <p className="text-xs text-slate-500 mt-1">Your RazorpayX source account number (Dashboard → Account Details). Leave blank to pay out wallet withdrawals manually.</p>
                         </div>
                       </div>
                     </div>

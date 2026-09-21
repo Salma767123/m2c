@@ -4,13 +4,7 @@ import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 export default function HubToCustomerPage() {
   return (
     <PermissionGuard permission="hub_to_customer:view">
-      <div className="p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Hub to Customer Orders</h1>
-          <p className="text-slate-600 mt-1">Manage orders from hub to customers</p>
-        </div>
-        <HubToCustomer />
-      </div>
+      <HubToCustomer />
     </PermissionGuard>
   );
 }

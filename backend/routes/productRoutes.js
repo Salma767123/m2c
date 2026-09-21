@@ -20,6 +20,7 @@ const {
   // Public functions
   getPublicProducts,
   getPublicProductFacets,
+  getPublicProductSuggestions,
   getPublicProduct
 } = require('../controllers/productController');
 const { authenticateToken, requireVendorRole, requireAdminRole, requireRole, requirePermission } = require('../middleware/auth');
@@ -29,6 +30,7 @@ const router = express.Router();
 // Public routes (no authentication required)
 router.get('/public', getPublicProducts);
 router.get('/public/facets', getPublicProductFacets);
+router.get('/public/suggest', getPublicProductSuggestions);
 router.get('/public/:id', getPublicProduct);
 
 // Admin routes (require admin authentication + per-action permission)

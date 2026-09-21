@@ -54,6 +54,7 @@ function buildOfferData(body) {
     startsAt,
     endsAt,
     isActive,
+    targetCustomerIds,
   } = body;
 
   if (!title || !String(title).trim()) return { error: 'Title is required' };
@@ -85,9 +86,21 @@ function buildOfferData(body) {
   if (type === 'QUANTITY') {
     if (mQty == null || mQty < 2) return { error: 'Quantity deals need minQty of at least 2' };
   }
+  // BOGO mode: SAME = buy N get M of the same item; CROSS = buy from one set, get
+  // free from another (different) set.
+  const bogoMode = type === 'BOGO' && String(body.bogoMode || '').toUpperCase() === 'CROSS' ? 'CROSS' : 'SAME';
+  const fScope = OFFER_SCOPES.includes(body.freeScope) ? body.freeScope : null;
+  const fpIds = Array.isArray(body.freeProductIds) ? body.freeProductIds.filter(Boolean) : [];
+  const fcNames = Array.isArray(body.freeCategoryNames) ? body.freeCategoryNames.filter(Boolean) : [];
   if (type === 'BOGO') {
     if (mQty == null || mQty < 1) return { error: 'BOGO needs minQty of at least 1' };
     if (gQty == null || gQty < 1) return { error: 'BOGO needs getQty of at least 1' };
+    if (bogoMode === 'CROSS') {
+      if (scope === 'STORE') return { error: 'A cross-product BOGO needs a specific buy product or category' };
+      if (fScope !== 'PRODUCT' && fScope !== 'CATEGORY') return { error: 'Choose the free item type (product or category)' };
+      if (fScope === 'PRODUCT' && fpIds.length === 0) return { error: 'Select at least one free product' };
+      if (fScope === 'CATEGORY' && fcNames.length === 0) return { error: 'Select at least one free category' };
+    }
   }
   if (type === 'THRESHOLD') {
     if (minCart == null || minCart <= 0) return { error: 'Threshold offers need a minCartValueINR' };
@@ -112,11 +125,19 @@ function buildOfferData(body) {
       minCartValueINR: type === 'THRESHOLD' ? minCart : null,
       productIds: scope === 'PRODUCT' ? pIds : [],
       categoryNames: scope === 'CATEGORY' ? cNames : [],
+      bogoMode: type === 'BOGO' ? bogoMode : null,
+      freeScope: type === 'BOGO' && bogoMode === 'CROSS' ? fScope : null,
+      freeProductIds: type === 'BOGO' && bogoMode === 'CROSS' && fScope === 'PRODUCT' ? fpIds : [],
+      freeCategoryNames: type === 'BOGO' && bogoMode === 'CROSS' && fScope === 'CATEGORY' ? fcNames : [],
       region: reg,
       priority: num(priority) || 0,
       startsAt: start,
       endsAt: end,
       isActive: isActive === undefined ? true : !!isActive,
+      // Customer targeting (empty = everyone); 24-hex ObjectIds only, deduped.
+      targetCustomerIds: Array.isArray(targetCustomerIds)
+        ? [...new Set(targetCustomerIds.filter((v) => typeof v === 'string' && /^[0-9a-fA-F]{24}$/.test(v)))]
+        : [],
     },
   };
 }
@@ -150,6 +171,22 @@ const createOffer = async (req, res) => {
     if (built.error) return res.status(400).json({ success: false, message: built.error });
     built.data.bannerImage = await resolveBanner(req.body.bannerImage);
     const offer = await prisma.offer.create({ data: built.data });
+
+    // Notify targeted customers about their exclusive offer.
+    if (Array.isArray(offer.targetCustomerIds) && offer.targetCustomerIds.length > 0) {
+      try {
+        const { createNotification } = require('./notificationController');
+        await Promise.all(offer.targetCustomerIds.map((uid) => createNotification({
+          userId: uid,
+          role: 'USER',
+          type: 'OFFER_ASSIGNED',
+          title: 'A special offer, just for you ✨',
+          message: `${offer.title} — automatically applied at checkout.`,
+          data: { offerId: offer.id },
+        }).catch(() => {})));
+      } catch (e) { console.error('Offer notify error:', e?.message || e); }
+    }
+
     res.status(201).json({ success: true, data: { ...offer, status: statusOf(offer) } });
   } catch (error) {
     console.error('Create offer error:', error);
@@ -225,6 +262,9 @@ const getActiveOffers = async (req, res) => {
     });
 
     const visible = offers
+      // Customer-targeted offers are private to those customers — never surface
+      // them in the public storefront feed (they still auto-apply at checkout).
+      .filter((o) => !(Array.isArray(o.targetCustomerIds) && o.targetCustomerIds.length > 0))
       .filter((o) => (currency ? offerMatchesCurrency(o, currency) : true))
       .filter((o) => isOfferLive(o, now))
       .map((o) => ({
@@ -252,9 +292,183 @@ const getActiveOffers = async (req, res) => {
   }
 };
 
+// Offer analytics report (Admin only). Offers are code-less and applied per
+// order LINE, so usage is derived from OrderItems that carry an appliedOffer
+// snapshot ({ offerId, savingPerUnit } + originalUnitPrice). Per offer we roll up
+// redemptions, units sold, unique orders/customers, total discount given and the
+// gross sales those discounted lines generated (all INR-normalised), a per-date
+// breakdown, and the line-level detail. The frontend turns this into a .xlsx.
+const getOfferReport = async (req, res) => {
+  try {
+    const now = new Date();
+    const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+    const [offers, lines] = await Promise.all([
+      prisma.offer.findMany({ orderBy: { createdAt: 'desc' } }),
+      // originalUnitPrice is written only when an offer discounted the line, so it
+      // is a reliable "this line used an offer" filter without JSON querying.
+      prisma.orderItem.findMany({
+        where: { originalUnitPrice: { not: null } },
+        select: {
+          productName: true,
+          quantity: true,
+          unitPrice: true,
+          originalUnitPrice: true,
+          totalPrice: true,
+          totalPriceINR: true,
+          appliedOffer: true,
+          order: {
+            select: {
+              orderId: true,
+              currency: true,
+              exchangeRate: true,
+              createdAt: true,
+              customerId: true,
+              customerName: true,
+              customerEmail: true,
+              status: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    // Bucket order-lines by the offer id captured in their appliedOffer snapshot.
+    const linesByOffer = new Map();
+    for (const li of lines) {
+      const ao = li.appliedOffer && typeof li.appliedOffer === 'object' ? li.appliedOffer : null;
+      const offerId = ao?.offerId;
+      if (!offerId) continue;
+      if (!linesByOffer.has(offerId)) linesByOffer.set(offerId, []);
+      linesByOffer.get(offerId).push(li);
+    }
+
+    const ymd = (d) => new Date(d).toISOString().slice(0, 10);
+    const toINR = (amount, ord) => (ord?.currency === 'USD' ? amount * (ord.exchangeRate || 0) : amount);
+
+    const report = offers.map((o) => {
+      const used = linesByOffer.get(o.id) || [];
+      const status = !o.isActive
+        ? 'Paused'
+        : (o.startsAt && now < new Date(o.startsAt))
+          ? 'Scheduled'
+          : (o.endsAt && now > new Date(o.endsAt))
+            ? 'Expired'
+            : 'Active';
+
+      const byDateMap = new Map();
+      const orderSet = new Set();
+      const customerSet = new Set();
+      let unitsSold = 0;
+      let totalDiscountINR = 0;
+      let grossSalesINR = 0;
+
+      const redemptions = used.map((li) => {
+        const ord = li.order || {};
+        const lineDiscount = Math.max(0, round2((li.originalUnitPrice - li.unitPrice) * li.quantity));
+        const lineDiscountINR = round2(toINR(lineDiscount, ord));
+        const lineTotalINR = li.totalPriceINR != null ? li.totalPriceINR : round2(toINR(li.totalPrice || 0, ord));
+
+        unitsSold += li.quantity;
+        totalDiscountINR += lineDiscountINR;
+        grossSalesINR += lineTotalINR;
+        if (ord.orderId) orderSet.add(ord.orderId);
+        if (ord.customerId) customerSet.add(ord.customerId);
+
+        const dayKey = ord.createdAt ? ymd(ord.createdAt) : '—';
+        const bucket = byDateMap.get(dayKey) || { date: dayKey, redemptions: 0, unitsSold: 0, discountINR: 0, salesINR: 0 };
+        bucket.redemptions += 1;
+        bucket.unitsSold += li.quantity;
+        bucket.discountINR += lineDiscountINR;
+        bucket.salesINR += lineTotalINR;
+        byDateMap.set(dayKey, bucket);
+
+        return {
+          orderId: ord.orderId,
+          date: ord.createdAt,
+          customerName: ord.customerName,
+          customerEmail: ord.customerEmail,
+          productName: li.productName,
+          quantity: li.quantity,
+          currency: ord.currency,
+          originalUnitPrice: li.originalUnitPrice,
+          unitPrice: li.unitPrice,
+          lineDiscount,
+          lineDiscountINR,
+          lineTotal: li.totalPrice || 0,
+          lineTotalINR,
+          orderStatus: ord.status,
+        };
+      });
+
+      const byDate = Array.from(byDateMap.values())
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((d) => ({ ...d, discountINR: round2(d.discountINR), salesINR: round2(d.salesINR) }));
+
+      return {
+        id: o.id,
+        title: o.title,
+        description: o.description || '',
+        type: o.type,
+        scope: o.scope,
+        discountPercent: o.discountPercent ?? null,
+        discountFlatINR: o.discountFlatINR ?? null,
+        maxDiscountINR: o.maxDiscountINR ?? null,
+        minQty: o.minQty ?? null,
+        getQty: o.getQty ?? null,
+        minCartValueINR: o.minCartValueINR ?? null,
+        productIds: o.productIds || [],
+        categoryNames: o.categoryNames || [],
+        region: o.region,
+        priority: o.priority,
+        startsAt: o.startsAt,
+        endsAt: o.endsAt,
+        isActive: o.isActive,
+        status,
+        createdAt: o.createdAt,
+        updatedAt: o.updatedAt,
+        // Derived usage / sales
+        redemptionsCount: used.length,
+        ordersCount: orderSet.size,
+        uniqueCustomers: customerSet.size,
+        unitsSold,
+        totalDiscountINR: round2(totalDiscountINR),
+        grossSalesINR: round2(grossSalesINR),
+        firstUsedAt: used.length ? used.reduce((a, b) => (new Date(a.order?.createdAt) < new Date(b.order?.createdAt) ? a : b)).order?.createdAt : null,
+        lastUsedAt: used.length ? used.reduce((a, b) => (new Date(a.order?.createdAt) > new Date(b.order?.createdAt) ? a : b)).order?.createdAt : null,
+        byDate,
+        redemptions,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        generatedAt: now.toISOString(),
+        totals: {
+          offers: offers.length,
+          active: report.filter((r) => r.status === 'Active').length,
+          scheduled: report.filter((r) => r.status === 'Scheduled').length,
+          expired: report.filter((r) => r.status === 'Expired').length,
+          paused: report.filter((r) => r.status === 'Paused').length,
+          totalRedemptions: report.reduce((s, r) => s + r.redemptionsCount, 0),
+          totalUnitsSold: report.reduce((s, r) => s + r.unitsSold, 0),
+          totalDiscountINR: round2(report.reduce((s, r) => s + r.totalDiscountINR, 0)),
+          totalGrossSalesINR: round2(report.reduce((s, r) => s + r.grossSalesINR, 0)),
+        },
+        offers: report,
+      },
+    });
+  } catch (error) {
+    console.error('Get offer report error:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate offer report' });
+  }
+};
+
 module.exports = {
   createOffer,
   getOffers,
+  getOfferReport,
   getOffer,
   updateOffer,
   deleteOffer,

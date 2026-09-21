@@ -22,9 +22,11 @@ import {
   Clock,
   ExternalLink,
   RotateCcw,
-  XCircle
+  BadgePercent,
+  ClipboardCheck
 } from "lucide-react"
 import { formatPrice } from '@/lib/currency'
+import { orderGstRows } from '@/lib/gst'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { courierService } from "@/services/courierService"
 import { courierName, courierTrackingUrl } from "@/lib/couriers"
@@ -34,6 +36,7 @@ import orderService, { Order as APIOrder } from "@/services/orderService"
 import productService from "@/services/productService"
 import ProductCard from "@/components/WebSite/ProductCard/ProductCard"
 import ReviewModal from "./ReviewModal"
+import ReturnRequestModal from "./ReturnRequestModal"
 import reviewService from "@/services/reviewService"
 import { getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants"
 
@@ -77,6 +80,9 @@ const isStatusReached = (orderStatus: string, step: string) => {
   // If cancelled, don't show any progress
   if (normalized === 'cancelled') return false;
 
+  // A placed order is always "confirmed" — that's the first, always-complete step.
+  if (step === 'confirmed') return true;
+
   const currentIndex = statusOrder.indexOf(normalized)
   const stepIndex = statusOrder.indexOf(step)
   // If the status is unknown (like some admin status not mapped), fallback to current step = -1
@@ -113,12 +119,6 @@ const historyForStep = (
   return { reachedAt: matches[0].timestamp }
 }
 
-// Order can be cancelled by the customer up to (but not including) dispatch.
-const CANCELLABLE_STATUSES = new Set([
-  'ORDER_CREATED', 'VENDOR_PROCESSING', 'PACKED_BY_VENDOR',
-  'IN_TRANSIT_TO_ADMIN_HUB', 'RECEIVED_AT_ADMIN_HUB', 'APPROVED_BY_ADMIN_HUB',
-])
-
 // Preset reasons offered in the cancel / return modal ("Other" reveals a text box).
 const CANCEL_REASONS = [
   'Changed my mind',
@@ -145,17 +145,12 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
   const [reviewModalState, setReviewModalState] = useState<{ isOpen: boolean, orderId: string, items: any[] }>({ isOpen: false, orderId: '', items: [] })
   const [hasReviewed, setHasReviewed] = useState(false)
   const [similarProducts, setSimilarProducts] = useState<any[]>([])
-  // Cancel / return confirmation modal.
+  // Cancel confirmation modal (returns use the dedicated multi-step ReturnRequestModal below).
   const [actionModal, setActionModal] = useState<'cancel' | 'return' | null>(null)
+  const [returnModalOpen, setReturnModalOpen] = useState(false)
   const [reasonChoice, setReasonChoice] = useState('')  // selected preset reason
   const [actionReason, setActionReason] = useState('')   // free text when "Other"
   const [actionSubmitting, setActionSubmitting] = useState(false)
-
-  const openActionModal = (type: 'cancel' | 'return') => {
-    setReasonChoice('')
-    setActionReason('')
-    setActionModal(type)
-  }
 
   const submitAction = async () => {
     if (!actionModal || !orderDetails) return
@@ -236,8 +231,11 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
         // Check if user already reviewed
         const order = response.data
         if (getNormalizedStatus(order.status) === 'received' && order.items?.length > 0) {
-          const check = await reviewService.checkReviewStatus(order.items[0].productId, order.id)
-          if (check.hasReviewed) setHasReviewed(true)
+          // "Done" only when every product is reviewed AND purchase-experience
+          // feedback has been given for this order.
+          const elig = await reviewService.getOrderReviewEligibility(order.id)
+          const d = elig?.data
+          if (d && d.products.every((p) => p.reviewed) && d.experienceReviewed) setHasReviewed(true)
         }
       } else {
         setError('Order not found')
@@ -387,6 +385,21 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
   // own currency once and use it for every amount below.
   const money = (n: number) => formatPrice(n, orderDetails.currency === 'USD' ? 'USD' : 'INR')
 
+  // Savings breakdown for the cart-style Order Summary. The stored order exposes
+  // each line's pre-offer price (originalUnitPrice, set only when an offer applied),
+  // so we can surface the offer discount alongside the coupon. Product-level MRP
+  // isn't frozen per line, so "Subtotal" starts at the post-offer goods value.
+  const round2 = (n: number) => Math.round(n * 100) / 100
+  const offerDiscount = Math.max(0, round2(
+    orderDetails.items.reduce((s, it) => {
+      const orig = it.originalUnitPrice
+      return s + (orig && orig > it.unitPrice ? (orig - it.unitPrice) * it.quantity : 0)
+    }, 0)
+  ))
+  const couponDiscount = orderDetails.discount || 0
+  const totalSavings = round2(offerDiscount + couponDiscount)
+  const itemsSubtotal = round2(orderDetails.subtotal + offerDiscount)
+
   const normalizedStatus = getNormalizedStatus(orderDetails.status)
   const shippingAddr = orderDetails.shippingAddress || {}
   const cityState = (loc?: { city?: string | null; state?: string | null } | null) =>
@@ -404,6 +417,20 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
     const recv = historyForStep(orderDetails.statusHistory, 'received')
     return [
       {
+        // Always-complete first step: the moment the customer placed the order.
+        // No location here — just when it was confirmed.
+        key: 'confirmed' as const,
+        label: 'Order Confirmed',
+        Icon: ClipboardCheck,
+        activeBg: 'bg-blue-500',
+        activeText: 'text-blue-600',
+        lineNext: 'processing',
+        at: formatDateTime(orderDetails.createdAt),
+        detail: '',
+      },
+      {
+        // Order assigned to the vendor to pack and hand to the hub. The time is when
+        // the admin assigned it; the location is the vendor's city/state.
         key: 'processing' as const,
         label: 'Processing',
         Icon: Package,
@@ -411,7 +438,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
         activeText: 'text-yellow-600',
         lineNext: 'shipped',
         at: formatDateTime(proc.reachedAt || orderDetails.createdAt),
-        detail: vendorPlace ? `Preparing at ${vendorPlace}.` : 'Order confirmed and being prepared.',
+        detail: vendorPlace ? `Assigned to vendor · ${vendorPlace}.` : 'Assigned to vendor for packing.',
       },
       {
         key: 'shipped' as const,
@@ -421,7 +448,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
         activeText: 'text-[#e01a1b]',
         lineNext: 'received',
         at: formatDateTime(ship.reachedAt || orderDetails.vendorShippedAt),
-        detail: hubPlace ? `Shipped from ${hubPlace} hub.` : 'Your order is on the way.',
+        detail: hubPlace ? `Shipped from ${hubPlace}.` : 'Your order is on the way.',
       },
       {
         key: 'received' as const,
@@ -463,25 +490,29 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 <Package className="w-4 h-4 mr-1" />
                 {formatStatus(getNormalizedStatus(orderDetails.status))}
               </div>
-              {/* Customer actions — cancel pre-dispatch, request return post-delivery */}
+              {/* Customer actions — request return post-delivery. Order
+                  cancellation is not offered to customers at any pre-delivery stage. */}
               <div className="flex flex-wrap items-center gap-2">
-                {CANCELLABLE_STATUSES.has(orderDetails.status) && (
-                  <button
-                    onClick={() => openActionModal('cancel')}
-                    className="inline-flex items-center gap-2 rounded-full border border-[#e01a1b] px-4 py-2 text-sm font-medium text-[#e01a1b] transition-colors hover:bg-[#e01a1b]/5"
-                  >
-                    <XCircle className="w-4 h-4" /> Cancel Order
-                  </button>
-                )}
                 {orderDetails.status === 'DELIVERED'
+                  && orderDetails.currency !== 'USD'
+                  && orderDetails.items.some((it) => it.returnable !== false)
                   && orderDetails.returnRequest?.status !== 'Requested'
                   && orderDetails.returnRequest?.status !== 'Approved' && (
                   <button
-                    onClick={() => openActionModal('return')}
+                    onClick={() => setReturnModalOpen(true)}
                     className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                   >
                     <RotateCcw className="w-4 h-4" /> Return
                   </button>
+                )}
+                {/* International (.com/USD) orders can't be returned — point them to support instead. */}
+                {orderDetails.status === 'DELIVERED' && orderDetails.currency === 'USD' && (
+                  <Link
+                    href="/profile?tab=support"
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    <MessageCircle className="w-4 h-4" /> Contact Support
+                  </Link>
                 )}
                 {orderDetails.returnRequest?.status === 'Requested' && (
                   <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">Return Requested</span>
@@ -604,8 +635,11 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                       const stateLabel = step.key === 'received'
                         ? (reached ? 'Complete' : 'Pending')
                         : (current ? 'Current' : reached ? 'Complete' : 'Pending')
+                      // Colour by outcome, not by stage: a completed step is
+                      // always positive (green), the in-progress step is amber,
+                      // and a step not yet reached is muted grey.
                       const stateCls = current
-                        ? 'bg-[#e01a1b]/10 text-[#e01a1b]'
+                        ? 'bg-amber-100 text-amber-700'
                         : reached
                           ? 'bg-green-100 text-green-700'
                           : 'bg-slate-100 text-slate-500'
@@ -614,7 +648,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                         <li key={step.key} className="relative flex gap-3 sm:gap-4">
                           {/* Rail: icon + connecting line */}
                           <div className="flex flex-col items-center">
-                            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${reached ? step.activeBg : 'bg-slate-300'}`}>
+                            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${current ? 'bg-amber-500 ring-4 ring-amber-100' : reached ? 'bg-green-500' : 'bg-slate-300'}`}>
                               <step.Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                             </div>
                             {!isLast && (
@@ -625,7 +659,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                           {/* Details */}
                           <div className={`min-w-0 flex-1 ${isLast ? 'pb-0' : 'pb-5 sm:pb-6'}`}>
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                              <span className={`text-sm sm:text-base font-semibold ${reached ? step.activeText : 'text-slate-500'}`}>
+                              <span className={`text-sm sm:text-base font-semibold ${current ? 'text-amber-700' : reached ? 'text-green-700' : 'text-slate-500'}`}>
                                 {step.label}
                               </span>
                               <span className={`text-[10px] sm:text-[11px] font-medium px-2 py-0.5 rounded-full ${stateCls}`}>
@@ -822,30 +856,77 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                     Order Summary
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 sm:p-5 lg:p-6 space-y-3 sm:space-y-4">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Subtotal</span>
-                    <span className="font-medium">{money(orderDetails.subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Shipping</span>
-                    <span className="font-medium text-green-600">
-                      {orderDetails.shippingCost > 0 ? money(orderDetails.shippingCost) : 'Free'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Tax</span>
-                    <span className="font-medium">{money(orderDetails.tax)}</span>
-                  </div>
-                  {orderDetails.discount > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">Discount</span>
-                      <span className="font-medium text-green-600">-{money(orderDetails.discount)}</span>
+                <CardContent className="p-4 sm:p-5 lg:p-6">
+                  {/* Cart-style price ladder. Discount rows only show when they
+                      exist and read as green savings; the coupon sits above the
+                      taxable amount (GST is charged on the post-coupon net). */}
+                  <div className="space-y-2.5 text-[13.5px] sm:text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">Items subtotal</span>
+                      <span className="tabular-nums text-slate-900">{money(itemsSubtotal)}</span>
                     </div>
-                  )}
-                  <div className="mt-1 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
-                    <span className="text-base font-bold text-slate-900">Total</span>
-                    <span className="text-xl font-bold text-[#e01a1b]">{money(orderDetails.totalAmount)}</span>
+
+                    {offerDiscount > 0 && (
+                      <div className="flex items-center justify-between text-[#157f4a]">
+                        <span>Offer discount</span>
+                        <span className="font-medium tabular-nums">−{money(offerDiscount)}</span>
+                      </div>
+                    )}
+                    {couponDiscount > 0 && (
+                      <div className="flex items-center justify-between text-[#157f4a]">
+                        <span>Coupon discount</span>
+                        <span className="font-medium tabular-nums">−{money(couponDiscount)}</span>
+                      </div>
+                    )}
+
+                    {/* Tax shown only for the `.in` region (INR orders); hidden
+                        on `.com`/other regions which carry no tax. */}
+                    {orderDetails.currency === 'INR' && (
+                      <>
+                        <div className="flex items-center justify-between border-t border-dashed border-slate-200 pt-2.5">
+                          <span className="text-slate-600">Taxable amount</span>
+                          <span className="font-medium tabular-nums text-slate-900">{money(Math.max(0, orderDetails.subtotal - couponDiscount))}</span>
+                        </div>
+
+                        {orderGstRows(orderDetails).map((row) => (
+                          <div key={row.label} className="flex items-center justify-between">
+                            <span className="text-slate-600">{row.label}</span>
+                            <span className="tabular-nums text-slate-900">{money(row.amount)}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">Delivery charges</span>
+                      {orderDetails.shippingCost > 0 ? (
+                        <span className="tabular-nums text-slate-900">{money(orderDetails.shippingCost)}</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 font-semibold text-[#157f4a]">
+                          <Truck className="h-3.5 w-3.5" /> FREE
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 border-t border-slate-100 pt-4">
+                    {totalSavings > 0 && (
+                      <div className="mb-3 flex items-center justify-between rounded-xl bg-[#eaf7ef] px-3.5 py-2.5 ring-1 ring-[#cdebd8]">
+                        <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#157f4a]">
+                          <BadgePercent className="h-4 w-4" /> You save
+                        </span>
+                        <span className="text-[15px] font-bold tabular-nums text-[#157f4a]">{money(totalSavings)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[15px] font-semibold text-slate-900 sm:text-base">Total payable</span>
+                      <span className="text-2xl font-bold tabular-nums text-[#e01a1b]">{money(orderDetails.totalAmount)}</span>
+                    </div>
+                    {orderDetails.currency === 'INR' && (
+                      <p className="mt-1.5 text-[11.5px] leading-snug text-slate-400">
+                        Taxes are calculated based on applicable product tax rates.
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -933,7 +1014,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
               {similarProducts.map((p) => (
-                <ProductCard key={p.id} product={p} />
+                <ProductCard key={p.id} product={p} variant="showcase" />
               ))}
             </div>
           </Reveal>
@@ -944,10 +1025,14 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
         isOpen={reviewModalState.isOpen}
         onClose={() => {
           setReviewModalState({ ...reviewModalState, isOpen: false })
-          // Re-check review status after modal closes
+          // Re-check eligibility after modal closes — mark done only when both
+          // the product reviews and the experience feedback are complete.
           if (orderDetails?.items?.length) {
-            reviewService.checkReviewStatus(orderDetails.items[0].productId, orderDetails.id)
-              .then((res) => { if (res.hasReviewed) setHasReviewed(true) })
+            reviewService.getOrderReviewEligibility(orderDetails.id)
+              .then((res) => {
+                const d = res?.data
+                if (d && d.products.every((p) => p.reviewed) && d.experienceReviewed) setHasReviewed(true)
+              })
               .catch(() => {})
           }
         }}
@@ -955,7 +1040,30 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
         items={reviewModalState.items}
       />
 
-      {/* Cancel / Return confirmation modal */}
+      {/* Multi-step return / refund / replacement flow */}
+      <ReturnRequestModal
+        open={returnModalOpen}
+        order={{
+          id: orderDetails.id,
+          orderNumber: orderDetails.orderId,
+          currency: orderDetails.currency === 'USD' ? 'USD' : 'INR',
+          paymentStatus: orderDetails.paymentStatus,
+          items: orderDetails.items.map((it) => ({
+            id: it.id,
+            name: it.productName,
+            image: it.productImage,
+            quantity: it.quantity,
+            price: it.unitPrice,
+            size: it.size,
+            color: it.color,
+            returnable: it.returnable,
+          })),
+        }}
+        onClose={() => setReturnModalOpen(false)}
+        onSubmitted={() => { setReturnModalOpen(false); fetchOrder() }}
+      />
+
+      {/* Cancel confirmation modal */}
       {actionModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]" onClick={() => !actionSubmitting && setActionModal(null)}>
           <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5" onClick={(e) => e.stopPropagation()}>

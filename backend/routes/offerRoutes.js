@@ -2,6 +2,7 @@ const express = require('express');
 const {
   createOffer,
   getOffers,
+  getOfferReport,
   getOffer,
   updateOffer,
   deleteOffer,
@@ -19,6 +20,8 @@ router.get('/active', getActiveOffers);
 // so no new permission strings need seeding into the roles module.
 router.post('/', authenticateToken, requireAdminRole, requirePermission('coupons:create'), createOffer);
 router.get('/', authenticateToken, requireAdminRole, requirePermission('coupons:view'), getOffers);
+// Analytics report for the Excel download — before '/:id' so "report" isn't an id.
+router.get('/report', authenticateToken, requireAdminRole, requirePermission('coupons:view'), getOfferReport);
 router.get('/:id', authenticateToken, requireAdminRole, requirePermission('coupons:view'), getOffer);
 router.put('/:id', authenticateToken, requireAdminRole, requirePermission('coupons:edit'), updateOffer);
 router.delete('/:id', authenticateToken, requireAdminRole, requirePermission('coupons:delete'), deleteOffer);

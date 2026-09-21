@@ -17,9 +17,18 @@ const { prisma } = require('../config/database');
 // Default sender name when a template has no fromName set.
 const DEFAULT_FROM_NAME = 'M2C MarkDowns';
 
-// Reusable transporter — mirrors the env-based config the legacy senders used.
-const createTransporter = () =>
-  nodemailer.createTransport({
+// Single POOLED transporter, created once and reused for every send.
+//
+// The old code built a fresh transporter per email, so each send opened a new
+// SMTP connection and authenticated from scratch. Gmail throttles bursts of
+// fresh logins with "534-5.7.9 Please log in with your web browser…", which
+// surfaced the moment two emails went out close together (e.g. an OTP request).
+// A pooled transporter keeps a small set of authenticated connections alive and
+// reuses them, so we log in once and stop tripping that limit.
+let _transporter = null;
+const createTransporter = () => {
+  if (_transporter) return _transporter;
+  _transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.SMTP_PORT || '587'),
     secure: process.env.SMTP_SECURE === 'true',
@@ -27,8 +36,13 @@ const createTransporter = () =>
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    pool: true,          // reuse connections instead of re-authenticating per send
+    maxConnections: 3,
+    maxMessages: 100,
     tls: { rejectUnauthorized: false },
   });
+  return _transporter;
+};
 
 /**
  * Replace every {{ key }} (whitespace tolerant) in `str` with data[key].

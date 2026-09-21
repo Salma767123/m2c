@@ -22,6 +22,8 @@ export interface ActiveOffer {
   discountFlatINR?: number | null
   minQty?: number | null
   getQty?: number | null
+  /** BOGO free-item mode: 'SAME' (buy N get M of same item) or 'CROSS' (buy A get B). */
+  bogoMode?: 'SAME' | 'CROSS' | null
   endsAt?: string | null
   /** qty=1 preview, already in the storefront currency. */
   originalPrice: number
@@ -73,6 +75,12 @@ export function applyOfferToPrice(
   convertINRtoUSD: (inr: number) => number
 ): number {
   if (!(basePrice > 0)) return basePrice
+  // Cross-product BOGO ("buy A get B free") is resolved across the whole cart by the
+  // backend — the client can't re-derive it from one line, so trust the precomputed
+  // per-unit price the server attached.
+  if (offer.type === 'BOGO' && offer.bogoMode === 'CROSS') {
+    return typeof offer.offerPrice === 'number' ? offer.offerPrice : basePrice
+  }
   let saving = 0
   switch (offer.type) {
     case 'PERCENTAGE':
@@ -91,10 +99,12 @@ export function applyOfferToPrice(
       break
     }
     case 'BOGO': {
+      // Free granted ONCE at buy+get units — not multiplied per group. Mirrors
+      // offerSavingPerUnit in backend/utils/offers.js.
       const buy = Math.max(1, offer.minQty || 1)
       const free = Math.max(0, offer.getQty || 0)
       const group = buy + free
-      const freeUnits = Math.floor(quantity / group) * free
+      const freeUnits = quantity >= group ? free : 0
       saving = quantity > 0 ? (freeUnits * basePrice) / quantity : 0
       break
     }

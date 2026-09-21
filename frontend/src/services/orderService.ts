@@ -8,6 +8,14 @@ export interface OrderItem {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
+    /** GST rate charged on this line, frozen at checkout (per-product). */
+    gstPercentage?: number | null;
+    /** Whether this product is eligible for return (live flag from the product).
+     *  Attached server-side on order fetch; absent → treat as returnable. */
+    returnable?: boolean;
+    /** Unit price before the automatic offer (set only when an offer applied),
+     *  so the order view can show how much the offer saved. */
+    originalUnitPrice?: number;
     // Vendor-derived price (what the vendor is actually paid). Backend attaches
     // these for all vendor-panel responses; admin/customer price is never shown.
     vendorUnitPrice?: number;
@@ -54,6 +62,10 @@ export interface VendorShipment {
     vendorId: string;
     vendorName: string;
     status: string;
+    /** Vendor order-acceptance gate. */
+    acceptedAt?: string | null;
+    acceptanceDeadline?: string | null;
+    acceptanceMins?: number | null;
     vendorCarrier?: string;
     vendorTrackingId?: string;
     vendorShippedAt?: string;
@@ -110,6 +122,11 @@ export interface Order {
     subtotal: number;
     shippingCost: number;
     tax: number;
+    /** GST split (display) — total stays `tax`. Intrastate: cgst+sgst; interstate: igst. */
+    cgstAmount?: number;
+    sgstAmount?: number;
+    igstAmount?: number;
+    taxType?: 'INTRASTATE' | 'INTERSTATE' | null;
     discount: number;
     /** Currency the buyer was actually charged in — 'INR' on .in, 'USD' on .com. */
     currency?: 'INR' | 'USD';
@@ -178,6 +195,9 @@ export interface CreateOrderParams {
      *  discount itself — the client's discount figure is advisory only. */
     couponCode?: string;
     currency?: string;
+    /** Wallet store credit to apply (in the order currency). Server clamps it to the
+     *  available balance and the order total, and debits the wallet accordingly. */
+    walletApplied?: number;
 }
 
 class OrderService {
@@ -191,6 +211,21 @@ class OrderService {
             // over the axios "Request failed with status code 500" message.
             const apiError = error?.response?.data;
             const message = apiError?.detail || apiError?.error || error.message || 'Failed to create order';
+            throw new Error(message);
+        }
+    }
+
+    // Pre-payment fulfilment check — runs the same courier/stock/shipping
+    // validation the server enforces on createOrder, BEFORE the payment gateway
+    // opens, so the customer is never charged for a cart that can't be placed.
+    // Throws with the server's user-facing message when the cart is not placeable.
+    async validateCheckout(currency: string): Promise<{ success: boolean }> {
+        try {
+            const response = await axios.post('/orders/validate-checkout', { currency });
+            return response.data;
+        } catch (error: any) {
+            const apiError = error?.response?.data;
+            const message = apiError?.error || error.message || 'Your cart could not be validated.';
             throw new Error(message);
         }
     }
@@ -216,8 +251,10 @@ class OrderService {
     }
 
     // Customer: cancel own pre-dispatch order (auto-refund for prepaid).
+    // refundTo: 'WALLET' (instant store credit) | 'BANK' (gateway, default).
     async cancelOrder(id: string, reason?: string): Promise<{ success: boolean; data: Order; message?: string }> {
         try {
+            // Refunds always go to the M2C Wallet — no destination choice.
             const response = await axios.post(`/orders/${id}/cancel`, { reason });
             return response.data;
         } catch (error: any) {
@@ -253,6 +290,15 @@ class OrderService {
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to fetch vendor order');
+        }
+    }
+
+    async acceptVendorOrder(id: string): Promise<{ success: boolean; data: VendorShipment; message?: string }> {
+        try {
+            const response = await axios.post(`/orders/vendor/${id}/accept`, {});
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error?.response?.data?.error || error.message || 'Failed to accept order');
         }
     }
 
@@ -373,9 +419,10 @@ class OrderService {
     async cancelAdminOrder(
         id: string,
         cancelReason: string,
+        restock: boolean = false,
     ): Promise<{ success: boolean; data: Order }> {
         try {
-            const response = await axios.put(`/orders/admin/${id}/cancel`, { cancelReason });
+            const response = await axios.put(`/orders/admin/${id}/cancel`, { cancelReason, restock });
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to cancel order');

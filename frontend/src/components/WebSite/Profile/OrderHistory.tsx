@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Package, Eye, Download, Truck, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronLeft, ChevronRight, ShoppingBag, SlidersHorizontal, Star, XCircle, RotateCcw } from 'lucide-react'
+import { Package, Eye, Download, Truck, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronLeft, ChevronRight, ShoppingBag, SlidersHorizontal, Star, XCircle, RotateCcw, LifeBuoy } from 'lucide-react'
 import orderService, { Order as APIOrder } from '@/services/orderService'
 import reviewService from '@/services/reviewService'
 import ReviewModal from '@/components/WebSite/Order/ReviewModal'
+import ReturnRequestModal from '@/components/WebSite/Order/ReturnRequestModal'
+import { returnService, returnStatusStyle, type ReturnRequest } from '@/services/returnService'
 import Reveal from '@/components/WebSite/Shared/Reveal'
 import SelectMenu from '@/components/WebSite/Shared/SelectMenu'
 import DateField from '@/components/WebSite/Shared/DateField'
-import { formatPrice } from '@/lib/currency'
+import { formatPrice, getRegion } from '@/lib/currency'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 
 // Order can be cancelled by the customer up to (but not including) dispatch.
@@ -74,6 +76,35 @@ const FIELD_LABEL =
 /** Show each amount in the currency the order was charged in, not a hardcoded '$'. */
 function money(amount: number, order: Pick<APIOrder, 'currency'>): string {
   return formatPrice(amount, order.currency === 'USD' ? 'USD' : 'INR')
+}
+
+/**
+ * .com has no returns — the "Contact Support" button stashes a pre-filled ticket
+ * (order details + dates + status) the Support tab picks up on navigation.
+ */
+function stashSupportPrefill(order: APIOrder): void {
+  try {
+    const items = (order.items || []).map((i: any) => `${i.productName} x${i.quantity}`).join(', ')
+    const ordered = new Date(order.createdAt).toLocaleString('en-US', {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    })
+    const description = [
+      `Order: ${order.orderId}`,
+      `Ordered on: ${ordered}`,
+      `Status: Delivered`,
+      (order as any).trackingReference ? `Tracking: ${(order as any).trackingReference}` : '',
+      `Items: ${items}`,
+      `Order total: ${money(order.totalAmount || 0, order)}`,
+      '',
+      'I need help with this delivered order:',
+      '',
+    ].filter(Boolean).join('\n')
+    sessionStorage.setItem('m2c_support_prefill', JSON.stringify({
+      subject: `Help with order ${order.orderId}`,
+      category: 'order',
+      description,
+    }))
+  } catch { /* sessionStorage may be unavailable */ }
 }
 
 /** Smart pagination range builder — collapses long page lists to "1 … 4 5 6 … 20". */
@@ -151,6 +182,18 @@ export default function OrderHistory() {
   const [reasonChoice, setReasonChoice] = useState('')
   const [actionReason, setActionReason] = useState('')
   const [actionSubmitting, setActionSubmitting] = useState(false)
+  // New multi-step return flow + per-order return status.
+  const [returnModalOrder, setReturnModalOrder] = useState<APIOrder | null>(null)
+  const [returnsByOrder, setReturnsByOrder] = useState<Record<string, ReturnRequest>>({})
+
+  const fetchMyReturns = async () => {
+    try {
+      const res = await returnService.getMyReturns()
+      const map: Record<string, ReturnRequest> = {}
+      for (const r of res.data || []) if (!map[r.orderCode]) map[r.orderCode] = r
+      setReturnsByOrder(map)
+    } catch { /* non-blocking */ }
+  }
 
   const openActionModal = (order: APIOrder, type: 'cancel' | 'return') => {
     setReasonChoice('')
@@ -195,6 +238,7 @@ export default function OrderHistory() {
 
   useEffect(() => {
     fetchOrders()
+    fetchMyReturns()
   }, [])
 
   const fetchOrders = async () => {
@@ -233,8 +277,12 @@ export default function OrderHistory() {
     Promise.all(
       delivered.map((o) =>
         reviewService
-          .checkReviewStatus(o.items[0].productId, o.id)
-          .then((r: { hasReviewed?: boolean }) => (r?.hasReviewed ? o.id : null))
+          .getOrderReviewEligibility(o.id)
+          // "Reviewed" only when every product is reviewed AND experience feedback given.
+          .then((r) => {
+            const d = r?.data
+            return d && d.products.every((p) => p.reviewed) && d.experienceReviewed ? o.id : null
+          })
           .catch(() => null),
       ),
     ).then((ids) => {
@@ -591,22 +639,38 @@ export default function OrderHistory() {
                         Cancel
                       </button>
                     )}
-                    {getNormalizedStatus(order.status) === 'delivered'
-                      && order.returnRequest?.status !== 'Requested'
-                      && order.returnRequest?.status !== 'Approved' && (
+                    {returnsByOrder[order.orderId] ? (
+                      (() => {
+                        const rr = returnsByOrder[order.orderId]
+                        const rst = returnStatusStyle(rr.status)
+                        return (
+                          <a
+                            href={`/profile?tab=returns&return=${rr.id}`}
+                            className={`${QUIET_BTN} flex-1 cursor-pointer sm:flex-none ${rst.bg} ${rst.text} border-transparent`}
+                            title="View return details"
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${rst.dot}`} /> Return · {rr.status}
+                          </a>
+                        )
+                      })()
+                    ) : getNormalizedStatus(order.status) === 'delivered' && getRegion() === 'IN' && (order.items || []).some((it: any) => it.returnable !== false) ? (
                       <button
-                        onClick={() => openActionModal(order, 'return')}
+                        onClick={() => setReturnModalOrder(order)}
                         className={`${QUIET_BTN} flex-1 sm:flex-none`}
                       >
                         <RotateCcw className="h-4 w-4" />
                         Return
                       </button>
-                    )}
-                    {order.returnRequest?.status === 'Requested' && (
-                      <span className={`${QUIET_BTN} flex-1 cursor-default border-amber-200 bg-amber-50 text-amber-700 sm:flex-none`}>
-                        Return Requested
-                      </span>
-                    )}
+                    ) : getNormalizedStatus(order.status) === 'delivered' && getRegion() !== 'IN' ? (
+                      <Link
+                        href="/profile?tab=support"
+                        onClick={() => stashSupportPrefill(order)}
+                        className={`${QUIET_BTN} flex-1 sm:flex-none`}
+                      >
+                        <LifeBuoy className="h-4 w-4" />
+                        Contact Support
+                      </Link>
+                    ) : null}
                   </div>
                 </Reveal>
               )
@@ -666,20 +730,39 @@ export default function OrderHistory() {
         isOpen={reviewModal.isOpen}
         onClose={() => {
           const closedId = reviewModal.orderId
-          const firstProduct = reviewModal.items?.[0]?.productId
           setReviewModal({ isOpen: false, orderId: '', items: [] })
-          // Re-check so a just-submitted review flips the button to "Reviewed".
-          if (closedId && firstProduct) {
+          // Re-check so a completed order flips the button to "Reviewed".
+          if (closedId) {
             reviewService
-              .checkReviewStatus(firstProduct, closedId)
-              .then((r: { hasReviewed?: boolean }) => {
-                if (r?.hasReviewed) setReviewedOrders((prev) => new Set([...prev, closedId]))
+              .getOrderReviewEligibility(closedId)
+              .then((r) => {
+                const d = r?.data
+                if (d && d.products.every((p) => p.reviewed) && d.experienceReviewed) {
+                  setReviewedOrders((prev) => new Set([...prev, closedId]))
+                }
               })
               .catch(() => {})
           }
         }}
         orderId={reviewModal.orderId}
         items={reviewModal.items}
+      />
+
+      {/* Multi-step return / refund / replacement flow */}
+      <ReturnRequestModal
+        open={!!returnModalOrder}
+        order={returnModalOrder ? {
+          id: returnModalOrder.id,
+          orderNumber: returnModalOrder.orderId,
+          currency: (returnModalOrder.currency as 'INR' | 'USD') || 'INR',
+          paymentStatus: returnModalOrder.paymentStatus,
+          items: (returnModalOrder.items || []).map((i: any) => ({
+            id: i.id, name: i.productName, image: i.productImage || '',
+            quantity: i.quantity, price: i.unitPrice, size: i.size, color: i.color,
+          })),
+        } : null}
+        onClose={() => setReturnModalOrder(null)}
+        onSubmitted={() => { fetchOrders(); fetchMyReturns() }}
       />
 
       {/* Cancel / Return confirmation modal */}

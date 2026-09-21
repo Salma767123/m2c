@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Search, UserCheck, Building2, Mail, Phone, CheckCircle,
   Plus, FileText,
-  AlertTriangle, Clock, Users, X, RotateCw,
+  AlertTriangle, Clock, Users, X, RotateCw, ChevronDown, SlidersHorizontal,
 } from "lucide-react";
 import { Badge } from "@/components/UI/Badge";
 import Pagination from "@/components/UI/Pagination";
@@ -152,6 +152,7 @@ export default function AssignQCChecker() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   const mapVendors = (rawVendors: any[]): Vendor[] =>
     rawVendors.map((v: any) => ({
@@ -316,6 +317,25 @@ export default function AssignQCChecker() {
           </Link>
         </div>
 
+        {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setPanelOpen((v) => !v)}
+            aria-expanded={panelOpen}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+          >
+            <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+            Overview &amp; Filters
+            <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+          </button>
+          <span className="text-xs text-slate-500">
+            Showing {filteredVendors.length} of {vendors.length} vendors
+          </span>
+        </div>
+
+        {panelOpen && (
+          <div className="space-y-4">
         {/* ── 2. Metric Cards — all interactive ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {metricCards.map(({ key, label, subtitle, count, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -421,6 +441,8 @@ export default function AssignQCChecker() {
             </div>
           </div>
         </div>
+          </div>
+        )}
 
         {/* ── 4. Table ── */}
         <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">

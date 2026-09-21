@@ -1,5 +1,6 @@
 import axios from '@/lib/axios';
 import { userAuthService } from '@/services/userAuthService';
+import { getRegion } from '@/lib/currency';
 
 export interface Coupon {
     id: string;
@@ -22,11 +23,85 @@ export interface Coupon {
     popupTitle?: string;
     popupMessage?: string;
     applicableCategories?: string[];
+    /** Product ids within the chosen categories to target (empty = every product
+     *  in those categories). */
+    applicableProducts?: string[];
     /** First-order coupon — only applies to a customer's first order and surfaces
      *  in the storefront promo strip. At most one active at a time. */
     isFirstOrder?: boolean;
+    /** Customer ids this coupon is restricted to (empty/undefined = everyone). */
+    targetCustomerIds?: string[];
     createdAt?: string;
     updatedAt?: string;
+}
+
+/** Per-coupon analytics returned by GET /coupons/report (Excel download). */
+export interface CouponReportRedemption {
+    orderId: string;
+    date: string;
+    customerName: string;
+    customerEmail: string;
+    currency: string;
+    discount: number;
+    discountINR: number;
+    orderTotal: number;
+    orderTotalINR: number;
+    orderStatus: string;
+}
+export interface CouponReportByDate {
+    date: string;
+    redemptions: number;
+    discountINR: number;
+}
+export interface CouponReportRow {
+    id: string;
+    code: string;
+    description: string;
+    discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+    discountValue: number;
+    minPurchaseAmount: number;
+    maxDiscountAmount: number | null;
+    startDate: string;
+    expiryDate: string;
+    usageLimit: number | null;
+    usedCount: number;
+    perUserLimit: number | null;
+    isActive: boolean;
+    isFirstOrder: boolean;
+    freeShipping: boolean;
+    status: 'Active' | 'Inactive' | 'Expired';
+    createdAt: string;
+    updatedAt: string;
+    redemptionsCount: number;
+    uniqueCustomers: number;
+    totalDiscountINR: number;
+    firstUsedAt: string | null;
+    lastUsedAt: string | null;
+    byDate: CouponReportByDate[];
+    redemptions: CouponReportRedemption[];
+}
+export interface CouponReport {
+    generatedAt: string;
+    totals: {
+        coupons: number;
+        active: number;
+        inactive: number;
+        expired: number;
+        totalRedemptions: number;
+        totalDiscountINR: number;
+    };
+    coupons: CouponReportRow[];
+}
+
+/** Active coupon summary for the storefront Coupons & Offers filter. */
+export interface ActiveCoupon {
+    id: string;
+    code: string;
+    description?: string;
+    discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+    discountValue: number;
+    applicableCategories?: string[];
+    applicableProducts?: string[];
 }
 
 /** The active first-order coupon shown in the storefront promo strip (or null). */
@@ -52,6 +127,8 @@ export interface FreeShippingOffer {
     minOrderValue: number;
     orderNumbers: number[];
     isActive: boolean;
+    /** Which storefront the offer applies to. */
+    region?: 'IN_ONLY' | 'COM_ONLY' | 'BOTH';
     createdAt: string;
     updatedAt: string;
 }
@@ -79,15 +156,22 @@ class CouponService {
             const response = await axios.post('/coupons/apply', { code, cartTotal, currency, userId });
             return response.data;
         } catch (error: unknown) {
-            // Return the error message from the backend if available
-            if (error && typeof error === 'object' && 'response' in error) {
-                const axiosError = error as { response?: { data?: unknown } };
-                if (axiosError.response && axiosError.response.data) {
-                    return axiosError.response.data as ApplyCouponResponse;
+            // Surface the backend's actual reason (e.g. "only valid on your first
+            // order"). The axios interceptor reshapes errors to { message, status,
+            // data } where `data` is the backend body; a raw axios error keeps it
+            // at error.response.data. Handle both so the user never sees the
+            // generic "Failed to apply coupon" when the server explained why.
+            if (error && typeof error === 'object') {
+                const e = error as { response?: { data?: unknown }; data?: unknown; message?: string };
+                const body = (e.data ?? e.response?.data) as ApplyCouponResponse | undefined;
+                if (body && typeof body === 'object' && 'success' in body) {
+                    return body;
+                }
+                if (typeof e.message === 'string' && e.message) {
+                    throw new Error(e.message);
                 }
             }
-            const errorMessage = error instanceof Error ? error.message : 'Failed to apply coupon';
-            throw new Error(errorMessage);
+            throw new Error('Failed to apply coupon');
         }
     }
 
@@ -103,6 +187,17 @@ class CouponService {
                     ? { message: c, image: null, link: '/products' }
                     : { message: c?.message, image: c?.image ?? null, link: c?.link || '/products' }))
                 .filter((c: { message?: string }) => c.message && c.message.trim());
+        } catch {
+            return [];
+        }
+    }
+
+    // Active coupons for the storefront "Coupons & Offers" product filter.
+    // Returns [] on any error so the filter section just hides itself.
+    async getActiveCoupons(): Promise<ActiveCoupon[]> {
+        try {
+            const response = await axios.get('/coupons/active', { timeout: 5000 });
+            return response.data?.success && Array.isArray(response.data.data) ? response.data.data : [];
         } catch {
             return [];
         }
@@ -130,7 +225,7 @@ class CouponService {
 
     async applyFreeShippingOffer(userId: string, cartTotal: number): Promise<ApplyCouponResponse> {
         try {
-            const response = await axios.post('/coupons/apply-free-shipping', { userId, cartTotal });
+            const response = await axios.post('/coupons/apply-free-shipping', { userId, cartTotal, region: getRegion() });
             return response.data;
         } catch (error: unknown) {
             // Return the error message from the backend if available
@@ -154,6 +249,19 @@ class CouponService {
             const errorMessage = error && typeof error === 'object' && 'response' in error 
                 ? (error as { response?: { data?: { error?: string } } }).response?.data?.error || 'Failed to fetch coupons'
                 : 'Failed to fetch coupons';
+            throw new Error(errorMessage);
+        }
+    }
+
+    // Full analytics report used by the "Download Report" Excel export.
+    async getCouponReport(): Promise<{ success: boolean; data: CouponReport }> {
+        try {
+            const response = await axios.get('/coupons/report');
+            return response.data;
+        } catch (error: unknown) {
+            const errorMessage = error && typeof error === 'object' && 'response' in error
+                ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to generate report'
+                : 'Failed to generate report';
             throw new Error(errorMessage);
         }
     }

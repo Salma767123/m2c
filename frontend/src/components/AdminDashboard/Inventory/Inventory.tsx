@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/UI/Table'
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
-import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Filter, Loader2, History, Edit, Trash2, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
+import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Filter, Loader2, History, Edit, Trash2, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal } from 'lucide-react'
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
 import DateRangeCalendar from '@/components/Shared/DateRangeCalendar'
@@ -78,6 +78,49 @@ const getStatusBadge = (currentStock: number, lowStockAlert: number) => {
   return <Badge className="bg-green-50 text-green-700 border border-green-200">In Stock</Badge>
 }
 
+// Stock level for a single stock/min pair.
+type StockLevel = 'out' | 'low' | 'in'
+const levelOf = (stock: number, min: number): StockLevel =>
+  stock <= 0 ? 'out' : stock <= min ? 'low' : 'in'
+
+// Roll the base stock together with every variant into one parent status,
+// checking each variant's OWN stock vs its OWN minimum:
+//   · "Out of Stock" only when nothing is sellable — base and every variant at 0.
+//   · "Low Stock" when the base OR any variant is at/below its minimum, or a
+//     variant is out while others still have stock (partial out-of-stock).
+//   · "In Stock" otherwise.
+// A product without variants falls back to its aggregate stock vs minimum.
+const rollupLevel = (item: InventoryItem): StockLevel => {
+  const variants = item.variants || []
+  if (variants.length === 0) return levelOf(item.currentStock, item.lowStockAlert)
+  const allOut = (item.currentStock || 0) <= 0 && variants.every((v) => (v.stock || 0) <= 0)
+  if (allOut) return 'out'
+  const anyIssue =
+    (item.currentStock || 0) <= item.lowStockAlert ||
+    variants.some((v) => (v.stock || 0) <= v.effectiveThreshold)
+  return anyIssue ? 'low' : 'in'
+}
+
+const getRollupBadge = (item: InventoryItem) => {
+  const level = rollupLevel(item)
+  const hasVariants = (item.variants?.length || 0) > 0
+  // When the aggregate looks fine but a variant dragged the status down, hint why.
+  const fromVariant = hasVariants && level !== levelOf(item.currentStock, item.lowStockAlert)
+  const badge =
+    level === 'out'
+      ? <Badge className="bg-red-50 text-red-700 border border-red-200">Out of Stock</Badge>
+      : level === 'low'
+        ? <Badge className="bg-yellow-50 text-yellow-700 border border-yellow-200">Low Stock</Badge>
+        : <Badge className="bg-green-50 text-green-700 border border-green-200">In Stock</Badge>
+  if (!fromVariant) return badge
+  return (
+    <span className="inline-flex items-center gap-1">
+      {badge}
+      <span className="text-[10px] font-medium text-slate-400">variant</span>
+    </span>
+  )
+}
+
 const getApprovalBadge = (item: InventoryItem) => {
   if (!item.hasProductCreated) return <Badge className="bg-slate-100 text-slate-600">No Product</Badge>
   switch (item.productApprovalStatus) {
@@ -92,6 +135,7 @@ const getApprovalBadge = (item: InventoryItem) => {
 }
 
 export default function Inventory() {
+  const [panelOpen, setPanelOpen] = useState(true)
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const toggleExpanded = (id: string) => setExpandedItems(prev => {
@@ -107,8 +151,15 @@ export default function Inventory() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
+  // Stock status + Last-Restocked are variant-aware, client-side filters, so the
+  // whole (search/category-scoped) set is fetched and then filtered + paginated
+  // on the client — otherwise server pagination would slice BEFORE the filter and
+  // hide matching rows on other pages (e.g. an out-of-stock item on page 2 while
+  // page 1 shows "none found"). PAGE_SIZE is the display page; FETCH_LIMIT pulls
+  // the full set (admin inventory is modest).
+  const PAGE_SIZE = 10
+  const FETCH_LIMIT = 5000
 
   // Stats
   const [stats, setStats] = useState({
@@ -149,9 +200,10 @@ export default function Inventory() {
     const fetchInventory = async () => {
       try {
         setIsLoading(true)
+        // Fetch the FULL set (status/date filters + pagination happen client-side).
         const params: any = {
-          page: currentPage,
-          limit: 10
+          page: 1,
+          limit: FETCH_LIMIT
         }
 
         if (searchTerm) params.search = searchTerm
@@ -161,7 +213,6 @@ export default function Inventory() {
 
         if (response.data.success) {
           setInventoryItems(response.data.data.items)
-          setTotalPages(response.data.data.pagination.totalPages)
           setTotalItems(response.data.data.pagination.totalItems)
         }
       } catch (error: any) {
@@ -172,7 +223,7 @@ export default function Inventory() {
     }
 
     fetchInventory()
-  }, [currentPage, searchTerm, categoryFilter])
+  }, [searchTerm, categoryFilter])
 
   // Get unique categories for filter
   const categories = ['all', ...Array.from(new Set(inventoryItems.map(item => item.category)))]
@@ -191,11 +242,23 @@ export default function Inventory() {
   const filteredItems = inventoryItems.filter(item => {
     if (!inDateRange(item.lastRestocked)) return false
     if (statusFilter === 'all') return true
-    if (statusFilter === 'out_of_stock') return item.currentStock === 0
-    if (statusFilter === 'low_stock') return item.currentStock <= item.lowStockAlert && item.currentStock > 0
-    if (statusFilter === 'in_stock') return item.currentStock > item.lowStockAlert
+    // Filter on the rolled-up level (base + variants) so it matches the badge shown.
+    const level = rollupLevel(item)
+    if (statusFilter === 'out_of_stock') return level === 'out'
+    if (statusFilter === 'low_stock') return level === 'low'
+    if (statusFilter === 'in_stock') return level === 'in'
     return true
   })
+
+  // Client-side pagination over the FILTERED set, so pages reflect what's shown.
+  const clientTotalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
+  const pagedItems = filteredItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  // Any filter/search change resets to page 1 (so a match on a later page isn't
+  // hidden behind an out-of-range current page).
+  useEffect(() => { setCurrentPage(1) }, [searchTerm, categoryFilter, statusFilter, dateFrom, dateTo])
+  // If filtering shrinks the result below the current page, snap back into range.
+  useEffect(() => { if (currentPage > clientTotalPages) setCurrentPage(clientTotalPages) }, [currentPage, clientTotalPages])
 
   const handleUpdateStock = (item: InventoryItem) => {
     // Navigate to separate stock update page
@@ -220,10 +283,10 @@ export default function Inventory() {
     try {
       await inventoryService.adminDeleteItem(deleteModal.item.id)
 
-      // Reload data
+      // Reload the full set (client handles filtering + pagination).
       const params: any = {
-        page: currentPage,
-        limit: 10
+        page: 1,
+        limit: FETCH_LIMIT
       }
       if (searchTerm) params.search = searchTerm
       if (categoryFilter !== 'all') params.category = categoryFilter
@@ -268,6 +331,25 @@ export default function Inventory() {
         )}
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filteredItems.length} of {inventoryItems.length} items
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Inventory Stats — click the first three to filter the table by stock status */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
@@ -358,6 +440,8 @@ export default function Inventory() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      )}
 
       {/* Inventory Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
@@ -394,7 +478,7 @@ export default function Inventory() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredItems.map((item) => {
+                    pagedItems.map((item) => {
                       const variants = item.variants || []
                       const canExpand = variants.length > 0
                       const isExpanded = expandedItems.has(item.id)
@@ -438,14 +522,14 @@ export default function Inventory() {
                           {getApprovalBadge(item)}
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className={`font-semibold ${item.currentStock <= item.lowStockAlert ? 'text-red-600' : 'text-slate-900'}`}>
+                          <span className={`font-semibold ${rollupLevel(item) !== 'in' ? 'text-red-600' : 'text-slate-900'}`}>
                             {item.currentStock}
                           </span>
                         </TableCell>
                         <TableCell className="text-sm text-slate-600 text-center">
                           {item.lowStockAlert}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap">{getStatusBadge(item.currentStock, item.lowStockAlert)}</TableCell>
+                        <TableCell className="whitespace-nowrap">{getRollupBadge(item)}</TableCell>
                         <TableCell className="text-sm text-slate-600 whitespace-nowrap">
                           {item.lastRestocked ? new Date(item.lastRestocked).toLocaleDateString() : 'Never'}
                         </TableCell>
@@ -549,12 +633,12 @@ export default function Inventory() {
               </div>
 
               {/* Pagination */}
-              {totalPages > 1 && (
+              {clientTotalPages > 1 && (
                 <div className="flex items-center justify-end gap-3 text-sm px-4 py-3 border-t border-slate-100">
                   <div className="flex items-center gap-1">
                     <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-                    {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/20' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
-                    <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
+                    {getPageRange(currentPage, clientTotalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/20' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                    <button onClick={() => setCurrentPage(prev => Math.min(clientTotalPages, prev + 1))} disabled={currentPage === clientTotalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
                   </div>
                 </div>
               )}

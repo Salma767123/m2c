@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/UI/Button";
-import { Building2, Globe, Mail, Phone, MapPin, Image, Home, Building, User, Users, Scale, HelpCircle, Loader2, Briefcase, ArrowRight, Upload, Eye, RefreshCw, X, CheckCircle2, ChevronDown, AlertCircle, Camera } from "lucide-react";
+import { Building2, Globe, Mail, Phone, MapPin, Image, Home, Building, User, Users, Scale, HelpCircle, Loader2, Briefcase, ArrowRight, Upload, Eye, RefreshCw, X, CheckCircle2, ChevronDown, AlertCircle, Camera, ShieldCheck, KeyRound, Check } from "lucide-react";
 import { ToggleButton, PhoneInput, parsePhone, CountrySelect, validatePhoneE164, PHONE_COUNTRY_CODES, AccordionSection, CoordinateFields, validateCoordinate, COORDINATE_HELP, LocalLandlineInput, type LocalLandlineValue } from "@/components/VendorHub/FormUI";
 import { IconFile, IconFileText } from "@tabler/icons-react";
 import { handleUpload, validateUpload, notifyUploadError, notifyUploadSuccess } from "@/lib/toast-utils";
@@ -14,6 +14,7 @@ import type { ZipPlace } from "@/lib/zipLookup";
 import { ZipAreaSelect } from "@/components/VendorHub/ZipAreaSelect";
 import { scrollToFirstError } from "@/lib/formErrorScroll";
 import { openDoc } from "@/lib/docViewerBus";
+import { enquiryService } from "@/services/enquiryService";
 
 interface CompanyDetailsProps {
   onNext: () => void;
@@ -507,6 +508,88 @@ export default function CompanyDetails({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  // ── Primary-email OTP verification ─────────────────────────────────
+  // The applicant must prove ownership of the primary business email before
+  // this step will let them continue (backend also enforces it on the final
+  // registration POST). `verifiedEmail` holds the exact address that was
+  // verified; the derived `emailVerified` below is true only while the current
+  // email still matches it — so editing the field silently un-verifies it.
+  // Both are seeded from, and persisted back into, the shared wizard data so
+  // the green state survives navigating away from and back to this step.
+  const [otpStage, setOtpStage] = useState<'idle' | 'sent'>('idle');
+  const [otpValue, setOtpValue] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpNotice, setOtpNotice] = useState('');
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
+  const [verifiedEmail, setVerifiedEmail] = useState<string>(
+    data.emailVerified && data.verifiedEmail && data.verifiedEmail === (data.email || '').trim().toLowerCase()
+      ? data.verifiedEmail
+      : ''
+  );
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim());
+  const emailVerified = !!verifiedEmail && verifiedEmail === formData.email.trim().toLowerCase();
+  // Refs so the memoised handleNext / buildPersistPayload can read the latest
+  // verification without taking the state into their dependency arrays.
+  const emailVerifiedRef = useRef(emailVerified);
+  emailVerifiedRef.current = emailVerified;
+  const verifiedEmailRef = useRef(verifiedEmail);
+  verifiedEmailRef.current = verifiedEmail;
+
+  const handleSendOtp = useCallback(async () => {
+    const addr = formData.email.trim();
+    if (!emailValid || sendingOtp || resendIn > 0) return;
+    setSendingOtp(true);
+    setOtpError('');
+    setOtpNotice('');
+    try {
+      const res = await enquiryService.sendOtp(addr, formData.companyName?.trim(), 'vendor_registration');
+      setOtpStage('sent');
+      setOtpValue('');
+      setResendIn(30);
+      setOtpNotice(res.message || `A verification code has been sent to ${addr}.`);
+    } catch (error) {
+      setOtpError((error as Error)?.message || 'Could not send the code. Please try again.');
+    } finally {
+      setSendingOtp(false);
+    }
+  }, [formData.email, formData.companyName, emailValid, sendingOtp, resendIn]);
+
+  const handleVerifyOtp = useCallback(async () => {
+    const addr = formData.email.trim();
+    if (otpValue.length !== 6 || verifyingOtp) return;
+    setVerifyingOtp(true);
+    setOtpError('');
+    try {
+      await enquiryService.verifyOtp(addr, otpValue, 'vendor_registration');
+      const lower = addr.toLowerCase();
+      setVerifiedEmail(lower);
+      setOtpStage('idle');
+      setOtpValue('');
+      setOtpNotice('');
+      setResendIn(0);
+      // NB: intentionally NOT calling onUpdateData here. Pushing to the parent
+      // mid-step changes the `data` prop, which trips the render-phase resync
+      // (it rebuilds formData from `data`) and would wipe fields not yet saved
+      // to the parent — including the email just typed. The verification flags
+      // are persisted through buildPersistPayload on Save & Continue / unmount
+      // instead, and re-hydrated from `data` on remount.
+    } catch (error) {
+      setOtpError((error as Error)?.message || 'Incorrect code. Please try again.');
+    } finally {
+      setVerifyingOtp(false);
+    }
+  }, [formData.email, otpValue, verifyingOtp]);
+
+  // Resend cooldown — setTimeout, not a render-time clock (impure calls during
+  // render are disallowed in this codebase).
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
+
   // ── Factory site photo crop state ──────────────────────────────────
   const [factoryCropPending, setFactoryCropPending] = useState<{
     slotId: FactoryImageSlotId;
@@ -736,6 +819,14 @@ export default function CompanyDetails({
     updatedData.landlineNumber = localLandline || '';
     updatedData.intlLandline = intlLandline || '';
 
+    // Carry the email-verification state up so the green "Verified" pill
+    // survives leaving and returning to this step. Only counts while the
+    // verified address still matches the current email.
+    const ve = verifiedEmailRef.current;
+    const stillMatches = !!ve && ve === (currentFormData.email || '').trim().toLowerCase();
+    updatedData.emailVerified = stillMatches;
+    updatedData.verifiedEmail = stillMatches ? ve : '';
+
     if (currentFormData.sameAsWarehouse) {
       // "Same as warehouse address" is on — propagate the full address
       // (including the optional lines + landmark) and the factory ownership
@@ -878,6 +969,18 @@ export default function CompanyDetails({
           return next;
         });
       }
+    }
+
+    // Editing the primary email tears down any in-progress code entry. The
+    // green "Verified" state falls away on its own (emailVerified is derived
+    // from verifiedEmail === the current email), but the sent-code row and any
+    // notice/error must be cleared so they don't linger against a new address.
+    if (field === 'email') {
+      setOtpStage('idle');
+      setOtpValue('');
+      setOtpError('');
+      setOtpNotice('');
+      setResendIn(0);
     }
 
     // ── Live validation for phone fields ────────────────────────────
@@ -1470,6 +1573,9 @@ export default function CompanyDetails({
       newErrors.email = 'Email 1 is required';
     } else if (!emailRe.test(currentFormData.email)) {
       newErrors.email = 'Please enter a valid email address';
+    } else if (!emailVerifiedRef.current) {
+      // Primary email must be verified with the emailed OTP before proceeding.
+      newErrors.email = 'Please verify your primary email address to continue';
     }
     // Email 2 is optional but must be valid when supplied, and not a
     // duplicate of Email 1.
@@ -2464,22 +2570,79 @@ export default function CompanyDetails({
                 <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>Primary Email</span>
                 <span className="text-brand-500" aria-hidden="true">*</span>
+                {emailVerified && (
+                  <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600">
+                    <ShieldCheck className="w-3 h-3" strokeWidth={2.5} /> Verified
+                  </span>
+                )}
               </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange("email", e.target.value)}
-                onBlur={() => handleBlur("email")}
-                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                  errors.email && touched.email ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
-                }`}
-                placeholder="company@example.com"
-                autoComplete="email"
-              />
-              {errors.email && touched.email && (
-                <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+              <div className="relative">
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange("email", e.target.value)}
+                  onBlur={() => handleBlur("email")}
+                  className={`w-full text-sm font-medium px-4 py-2.5 ${emailVerified ? 'pr-10' : 'pr-[104px]'} border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                    errors.email && touched.email ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                  }`}
+                  placeholder="company@example.com"
+                  autoComplete="email"
+                />
+                {emailVerified ? (
+                  <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-500" />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSendOtp}
+                    disabled={!emailValid || sendingOtp || resendIn > 0}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-md bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    {sendingOtp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                    {sendingOtp ? 'Sending' : resendIn > 0 ? `Resend ${resendIn}s` : otpStage === 'sent' ? 'Resend' : 'Verify'}
+                  </button>
+                )}
+              </div>
+
+              {/* Code-entry row — shown once a code has been sent, until verified. */}
+              {otpStage === 'sent' && !emailVerified && (
+                <div className="mt-2 flex items-stretch gap-2">
+                  <div className="relative flex-1">
+                    <KeyRound className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      aria-label="Verification code"
+                      value={otpValue}
+                      onChange={(e) => { setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6)); if (otpError) setOtpError(''); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleVerifyOtp(); } }}
+                      maxLength={6}
+                      className="w-full text-sm font-semibold tracking-[0.3em] pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
+                      placeholder="6-digit code"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleVerifyOtp}
+                    disabled={otpValue.length !== 6 || verifyingOtp}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {verifyingOtp ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" strokeWidth={3} />}
+                    Verify
+                  </button>
+                </div>
               )}
+
+              {otpError ? (
+                <p className="text-red-500 text-xs mt-1">{otpError}</p>
+              ) : otpNotice ? (
+                <p className="text-emerald-600 text-xs mt-1">{otpNotice}</p>
+              ) : errors.email && touched.email ? (
+                <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+              ) : !emailVerified ? (
+                <p className="text-slate-400 text-xs mt-1">Verify your email — we&rsquo;ll send a one-time code to confirm it.</p>
+              ) : null}
             </div>
 
             <div>

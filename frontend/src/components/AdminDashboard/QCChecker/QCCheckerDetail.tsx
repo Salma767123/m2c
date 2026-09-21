@@ -17,9 +17,9 @@ import CheckerAssignmentsTab from "./CheckerAssignmentsTab";
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <div>
-      <label className="block text-slate-500 font-medium mb-1.5 text-xs uppercase tracking-wide">{label}</label>
-      <div className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50/70 text-slate-800 text-sm min-h-[46px] flex items-center">
-        {value !== undefined && value !== null && value !== "" ? value : <span className="text-slate-400">—</span>}
+      <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-1.5">{label}</label>
+      <div className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50/70 text-slate-800 text-sm font-medium min-h-[46px] flex items-center">
+        {value !== undefined && value !== null && value !== "" ? value : <span className="text-slate-300 font-normal">—</span>}
       </div>
     </div>
   );
@@ -35,11 +35,13 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card>
+    <Card className="rounded-2xl border border-slate-200 shadow-sm">
       <CardContent className="p-6">
-        <div className="flex items-center gap-2 mb-5">
-          <Icon className="h-5 w-5 text-brand-500" />
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+        <div className="flex items-center gap-2.5 mb-5">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-500">
+            <Icon className="h-4 w-4" />
+          </span>
+          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
         </div>
         {children}
       </CardContent>
@@ -88,10 +90,10 @@ export default function QCCheckerDetail() {
   const isPdfIdProof = checker?.idProof?.startsWith("data:application/pdf") || checker?.idProof?.toLowerCase().endsWith(".pdf");
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="px-4 sm:px-6 py-4 max-w-7xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-3 mb-4">
         <button
           onClick={() => router.push("/admin/dashboard/qc-checker")}
           className="text-slate-500 hover:text-brand-600 transition-colors"
@@ -113,12 +115,13 @@ export default function QCCheckerDetail() {
       ) : !checker ? (
         <div className="p-16 text-center text-slate-500">QC checker not found.</div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Identity banner */}
-          <Card>
-            <CardContent className="p-6">
+          <Card className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="h-1.5 w-full bg-gradient-to-r from-brand-500 to-[#c41617]" />
+            <CardContent className="p-6 bg-gradient-to-br from-white to-slate-50/60">
               <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-                <div className="w-24 h-24 rounded-full border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0">
+                <div className="w-24 h-24 rounded-full ring-4 ring-brand-50 border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
                   {checker.profilePhoto ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={checker.profilePhoto} alt={formatCheckerName(checker)} className="w-full h-full object-cover" />
@@ -126,18 +129,24 @@ export default function QCCheckerDetail() {
                     <User className="w-10 h-10 text-slate-300" />
                   )}
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 flex-wrap">
                     <h2 className="text-2xl font-bold text-slate-900">{formatCheckerName(checker)}</h2>
-                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg border text-xs font-semibold ${statusStyle}`}>
+                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full border text-xs font-semibold ${statusStyle}`}>
                       <BadgeCheck className="w-3.5 h-3.5" />{checker.status}
                     </span>
                   </div>
-                  <div className="text-sm text-brand-600 font-mono mt-1">{checker.checkerId}</div>
-                  <div className="flex items-center gap-4 text-sm text-slate-500 mt-2 flex-wrap">
-                    <span className="flex items-center gap-1"><Mail className="w-4 h-4" />{checker.email}</span>
-                    <span className="flex items-center gap-1"><Phone className="w-4 h-4" />{checker.phone}</span>
-                    <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />Joined {formatDate(checker.joiningDate) || "—"}</span>
+                  <div className="inline-block text-xs text-brand-600 font-mono font-semibold mt-1.5 px-2 py-0.5 rounded-md bg-brand-50 border border-brand-100">{checker.checkerId}</div>
+                  <div className="flex items-center gap-2 text-sm text-slate-600 mt-3 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200">
+                      <Mail className="w-3.5 h-3.5 text-brand-500" />{checker.email}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200">
+                      <Phone className="w-3.5 h-3.5 text-brand-500" />{checker.phone}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200">
+                      <Calendar className="w-3.5 h-3.5 text-brand-500" />Joined {formatDate(checker.joiningDate) || "—"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -163,7 +172,7 @@ export default function QCCheckerDetail() {
           {tab === "assignments" && <CheckerAssignmentsTab checkerId={checker.id} />}
 
           {tab === "overview" && (
-          <div className="space-y-6">
+          <div className="space-y-4">
           {/* Contact */}
           <SectionCard icon={Mail} title="Contact Information">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -207,7 +216,7 @@ export default function QCCheckerDetail() {
           {/* Documents */}
           <SectionCard icon={FileText} title="ID Proof">
             <div>
-              <label className="block text-slate-500 font-medium mb-1.5 text-xs uppercase tracking-wide">ID Proof</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-1.5">ID Proof</label>
               {checker.idProof ? (
                 <button
                   type="button"

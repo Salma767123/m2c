@@ -371,6 +371,18 @@ export function validatePhoneE164(
     return isLive ? '' : `Please enter a valid ${label.toLowerCase()}`;
   }
 
+  // India (+91): enforce exactly 10 national digits. This is the explicit rule
+  // the vendor forms require, and it's clearer than deferring solely to
+  // libphonenumber's per-country length check.
+  if (trimmed.startsWith('+91')) {
+    const national = trimmed.slice(3);
+    if (national.length !== 10) {
+      // Fewer than 10 while typing = "still being entered", not an error.
+      if (isLive && national.length < 10) return '';
+      return `${label} must be a 10-digit number`;
+    }
+  }
+
   // Secondary phone for non-Indian numbers: E.164 format check above is
   // sufficient — skip libphonenumber's country-specific rules.
   if (isSecondaryPhone && !trimmed.startsWith('+91')) {
@@ -797,7 +809,14 @@ export function PhoneInput({
         value={national}
         disabled={disabled}
         onBlur={onBlur}
-        onChange={(e) => onChange(`${dial}${e.target.value.replace(/\D/g, '')}`)}
+        // India (+91) mobile numbers are exactly 10 digits — hard-cap the input
+        // so more than 10 can't be typed. Other countries keep their own lengths.
+        maxLength={dial === '+91' ? 10 : undefined}
+        onChange={(e) => {
+          const digits = e.target.value.replace(/\D/g, '');
+          const capped = dial === '+91' ? digits.slice(0, 10) : digits;
+          onChange(`${dial}${capped}`);
+        }}
         placeholder={placeholder}
         autoComplete={autoComplete}
         inputMode="tel"

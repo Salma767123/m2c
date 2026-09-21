@@ -325,7 +325,7 @@ export default function Category() {
                         alt={`${category.name} category image`}
                         fill
                         sizes="(max-width: 480px) 50vw, (max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, (max-width: 1280px) 16vw, (max-width: 1536px) 14vw, 12vw"
-                        className="object-cover group-hover:scale-110 transition-transform duration-[900ms] ease-out"
+                        className="object-cover object-center group-hover:scale-110 transition-transform duration-[900ms] ease-out"
                         onError={() => handleImageError(category.image!)}
                         loading={index < 4 ? 'eager' : 'lazy'}
                         priority={index < 4}

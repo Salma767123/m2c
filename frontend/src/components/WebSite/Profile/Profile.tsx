@@ -8,7 +8,9 @@ import {
   LifeBuoy,
   LogOut,
   Camera,
-  Loader2
+  Loader2,
+  RotateCcw,
+  Wallet
 } from 'lucide-react';
 import Image from 'next/image';
 import { dispatchAuthChange } from '@/lib/authEvents';
@@ -16,12 +18,16 @@ import ImageCropModal from '@/components/UI/ImageCropModal';
 import ProfileTab from '@/components/WebSite/Profile/ProfileTab';
 import AddressBook from '@/components/WebSite/Profile/AddressBook';
 import OrderHistory from '@/components/WebSite/Profile/OrderHistory';
+import ReturnsSection from '@/components/WebSite/Profile/ReturnsSection';
+import WalletSection from '@/components/WebSite/Profile/WalletSection';
 import SupportTickets from '@/components/WebSite/Profile/SupportTickets';
+import AccountDiscovery from '@/components/WebSite/Profile/AccountDiscovery';
 import Reveal from '@/components/WebSite/Shared/Reveal';
 import LogoutConfirmModal from '@/components/WebSite/Shared/LogoutConfirmModal';
 // import Notifications from '@/components/WebSite/Profile/Notifications';
 import type { UserProfile } from '@/components/WebSite/Profile/types';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { getRegion } from '@/lib/currency';
 import { userProfileService } from '@/services/userProfileService';
 import { userAuthService } from '@/services/userAuthService';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -134,7 +140,9 @@ const Profile = () => {
    */
   useEffect(() => {
     const t = searchParams?.get('tab');
-    if (t && ['profile', 'addresses', 'orders', 'support'].includes(t)) {
+    const allowed = ['profile', 'addresses', 'orders', 'wallet', 'support'];
+    if (getRegion() === 'IN') allowed.push('returns'); // returns tab is .in only
+    if (t && allowed.includes(t)) {
       setActiveTab(t);
     }
   }, [searchParams]);
@@ -247,6 +255,7 @@ const Profile = () => {
 
         setUserProfile(profile);
         setEditedProfile(profile);
+        syncStoredTitle(profile.title || '');
       }
     } catch (error: any) {
       console.error('Error loading profile:', error);
@@ -337,6 +346,26 @@ const Profile = () => {
     }
   };
 
+  // Mirror the title into the stored auth session so the header's "Signed in as"
+  // shows the full name with title even for sessions created before login began
+  // returning it. Only writes when the stored copy is missing/stale.
+  const syncStoredTitle = (title: string) => {
+    try {
+      const store = localStorage.getItem('userToken') ? localStorage : sessionStorage;
+      const raw = store.getItem('userData');
+      if (raw) {
+        const u = JSON.parse(raw);
+        if ((u.title || '') !== (title || '')) {
+          u.title = title;
+          store.setItem('userData', JSON.stringify(u));
+          dispatchAuthChange();
+        }
+      }
+    } catch {
+      /* non-fatal — header will pick it up on next login */
+    }
+  };
+
   const fileToDataUrl = (file: File) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -418,6 +447,9 @@ const Profile = () => {
     { id: 'profile', label: 'Profile Information', icon: User },
     { id: 'addresses', label: 'Saved Addresses', icon: MapPin },
     { id: 'orders', label: 'Order History', icon: Package },
+    // Returns / refunds / replacements are a .in (INR) feature only — hidden on .com.
+    ...(getRegion() === 'IN' ? [{ id: 'returns', label: 'Returns & Replacements', icon: RotateCcw }] : []),
+    { id: 'wallet', label: 'My Wallet', icon: Wallet },
     { id: 'support', label: 'Support', icon: LifeBuoy },
   ];
 
@@ -677,9 +709,15 @@ const Profile = () => {
             {activeTab === 'profile' && renderProfileTab()}
             {activeTab === 'addresses' && <AddressBook />}
             {activeTab === 'orders' && <OrderHistory />}
+            {activeTab === 'returns' && <ReturnsSection />}
+            {activeTab === 'wallet' && <WalletSection />}
             {activeTab === 'support' && <SupportTickets />}
           </Reveal>
         </div>
+
+        {/* Recently viewed + items awaiting review — their own sections below the whole
+            account block, shown on every tab. Each self-hides when empty. */}
+        <AccountDiscovery />
       </div>
 
       <LogoutConfirmModal

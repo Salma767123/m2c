@@ -33,7 +33,8 @@ async function getCroppedFile(
   imageSrc: string,
   cropPixels: Area,
   rotation: number,
-  fileName: string
+  fileName: string,
+  aspect: number = 1
 ): Promise<File> {
   const image = await loadImage(imageSrc);
 
@@ -52,12 +53,18 @@ async function getCroppedFile(
   wctx.rotate(rad);
   wctx.drawImage(image, -srcW / 2, -srcH / 2);
 
-  // Now crop the requested region and scale it into the square output canvas.
+  // Crop the requested region into an output canvas sized to the crop aspect
+  // (square by default; wide for a logo). Longest side capped at OUTPUT_SIZE.
   const out = document.createElement("canvas");
-  out.width = OUTPUT_SIZE;
-  out.height = OUTPUT_SIZE;
+  const outW = aspect >= 1 ? OUTPUT_SIZE : Math.round(OUTPUT_SIZE * aspect);
+  const outH = aspect >= 1 ? Math.round(OUTPUT_SIZE / aspect) : OUTPUT_SIZE;
+  out.width = outW;
+  out.height = outH;
   const octx = out.getContext("2d")!;
   octx.imageSmoothingQuality = "high";
+  // JPEG has no alpha — paint white first so transparent logos don't turn black.
+  octx.fillStyle = "#ffffff";
+  octx.fillRect(0, 0, outW, outH);
   octx.drawImage(
     work,
     cropPixels.x,
@@ -66,8 +73,8 @@ async function getCroppedFile(
     cropPixels.height,
     0,
     0,
-    OUTPUT_SIZE,
-    OUTPUT_SIZE
+    outW,
+    outH
   );
 
   const toBlob = (quality: number) =>
@@ -94,6 +101,8 @@ interface ImageCropModalProps {
   title?: string;
   /** 'round' for circular overlay (profile photos), 'rect' for square overlay (facility images). Default: 'round'. */
   cropShape?: "round" | "rect";
+  /** Crop aspect ratio (width / height). Default 1 (square). e.g. 3 for a wide logo. */
+  aspect?: number;
   /** Show rule-of-thirds grid inside the crop area. Default: false. */
   showGrid?: boolean;
   onCancel: () => void;
@@ -105,6 +114,7 @@ export default function ImageCropModal({
   fileName,
   title = "Crop Profile Photo",
   cropShape = "round",
+  aspect = 1,
   showGrid = false,
   onCancel,
   onCropped,
@@ -169,7 +179,7 @@ export default function ImageCropModal({
     if (!src || !croppedAreaPixels) return;
     setSaving(true);
     try {
-      const file = await getCroppedFile(src, croppedAreaPixels, rotation, fileName || "profile");
+      const file = await getCroppedFile(src, croppedAreaPixels, rotation, fileName || "profile", aspect);
       onCropped(file);
     } catch (e) {
       console.error("Crop failed:", e);
@@ -240,7 +250,7 @@ export default function ImageCropModal({
             crop={crop}
             zoom={zoom}
             rotation={rotation}
-            aspect={1}
+            aspect={aspect}
             cropShape={cropShape}
             showGrid={showGrid}
             onCropChange={setCrop}

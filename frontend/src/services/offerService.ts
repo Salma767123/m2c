@@ -20,14 +20,94 @@ export interface Offer {
   minCartValueINR?: number | null
   productIds: string[]
   categoryNames: string[]
+  // BOGO free-item mode + the free (get) set for a CROSS ("buy A get B") deal.
+  bogoMode?: 'SAME' | 'CROSS' | null
+  freeScope?: OfferScope | null
+  freeProductIds?: string[]
+  freeCategoryNames?: string[]
   region: OfferRegion
   priority: number
   startsAt: string
   endsAt: string
   isActive: boolean
+  /** Customer ids this offer is restricted to (empty/undefined = everyone). */
+  targetCustomerIds?: string[]
   status?: OfferStatus
   createdAt?: string
   updatedAt?: string
+}
+
+// Per-offer analytics + sales returned by GET /offers/report (Excel download).
+export interface OfferReportRedemption {
+  orderId: string
+  date: string
+  customerName: string
+  customerEmail: string
+  productName: string
+  quantity: number
+  currency: string
+  originalUnitPrice: number
+  unitPrice: number
+  lineDiscount: number
+  lineDiscountINR: number
+  lineTotal: number
+  lineTotalINR: number
+  orderStatus: string
+}
+export interface OfferReportByDate {
+  date: string
+  redemptions: number
+  unitsSold: number
+  discountINR: number
+  salesINR: number
+}
+export interface OfferReportRow {
+  id: string
+  title: string
+  description: string
+  type: OfferType
+  scope: OfferScope
+  discountPercent: number | null
+  discountFlatINR: number | null
+  maxDiscountINR: number | null
+  minQty: number | null
+  getQty: number | null
+  minCartValueINR: number | null
+  productIds: string[]
+  categoryNames: string[]
+  region: OfferRegion
+  priority: number
+  startsAt: string
+  endsAt: string
+  isActive: boolean
+  status: 'Active' | 'Scheduled' | 'Expired' | 'Paused'
+  createdAt: string
+  updatedAt: string
+  redemptionsCount: number
+  ordersCount: number
+  uniqueCustomers: number
+  unitsSold: number
+  totalDiscountINR: number
+  grossSalesINR: number
+  firstUsedAt: string | null
+  lastUsedAt: string | null
+  byDate: OfferReportByDate[]
+  redemptions: OfferReportRedemption[]
+}
+export interface OfferReport {
+  generatedAt: string
+  totals: {
+    offers: number
+    active: number
+    scheduled: number
+    expired: number
+    paused: number
+    totalRedemptions: number
+    totalUnitsSold: number
+    totalDiscountINR: number
+    totalGrossSalesINR: number
+  }
+  offers: OfferReportRow[]
 }
 
 // Fields accepted when creating/updating (server validates + normalises).
@@ -47,11 +127,16 @@ export type OfferInput = Partial<
     | 'minCartValueINR'
     | 'productIds'
     | 'categoryNames'
+    | 'bogoMode'
+    | 'freeScope'
+    | 'freeProductIds'
+    | 'freeCategoryNames'
     | 'region'
     | 'priority'
     | 'startsAt'
     | 'endsAt'
     | 'isActive'
+    | 'targetCustomerIds'
   >
 >
 
@@ -85,6 +170,16 @@ class OfferService {
     }
   }
 
+  // Full analytics + sales report used by the "Download Report" Excel export.
+  async getOfferReport(): Promise<OfferReport> {
+    try {
+      const res = await axios.get('/offers/report')
+      return res.data.data
+    } catch (error) {
+      throw new Error(errMessage(error, 'Failed to generate offer report'))
+    }
+  }
+
   async getOffer(id: string): Promise<Offer> {
     try {
       const res = await axios.get(`/offers/${id}`)
@@ -106,6 +201,19 @@ class OfferService {
   async updateOffer(id: string, data: OfferInput): Promise<Offer> {
     try {
       const res = await axios.put(`/offers/${id}`, data)
+      return res.data.data
+    } catch (error) {
+      throw new Error(errMessage(error, 'Failed to update offer'))
+    }
+  }
+
+  // Activate / pause an offer. Sends only isActive — the backend merges it with
+  // the existing offer, so no other field is touched. A paused offer stops
+  // applying at checkout; the derived status becomes PAUSED (or ACTIVE/SCHEDULED
+  // again on re-activate, based on its window).
+  async setOfferActive(id: string, isActive: boolean): Promise<Offer> {
+    try {
+      const res = await axios.put(`/offers/${id}`, { isActive })
       return res.data.data
     } catch (error) {
       throw new Error(errMessage(error, 'Failed to update offer'))

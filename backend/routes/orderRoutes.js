@@ -9,6 +9,69 @@ const { getOrderInvoiceHTML } = require('../utils/email/templates/orderInvoiceTe
 const { prisma } = require('../config/database');
 const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
 
+// Legacy orders (placed before per-line GST was frozen on the order item) have
+// no gstPercentage on their items. Backfill it from each product's current rate
+// so the invoice prints the real per-item rate instead of a blended average.
+// In-memory only — never persisted (the product's rate may have moved since).
+async function attachItemGst(order) {
+    const items = (order?.items || []).filter((it) => it.productId);
+    if (items.length === 0) return;
+    const ids = [...new Set(items.map((it) => it.productId))];
+    const products = await prisma.product.findMany({
+        where: { id: { in: ids } },
+        // hsnCode is NOT frozen on the order item, so it's always pulled live here.
+        select: { id: true, gstPercentage: true, hsnCode: true },
+    });
+    const byId = new Map(products.map((p) => [p.id, p]));
+    for (const it of items) {
+        const p = byId.get(it.productId);
+        if (!p) continue;
+        if (it.gstPercentage == null && p.gstPercentage != null) it.gstPercentage = p.gstPercentage;
+        if (it.hsnCode == null && p.hsnCode) it.hsnCode = p.hsnCode;
+    }
+}
+
+// Build the adminSettings object the invoice template expects — shared by the
+// admin and customer invoice routes so both stay identical. Also backfills each
+// line's GST rate + HSN code from the product.
+async function buildInvoiceHeader(order) {
+    await attachItemGst(order);
+    const [company, invSettings] = await Promise.all([
+        prisma.companyInfo.findFirst({
+            select: {
+                companyName: true, companyEmail: true, companyPhone: true, gstNumber: true, panNumber: true,
+                registeredAddress: true, addressLine2: true, addressLine3: true, landmark: true,
+                city: true, state: true, zipCode: true, country: true,
+                companyLogo: true, companyWebsite: true,
+            },
+        }),
+        prisma.invoiceSettings.findFirst({ select: { invoiceLogo: true, signature: true } }),
+    ]);
+    const signature = invSettings?.signature || null;
+    if (!company) {
+        return { ...(invSettings?.invoiceLogo ? { companyLogo: invSettings.invoiceLogo } : {}), signature };
+    }
+    return {
+        companyName: company.companyName,
+        // Dedicated invoice logo wins; fall back to the company logo when unset.
+        companyLogo: invSettings?.invoiceLogo || company.companyLogo,
+        gstNumber: company.gstNumber,
+        panNumber: company.panNumber,
+        address: company.registeredAddress,
+        addressLine2: company.addressLine2,
+        addressLine3: company.addressLine3,
+        landmark: company.landmark,
+        city: company.city,
+        state: company.state,
+        zipCode: company.zipCode,
+        country: company.country,
+        companyWebsite: company.companyWebsite,
+        email: company.companyEmail,
+        phone: company.companyPhone,
+        signature,
+    };
+}
+
 // Apply base auth middleware to all routes
 router.use(authenticateToken);
 
@@ -39,20 +102,7 @@ router.get('/admin/:id/invoice', requireAdminRole, requirePermission(['invoices:
         const order = await prisma.order.findUnique({ where, include: { items: ACTIVE_ITEMS_FILTER } });
         if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
 
-        // Fetch company info for invoice header (logo, name, GST, etc.)
-        const company = await prisma.companyInfo.findFirst({
-            select: { companyName: true, gstNumber: true, registeredAddress: true, state: true, country: true, companyLogo: true, companyWebsite: true }
-        });
-
-        const html = getOrderInvoiceHTML(order, company ? {
-            companyName: company.companyName,
-            companyLogo: company.companyLogo,
-            gstNumber: company.gstNumber,
-            address: company.registeredAddress,
-            state: company.state,
-            country: company.country,
-            companyWebsite: company.companyWebsite,
-        } : {});
+        const html = getOrderInvoiceHTML(order, await buildInvoiceHeader(order));
         res.setHeader('Content-Type', 'text/html');
         res.send(html);
     } catch (err) {
@@ -81,6 +131,7 @@ router.get('/vendor', requireVendorRole, vendorOrderController.getVendorOrders);
 // doesn't treat "reviews" as an order id.
 router.get('/vendor/reviews', requireVendorRole, vendorOrderController.getVendorReviews);
 router.get('/vendor/:id', requireVendorRole, vendorOrderController.getVendorOrderById);
+router.post('/vendor/:id/accept', requireVendorRole, vendorOrderController.acceptVendorOrder);
 router.put('/vendor/:id/status', requireVendorRole, vendorOrderController.updateVendorOrderStatus);
 router.post('/vendor/:id/reship', requireVendorRole, vendorOrderController.reshipVendorOrder);
 
@@ -88,6 +139,9 @@ router.post('/vendor/:id/reship', requireVendorRole, vendorOrderController.reshi
 // CUSTOMER ROUTES (/api/orders/*)
 // ============================================
 router.post('/', orderController.createOrder);
+// Pre-payment fulfilment check — the storefront calls this before opening the
+// payment gateway, so a cart that createOrder would reject never gets charged.
+router.post('/validate-checkout', orderController.validateCheckout);
 router.get('/', orderController.getUserOrders);
 router.get('/:id', orderController.getOrderById);
 // Customer self-service: cancel a pre-dispatch order, or request a return after delivery.
@@ -106,19 +160,7 @@ router.get('/:id/invoice', async (req, res) => {
         if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
         if (order.customerId !== userId) return res.status(403).json({ success: false, error: 'Unauthorized' });
 
-        const company = await prisma.companyInfo.findFirst({
-            select: { companyName: true, gstNumber: true, registeredAddress: true, state: true, country: true, companyLogo: true, companyWebsite: true }
-        });
-
-        const html = getOrderInvoiceHTML(order, company ? {
-            companyName: company.companyName,
-            companyLogo: company.companyLogo,
-            gstNumber: company.gstNumber,
-            address: company.registeredAddress,
-            state: company.state,
-            country: company.country,
-            companyWebsite: company.companyWebsite,
-        } : {});
+        const html = getOrderInvoiceHTML(order, await buildInvoiceHeader(order));
         res.setHeader('Content-Type', 'text/html');
         res.send(html);
     } catch (err) {

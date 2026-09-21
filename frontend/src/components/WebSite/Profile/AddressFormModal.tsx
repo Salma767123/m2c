@@ -31,6 +31,9 @@ interface AddressFormModalProps {
 
 type FormState = {
   type: AddressType;
+  // Office/company name when type is "work", or a custom label ("Friend's place",
+  // "Warehouse", …) when type is "other". Unused for "home".
+  typeLabel: string;
   name: string;
   phone: string;
   phone2: string;
@@ -60,6 +63,7 @@ const TYPE_OPTIONS: { value: AddressType; label: string; icon: typeof Home }[] =
 
 const emptyForm: FormState = {
   type: "home",
+  typeLabel: "",
   name: "",
   phone: "",
   phone2: "",
@@ -402,6 +406,7 @@ export default function AddressFormModal({
       const editIso = normalizeCountryToIso(editing.country);
       setForm({
         type: editing.type,
+        typeLabel: editing.typeLabel || "",
         name: editing.name || "",
         phone: formatPhoneAsYouType(editing.phone || "", editIso),
         phone2: formatPhoneAsYouType(editing.phone2 || "", editIso),
@@ -561,6 +566,9 @@ export default function AddressFormModal({
       setSubmitError(null);
       const payload: AddressPayload = {
         type: form.type,
+        typeLabel: (form.type === "work" || form.type === "other")
+          ? (form.typeLabel.trim() || undefined)
+          : undefined,
         name: form.name.trim(),
         phone: toE164(form.phone, phoneIso),
         phone2: form.phone2.trim() ? toE164(form.phone2, phone2Iso) : undefined,
@@ -657,6 +665,22 @@ export default function AddressFormModal({
                 })}
               </div>
             </div>
+
+            {/* Dynamic label for Work / Other — office name, or what "Other" is. */}
+            {(form.type === "work" || form.type === "other") && (
+              <div>
+                <Label>{form.type === "work" ? "Office / Company Name" : "Address Label"}</Label>
+                <input
+                  type="text"
+                  maxLength={80}
+                  value={form.typeLabel}
+                  onChange={(e) => setField("typeLabel", e.target.value)}
+                  disabled={submitting}
+                  placeholder={form.type === "work" ? "e.g. Acme Corp, 3rd floor" : "e.g. Friend's place, Warehouse"}
+                  className={inputCls("typeLabel")}
+                />
+              </div>
+            )}
 
             {/* Full Name + Primary Phone */}
             <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">

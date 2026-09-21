@@ -141,26 +141,32 @@ const updateAddress = async (req, res) => {
   try {
     const {
       registeredAddress,
+      addressLine2,
+      addressLine3,
+      landmark,
       city,
       state,
       country,
       zipCode
     } = req.body;
-    
+
     // Get existing company info
     let companyInfo = await prisma.companyInfo.findFirst();
-    
+
     if (!companyInfo) {
       return res.status(404).json({
         success: false,
         error: 'Company info not found. Please update basic information first.'
       });
     }
-    
+
     companyInfo = await prisma.companyInfo.update({
       where: { id: companyInfo.id },
       data: {
         registeredAddress,
+        addressLine2,
+        addressLine3,
+        landmark,
         city,
         state,
         country,
@@ -288,6 +294,9 @@ const getPublicCompanyInfo = async (req, res) => {
         companyWebsite: true,
         gstNumber: true,
         registeredAddress: true,
+        addressLine2: true,
+        addressLine3: true,
+        landmark: true,
         city: true,
         state: true,
         country: true,

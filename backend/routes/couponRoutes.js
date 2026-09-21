@@ -2,6 +2,7 @@ const express = require('express');
 const {
     createCoupon,
     getCoupons,
+    getCouponReport,
     getCoupon,
     updateCoupon,
     deleteCoupon,
@@ -9,6 +10,7 @@ const {
     applyFreeShippingOffer, // Public/User endpoint for free shipping
     getPromotionalCoupons, // Public endpoint for promotional display
     getFirstOrderCoupon,
+    getActiveCoupons, // Public endpoint for the storefront Coupons & Offers filter
     getPopupCoupons, // Public endpoint for category/product popup modals
     // Free shipping offer functions
     createFreeShippingOffer,
@@ -28,6 +30,7 @@ router.post('/apply-free-shipping', applyFreeShippingOffer);
 router.post('/check-free-shipping', checkFreeShipping);
 router.get('/promotional', getPromotionalCoupons); // Public endpoint for promotional display
 router.get('/first-order', getFirstOrderCoupon); // Public — active first-order coupon for the promo strip
+router.get('/active', getActiveCoupons); // Public — active coupons for the storefront Coupons & Offers filter
 router.get('/popup', getPopupCoupons); // Public endpoint for category/product popup modals
 
 // Free shipping offer routes (Admin only) - MUST come before /:id route
@@ -40,6 +43,9 @@ router.delete('/free-shipping/:id', authenticateToken, requireAdminRole, require
 // Admin routes (require admin authentication) - /:id route MUST come after specific routes
 router.post('/', authenticateToken, requireAdminRole, requirePermission('coupons:create'), createCoupon);
 router.get('/', authenticateToken, requireAdminRole, requirePermission('coupons:view'), getCoupons);
+// Analytics report for the Excel download — must precede '/:id' so "report" isn't
+// treated as a coupon id.
+router.get('/report', authenticateToken, requireAdminRole, requirePermission('coupons:view'), getCouponReport);
 router.get('/:id', authenticateToken, requireAdminRole, requirePermission('coupons:view'), getCoupon);
 router.put('/:id', authenticateToken, requireAdminRole, requirePermission('coupons:edit'), updateCoupon);
 router.delete('/:id', authenticateToken, requireAdminRole, requirePermission('coupons:delete'), deleteCoupon);

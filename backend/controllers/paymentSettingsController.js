@@ -23,6 +23,7 @@ const getPaymentSettings = async (req, res) => {
       razorpayKeyId: settings.razorpayKeyId || '',
       razorpayKeySecret: settings.razorpayKeySecret ? '••••••••' : '', // Mask the secret
       razorpayWebhookSecret: settings.razorpayWebhookSecret ? '••••••••' : '', // Mask the secret
+      razorpayxAccountNumber: settings.razorpayxAccountNumber || '', // account no., not a secret
       payuEnabled: settings.payuEnabled,
       payuMerchantKey: settings.payuMerchantKey || '',
       payuMerchantSalt: settings.payuMerchantSalt ? '••••••••' : '', // Mask the salt
@@ -87,7 +88,8 @@ const updateRazorpaySettings = async (req, res) => {
       enabled,
       keyId,
       keySecret,
-      webhookSecret
+      webhookSecret,
+      xAccountNumber
     } = req.body;
 
     // Validation
@@ -115,6 +117,7 @@ const updateRazorpaySettings = async (req, res) => {
     if (keyId) updateData.razorpayKeyId = keyId.replace(/^,+|,+$/g, '').trim();
     if (keySecret && keySecret !== '••••••••') updateData.razorpayKeySecret = keySecret.replace(/^,+|,+$/g, '').trim();
     if (webhookSecret && webhookSecret !== '••••••••') updateData.razorpayWebhookSecret = webhookSecret.replace(/^,+|,+$/g, '').trim();
+    if (xAccountNumber !== undefined) updateData.razorpayxAccountNumber = String(xAccountNumber || '').trim() || null;
 
     if (settings) {
       // Update existing settings

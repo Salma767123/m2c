@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Eye, CheckCircle, Clock, X, RefreshCw, ChevronLeft, ChevronRight, CalendarDays, Receipt, Hourglass } from "lucide-react";
+import { Search, Eye, CheckCircle, Clock, X, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, CalendarDays, Receipt, Hourglass, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -16,6 +16,7 @@ import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalenda
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { settlementService, Settlement } from "@/services/settlementService";
 import { hasPermission } from "@/lib/auth";
+import VendorDeliveryReviewModal from "./VendorDeliveryReviewModal";
 
 const PAGE_SIZE = 10;
 
@@ -44,9 +45,12 @@ export default function SettlementManagement() {
   const [transactionId, setTransactionId] = useState("");
   const [processing, setProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [panelOpen, setPanelOpen] = useState(true);
   const [showDueDateModal, setShowDueDateModal] = useState(false);
   const [dueDateSettlement, setDueDateSettlement] = useState<Settlement | null>(null);
   const [dueDateValue, setDueDateValue] = useState("");
+  // When set, the vendor-delivery review popup is open for this settlement.
+  const [reviewSettlementId, setReviewSettlementId] = useState<string | null>(null);
 
   const statusOptions = ["All", "Pending", "Processing", "Paid", "Failed", "Cancelled"];
 
@@ -125,6 +129,7 @@ export default function SettlementManagement() {
 
     try {
       setProcessing(true);
+      const paidSettlementId = selectedSettlement.id;
       const res = await settlementService.updateSettlementStatus(selectedSettlement.id, "Paid", transactionId);
       if (res.success) {
         showSuccessToast(`Settlement ${selectedSettlement.settlementNumber} marked as paid`);
@@ -132,6 +137,8 @@ export default function SettlementManagement() {
         setSelectedSettlement(null);
         setTransactionId("");
         fetchSettlements(); // refresh table
+        // Settlement complete → immediately open the vendor-delivery review.
+        setReviewSettlementId(paidSettlementId);
       }
     } catch (error: any) {
       showErrorToast(error?.error || "Failed to confirm payment");
@@ -196,6 +203,25 @@ export default function SettlementManagement() {
 
   return (
     <div className="space-y-4">
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filteredSettlements.length} of {settlements.length} settlements
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Stats Cards (click a card to filter the table below by that status) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {metricCards.map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -262,6 +288,8 @@ export default function SettlementManagement() {
           </button>
         </div>
       </div>
+        </div>
+      )}
 
       {/* Settlements Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
@@ -392,6 +420,16 @@ export default function SettlementManagement() {
                             );
                           })()
                         ) : null}
+                        {/* Settled orders can be reviewed (or re-reviewed) for the vendor. */}
+                        {settlement.status === "Paid" && hasPermission('settlement:mark_paid') && (
+                          <button
+                            onClick={() => setReviewSettlementId(settlement.id)}
+                            className="p-2 text-amber-600 hover:text-amber-900 hover:bg-amber-50 rounded-lg transition-colors"
+                            title="Review Vendor"
+                          >
+                            <Star className="h-5 w-5" />
+                          </button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -590,6 +628,14 @@ export default function SettlementManagement() {
           </div>
         </div>
       )}
+
+      {/* Vendor-delivery review — opens on settlement completion, re-openable per row */}
+      <VendorDeliveryReviewModal
+        open={!!reviewSettlementId}
+        settlementId={reviewSettlementId}
+        onClose={() => setReviewSettlementId(null)}
+        onSubmitted={fetchSettlements}
+      />
     </div>
   );
 }

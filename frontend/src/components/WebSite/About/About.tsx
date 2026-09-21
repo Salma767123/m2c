@@ -7,6 +7,7 @@ import AboutBanner from '@/components/WebSite/About/AboutBanner';
 import AboutMission from '@/components/WebSite/About/AboutMission';
 import AboutVideo from '@/components/WebSite/About/AboutVideo';
 import AboutStory from '@/components/WebSite/About/AboutStory';
+import Testimonials from '@/components/WebSite/Testimonials/Testimonials';
 
 /**
  * One icon per value, and a different one each time.
@@ -156,6 +157,9 @@ const About = () => {
           </div>
         </div>
       </section> */}
+
+      {/* What customers say — moved here from the homepage. */}
+      <Testimonials />
     </div>
   );
 };

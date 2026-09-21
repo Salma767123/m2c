@@ -111,8 +111,10 @@ function convertShippingToOrderCurrency(inrAmount, currency, rate) {
  * @param {number} args.cartTotalInr  Goods subtotal in INR.
  * @param {boolean} [args.couponGrantsFreeShipping] From the validated coupon.
  */
-async function qualifiesForFreeShipping({ prisma, userId, cartTotalInr, couponGrantsFreeShipping }) {
+async function qualifiesForFreeShipping({ prisma, userId, cartTotalInr, couponGrantsFreeShipping, region }) {
     if (couponGrantsFreeShipping) return true;
+
+    const { isVisibleInRegion } = require('./regionVisibility');
 
     const offers = await prisma.freeShippingOffer.findMany({
         where: { isActive: true },
@@ -126,6 +128,8 @@ async function qualifiesForFreeShipping({ prisma, userId, cartTotalInr, couponGr
     const nextOrderNumber = orderCount + 1;
 
     for (const offer of offers) {
+        // Region gate — an offer only applies on the storefront it targets.
+        if (!isVisibleInRegion(offer.region, region)) continue;
         if (offer.minOrderValue > 0 && cartTotalInr < offer.minOrderValue) continue;
         if (offer.orderNumbers?.length > 0 && !offer.orderNumbers.includes(nextOrderNumber)) continue;
         return true;

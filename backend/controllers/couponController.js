@@ -1,6 +1,7 @@
 const { prisma } = require('../config/database');
 const { evaluateCoupon } = require('../utils/couponPricing');
 const { resolveBase64InValue } = require('../config/cloudinary');
+const { isVisibleInRegion } = require('../utils/regionVisibility');
 
 // Create a new coupon (Admin only)
 const createCoupon = async (req, res) => {
@@ -24,8 +25,14 @@ const createCoupon = async (req, res) => {
             popupTitle,
             popupMessage,
             applicableCategories,
+            applicableProducts,
             isFirstOrder,
+            targetCustomerIds,
         } = req.body;
+        // Normalise the customer-targeting list (24-hex ObjectIds only, deduped).
+        const targetIds = Array.isArray(targetCustomerIds)
+            ? [...new Set(targetCustomerIds.filter((v) => typeof v === 'string' && /^[0-9a-fA-F]{24}$/.test(v)))]
+            : [];
 
         // Check if coupon code already exists
         const existingCoupon = await prisma.coupon.findUnique({
@@ -77,9 +84,27 @@ const createCoupon = async (req, res) => {
                 popupTitle: popupTitle || undefined,
                 popupMessage: popupMessage || undefined,
                 applicableCategories: applicableCategories || [],
+                applicableProducts: applicableProducts || [],
                 isFirstOrder: isFirstOrder || false,
+                targetCustomerIds: targetIds,
             }
         });
+
+        // Notify targeted customers that a coupon is waiting for them.
+        if (targetIds.length > 0) {
+            try {
+                const { createNotification } = require('./notificationController');
+                const pct = coupon.discountType === 'PERCENTAGE' ? `${coupon.discountValue}%` : `₹${coupon.discountValue}`;
+                await Promise.all(targetIds.map((uid) => createNotification({
+                    userId: uid,
+                    role: 'USER',
+                    type: 'COUPON_ASSIGNED',
+                    title: 'You’ve got a coupon! 🎉',
+                    message: `Use code ${coupon.code} for ${pct} off your order.`,
+                    data: { couponCode: coupon.code, couponId: coupon.id },
+                }).catch(() => {})));
+            } catch (e) { console.error('Coupon notify error:', e?.message || e); }
+        }
 
         res.status(201).json({
             success: true,
@@ -290,7 +315,7 @@ const applyCoupon = async (req, res) => {
 // Apply free shipping offer (separate function)
 const applyFreeShippingOffer = async (req, res) => {
     try {
-        const { userId, cartTotal } = req.body;
+        const { userId, cartTotal, region, currency } = req.body;
 
         if (!userId) {
             return res.status(400).json({
@@ -311,6 +336,11 @@ const applyFreeShippingOffer = async (req, res) => {
 
         // Check each offer
         for (const offer of activeOffers) {
+            // Region gate — an offer only applies on the storefront it targets.
+            if (!isVisibleInRegion(offer.region, region || currency)) {
+                continue;
+            }
+
             // Check minimum order value
             if (offer.minOrderValue > 0 && cartTotal < offer.minOrderValue) {
                 continue;
@@ -421,6 +451,36 @@ const getPromotionalCoupons = async (req, res) => {
 // Get the active first-order coupon for the storefront promo strip (Public).
 // Returns the single active, non-expired first-order coupon, or null so the strip
 // hides itself — never hardcoded.
+// Public: active coupons for the storefront's "Coupons & Offers" product filter.
+// Returns only what the filter needs (code + where it applies) — never usage
+// counts, per-user limits or other internal fields.
+const getActiveCoupons = async (req, res) => {
+    try {
+        const now = new Date();
+        const coupons = await prisma.coupon.findMany({
+            where: {
+                isActive: true,
+                startDate: { lte: now },
+                expiryDate: { gt: now },
+            },
+            select: {
+                id: true,
+                code: true,
+                description: true,
+                discountType: true,
+                discountValue: true,
+                applicableCategories: true,
+                applicableProducts: true,
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        res.json({ success: true, data: coupons });
+    } catch (error) {
+        console.error('Get active coupons error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch coupons' });
+    }
+};
+
 const getFirstOrderCoupon = async (req, res) => {
     try {
         const now = new Date();
@@ -471,19 +531,23 @@ function getOrdinalSuffix(n) {
 // ============================================
 
 // Create a new free shipping offer (Admin only)
+const VALID_REGIONS = ['IN_ONLY', 'COM_ONLY', 'BOTH'];
+
 const createFreeShippingOffer = async (req, res) => {
     try {
         const {
             minOrderValue,
             orderNumbers,
-            isActive
+            isActive,
+            region
         } = req.body;
 
         const offer = await prisma.freeShippingOffer.create({
             data: {
                 minOrderValue: minOrderValue || 0,
                 orderNumbers: orderNumbers || [],
-                isActive: isActive !== undefined ? isActive : true
+                isActive: isActive !== undefined ? isActive : true,
+                region: VALID_REGIONS.includes(region) ? region : 'BOTH'
             }
         });
 
@@ -585,6 +649,10 @@ const updateFreeShippingOffer = async (req, res) => {
         delete updateData.id;
         delete updateData.createdAt;
         delete updateData.updatedAt;
+        // Only accept a valid region value if supplied.
+        if (updateData.region !== undefined && !VALID_REGIONS.includes(updateData.region)) {
+            delete updateData.region;
+        }
 
         const offer = await prisma.freeShippingOffer.update({
             where: { id },
@@ -630,7 +698,7 @@ const deleteFreeShippingOffer = async (req, res) => {
 // Check if free shipping applies for a user's order
 const checkFreeShipping = async (req, res) => {
     try {
-        const { userId, cartTotal } = req.body;
+        const { userId, cartTotal, region, currency } = req.body;
 
         if (!userId) {
             return res.status(400).json({
@@ -650,6 +718,11 @@ const checkFreeShipping = async (req, res) => {
 
         // Check each offer
         for (const offer of activeOffers) {
+            // Region gate — an offer only applies on the storefront it targets.
+            if (!isVisibleInRegion(offer.region, region || currency)) {
+                continue;
+            }
+
             // Check minimum order value
             if (offer.minOrderValue > 0 && cartTotal < offer.minOrderValue) {
                 continue;
@@ -749,9 +822,139 @@ const getPopupCoupons = async (req, res) => {
     }
 };
 
+// Coupon analytics report (Admin only). Returns, per coupon, its metadata plus
+// usage derived from Orders that carry its code: overall redemptions, unique
+// customers, total discount given (INR-normalised so mixed-currency orders add
+// up), first/last use, a per-date usage+discount breakdown, and the redemption
+// detail list. The frontend turns this into a multi-sheet .xlsx download.
+const getCouponReport = async (req, res) => {
+    try {
+        const now = new Date();
+
+        // All coupons, plus every order that ever carried a coupon code. Orders
+        // reference a coupon by CODE (not id), so we group on the code below.
+        const [coupons, orders] = await Promise.all([
+            prisma.coupon.findMany({ orderBy: { createdAt: 'desc' } }),
+            prisma.order.findMany({
+                where: { couponCode: { not: null } },
+                select: {
+                    orderId: true,
+                    couponCode: true,
+                    discount: true,
+                    discountINR: true,
+                    currency: true,
+                    totalAmount: true,
+                    totalAmountINR: true,
+                    customerId: true,
+                    customerName: true,
+                    customerEmail: true,
+                    status: true,
+                    createdAt: true,
+                },
+                orderBy: { createdAt: 'asc' },
+            }),
+        ]);
+
+        // Bucket orders by the coupon code they used.
+        const ordersByCode = new Map();
+        for (const o of orders) {
+            const code = o.couponCode;
+            if (!code) continue;
+            if (!ordersByCode.has(code)) ordersByCode.set(code, []);
+            ordersByCode.get(code).push(o);
+        }
+
+        const ymd = (d) => new Date(d).toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+
+        const report = coupons.map((c) => {
+            const used = ordersByCode.get(c.code) || [];
+            const isExpired = new Date(c.expiryDate) < now;
+            const status = isExpired ? 'Expired' : (c.isActive ? 'Active' : 'Inactive');
+
+            // Per-date rollup: redemptions + INR discount given that day.
+            const byDateMap = new Map();
+            const customerSet = new Set();
+            let totalDiscountINR = 0;
+            const redemptions = used.map((o) => {
+                const dISO = o.discountINR != null ? o.discountINR : (o.discount || 0);
+                totalDiscountINR += dISO;
+                if (o.customerId) customerSet.add(o.customerId);
+                const day = ymd(o.createdAt);
+                const bucket = byDateMap.get(day) || { date: day, redemptions: 0, discountINR: 0 };
+                bucket.redemptions += 1;
+                bucket.discountINR += dISO;
+                byDateMap.set(day, bucket);
+                return {
+                    orderId: o.orderId,
+                    date: o.createdAt,
+                    customerName: o.customerName,
+                    customerEmail: o.customerEmail,
+                    currency: o.currency,
+                    discount: o.discount || 0,
+                    discountINR: dISO,
+                    orderTotal: o.totalAmount || 0,
+                    orderTotalINR: o.totalAmountINR != null ? o.totalAmountINR : (o.totalAmount || 0),
+                    orderStatus: o.status,
+                };
+            });
+
+            const byDate = Array.from(byDateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+            return {
+                id: c.id,
+                code: c.code,
+                description: c.description || '',
+                discountType: c.discountType,
+                discountValue: c.discountValue,
+                minPurchaseAmount: c.minPurchaseAmount || 0,
+                maxDiscountAmount: c.maxDiscountAmount ?? null,
+                startDate: c.startDate,
+                expiryDate: c.expiryDate,
+                usageLimit: c.usageLimit ?? null,
+                usedCount: c.usedCount || 0,
+                perUserLimit: c.perUserLimit ?? null,
+                isActive: c.isActive,
+                isFirstOrder: c.isFirstOrder,
+                freeShipping: c.freeShipping,
+                status,
+                createdAt: c.createdAt,
+                updatedAt: c.updatedAt,
+                // Derived usage
+                redemptionsCount: used.length,
+                uniqueCustomers: customerSet.size,
+                totalDiscountINR: Math.round(totalDiscountINR * 100) / 100,
+                firstUsedAt: used.length ? used[0].createdAt : null,
+                lastUsedAt: used.length ? used[used.length - 1].createdAt : null,
+                byDate,
+                redemptions,
+            };
+        });
+
+        res.json({
+            success: true,
+            data: {
+                generatedAt: now.toISOString(),
+                totals: {
+                    coupons: coupons.length,
+                    active: report.filter((r) => r.status === 'Active').length,
+                    inactive: report.filter((r) => r.status === 'Inactive').length,
+                    expired: report.filter((r) => r.status === 'Expired').length,
+                    totalRedemptions: report.reduce((s, r) => s + r.redemptionsCount, 0),
+                    totalDiscountINR: Math.round(report.reduce((s, r) => s + r.totalDiscountINR, 0) * 100) / 100,
+                },
+                coupons: report,
+            },
+        });
+    } catch (error) {
+        console.error('Get coupon report error:', error);
+        res.status(500).json({ success: false, message: 'Failed to generate coupon report' });
+    }
+};
+
 module.exports = {
     createCoupon,
     getCoupons,
+    getCouponReport,
     getCoupon,
     updateCoupon,
     deleteCoupon,
@@ -759,6 +962,7 @@ module.exports = {
     applyFreeShippingOffer,
     getPromotionalCoupons,
     getFirstOrderCoupon,
+    getActiveCoupons,
     getPopupCoupons,
     // Free shipping offer functions
     createFreeShippingOffer,

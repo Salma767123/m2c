@@ -12,6 +12,10 @@ export interface CartItem {
   transportType?: 'AIR' | 'SHIP' | null;
   /** Courier partner id (see lib/couriers) chosen for this line. */
   courier?: string | null;
+  /** True when this line is a free gift from a "Buy A get B free" offer (price 0). */
+  isFreeGift?: boolean;
+  /** The offer that granted this free-gift line. */
+  giftOfferId?: string | null;
   product?: {
     id: string;
     name: string;
@@ -51,12 +55,30 @@ export interface CartItem {
   };
 }
 
+/** A free gift the customer must choose (offer's free set has multiple products/variants). */
+export interface PendingGift {
+  offerId: string;
+  offerTitle: string;
+  getQty: number;
+  freeScope?: 'PRODUCT' | 'CATEGORY' | null;
+  options: {
+    productId: string;
+    name: string;
+    image: string | null;
+    variants: { id: string; size?: string; color?: string; colorHex?: string; stock: number }[];
+  }[];
+}
+
 export interface CartResponse {
   success: boolean;
   data?: {
     items: CartItem[];
     total: number;
     itemCount: number;
+    /** Free gifts awaiting the customer's choice (chooser modal). */
+    pendingGifts?: PendingGift[];
+    /** Chooser data for every choosable gift offer (chosen or not) — powers "Change gift". */
+    giftOptions?: PendingGift[];
   };
   message?: string;
   error?: string;
@@ -98,6 +120,18 @@ class CartService {
     }
   }
 
+  /** Choose a free gift (for a "Buy A get B free" offer whose free set has options). */
+  async addFreeGift(offerId: string, productId: string, variantId?: string): Promise<CartResponse> {
+    try {
+      const response = await axios.post('/cart/gift', { offerId, productId, variantId }, { params: { region: getRegion() } });
+      const result: CartResponse = response.data;
+      if (result.success && result.data) this._notify(result.data.itemCount);
+      return result;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to add free gift');
+    }
+  }
+
   // Get cart items
   async getCart(): Promise<CartResponse> {
     try {
@@ -126,7 +160,10 @@ class CartService {
   /** Set the shipping mode and courier for one cart line. */
   async setShipping(itemId: string, transportType: 'AIR' | 'SHIP', courier: string): Promise<CartResponse> {
     try {
-      const response = await axios.put(`/cart/${itemId}`, { transportType, courier });
+      // Send the active storefront currency so the server validates the courier
+      // against the region the shopper is actually in (and re-aligns a line that
+      // was added in another region), not the currency frozen on the line.
+      const response = await axios.put(`/cart/${itemId}`, { transportType, courier, currency: getCurrency() });
       return response.data;
     } catch (error: any) {
       throw new Error(error?.response?.data?.error || error.message || 'Failed to set shipping method');
@@ -228,7 +265,7 @@ class CartService {
   // Check free shipping eligibility
   async checkFreeShipping(userId: string, cartTotal: number): Promise<{ success: boolean; data?: any; message?: string }> {
     try {
-      const response = await axios.post('/coupons/check-free-shipping', { userId, cartTotal });
+      const response = await axios.post('/coupons/check-free-shipping', { userId, cartTotal, region: getRegion() });
       return response.data;
     } catch (error: any) {
       console.warn('Free shipping check failed:', error);

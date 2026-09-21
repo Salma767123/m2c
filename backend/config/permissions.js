@@ -98,6 +98,24 @@ const PERMISSION_MODULES = [
                 ],
             },
             {
+                key: 'returns',
+                name: 'Returns & Replacements',
+                description: 'Customer return, refund and replacement requests',
+                actions: { view: true, create: false, edit: false, delete: false },
+                extra: [
+                    { key: 'manage', label: 'Approve / Reject / Process', description: 'Approve, reject and progress return, refund and replacement requests' },
+                ],
+            },
+            {
+                key: 'wallet',
+                name: 'Customer Wallets',
+                description: 'Customer store-credit wallet balances and history',
+                actions: { view: true, create: false, edit: false, delete: false },
+                extra: [
+                    { key: 'adjust', label: 'Adjust Balance', description: 'Manually credit or debit a customer wallet (with a reason)' },
+                ],
+            },
+            {
                 key: 'invoices',
                 name: 'Invoices',
                 description: 'Customer invoices',

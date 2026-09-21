@@ -6,6 +6,8 @@ export interface SavedAddress {
   id: string;
   userId?: string;
   type: AddressType;
+  /** Office/company name (work) or a custom label (other). Empty for home. */
+  typeLabel?: string;
   name: string;
   phone: string;
   phone2?: string;
@@ -25,6 +27,7 @@ export interface SavedAddress {
 
 export interface AddressPayload {
   type: AddressType;
+  typeLabel?: string;
   name: string;
   phone: string;
   phone2?: string;

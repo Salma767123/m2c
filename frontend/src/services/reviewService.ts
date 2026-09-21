@@ -54,6 +54,73 @@ export interface AdminReviewsResponse {
     };
 }
 
+export interface ExperienceReviewData {
+    orderId: string;
+    rating: number;
+    comment: string;
+    images: string[];
+}
+
+export interface OrderReviewEligibility {
+    products: { productId: string; reviewed: boolean }[];
+    experienceReviewed: boolean;
+}
+
+export interface PublicExperienceReview {
+    id: string;
+    rating: number;
+    comment: string | null;
+    createdAt: string;
+    user: { name: string; image: string | null; country: string | null } | null;
+}
+
+export interface PublicExperienceReviewsResponse {
+    success: boolean;
+    data: PublicExperienceReview[];
+    summary: { average: number; count: number };
+}
+
+export interface AdminExperienceReview {
+    id: string;
+    userId: string;
+    orderId: string;
+    rating: number;
+    comment: string | null;
+    images: string[];
+    isApproved: boolean;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    createdAt: string;
+    updatedAt: string;
+    user: {
+        id: string;
+        name: string;
+        email: string;
+        image: string | null;
+    };
+    order: {
+        id: string;
+        orderId: string;
+    };
+}
+
+export interface AdminExperienceReviewsResponse {
+    success: boolean;
+    data: AdminExperienceReview[];
+    pagination: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+    stats: {
+        total: number;
+        pending: number;
+        approved: number;
+        rejected: number;
+        averageRating: number;
+    };
+}
+
 class ReviewService {
     async submitReview(data: ReviewData) {
         try {
@@ -64,7 +131,7 @@ class ReviewService {
         }
     }
 
-    async checkReviewStatus(productId: string, orderId: string) {
+    async checkReviewStatus(productId: string, orderId?: string) {
         try {
             const response = await axios.get(`/reviews/check-status`, {
                 params: { productId, orderId }
@@ -72,6 +139,37 @@ class ReviewService {
             return response.data;
         } catch (error: any) {
             return { success: false, hasReviewed: false };
+        }
+    }
+
+    // Which products in an order can still be reviewed, and whether purchase
+    // experience feedback has already been given for it.
+    async getOrderReviewEligibility(orderId: string): Promise<{ success: boolean; data?: OrderReviewEligibility }> {
+        try {
+            const response = await axios.get(`/reviews/order-eligibility`, { params: { orderId } });
+            return response.data;
+        } catch (error: any) {
+            return { success: false };
+        }
+    }
+
+    // Approved purchase-experience feedback for the storefront testimonials strip.
+    // Returns empty data on any error so the homepage section just hides itself.
+    async getPublicExperienceReviews(limit = 12): Promise<PublicExperienceReviewsResponse> {
+        try {
+            const response = await axios.get('/reviews/experience/public', { params: { limit }, timeout: 5000 });
+            return response.data;
+        } catch {
+            return { success: false, data: [], summary: { average: 0, count: 0 } };
+        }
+    }
+
+    async submitExperienceReview(data: ExperienceReviewData) {
+        try {
+            const response = await axios.post('/reviews/experience', data);
+            return response.data;
+        } catch (error: any) {
+            throw error.data || error;
         }
     }
 
@@ -114,6 +212,40 @@ class ReviewService {
     async deleteReview(reviewId: string) {
         try {
             const response = await axios.delete(`/reviews/${reviewId}`);
+            return response.data;
+        } catch (error: any) {
+            throw error.data || error;
+        }
+    }
+
+    // ---- Admin: purchase-experience feedback ----
+
+    async getAdminExperienceReviews(params?: {
+        search?: string;
+        status?: string;
+        page?: number;
+        limit?: number;
+    }): Promise<AdminExperienceReviewsResponse> {
+        try {
+            const response = await axios.get('/reviews/admin/experience/all', { params });
+            return response.data;
+        } catch (error: any) {
+            throw error.data || error;
+        }
+    }
+
+    async updateExperienceReviewStatus(reviewId: string, isApproved: boolean) {
+        try {
+            const response = await axios.patch(`/reviews/experience/${reviewId}/status`, { isApproved });
+            return response.data;
+        } catch (error: any) {
+            throw error.data || error;
+        }
+    }
+
+    async deleteExperienceReview(reviewId: string) {
+        try {
+            const response = await axios.delete(`/reviews/experience/${reviewId}`);
             return response.data;
         } catch (error: any) {
             throw error.data || error;

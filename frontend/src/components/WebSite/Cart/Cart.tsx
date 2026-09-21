@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { cartService } from "@/services/cartService"
+import { useRouter } from "next/navigation"
+import orderService from "@/services/orderService"
+import { cartService, type PendingGift } from "@/services/cartService"
 import { wishlistService } from "@/services/wishlistService"
 import { couponService } from "@/services/couponService"
 import { publicProductService, PublicProduct } from "@/services/publicProductService"
@@ -11,10 +13,15 @@ import { getRecentSearches, getRecentlyViewed } from "@/lib/browsingHistory"
 import { userAuthService } from "@/services/userAuthService"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, getCurrency, getRegion, convertINRtoUSD } from "@/lib/currency"
+import { isIntrastate, gstRateRows } from "@/lib/gst"
+import { companyInfoService } from "@/services/companyInfoService"
+import addressService from "@/services/addressService"
 import { applyOfferToPrice, type ActiveOffer } from "@/lib/offers"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
 import { courierName } from "@/lib/couriers"
+import { courierService } from "@/services/courierService"
 import Reveal from "@/components/WebSite/Shared/Reveal"
+import OfferCelebration from "@/components/WebSite/Shared/OfferCelebration"
 import ProductCard from "@/components/WebSite/ProductCard/ProductCard"
 import {
   ShoppingCart,
@@ -37,6 +44,9 @@ import {
   CheckCircle,
   Sparkles,
   TrendingUp,
+  Gift,
+  RefreshCw,
+  BadgePercent,
 } from "lucide-react"
 
 /**
@@ -201,6 +211,9 @@ interface OrderItem {
   /** Automatic offer applied to this line + the pre-offer price to strike through. */
   activeOffer?: ActiveOffer
   offerStrikePrice?: number
+  /** Free-gift line from a "Buy A get B free" offer (price 0, fixed qty). */
+  isFreeGift?: boolean
+  giftOfferId?: string | null
   images: string[]
   category: string
   rating?: number
@@ -232,12 +245,153 @@ interface OrderSummary {
   total: number
 }
 
+/** Modal that lets the customer pick their free gift when the offer's free set has
+ *  multiple products (or a product with variants). */
+function GiftChooserModal({ gift, initialProductId, busy, onClose, onChoose }: {
+  gift: PendingGift
+  initialProductId?: string
+  busy: boolean
+  onClose: () => void
+  onChoose: (productId: string, variantId?: string) => void
+}) {
+  const [productId, setProductId] = useState(
+    (initialProductId && gift.options.some((o) => o.productId === initialProductId) ? initialProductId : gift.options[0]?.productId) || ''
+  )
+  const [variantId, setVariantId] = useState('')
+  const selected = gift.options.find((o) => o.productId === productId)
+  const needsVariant = (selected?.variants?.length || 0) > 0
+  const canAdd = !!productId && (!needsVariant || !!variantId)
+  return (
+    <div className="fixed inset-0 z-[65] flex items-center justify-center bg-[#2f1e1a]/60 p-4 backdrop-blur-[3px]" onClick={onClose}>
+      <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 flex items-center justify-between border-b border-[#f2eae1] bg-white px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Gift className="h-5 w-5 text-[#157f4a]" />
+            <h3 className="text-base font-bold text-[#1a1a1a]">Choose your free gift</h3>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="p-1 text-[#8a807a] hover:text-[#1a1a1a]"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="px-5 py-4">
+          <p className="mb-3 text-[13px] text-[#7a5a52]">{gift.offerTitle} — pick your free item.</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {gift.options.map((o) => {
+              const on = o.productId === productId
+              return (
+                <button
+                  key={o.productId}
+                  type="button"
+                  onClick={() => { setProductId(o.productId); setVariantId('') }}
+                  className={`rounded-xl border p-2 text-left transition-all ${on ? 'border-[#157f4a] ring-2 ring-[#157f4a]/30' : 'border-[#eee4db] hover:border-[#157f4a]/40'}`}
+                >
+                  <div className="aspect-square w-full overflow-hidden rounded-lg bg-[#f6f1ea]">
+                    {o.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={o.image} alt={o.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center"><Package className="h-6 w-6 text-[#c9aeab]" /></div>
+                    )}
+                  </div>
+                  <p className="mt-1.5 line-clamp-2 text-[12px] font-medium text-[#1a1a1a]">{o.name}</p>
+                </button>
+              )
+            })}
+          </div>
+          {needsVariant && (
+            <div className="mt-4">
+              <p className="mb-1.5 text-[13px] font-semibold text-[#1a1a1a]">Choose an option</p>
+              <div className="flex flex-wrap gap-2">
+                {selected!.variants.map((v) => {
+                  const on = v.id === variantId
+                  const oos = (v.stock ?? 0) <= 0
+                  const label = [v.size, v.color].filter(Boolean).join(' / ') || 'Option'
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      disabled={oos}
+                      onClick={() => setVariantId(v.id)}
+                      className={`rounded-full border px-3 py-1 text-xs transition-colors ${on ? 'border-[#157f4a] bg-[#157f4a] text-white' : 'border-[#ddd] text-[#555] hover:border-[#157f4a]/50'} ${oos ? 'cursor-not-allowed line-through opacity-40' : ''}`}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[#f2eae1] bg-white px-5 py-4">
+          <button onClick={onClose} className="rounded-full px-4 py-2 text-sm text-[#8a807a] hover:text-[#1a1a1a]">Cancel</button>
+          <button
+            disabled={!canAdd || busy}
+            onClick={() => onChoose(productId, needsVariant ? variantId : undefined)}
+            className="rounded-full bg-[#157f4a] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#116b3e] disabled:opacity-50"
+          >
+            {busy ? 'Adding…' : 'Add free gift'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Order() {
+  const router = useRouter()
   const [cartItems, setCartItems] = useState<OrderItem[]>([])
+  // Free gifts awaiting the customer's choice, the chooser data for changing a chosen
+  // gift, and the descriptor currently open in the chooser modal.
+  const [pendingGifts, setPendingGifts] = useState<PendingGift[]>([])
+  const [giftOptions, setGiftOptions] = useState<PendingGift[]>([])
+  const [giftChooser, setGiftChooser] = useState<PendingGift | null>(null)
+  const [giftInitialProduct, setGiftInitialProduct] = useState<string | undefined>(undefined)
+  const [addingGift, setAddingGift] = useState(false)
   const [isHydrated, setIsHydrated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  // GST place-of-supply inputs: SUPPLIER = company registered state, PLACE OF
+  // SUPPLY = the customer's default saved address state. Used only on `.in` to
+  // split the tax into CGST+SGST / IGST; falls back to a combined "Tax (GST)"
+  // row until both are known.
+  const [gstSupplier, setGstSupplier] = useState<{ state: string | null; country: string | null }>({ state: null, country: null })
+  const [gstCustomer, setGstCustomer] = useState<{ state: string | null; country: string | null }>({ state: null, country: null })
+  useEffect(() => {
+    if (getRegion() !== 'IN') return
+    companyInfoService.getPublicCompanyInfo()
+      .then((ci) => setGstSupplier({ state: ci?.state ?? null, country: ci?.country ?? null }))
+      .catch(() => { /* keep fallback */ })
+  }, [])
+  useEffect(() => {
+    if (getRegion() !== 'IN' || !isAuthenticated) return
+    addressService.list()
+      .then((list) => {
+        const def = list.find((a) => a.isDefault) || list[0]
+        if (def) setGstCustomer({ state: def.state ?? null, country: (def as any).country ?? null })
+      })
+      .catch(() => { /* keep fallback */ })
+  }, [isAuthenticated])
+  // Blocks the "Proceed to Checkout" click while the server re-validates the cart
+  // (courier availability, shipping method, stock) so an invalid-but-selected
+  // courier is caught HERE instead of after payment on the checkout page.
+  const [validatingCheckout, setValidatingCheckout] = useState(false)
+
+  const handleProceedToCheckout = async () => {
+    try {
+      setValidatingCheckout(true)
+      await orderService.validateCheckout(getCurrency())
+      router.push("/checkout")
+    } catch (err: any) {
+      showErrorToast('Cannot proceed to checkout', err?.message || 'Please review the shipping and courier for your items.')
+    } finally {
+      setValidatingCheckout(false)
+    }
+  }
   const [similarProducts, setSimilarProducts] = useState<PublicProduct[]>([])
+  // Prime the admin-managed courier catalogue so courierName() resolves the DB
+  // courier ids stored on cart lines to their display names (else it prints the id).
+  const [, setCourierTick] = useState(0)
+  useEffect(() => {
+    courierService.getActiveCouriers().then(() => setCourierTick((t) => t + 1)).catch(() => {})
+  }, [])
 
   // Empty-cart discovery rails.
   const [suggested, setSuggested] = useState<PublicProduct[]>([])
@@ -262,11 +416,22 @@ export default function Order() {
   useEffect(() => {
     if (cartItems.length === 0) { setSimilarProducts([]); return }
     let cancelled = false
+    const TARGET = 6
     const run = async () => {
       const cats = Array.from(new Set(cartItems.map((i) => i.category).filter(Boolean))) as string[]
       const inCart = new Set(cartItems.map((i) => i.productId))
+      const seen = new Set<string>()
+      const list: PublicProduct[] = []
+      // Collect distinct, not-in-cart products up to TARGET.
+      const addFrom = (items: PublicProduct[]) => {
+        for (const p of items) {
+          if (list.length >= TARGET) break
+          if (!p || inCart.has(p.id) || seen.has(p.id)) continue
+          seen.add(p.id)
+          list.push(p)
+        }
+      }
       try {
-        let pool: PublicProduct[] = []
         if (cats.length) {
           const results = await Promise.all(
             cats.slice(0, 4).map((c) =>
@@ -276,19 +441,15 @@ export default function Order() {
                 .catch(() => [] as PublicProduct[]),
             ),
           )
-          pool = results.flat()
+          results.forEach(addFrom)
         }
-        // Fallback so the rail isn't empty when categories are sparse.
-        if (pool.length === 0) {
-          const r = await publicProductService.getProducts({ limit: 8, sortBy: 'createdAt', sortOrder: 'desc' })
-          pool = r.success && r.data ? r.data.items : []
+        // Top up from recent products whenever the category pool didn't fill the
+        // rail — including the common case where the cart's category contains only
+        // the cart item itself (so every category result gets filtered out).
+        if (list.length < TARGET) {
+          const r = await publicProductService.getProducts({ limit: 12, sortBy: 'createdAt', sortOrder: 'desc' })
+          if (r.success && r.data) addFrom(r.data.items)
         }
-        const seen = new Set<string>()
-        const list = pool.filter((p) => {
-          if (inCart.has(p.id) || seen.has(p.id)) return false
-          seen.add(p.id)
-          return true
-        }).slice(0, 6)
         if (!cancelled) setSimilarProducts(list)
       } catch {
         if (!cancelled) setSimilarProducts([])
@@ -468,17 +629,25 @@ export default function Order() {
               // Automatic offer (attached by the backend). Bake it into `price` so the
               // subtotal, tax and coupon math all use exactly what checkout will charge.
               const activeOffer: ActiveOffer | undefined = item.product?.activeOffer;
-              const effectivePrice = activeOffer
-                ? applyOfferToPrice(livePrice, activeOffer, getCurrency(), item.quantity, convertINRtoUSD)
-                : livePrice;
-              const offerStrikePrice = activeOffer && effectivePrice < livePrice ? livePrice : undefined;
+              const isFreeGift = !!item.isFreeGift;
+              const effectivePrice = isFreeGift
+                ? 0
+                : activeOffer
+                  ? applyOfferToPrice(livePrice, activeOffer, getCurrency(), item.quantity, convertINRtoUSD)
+                  : livePrice;
+              // Gift line: strike the normal price so the shopper sees the value they got free.
+              const offerStrikePrice = isFreeGift
+                ? livePrice
+                : (activeOffer && effectivePrice < livePrice ? livePrice : undefined);
 
               return {
                 id: item.id,
                 productId: item.productId,
                 name: item.product?.name || 'Unknown Product',
                 price: effectivePrice,
-                originalPrice: liveOriginalPrice ?? undefined,
+                originalPrice: isFreeGift ? livePrice : (liveOriginalPrice ?? undefined),
+                isFreeGift,
+                giftOfferId: item.giftOfferId ?? null,
                 activeOffer,
                 offerStrikePrice,
                 images: imgArray,
@@ -509,6 +678,8 @@ export default function Order() {
               }
             })
             setCartItems(items)
+            setPendingGifts(response.data.pendingGifts || [])
+            setGiftOptions(response.data.giftOptions || [])
           }
         }
       } catch (error) {
@@ -522,6 +693,25 @@ export default function Order() {
   }, [])
 
   useEffect(() => { loadCart() }, [loadCart])
+
+  // Claim a chosen free gift, then refresh so the gift line + celebration appear.
+  const chooseGift = async (offerId: string, productId: string, variantId?: string) => {
+    setAddingGift(true)
+    try {
+      const res = await cartService.addFreeGift(offerId, productId, variantId)
+      if (res.success) {
+        setGiftChooser(null)
+        await loadCart(true)
+        showSuccessToast('Free gift added', 'Enjoy your free item!')
+      } else {
+        showErrorToast('Could not add gift', res.error || res.message || 'Please try again')
+      }
+    } catch (e) {
+      showErrorToast('Could not add gift', e instanceof Error ? e.message : 'Please try again')
+    } finally {
+      setAddingGift(false)
+    }
+  }
 
   // Refresh when the cart changes elsewhere (e.g. adding a similar product below).
   // Self-triggered events are ignored — those already update state optimistically.
@@ -541,6 +731,102 @@ export default function Order() {
   const [discountAmount, setDiscountAmount] = useState(0)
   const [freeShippingApplied, setFreeShippingApplied] = useState(false)
   const [freeShippingMessage, setFreeShippingMessage] = useState("")
+
+  // Automatic-offer celebration: a gift-box popup for BOGO, a coin "you saved ₹X"
+  // popup for any other applied offer. Fires on every cart visit and names the offer.
+  const [offerCelebration, setOfferCelebration] = useState<
+    | { kind: 'bogo'; freeUnits: number; dealLabel: string; offerTitle: string; offerDescription: string }
+    | { kind: 'savings'; amount: number; offerTitle: string; offerDescription: string }
+    | null
+  >(null)
+  const offerCelebratedRef = useRef(false)
+
+  // What did the automatic offers earn on this cart? Free units + deepest deal for
+  // BOGO, and total rupee saving vs the pre-offer price for everything else.
+  const offerAgg = useMemo(() => {
+    let freeUnits = 0
+    let savings = 0
+    let bogoLabel = ''
+    // The named offer that drives the celebration — the BOGO deal's offer if one
+    // is unlocked, else the offer on the line that saved the most money — so the
+    // popup can say exactly which offer was applied and what it is.
+    let bogoOffer: { title?: string; description?: string | null } | null = null
+    let bestSavingOffer: { title?: string; description?: string | null } | null = null
+    let bestSaving = 0
+    for (const it of cartItems) {
+      // Free-gift lines have no activeOffer — celebrate them as a gift-box freebie.
+      if (it.isFreeGift) {
+        const strike = it.offerStrikePrice && it.offerStrikePrice > it.price ? it.offerStrikePrice : 0
+        if (strike) {
+          savings += (strike - it.price) * it.quantity
+          freeUnits += it.quantity
+          if (!bogoLabel) bogoLabel = 'Free gift unlocked'
+          if (!bogoOffer) bogoOffer = { title: it.name, description: 'Added to your cart free' }
+        }
+        continue
+      }
+      const ao = it.activeOffer
+      if (!ao) continue
+      if (ao.type === 'BOGO' && ao.bogoMode !== 'CROSS') {
+        const buy = Math.max(1, ao.minQty || 1)
+        const free = Math.max(0, ao.getQty || 0)
+        const group = buy + free
+        const fu = group > 0 && it.quantity >= group ? free : 0
+        if (fu > 0) {
+          freeUnits += fu
+          if (!bogoLabel) bogoLabel = `Buy ${buy} Get ${free} Free`
+          if (!bogoOffer) bogoOffer = { title: ao.title, description: ao.description }
+        }
+      }
+      const strike = it.offerStrikePrice && it.offerStrikePrice > it.price ? it.offerStrikePrice : 0
+      if (strike) {
+        const lineSaving = (strike - it.price) * it.quantity
+        savings += lineSaving
+        // Cross-product BOGO free line: each free unit saves its full price, so
+        // freeUnits ≈ lineSaving / unit list price. Celebrate it as a freebie.
+        if (ao.type === 'BOGO' && ao.bogoMode === 'CROSS') {
+          const fu = Math.round(lineSaving / strike)
+          if (fu > 0) {
+            freeUnits += fu
+            if (!bogoLabel) bogoLabel = ao.title || 'Free item'
+            if (!bogoOffer) bogoOffer = { title: ao.title, description: ao.description }
+          }
+        }
+        if (lineSaving > bestSaving) {
+          bestSaving = lineSaving
+          bestSavingOffer = { title: ao.title, description: ao.description }
+        }
+      }
+    }
+    const offer = freeUnits > 0 ? bogoOffer : bestSavingOffer
+    return {
+      freeUnits,
+      savings: Math.round(savings * 100) / 100,
+      bogoLabel,
+      offerTitle: offer?.title || '',
+      offerDescription: offer?.description || '',
+    }
+  }, [cartItems])
+
+  // Trigger the celebration once, shortly after the cart has settled, so it lands
+  // as a reward on arrival rather than fighting the page paint. Deferred via a timer
+  // so we never setState synchronously inside the effect.
+  useEffect(() => {
+    if (loading || offerCelebratedRef.current) return
+    if (offerAgg.freeUnits <= 0 && offerAgg.savings <= 0) return
+    // Fire on every visit to the page (once per mount — the ref just stops it
+    // double-firing while this mount is alive). No sessionStorage guard, so the
+    // reward pops again each time the shopper opens the cart, as requested.
+    offerCelebratedRef.current = true
+    const t = setTimeout(() => {
+      setOfferCelebration(
+        offerAgg.freeUnits > 0
+          ? { kind: 'bogo', freeUnits: offerAgg.freeUnits, dealLabel: offerAgg.bogoLabel, offerTitle: offerAgg.offerTitle, offerDescription: offerAgg.offerDescription }
+          : { kind: 'savings', amount: offerAgg.savings, offerTitle: offerAgg.offerTitle, offerDescription: offerAgg.offerDescription }
+      )
+    }, 600)
+    return () => clearTimeout(t)
+  }, [loading, offerAgg, cartItems])
 
   useEffect(() => {
     const savedCoupon = localStorage.getItem('appliedCoupon')
@@ -826,11 +1112,20 @@ export default function Order() {
       : (getCurrency() === 'USD' ? convertINRtoUSD(logisticsShippingInr) : logisticsShippingInr)
     const discount = discountAmount
 
-    // Calculate tax based on individual product GST percentages
-    const tax = cartItems.reduce((sum, item) => {
-      const itemSubtotal = item.price * item.quantity
+    // GST is charged on the POST-coupon net, per each product's own rate. A coupon
+    // reduces the taxable value (it's an invoice-recorded, pre-supply discount), so
+    // we allocate it across lines in proportion to their value and tax each net.
+    // This mirrors the server (orderController) exactly, so the quoted tax equals
+    // the charged tax. Product discounts / automatic offers are already inside
+    // item.price, so they are taxed net too.
+    // Tax/GST applies ONLY on the `.in` storefront. On `.com` and every other
+    // region tax is 0 (mirrors the server, which gates on the order currency).
+    const tax = getRegion() !== 'IN' ? 0 : cartItems.reduce((sum, item) => {
+      const gross = item.price * item.quantity
+      const couponShare = subtotal > 0 ? (gross / subtotal) * discount : 0
+      const net = Math.max(0, gross - couponShare)
       const gstRate = item.gstPercentage ? item.gstPercentage / 100 : 0
-      return sum + (itemSubtotal * gstRate)
+      return sum + (net * gstRate)
     }, 0)
 
     const total = subtotal + shipping + tax - discount
@@ -839,6 +1134,44 @@ export default function Order() {
   }
 
   const summary = calculateSummary()
+
+  // GST breakup rows for the cart summary (IN only). Split when both the company
+  // state and the customer's default address state are known; otherwise show a
+  // single "Tax (GST)" row (place of supply is finalised at checkout).
+  const gstLines = (() => {
+    if (getRegion() !== 'IN' || summary.tax <= 0) return []
+    const lines = cartItems.map((i) => {
+      const gross = i.price * i.quantity
+      const couponShare = summary.subtotal > 0 ? (gross / summary.subtotal) * summary.discount : 0
+      return { net: Math.max(0, gross - couponShare), rate: i.gstPercentage || 0 }
+    })
+    const mode = (!gstSupplier.state || !gstCustomer.state)
+      ? 'COMBINED' as const
+      : (isIntrastate(gstSupplier.state, gstCustomer.state, gstSupplier.country, gstCustomer.country) ? 'INTRASTATE' as const : 'INTERSTATE' as const)
+    return gstRateRows(lines, mode)
+  })()
+
+  // Rich, reconcilable savings breakdown for the Order Summary. Each line bridges
+  // one step of the price ladder so the numbers add up top-to-bottom:
+  //   Items subtotal (MRP)
+  //     − Product discount   → after product-level % off
+  //     − Offer discount     → after automatic offers (baked into item.price)
+  //   = Taxable amount (the base GST is actually computed on)
+  //     + Tax (GST) + Delivery − Coupon
+  //   = Total payable
+  // Product-level maths stay on each cart item; here we only show the aggregate.
+  const round2 = (n: number) => Math.round(n * 100) / 100
+  const listSubtotal = cartItems.reduce((s, it) => {
+    const list = Math.max(it.originalPrice ?? 0, it.offerStrikePrice ?? 0, it.price)
+    return s + list * it.quantity
+  }, 0)
+  const preOfferSubtotal = cartItems.reduce(
+    (s, it) => s + (it.offerStrikePrice ?? it.price) * it.quantity, 0,
+  )
+  const productDiscount = Math.max(0, round2(listSubtotal - preOfferSubtotal))
+  const offerDiscount = Math.max(0, round2(preOfferSubtotal - summary.subtotal))
+  const couponDiscount = summary.discount
+  const totalSavings = round2(productDiscount + offerDiscount + couponDiscount)
 
   return (
     <div className="min-h-screen bg-[#f9f5f2] py-4 sm:py-6 lg:py-8 font-sans">
@@ -996,6 +1329,29 @@ export default function Order() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
           {/* Cart Items — Order-page style: each item its own card with gaps between */}
           <div className="lg:col-span-2">
+            {/* Free gift to claim — the buy condition is met but the free set has options,
+                so the customer chooses which gift they want. */}
+            {pendingGifts.map((pg) => (
+              <div key={pg.offerId} className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#f3d9a0] bg-linear-to-r from-[#fff9ec] to-[#fdf3f0] p-4 shadow-[0_1px_2px_rgba(90,60,40,0.05)]">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#157f4a] text-white">
+                  <Gift className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-[#1a1a1a]">You&apos;ve unlocked a free gift! 🎉</p>
+                  <p className="text-[13px] text-[#7a5a52]">
+                    {pg.offerTitle} — choose your free item{pg.getQty > 1 ? ` (×${pg.getQty})` : ''}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setGiftInitialProduct(undefined); setGiftChooser(pg) }}
+                  className="shrink-0 rounded-full bg-[#157f4a] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#116b3e]"
+                >
+                  Choose free gift
+                </button>
+              </div>
+            ))}
+
             {/* One panel, rows divided by a hairline. It was a card per
                 item -- eight floating boxes each with its own ring, shadow
                 and gap, which made a six-line cart read as six separate
@@ -1006,18 +1362,42 @@ export default function Order() {
               <div className="overflow-hidden rounded-2xl bg-white shadow-[0_1px_2px_rgba(90,60,40,0.05)] ring-1 ring-[#efe6df]">
                 <ul className="divide-y divide-[#f2eae1]">
                   {cartItems.map((item) => {
-                    // One percentage, measured against the highest original we
-                    // hold. The old row showed TWO: a "Save 29%" chip (base
-                    // price against MRP) and a "20% OFF" pill (the store offer
-                    // on top of it), which are different sums against different
-                    // bases and read as a contradiction. Folding them into a
-                    // single figure against the price actually struck through
-                    // is both simpler and larger -- 29 and 20 separately is 43
-                    // together, which is what the customer really saves.
-                    const unitList = Math.max(item.offerStrikePrice ?? 0, item.originalPrice ?? 0, item.price)
+                    // Mirror the product page exactly so the two never disagree.
+                    // The product detail buy box strikes the PRE-OFFER selling
+                    // price when a store offer is live (e.g. ₹350 -> ₹280 = 20%),
+                    // and falls back to the MRP only when there is no offer
+                    // (e.g. ₹400 -> ₹350). Taking the MAX of both bases (the old
+                    // behaviour) measured the discount against the ₹400 MRP and
+                    // produced 30% here while the product page showed 20% -- the
+                    // same item reading two different discounts. So: prefer the
+                    // offer strike price; otherwise the MRP; otherwise no badge.
+                    const offerStrike = item.offerStrikePrice && item.offerStrikePrice > item.price
+                      ? item.offerStrikePrice
+                      : 0
+                    const unitList = offerStrike
+                      || (item.originalPrice && item.originalPrice > item.price ? item.originalPrice : item.price)
                     const lineList = unitList * item.quantity
                     const linePaid = item.price * item.quantity
                     const offPct = lineList > linePaid ? Math.round(((lineList - linePaid) / lineList) * 100) : 0
+                    // Free-gift line ("buy A get B free"): a system-managed ₹0 line the
+                    // customer got (or chose) for free. Fixed quantity, no controls.
+                    const isCrossFree = !!item.isFreeGift
+                    // Same-item Buy X Get Y (BOGO): a plain "33% off" pill hides what the
+                    // deal actually is. Surface the terms ("Buy 2 Get 1") and, once enough
+                    // units are in the cart to earn a free one, how many are free.
+                    const bogo = item.activeOffer?.type === 'BOGO' && item.activeOffer?.bogoMode !== 'CROSS'
+                      ? { buy: Math.max(1, item.activeOffer.minQty || 1), free: Math.max(0, item.activeOffer.getQty || 0) }
+                      : null
+                    const bogoGroup = bogo ? bogo.buy + bogo.free : 0
+                    // Free granted ONCE at buy+get units, not multiplied per group.
+                    const bogoFreeUnits = bogo && bogoGroup > 0 && item.quantity >= bogoGroup ? bogo.free : 0
+                    // Hover text for the FREE tag: cross-BOGO names the free product;
+                    // same-item BOGO explains which/how many of the units are free.
+                    const freeTooltip = isCrossFree
+                      ? `This ${item.name} is your free gift — you pay nothing for it.`
+                      : (bogoFreeUnits > 0 && bogo)
+                        ? `Buy ${bogo.buy} Get ${bogo.free} free — ${bogoFreeUnits} of your ${item.quantity} ${bogoFreeUnits === 1 ? 'unit is' : 'units are'} free.`
+                        : ''
                     const lowStock = item.inStock && item.availableStock != null
                       && item.availableStock > 0 && item.availableStock <= 5
                     // The cart line carries no slug, only the product id -- and
@@ -1104,7 +1484,17 @@ export default function Order() {
                                     store-wide offers running neither the
                                     customer nor the admin could tell from the
                                     page which one had won. */}
-                                {item.activeOffer?.title ? (
+                                {isCrossFree ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-[#eaf7ef] px-2 py-0.5 font-semibold text-[#157f4a]">
+                                    <Gift className="h-3 w-3" strokeWidth={2.2} />
+                                    Free gift
+                                  </span>
+                                ) : bogo ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-[#eaf7ef] px-2 py-0.5 font-semibold text-[#157f4a]">
+                                    <Gift className="h-3 w-3" strokeWidth={2.2} />
+                                    Buy {bogo.buy} Get {bogo.free} free
+                                  </span>
+                                ) : item.activeOffer?.title ? (
                                   <span className="inline-flex items-center gap-1 text-[#8a807a]">
                                     <span aria-hidden className="h-1 w-1 rounded-full bg-[#ded3c6]" />
                                     {item.activeOffer.title}
@@ -1120,6 +1510,17 @@ export default function Order() {
                                   </span>
                                 ) : null}
                               </div>
+
+                              {/* Always-visible free-item note — a hover tooltip got
+                                  clipped by the card's overflow, so the explanation
+                                  ("1 of your 3 units is free" / which product is free)
+                                  now sits inline where it can't be hidden. */}
+                              {freeTooltip && (
+                                <p className="mt-1.5 flex items-start gap-1 text-[12px] font-medium leading-snug text-[#157f4a]">
+                                  <Gift className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={2.2} />
+                                  <span>{freeTooltip}</span>
+                                </p>
+                              )}
                             </div>
 
                             {/* Flipkart's price line: how much off, what it
@@ -1127,12 +1528,17 @@ export default function Order() {
                                 order, on one line. */}
                             <div className="shrink-0 text-left @min-[24rem]:text-right">
                               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 @min-[24rem]:justify-end">
-                                {offPct > 0 && (
+                                {isCrossFree || bogoFreeUnits > 0 ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-[#157f4a] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+                                    <Gift className="h-3 w-3" strokeWidth={2.4} />
+                                    {isCrossFree ? (linePaid <= 0 ? 'Free' : `${offPct}% off`) : `${bogoFreeUnits} free`}
+                                  </span>
+                                ) : offPct > 0 ? (
                                   <span className="inline-flex items-baseline gap-0.5 text-[13px] font-bold text-[#157f4a]">
                                     <ArrowDown className="h-3 w-3 self-center" strokeWidth={3} />
                                     {offPct}%
                                   </span>
-                                )}
+                                ) : null}
                                 {lineList > linePaid && (
                                   <span className="text-[13px] tabular-nums text-[#a1948a] line-through">{formatPrice(lineList)}</span>
                                 )}
@@ -1144,10 +1550,30 @@ export default function Order() {
                             </div>
                           </div>
 
-                          {/* Controls as a divided strip, the way both
-                              references set them: the stepper, then the two
-                              actions as plain links rather than pill buttons
-                              competing with Proceed to Checkout. */}
+                          {/* Controls as a divided strip. A free-gift line is managed
+                              by the offer — fixed quantity, no wishlist/remove — so it
+                              shows a static note instead. */}
+                          {isCrossFree ? (
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#eaf7ef] px-3 py-1.5 text-[12px] font-semibold text-[#157f4a]">
+                                <Gift className="h-3.5 w-3.5" strokeWidth={2.2} />
+                                Free gift · Qty {item.quantity}
+                              </span>
+                              {(() => {
+                                const chooser = giftOptions.find((g) => g.offerId === item.giftOfferId)
+                                return chooser ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => { setGiftInitialProduct(item.productId); setGiftChooser(chooser) }}
+                                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold text-[#157f4a] ring-1 ring-[#c9e9d5] transition-colors hover:bg-[#eaf7ef]"
+                                  >
+                                    <RefreshCw className="h-3.5 w-3.5" />
+                                    Change gift
+                                  </button>
+                                ) : null
+                              })()}
+                            </div>
+                          ) : (
                           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
                             <div className="flex items-center overflow-hidden rounded-full ring-1 ring-[#e9ded2]">
                               <button
@@ -1191,6 +1617,7 @@ export default function Order() {
                               Remove
                             </button>
                           </div>
+                          )}
 
                 {transportOptionsFor(item).length >= 1 && (
                 <div className="basis-full">
@@ -1270,11 +1697,11 @@ export default function Order() {
                   a customer and the only number they are looking for. */}
               <div className="overflow-hidden rounded-xl bg-white shadow-[0_1px_2px_rgba(90,60,40,0.05)] ring-1 ring-[#efe6df] sm:rounded-2xl lg:sticky lg:top-8">
               <div className="border-b border-[#f0e8df] p-4 sm:p-5 lg:p-6">
-                <h3 className="font-playfair text-base sm:text-lg font-semibold text-[#1a1a1a] mb-3 sm:mb-4">Promo Code</h3>
+                <h3 className="font-playfair text-base sm:text-lg font-semibold text-[#1a1a1a] mb-3 sm:mb-4">Coupon</h3>
                 <div className="flex gap-2 sm:gap-3">
                   <input
                     type="text"
-                    placeholder="Enter promo code"
+                    placeholder="Enter coupon code"
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
                     className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-[#e3dbd1] rounded-lg sm:rounded-xl focus:ring-2 focus:ring-[#e01a1b]/40 focus:border-[#e01a1b] outline-none"
@@ -1324,45 +1751,89 @@ export default function Order() {
                 )}
               </div>
 
-                <div className="border-b border-[#f0e8df] bg-linear-to-r from-[#faf5ef] to-white px-4 py-3 sm:px-6 sm:py-4">
-                  <h2 className="font-playfair text-lg sm:text-xl font-semibold text-[#1a1a1a]">Order Summary</h2>
+                <div className="border-b border-[#f0e8df] px-4 py-3.5 sm:px-6 sm:py-4">
+                  <h2 className="font-playfair text-lg font-semibold text-[#1a1a1a] sm:text-xl">Order Summary</h2>
                 </div>
 
                 <div className="p-4 sm:p-5 lg:p-6">
-                  <div className="space-y-4 mb-6">
-                    <div className="flex justify-between">
-                      <span className="text-[#6b625b]">Subtotal</span>
-                      <span className="font-medium tabular-nums text-[#1a1a1a]">{formatPrice(summary.subtotal)}</span>
+                  {/* Price ladder — aggregated, reconcilable line by line. Discount
+                      rows only appear when they exist, and read as green savings. */}
+                  <div className="mb-4 space-y-2.5 text-[13.5px] sm:text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#6b625b]">Items subtotal</span>
+                      <span className="tabular-nums text-[#1a1a1a]">{formatPrice(listSubtotal)}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#6b625b]">Shipping</span>
-                      <span className="font-medium">
-                        {summary.shipping === 0 ? (
-                          <span className="text-green-600 flex items-center gap-1">
-                            <Truck className="w-4 h-4" />
-                            Free
-                          </span>
-                        ) : (
-                          `${formatPrice(summary.shipping)}`
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#6b625b]">Tax (GST)</span>
-                      <span className="font-medium tabular-nums text-[#1a1a1a]">{formatPrice(summary.tax)}</span>
-                    </div>
-                    {summary.discount > 0 && (
-                      <div className="flex justify-between text-green-600">
-                        <span>Discount</span>
-                        <span className="font-medium">-{formatPrice(summary.discount)}</span>
+
+                    {productDiscount > 0 && (
+                      <div className="flex items-center justify-between text-[#157f4a]">
+                        <span>Product discount</span>
+                        <span className="font-medium tabular-nums">−{formatPrice(productDiscount)}</span>
                       </div>
                     )}
-                    <div className="border-t border-[#f0e8df] pt-4">
-                      <div className="flex items-baseline justify-between font-bold text-[#1a1a1a]">
-                        <span className="text-base sm:text-lg">Total</span>
-                        <span className="text-xl tabular-nums sm:text-2xl">{formatPrice(summary.total)}</span>
+                    {offerDiscount > 0 && (
+                      <div className="flex items-center justify-between text-[#157f4a]">
+                        <span>Offer discount</span>
+                        <span className="font-medium tabular-nums">−{formatPrice(offerDiscount)}</span>
                       </div>
+                    )}
+                    {couponDiscount > 0 && (
+                      <div className="flex items-center justify-between text-[#157f4a]">
+                        <span>Coupon discount</span>
+                        <span className="font-medium tabular-nums">−{formatPrice(couponDiscount)}</span>
+                      </div>
+                    )}
+
+                    {/* Taxable amount + Tax (GST) are shown ONLY on the `.in`
+                        storefront. On `.com`/other regions no tax is charged, so
+                        the whole tax block is hidden. Taxable amount = subtotal −
+                        all discounts (the coupon sits ABOVE, reducing the base). */}
+                    {getRegion() === 'IN' && (
+                      <>
+                        <div className="flex items-center justify-between border-t border-dashed border-[#ece1d4] pt-2.5">
+                          <span className="text-[#6b625b]">Taxable amount</span>
+                          <span className="font-medium tabular-nums text-[#1a1a1a]">{formatPrice(Math.max(0, summary.subtotal - couponDiscount))}</span>
+                        </div>
+
+                        {gstLines.map((row) => (
+                          <div key={row.label} className="flex items-center justify-between">
+                            <span className="text-[#6b625b]">{row.label}</span>
+                            <span className="tabular-nums text-[#1a1a1a]">{formatPrice(row.amount)}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#6b625b]">Delivery charges</span>
+                      {summary.shipping === 0 ? (
+                        <span className="inline-flex items-center gap-1 font-semibold text-[#157f4a]">
+                          <Truck className="h-3.5 w-3.5" /> FREE
+                        </span>
+                      ) : (
+                        <span className="tabular-nums text-[#1a1a1a]">{formatPrice(summary.shipping)}</span>
+                      )}
                     </div>
+                  </div>
+
+                  {/* Savings highlight + the payable, with the strongest emphasis. */}
+                  <div className="mb-4 border-t border-[#f0e8df] pt-4">
+                    {totalSavings > 0 && (
+                      <div className="mb-3 flex items-center justify-between rounded-xl bg-[#eaf7ef] px-3.5 py-2.5 ring-1 ring-[#cdebd8]">
+                        <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#157f4a]">
+                          <BadgePercent className="h-4 w-4" /> You save
+                        </span>
+                        <span className="text-[15px] font-bold tabular-nums text-[#157f4a]">{formatPrice(totalSavings)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[15px] font-semibold text-[#1a1a1a] sm:text-base">Total payable</span>
+                      <span className="font-playfair text-[26px] font-bold tabular-nums text-[#1a1a1a] sm:text-[28px]">{formatPrice(summary.total)}</span>
+                    </div>
+                    {getRegion() === 'IN' && (
+                      <p className="mt-1.5 text-[11.5px] leading-snug text-[#a1948a]">
+                        Taxes are calculated based on applicable product tax rates.
+                      </p>
+                    )}
                   </div>
 
                   {cartItems.some(needsTransportChoice) ? (
@@ -1382,13 +1853,15 @@ export default function Order() {
                       Remove out of stock items to proceed
                     </button>
                   ) : (
-                    <Link href="/checkout">
-                      <button className="btn-shine w-full bg-[#e01a1b] text-white font-semibold py-4 px-6 rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2 group mb-4">
-                        <CreditCard className="w-5 h-5" />
-                        Proceed to Checkout
-                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                      </button>
-                    </Link>
+                    <button
+                      onClick={handleProceedToCheckout}
+                      disabled={validatingCheckout}
+                      className="btn-shine w-full bg-[#e01a1b] text-white font-semibold py-4 px-6 rounded-full hover:bg-[#c41617] shadow-[0_6px_20px_rgba(224,26,27,0.3)] hover:shadow-[0_12px_30px_rgba(224,26,27,0.45)] hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2 group mb-4 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
+                    >
+                      <CreditCard className="w-5 h-5" />
+                      {validatingCheckout ? 'Checking availability…' : 'Proceed to Checkout'}
+                      {!validatingCheckout && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />}
+                    </button>
                   )}
 
                   {/* ── Reassurance under the button ──────────────────────
@@ -1443,7 +1916,7 @@ export default function Order() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3">
               {similarProducts.map((p) => (
-                <ProductCard key={p.id} product={p} />
+                <ProductCard key={p.id} product={p} variant="showcase" />
               ))}
             </div>
           </section>
@@ -1467,7 +1940,7 @@ export default function Order() {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3">
                   {s.items.map((p) => (
-                    <ProductCard key={p.id} product={p} />
+                    <ProductCard key={p.id} product={p} variant="showcase" />
                   ))}
                 </div>
               </section>
@@ -1490,6 +1963,30 @@ export default function Order() {
           The shadow lives on the outer wrapper because a mask clips
           everything an element paints, box-shadow included, so a shadow on
           the masked box would be sliced off at its own edge. */}
+      {giftChooser && (
+        <GiftChooserModal
+          gift={giftChooser}
+          initialProductId={giftInitialProduct}
+          busy={addingGift}
+          onClose={() => setGiftChooser(null)}
+          onChoose={(pid, vid) => chooseGift(giftChooser.offerId, pid, vid)}
+        />
+      )}
+
+      {offerCelebration && (
+        <OfferCelebration
+          open
+          onClose={() => setOfferCelebration(null)}
+          variant={offerCelebration.kind}
+          freeUnits={offerCelebration.kind === 'bogo' ? offerCelebration.freeUnits : undefined}
+          dealLabel={offerCelebration.kind === 'bogo' ? offerCelebration.dealLabel : undefined}
+          amountLabel={offerCelebration.kind === 'savings' ? formatPrice(offerCelebration.amount) : undefined}
+          offerTitle={offerCelebration.offerTitle}
+          offerDescription={offerCelebration.offerDescription}
+          autoCloseMs={6000}
+        />
+      )}
+
       {couponLanded && (
         <div
           className="coupon-scrim fixed inset-0 z-60 flex items-center justify-center bg-[#2f1e1a]/60 p-4 backdrop-blur-[3px]"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Eye, Edit, Trash2, UserPlus, Mail, Phone, Calendar, RefreshCw, Send, ChevronLeft, ChevronRight, Users, UserCheck, UserX, ClipboardList, User } from "lucide-react";
+import { Search, Eye, Edit, Trash2, UserPlus, Mail, Phone, Calendar, RefreshCw, Send, ChevronLeft, ChevronRight, Users, UserCheck, UserX, ClipboardList, User, ChevronDown, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
@@ -28,6 +28,7 @@ function getPageRange(current: number, total: number): Array<number | '…'> {
 }
 
 export default function QCCheckerList() {
+  const [panelOpen, setPanelOpen] = useState(true);
   const [checkers, setCheckers] = useState<QCCheckerData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -181,6 +182,25 @@ export default function QCCheckerList() {
         </div>
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filteredCheckers.length} of {checkers.length} checkers
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Stats — click the first three cards to filter the table below */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {metricCards.map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -255,6 +275,8 @@ export default function QCCheckerList() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      )}
 
       {/* Checkers Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">

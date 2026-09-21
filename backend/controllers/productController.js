@@ -171,6 +171,8 @@ const createProduct = async (req, res) => {
       originalPrice,
       discount,
       gstPercentage,
+      hsnCode,
+      returnable,
 
       // Single Unit Pricing Configuration
       singleUnitSize,
@@ -328,6 +330,9 @@ const createProduct = async (req, res) => {
           originalPrice: originalPrice ? parseFloat(originalPrice) : null,
           discount: discount ? parseFloat(discount) : null,
           gstPercentage: gstPercentage !== null && gstPercentage !== undefined && gstPercentage !== '' ? parseFloat(gstPercentage) : null,
+          hsnCode: hsnCode ? String(hsnCode).trim() : null,
+          // Return eligibility — defaults to true unless explicitly turned off.
+          returnable: returnable === false || returnable === 'false' || returnable === 'no' ? false : true,
 
           // Single Unit Pricing Configuration
           singleUnitSize: singleUnitSize || null,
@@ -796,6 +801,12 @@ const updateProduct = async (req, res) => {
           }),
           ...(updateData.gstPercentage !== undefined && {
             gstPercentage: parseFloat(updateData.gstPercentage)
+          }),
+          ...(updateData.hsnCode !== undefined && {
+            hsnCode: updateData.hsnCode ? String(updateData.hsnCode).trim() : null
+          }),
+          ...(updateData.returnable !== undefined && {
+            returnable: !(updateData.returnable === false || updateData.returnable === 'false' || updateData.returnable === 'no')
           }),
 
           // Single Unit Pricing Configuration
@@ -1751,6 +1762,8 @@ const createProductByAdmin = async (req, res) => {
       originalPrice,
       discount,
       gstPercentage,
+      hsnCode,
+      returnable,
       adminFixedPrice, // Admin can set their own price
       priceINR,
       priceUSD,
@@ -1950,6 +1963,9 @@ const createProductByAdmin = async (req, res) => {
           originalPrice: originalPrice ? parseFloat(originalPrice) : null,
           discount: discount ? parseFloat(discount) : null,
           gstPercentage: gstPercentage !== null && gstPercentage !== undefined && gstPercentage !== '' ? parseFloat(gstPercentage) : null,
+          hsnCode: hsnCode ? String(hsnCode).trim() : null,
+          // Return eligibility — defaults to true unless explicitly turned off.
+          returnable: returnable === false || returnable === 'false' || returnable === 'no' ? false : true,
           adminFixedPrice: numOrNull(adminFixedPrice),
           ...productPrices,
           priceVisibility: priceVisibility || 'BOTH',
@@ -2235,6 +2251,12 @@ const updateProductByAdmin = async (req, res) => {
         }),
         ...(updateData.gstPercentage !== undefined && {
           gstPercentage: parseFloat(updateData.gstPercentage)
+        }),
+        ...(updateData.hsnCode !== undefined && {
+          hsnCode: updateData.hsnCode ? String(updateData.hsnCode).trim() : null
+        }),
+        ...(updateData.returnable !== undefined && {
+          returnable: !(updateData.returnable === false || updateData.returnable === 'false' || updateData.returnable === 'no')
         }),
         ...(updateData.adminFixedPrice !== undefined && {
           adminFixedPrice: updateData.adminFixedPrice ? parseFloat(updateData.adminFixedPrice) : null
@@ -2689,15 +2711,59 @@ const getPublicProducts = async (req, res) => {
     }
 
     if (search) {
+      // Partial keyword match across every searchable field, so short keywords like
+      // "tow", "cotton", "red", "men" find products by name, category, material,
+      // colour/size (incl. variants), SKU, tags or description — not just exact names.
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
-        { tags: { has: search } }
+        { category: { contains: search, mode: 'insensitive' } },
+        { subCategory: { contains: search, mode: 'insensitive' } },
+        { material: { contains: search, mode: 'insensitive' } },
+        { fabricType: { contains: search, mode: 'insensitive' } },
+        { baseSku: { contains: search, mode: 'insensitive' } },
+        { singleUnitColor: { contains: search, mode: 'insensitive' } },
+        { singleUnitSize: { contains: search, mode: 'insensitive' } },
+        { tags: { has: search } },
+        { variants: { some: { OR: [
+          { color: { contains: search, mode: 'insensitive' } },
+          { size: { contains: search, mode: 'insensitive' } },
+          { variantName: { contains: search, mode: 'insensitive' } },
+        ] } } },
       ];
     }
 
     if (category) {
-      where.category = { equals: category, mode: 'insensitive' };
+      // One category, or a comma-separated set (banners can target several).
+      const cats = String(category).split(',').map((c) => c.trim()).filter(Boolean);
+      if (cats.length > 1) {
+        // AND-wrapped so it never collides with the search OR above.
+        where.AND = [
+          ...(where.AND || []),
+          { OR: cats.map((c) => ({ category: { equals: c, mode: 'insensitive' } })) },
+        ];
+      } else if (cats.length === 1) {
+        where.category = { equals: cats[0], mode: 'insensitive' };
+      }
+    }
+
+    // Explicit product set (by slug) — used by banners that target specific products.
+    if (req.query.products) {
+      const slugs = String(req.query.products).split(',').map((s) => s.trim()).filter(Boolean);
+      if (slugs.length > 0) where.slug = { in: slugs };
+    }
+
+    // Product set by key (id OR slug) — used by the Coupons & Offers filter, since
+    // offers store product IDs while coupons may store slugs. AND-wrapped so it
+    // never collides with the search OR.
+    if (req.query.productKeys) {
+      const keys = String(req.query.productKeys).split(',').map((s) => s.trim()).filter(Boolean);
+      if (keys.length > 0) {
+        where.AND = [
+          ...(where.AND || []),
+          { OR: [{ id: { in: keys } }, { slug: { in: keys } }] },
+        ];
+      }
     }
 
     if (subCategory) {
@@ -2913,6 +2979,91 @@ const getPublicProducts = async (req, res) => {
   }
 };
 
+// Public autocomplete: a small, relevance-ranked set of product suggestions for the
+// header search-as-you-type. Matches partial keywords across name/category/material/
+// colour/size/SKU/tags/description/variants, then ranks in JS by field priority so a
+// name hit outranks a description hit. Returns ~8 lightweight rows (no full catalogue).
+const getPublicProductSuggestions = async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    const region = req.query.region;
+    if (q.length < 2) return res.json({ success: true, data: [] });
+
+    const where = {
+      status: 'ACTIVE',
+      approvalStatus: 'APPROVED',
+      OR: [
+        { name: { contains: q, mode: 'insensitive' } },
+        { description: { contains: q, mode: 'insensitive' } },
+        { category: { contains: q, mode: 'insensitive' } },
+        { subCategory: { contains: q, mode: 'insensitive' } },
+        { material: { contains: q, mode: 'insensitive' } },
+        { fabricType: { contains: q, mode: 'insensitive' } },
+        { baseSku: { contains: q, mode: 'insensitive' } },
+        { singleUnitColor: { contains: q, mode: 'insensitive' } },
+        { singleUnitSize: { contains: q, mode: 'insensitive' } },
+        { tags: { has: q } },
+        { variants: { some: { OR: [
+          { color: { contains: q, mode: 'insensitive' } },
+          { size: { contains: q, mode: 'insensitive' } },
+          { variantName: { contains: q, mode: 'insensitive' } },
+        ] } } },
+      ],
+    };
+    Object.assign(where, visibilityWhere(region));
+
+    // Pull a bounded candidate set, then rank in JS (Prisma/Mongo has no relevance score).
+    const candidates = await prisma.product.findMany({
+      where,
+      select: {
+        id: true, name: true, category: true, subCategory: true, material: true,
+        fabricType: true, description: true, tags: true, baseSku: true,
+        adminFixedPrice: true, basePrice: true, priceINR: true, priceUSD: true,
+        singleUnitColor: true, singleUnitSize: true,
+        images: { where: { isPrimary: true }, select: { url: true }, take: 1 },
+        variants: { select: { color: true, size: true, variantName: true }, take: 20 },
+      },
+      take: 40,
+    });
+
+    const ql = q.toLowerCase();
+    const has = (v) => typeof v === 'string' && v.toLowerCase().includes(ql);
+    const starts = (v) => typeof v === 'string' && v.toLowerCase().startsWith(ql);
+    // Field-priority score (spec §6): name > tag/keyword > category/sub > material/attr > desc.
+    const scoreOf = (p) => {
+      let s = 0;
+      if (starts(p.name)) s += 120; else if (has(p.name)) s += 90;
+      if (Array.isArray(p.tags) && p.tags.some((t) => has(t))) s += 60;
+      if (has(p.category) || has(p.subCategory)) s += 45;
+      if (has(p.material) || has(p.fabricType) || has(p.singleUnitColor) || has(p.singleUnitSize)) s += 30;
+      if (Array.isArray(p.variants) && p.variants.some((v) => has(v.color) || has(v.size) || has(v.variantName))) s += 25;
+      if (has(p.baseSku)) s += 20;
+      if (has(p.description)) s += 10;
+      return s;
+    };
+
+    const data = candidates
+      .map((p) => ({ p, s: scoreOf(p) }))
+      .sort((a, b) => b.s - a.s)
+      .slice(0, 8)
+      .map(({ p }) => ({
+        id: p.id,
+        name: p.name,
+        category: p.category,
+        image: p.images?.[0]?.url || null,
+        adminFixedPrice: p.adminFixedPrice,
+        basePrice: p.basePrice,
+        priceINR: p.priceINR,
+        priceUSD: p.priceUSD,
+      }));
+
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Suggestion search error:', error);
+    res.json({ success: true, data: [] }); // never break the search box
+  }
+};
+
 // Public endpoint: available filter facets for the storefront.
 // Everything is computed live from the ACTIVE/APPROVED catalogue (optionally
 // scoped to the current search/category context) — no hardcoded option lists.
@@ -3097,6 +3248,7 @@ const getPublicProduct = async (req, res) => {
         weightUnit: true,
         dispatchTimeline: true,
         logisticsConfig: true,
+        returnable: true, // return eligibility — drives the "Easy return" badge + policy note
         createdAt: true,
         updatedAt: true,
         inventory: {
@@ -3389,6 +3541,7 @@ module.exports = {
   getAllProductsForAdmin,
   getPublicProducts,
   getPublicProductFacets,
+  getPublicProductSuggestions,
   getPublicProduct,
   updateVariantStocks
 };

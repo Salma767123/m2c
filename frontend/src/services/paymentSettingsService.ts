@@ -5,6 +5,7 @@ export interface RazorpaySettings {
   keyId: string;
   keySecret: string;
   webhookSecret: string;
+  xAccountNumber?: string;
 }
 
 export interface PayUSettings {
@@ -26,6 +27,7 @@ export interface PaymentSettings {
   razorpayKeyId: string;
   razorpayKeySecret: string;
   razorpayWebhookSecret: string;
+  razorpayxAccountNumber?: string;
   payuEnabled: boolean;
   payuMerchantKey: string;
   payuMerchantSalt: string;

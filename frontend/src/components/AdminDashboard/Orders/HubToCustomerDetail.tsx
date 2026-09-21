@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order, VendorShipment } from "@/services/orderService";
 import { courierService, type Courier } from "@/services/courierService";
+import { courierName, transportModeLabel } from "@/lib/couriers";
 import adminProductService from "@/services/adminProductService";
 import Dropdown from "@/components/UI/Dropdown";
 import { formatOrderAmount } from "@/lib/currency";
@@ -105,6 +106,9 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
   const [cancelChoice, setCancelChoice] = useState("");
   const [cancelOther, setCancelOther] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  // Restock decision: a cancellation does NOT return stock to inventory unless
+  // the admin explicitly approves it here. Default = do not restock.
+  const [cancelRestock, setCancelRestock] = useState<boolean | null>(null);
 
   const handleCancelOrder = async () => {
     const reason = cancelChoice === "Other" ? cancelOther.trim() : cancelChoice;
@@ -112,16 +116,21 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
       showErrorToast("Please select or enter a cancellation reason.");
       return;
     }
+    if (cancelRestock === null) {
+      showErrorToast("Please choose whether to return the stock to inventory.");
+      return;
+    }
     try {
       setCancelling(true);
-      const res = await orderService.cancelAdminOrder(orderId, reason);
+      const res = await orderService.cancelAdminOrder(orderId, reason, cancelRestock === true);
       if (res.success) {
         const paid = ["PAID", "SUCCESS", "CAPTURED"].includes(String(order?.paymentStatus || "").toUpperCase());
-        showSuccessToast("Order cancelled" + (paid ? " — refund initiated" : ""));
+        showSuccessToast("Order cancelled" + (paid ? " — refund initiated" : "") + (cancelRestock ? " · stock restored" : " · stock not restocked"));
         setOrder(res.data);
         setShowCancelModal(false);
         setCancelChoice("");
         setCancelOther("");
+        setCancelRestock(null);
       }
     } catch (error: any) {
       showErrorToast(error.message || "Failed to cancel order");
@@ -687,13 +696,31 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           </div>
           */}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-4 border-t border-slate-200">
+        {/* Subtotal → Discount → Taxable → Tax → Shipping → Total: the coupon
+            reduces the taxable base (GST is charged on the post-coupon net). */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6 pt-4 border-t border-slate-200">
           <div>
             <p className="text-sm text-slate-600">Subtotal</p>
             <p className="text-base font-medium text-slate-900 mt-1">
               {money(order.subtotal)}
             </p>
           </div>
+          {order.discount > 0 && (
+            <div>
+              <p className="text-sm text-slate-600">Discount</p>
+              <p className="text-base font-medium text-green-600 mt-1">
+                −{money(order.discount)}
+              </p>
+            </div>
+          )}
+          {order.discount > 0 && (
+            <div>
+              <p className="text-sm text-slate-600">Taxable amount</p>
+              <p className="text-base font-medium text-slate-900 mt-1">
+                {money(Math.max(0, order.subtotal - order.discount))}
+              </p>
+            </div>
+          )}
           <div>
             <p className="text-sm text-slate-600">Tax</p>
             <p className="text-base font-medium text-slate-900 mt-1">
@@ -704,12 +731,6 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
             <p className="text-sm text-slate-600">Shipping</p>
             <p className="text-base font-medium text-slate-900 mt-1">
               {money(order.shippingCost)}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-600">Discount</p>
-            <p className="text-base font-medium text-green-600 mt-1">
-              -{money(order.discount)}
             </p>
           </div>
           <div>
@@ -770,6 +791,52 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
                     </p>
                   </div>
                 </div>
+
+                {/* Customer's Selected Delivery — the courier / transport / ETA the
+                    customer chose at checkout, frozen on the order line. Lets the admin
+                    see the choice before dispatching (and spot a courier change).
+                    Always shown; falls back to a note for legacy/free-shipping lines
+                    that carry no delivery snapshot. */}
+                {(() => {
+                  const lc = item.logistics?.courier || item.courier || null;
+                  const lt = item.logistics?.transportType || item.transportType || null;
+                  const ld = item.logistics?.deliveryDays ?? null;
+                  const ls = item.logistics?.shippingCostInr ?? null;
+                  const hasAny = !!lc || !!lt || ld != null;
+                  const region = order.currency === "USD" ? "US" : "IN";
+                  return (
+                    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Truck className="h-4 w-4 text-slate-500" />
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Customer&apos;s Selected Delivery</p>
+                      </div>
+                      {hasAny ? (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div>
+                            <p className="text-xs text-slate-500">Courier</p>
+                            <p className="text-sm font-medium text-slate-900">{lc ? courierName(lc) : "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500">Mode</p>
+                            <p className="text-sm font-medium text-slate-900">{lt ? transportModeLabel(lt, region) : "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500">Delivery Estimate</p>
+                            <p className="text-sm font-medium text-slate-900">{ld != null ? `${ld} day${ld === 1 ? "" : "s"}` : "—"}</p>
+                          </div>
+                          {order.currency === "INR" && ls != null && (
+                            <div>
+                              <p className="text-xs text-slate-500">Shipping</p>
+                              <p className="text-sm font-medium text-slate-900">{ls > 0 ? `₹${ls.toLocaleString("en-IN")}` : "Free"}</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-400 italic">No courier preference recorded for this item (free-shipping or a legacy order placed before courier selection).</p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ))}
@@ -873,33 +940,61 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           )}
           <div className="space-y-3">
             {shipments.map((s) => {
-              const reviewData = (s as VendorShipment & { adminReviews?: Array<{ approved?: boolean; rating?: number }> }).adminReviews?.[0];
+              const reviewData = (s as VendorShipment & { adminReviews?: Array<{ approved?: boolean; rating?: number; rejectionReason?: string | null; qualityCheckNotes?: string | null; reviewComments?: string | null }> }).adminReviews?.[0];
+              const isRejected = s.status === 'REJECTED_BY_ADMIN_HUB';
+              const hasRejectionDetail = isRejected && (reviewData?.rejectionReason || reviewData?.qualityCheckNotes || reviewData?.reviewComments);
               return (
-                <div key={s.id} className="flex items-center gap-4 p-3 border border-slate-100 rounded-lg">
-                  {s.status === 'APPROVED_BY_ADMIN_HUB' ? (
-                    <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
-                  ) : s.status === 'REJECTED_BY_ADMIN_HUB' ? (
-                    <XCircle className="h-5 w-5 text-red-500 shrink-0" />
-                  ) : s.status === 'CANCELLED' ? (
-                    <XCircle className="h-5 w-5 text-slate-400 shrink-0" />
-                  ) : (
-                    <AlertTriangle className="h-5 w-5 text-yellow-500 shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900">{s.vendorName}</p>
-                    <p className="text-xs text-slate-500">
-                      {s.items?.length || 0} item{(s.items?.length || 0) !== 1 ? 's' : ''} &middot; {s.status.replace(/_/g, ' ')}
-                    </p>
+                <div key={s.id} className="overflow-hidden rounded-lg border border-slate-100">
+                  <div className="flex items-center gap-4 p-3">
+                    {s.status === 'APPROVED_BY_ADMIN_HUB' ? (
+                      <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                    ) : s.status === 'REJECTED_BY_ADMIN_HUB' ? (
+                      <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+                    ) : s.status === 'CANCELLED' ? (
+                      <XCircle className="h-5 w-5 text-slate-400 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="h-5 w-5 text-yellow-500 shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900">{s.vendorName}</p>
+                      <p className="text-xs text-slate-500">
+                        {s.items?.length || 0} item{(s.items?.length || 0) !== 1 ? 's' : ''} &middot; {s.status.replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                    {s.vendorCarrier && (
+                      <p className="text-xs text-slate-500 shrink-0">
+                        {s.vendorCarrier}: {s.vendorTrackingId}
+                      </p>
+                    )}
+                    {reviewData?.approved && typeof reviewData.rating === 'number' && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                        <span className="text-xs font-medium text-slate-700">{reviewData.rating}/5</span>
+                      </div>
+                    )}
                   </div>
-                  {s.vendorCarrier && (
-                    <p className="text-xs text-slate-500 shrink-0">
-                      {s.vendorCarrier}: {s.vendorTrackingId}
-                    </p>
+
+                  {/* Why the hub rejected this vendor shipment — the reason + QC notes the
+                      admin recorded at review time, so it's visible without digging. */}
+                  {hasRejectionDetail && (
+                    <div className="border-t border-red-100 bg-red-50 px-3 py-2.5">
+                      <p className="flex items-center gap-1.5 text-xs font-semibold text-red-700">
+                        <XCircle className="h-3.5 w-3.5" /> Rejection reason
+                      </p>
+                      {reviewData?.rejectionReason && (
+                        <p className="mt-1 text-sm text-red-800">{reviewData.rejectionReason}</p>
+                      )}
+                      {reviewData?.qualityCheckNotes && (
+                        <p className="mt-1 text-xs text-red-700/80"><span className="font-medium">QC notes:</span> {reviewData.qualityCheckNotes}</p>
+                      )}
+                      {reviewData?.reviewComments && (
+                        <p className="mt-1 text-xs text-red-700/80"><span className="font-medium">Comments:</span> {reviewData.reviewComments}</p>
+                      )}
+                    </div>
                   )}
-                  {reviewData?.approved && typeof reviewData.rating === 'number' && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                      <span className="text-xs font-medium text-slate-700">{reviewData.rating}/5</span>
+                  {isRejected && !hasRejectionDetail && (
+                    <div className="border-t border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700/80">
+                      Rejected at the hub — no written reason was recorded.
                     </div>
                   )}
                 </div>
@@ -1040,10 +1135,32 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
                 className="mt-2 w-full rounded-lg border border-slate-200 p-2.5 text-sm text-slate-700 focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400"
               />
             )}
+
+            {/* Restock decision — cancellation does not add stock back unless approved here. */}
+            <label className="mb-1.5 mt-4 block text-xs font-medium uppercase tracking-wide text-slate-500">Return stock to inventory?</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setCancelRestock(true)}
+                className={`rounded-lg border-2 px-3 py-2.5 text-left text-sm font-semibold transition-all ${cancelRestock === true ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+              >
+                Yes, add back
+                <span className="mt-0.5 block text-[11px] font-normal text-slate-400">Units return to sellable stock</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCancelRestock(false)}
+                className={`rounded-lg border-2 px-3 py-2.5 text-left text-sm font-semibold transition-all ${cancelRestock === false ? "border-red-500 bg-red-50 text-red-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+              >
+                No, write off
+                <span className="mt-0.5 block text-[11px] font-normal text-slate-400">Stock is not restocked</span>
+              </button>
+            </div>
+
             <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setShowCancelModal(false)}
+                onClick={() => { setShowCancelModal(false); setCancelRestock(null); }}
                 disabled={cancelling}
                 className="rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
               >
@@ -1052,7 +1169,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
               <button
                 type="button"
                 onClick={handleCancelOrder}
-                disabled={cancelling || !cancelChoice || (cancelChoice === "Other" && !cancelOther.trim())}
+                disabled={cancelling || !cancelChoice || (cancelChoice === "Other" && !cancelOther.trim()) || cancelRestock === null}
                 className="inline-flex items-center gap-2 rounded-full bg-red-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {cancelling ? "Cancelling…" : "Cancel Order"}

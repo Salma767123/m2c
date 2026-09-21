@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/UI/Table"
-import { Eye, Edit, Trash2, CheckCircle, XCircle, Filter, ChevronLeft, ChevronRight, ChevronDown, Package, Clock, ShieldCheck, AlertTriangle } from "lucide-react"
+import { Eye, Edit, Trash2, CheckCircle, XCircle, Filter, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Package, Clock, ShieldCheck, AlertTriangle } from "lucide-react"
 import { formatDate, formatPrice } from "@/lib/utils"
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Dropdown from '@/components/UI/Dropdown'
@@ -114,6 +114,7 @@ const getApprovalBadge = (status: string) => {
 export default function ProductsTable() {
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [panelOpen, setPanelOpen] = useState(true)
   // Rows expanded to reveal their per-variant breakdown (mirrors the vendor inventory).
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const toggleExpanded = (id: string) => setExpandedIds(prev => {
@@ -273,6 +274,25 @@ export default function ProductsTable() {
           )}
         </div>
         
+        {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+        <div className="flex items-center justify-between gap-3 mt-4">
+          <button
+            type="button"
+            onClick={() => setPanelOpen((v) => !v)}
+            aria-expanded={panelOpen}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+          >
+            <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+            Overview &amp; Filters
+            <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+          </button>
+          <span className="text-xs text-slate-500">
+            Showing {products.length} of {pagination.totalCount} products
+          </span>
+        </div>
+
+        {panelOpen && (
+          <div className="space-y-4">
         {/* Metric Cards — click a card to filter by approval status */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
           {metricCards.map(({ key, label, subtitle, count, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -376,6 +396,8 @@ export default function ProductsTable() {
             />
           </div>
         </div>
+          </div>
+        )}
       </CardHeader>
 
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">

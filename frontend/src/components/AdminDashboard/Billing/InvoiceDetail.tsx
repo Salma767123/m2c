@@ -342,15 +342,23 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
 
           {/* Totals */}
           <div className="flex justify-end">
+            {/* Subtotal → Discount → Taxable amount → Tax → Shipping → Grand Total:
+                the coupon reduces the taxable base, so GST is on the post-coupon net. */}
             <div className="w-64 space-y-2 text-sm">
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Subtotal</span>
                 <span className="font-medium">{money(order.subtotal)}</span>
               </div>
-              {order.shippingCost > 0 && (
+              {order.discount > 0 && (
                 <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Shipping</span>
-                  <span className="font-medium">{money(order.shippingCost)}</span>
+                  <span className="text-green-600">Discount</span>
+                  <span className="font-medium text-green-600">− {money(order.discount)}</span>
+                </div>
+              )}
+              {order.discount > 0 && (
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500">Taxable amount</span>
+                  <span className="font-medium">{money(Math.max(0, order.subtotal - order.discount))}</span>
                 </div>
               )}
               {order.tax > 0 && (
@@ -359,10 +367,10 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
                   <span className="font-medium">{money(order.tax)}</span>
                 </div>
               )}
-              {order.discount > 0 && (
+              {order.shippingCost > 0 && (
                 <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-green-600">Discount</span>
-                  <span className="font-medium text-green-600">− {money(order.discount)}</span>
+                  <span className="text-slate-500">Shipping</span>
+                  <span className="font-medium">{money(order.shippingCost)}</span>
                 </div>
               )}
               <div className="mt-3 flex items-center justify-between rounded-xl bg-gradient-to-r from-brand-600 to-[#ff6a3d] px-4 py-3.5 text-white shadow-[0_8px_24px_-10px_rgba(224,26,27,0.6)]">

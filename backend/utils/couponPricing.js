@@ -49,6 +49,14 @@ async function evaluateCoupon({ code, cartTotal, userId, currency: rawCurrency }
     if (!coupon) return { ok: false, message: 'Invalid coupon code' };
     if (!coupon.isActive) return { ok: false, message: 'This coupon is no longer active' };
 
+    // Customer targeting: a coupon created for specific customers is redeemable
+    // only by them. An empty list (the default) means it's open to everyone.
+    if (Array.isArray(coupon.targetCustomerIds) && coupon.targetCustomerIds.length > 0) {
+        if (!userId || !coupon.targetCustomerIds.includes(userId)) {
+            return { ok: false, message: 'This coupon is not available for your account' };
+        }
+    }
+
     const now = new Date();
     if (now < coupon.startDate || now > coupon.expiryDate) {
         return { ok: false, message: 'This coupon has expired or is not yet valid' };

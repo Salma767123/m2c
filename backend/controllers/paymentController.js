@@ -311,6 +311,29 @@ const handleRazorpayWebhook = async (req, res) => {
       }
     }
 
+    // Refund lifecycle → auto-advance the matching return request.
+    // refund.processed = money settled to the customer → "Refund Completed".
+    // refund.failed = gateway couldn't complete it → flag for admin attention.
+    if (event === 'refund.processed' || event === 'refund.failed') {
+      const refund = payload?.refund?.entity;
+      if (refund?.id) {
+        const { handleRefundWebhook } = require('./returnController');
+        await handleRefundWebhook(refund.id, event === 'refund.processed' ? 'processed' : 'failed');
+        console.log(`Refund webhook ${event} handled for refund ${refund.id}`);
+      }
+    }
+
+    // RazorpayX payout lifecycle → advance the matching wallet withdrawal.
+    // payout.processed → Completed; payout.failed/reversed → Failed + wallet refund.
+    if (typeof event === 'string' && event.startsWith('payout.')) {
+      const payout = payload?.payout?.entity;
+      if (payout?.id) {
+        const { handlePayoutWebhook } = require('./walletController');
+        await handlePayoutWebhook(payout.id, payout.status || event.replace('payout.', ''));
+        console.log(`Payout webhook ${event} handled for payout ${payout.id} (status ${payout.status})`);
+      }
+    }
+
     res.json({ status: 'ok' });
 
   } catch (error) {

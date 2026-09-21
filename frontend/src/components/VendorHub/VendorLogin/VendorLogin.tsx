@@ -120,17 +120,22 @@ export default function VendorLogin() {
       // Register FCM push token (fire-and-forget)
       import('@/services/webNotificationService').then(m => m.registerWebPushToken()).catch(() => {})
 
-      // Small delay to show the toast before redirect
+      // Small delay to show the toast before redirect.
       setTimeout(() => {
-        // Redirect based on vendor status
-        if (result.vendor.status === 'APPROVED') {
-          router.push('/vendor/dashboard')
-        } else if (result.vendor.status === 'PENDING') {
+        // The backend only issues a token to vendors past review (it blocks PENDING /
+        // REJECTED / SUSPENDED before this point), so any successful login goes to the
+        // dashboard. The status branches below stay as a defensive fallback — and
+        // crucially the DEFAULT is the dashboard, so post-approval states like
+        // UNDER_REVIEW / REINSPECTION no longer fall through and leave the user stuck.
+        const status = result.vendor.status
+        if (status === 'PENDING') {
           router.push('/vendor/status?status=pending')
-        } else if (result.vendor.status === 'REJECTED') {
+        } else if (status === 'REJECTED') {
           router.push('/vendor/status?status=rejected')
-        } else if (result.vendor.status === 'SUSPENDED') {
+        } else if (status === 'SUSPENDED') {
           router.push('/vendor/status?status=suspended')
+        } else {
+          router.push('/vendor/dashboard')
         }
       }, 1000)
     } catch (error: any) {

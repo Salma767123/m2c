@@ -141,6 +141,27 @@ async function sendLowStockAlertEmail({ to, companyName, ownerName, productName,
 }
 
 /**
+ * Email a vendor that the admin has assigned them an order to deliver to a hub.
+ * Fire-and-forget from the caller — never blocks the assignment response.
+ */
+async function sendVendorOrderAssignedEmail({ to, companyName, ownerName, orderId, itemCount, hubName, hubAddress }) {
+  if (!to) return { success: false, skipped: 'no recipient' };
+  return sendTemplatedEmail({
+    key: 'vendor_order_assigned',
+    to,
+    data: {
+      greetingName: ownerName || companyName || 'Vendor',
+      companyName: companyName || 'your store',
+      orderId: orderId || '',
+      itemCount: itemCount != null ? String(itemCount) : '—',
+      hubName: hubName || '—',
+      hubAddress: hubAddress || '—',
+      dashboardUrl: `${publicSite()}/vendor/dashboard/orders`,
+    },
+  });
+}
+
+/**
  * Generate a secure random password
  */
 function generateSecurePassword(length = 12) {
@@ -158,5 +179,6 @@ module.exports = {
   sendVendorSuspensionEmail,
   sendNewVendorRegistrationEmailToAdmins,
   sendLowStockAlertEmail,
+  sendVendorOrderAssignedEmail,
   generateSecurePassword
 };

@@ -2,15 +2,55 @@ const crypto = require('crypto');
 const { prisma } = require('../config/database');
 const { generateInvoiceNo } = require('../utils/invoiceGenerator');
 const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
+
+// Prune items belonging to a CANCELLED/RETURNED shipment (reship scenario) — but
+// ONLY for live orders. A fully cancelled/returned ORDER has all its shipments
+// cancelled, so the shipment-status filter would wrongly empty it; there the
+// customer must still see everything they ordered. Include shipment.status on the
+// items query for this to work, then run each fetched order through here.
+const CANCELLED_OR_RETURNED = ['CANCELLED', 'RETURNED'];
+function pruneReshippedItems(order) {
+    if (!order || !Array.isArray(order.items)) return order;
+    if (!CANCELLED_OR_RETURNED.includes(order.status)) {
+        order.items = order.items.filter(
+            (it) => !it.shipmentId || !CANCELLED_OR_RETURNED.includes(it.shipment?.status),
+        );
+    }
+    // Drop the helper relation we only pulled for the check above.
+    order.items = order.items.map(({ shipment, ...rest }) => rest);
+    return order;
+}
+const ITEMS_WITH_SHIPMENT_STATUS = { include: { shipment: { select: { status: true } } } };
+
+// Attach each order item's live product return-eligibility flag (`returnable`).
+// OrderItems are frozen snapshots and don't carry it, so the storefront can't tell
+// whether a return is allowed without this. In-memory only — never persisted.
+// Defaults to true when the product is missing (e.g. deleted) to match the schema.
+async function attachItemReturnable(orders) {
+    const list = Array.isArray(orders) ? orders : [orders];
+    const ids = [...new Set(list.flatMap((o) => (o?.items || []).map((it) => it.productId).filter(Boolean)))];
+    if (ids.length === 0) return;
+    const products = await prisma.product.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, returnable: true },
+    });
+    const byId = new Map(products.map((p) => [p.id, p.returnable !== false]));
+    for (const o of list) {
+        for (const it of (o?.items || [])) {
+            it.returnable = it.productId && byId.has(it.productId) ? byId.get(it.productId) : true;
+        }
+    }
+}
 const { notifications } = require('../utils/notificationService');
 const { checkAndAlertLowStock } = require('../utils/lowStockAlert');
 const { withRetry } = require('../utils/dbRetry');
 const { resolveUsdRate, toINR, resolveUnitPrice } = require('../utils/orderCurrency');
 const { evaluateCoupon } = require('../utils/couponPricing');
 const { calculateLogistics, convertShippingToOrderCurrency, qualifiesForFreeShipping } = require('../utils/logistics');
-const { isVisibleInRegion } = require('../utils/regionVisibility');
+const { isVisibleInRegion, normalizeRegion } = require('../utils/regionVisibility');
+const { isIntrastate, splitLineTax } = require('../utils/gst');
 const { isCourierAvailable } = require('../utils/couriers');
-const { applyBestOffer, qualifyingThresholdIds } = require('../utils/offers');
+const { applyBestOffer, qualifyingThresholdIds, qualifyingCrossBogo, offerAppliesToFreeSet } = require('../utils/offers');
 
 /** Round a money value to 2 decimals, avoiding float artefacts (e.g. 115.19999). */
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -55,7 +95,10 @@ const createOrder = async (req, res) => {
         // opt-in (`razorpayOrderId && razorpaySignature && paymentId`), which meant
         // POSTing an order with no payment fields skipped verification entirely and
         // still got written `paymentStatus: 'PAID'` below.
-        const isPrepaid = paymentMethod !== 'COD';
+        // COD and a fully-wallet-covered order carry no gateway payment, so they
+        // skip Razorpay verification. A partial-wallet order still pays the rest
+        // via Razorpay (paymentMethod stays 'razorpay').
+        const isPrepaid = paymentMethod !== 'COD' && paymentMethod !== 'WALLET';
         const needsRazorpayVerification = isPrepaid;
         if (isPrepaid && !(razorpayOrderId && razorpaySignature && paymentId)) {
             return res.status(400).json({
@@ -133,6 +176,25 @@ const createOrder = async (req, res) => {
         // twin, and those must all share one rate for the order to be internally
         // consistent. Snapshotting also stops admin rate edits rewriting this order.
         const orderExchangeRate = currency === 'USD' ? await resolveUsdRate(prisma) : null;
+        // Customer GST/tax is charged ONLY on the `.in` storefront (currency INR).
+        // On `.com` and every other region tax is 0 and no tax line is shown. This
+        // gates the customer rate only — vendor settlement GST (below) is a separate
+        // payout tied to the vendor's GSTIN, not the storefront, and is unaffected.
+        const taxApplies = normalizeRegion(currency) === 'IN';
+
+        // GST place-of-supply split: SUPPLIER = the Admin/Company registered State,
+        // PLACE OF SUPPLY = the customer's shipping State. Same state -> intrastate
+        // (CGST+SGST); different -> interstate (IGST). Vendor/warehouse/hub location
+        // is deliberately NOT used. Only relevant when tax applies (`.in`).
+        let intrastate = false;
+        if (taxApplies) {
+            const company = await prisma.companyInfo.findFirst({ select: { state: true, country: true } });
+            intrastate = isIntrastate(
+                company?.state, shippingAddress?.state,
+                company?.country, shippingAddress?.country,
+            );
+        }
+
         let subtotal = 0;
         // Customer GST accumulated per line below. The client also sends a `tax`,
         // but it is advisory only — this server-side figure is what gets stored.
@@ -172,6 +234,14 @@ const createOrder = async (req, res) => {
             }),
         ]);
 
+        // Customer targeting: a targeted offer applies ONLY for the customers it
+        // names. Drop the rest so this buyer can never receive someone else's
+        // private offer; untargeted offers (the norm) stay in for everyone.
+        const scopedOffers = activeOffers.filter(
+            (o) => !(Array.isArray(o.targetCustomerIds) && o.targetCustomerIds.length > 0)
+                || o.targetCustomerIds.includes(userId)
+        );
+
         // THRESHOLD offers ("spend ₹X, get Y% off") fire on the whole-cart value, which
         // isn't known until the lines are priced. A lightweight pre-pass sums the INR
         // selling price of every buyable line so we know which threshold offers qualify
@@ -183,7 +253,22 @@ const createOrder = async (req, res) => {
             const v = cart.items[i].variantId && p.variants?.length > 0 ? p.variants[0] : null;
             preSubtotalINR += resolveUnitPrice(v || p, 'INR', null) * cart.items[i].quantity;
         }
-        const thresholdEligibleIds = qualifyingThresholdIds(activeOffers, preSubtotalINR, currency, orderNow);
+        const thresholdEligibleIds = qualifyingThresholdIds(scopedOffers, preSubtotalINR, currency, orderNow);
+
+        // Cross-product BOGO ("buy A get B free") is delivered as free-gift lines that the
+        // cart auto-added/chose (isFreeGift, price 0). Re-validate them here: the buy
+        // condition must still hold and the gifted product must belong to the offer's free
+        // set — otherwise the cart changed since the gift was granted and we reject so the
+        // customer can review rather than get a free item they no longer qualify for.
+        const giftBuyLines = [];
+        for (let i = 0; i < cart.items.length; i++) {
+            const p = productsForItems[i];
+            if (!p || cart.items[i].isFreeGift) continue;
+            giftBuyLines.push({ product: p, quantity: cart.items[i].quantity, isFreeGift: false });
+        }
+        const qualifyingGiftOfferIds = new Set(
+            qualifyingCrossBogo(scopedOffers, giftBuyLines, currency, orderNow).map((q) => q.offer.id)
+        );
 
         for (let i = 0; i < cart.items.length; i++) {
             const item = cart.items[i];
@@ -226,27 +311,47 @@ const createOrder = async (req, res) => {
                 });
             }
 
+            // A free-gift line ("Buy A get B free"): validate it still qualifies, then
+            // price it at 0. If the buy condition or free set no longer holds, the cart
+            // changed since the gift was granted — reject so nothing free slips through.
+            const isGift = !!item.isFreeGift;
+            if (isGift) {
+                const giftOffer = scopedOffers.find((o) => o.id === item.giftOfferId);
+                const valid = giftOffer
+                    && qualifyingGiftOfferIds.has(item.giftOfferId)
+                    && offerAppliesToFreeSet(giftOffer, product);
+                if (!valid) {
+                    return res.status(400).json({
+                        success: false,
+                        error: `Your free gift "${product.name}" is no longer valid because your cart changed. Please review your cart and try again.`,
+                    });
+                }
+            }
+
             // Price the line in the order's currency. Shared with the storefront's
             // getRegionalPrice() chain — see resolveUnitPrice() for why a USD order
             // must convert from INR rather than fall through to an INR field.
-            const sellingUnitPrice = resolveUnitPrice(variant || product, currency, orderExchangeRate);
+            const sellingUnitPrice = isGift ? 0 : resolveUnitPrice(variant || product, currency, orderExchangeRate);
 
             // Apply the best automatic Offer to the SELLING price only. This never
             // touches vendorPrice below, so the vendor settlement is unchanged — M2C's
             // margin absorbs the discount. With no live offers, applyBestOffer returns
             // the price untouched and offer=null, so this is a no-op for every existing
             // order. Offer eligibility (category/product, region, min-qty) is resolved
-            // server-side here; the storefront badge is only advisory.
-            const offerResult = applyBestOffer({
-                product,
-                sellingUnitPrice,
-                quantity: item.quantity,
-                currency,
-                rate: orderExchangeRate,
-                offers: activeOffers,
-                now: orderNow,
-                thresholdEligibleIds,
-            });
+            // server-side here; the storefront badge is only advisory. Gift lines skip
+            // this entirely — they are already ₹0.
+            const offerResult = isGift
+                ? { unitPrice: 0 }
+                : applyBestOffer({
+                    product,
+                    sellingUnitPrice,
+                    quantity: item.quantity,
+                    currency,
+                    rate: orderExchangeRate,
+                    offers: scopedOffers,
+                    now: orderNow,
+                    thresholdEligibleIds,
+                });
             const unitPrice = offerResult.unitPrice;
 
             // Round per line as well: the invoice prints each item's totalPrice,
@@ -270,9 +375,12 @@ const createOrder = async (req, res) => {
                     `charging 0% GST to the customer and paying 0 tax to the vendor.`
                 );
             }
-            const customerGstRate = product.gstPercentage || 0;
-            const itemTax = round2(itemTotal * customerGstRate / 100);
-            computedTax += itemTax;
+            // The customer GST is NOT charged here. A coupon reduces the taxable
+            // value (see the post-coupon block below), so tax has to wait until the
+            // coupon is known — otherwise GST would be charged on the pre-coupon
+            // amount, over-charging the customer. Only the per-line RATE is frozen
+            // now (stored on the order item), so the invoice can reproduce the split.
+            const customerGstRate = taxApplies ? (product.gstPercentage || 0) : 0;
 
             // Shipping for this line, from the product's own logistics config.
             // Same calculator the storefront uses (utils/logistics.js is a port of
@@ -393,6 +501,9 @@ const createOrder = async (req, res) => {
                 unitPrice: unitPrice,
                 totalPrice: itemTotal,
                 totalPriceINR: toINR(itemTotal, currency, orderExchangeRate),
+                // Freeze the GST rate charged on this line so the invoice shows the
+                // real per-item rate, not a blended average across mixed-rate carts.
+                gstPercentage: customerGstRate,
                 transportType: lineTransport,
                 courier: lineCourier,
                 logistics: lineLogisticsSnapshot || undefined,
@@ -453,17 +564,6 @@ const createOrder = async (req, res) => {
           discount = 1.6760000000000002.
         */
         const roundedSubtotal = round2(subtotal);
-        // Server-computed GST wins over the client's figure. The client value is
-        // only compared, so a genuine mismatch (stale cart price, tampering) is
-        // visible in the logs instead of silently becoming the invoiced tax.
-        const roundedTax = round2(computedTax);
-        const clientTax = round2(Number(tax) || 0);
-        if (Math.abs(clientTax - roundedTax) > 0.01) {
-            console.warn(
-                `[createOrder] Client tax ${clientTax} != server tax ${roundedTax} ` +
-                `(user ${userId}, ${currency}). Storing the server figure.`
-            );
-        }
         // ── Discount: re-derived server-side from the coupon row ─────────────
         // The client reads `discount` out of localStorage, so it is attacker-
         // controlled. Re-run the same validator the /coupons/apply endpoint uses,
@@ -491,6 +591,46 @@ const createOrder = async (req, res) => {
             validatedCouponCode = evaluated.code;
             couponGrantsFreeShipping = Boolean(evaluated.freeShipping);
         }
+        // ── GST on the POST-coupon net (correct treatment) ──────────────────
+        // Under GST, a discount recorded on the invoice and given at the time of
+        // supply is excluded from the taxable value — so the coupon must reduce the
+        // base BEFORE tax, not after. Allocate the coupon across the taxable lines
+        // in proportion to each line's value, tax each line's net at its own frozen
+        // rate, and sum. Proportional allocation keeps mixed-rate carts correct, and
+        // the invoice re-derives the identical split from (subtotal, discount, each
+        // line's totalPrice + gstPercentage), so the printed lines reconcile exactly.
+        // Product-level discounts and automatic offers are already baked into each
+        // line's price, so they are taxed net too. The VENDOR settlement tax above is
+        // deliberately left on the vendor's own base — M2C's margin absorbs the coupon.
+        // Accumulate the tax, splitting each line into CGST/SGST (intrastate) or
+        // IGST (interstate) per its own product rate — products may differ.
+        let cgstTotal = 0, sgstTotal = 0, igstTotal = 0;
+        for (const oi of orderItemsData) {
+            const gross = oi.totalPrice;
+            const couponShare = roundedSubtotal > 0 ? (gross / roundedSubtotal) * roundedDiscount : 0;
+            const netTaxable = Math.max(0, gross - couponShare);
+            const lineTax = round2(netTaxable * (oi.gstPercentage || 0) / 100);
+            computedTax += lineTax;
+            const split = splitLineTax(lineTax, intrastate);
+            cgstTotal += split.cgst;
+            sgstTotal += split.sgst;
+            igstTotal += split.igst;
+        }
+        // Server-computed GST wins over the client's figure. The client value is
+        // only compared, so a genuine mismatch (stale cart price, tampering) is
+        // visible in the logs instead of silently becoming the invoiced tax.
+        const roundedTax = round2(computedTax);
+        const cgstAmount = round2(cgstTotal);
+        const sgstAmount = round2(sgstTotal);
+        const igstAmount = round2(igstTotal);
+        const taxType = roundedTax > 0 ? (intrastate ? 'INTRASTATE' : 'INTERSTATE') : null;
+        const clientTax = round2(Number(tax) || 0);
+        if (Math.abs(clientTax - roundedTax) > 0.01) {
+            console.warn(
+                `[createOrder] Client tax ${clientTax} != server tax ${roundedTax} ` +
+                `(user ${userId}, ${currency}). Storing the server figure.`
+            );
+        }
         const clientDiscount = round2(Number(discount) || 0);
         if (Math.abs(clientDiscount - roundedDiscount) > 0.01) {
             console.warn(
@@ -511,6 +651,7 @@ const createOrder = async (req, res) => {
                 ? toINR(roundedSubtotal, currency, orderExchangeRate)
                 : roundedSubtotal,
             couponGrantsFreeShipping,
+            region: currency, // 'INR'|'USD' — normalized inside isVisibleInRegion
         });
         const roundedShipping = freeShipping
             ? 0
@@ -530,6 +671,36 @@ const createOrder = async (req, res) => {
         const totalAmount = Math.max(0, round2(
             roundedSubtotal + roundedShipping + roundedTax - roundedDiscount
         ));
+
+        // ── Wallet redemption (store credit) ─────────────────────────────────
+        // Store credit is a TENDER applied AFTER the invoice total is final — it
+        // never touches subtotal/discount/tax. Wallet balance is INR; convert to
+        // the order currency to cap it, and remember the INR amount to debit.
+        let walletApplied = 0;      // order currency
+        let walletAppliedINR = 0;   // actually debited from the wallet
+        const requestedWallet = Math.max(0, Number(req.body?.walletApplied) || 0);
+        if (requestedWallet > 0 || paymentMethod === 'WALLET') {
+            const wallet = await prisma.wallet.findUnique({ where: { customerId: userId } });
+            const balanceINR = wallet?.balance || 0;
+            const balanceOrderCcy = currency === 'USD'
+                ? round2(orderExchangeRate ? balanceINR / orderExchangeRate : 0)
+                : balanceINR;
+            const maxRedeem = round2(Math.min(balanceOrderCcy, totalAmount));
+            const want = paymentMethod === 'WALLET' ? totalAmount : requestedWallet;
+            walletApplied = round2(Math.max(0, Math.min(want, maxRedeem)));
+            walletAppliedINR = currency === 'USD' ? round2(walletApplied * orderExchangeRate) : walletApplied;
+            if (walletAppliedINR > balanceINR) walletAppliedINR = round2(balanceINR);
+        }
+        // Net still payable via gateway after wallet.
+        const netPayable = Math.max(0, round2(totalAmount - walletApplied));
+
+        // A pure-wallet order must be fully covered by the balance.
+        if (paymentMethod === 'WALLET' && netPayable > 0.009) {
+            return res.status(400).json({
+                success: false,
+                error: 'Your wallet balance does not cover the full amount. Please choose another payment method.'
+            });
+        }
 
         // ── Payment amount reconciliation ────────────────────────────────────
         // The HMAC signature proves the payment exists and is ours — it does NOT
@@ -584,16 +755,18 @@ const createOrder = async (req, res) => {
                 let expected = null;
                 let paid = null;
                 let unit = currency;
+                // Compare against the NET payable (total minus any wallet credit),
+                // since that is what the Razorpay order was raised for.
                 if (Number.isFinite(quotedAmount) && quotedCurrency === currency) {
-                    expected = totalAmount;
+                    expected = netPayable;
                     paid = quotedAmount;
                 } else {
                     // Fallback for orders raised before the quote was stamped: compare
                     // in INR using this order's own rate snapshot.
                     unit = 'INR';
                     expected = currency === 'USD'
-                        ? toINR(totalAmount, currency, orderExchangeRate)
-                        : totalAmount;
+                        ? toINR(netPayable, currency, orderExchangeRate)
+                        : netPayable;
                     paid = round2(paidPaise / 100);
                 }
 
@@ -660,6 +833,12 @@ const createOrder = async (req, res) => {
                     subtotal: roundedSubtotal,
                     shippingCost: roundedShipping,
                     tax: roundedTax,
+                    // GST split (display) — total stays `tax`. Intrastate =>
+                    // cgst+sgst, interstate => igst. All 0 / null when no GST.
+                    cgstAmount,
+                    sgstAmount,
+                    igstAmount,
+                    taxType,
                     discount: roundedDiscount,
                     totalAmount,
                     couponCode: validatedCouponCode,
@@ -670,6 +849,10 @@ const createOrder = async (req, res) => {
                     taxINR: round2(toINR(roundedTax, currency, orderExchangeRate)),
                     shippingCostINR: round2(toINR(roundedShipping, currency, orderExchangeRate)),
                     discountINR: round2(toINR(roundedDiscount, currency, orderExchangeRate)),
+                    // Wallet tender (order currency) + INR twin + what the gateway was charged.
+                    walletApplied,
+                    walletAppliedINR: round2(walletAppliedINR),
+                    amountPaid: netPayable,
                     paymentStatus: paymentMethod === 'COD' ? 'PENDING' : 'PAID',
                     paymentMethod,
                     paymentId,
@@ -712,6 +895,21 @@ const createOrder = async (req, res) => {
                     where: { code: validatedCouponCode },
                     data: { usedCount: { increment: 1 } },
                 });
+            }
+
+            // Debit the wallet inside the transaction — a rollback (e.g. stock
+            // shortage below) also reverses the debit. debitWallet re-reads the
+            // balance and throws if it's insufficient, so it can't over-spend.
+            if (walletAppliedINR > 0) {
+                const { debitWallet } = require('../utils/wallet');
+                await debitWallet({
+                    customerId: userId,
+                    amount: walletAppliedINR,
+                    source: 'ORDER_REDEMPTION',
+                    description: `Applied to order ${orderDisplayId}`,
+                    refs: { orderId: newOrder.id, orderCode: orderDisplayId },
+                    actor: { id: userId, name: user.name, type: 'customer' },
+                }, tx);
             }
 
             // Update Stock
@@ -873,6 +1071,9 @@ const createOrder = async (req, res) => {
                         vendorId: vid,
                         vendorName: group.vendorName,
                         status: 'ORDER_CREATED',
+                        // Vendor has 6 hours to accept before the overdue sweep alerts
+                        // admin + vendor.
+                        acceptanceDeadline: new Date(Date.now() + 6 * 60 * 60 * 1000),
                     },
                 });
                 await tx.orderItem.updateMany({
@@ -957,6 +1158,30 @@ const createOrder = async (req, res) => {
             }).catch(() => {});
         }
 
+        // Email the customer their order confirmation with the tax-invoice PDF attached.
+        // Fire-and-forget — a mail failure must never fail the order. Re-fetch the order
+        // fresh (with items) + company/invoice-logo settings so the PDF has everything.
+        (async () => {
+            try {
+                const { sendOrderConfirmationEmail } = require('../utils/email/orderEmailSender');
+                const [fullOrder, company, invSettings] = await Promise.all([
+                    prisma.order.findUnique({ where: { id: result.id }, include: { items: true } }),
+                    prisma.companyInfo.findFirst({ select: { companyName: true, gstNumber: true, registeredAddress: true, companyLogo: true } }),
+                    prisma.invoiceSettings.findFirst({ select: { invoiceLogo: true } }),
+                ]);
+                if (fullOrder?.customerEmail) {
+                    await sendOrderConfirmationEmail(fullOrder, {
+                        companyName: company?.companyName,
+                        gstNumber: company?.gstNumber,
+                        address: company?.registeredAddress,
+                        companyLogo: invSettings?.invoiceLogo || company?.companyLogo,
+                    });
+                }
+            } catch (e) {
+                console.warn('[order] confirmation email skipped:', e.message);
+            }
+        })();
+
         // Fire-and-forget: email vendors whose stock dropped to its low-stock
         // alert level because of this order (deduped per low-stock episode).
         const affectedInventoryIds = [...new Set(stockUpdates.map(u => u.inventoryItemId).filter(Boolean))];
@@ -994,12 +1219,14 @@ const getUserOrders = async (req, res) => {
         const orders = await prisma.order.findMany({
             where: { customerId: userId },
             include: {
-                items: ACTIVE_ITEMS_FILTER,
+                items: ITEMS_WITH_SHIPMENT_STATUS,
             },
             orderBy: {
                 createdAt: 'desc'
             }
         });
+        orders.forEach(pruneReshippedItems);
+        await attachItemReturnable(orders);
 
         res.json({
             success: true,
@@ -1030,7 +1257,7 @@ const getOrderById = async (req, res) => {
             order = await prisma.order.findUnique({
                 where: { id },
                 include: {
-                    items: ACTIVE_ITEMS_FILTER,
+                    items: ITEMS_WITH_SHIPMENT_STATUS,
                     statusHistory: true,
                     hub: { select: { name: true, city: true, state: true } },
                     shipments: { select: { hub: { select: { name: true, city: true, state: true } } } }
@@ -1043,7 +1270,7 @@ const getOrderById = async (req, res) => {
             order = await prisma.order.findUnique({
                 where: { orderId: id },
                 include: {
-                    items: ACTIVE_ITEMS_FILTER,
+                    items: ITEMS_WITH_SHIPMENT_STATUS,
                     statusHistory: true,
                     hub: { select: { name: true, city: true, state: true } },
                     shipments: { select: { hub: { select: { name: true, city: true, state: true } } } }
@@ -1058,6 +1285,9 @@ const getOrderById = async (req, res) => {
             });
         }
 
+        // Keep reship-hiding for live orders; show all items for a cancelled/returned order.
+        pruneReshippedItems(order);
+
         // Ensure user owns the order
         if (order.customerId !== userId) {
             return res.status(403).json({
@@ -1065,6 +1295,8 @@ const getOrderById = async (req, res) => {
                 error: 'Unauthorized access to order'
             });
         }
+
+        await attachItemReturnable(order);
 
         // Timeline places (city/state only):
         //   processing → the vendor's warehouse/factory (where the goods are stored)
@@ -1142,11 +1374,20 @@ const cancelMyOrder = async (req, res) => {
             });
         }
 
+        const { restoreStockForOrder } = require('../utils/restoreStock');
+        let stockHistoryRecords = [];
         await prisma.$transaction(async (tx) => {
             // Stop the vendor payout for a cancelled order.
             await tx.settlement.updateMany({
                 where: { orderId: order.id, status: { in: ['Pending', 'Processing'] } },
                 data: { status: 'Cancelled' },
+            });
+            // Put the reserved stock back on sale — the items never shipped.
+            stockHistoryRecords = await restoreStockForOrder(tx, order, {
+                reason: `Order cancelled: ${order.orderId}`,
+                changedBy: userId,
+                changedByType: 'customer',
+                changedByName: 'Customer',
             });
             await tx.order.update({
                 where: { id: order.id },
@@ -1187,13 +1428,35 @@ const cancelMyOrder = async (req, res) => {
             }
         });
 
-        // Refund (fire after the state change so a gateway hiccup can't undo the cancel).
-        const { issueRefund } = require('../utils/refund');
-        const refund = await issueRefund(order);
-        const updated = await prisma.order.update({
-            where: { id: order.id },
-            data: { refundStatus: refund.refundStatus, refundId: refund.refundId, refundAmount: order.totalAmount },
-        });
+        // Persist restock audit rows (best-effort — never block the cancel).
+        if (stockHistoryRecords.length > 0) {
+            prisma.stockChangeHistory.createMany({ data: stockHistoryRecords }).catch(() => {});
+        }
+
+        // Refund policy: ALWAYS to the M2C Wallet as instant store credit — never
+        // back to the gateway. The captured amount stays with M2C; the customer
+        // withdraws from the wallet separately if they want cash. Only paid,
+        // non-COD orders have anything to refund.
+        const wasPaid = order.paymentStatus === 'PAID' && order.paymentMethod !== 'COD';
+        let updated;
+        if (wasPaid) {
+            const creditInr = order.totalAmountINR != null ? order.totalAmountINR : order.totalAmount;
+            try {
+                const { creditWallet } = require('../utils/wallet');
+                await creditWallet({
+                    customerId: userId, amount: creditInr, source: 'REFUND',
+                    description: `Cancellation refund for ${order.orderId}`,
+                    refs: { orderId: order.id, orderCode: order.orderId },
+                    actor: { id: userId, name: 'Customer', type: 'customer' },
+                });
+            } catch (e) { console.warn('[cancel] wallet credit failed:', e?.message); }
+            updated = await prisma.order.update({
+                where: { id: order.id },
+                data: { refundStatus: 'WALLET', refundAmount: order.totalAmount },
+            });
+        } else {
+            updated = order;
+        }
 
         // Notify vendors so they stop processing.
         try {
@@ -1208,7 +1471,10 @@ const cancelMyOrder = async (req, res) => {
             }
         } catch { /* notifications are best-effort */ }
 
-        res.json({ success: true, data: updated, message: 'Order cancelled. Your refund has been initiated.' });
+        const refundMsg = wasPaid
+            ? 'Order cancelled. Your refund has been added to your M2C Wallet.'
+            : 'Order cancelled.';
+        res.json({ success: true, data: updated, message: refundMsg });
     } catch (error) {
         console.error('Cancel my order error:', error);
         res.status(500).json({ success: false, error: 'Failed to cancel order' });
@@ -1268,8 +1534,77 @@ const requestReturn = async (req, res) => {
     }
 };
 
+// Pre-payment fulfilment check. Runs the same cart validations that createOrder
+// enforces (stock, shipping method, courier availability) BEFORE the customer is
+// sent to the payment gateway — so we never capture a payment for an order that
+// createOrder would then reject (which stranded the customer: charged, no order,
+// bounced back to checkout). Returns { success:true } when the cart can be placed,
+// or the first blocking problem as a 400 with a user-facing message.
+const validateCheckout = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const currency = req.body?.currency === 'USD' ? 'USD' : 'INR';
+
+        const cart = await prisma.cart.findFirst({ where: { userId }, include: { items: true } });
+        if (!cart || cart.items.length === 0) {
+            return res.status(400).json({ success: false, error: 'Your cart is empty.' });
+        }
+
+        const products = await Promise.all(cart.items.map((item) =>
+            prisma.product.findUnique({
+                where: { id: item.productId },
+                include: { variants: item.variantId ? { where: { id: item.variantId } } : false },
+            })
+        ));
+
+        for (let i = 0; i < cart.items.length; i++) {
+            const item = cart.items[i];
+            const product = products[i];
+
+            if (!product) {
+                return res.status(400).json({ success: false, error: 'A product in your cart is no longer available. Please review your cart.' });
+            }
+            if (!product.inStock) {
+                return res.status(400).json({ success: false, error: `"${product.name}" is out of stock. Please remove it to continue.` });
+            }
+            const variant = item.variantId && product.variants?.length > 0 ? product.variants[0] : null;
+            const checkStock = variant ? variant.stock : product.totalStock;
+            if (product.trackInventory && checkStock < item.quantity) {
+                return res.status(400).json({ success: false, error: `Insufficient stock for "${product.name}".` });
+            }
+
+            // Shipping method + courier — the checks that produced "courier not
+            // available" only AFTER payment. Mirror them here, pre-payment.
+            const allowedTransports = Array.isArray(product.logisticsConfig?.transportTypes)
+                ? product.logisticsConfig.transportTypes
+                : [];
+            if (allowedTransports.length > 1 && !item.transportType) {
+                return res.status(400).json({ success: false, error: `Please choose a shipping method for "${product.name}" before placing the order.` });
+            }
+            if (item.transportType && !allowedTransports.includes(item.transportType)) {
+                return res.status(400).json({ success: false, error: `The selected shipping method is not available for "${product.name}".` });
+            }
+            const lineTransport = item.transportType || allowedTransports[0] || null;
+            if (allowedTransports.length > 0) {
+                if (!item.courier) {
+                    return res.status(400).json({ success: false, error: `Please choose a courier partner for "${product.name}" before placing the order.` });
+                }
+                if (!(await isCourierAvailable(item.courier, currency, lineTransport))) {
+                    return res.status(400).json({ success: false, error: `The selected courier is not available for "${product.name}". Please go back to your cart and choose a different courier.` });
+                }
+            }
+        }
+
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Validate checkout error:', error);
+        return res.status(500).json({ success: false, error: 'Could not validate your cart. Please try again.' });
+    }
+};
+
 module.exports = {
     createOrder,
+    validateCheckout,
     getUserOrders,
     getOrderById,
     cancelMyOrder,

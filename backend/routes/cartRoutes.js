@@ -4,7 +4,8 @@ const {
   getCart,
   updateCartItem,
   removeFromCart,
-  clearCart
+  clearCart,
+  addFreeGift
 } = require('../controllers/cartController');
 const { authenticateToken, optionalAuth } = require('../middleware/auth');
 
@@ -16,6 +17,7 @@ router.use(optionalAuth);
 
 // Cart routes
 router.post('/add', authenticateToken, addToCart);
+router.post('/gift', authenticateToken, addFreeGift);
 router.get('/', getCart);
 router.put('/:itemId', authenticateToken, updateCartItem);
 router.delete('/:itemId', authenticateToken, removeFromCart);

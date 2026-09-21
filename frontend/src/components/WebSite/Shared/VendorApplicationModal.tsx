@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Send, Store, X, Building2, FileText, Globe, Mail, Phone, User, Check, Loader2 } from 'lucide-react';
+import { Send, Store, X, Building2, FileText, Globe, Mail, Phone, User, Check, Loader2, ShieldCheck, KeyRound } from 'lucide-react';
 import { showCenterNotice } from '@/components/UI/CenterNotice';
 import { enquiryService } from '@/services/enquiryService';
 
 const EMPTY = {
+  vendorType: 'REGISTERED' as 'REGISTERED' | 'UNREGISTERED',
   name: '',
   companyName: '',
   gstNumber: '',
@@ -86,6 +87,26 @@ export default function VendorApplicationModal({
    */
   const [gstTouched, setGstTouched] = useState(false);
 
+  /**
+   * Email ownership gate. The form cannot be submitted until the applicant has
+   * proven they can receive mail at the address they typed: request a code,
+   * type it back, get it verified. Enforced on the server too, so this is UX,
+   * not the security boundary.
+   *
+   * `verifiedEmail` remembers the exact address that was verified — edit the
+   * email afterwards and the green state falls away, because the new address is
+   * unproven.
+   */
+  const [otpStage, setOtpStage] = useState<'idle' | 'sent'>('idle');
+  const [otpValue, setOtpValue] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpNotice, setOtpNotice] = useState('');
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState('');
+
   const panelRef = useRef<HTMLDivElement | null>(null);
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
   const restoreFocusTo = useRef<HTMLElement | null>(null);
@@ -96,6 +117,19 @@ export default function VendorApplicationModal({
     const next = name === 'gstNumber' ? value.toUpperCase() : value;
     setForm((prev) => ({ ...prev, [name]: next }));
 
+    // Editing the email un-proves it — unless they've typed the exact address
+    // that was already verified (e.g. after fixing and reverting a typo).
+    if (name === 'email') {
+      const matches = next.trim().toLowerCase() === verifiedEmail && verifiedEmail !== '';
+      setEmailVerified(matches);
+      if (!matches) {
+        setOtpStage('idle');
+        setOtpValue('');
+        setOtpError('');
+        setOtpNotice('');
+      }
+    }
+
     if (name === 'gstNumber') {
       const complete = next.length >= GST_LENGTH;
       if (!next || (!gstTouched && !complete)) setGstError('');
@@ -103,6 +137,53 @@ export default function VendorApplicationModal({
       else setGstError('');
     }
   };
+
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
+
+  const handleSendOtp = async () => {
+    if (!emailValid || sendingOtp || resendIn > 0) return;
+    setSendingOtp(true);
+    setOtpError('');
+    setOtpNotice('');
+    try {
+      const res = await enquiryService.sendOtp(form.email.trim(), form.name.trim());
+      setOtpStage('sent');
+      setOtpValue('');
+      setResendIn(30);
+      setOtpNotice(res.message || `A verification code has been sent to ${form.email.trim()}.`);
+    } catch (error) {
+      setOtpError((error as Error)?.message || 'Could not send the code. Please try again.');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (otpValue.length !== 6 || verifyingOtp) return;
+    setVerifyingOtp(true);
+    setOtpError('');
+    try {
+      await enquiryService.verifyOtp(form.email.trim(), otpValue);
+      setEmailVerified(true);
+      setVerifiedEmail(form.email.trim().toLowerCase());
+      setOtpStage('idle');
+      setOtpValue('');
+      setOtpNotice('');
+      setResendIn(0);
+    } catch (error) {
+      setOtpError((error as Error)?.message || 'Incorrect code. Please try again.');
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  // Resend cooldown countdown. setTimeout, not a render-time clock — impure
+  // calls during render are disallowed in this codebase.
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
 
   const handleGstBlur = () => {
     setGstTouched(true);
@@ -117,6 +198,9 @@ export default function VendorApplicationModal({
    * speaks up once you try, and a six-field form should say where you are
    * while you are still inside it.
    */
+  // GST is only a required answer for a REGISTERED vendor; an unregistered vendor
+  // can apply without one.
+  const isRegistered = form.vendorType === 'REGISTERED';
   const filled = useMemo(() => ({
     name: form.name.trim() !== '',
     companyName: form.companyName.trim() !== '',
@@ -127,19 +211,40 @@ export default function VendorApplicationModal({
     phone: form.phone.trim() !== '',
   }), [form]);
 
-  const answeredCount = Object.values(filled).filter(Boolean).length;
-  const requiredCount = Object.keys(filled).length;
+  // GST counts toward the progress only when a registered vendor is applying.
+  const requiredKeys = (isRegistered
+    ? ['name', 'companyName', 'email', 'gstNumber', 'phone']
+    : ['name', 'companyName', 'email', 'phone']) as (keyof typeof filled)[];
+  // Email verification is a required step of its own, so it counts toward the
+  // meter alongside the text fields.
+  const answeredCount = requiredKeys.filter((k) => filled[k]).length + (emailVerified ? 1 : 0);
+  const requiredCount = requiredKeys.length + 1;
   const readyToSend = answeredCount === requiredCount;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    setGstTouched(true);
-    if (!form.gstNumber) {
-      setGstError('GST Number is required');
+    // Email must be verified first. The server enforces this too (403), but
+    // catching it here keeps the applicant on the form with a clear pointer.
+    if (!emailVerified) {
+      setOtpError('Please verify your email address before submitting.');
+      if (otpStage !== 'sent') setOtpStage(emailValid ? otpStage : 'idle');
       return;
     }
-    if (!GST_PATTERN.test(form.gstNumber)) {
+
+    setGstTouched(true);
+    if (isRegistered) {
+      // Registered vendor → GST is mandatory and must be valid.
+      if (!form.gstNumber) {
+        setGstError('GST Number is required');
+        return;
+      }
+      if (!GST_PATTERN.test(form.gstNumber)) {
+        setGstError(`GST Number must be exactly ${GST_LENGTH} alphanumeric characters`);
+        return;
+      }
+    } else if (form.gstNumber && !GST_PATTERN.test(form.gstNumber)) {
+      // Unregistered vendor → GST optional, but if they typed one it must be valid.
       setGstError(`GST Number must be exactly ${GST_LENGTH} alphanumeric characters`);
       return;
     }
@@ -149,7 +254,8 @@ export default function VendorApplicationModal({
       await enquiryService.submitEnquiry({
         name: form.name,
         companyName: form.companyName,
-        gstNumber: form.gstNumber,
+        vendorType: form.vendorType,
+        gstNumber: form.gstNumber || undefined,
         email: form.email,
         phone: form.phone,
         website: form.website || undefined,
@@ -157,6 +263,13 @@ export default function VendorApplicationModal({
       setForm(EMPTY);
       setGstError('');
       setGstTouched(false);
+      setEmailVerified(false);
+      setVerifiedEmail('');
+      setOtpStage('idle');
+      setOtpValue('');
+      setOtpError('');
+      setOtpNotice('');
+      setResendIn(0);
       onClose();
       // Centre-screen rather than a corner toast: submitting an application is
       // the end of a task, and the confirmation should stop you rather than
@@ -322,7 +435,7 @@ export default function VendorApplicationModal({
                 id="vendor-application-title"
                 className="font-playfair text-xl font-semibold tracking-tight text-[#1a1a1a] sm:text-2xl"
               >
-                Vendor Application
+                Join as a Vendor
               </h2>
               <p className="mt-0.5 text-[13px] text-[#5f5550]">Fill in your details to join our marketplace</p>
             </div>
@@ -375,6 +488,43 @@ export default function VendorApplicationModal({
               </div>
             </div>
 
+            {/* Registered vs unregistered — decides whether GST is mandatory. */}
+            <div className="mb-5">
+              <label className="mb-2 block text-[13px] font-semibold text-[#3d352f]">
+                Vendor type <span className="text-[#e01a1b]">*</span>
+              </label>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {([
+                  { value: 'REGISTERED', label: 'Registered vendor', hint: 'Has a GST number' },
+                  { value: 'UNREGISTERED', label: 'Unregistered vendor', hint: 'No GST number' },
+                ] as const).map((opt) => {
+                  const active = form.vendorType === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setForm((f) => ({ ...f, vendorType: opt.value }));
+                        if (opt.value === 'UNREGISTERED') { setGstError(''); setGstTouched(false); }
+                      }}
+                      className={`flex items-center justify-between gap-2 rounded-xl border px-4 py-3 text-left transition-all ${
+                        active ? 'border-[#e01a1b] bg-[#fdf1ef] ring-1 ring-[#e01a1b]/30' : 'border-[#e6dcd3] bg-white hover:border-[#e01a1b]/40'
+                      }`}
+                    >
+                      <span>
+                        <span className={`block text-sm font-semibold ${active ? 'text-[#c41617]' : 'text-[#3d352f]'}`}>{opt.label}</span>
+                        <span className="block text-[12px] text-[#a89a8d]">{opt.hint}</span>
+                      </span>
+                      <span className={`h-4 w-4 shrink-0 rounded-full border-2 ${active ? 'border-[#e01a1b] bg-[#e01a1b]' : 'border-[#cbbfb4]'}`} />
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-[12.5px] text-[#a89a8d]">
+                {isRegistered ? 'GST number is required for registered vendors.' : 'GST number is optional for unregistered vendors.'}
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div className="group">
                 <label htmlFor="vendor-name" className={LABEL_CLASS}>
@@ -419,7 +569,9 @@ export default function VendorApplicationModal({
 
               <div className="group">
                 <label htmlFor="vendor-gst" className={LABEL_CLASS}>
-                  GST Number <span className="text-[#e01a1b]">*</span>
+                  GST Number {isRegistered
+                    ? <span className="text-[#e01a1b]">*</span>
+                    : <span className="font-normal text-[#a89a8d]">(optional)</span>}
                 </label>
                 <div className="relative">
                   <FileText aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#c0b3a6]" />
@@ -427,7 +579,7 @@ export default function VendorApplicationModal({
                     type="text"
                     id="vendor-gst"
                     name="gstNumber"
-                    required
+                    required={isRegistered}
                     maxLength={GST_LENGTH}
                     value={form.gstNumber}
                     onChange={handleChange}
@@ -456,6 +608,11 @@ export default function VendorApplicationModal({
               <div className="group">
                 <label htmlFor="vendor-email" className={LABEL_CLASS}>
                   Email Address <span className="text-[#e01a1b]">*</span>
+                  {emailVerified && (
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#e6f5ec] px-2 py-0.5 text-[11px] font-semibold text-[#1f9d57] align-middle">
+                      <ShieldCheck className="h-3 w-3" strokeWidth={2.5} /> Verified
+                    </span>
+                  )}
                 </label>
                 <div className="relative">
                   <Mail aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#c0b3a6]" />
@@ -466,11 +623,71 @@ export default function VendorApplicationModal({
                     required
                     value={form.email}
                     onChange={handleChange}
-                    className={`${FIELD_CLASS} pl-11 pr-11`}
+                    className={`${FIELD_CLASS} pl-11 ${emailVerified ? 'pr-11' : 'pr-[104px]'}`}
                     placeholder="your.email@company.com"
                   />
-                  <FieldTick done={filled.email} />
+                  {emailVerified ? (
+                    <FieldTick done />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={!emailValid || sendingOtp || resendIn > 0}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-lg bg-[#e01a1b] px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#c41617] disabled:cursor-not-allowed disabled:bg-[#e6b9b9]"
+                    >
+                      {sendingOtp ? (
+                        <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <ShieldCheck aria-hidden className="h-3.5 w-3.5" />
+                      )}
+                      {sendingOtp ? 'Sending' : resendIn > 0 ? `Resend ${resendIn}s` : otpStage === 'sent' ? 'Resend' : 'Verify'}
+                    </button>
+                  )}
                 </div>
+
+                {/* Code-entry row — appears after a code has been sent, until the
+                    address is verified. */}
+                {otpStage === 'sent' && !emailVerified && (
+                  <div className="mt-2.5 flex items-stretch gap-2">
+                    <div className="relative flex-1">
+                      <KeyRound aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#c0b3a6]" />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        aria-label="Verification code"
+                        value={otpValue}
+                        onChange={(e) => {
+                          setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6));
+                          if (otpError) setOtpError('');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); handleVerifyOtp(); }
+                        }}
+                        maxLength={6}
+                        className={`${FIELD_CLASS} pl-11 pr-4 tracking-[0.4em] font-semibold`}
+                        placeholder="6-digit code"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleVerifyOtp}
+                      disabled={otpValue.length !== 6 || verifyingOtp}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#157f4a] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#116b3e] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {verifyingOtp ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : <Check aria-hidden className="h-4 w-4" strokeWidth={3} />}
+                      Verify
+                    </button>
+                  </div>
+                )}
+
+                {otpError ? (
+                  <p className="mt-1.5 text-[12.5px] text-[#e01a1b]">{otpError}</p>
+                ) : otpNotice ? (
+                  <p className="mt-1.5 text-[12.5px] text-[#157f4a]">{otpNotice}</p>
+                ) : !emailVerified ? (
+                  <p className="mt-1.5 text-[12.5px] text-[#a89a8d]">Verify your email — we&rsquo;ll send a one-time code to confirm it.</p>
+                ) : null}
               </div>
 
               <div className="group">

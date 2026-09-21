@@ -63,9 +63,10 @@ const getApprovalBadge = (item: APIInventoryItem) => {
 const computeStockFlags = (item: APIInventoryItem) => {
   const variants = item.variants || []
   if (variants.length > 0) {
-    const allZero = variants.every(v => (v.stock || 0) === 0) && (item.baseStock || 0) === 0
-    const anyLow = variants.some(v => (v.stock || 0) > 0 && (v.stock || 0) <= (v.effectiveThreshold ?? item.lowStockAlert))
-    return { out: allZero, low: !allZero && anyLow }
+    // The parent row reflects the BASE (no-variant) unit's stock — each variant carries
+    // its own row/status below. Base 0 → Out of Stock; base at/below the alert → Low Stock.
+    const base = item.baseStock || 0
+    return { out: base === 0, low: base > 0 && base <= item.lowStockAlert }
   }
   return {
     out: (item.currentStock || 0) === 0,

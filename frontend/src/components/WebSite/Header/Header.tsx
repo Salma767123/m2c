@@ -19,6 +19,7 @@ import {
 import { IconUserFilled } from '@tabler/icons-react';
 import DiscoverNav from "./Discover/DiscoverNav";
 import CategoryRibbon from "./CategoryRibbon/CategoryRibbon";
+import SearchAutocomplete from "./SearchAutocomplete";
 import { isAuthenticated } from "@/lib/auth";
 import { recordSearch } from "@/lib/browsingHistory";
 import { cartService } from "@/services/cartService";
@@ -34,7 +35,7 @@ import LogoutConfirmModal from "@/components/WebSite/Shared/LogoutConfirmModal";
 
 // Pages that show the PRIMARY logo. Every other page shows the secondary logo.
 // Edit this list to move a page between the two logos.
-const PRIMARY_LOGO_ROUTES = ['/', '/contact', '/about', '/terms', '/privacy', '/returns'];
+const PRIMARY_LOGO_ROUTES = ['/', '/contact', '/about', '/terms', '/privacy', '/returns', '/faq'];
 
 const Header = () => {
   const pathname = usePathname();
@@ -54,6 +55,7 @@ const Header = () => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
   const [userName, setUserName] = useState("");
+  const [userTitle, setUserTitle] = useState("");
   const [userImage, setUserImage] = useState("");
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
@@ -122,15 +124,18 @@ const Header = () => {
         try {
           const user = JSON.parse(userData)
           setUserName(user.name || '')
+          setUserTitle(user.title || '')
           setUserImage(user.image || '')
         } catch {
           setIsUserLoggedIn(false)
           setUserName('')
+          setUserTitle('')
           setUserImage('')
         }
       } else {
         setIsUserLoggedIn(false)
         setUserName('')
+        setUserTitle('')
         setUserImage('')
       }
     }
@@ -302,39 +307,53 @@ const Header = () => {
         <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14 sm:h-16 lg:h-[68px] gap-1 min-[360px]:gap-2 sm:gap-4">
 
-            {/* Logo — sized to sit comfortably in the row without dominating it. */}
-            <Link href="/" className="flex items-center shrink-0">
+            {/* Logo — sized to sit comfortably in the row without dominating it.
+                On hover the full company name unfurls to the right (desktop only):
+                a width + fade + slide reveal, so it stays hidden until wanted and
+                never reserves layout space when collapsed. */}
+            <Link
+              href="/"
+              aria-label="M2C Markdowns Pvt Ltd — Home"
+              className="group flex items-center shrink-0"
+            >
               <CompanyLogo
                 variant={logoVariant}
-                className="h-7 min-[360px]:h-8 sm:h-12 lg:h-14 w-auto object-contain"
-                skeletonClassName="h-7 min-[360px]:h-8 sm:h-12 lg:h-14 aspect-square bg-gray-100"
-                fallbackSizes="(max-width: 360px) 26px, (max-width: 640px) 32px, (max-width: 1024px) 48px, 56px"
+                className="h-8 min-[360px]:h-10 sm:h-14 lg:h-16 w-auto object-contain transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+                skeletonClassName="h-8 min-[360px]:h-10 sm:h-14 lg:h-16 aspect-square bg-gray-100"
+                fallbackSizes="(max-width: 360px) 32px, (max-width: 640px) 40px, (max-width: 1024px) 56px, 64px"
                 priority
               />
+              {/* Hover reveal only on the SECONDARY-logo pages (product/other views
+                  where the logo is just the icon). The main brand/legal pages —
+                  home, about, contact, terms, privacy, returns, faq — already show
+                  the full wordmark in the primary logo, so no reveal there. */}
+              {logoVariant === 'secondary' && (
+                <span
+                  aria-hidden="true"
+                  className="hidden sm:flex items-center overflow-hidden whitespace-nowrap max-w-0 -translate-x-2 opacity-0 transition-all duration-500 ease-out group-hover:max-w-[260px] group-hover:translate-x-0 group-hover:opacity-100 group-hover:ml-2.5 lg:group-hover:ml-3"
+                >
+                  <span aria-hidden="true" className="mr-2.5 h-7 w-px shrink-0 bg-gradient-to-b from-transparent via-[#e6dcd0] to-transparent" />
+                  {/* Wordmark: "M2C" with M/C in red and 2 in yellow, "Markdowns"
+                      in red (no italic). */}
+                  <span className="flex items-baseline gap-1.5 leading-none">
+                    <span className="font-extrabold tracking-tight text-[17px] lg:text-xl">
+                      <span className="text-[#e01a1b]">M</span>
+                      <span className="text-[#f5b301]">2</span>
+                      <span className="text-[#e01a1b]">C</span>
+                    </span>
+                    <span className="font-extrabold uppercase tracking-wide text-[#e01a1b] text-[15px] lg:text-lg">Markdowns</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#a89a8d] lg:text-[10px]">Pvt Ltd</span>
+                  </span>
+                </span>
+              )}
             </Link>
 
             {/* Prominent inline search — the primary way to find products
                 (Amazon/Flipkart/Myntra pattern). Fills the header on md+; on
                 mobile the compact search icon in the actions opens the modal. */}
-            <form onSubmit={handleSearchSubmit} className="hidden md:flex flex-1 min-w-0 max-w-xs lg:max-w-sm mx-4 lg:mx-6">
-              <div className="relative w-full">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search for products, categories & more"
-                  aria-label="Search products"
-                  className="w-full pl-4 pr-28 py-2 lg:py-2.5 rounded-full bg-gray-50 border border-gray-200 text-sm text-gray-800 placeholder-gray-400 focus:bg-white focus:border-[#e01a1b] focus:ring-4 focus:ring-[#e01a1b]/10 outline-none transition-all"
-                />
-                <button
-                  type="submit"
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 bg-[#e01a1b] hover:bg-[#c41617] text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-colors"
-                >
-                  <Search className="w-4 h-4" />
-                  <span className="hidden 2xl:inline">Search</span>
-                </button>
-              </div>
-            </form>
+            <div className="hidden md:flex flex-1 min-w-0 max-w-xs lg:max-w-sm mx-4 lg:mx-6">
+              <SearchAutocomplete variant="desktop" popularSearches={popularSearches} />
+            </div>
 
             {/* Action Icons */}
             <div className="flex items-center justify-end gap-0.5 min-[360px]:gap-1 sm:gap-2 shrink-0">
@@ -461,7 +480,7 @@ const Header = () => {
                         <>
                           <div className="px-3 sm:px-4 py-2 border-b border-slate-100">
                             <p className="text-xs text-slate-500">Signed in as</p>
-                            <p className="text-sm font-semibold text-slate-800 truncate">{userName}</p>
+                            <p className="text-sm font-semibold text-slate-800 truncate">{[userTitle, userName].filter(Boolean).join(' ')}</p>
                           </div>
                         </>
                       )}
@@ -657,7 +676,7 @@ const Header = () => {
               {isUserLoggedIn && userName && (
                 <div className="px-3 sm:px-4 py-2 bg-gray-50 rounded-lg mb-2">
                   <p className="text-xs text-slate-500">Signed in as</p>
-                  <p className="text-sm font-semibold text-slate-800 truncate">{userName}</p>
+                  <p className="text-sm font-semibold text-slate-800 truncate">{[userTitle, userName].filter(Boolean).join(' ')}</p>
                 </div>
               )}
 
@@ -740,55 +759,26 @@ const Header = () => {
               className="bg-white rounded-b-2xl shadow-[0_18px_40px_-12px_rgba(15,23,42,0.35)] w-full max-w-3xl mx-auto overflow-hidden border border-t-0 border-slate-200"
             >
               <div className="p-4 sm:p-5">
-                {/* Search Input Section */}
-                <form
-                  onSubmit={handleSearchSubmit}
-                  className="flex items-center gap-2 sm:gap-3 bg-slate-50 border border-slate-200 focus-within:border-[#e01a1b] focus-within:ring-2 focus-within:ring-[#e01a1b]/15 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all duration-200"
-                >
-                  <Search className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 shrink-0" />
-                  <input
-                    type="text"
-                    placeholder="Search for products, categories, brands..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="flex-1 text-sm sm:text-base font-medium outline-none bg-transparent text-slate-800 placeholder-slate-400"
-                    autoFocus
-                  />
-                  {searchQuery && (
-                    <button
-                      type="submit"
-                      className="bg-[#e01a1b] hover:bg-[#c01617] text-white px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-colors shrink-0"
-                    >
-                      Search
-                    </button>
-                  )}
+                {/* Smart search-as-you-type — suggestions, recent + popular searches,
+                    keyboard nav; Enter opens the full results page. */}
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="min-w-0 flex-1">
+                    <SearchAutocomplete
+                      variant="mobile"
+                      autoFocus
+                      popularSearches={popularSearches}
+                      onNavigate={() => setShowSearchModal(false)}
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowSearchModal(false)}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors shrink-0"
+                    className="mt-1.5 shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700"
                     aria-label="Close search"
                   >
-                    <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <X className="h-4 w-4 sm:h-5 sm:w-5" />
                   </button>
-                </form>
-                {!searchQuery && popularSearches.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-[11px] font-bold text-slate-500 mb-2.5 uppercase tracking-widest">
-                      Popular Searches
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {popularSearches.map((term) => (
-                        <button
-                          key={term}
-                          onClick={() => handleSearchShortcut(term)}
-                          className="px-3 py-1.5 bg-slate-50 hover:bg-[#e01a1b] hover:border-[#e01a1b] hover:text-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 transition-colors duration-200"
-                        >
-                          {term}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             </div>
           </div>

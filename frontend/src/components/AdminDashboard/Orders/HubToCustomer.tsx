@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Eye, ChevronLeft, ChevronRight, Package, Warehouse, Truck, CheckCircle } from "lucide-react";
+import { Search, Eye, ChevronLeft, ChevronRight, Package, Warehouse, Truck, CheckCircle, X, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -14,6 +14,8 @@ import {
 import Dropdown from "@/components/UI/Dropdown";
 import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalendar";
 import { orderService, Order } from "@/services/orderService";
+import { courierService } from "@/services/courierService";
+import { courierName } from "@/lib/couriers";
 import { formatOrderAmount } from "@/lib/currency";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { hasPermission } from "@/lib/auth";
@@ -54,6 +56,15 @@ export default function HubToCustomer() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  // Additional client-side filters covering every order dimension.
+  const [payFilter, setPayFilter] = useState("all");        // payment status
+  const [methodFilter, setMethodFilter] = useState("all");  // payment method
+  const [currencyFilter, setCurrencyFilter] = useState("all"); // INR / USD region
+  const [amountFilter, setAmountFilter] = useState("all");  // amount tiers (INR-equiv)
+  const [itemsFilter, setItemsFilter] = useState("all");    // single / multi-item
+  const [courierFilter, setCourierFilter] = useState("all"); // delivery partner
+  const [sortBy, setSortBy] = useState("recent");           // result ordering
+  const [panelOpen, setPanelOpen] = useState(true);         // collapse metrics + filters
 
   // Statuses relevant for Hub to Customer tracking
   const STATUS_LABELS: Record<string, string> = {
@@ -71,6 +82,8 @@ export default function HubToCustomer() {
 
   useEffect(() => {
     fetchOrders();
+    // Prime the courier registry so courierName() resolves ids to names.
+    courierService.getActiveCouriers().catch(() => {});
   }, []);
 
   const fetchOrders = async () => {
@@ -87,6 +100,29 @@ export default function HubToCustomer() {
     }
   };
 
+  // INR-equivalent amount, so amount tiers/sorting compare mixed-currency orders fairly.
+  const inrAmount = (order: Order) => {
+    const amt = order.totalAmount || 0;
+    return order.currency === "USD" ? amt * (order.exchangeRate || 83.5) : amt;
+  };
+
+  // Distinct payment methods + couriers present in the data, for their dropdowns.
+  const methodOptions = [
+    { value: "all", label: "Any Method" },
+    ...Array.from(new Set(orders.map((o) => (o.paymentMethod || "").trim()).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b))
+      .map((m) => ({
+        value: m.toLowerCase(),
+        label: m.toUpperCase() === "COD" ? "Cash on Delivery" : m.charAt(0).toUpperCase() + m.slice(1),
+      })),
+  ];
+  const courierOptions = [
+    { value: "all", label: "Any Courier" },
+    ...Array.from(new Set(orders.map((o) => o.courier || "").filter(Boolean)))
+      .map((c) => ({ value: c, label: courierName(c) || c }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+  ];
+
   const filteredOrders = orders.filter((order) => {
     const mainItem = order.items?.[0] || {} as any;
     const productName = mainItem.productName || "Unknown";
@@ -98,32 +134,87 @@ export default function HubToCustomer() {
       productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!matchesSearch) return false;
+
     const matchesStatus =
       statusFilter === "All" ||
       (statusFilter === "Active" && ACTIVE_STATUSES.includes(order.status)) ||
       (statusFilter === "AT_HUB" && ["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB"].includes(order.status)) ||
       order.status === statusFilter;
+    if (!matchesStatus) return false;
 
     // Order-date range filter (YYYY-MM-DD strings compare lexicographically)
-    let matchesDate = true;
     if (dateFrom || dateTo) {
       const od = order.createdAt ? fmtDate(new Date(order.createdAt)) : "";
-      if (!od) matchesDate = false;
-      else if (dateFrom && od < dateFrom) matchesDate = false;
-      else if (dateTo && od > dateTo) matchesDate = false;
+      if (!od) return false;
+      if (dateFrom && od < dateFrom) return false;
+      if (dateTo && od > dateTo) return false;
     }
 
-    return matchesSearch && matchesStatus && matchesDate;
+    // Payment status
+    const ps = (order.paymentStatus || "").toUpperCase();
+    const refunded = !!order.refundStatus && order.refundStatus !== "NONE";
+    if (payFilter === "paid" && ps !== "PAID") return false;
+    if (payFilter === "pending" && ps !== "PENDING") return false;
+    if (payFilter === "refunded" && !refunded) return false;
+
+    // Payment method
+    if (methodFilter !== "all" && (order.paymentMethod || "").toLowerCase() !== methodFilter) return false;
+
+    // Currency / region
+    if (currencyFilter !== "all" && (order.currency || "INR") !== currencyFilter) return false;
+
+    // Amount tiers (INR-equivalent)
+    if (amountFilter !== "all") {
+      const a = inrAmount(order);
+      if (amountFilter === "lt500" && !(a < 500)) return false;
+      if (amountFilter === "500-2k" && !(a >= 500 && a < 2000)) return false;
+      if (amountFilter === "2k-10k" && !(a >= 2000 && a <= 10000)) return false;
+      if (amountFilter === "gt10k" && !(a > 10000)) return false;
+    }
+
+    // Item count
+    const n = order.items?.length || 0;
+    if (itemsFilter === "single" && n > 1) return false;
+    if (itemsFilter === "multi" && n <= 1) return false;
+
+    // Courier / delivery partner
+    if (courierFilter !== "all" && (order.courier || "") !== courierFilter) return false;
+
+    return true;
   });
+
+  // Sort the filtered set (default: newest order first).
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    switch (sortBy) {
+      case "oldest": return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      case "amount_desc": return inrAmount(b) - inrAmount(a);
+      case "amount_asc": return inrAmount(a) - inrAmount(b);
+      case "customer_asc": return (a.customerName || "").localeCompare(b.customerName || "");
+      case "recent":
+      default: return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    }
+  });
+
+  const anyFilterActive =
+    !!searchTerm || statusFilter !== "Active" || !!dateFrom || !!dateTo ||
+    payFilter !== "all" || methodFilter !== "all" || currencyFilter !== "all" ||
+    amountFilter !== "all" || itemsFilter !== "all" || courierFilter !== "all" || sortBy !== "recent";
+
+  const clearAllFilters = () => {
+    setSearchTerm(""); setStatusFilter("Active"); setDateFrom(""); setDateTo("");
+    setPayFilter("all"); setMethodFilter("all"); setCurrencyFilter("all");
+    setAmountFilter("all"); setItemsFilter("all"); setCourierFilter("all"); setSortBy("recent");
+  };
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, dateFrom, dateTo]);
+  }, [searchTerm, statusFilter, dateFrom, dateTo, payFilter, methodFilter, currencyFilter, amountFilter, itemsFilter, courierFilter, sortBy]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredOrders.length / PAGE_SIZE);
-  const paginatedOrders = filteredOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalPages = Math.ceil(sortedOrders.length / PAGE_SIZE);
+  const paginatedOrders = sortedOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -152,7 +243,34 @@ export default function HubToCustomer() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Hub to Customer Orders</h1>
+          <p className="text-sm text-slate-500">Manage orders from hub to customers</p>
+        </div>
+      </div>
+
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? "rotate-180" : ""}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {sortedOrders.length} of {orders.length} orders{anyFilterActive ? " (filtered)" : ""}
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-3">
       {/* Stats Cards — click a card to filter the table below by that status */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
@@ -185,10 +303,10 @@ export default function HubToCustomer() {
         })}
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
+      {/* Filters — search + every order dimension on one wrapping row */}
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="relative w-full sm:w-64 md:w-72">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
             <input
               type="text"
@@ -198,12 +316,97 @@ export default function HubToCustomer() {
               className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
             />
           </div>
-          <div className="w-full md:w-64">
+          <div className="w-44">
             <Dropdown
               value={STATUS_LABELS[statusFilter] ? statusFilter : "All"}
               options={statusDisplayOptions}
               onChange={(value) => setStatusFilter(value as string)}
               placeholder="Filter by Status"
+            />
+          </div>
+          <div className="w-40">
+            <Dropdown
+              value={payFilter}
+              options={[
+                { value: "all", label: "Any Payment" },
+                { value: "paid", label: "Paid" },
+                { value: "pending", label: "Pending" },
+                { value: "refunded", label: "Refunded" },
+              ]}
+              onChange={(value) => setPayFilter(value as string)}
+              placeholder="Any Payment"
+            />
+          </div>
+          {methodOptions.length > 1 && (
+            <div className="w-44">
+              <Dropdown
+                value={methodFilter}
+                options={methodOptions}
+                onChange={(value) => setMethodFilter(value as string)}
+                placeholder="Any Method"
+              />
+            </div>
+          )}
+          <div className="w-44">
+            <Dropdown
+              value={currencyFilter}
+              options={[
+                { value: "all", label: "Any Currency" },
+                { value: "INR", label: "India (₹)" },
+                { value: "USD", label: "International ($)" },
+              ]}
+              onChange={(value) => setCurrencyFilter(value as string)}
+              placeholder="Any Currency"
+            />
+          </div>
+          <div className="w-44">
+            <Dropdown
+              value={amountFilter}
+              options={[
+                { value: "all", label: "Any Amount" },
+                { value: "lt500", label: "Under ₹500" },
+                { value: "500-2k", label: "₹500 – ₹2,000" },
+                { value: "2k-10k", label: "₹2,000 – ₹10,000" },
+                { value: "gt10k", label: "Over ₹10,000" },
+              ]}
+              onChange={(value) => setAmountFilter(value as string)}
+              placeholder="Any Amount"
+            />
+          </div>
+          <div className="w-40">
+            <Dropdown
+              value={itemsFilter}
+              options={[
+                { value: "all", label: "Any Items" },
+                { value: "single", label: "Single item" },
+                { value: "multi", label: "Multiple items" },
+              ]}
+              onChange={(value) => setItemsFilter(value as string)}
+              placeholder="Any Items"
+            />
+          </div>
+          {courierOptions.length > 1 && (
+            <div className="w-44">
+              <Dropdown
+                value={courierFilter}
+                options={courierOptions}
+                onChange={(value) => setCourierFilter(value as string)}
+                placeholder="Any Courier"
+              />
+            </div>
+          )}
+          <div className="w-44">
+            <Dropdown
+              value={sortBy}
+              options={[
+                { value: "recent", label: "Sort: Newest" },
+                { value: "oldest", label: "Sort: Oldest" },
+                { value: "amount_desc", label: "Sort: Amount high→low" },
+                { value: "amount_asc", label: "Sort: Amount low→high" },
+                { value: "customer_asc", label: "Sort: Customer A–Z" },
+              ]}
+              onChange={(value) => setSortBy(value as string)}
+              placeholder="Sort"
             />
           </div>
           <div className="shrink-0">
@@ -214,8 +417,20 @@ export default function HubToCustomer() {
               placeholder="Order Date"
             />
           </div>
+          {anyFilterActive && (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              <X className="h-4 w-4" /> Clear
+            </button>
+          )}
         </div>
       </div>
+
+        </div>
+      )}
 
       {/* Orders Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">

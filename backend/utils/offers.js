@@ -99,12 +99,14 @@ function offerSavingPerUnit(offer, sellingUnitPrice, quantity, currency, rate) {
       break;
     }
     case 'BOGO': {
-      // Buy `minQty`, get `getQty` cheapest units free. Same SKU here, so spread the
-      // free units' value across the whole line as an equivalent per-unit saving.
+      // Buy `minQty`, get `getQty` free — ONCE. The deal grants getQty free units as
+      // soon as the line reaches buy+get units, and does NOT multiply with more groups
+      // (a "buy 2 get 1" line gives exactly 1 free at qty 3, 4, 5, 10 …). The free
+      // value is spread across the whole line as an equivalent per-unit saving.
       const buy = Math.max(1, offer.minQty || 1);
       const free = Math.max(0, offer.getQty || 0);
       const group = buy + free;
-      const freeUnits = Math.floor(quantity / group) * free;
+      const freeUnits = quantity >= group ? free : 0;
       saving = quantity > 0 ? (freeUnits * sellingUnitPrice) / quantity : 0;
       break;
     }
@@ -122,17 +124,20 @@ function offerSavingPerUnit(offer, sellingUnitPrice, quantity, currency, rate) {
 }
 
 /**
- * Pick the single best per-line offer for a product and return the discounted unit
- * price. Best = largest per-unit saving, tie-broken by priority then deepest scope.
- * Only ever reduces the price; returns the base price and a null offer when nothing
- * applies — so a product with no offers is byte-identical to the pre-offer behaviour.
+ * Pick the single winning per-line offer for a product and return the discounted unit
+ * price. Winner = highest PRIORITY (the admin explicitly controls which promotion wins),
+ * tie-broken by largest per-unit saving, then deepest scope. Only offers that actually
+ * reduce the price compete (saving > 0), so a high-priority offer that doesn't apply to
+ * this product/currency never blocks a lower-priority one that does. Only ever reduces
+ * the price; returns the base price and a null offer when nothing applies — so a product
+ * with no offers is byte-identical to the pre-offer behaviour.
  *
  * @returns { unitPrice, originalUnitPrice, offer } where offer is
  *          { offerId, title, type, savingPerUnit } or null.
  */
-function applyBestOffer({ product, sellingUnitPrice, quantity = 1, currency = 'INR', rate = null, offers = [], now = new Date(), thresholdEligibleIds = null }) {
+function applyBestOffer({ product, sellingUnitPrice, quantity = 1, currency = 'INR', rate = null, offers = [], now = new Date(), thresholdEligibleIds = null, crossBogo = null }) {
   const base = round2(sellingUnitPrice);
-  if (!(base > 0) || !Array.isArray(offers) || offers.length === 0) {
+  if (!(base > 0) || ((!Array.isArray(offers) || offers.length === 0) && !crossBogo)) {
     return { unitPrice: base, originalUnitPrice: base, offer: null };
   }
 
@@ -141,18 +146,38 @@ function applyBestOffer({ product, sellingUnitPrice, quantity = 1, currency = 'I
     // THRESHOLD is cart-level: it only competes for this line once the caller has
     // confirmed the cart subtotal qualifies (its id is in thresholdEligibleIds).
     if (offer.type === 'THRESHOLD' && !(thresholdEligibleIds && thresholdEligibleIds.has(offer.id))) continue;
+    // CROSS BOGO ("buy A get B free") is cart-level: it reaches this line only as the
+    // precomputed `crossBogo` candidate below, never as a same-line BOGO.
+    if (offer.type === 'BOGO' && offer.bogoMode === 'CROSS') continue;
     if (!isOfferLive(offer, now)) continue;
     if (!offerMatchesCurrency(offer, currency)) continue;
     if (!offerAppliesToProduct(offer, product)) continue;
     const saving = offerSavingPerUnit(offer, base, quantity, currency, rate);
     if (saving <= 0) continue;
+    // Priority is the primary decider: the admin sets which promotion wins when several
+    // overlap. Saving size only breaks a priority tie, then deepest scope. (This is a
+    // deliberate business choice — the platform's margin absorbs the discount, so the
+    // admin, not the discount size, controls how deep it goes.)
+    const priority = offer.priority || 0;
+    const bestPriority = best ? (best.offer.priority || 0) : -Infinity;
     if (
       !best ||
-      saving > best.saving ||
-      (saving === best.saving && (offer.priority || 0) > (best.offer.priority || 0)) ||
-      (saving === best.saving && (offer.priority || 0) === (best.offer.priority || 0) && scopeRank(offer.scope) > scopeRank(best.offer.scope))
+      priority > bestPriority ||
+      (priority === bestPriority && saving > best.saving) ||
+      (priority === bestPriority && saving === best.saving && scopeRank(offer.scope) > scopeRank(best.offer.scope))
     ) {
       best = { offer, saving };
+    }
+  }
+
+  // The cross-BOGO free allocation for this line (from resolveCrossBogoAllocations)
+  // competes with the per-line offers by the same priority-then-saving rule.
+  if (crossBogo && crossBogo.savingPerUnit > 0) {
+    const saving = Math.min(round2(crossBogo.savingPerUnit), base);
+    const priority = crossBogo.priority || 0;
+    const bestPriority = best ? (best.offer.priority || 0) : -Infinity;
+    if (!best || priority > bestPriority || (priority === bestPriority && saving > best.saving)) {
+      best = { offer: { id: crossBogo.offerId, title: crossBogo.title, type: 'BOGO', priority }, saving };
     }
   }
 
@@ -184,6 +209,106 @@ function qualifyingThresholdIds(offers, cartSubtotalINR, currency, now = new Dat
     if (o.minCartValueINR != null && cartSubtotalINR >= o.minCartValueINR) ids.add(o.id);
   }
   return ids;
+}
+
+/** Does this product belong to a CROSS BOGO's FREE (get) set? */
+function offerAppliesToFreeSet(offer, product) {
+  if (offer.freeScope === 'CATEGORY') {
+    return (
+      Array.isArray(offer.freeCategoryNames) &&
+      !!product.category &&
+      offer.freeCategoryNames.some(
+        (c) => c && String(c).toLowerCase() === String(product.category).toLowerCase()
+      )
+    );
+  }
+  if (offer.freeScope === 'PRODUCT') {
+    return Array.isArray(offer.freeProductIds) && offer.freeProductIds.includes(product.id);
+  }
+  return false; // a CROSS BOGO must name its free set explicitly
+}
+
+/**
+ * Cross-product BOGO ("buy A, get B free"), resolved at CART level. For each live CROSS
+ * BOGO offer it counts the qualifying BUY units the customer has in the cart, works out
+ * how many FREE units that earns (floor(buyUnits / buyN) * getN), and allocates them to
+ * the CHEAPEST matching free-set lines the customer has ALREADY added — the free item is
+ * never auto-added, so a customer who buys A but never adds B simply gets no discount.
+ *
+ * Returns a Map keyed by line.key → { offerId, title, savingPerUnit, priority } for the
+ * free lines. Higher-priority offers allocate first; a line keeps its largest saving.
+ *
+ * @param lines [{ key, product, unitPrice (in `currency`), quantity }]
+ */
+function resolveCrossBogoAllocations(offers, lines, currency, now = new Date()) {
+  const alloc = new Map();
+  if (!Array.isArray(offers) || !Array.isArray(lines) || lines.length === 0) return alloc;
+
+  const crossOffers = offers
+    .filter((o) => o.type === 'BOGO' && o.bogoMode === 'CROSS' && isOfferLive(o, now) && offerMatchesCurrency(o, currency))
+    .sort((a, b) => (b.priority || 0) - (a.priority || 0));
+  if (crossOffers.length === 0) return alloc;
+
+  // How many free units each line can still absorb (its quantity minus what a
+  // higher-priority offer already claimed).
+  const remainingByLine = new Map(lines.map((l) => [l.key, l.quantity]));
+
+  for (const offer of crossOffers) {
+    const buyN = Math.max(1, offer.minQty || 1);
+    const getN = Math.max(0, offer.getQty || 0);
+    if (getN <= 0) continue;
+
+    let buyUnits = 0;
+    for (const l of lines) if (offerAppliesToProduct(offer, l.product)) buyUnits += l.quantity;
+    // Granted ONCE when the buy threshold is met — getN free units, not multiplied by
+    // how many buy-groups are in the cart.
+    let freeUnits = buyUnits >= buyN ? getN : 0;
+    if (freeUnits <= 0) continue;
+
+    const candidates = lines
+      .filter((l) => offerAppliesToFreeSet(offer, l.product) && (remainingByLine.get(l.key) || 0) > 0)
+      .sort((a, b) => a.unitPrice - b.unitPrice);
+
+    for (const l of candidates) {
+      if (freeUnits <= 0) break;
+      const avail = remainingByLine.get(l.key) || 0;
+      const take = Math.min(avail, freeUnits);
+      if (take <= 0) continue;
+      // 100% off the free units, spread across the whole line as a per-unit saving —
+      // the same shape the same-item BOGO uses, so downstream code is identical.
+      const savingPerUnit = round2((take * l.unitPrice) / l.quantity);
+      const existing = alloc.get(l.key);
+      if (!existing || savingPerUnit > existing.savingPerUnit) {
+        alloc.set(l.key, { offerId: offer.id, title: offer.title, savingPerUnit, priority: offer.priority || 0 });
+      }
+      remainingByLine.set(l.key, avail - take);
+      freeUnits -= take;
+    }
+  }
+  return alloc;
+}
+
+/**
+ * Which live CROSS BOGO offers has the cart met the BUY condition for? Free-gift lines
+ * (isFreeGift) never count toward the buy total. Returns [{ offer, getQty }] — the caller
+ * resolves the free candidates (stock/variants) and auto-adds or offers a chooser.
+ *
+ * @param lines [{ product, quantity, isFreeGift }]
+ */
+function qualifyingCrossBogo(offers, lines, currency, now = new Date()) {
+  const out = [];
+  if (!Array.isArray(offers) || !Array.isArray(lines)) return out;
+  for (const offer of offers) {
+    if (offer.type !== 'BOGO' || offer.bogoMode !== 'CROSS') continue;
+    if (!isOfferLive(offer, now) || !offerMatchesCurrency(offer, currency)) continue;
+    const buyN = Math.max(1, offer.minQty || 1);
+    const getN = Math.max(0, offer.getQty || 0);
+    if (getN <= 0) continue;
+    let buyUnits = 0;
+    for (const l of lines) if (!l.isFreeGift && offerAppliesToProduct(offer, l.product)) buyUnits += l.quantity;
+    if (buyUnits >= buyN) out.push({ offer, getQty: getN });
+  }
+  return out;
 }
 
 /** Short human badge for the storefront, e.g. "20% OFF" / "Buy 2 Get 1 Free". */
@@ -221,7 +346,7 @@ function offerBadgeLabel(offer, currency = 'INR', rate = null) {
  * @param currency 'INR' | 'USD' — the storefront the request came from.
  * @param rate     INR-per-USD snapshot for FLAT/USD conversion (may be null for INR).
  */
-function buildActiveOffer(product, offers, currency = 'INR', rate = null, now = new Date(), quantity = 1, thresholdEligibleIds = null) {
+function buildActiveOffer(product, offers, currency = 'INR', rate = null, now = new Date(), quantity = 1, thresholdEligibleIds = null, crossBogo = null) {
   const sellingINR = firstSet(product.priceINR, product.adminFixedPrice, product.basePrice, product.price) ?? 0;
   if (!(sellingINR > 0)) return null;
 
@@ -240,17 +365,21 @@ function buildActiveOffer(product, offers, currency = 'INR', rate = null, now = 
     offers,
     now,
     thresholdEligibleIds,
+    crossBogo,
   });
   if (!offer) return null;
 
   const full = offers.find((o) => o.id === offer.offerId) || {};
+  const isCross = full.type === 'BOGO' && full.bogoMode === 'CROSS';
   return {
     offerId: offer.offerId,
     title: offer.title,
     description: full.description || null,
     type: offer.type,
     scope: full.scope || null,
-    badge: offerBadgeLabel(full, currency, rate),
+    // For a cross-BOGO free line the deal is "this item is free", not "buy N get M".
+    badge: isCross ? 'FREE' : offerBadgeLabel(full, currency, rate),
+    bogoMode: full.bogoMode || (offer.type === 'BOGO' ? 'SAME' : null),
     discountPercent: full.discountPercent ?? null,
     discountFlatINR: full.discountFlatINR ?? null,
     minQty: full.minQty ?? null,
@@ -272,6 +401,9 @@ module.exports = {
   offerSavingPerUnit,
   applyBestOffer,
   qualifyingThresholdIds,
+  resolveCrossBogoAllocations,
+  qualifyingCrossBogo,
+  offerAppliesToFreeSet,
   offerBadgeLabel,
   buildActiveOffer,
   firstSet,

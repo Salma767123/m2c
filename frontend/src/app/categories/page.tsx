@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react';
 import Categories from '@/components/WebSite/Categories/Categories';
 import Header from '@/components/WebSite/Header/Header';
 import Footer from '@/components/WebSite/Footer/Footer';
@@ -20,7 +21,9 @@ export default function CategoriesPage() {
       />
       <Header />
       <Breadcrumb items={breadcrumbItems} />
-      <Categories />
+      <Suspense fallback={null}>
+        <Categories />
+      </Suspense>
       <Footer />
     </>
   );
