@@ -333,12 +333,16 @@ const Header = () => {
                   className="hidden sm:flex items-center overflow-hidden whitespace-nowrap max-w-0 -translate-x-2 opacity-0 transition-all duration-500 ease-out group-hover:max-w-[260px] group-hover:translate-x-0 group-hover:opacity-100 group-hover:ml-2.5 lg:group-hover:ml-3"
                 >
                   <span aria-hidden="true" className="mr-2.5 h-7 w-px shrink-0 bg-gradient-to-b from-transparent via-[#e6dcd0] to-transparent" />
-                  {/* Wordmark styled to mirror the brand logo: "M2C" in a gold→red
-                      gradient, "MARKDOWNS" in bold italic maroon caps. */}
+                  {/* Wordmark: "M2C" with M/C in red and 2 in yellow, "Markdowns"
+                      in red (no italic). */}
                   <span className="flex items-baseline gap-1.5 leading-none">
-                    <span className="bg-gradient-to-b from-[#f0b429] via-[#e01a1b] to-[#7a1012] bg-clip-text font-extrabold tracking-tight text-transparent text-[17px] lg:text-xl">M2C</span>
-                    <span className="font-extrabold italic uppercase tracking-wide text-[#7a1012] text-[15px] lg:text-lg">Markdowns</span>
-                    <span className="text-[9px] font-semibold uppercase not-italic tracking-[0.18em] text-[#a89a8d] lg:text-[10px]">Pvt Ltd</span>
+                    <span className="font-extrabold tracking-tight text-[17px] lg:text-xl">
+                      <span className="text-[#e01a1b]">M</span>
+                      <span className="text-[#f5b301]">2</span>
+                      <span className="text-[#e01a1b]">C</span>
+                    </span>
+                    <span className="font-extrabold uppercase tracking-wide text-[#e01a1b] text-[15px] lg:text-lg">Markdowns</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#a89a8d] lg:text-[10px]">Pvt Ltd</span>
                   </span>
                 </span>
               )}

@@ -138,8 +138,8 @@ function NoticeCard({ notice }: { notice: CenterNotice }) {
         <div className={`mx-auto w-14 h-14 rounded-full flex items-center justify-center ${iconWrap} animate-in zoom-in-50 duration-300`}>
           <Icon className="w-8 h-8" />
         </div>
-        <h3 className="text-lg font-bold text-slate-900 mt-4">{notice.title}</h3>
-        {notice.message && <p className="text-sm text-slate-600 mt-1.5 leading-relaxed break-words">{notice.message}</p>}
+        <h3 className="text-lg font-bold text-slate-900 mt-4 break-words [overflow-wrap:anywhere]">{notice.title}</h3>
+        {notice.message && <p className="text-sm text-slate-600 mt-1.5 leading-relaxed break-words [overflow-wrap:anywhere]">{notice.message}</p>}
         <button
           type="button"
           onClick={close}
