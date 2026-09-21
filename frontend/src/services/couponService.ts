@@ -1,5 +1,6 @@
 import axios from '@/lib/axios';
 import { userAuthService } from '@/services/userAuthService';
+import { getRegion } from '@/lib/currency';
 
 export interface Coupon {
     id: string;
@@ -28,6 +29,8 @@ export interface Coupon {
     /** First-order coupon — only applies to a customer's first order and surfaces
      *  in the storefront promo strip. At most one active at a time. */
     isFirstOrder?: boolean;
+    /** Customer ids this coupon is restricted to (empty/undefined = everyone). */
+    targetCustomerIds?: string[];
     createdAt?: string;
     updatedAt?: string;
 }
@@ -90,6 +93,17 @@ export interface CouponReport {
     coupons: CouponReportRow[];
 }
 
+/** Active coupon summary for the storefront Coupons & Offers filter. */
+export interface ActiveCoupon {
+    id: string;
+    code: string;
+    description?: string;
+    discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+    discountValue: number;
+    applicableCategories?: string[];
+    applicableProducts?: string[];
+}
+
 /** The active first-order coupon shown in the storefront promo strip (or null). */
 export interface FirstOrderCoupon {
     code: string;
@@ -113,6 +127,8 @@ export interface FreeShippingOffer {
     minOrderValue: number;
     orderNumbers: number[];
     isActive: boolean;
+    /** Which storefront the offer applies to. */
+    region?: 'IN_ONLY' | 'COM_ONLY' | 'BOTH';
     createdAt: string;
     updatedAt: string;
 }
@@ -176,6 +192,17 @@ class CouponService {
         }
     }
 
+    // Active coupons for the storefront "Coupons & Offers" product filter.
+    // Returns [] on any error so the filter section just hides itself.
+    async getActiveCoupons(): Promise<ActiveCoupon[]> {
+        try {
+            const response = await axios.get('/coupons/active', { timeout: 5000 });
+            return response.data?.success && Array.isArray(response.data.data) ? response.data.data : [];
+        } catch {
+            return [];
+        }
+    }
+
     // Active first-order coupon for the storefront promo strip. Returns null when
     // none is active (the strip hides itself). Never hardcoded.
     async getFirstOrderCoupon(): Promise<FirstOrderCoupon | null> {
@@ -198,7 +225,7 @@ class CouponService {
 
     async applyFreeShippingOffer(userId: string, cartTotal: number): Promise<ApplyCouponResponse> {
         try {
-            const response = await axios.post('/coupons/apply-free-shipping', { userId, cartTotal });
+            const response = await axios.post('/coupons/apply-free-shipping', { userId, cartTotal, region: getRegion() });
             return response.data;
         } catch (error: unknown) {
             // Return the error message from the backend if available

@@ -7,7 +7,7 @@ import { Badge } from '@/components/UI/Badge';
 import { Button } from '@/components/UI/Button';
 import Dropdown from '@/components/UI/Dropdown';
 import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar';
-import { Mail, Phone, Eye, Trash2, MessageSquare, Search, ChevronLeft, ChevronRight, Inbox, Reply, CheckCircle } from 'lucide-react';
+import { Mail, Phone, Eye, Trash2, MessageSquare, Search, ChevronLeft, ChevronRight, Inbox, Reply, CheckCircle, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { hasPermission } from '@/lib/auth';
 import { getHearAboutUsLabel, HEAR_ABOUT_US_OPTIONS } from '@/lib/enquirySources';
@@ -44,6 +44,7 @@ export default function WebsiteEnquiryManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; subject: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   useEffect(() => {
     fetchEnquiries();
@@ -165,6 +166,25 @@ export default function WebsiteEnquiryManagement() {
         <p className="text-sm text-slate-500">Manage contact form submissions from website visitors</p>
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filteredEnquiries.length} of {enquiries.length} enquiries
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Stats Cards — click a card to filter the table below by that status */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {metricCards.map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -245,6 +265,8 @@ export default function WebsiteEnquiryManagement() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      )}
 
       {/* Enquiries Table */}
       <Card>

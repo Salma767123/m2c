@@ -323,6 +323,17 @@ const handleRazorpayWebhook = async (req, res) => {
       }
     }
 
+    // RazorpayX payout lifecycle → advance the matching wallet withdrawal.
+    // payout.processed → Completed; payout.failed/reversed → Failed + wallet refund.
+    if (typeof event === 'string' && event.startsWith('payout.')) {
+      const payout = payload?.payout?.entity;
+      if (payout?.id) {
+        const { handlePayoutWebhook } = require('./walletController');
+        await handlePayoutWebhook(payout.id, payout.status || event.replace('payout.', ''));
+        console.log(`Payout webhook ${event} handled for payout ${payout.id} (status ${payout.status})`);
+      }
+    }
+
     res.json({ status: 'ok' });
 
   } catch (error) {

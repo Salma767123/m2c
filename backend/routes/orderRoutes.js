@@ -131,6 +131,7 @@ router.get('/vendor', requireVendorRole, vendorOrderController.getVendorOrders);
 // doesn't treat "reviews" as an order id.
 router.get('/vendor/reviews', requireVendorRole, vendorOrderController.getVendorReviews);
 router.get('/vendor/:id', requireVendorRole, vendorOrderController.getVendorOrderById);
+router.post('/vendor/:id/accept', requireVendorRole, vendorOrderController.acceptVendorOrder);
 router.put('/vendor/:id/status', requireVendorRole, vendorOrderController.updateVendorOrderStatus);
 router.post('/vendor/:id/reship', requireVendorRole, vendorOrderController.reshipVendorOrder);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Eye, Clock, CheckCircle, AlertCircle, MessageCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Eye, Clock, CheckCircle, AlertCircle, MessageCircle, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
@@ -36,6 +36,7 @@ const SCOPE_TITLE: Record<SupportScope, { title: string; subtitle: string }> = {
 };
 
 export default function AdminSupport({ scope = "all" }: { scope?: SupportScope }) {
+  const [panelOpen, setPanelOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -172,6 +173,25 @@ export default function AdminSupport({ scope = "all" }: { scope?: SupportScope }
         </div>
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filteredTickets.length} of {tickets.length} tickets
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Interactive metric cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {metricCards.map(({ key, label, subtitle, count, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -272,6 +292,8 @@ export default function AdminSupport({ scope = "all" }: { scope?: SupportScope }
           </div>
         </CardContent>
       </Card>
+        </div>
+      )}
 
       {/* Tickets Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">

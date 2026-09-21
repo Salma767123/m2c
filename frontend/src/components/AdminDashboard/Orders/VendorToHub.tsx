@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Search, Eye, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Package, Clock, PackageCheck, Truck, CheckCircle } from "lucide-react";
+import { Search, Eye, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Package, Clock, PackageCheck, Truck, CheckCircle, SlidersHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -77,11 +77,13 @@ export default function VendorToHub() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   const STATUS_LABELS: Record<string, string> = {
     "Active": "Active Orders",
     "All": "All Statuses",
-    "ORDER_CREATED": "Order Created",
+    "ORDER_CREATED": "Awaiting Vendor Acceptance",
+    "ACCEPTED_BY_VENDOR": "Accepted by Vendor",
     "VENDOR_PROCESSING": "Vendor Processing",
     "PACKED_BY_VENDOR": "Packed by Vendor",
     "IN_TRANSIT_TO_ADMIN_HUB": "In Transit to Hub",
@@ -89,7 +91,7 @@ export default function VendorToHub() {
     "APPROVED_BY_ADMIN_HUB": "Approved by Admin Hub",
     "REJECTED_BY_ADMIN_HUB": "Rejected by Admin Hub",
   };
-  const ACTIVE_STATUSES = ["ORDER_CREATED", "VENDOR_PROCESSING", "PACKED_BY_VENDOR", "IN_TRANSIT_TO_ADMIN_HUB"];
+  const ACTIVE_STATUSES = ["ORDER_CREATED", "ACCEPTED_BY_VENDOR", "VENDOR_PROCESSING", "PACKED_BY_VENDOR", "IN_TRANSIT_TO_ADMIN_HUB"];
   const statusOptions = Object.keys(STATUS_LABELS);
   const statusDisplayOptions = statusOptions.map(key => ({ value: key, label: STATUS_LABELS[key] }));
 
@@ -194,7 +196,7 @@ export default function VendorToHub() {
     const matchesStatus =
       statusFilter === "All" ||
       (statusFilter === "Active" && group.shipments.some(s => ACTIVE_STATUSES.includes(s.status))) ||
-      (statusFilter === "PROCESSING" && group.shipments.some(s => ["VENDOR_PROCESSING", "ORDER_CREATED"].includes(s.status))) ||
+      (statusFilter === "PROCESSING" && group.shipments.some(s => ["VENDOR_PROCESSING", "ORDER_CREATED", "ACCEPTED_BY_VENDOR"].includes(s.status))) ||
       group.shipments.some(s => s.status === statusFilter);
 
     // Order-date range filter (YYYY-MM-DD strings compare lexicographically)
@@ -221,7 +223,7 @@ export default function VendorToHub() {
   // Metric cards — styled like the Vendor Product Requests module; click to filter.
   const metricCards = [
     { key: 'All',                     label: 'Total Shipments', subtitle: 'All shipments',  count: shipments.length,                                                                                     Icon: Package,      iconBg: 'bg-brand-50',   iconColor: 'text-brand-500',   countColor: 'text-slate-900',  activeClass: 'border-brand-400 bg-brand-50/50' },
-    { key: 'PROCESSING',              label: 'Processing',      subtitle: 'Being prepared', count: shipments.filter((s) => s.status === 'VENDOR_PROCESSING' || s.status === 'ORDER_CREATED').length,       Icon: Clock,        iconBg: 'bg-amber-50',   iconColor: 'text-amber-500',   countColor: 'text-amber-700',  activeClass: 'border-amber-400 bg-amber-50/60' },
+    { key: 'PROCESSING',              label: 'Processing',      subtitle: 'Being prepared', count: shipments.filter((s) => ['VENDOR_PROCESSING', 'ORDER_CREATED', 'ACCEPTED_BY_VENDOR'].includes(s.status)).length,       Icon: Clock,        iconBg: 'bg-amber-50',   iconColor: 'text-amber-500',   countColor: 'text-amber-700',  activeClass: 'border-amber-400 bg-amber-50/60' },
     { key: 'PACKED_BY_VENDOR',        label: 'Packed',          subtitle: 'Ready to ship',  count: shipments.filter((s) => s.status === 'PACKED_BY_VENDOR').length,                                       Icon: PackageCheck, iconBg: 'bg-purple-50',  iconColor: 'text-purple-500',  countColor: 'text-purple-700', activeClass: 'border-purple-400 bg-purple-50/60' },
     { key: 'IN_TRANSIT_TO_ADMIN_HUB', label: 'In Transit',      subtitle: 'On the way',     count: shipments.filter((s) => s.status === 'IN_TRANSIT_TO_ADMIN_HUB').length,                                Icon: Truck,        iconBg: 'bg-blue-50',    iconColor: 'text-blue-500',    countColor: 'text-blue-700',   activeClass: 'border-blue-400 bg-blue-50/60' },
     { key: 'RECEIVED_AT_ADMIN_HUB',   label: 'Received at Hub', subtitle: 'At the hub',     count: shipments.filter((s) => s.status === 'RECEIVED_AT_ADMIN_HUB').length,                                  Icon: CheckCircle,  iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500', countColor: 'text-emerald-700', activeClass: 'border-emerald-400 bg-emerald-50/60' },
@@ -230,6 +232,9 @@ export default function VendorToHub() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "ORDER_CREATED":
+        return "bg-amber-50 text-amber-700 border border-amber-200";
+      case "ACCEPTED_BY_VENDOR":
+        return "bg-cyan-50 text-cyan-700 border border-cyan-200";
       case "VENDOR_PROCESSING":
         return "bg-yellow-50 text-yellow-700 border border-yellow-200";
       case "PACKED_BY_VENDOR":
@@ -263,6 +268,25 @@ export default function VendorToHub() {
 
   return (
     <div className="space-y-4">
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filteredGroups.length} of {orderGroups.length} orders
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Stats Cards (click a card to filter the table below by that status) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {metricCards.map(({ key, label, subtitle, count, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -331,6 +355,8 @@ export default function VendorToHub() {
           </button>
         </div>
       </div>
+        </div>
+      )}
 
       {/* Orders Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">

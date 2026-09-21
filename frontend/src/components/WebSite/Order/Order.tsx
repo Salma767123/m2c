@@ -23,10 +23,10 @@ import {
   ExternalLink,
   Copy,
   X,
-  XCircle,
   RotateCcw,
   CreditCard,
-  ShieldCheck
+  ShieldCheck,
+  LifeBuoy
 } from "lucide-react"
 import SelectMenu from "@/components/WebSite/Shared/SelectMenu"
 import DateField from "@/components/WebSite/Shared/DateField"
@@ -66,6 +66,7 @@ interface OrderItem {
   price: number
   size?: string
   color?: string
+  returnable?: boolean
 }
 
 /**
@@ -98,12 +99,37 @@ interface Order {
   refundStatus?: string | null
 }
 
-// Statuses from which a customer may still cancel (pre-dispatch).
-const CANCELLABLE_STATUSES = new Set([
-  'ORDER_CREATED', 'VENDOR_PROCESSING', 'PACKED_BY_VENDOR',
-  'IN_TRANSIT_TO_ADMIN_HUB', 'RECEIVED_AT_ADMIN_HUB', 'APPROVED_BY_ADMIN_HUB',
-])
+/**
+ * .com storefront has no returns — the "Contact Support" button on a delivered
+ * order stashes a pre-filled ticket (order details + dates + status) that the
+ * Support tab picks up, then routes the customer there.
+ */
+function stashSupportPrefill(order: Order): void {
+  try {
+    const items = order.items.map((i) => `${i.name} x${i.quantity}`).join(', ')
+    const ordered = new Date(order.date).toLocaleString('en-US', {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    })
+    const description = [
+      `Order: ${order.orderNumber}`,
+      `Ordered on: ${ordered}`,
+      `Status: Delivered`,
+      order.trackingNumber ? `Tracking: ${order.trackingNumber}` : '',
+      `Items: ${items}`,
+      `Order total: ${money(order.total, order)}`,
+      '',
+      'I need help with this delivered order:',
+      '',
+    ].filter(Boolean).join('\n')
+    sessionStorage.setItem('m2c_support_prefill', JSON.stringify({
+      subject: `Help with order ${order.orderNumber}`,
+      category: 'order',
+      description,
+    }))
+  } catch { /* sessionStorage may be unavailable */ }
+}
 
+// Statuses from which a customer may still cancel (pre-dispatch).
 // Preset reasons offered in the cancel / return modal ("Other" reveals a text box).
 const CANCEL_REASONS = [
   'Changed my mind',
@@ -142,7 +168,6 @@ export default function OrderList() {
   const [actionReason, setActionReason] = useState('')  // free text when "Other"
   const [actionSubmitting, setActionSubmitting] = useState(false)
   // Cancel refund destination: 'WALLET' (instant credit) or 'BANK' (gateway).
-  const [cancelRefundTo, setCancelRefundTo] = useState<'WALLET' | 'BANK'>('BANK')
   // Multi-step return/refund/replacement flow (replaces the old single-reason return modal).
   const [returnModalOrder, setReturnModalOrder] = useState<Order | null>(null)
   // Latest return request per order code (ORD-…) — drives the Return button state
@@ -159,13 +184,6 @@ export default function OrderList() {
     } catch { /* non-blocking */ }
   }
 
-  const openActionModal = (order: Order, type: 'cancel' | 'return') => {
-    setReasonChoice('')
-    setActionReason('')
-    setCancelRefundTo('BANK')
-    setActionModal({ order, type })
-  }
-
   const submitAction = async () => {
     if (!actionModal) return
     const { order, type } = actionModal
@@ -179,8 +197,8 @@ export default function OrderList() {
     try {
       setActionSubmitting(true)
       if (type === 'cancel') {
-        const res = await orderService.cancelOrder(order.id, finalReason || undefined, cancelRefundTo)
-        showSuccessToast('Order Cancelled', res.message || 'Your refund has been initiated.')
+        const res = await orderService.cancelOrder(order.id, finalReason || undefined)
+        showSuccessToast('Order Cancelled', res.message || 'Your refund has been added to your wallet.')
       } else {
         const res = await orderService.requestReturn(order.id, finalReason)
         showSuccessToast('Return Requested', res.message || 'We will review it shortly.')
@@ -247,7 +265,8 @@ export default function OrderList() {
             quantity: item.quantity,
             price: item.unitPrice,
             size: item.size,
-            color: item.color
+            color: item.color,
+            returnable: item.returnable,
           })),
           trackingNumber: apiOrder.trackingReference,
           courier: apiOrder.courier,
@@ -674,14 +693,8 @@ export default function OrderList() {
                             <Download className="w-4 h-4 shrink-0" />
                             <span className="truncate">Download Invoice</span>
                           </button>
-                          {CANCELLABLE_STATUSES.has(order.rawStatus || '') && (
-                            <button
-                              onClick={() => openActionModal(order, 'cancel')}
-                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-red-300 text-red-600 rounded-full hover:bg-red-50 transition-colors"
-                            >
-                              <XCircle className="w-4 h-4" /> Cancel Order
-                            </button>
-                          )}
+                          {/* Order cancellation is not offered to customers at any
+                              pre-delivery stage. */}
                           {/* A return already exists → show its status, no Return button.
                               Otherwise a delivered order can still be returned. */}
                           {returnsByOrder[order.orderNumber] ? (
@@ -698,13 +711,21 @@ export default function OrderList() {
                                 </a>
                               )
                             })()
-                          ) : order.rawStatus === 'DELIVERED' && order.currency !== 'USD' ? (
+                          ) : order.rawStatus === 'DELIVERED' && order.currency !== 'USD' && order.items.some((it) => it.returnable !== false) ? (
                             <button
                               onClick={() => setReturnModalOrder(order)}
                               className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors"
                             >
                               <RotateCcw className="w-4 h-4" /> Return
                             </button>
+                          ) : order.rawStatus === 'DELIVERED' && order.currency === 'USD' ? (
+                            <Link
+                              href="/profile?tab=support"
+                              onClick={() => stashSupportPrefill(order)}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors"
+                            >
+                              <LifeBuoy className="w-4 h-4" /> Contact Support
+                            </Link>
                           ) : null}
                         </div>
 
@@ -894,14 +915,8 @@ export default function OrderList() {
                             <Download className="w-4 h-4 shrink-0" />
                             <span className="truncate">Download Invoice</span>
                           </button>
-                          {CANCELLABLE_STATUSES.has(order.rawStatus || '') && (
-                            <button
-                              onClick={() => openActionModal(order, 'cancel')}
-                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-red-300 text-red-600 rounded-full hover:bg-red-50 transition-colors"
-                            >
-                              <XCircle className="w-4 h-4" /> Cancel Order
-                            </button>
-                          )}
+                          {/* Order cancellation is not offered to customers at any
+                              pre-delivery stage. */}
                           {/* A return already exists → show its status, no Return button.
                               Otherwise a delivered order can still be returned. */}
                           {returnsByOrder[order.orderNumber] ? (
@@ -918,13 +933,21 @@ export default function OrderList() {
                                 </a>
                               )
                             })()
-                          ) : order.rawStatus === 'DELIVERED' && order.currency !== 'USD' ? (
+                          ) : order.rawStatus === 'DELIVERED' && order.currency !== 'USD' && order.items.some((it) => it.returnable !== false) ? (
                             <button
                               onClick={() => setReturnModalOrder(order)}
                               className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors"
                             >
                               <RotateCcw className="w-4 h-4" /> Return
                             </button>
+                          ) : order.rawStatus === 'DELIVERED' && order.currency === 'USD' ? (
+                            <Link
+                              href="/profile?tab=support"
+                              onClick={() => stashSupportPrefill(order)}
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors"
+                            >
+                              <LifeBuoy className="w-4 h-4" /> Contact Support
+                            </Link>
                           ) : null}
                         </div>
                       </Reveal>
@@ -1154,38 +1177,23 @@ export default function OrderList() {
                 />
               )}
 
-              {/* Refund destination — cancelling a paid (online) order can refund to
-                  the M2C wallet (instant) or the original method. COD/unpaid: nothing. */}
+              {/* Refund — a paid (online) order is refunded to the M2C Wallet as
+                  instant store credit. COD/unpaid: nothing to refund. */}
               {actionModal.type === 'cancel' && (
                 actionModal.order.paymentStatus === 'PAID' ? (
-                  <div className="mt-4">
-                    <div className="mb-2 flex items-center justify-between">
-                      <p className="flex items-center gap-2 text-[13px] font-semibold text-slate-800">
-                        <CreditCard className="h-4 w-4 text-[#e01a1b]" /> Refund of {money(actionModal.order.total, actionModal.order)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <button type="button" onClick={() => setCancelRefundTo('WALLET')}
-                        className={`flex w-full items-start gap-2.5 rounded-xl border p-3 text-left transition-colors ${cancelRefundTo === 'WALLET' ? 'border-[#e01a1b] bg-red-50/40 ring-1 ring-[#e01a1b]/20' : 'border-slate-200 hover:border-slate-300'}`}>
-                        <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-2 text-[13px] font-semibold text-slate-800">Add to M2C Wallet
-                            <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">Instant</span>
-                          </span>
-                          <span className="mt-0.5 block text-[11.5px] text-slate-500">Store credit — use it on your next purchase right away.</span>
-                        </span>
-                        <span className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 ${cancelRefundTo === 'WALLET' ? 'border-[#e01a1b] bg-[#e01a1b]' : 'border-slate-300'}`} />
-                      </button>
-                      <button type="button" onClick={() => setCancelRefundTo('BANK')}
-                        className={`flex w-full items-start gap-2.5 rounded-xl border p-3 text-left transition-colors ${cancelRefundTo === 'BANK' ? 'border-[#e01a1b] bg-red-50/40 ring-1 ring-[#e01a1b]/20' : 'border-slate-200 hover:border-slate-300'}`}>
-                        <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[13px] font-semibold text-slate-800">Original payment method</span>
-                          <span className="mt-0.5 block text-[11.5px] text-slate-500">Back to the account you paid with — 5–7 business days.</span>
-                        </span>
-                        <span className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 ${cancelRefundTo === 'BANK' ? 'border-[#e01a1b] bg-[#e01a1b]' : 'border-slate-300'}`} />
-                      </button>
-                    </div>
+                  <div className="mt-4 flex items-start gap-2.5 rounded-xl border-2 border-emerald-200 bg-emerald-50/50 p-3.5">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-700">
+                      <RotateCcw className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2 text-[13px] font-semibold text-slate-800">
+                        {money(actionModal.order.total, actionModal.order)} refund to M2C Wallet
+                        <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">Instant</span>
+                      </span>
+                      <span className="mt-0.5 block text-[11.5px] text-slate-500">
+                        Added to your wallet as store credit right away — use it on your next purchase, or withdraw it from your account later.
+                      </span>
+                    </span>
                   </div>
                 ) : (
                   <p className="mt-4 rounded-xl bg-slate-50 p-3 text-[12.5px] text-slate-500">

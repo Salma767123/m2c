@@ -35,7 +35,7 @@ import LogoutConfirmModal from "@/components/WebSite/Shared/LogoutConfirmModal";
 
 // Pages that show the PRIMARY logo. Every other page shows the secondary logo.
 // Edit this list to move a page between the two logos.
-const PRIMARY_LOGO_ROUTES = ['/', '/contact', '/about', '/terms', '/privacy', '/returns'];
+const PRIMARY_LOGO_ROUTES = ['/', '/contact', '/about', '/terms', '/privacy', '/returns', '/faq'];
 
 const Header = () => {
   const pathname = usePathname();
@@ -307,15 +307,45 @@ const Header = () => {
         <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14 sm:h-16 lg:h-[68px] gap-1 min-[360px]:gap-2 sm:gap-4">
 
-            {/* Logo — sized to sit comfortably in the row without dominating it. */}
-            <Link href="/" className="flex items-center shrink-0">
+            {/* Logo — sized to sit comfortably in the row without dominating it.
+                On hover the full company name unfurls to the right (desktop only):
+                a width + fade + slide reveal, so it stays hidden until wanted and
+                never reserves layout space when collapsed. */}
+            <Link
+              href="/"
+              aria-label="M2C Markdowns Pvt Ltd — Home"
+              className="group flex items-center shrink-0"
+            >
               <CompanyLogo
                 variant={logoVariant}
-                className="h-8 min-[360px]:h-10 sm:h-14 lg:h-16 w-auto object-contain"
+                className="h-8 min-[360px]:h-10 sm:h-14 lg:h-16 w-auto object-contain transition-transform duration-500 ease-out group-hover:scale-[1.03]"
                 skeletonClassName="h-8 min-[360px]:h-10 sm:h-14 lg:h-16 aspect-square bg-gray-100"
                 fallbackSizes="(max-width: 360px) 32px, (max-width: 640px) 40px, (max-width: 1024px) 56px, 64px"
                 priority
               />
+              {/* Hover reveal only on the SECONDARY-logo pages (product/other views
+                  where the logo is just the icon). The main brand/legal pages —
+                  home, about, contact, terms, privacy, returns, faq — already show
+                  the full wordmark in the primary logo, so no reveal there. */}
+              {logoVariant === 'secondary' && (
+                <span
+                  aria-hidden="true"
+                  className="hidden sm:flex items-center overflow-hidden whitespace-nowrap max-w-0 -translate-x-2 opacity-0 transition-all duration-500 ease-out group-hover:max-w-[260px] group-hover:translate-x-0 group-hover:opacity-100 group-hover:ml-2.5 lg:group-hover:ml-3"
+                >
+                  <span aria-hidden="true" className="mr-2.5 h-7 w-px shrink-0 bg-gradient-to-b from-transparent via-[#e6dcd0] to-transparent" />
+                  {/* Wordmark: "M2C" with M/C in red and 2 in yellow, "Markdowns"
+                      in red (no italic). */}
+                  <span className="flex items-baseline gap-1.5 leading-none">
+                    <span className="font-extrabold tracking-tight text-[17px] lg:text-xl">
+                      <span className="text-[#e01a1b]">M</span>
+                      <span className="text-[#f5b301]">2</span>
+                      <span className="text-[#e01a1b]">C</span>
+                    </span>
+                    <span className="font-extrabold uppercase tracking-wide text-[#e01a1b] text-[15px] lg:text-lg">Markdowns</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#a89a8d] lg:text-[10px]">Pvt Ltd</span>
+                  </span>
+                </span>
+              )}
             </Link>
 
             {/* Prominent inline search — the primary way to find products

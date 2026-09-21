@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Star, Search, Eye, AlertCircle, RefreshCw, Package, ChevronLeft, ChevronRight, MessageSquare, CheckCircle, XCircle, Percent } from "lucide-react";
+import { Star, Search, Eye, AlertCircle, RefreshCw, Package, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, MessageSquare, CheckCircle, XCircle, Percent } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
@@ -57,6 +57,7 @@ export default function VendorProductReviews() {
   const [selectedReview, setSelectedReview] = useState<VendorProductReview | null>(null);
   const [stats, setStats] = useState({ total: 0, approved: 0, rejected: 0, averageRating: 0 });
   const [currentPage, setCurrentPage] = useState(1);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   // Fetch the FULL review set (no status/search params) so the metric cards
   // reflect global totals. Search + status + date filtering is applied
@@ -188,6 +189,25 @@ export default function VendorProductReviews() {
         <p className="text-sm text-slate-500">Quality check reviews given by admin after receiving products from vendors</p>
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filteredReviews.length} of {reviews.length} reviews
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Stats — click the first three cards to filter the table below */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
         {metricCards.map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -261,6 +281,8 @@ export default function VendorProductReviews() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      )}
 
       {/* Reviews Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">

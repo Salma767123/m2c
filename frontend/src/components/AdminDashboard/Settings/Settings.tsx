@@ -120,7 +120,8 @@ export default function Settings() {
     enabled: false,
     keyId: "",
     keySecret: "",
-    webhookSecret: ""
+    webhookSecret: "",
+    xAccountNumber: ""
   });
 
   // PayU settings state (only for super_admin)
@@ -243,7 +244,8 @@ export default function Settings() {
               enabled: response.data.razorpayEnabled,
               keyId: response.data.razorpayKeyId || "",
               keySecret: response.data.razorpayKeySecret || "",
-              webhookSecret: response.data.razorpayWebhookSecret || ""
+              webhookSecret: response.data.razorpayWebhookSecret || "",
+              xAccountNumber: (response.data as any).razorpayxAccountNumber || ""
             });
 
             setPayuSettings({
@@ -492,7 +494,8 @@ export default function Settings() {
         enabled: razorpaySettings.enabled,
         keyId: razorpaySettings.keyId,
         keySecret: razorpaySettings.keySecret,
-        webhookSecret: razorpaySettings.webhookSecret
+        webhookSecret: razorpaySettings.webhookSecret,
+        xAccountNumber: razorpaySettings.xAccountNumber
       });
 
       if (response.success) {
@@ -1695,6 +1698,19 @@ export default function Settings() {
                           {isRazorpayWebhookMasked && (
                             <p className="text-xs text-slate-500 mt-1">Secret is hidden. Enter a new value to update.</p>
                           )}
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-slate-700 mb-2">RazorpayX Account Number <span className="font-normal text-slate-400">(for automated wallet payouts)</span></label>
+                          <input
+                            type="text"
+                            value={razorpaySettings.xAccountNumber}
+                            onChange={(e) => setRazorpaySettings({ ...razorpaySettings, xAccountNumber: e.target.value })}
+                            disabled={currentUser.role !== "super_admin"}
+                            placeholder="e.g. 2323230000000000"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent disabled:bg-slate-100 font-mono text-sm"
+                          />
+                          <p className="text-xs text-slate-500 mt-1">Your RazorpayX source account number (Dashboard → Account Details). Leave blank to pay out wallet withdrawals manually.</p>
                         </div>
                       </div>
                     </div>

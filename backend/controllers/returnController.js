@@ -39,6 +39,25 @@ const asObjectId = (v) => (typeof v === 'string' && /^[a-f\d]{24}$/i.test(v) ? v
 // stock); everything else defaults to being restocked. Admin can override.
 const defaultRestock = (reason) => !['damaged', 'quality'].includes(reason);
 
+// Resolve which vendor supplied a product, so a damaged item can be routed back
+// to them. Returns { vendorId, vendorName, vendorCode } (nulls when unknown).
+async function resolveVendorForProduct(productId) {
+    if (!productId) return { vendorId: null, vendorName: null, vendorCode: null };
+    try {
+        const product = await prisma.product.findUnique({
+            where: { id: productId },
+            select: { vendorId: true, vendor: { select: { companyName: true, vendorCode: true } } },
+        });
+        return {
+            vendorId: product?.vendorId || null,
+            vendorName: product?.vendor?.companyName || null,
+            vendorCode: product?.vendor?.vendorCode || null,
+        };
+    } catch {
+        return { vendorId: null, vendorName: null, vendorCode: null };
+    }
+}
+
 /**
  * Dispose of the returned physical item when a return is approved:
  *  • restock=true  → put units back into sellable inventory (+ stock history)
@@ -67,7 +86,9 @@ async function applyDisposition(rec, { restock, note, adminName, adminId }) {
     }
 
     // Not restocked → permanent Damaged Items ledger entry (the tracked audit).
+    // Attribute it to the supplying vendor so it can be returned to them (RTV).
     try {
+        const vendor = await resolveVendorForProduct(rec.productId);
         await prisma.damagedStock.create({
             data: {
                 productId: rec.productId || null,
@@ -87,6 +108,10 @@ async function applyDisposition(rec, { restock, note, adminName, adminId }) {
                 customerName: rec.customerName,
                 recordedById: asObjectId(adminId),
                 recordedByName: adminName,
+                vendorId: vendor.vendorId,
+                vendorName: vendor.vendorName,
+                vendorCode: vendor.vendorCode,
+                vendorReturnStatus: 'AT_HUB',
             },
         });
     } catch (e) {
@@ -160,6 +185,17 @@ const createReturnRequest = async (req, res) => {
         else if (order.items.length === 1) item = order.items[0];
         if (!item) return res.status(400).json({ success: false, message: 'Please select the item you want to return' });
 
+        // Per-product return eligibility — the admin can disable returns on a product.
+        if (item.productId) {
+            const product = await prisma.product.findUnique({
+                where: { id: item.productId },
+                select: { returnable: true },
+            });
+            if (product && product.returnable === false) {
+                return res.status(400).json({ success: false, message: 'This product is not eligible for return.' });
+            }
+        }
+
         // Block a second active return for the same item.
         const TERMINAL = [STATUS.REJECTED, STATUS.CANCELLED, STATUS.REFUND_COMPLETED, STATUS.REPLACEMENT_COMPLETED];
         const existingActive = await prisma.returnRequest.findFirst({
@@ -178,13 +214,9 @@ const createReturnRequest = async (req, res) => {
         }
 
         // Resolution preference validation.
-        //  REFUND      → 'ORIGINAL' (back to bank/source) | 'WALLET' (instant store credit)
-        //  REPLACEMENT → 'CREDIT'  (wallet store credit)   | 'ITEM'   (ship with next order)
-        if (resolution === 'REFUND') {
-            if (!['ORIGINAL', 'WALLET'].includes(refundMethod)) {
-                return res.status(400).json({ success: false, message: 'Please choose how to receive your refund' });
-            }
-        } else if (resolution === 'REPLACEMENT') {
+        //  REFUND      → always WALLET (store credit; no gateway refund)
+        //  REPLACEMENT → 'CREDIT' (wallet store credit) | 'ITEM' (ship with next order)
+        if (resolution === 'REPLACEMENT') {
             if (!['CREDIT', 'ITEM'].includes(replacementMethod)) {
                 return res.status(400).json({ success: false, message: 'Please choose how to receive your replacement' });
             }
@@ -228,7 +260,7 @@ const createReturnRequest = async (req, res) => {
                 reasonNote: reasonNote ? String(reasonNote).trim() : null,
                 evidenceImages: uploaded,
                 resolution,
-                refundMethod: resolution === 'REFUND' ? refundMethod : null,
+                refundMethod: resolution === 'REFUND' ? 'WALLET' : null,
                 replacementMethod: resolution === 'REPLACEMENT' ? replacementMethod : null,
                 refundAmount: resolution === 'REFUND' ? itemAmount : null,
                 replacementValue: resolution === 'REPLACEMENT' ? itemAmount : null,
@@ -469,41 +501,21 @@ const decideReturn = async (req, res) => {
 
             // ── REFUND ──
             if (rec.resolution === 'REFUND') {
-                // WALLET → instant store credit, no gateway wait.
-                if (rec.refundMethod === 'WALLET') {
-                    await creditWallet({ customerId: rec.customerId, amount: creditInr, source: 'REFUND', description: `Refund for return ${rec.returnId}`, refs: walletRefs, actor: walletActor }).catch((e) => console.warn('[return] wallet credit failed:', e?.message));
-                    let history = withHistory(rec.statusHistory, STATUS.APPROVED, 'Return approved', adminName);
-                    history = withHistory(history, STATUS.APPROVED, disp.historyNote, adminName);
-                    history = withHistory(history, STATUS.REFUND_COMPLETED, `Refunded ₹${creditInr.toFixed(2)} to wallet`, adminName);
-                    const updated = await prisma.returnRequest.update({
-                        where: { id },
-                        data: { ...baseDecision, status: STATUS.REFUND_COMPLETED, refundStatus: 'WALLET', refundAmount: rec.refundAmount ?? rec.itemAmount, statusHistory: history },
-                    });
-                    notifyCustomer(rec, 'REFUND_COMPLETED', 'Refund added to wallet', `₹${creditInr.toFixed(2)} was added to your wallet for ${rec.returnId}.`);
-                    emailStatus(rec, 'Your refund was added to your wallet', `We've added ₹${creditInr.toFixed(2)} to your M2C wallet for return ${rec.returnId}. You can use it on your next purchase.`);
-                    return res.json({ success: true, message: 'Refund credited to wallet', data: updated });
-                }
-
-                // ORIGINAL (bank) → gateway refund → Refund Processing.
-                const order = await prisma.order.findUnique({ where: { id: rec.orderId } }).catch(() => null);
-                let refundStatus = 'MANUAL', refundId = null, paymentMethodLabel = rec.paymentMethodLabel || null;
-                if (order) {
-                    const r = await issueRefundAmount(order, creditInr);
-                    refundStatus = r.refundStatus; refundId = r.refundId;
-                    const label = await fetchPaymentMethodLabel(order);
-                    if (label) paymentMethodLabel = label;
-                }
+                // Refunds are ALWAYS issued as M2C Wallet store credit — never back to
+                // the gateway. The captured amount stays with M2C; the customer gets
+                // instant credit and withdraws from the wallet separately if they want
+                // cash. So a refund completes immediately on approval.
+                await creditWallet({ customerId: rec.customerId, amount: creditInr, source: 'REFUND', description: `Refund for return ${rec.returnId}`, refs: walletRefs, actor: walletActor }).catch((e) => console.warn('[return] wallet credit failed:', e?.message));
                 let history = withHistory(rec.statusHistory, STATUS.APPROVED, 'Return approved', adminName);
                 history = withHistory(history, STATUS.APPROVED, disp.historyNote, adminName);
-                history = withHistory(history, STATUS.REFUND_PROCESSING,
-                    refundStatus === 'MANUAL' ? 'Refund to be processed manually' : 'Refund initiated with payment provider', adminName);
+                history = withHistory(history, STATUS.REFUND_COMPLETED, `Refunded ₹${creditInr.toFixed(2)} to wallet`, adminName);
                 const updated = await prisma.returnRequest.update({
                     where: { id },
-                    data: { ...baseDecision, status: STATUS.REFUND_PROCESSING, refundId, refundStatus, paymentMethodLabel, paymentReference: refundId || null, statusHistory: history },
+                    data: { ...baseDecision, status: STATUS.REFUND_COMPLETED, refundMethod: 'WALLET', refundStatus: 'WALLET', refundAmount: rec.refundAmount ?? rec.itemAmount, statusHistory: history },
                 });
-                notifyCustomer(rec, 'RETURN_APPROVED', 'Return approved', `Your refund for ${rec.returnId} is being processed.`);
-                emailStatus(rec, 'Your refund is being processed', `Good news — return ${rec.returnId} was approved and your refund of ${rec.currency === 'INR' ? '₹' : '$'}${(rec.refundAmount || rec.itemAmount).toFixed(2)} is being processed to your original payment method.`);
-                return res.json({ success: true, message: 'Return approved, refund processing', data: updated });
+                notifyCustomer(rec, 'REFUND_COMPLETED', 'Refund added to wallet', `₹${creditInr.toFixed(2)} was added to your wallet for ${rec.returnId}.`);
+                emailStatus(rec, 'Your refund was added to your wallet', `We've added ₹${creditInr.toFixed(2)} to your M2C wallet for return ${rec.returnId}. You can use it on your next purchase.`);
+                return res.json({ success: true, message: 'Refund credited to wallet', data: updated });
             }
 
             // ── REPLACEMENT ──
@@ -604,10 +616,111 @@ const advanceReturnStatus = async (req, res) => {
     }
 };
 
+// ════════════════════════════════════════════════════════════════════════════
+// VENDOR — DEFECTIVE RETURNS (items the hub shipped back to this vendor)
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /api/returns/vendor/defective — defective items returned to the signed-in
+// vendor. Only items already dispatched to them are visible (AT_HUB items are
+// still at the hub and not the vendor's concern yet).
+const getVendorDefectiveReturns = async (req, res) => {
+    try {
+        const vendorId = req.vendorId || req.userId;
+        const { search, status, page = 1, limit = 50 } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const visible = ['SENT_TO_VENDOR', 'RECEIVED_BY_VENDOR', 'CLOSED'];
+        const where = { vendorId, vendorReturnStatus: { in: visible } };
+        if (status && visible.includes(status)) where.vendorReturnStatus = status;
+        if (search) {
+            where.AND = [{
+                OR: [
+                    { productName: { contains: search, mode: 'insensitive' } },
+                    { returnCode: { contains: search, mode: 'insensitive' } },
+                    { orderCode: { contains: search, mode: 'insensitive' } },
+                    { sku: { contains: search, mode: 'insensitive' } },
+                    { trackingNumber: { contains: search, mode: 'insensitive' } },
+                ],
+            }];
+        }
+
+        const baseWhere = { vendorId };
+        const [rows, total, totalUnitsAgg, cSent, cReceived, cClosed] = await Promise.all([
+            prisma.damagedStock.findMany({ where, orderBy: { sentToVendorAt: 'desc' }, skip, take: parseInt(limit) }),
+            prisma.damagedStock.count({ where }),
+            prisma.damagedStock.findMany({ where, select: { quantity: true } }),
+            prisma.damagedStock.count({ where: { ...baseWhere, vendorReturnStatus: 'SENT_TO_VENDOR' } }),
+            prisma.damagedStock.count({ where: { ...baseWhere, vendorReturnStatus: 'RECEIVED_BY_VENDOR' } }),
+            prisma.damagedStock.count({ where: { ...baseWhere, vendorReturnStatus: 'CLOSED' } }),
+        ]);
+
+        const totalUnits = totalUnitsAgg.reduce((s, r) => s + (r.quantity || 0), 0);
+        res.json({
+            success: true,
+            data: rows,
+            totalUnits,
+            statusCounts: {
+                ALL: cSent + cReceived + cClosed,
+                SENT_TO_VENDOR: cSent,
+                RECEIVED_BY_VENDOR: cReceived,
+                CLOSED: cClosed,
+            },
+            pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) },
+        });
+    } catch (error) {
+        console.error('Error fetching vendor defective returns:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch defective returns' });
+    }
+};
+
+// PATCH /api/returns/vendor/defective/:id/acknowledge — the vendor confirms they
+// received the defective item shipped back to them.
+const acknowledgeVendorDefectiveReturn = async (req, res) => {
+    try {
+        const vendorId = req.vendorId || req.userId;
+        const { id } = req.params;
+        const { note } = req.body || {};
+
+        const rec = await prisma.damagedStock.findUnique({ where: { id } });
+        if (!rec || rec.vendorId !== vendorId) {
+            return res.status(404).json({ success: false, message: 'Defective return not found' });
+        }
+        if (rec.vendorReturnStatus !== 'SENT_TO_VENDOR') {
+            return res.status(400).json({ success: false, message: 'This item is not awaiting your acknowledgement.' });
+        }
+
+        const cleanNote = note ? String(note).trim().slice(0, 500) : null;
+        const updated = await prisma.damagedStock.update({
+            where: { id },
+            data: {
+                vendorReturnStatus: 'RECEIVED_BY_VENDOR',
+                vendorReceivedAt: new Date(),
+                ...(cleanNote ? { vendorReturnNote: cleanNote } : {}),
+            },
+        });
+
+        // Let admins know the vendor confirmed receipt.
+        createNotificationForRole({
+            role: 'ADMIN',
+            type: 'DEFECTIVE_RETURN_ACKNOWLEDGED',
+            title: 'Vendor acknowledged a defective return',
+            message: `${rec.vendorName || 'A vendor'} confirmed receiving ${rec.quantity} × ${rec.productName}${rec.returnCode ? ` (${rec.returnCode})` : ''}.`,
+            data: { damagedStockId: rec.id, returnCode: rec.returnCode, orderCode: rec.orderCode },
+        }).catch(() => {});
+
+        res.json({ success: true, message: 'Marked as received', data: updated });
+    } catch (error) {
+        console.error('Error acknowledging defective return:', error);
+        res.status(500).json({ success: false, message: 'Failed to update' });
+    }
+};
+
+const RTV_STATUSES = ['AT_HUB', 'SENT_TO_VENDOR', 'RECEIVED_BY_VENDOR', 'CLOSED'];
+
 // GET /api/returns/admin/damaged — the Damaged Items ledger (admin).
 const getDamagedStock = async (req, res) => {
     try {
-        const { search, page = 1, limit = 50 } = req.query;
+        const { search, status, page = 1, limit = 50 } = req.query;
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const where = {};
         if (search) {
@@ -617,23 +730,134 @@ const getDamagedStock = async (req, res) => {
                 { orderCode: { contains: search, mode: 'insensitive' } },
                 { sku: { contains: search, mode: 'insensitive' } },
                 { customerName: { contains: search, mode: 'insensitive' } },
+                { vendorName: { contains: search, mode: 'insensitive' } },
             ];
         }
-        const [rows, total, totalUnitsAgg] = await Promise.all([
+        if (status && RTV_STATUSES.includes(status)) where.vendorReturnStatus = status;
+
+        // Per-status counts drive the metric cards (computed over the search set,
+        // ignoring the status filter itself so the cards stay stable).
+        const countWhere = { ...where };
+        delete countWhere.vendorReturnStatus;
+
+        // Count per status with plain counts (groupBy rejects legacy null values on
+        // the non-nullable status field). AT_HUB also absorbs any legacy null/absent.
+        const [rows, total, totalUnitsAgg, cAll, cSent, cReceived, cClosed] = await Promise.all([
             prisma.damagedStock.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: parseInt(limit) }),
             prisma.damagedStock.count({ where }),
             prisma.damagedStock.findMany({ where, select: { quantity: true } }),
+            prisma.damagedStock.count({ where: countWhere }),
+            prisma.damagedStock.count({ where: { ...countWhere, vendorReturnStatus: 'SENT_TO_VENDOR' } }),
+            prisma.damagedStock.count({ where: { ...countWhere, vendorReturnStatus: 'RECEIVED_BY_VENDOR' } }),
+            prisma.damagedStock.count({ where: { ...countWhere, vendorReturnStatus: 'CLOSED' } }),
         ]);
+
+        // Legacy rows created before RTV existed have no vendor attribution — fill
+        // it in on read so they still route correctly (best-effort, cached per product).
+        const missing = rows.filter((r) => !r.vendorId && r.productId);
+        if (missing.length) {
+            const cache = new Map();
+            for (const r of missing) {
+                if (!cache.has(r.productId)) cache.set(r.productId, await resolveVendorForProduct(r.productId));
+                const v = cache.get(r.productId);
+                r.vendorId = v.vendorId; r.vendorName = v.vendorName; r.vendorCode = v.vendorCode;
+                if (!r.vendorReturnStatus) r.vendorReturnStatus = 'AT_HUB';
+            }
+        }
+
         const totalUnits = totalUnitsAgg.reduce((s, r) => s + (r.quantity || 0), 0);
+        // AT_HUB = everything that isn't in a later state (covers legacy null rows too).
+        const statusCounts = {
+            ALL: cAll,
+            SENT_TO_VENDOR: cSent,
+            RECEIVED_BY_VENDOR: cReceived,
+            CLOSED: cClosed,
+            AT_HUB: Math.max(0, cAll - cSent - cReceived - cClosed),
+        };
+
         res.json({
             success: true,
             data: rows,
             totalUnits,
+            statusCounts,
             pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) },
         });
     } catch (error) {
         console.error('Error fetching damaged stock:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch damaged items' });
+    }
+};
+
+// PATCH /api/returns/admin/damaged/:id/rtv — advance a damaged item through the
+// return-to-vendor lifecycle (send to vendor, confirm vendor receipt, close).
+const updateDamagedVendorReturn = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { action, courier, trackingNumber, note } = req.body;
+        const adminId = req.userId || req.user?.id;
+        const adminName = req.user?.name || req.user?.email || 'Admin';
+
+        const rec = await prisma.damagedStock.findUnique({ where: { id } });
+        if (!rec) return res.status(404).json({ success: false, message: 'Damaged item not found' });
+
+        const cleanNote = note ? String(note).trim().slice(0, 500) : null;
+        const data = {};
+
+        if (action === 'send') {
+            if (!rec.vendorId) {
+                return res.status(400).json({ success: false, message: 'No vendor is linked to this item, so it cannot be returned to a vendor.' });
+            }
+            if (rec.vendorReturnStatus === 'SENT_TO_VENDOR' || rec.vendorReturnStatus === 'RECEIVED_BY_VENDOR') {
+                return res.status(400).json({ success: false, message: 'This item has already been sent to the vendor.' });
+            }
+            data.vendorReturnStatus = 'SENT_TO_VENDOR';
+            data.courier = courier ? String(courier).trim().slice(0, 120) : null;
+            data.trackingNumber = trackingNumber ? String(trackingNumber).trim().slice(0, 120) : null;
+            data.sentToVendorAt = new Date();
+            data.sentById = asObjectId(adminId);
+            data.sentByName = adminName;
+            if (cleanNote) data.vendorReturnNote = cleanNote;
+        } else if (action === 'receive') {
+            if (rec.vendorReturnStatus !== 'SENT_TO_VENDOR') {
+                return res.status(400).json({ success: false, message: 'Only items that were sent to the vendor can be marked received.' });
+            }
+            data.vendorReturnStatus = 'RECEIVED_BY_VENDOR';
+            data.vendorReceivedAt = new Date();
+            if (cleanNote) data.vendorReturnNote = cleanNote;
+        } else if (action === 'close') {
+            data.vendorReturnStatus = 'CLOSED';
+            if (cleanNote) data.vendorReturnNote = cleanNote;
+        } else if (action === 'reset') {
+            // Undo a mistaken dispatch, back to At Hub.
+            data.vendorReturnStatus = 'AT_HUB';
+            data.courier = null;
+            data.trackingNumber = null;
+            data.sentToVendorAt = null;
+            data.sentById = null;
+            data.sentByName = null;
+            data.vendorReceivedAt = null;
+        } else {
+            return res.status(400).json({ success: false, message: 'Unknown action' });
+        }
+
+        const updated = await prisma.damagedStock.update({ where: { id }, data });
+
+        // Notify the vendor in-app when a defective item is dispatched to them.
+        if (action === 'send' && rec.vendorId) {
+            createNotification({
+                userId: rec.vendorId,
+                role: 'VENDOR',
+                type: 'DAMAGED_ITEM_RETURNED',
+                title: 'Defective item returned to you',
+                message: `${rec.quantity} × ${rec.productName} (${rec.reason}) has been shipped back to you${data.courier ? ` via ${data.courier}` : ''}${data.trackingNumber ? ` — ${data.trackingNumber}` : ''}.`,
+                data: { damagedStockId: rec.id, returnCode: rec.returnCode, orderCode: rec.orderCode, trackingNumber: data.trackingNumber || null, courier: data.courier || null },
+            }).catch(() => {});
+        }
+
+        res.json({ success: true, message: 'Updated', data: updated });
+    } catch (error) {
+        console.error('Error updating vendor return:', error);
+        res.status(500).json({ success: false, message: 'Failed to update vendor return' });
     }
 };
 
@@ -693,5 +917,8 @@ module.exports = {
     decideReturn,
     advanceReturnStatus,
     getDamagedStock,
+    updateDamagedVendorReturn,
+    getVendorDefectiveReturns,
+    acknowledgeVendorDefectiveReturn,
     handleRefundWebhook,
 };

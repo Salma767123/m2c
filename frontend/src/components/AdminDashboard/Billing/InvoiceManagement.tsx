@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, Eye, RefreshCw, FileText, Receipt, ChevronLeft, ChevronRight, CheckCircle, Clock, AlertTriangle } from "lucide-react";
+import { Search, Eye, RefreshCw, FileText, Receipt, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, CheckCircle, Clock, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -72,6 +72,7 @@ export default function InvoiceManagement() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   const statusOptions = ["All", "Paid", "Pending", "Overdue"];
 
@@ -153,6 +154,25 @@ export default function InvoiceManagement() {
   return (
     <div className="space-y-4">
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filtered.length} of {orders.length} invoices
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* ── Stats (click a card to filter the table below) ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
@@ -224,6 +244,8 @@ export default function InvoiceManagement() {
           </button>
         </div>
       </div>
+        </div>
+      )}
 
       {/* ── Table ── */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">

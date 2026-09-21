@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Tag, Percent, Calendar, TrendingUp, Info, Upload, Megaphone, ChevronDown, Package, Loader2 } from 'lucide-react';
+import { X, Tag, Percent, Calendar, TrendingUp, Info, Upload, Megaphone, ChevronDown, Package, Loader2, Users } from 'lucide-react';
 import Dropdown from '@/components/UI/Dropdown';
 import { Coupon } from '@/services/couponService';
 import { categoryService } from '@/services/categoryService';
@@ -19,6 +19,8 @@ interface CouponModalProps {
   onSubmit: (e: React.FormEvent) => void;
   /** True when another active first-order coupon already exists — locks this toggle. */
   firstOrderLocked?: boolean;
+  /** When set (>0), this coupon is being created for that many selected customers. */
+  targetCount?: number;
 }
 
 const CouponModal = ({
@@ -30,6 +32,7 @@ const CouponModal = ({
   setFormData,
   onSubmit,
   firstOrderLocked = false,
+  targetCount = 0,
 }: CouponModalProps) => {
   const [popupImagePreview, setPopupImagePreview] = useState<string>('');
   const popupFileInputRef = useRef<HTMLInputElement>(null);
@@ -332,6 +335,14 @@ const CouponModal = ({
             // Create/Edit Mode - Form Layout
             <form onSubmit={onSubmit}>
               <div className="space-y-6">
+                {targetCount > 0 && (
+                  <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700">
+                    <Users className="h-4 w-4 shrink-0" />
+                    <span>
+                      This coupon will be available to <span className="font-bold">{targetCount}</span> selected customer{targetCount === 1 ? '' : 's'} only — they’ll get an app notification with the code.
+                    </span>
+                  </div>
+                )}
                 {/* Top Row: Basic Information | Discount Details */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Left: Basic Information */}

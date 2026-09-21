@@ -41,6 +41,10 @@ const createNotificationForRole = async ({ role, type, title, message, data }) =
     } else if (role === 'QC_CHECKER') {
       const checkers = await prisma.qCChecker.findMany({ select: { id: true } });
       userIds = checkers.map(c => c.id);
+    } else if (role === 'USER') {
+      // All active customers.
+      const customers = await prisma.user.findMany({ where: { isActive: true }, select: { id: true } });
+      userIds = customers.map(u => u.id);
     }
 
     if (userIds.length === 0) return;
@@ -61,6 +65,34 @@ const createNotificationForRole = async ({ role, type, title, message, data }) =
     }
   } catch (error) {
     console.error('Create role notification error:', error);
+  }
+};
+
+/**
+ * Create in-app notifications for a specific set of users (and fire FCM push).
+ * Used when a notification targets some customers rather than a whole role
+ * (e.g. an offer/coupon restricted to selected customers).
+ */
+const createNotificationForUsers = async ({ userIds, role = 'USER', type, title, message, data }) => {
+  try {
+    const ids = [...new Set((userIds || []).filter(Boolean))];
+    if (ids.length === 0) return;
+
+    await prisma.notification.createMany({
+      data: ids.map(uid => ({ userId: uid, role, type, title, message, data: data || null })),
+    });
+
+    // Fire-and-forget FCM push, one per targeted user.
+    try {
+      const { sendToUser } = require('../utils/notificationService');
+      ids.forEach(uid =>
+        sendToUser(uid, role, { title, body: message, data: { type, ...(data || {}) } }).catch(() => {})
+      );
+    } catch {
+      // FCM not configured — skip silently
+    }
+  } catch (error) {
+    console.error('Create user notifications error:', error);
   }
 };
 
@@ -166,6 +198,7 @@ const getUnreadCount = async (req, res) => {
 module.exports = {
   createNotification,
   createNotificationForRole,
+  createNotificationForUsers,
   getNotifications,
   markAsRead,
   markAsUnread,

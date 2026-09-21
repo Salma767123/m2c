@@ -22,7 +22,6 @@ import {
   Clock,
   ExternalLink,
   RotateCcw,
-  XCircle,
   BadgePercent,
   ClipboardCheck
 } from "lucide-react"
@@ -120,12 +119,6 @@ const historyForStep = (
   return { reachedAt: matches[0].timestamp }
 }
 
-// Order can be cancelled by the customer up to (but not including) dispatch.
-const CANCELLABLE_STATUSES = new Set([
-  'ORDER_CREATED', 'VENDOR_PROCESSING', 'PACKED_BY_VENDOR',
-  'IN_TRANSIT_TO_ADMIN_HUB', 'RECEIVED_AT_ADMIN_HUB', 'APPROVED_BY_ADMIN_HUB',
-])
-
 // Preset reasons offered in the cancel / return modal ("Other" reveals a text box).
 const CANCEL_REASONS = [
   'Changed my mind',
@@ -158,12 +151,6 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
   const [reasonChoice, setReasonChoice] = useState('')  // selected preset reason
   const [actionReason, setActionReason] = useState('')   // free text when "Other"
   const [actionSubmitting, setActionSubmitting] = useState(false)
-
-  const openActionModal = (type: 'cancel' | 'return') => {
-    setReasonChoice('')
-    setActionReason('')
-    setActionModal(type)
-  }
 
   const submitAction = async () => {
     if (!actionModal || !orderDetails) return
@@ -244,8 +231,11 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
         // Check if user already reviewed
         const order = response.data
         if (getNormalizedStatus(order.status) === 'received' && order.items?.length > 0) {
-          const check = await reviewService.checkReviewStatus(order.items[0].productId, order.id)
-          if (check.hasReviewed) setHasReviewed(true)
+          // "Done" only when every product is reviewed AND purchase-experience
+          // feedback has been given for this order.
+          const elig = await reviewService.getOrderReviewEligibility(order.id)
+          const d = elig?.data
+          if (d && d.products.every((p) => p.reviewed) && d.experienceReviewed) setHasReviewed(true)
         }
       } else {
         setError('Order not found')
@@ -500,17 +490,12 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 <Package className="w-4 h-4 mr-1" />
                 {formatStatus(getNormalizedStatus(orderDetails.status))}
               </div>
-              {/* Customer actions — cancel pre-dispatch, request return post-delivery */}
+              {/* Customer actions — request return post-delivery. Order
+                  cancellation is not offered to customers at any pre-delivery stage. */}
               <div className="flex flex-wrap items-center gap-2">
-                {CANCELLABLE_STATUSES.has(orderDetails.status) && (
-                  <button
-                    onClick={() => openActionModal('cancel')}
-                    className="inline-flex items-center gap-2 rounded-full border border-[#e01a1b] px-4 py-2 text-sm font-medium text-[#e01a1b] transition-colors hover:bg-[#e01a1b]/5"
-                  >
-                    <XCircle className="w-4 h-4" /> Cancel Order
-                  </button>
-                )}
                 {orderDetails.status === 'DELIVERED'
+                  && orderDetails.currency !== 'USD'
+                  && orderDetails.items.some((it) => it.returnable !== false)
                   && orderDetails.returnRequest?.status !== 'Requested'
                   && orderDetails.returnRequest?.status !== 'Approved' && (
                   <button
@@ -519,6 +504,15 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                   >
                     <RotateCcw className="w-4 h-4" /> Return
                   </button>
+                )}
+                {/* International (.com/USD) orders can't be returned — point them to support instead. */}
+                {orderDetails.status === 'DELIVERED' && orderDetails.currency === 'USD' && (
+                  <Link
+                    href="/profile?tab=support"
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    <MessageCircle className="w-4 h-4" /> Contact Support
+                  </Link>
                 )}
                 {orderDetails.returnRequest?.status === 'Requested' && (
                   <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">Return Requested</span>
@@ -641,8 +635,11 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                       const stateLabel = step.key === 'received'
                         ? (reached ? 'Complete' : 'Pending')
                         : (current ? 'Current' : reached ? 'Complete' : 'Pending')
+                      // Colour by outcome, not by stage: a completed step is
+                      // always positive (green), the in-progress step is amber,
+                      // and a step not yet reached is muted grey.
                       const stateCls = current
-                        ? 'bg-[#e01a1b]/10 text-[#e01a1b]'
+                        ? 'bg-amber-100 text-amber-700'
                         : reached
                           ? 'bg-green-100 text-green-700'
                           : 'bg-slate-100 text-slate-500'
@@ -651,7 +648,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                         <li key={step.key} className="relative flex gap-3 sm:gap-4">
                           {/* Rail: icon + connecting line */}
                           <div className="flex flex-col items-center">
-                            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${reached ? step.activeBg : 'bg-slate-300'}`}>
+                            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${current ? 'bg-amber-500 ring-4 ring-amber-100' : reached ? 'bg-green-500' : 'bg-slate-300'}`}>
                               <step.Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                             </div>
                             {!isLast && (
@@ -662,7 +659,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                           {/* Details */}
                           <div className={`min-w-0 flex-1 ${isLast ? 'pb-0' : 'pb-5 sm:pb-6'}`}>
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                              <span className={`text-sm sm:text-base font-semibold ${reached ? step.activeText : 'text-slate-500'}`}>
+                              <span className={`text-sm sm:text-base font-semibold ${current ? 'text-amber-700' : reached ? 'text-green-700' : 'text-slate-500'}`}>
                                 {step.label}
                               </span>
                               <span className={`text-[10px] sm:text-[11px] font-medium px-2 py-0.5 rounded-full ${stateCls}`}>
@@ -1028,10 +1025,14 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
         isOpen={reviewModalState.isOpen}
         onClose={() => {
           setReviewModalState({ ...reviewModalState, isOpen: false })
-          // Re-check review status after modal closes
+          // Re-check eligibility after modal closes — mark done only when both
+          // the product reviews and the experience feedback are complete.
           if (orderDetails?.items?.length) {
-            reviewService.checkReviewStatus(orderDetails.items[0].productId, orderDetails.id)
-              .then((res) => { if (res.hasReviewed) setHasReviewed(true) })
+            reviewService.getOrderReviewEligibility(orderDetails.id)
+              .then((res) => {
+                const d = res?.data
+                if (d && d.products.every((p) => p.reviewed) && d.experienceReviewed) setHasReviewed(true)
+              })
               .catch(() => {})
           }
         }}
@@ -1055,6 +1056,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
             price: it.unitPrice,
             size: it.size,
             color: it.color,
+            returnable: it.returnable,
           })),
         }}
         onClose={() => setReturnModalOpen(false)}

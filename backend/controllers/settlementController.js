@@ -207,6 +207,88 @@ const updateSettlementStatus = async (req, res) => {
     }
 };
 
+// Admin: Context for the vendor-delivery review shown when a settlement is settled.
+// Bundles the vendor's shipment for this order (with its accept time), any existing
+// admin review, and the customer's product reviews for this vendor's items — so the
+// admin can rate the vendor with the customer's feedback and acceptance time in view.
+const getSettlementReviewContext = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const settlement = await prisma.settlement.findUnique({
+            where: { id },
+            include: { order: { select: { id: true, orderId: true, customerName: true } } },
+        });
+        if (!settlement) {
+            return res.status(404).json({ success: false, error: 'Settlement not found' });
+        }
+
+        // The vendor's shipment for this order (carries the acceptance time).
+        const shipment = await prisma.vendorShipment.findFirst({
+            where: { orderId: settlement.orderId, vendorId: settlement.vendorId },
+            select: {
+                id: true, status: true, acceptedAt: true, acceptanceMins: true,
+                createdAt: true,
+                items: { select: { productId: true } },
+            },
+        });
+
+        // Existing admin review for that shipment (so the modal can prefill / show it).
+        const existingReview = shipment
+            ? await prisma.adminReview.findFirst({
+                where: { shipmentId: shipment.id },
+                select: { rating: true, reviewComments: true, qualityCheckNotes: true, approved: true, reviewedAt: true },
+                orderBy: { createdAt: 'desc' },
+            })
+            : null;
+
+        // Customer product reviews for THIS vendor's items in THIS order.
+        const productIds = [...new Set((shipment?.items || []).map((it) => it.productId).filter(Boolean))];
+        let customerReviews = [];
+        if (productIds.length > 0) {
+            const reviews = await prisma.review.findMany({
+                where: { orderId: settlement.orderId, productId: { in: productIds } },
+                select: {
+                    id: true, rating: true, comment: true, images: true, createdAt: true,
+                    product: { select: { name: true } },
+                },
+                orderBy: { createdAt: 'desc' },
+            });
+            customerReviews = reviews.map((r) => ({
+                id: r.id,
+                productName: r.product?.name || 'Product',
+                rating: r.rating,
+                comment: r.comment || '',
+                images: r.images || [],
+                createdAt: r.createdAt,
+            }));
+        }
+
+        res.json({
+            success: true,
+            data: {
+                settlement: {
+                    id: settlement.id,
+                    settlementNumber: settlement.settlementNumber,
+                    vendorId: settlement.vendorId,
+                    vendorName: settlement.vendorName,
+                    orderId: settlement.orderId,
+                    orderDisplayId: settlement.order?.orderId || '',
+                    customerName: settlement.order?.customerName || '',
+                    status: settlement.status,
+                },
+                shipmentId: shipment?.id || null,
+                vendorAcceptedAt: shipment?.acceptedAt || null,
+                acceptanceMins: shipment?.acceptanceMins ?? null,
+                existingReview,
+                customerReviews,
+            },
+        });
+    } catch (error) {
+        console.error('Error building settlement review context:', error);
+        res.status(500).json({ success: false, error: 'Failed to load review context' });
+    }
+};
+
 // Vendor: Get own settlements
 const getVendorSettlements = async (req, res) => {
     try {
@@ -305,5 +387,6 @@ module.exports = {
     getSettlementById,
     updateSettlementStatus,
     updateSettlementDueDate,
+    getSettlementReviewContext,
     getVendorSettlements
 };

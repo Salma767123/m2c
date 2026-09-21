@@ -8,7 +8,7 @@ import { publicProductService, type PublicProduct } from '@/services/publicProdu
 import ProductCard from '@/components/WebSite/ProductCard/ProductCard';
 import { cartService } from '@/services/cartService';
 import { userAuthService } from '@/services/userAuthService';
-import { Heart, Truck, Shield, RotateCcw, Package, Plane, Ship, AlertTriangle, Info, Box, Check, User, Award, Clock, ChevronDown, Tag, Search, ThumbsUp, X, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
+import { Heart, Truck, Shield, RotateCcw, Package, Plane, Ship, AlertTriangle, Info, Box, Check, User, Award, Clock, ChevronDown, Tag, Search, ThumbsUp, X, ChevronLeft, ChevronRight, Share2, Home } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { hasManufacturerInfo, manufacturerDisplayName } from '@/lib/manufacturerInfo';
 import { useToast } from '@/hooks/use-toast';
@@ -32,7 +32,7 @@ import CourierBadge from '@/components/Shared/CourierBadge';
 import FeaturedProducts from '@/components/WebSite/Featured/Products';
 // Same care-symbol catalogue the vendor picks from on the product form, so the
 // storefront shows the exact icons they selected.
-import { CARE_INSTRUCTIONS, CareIcon, CATEGORY_COLORS } from '@/components/VendorDashboard/Products/CareInstructionModal';
+import { CARE_INSTRUCTIONS, CareIcon } from '@/components/VendorDashboard/Products/CareInstructionModal';
 
 /** A soft ground behind each care symbol, matched to its category. */
 /**
@@ -217,15 +217,6 @@ const INFO_CARD =
 
 /** A faint dot grid, used as a corner flourish on two of the promise cards. */
 const DOT_GRID = 'bg-[radial-gradient(circle,currentColor_1.1px,transparent_1.1px)] bg-[length:9px_9px]';
-
-const CARE_TINTS: Record<string, string> = {
-  'Washing': 'bg-[#e8f1fb]',
-  'Bleaching': 'bg-[#fdf1de]',
-  'Drying': 'bg-[#e6f5ee]',
-  'Ironing': 'bg-[#fdeade]',
-  'Dry Cleaning': 'bg-[#f0eafb]',
-  'Special': 'bg-[#fdeaee]',
-}
 
 /** How many specification rows the hero shows before "Show all". */
 const SPEC_PREVIEW = 6;
@@ -875,10 +866,12 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
     (v: any) => isVisibleInRegion(v.priceVisibility)
   ) || [];
 
-  // Get images - use variant images if variant is selected, otherwise use product images
-  const displayImages = selectedVariant?.images && selectedVariant.images.length > 0
+  // Get images - use variant images if variant is selected, otherwise use product images.
+  // Drop any blank/whitespace urls so the thumbnail rail never shows an empty tile.
+  const displayImages = (selectedVariant?.images && selectedVariant.images.length > 0
     ? selectedVariant.images.map((url: string) => ({ url, isPrimary: false }))
-    : product.images || [];
+    : product.images || []
+  ).filter((img: any) => img && typeof img.url === 'string' && img.url.trim() !== '');
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!imageRef) return;
@@ -1040,10 +1033,21 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
    */
   const shareProduct = async () => {
     if (!product) return;
-    const url = typeof window !== 'undefined' ? window.location.href : '';
+    // Build the canonical product URL from origin + slug rather than
+    // window.location.href — the current URL can carry query params (e.g.
+    // ?selectShipping=… from the cart deep-link), which would be shared as a
+    // "wrong" link. Falls back to the current href only if origin is unavailable.
+    const slug = product.slug || productSlug;
+    const url = typeof window !== 'undefined'
+      ? (slug ? `${window.location.origin}/products/${slug}` : window.location.href)
+      : '';
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
-        await navigator.share({ title: product.name, text: `Take a look at ${product.name}`, url });
+        // Deliberately NO `text` field: on macOS/iOS the native share sheet's
+        // "Copy" action copies the `text` string instead of the `url` when both
+        // are present — which is why Copy was yielding the wrong content. With
+        // only title + url, Copy reliably puts the product link on the clipboard.
+        await navigator.share({ title: product.name, url });
         return;
       } catch (error) {
         // Cancelling the sheet is a decision, not a failure -- stop there.
@@ -1185,6 +1189,12 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
       });
     if (product.hasVariants) out.push({ label: 'Variants', value: String(visibleVariants.length) });
     out.push({ label: 'Availability', value: availableStock > 0 ? `In stock (${availableStock})` : 'Out of stock' });
+    out.push({
+      label: 'Return Policy',
+      value: product.returnable !== false
+        ? 'Easy return within 7 days of delivery'
+        : 'This product is not eligible for return',
+    });
     return out;
   })();
   const careList: string[] = Array.isArray(fabricSpec.careInstructions) ? fabricSpec.careInstructions : [];
@@ -1192,8 +1202,8 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
   const whyChoose: { icon: any; title: string; desc: string }[] = [];
   if (product.dispatchTimeline) whyChoose.push({ icon: Truck, title: 'Fast Dispatch', desc: 'Fast delivery' });
   if (logisticsResult && logisticsResult.totalShippingCost === 0) whyChoose.push({ icon: Ship, title: 'Free Shipping', desc: 'No shipping charge on this item' });
-  if (product.hasVariants && visibleVariants.length > 0) whyChoose.push({ icon: Box, title: 'Multiple Options', desc: `${visibleVariants.length} variant${visibleVariants.length === 1 ? '' : 's'} to choose from` });
   if (availableStock > 0) whyChoose.push({ icon: Check, title: 'In Stock', desc: `${availableStock} unit${availableStock === 1 ? '' : 's'} available now` });
+  if (product.returnable !== false) whyChoose.push({ icon: RotateCcw, title: 'Easy Returns', desc: 'Return within 7 days of delivery' });
   if (hasManufacturerInfo(product.manufacturerInfo)) {
     const m = product.manufacturerInfo!;
     const detail = (m.experience && m.experience.trim())
@@ -1276,9 +1286,11 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     on top for mobile, `lg:flex-row` puts the rail on the left.
                   */}
                   <div className="flex flex-col-reverse lg:flex-row gap-3 sm:gap-4">
-                    {/* Image Thumbnails */}
+                    {/* Image Thumbnails — on desktop they distribute down the rail
+                        (justify-between) so the column fills the main image's height
+                        instead of leaving dead space below the last thumbnail. */}
                     {displayImages.length > 1 && (
-                      <div className="flex lg:flex-col gap-2 sm:gap-3 overflow-x-auto lg:overflow-visible scrollbar-hide shrink-0 -mx-1 px-1 lg:mx-0 lg:px-0">
+                      <div className="flex lg:flex-col lg:justify-between gap-2 sm:gap-3 overflow-x-auto lg:overflow-visible scrollbar-hide shrink-0 -mx-1 px-1 lg:mx-0 lg:px-0">
                         {displayImages.map((image: any, index: number) => (
                           <button
                             key={index}
@@ -2177,7 +2189,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     13px in a 900px-wide column was hard to read. */}
                 <div className={`grid grid-cols-1 gap-4 sm:gap-5 ${bandCols}`}>
                   {whyChoose.length > 0 && (
-                    <section className={INFO_CARD}>
+                    <section className={`${INFO_CARD} flex flex-col`}>
                       <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#e01a1b_0%,#f0a03a_100%)]" />
                       <span aria-hidden className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#e01a1b]/[0.05]" />
                       <div className="relative flex items-start gap-3">
@@ -2192,19 +2204,19 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       {/* Two across on a phone where each card has room to stand
                           up, one column from lg where the card lies down inside
                           its own column of the row. */}
-                      <div className={`mt-4 grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:gap-2.5 ${soloBand ? 'lg:grid-cols-2' : 'lg:grid-cols-1'}`}>
+                      <div className={`mt-4 grid flex-1 grid-cols-1 gap-2.5 min-[420px]:grid-cols-2 lg:auto-rows-fr lg:gap-2 ${soloBand ? 'lg:grid-cols-2' : 'lg:grid-cols-1'}`}>
                         {whyChoose.map((w, i) => {
                           const Icon = w.icon;
                           const m = PROMISE_MOTIFS[i % PROMISE_MOTIFS.length];
                           return (
                             <article
                               key={i}
-                              className={`group relative flex flex-col items-center justify-center overflow-hidden rounded-2xl px-5 py-6 text-center ring-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_14px_34px_rgba(0,0,0,0.07)] lg:flex-row lg:items-center lg:justify-start lg:gap-5 lg:px-5 lg:py-4 lg:text-left ${m.card}`}
+                              className={`group relative flex flex-col items-center justify-center overflow-hidden rounded-2xl px-4 py-3.5 text-center ring-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_14px_34px_rgba(0,0,0,0.07)] lg:flex-row lg:items-center lg:justify-start lg:gap-4 lg:px-4 lg:py-2.5 lg:text-left ${m.card}`}
                             >
                               {/* Top left while the card stands up; once it lies
                                   down the icon owns that corner, so it crosses
                                   to the right. */}
-                              <span aria-hidden className={`absolute left-4 top-3 font-playfair text-[28px] font-semibold leading-none tracking-tight lg:left-auto lg:right-4 lg:top-1/2 lg:-translate-y-1/2 lg:text-[26px] ${m.numeral}`}>
+                              <span aria-hidden className={`absolute left-3.5 top-2.5 font-playfair text-[20px] font-semibold leading-none tracking-tight lg:left-auto lg:right-4 lg:top-1/2 lg:-translate-y-1/2 lg:text-[20px] ${m.numeral}`}>
                                 {String(i + 1).padStart(2, '0')}
                               </span>
 
@@ -2239,15 +2251,15 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                 {i % 4 === 0 && (
                                   <span aria-hidden className={`absolute -right-4 top-1 h-12 w-12 rounded-full ${m.blob}`} />
                                 )}
-                                <span className={`relative flex h-14 w-14 items-center justify-center shadow-[0_3px_12px_rgba(0,0,0,0.06)] transition-transform duration-300 group-hover:scale-110 ${m.icon}`}>
-                                  <Icon className="h-6 w-6" strokeWidth={1.6} />
+                                <span className={`relative flex h-10 w-10 items-center justify-center shadow-[0_3px_12px_rgba(0,0,0,0.06)] transition-transform duration-300 group-hover:scale-110 ${m.icon}`}>
+                                  <Icon className="h-5 w-5" strokeWidth={1.6} />
                                 </span>
                               </span>
 
                               <div className="relative flex min-w-0 flex-col items-center lg:items-start">
-                                <h3 className="font-playfair text-[15px] font-semibold leading-tight text-[#2b2320] mt-3.5 lg:mt-0">{w.title}</h3>
-                                <p className="mt-1 max-w-[15rem] text-[12.5px] leading-snug text-[#8a807a]">{w.desc}</p>
-                                <span aria-hidden className={`mt-2.5 h-[2.5px] w-8 rounded-full ${m.rule}`} />
+                                <h3 className="font-playfair text-[13.5px] font-semibold leading-tight text-[#2b2320] mt-2.5 lg:mt-0">{w.title}</h3>
+                                <p className="mt-0.5 max-w-[15rem] text-[11.5px] leading-snug text-[#8a807a]">{w.desc}</p>
+                                <span aria-hidden className={`mt-1.5 h-[2px] w-7 rounded-full ${m.rule}`} />
                               </div>
                             </article>
                           );
@@ -2257,7 +2269,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                   )}
 
                   {careList.length > 0 && (
-                  <section className={INFO_CARD}>
+                  <section className={`${INFO_CARD} flex flex-col`}>
                     {/* z-10 because the product photograph bleeds in from the right and
                         would otherwise paint over the last third of this line,
                         leaving it looking broken. */}
@@ -2284,35 +2296,40 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       </div>
                     )}
 
-                    <div className="relative">
+                    <div className="relative flex flex-1 flex-col">
                       <p className="font-playfair text-[15px] italic tracking-wide text-[#b08a5e]">Keep it fresh</p>
                       <h2 className="mt-1 font-playfair text-2xl font-semibold tracking-tight text-[#1a1a1a] sm:text-3xl">How to care for it</h2>
                       <p className="mt-1.5 max-w-md text-[13px] text-[#a1948a] sm:text-sm">
                         A little care goes a long way in keeping it soft and long lasting.
                       </p>
 
-                      {/* Compact list: one small row per instruction — round icon
-                          on the left, label + its category (real data) stacked. */}
-                      <div className={`mt-5 grid grid-cols-1 gap-2 sm:mt-6 ${soloBand ? 'sm:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-1'}`}>
+                      {/* Same card design as "Why choose this" — motif card, index
+                          numeral, icon disc, title + its category, accent rule. */}
+                      <div className={`mt-4 grid flex-1 grid-cols-1 gap-2.5 min-[420px]:grid-cols-2 sm:mt-5 lg:auto-rows-fr lg:gap-2 ${soloBand ? 'lg:grid-cols-2' : 'lg:grid-cols-1'}`}>
                         {careList.map((instruction, index) => {
                           const item = CARE_INSTRUCTIONS.find((c) => c.label === instruction);
-                          const iconColor = item ? CATEGORY_COLORS[item.category] || 'text-[#6b625b]' : 'text-[#a1948a]';
-                          const tint = item ? CARE_TINTS[item.category] || 'bg-[#f4efe8]' : 'bg-[#f4efe8]';
+                          const m = PROMISE_MOTIFS[index % PROMISE_MOTIFS.length];
                           return (
-                            <div
+                            <article
                               key={index}
-                              className="group flex items-center gap-3 rounded-xl bg-white/85 px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ring-1 ring-[#efe6df] backdrop-blur-[2px] transition-all duration-300 hover:bg-white hover:shadow-[0_6px_16px_rgba(0,0,0,0.06)]"
+                              className={`group relative flex flex-col items-center justify-center overflow-hidden rounded-2xl px-4 py-3.5 text-center ring-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_14px_34px_rgba(0,0,0,0.07)] lg:flex-row lg:items-center lg:justify-start lg:gap-4 lg:px-4 lg:py-2.5 lg:text-left ${m.card}`}
                             >
-                              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${tint} ${iconColor} transition-transform duration-300 group-hover:scale-105`}>
-                                {item ? <CareIcon paths={item.paths} className="h-4 w-4" /> : <span className="text-[12px] font-bold">{index + 1}</span>}
+                              <span aria-hidden className={`absolute left-3.5 top-2.5 font-playfair text-[20px] font-semibold leading-none tracking-tight lg:left-auto lg:right-4 lg:top-1/2 lg:-translate-y-1/2 lg:text-[20px] ${m.numeral}`}>
+                                {String(index + 1).padStart(2, '0')}
                               </span>
-                              <div className="min-w-0">
-                                <p className="text-[13px] font-bold leading-tight text-[#2b2320]">{instruction}</p>
+                              <span className="relative flex shrink-0">
+                                <span className={`relative flex h-10 w-10 items-center justify-center shadow-[0_3px_12px_rgba(0,0,0,0.06)] transition-transform duration-300 group-hover:scale-110 ${m.icon}`}>
+                                  {item ? <CareIcon paths={item.paths} className="h-5 w-5" /> : <span className="text-[13px] font-bold">{index + 1}</span>}
+                                </span>
+                              </span>
+                              <div className="relative flex min-w-0 flex-col items-center lg:items-start">
+                                <h3 className="mt-2.5 font-playfair text-[13.5px] font-semibold leading-tight text-[#2b2320] lg:mt-0">{instruction}</h3>
                                 {/* The second line is the symbol's own category,
                                     which is real data — not invented advice. */}
-                                {item && <p className="text-[11px] leading-tight text-[#a1948a]">{item.category}</p>}
+                                {item && <p className="mt-0.5 max-w-[15rem] text-[11.5px] leading-snug text-[#8a807a]">{item.category}</p>}
+                                <span aria-hidden className={`mt-1.5 h-[2px] w-7 rounded-full ${m.rule}`} />
                               </div>
-                            </div>
+                            </article>
                           );
                         })}
                       </div>
@@ -2321,7 +2338,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                   )}
 
                   {hasShipping && (
-                  <section className={`${INFO_CARD} text-center`}>
+                  <section className={`${INFO_CARD} flex flex-col text-center`}>
                     <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1f5faa_0%,#157f4a_100%)]" />
                     <style>{`
                       /* The dashes travel along the curve, from the first stop
@@ -2341,6 +2358,10 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     <h2 className="mt-2.5 font-playfair text-2xl font-semibold tracking-tight text-[#1a1a1a] sm:text-3xl">Getting it to you</h2>
                     <p className="mt-1.5 text-[13px] text-[#a1948a] sm:text-sm">Straight from the people who made it</p>
 
+                    {/* Grows to fill the card so the journey + note sit centred
+                        in the leftover height instead of leaving the card empty
+                        below. */}
+                    <div className="flex flex-1 flex-col justify-center">
                     {logisticsResult ? (() => {
                       const cost = logisticsResult.totalShippingCost === 0
                         ? 'Free shipping'
@@ -2360,7 +2381,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                           detail: cost,
                         },
                         {
-                          icon: Check,
+                          icon: Home,
                           pill: `Within ${logisticsResult.deliveryDays} days`,
                           title: 'At your door',
                           detail: `${logisticsResult.deliveryDays} day estimate`,
@@ -2389,15 +2410,14 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                           </svg>
 
                           <div className="relative grid grid-cols-3 gap-2">
-                            {stops.map((s, i) => {
+                            {stops.map((s) => {
                               const Icon = s.icon;
-                              const last = i === stops.length - 1;
                               return (
                                 <div key={s.title} className="flex flex-col items-center text-center">
                                   <span className="rounded-full bg-[#f2e7d8] px-2.5 py-1 text-[10.5px] font-semibold text-[#8a6a44] sm:text-[11.5px]">
                                     {s.pill}
                                   </span>
-                                  <span className={`mt-2.5 flex h-14 w-14 items-center justify-center rounded-full shadow-[0_4px_16px_rgba(0,0,0,0.07)] sm:h-16 sm:w-16 ${last ? 'bg-[#157f4a] text-white' : 'bg-white text-[#b08a5e]'}`}>
+                                  <span className="mt-2.5 flex h-14 w-14 items-center justify-center rounded-full bg-white text-[#b08a5e] shadow-[0_4px_16px_rgba(0,0,0,0.07)] sm:h-16 sm:w-16">
                                     <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
                                   </span>
                                   <p className="mt-2.5 text-[13.5px] font-bold text-[#2b2320] sm:text-[15px]">{s.title}</p>
@@ -2413,6 +2433,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     <p className="mx-auto mt-7 max-w-md text-[12.5px] leading-relaxed text-[#a1948a]">
                       Shipping method and final delivery estimate are confirmed in the purchase panel above.
                     </p>
+                    </div>
                   </section>
                   )}
                 </div>

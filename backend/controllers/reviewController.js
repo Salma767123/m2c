@@ -13,19 +13,19 @@ exports.createReview = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Missing required fields' });
         }
 
-        // Check if review already exists
+        // A customer may review a given product only once, ever — regardless of
+        // how many times they buy it. Check by (user, product), not the order.
         const existingReview = await prisma.review.findUnique({
             where: {
-                userId_productId_orderId: {
+                userId_productId: {
                     userId,
-                    productId,
-                    orderId
+                    productId
                 }
             }
         });
 
         if (existingReview) {
-            return res.status(400).json({ success: false, message: 'You have already reviewed this product for this order' });
+            return res.status(400).json({ success: false, message: 'You have already reviewed this product' });
         }
 
         // Verify that the user successfully purchased the product in this order
@@ -114,22 +114,22 @@ exports.getProductReviews = async (req, res) => {
     }
 };
 
-// Try to check if user has reviewed an item
+// Check whether the customer has already reviewed a product (lifetime — the
+// orderId param is accepted for backwards compatibility but ignored).
 exports.checkReviewStatus = async (req, res) => {
     try {
-        const { productId, orderId } = req.query;
+        const { productId } = req.query;
         const userId = req.user.id;
 
-        if (!productId || !orderId) {
-            return res.status(400).json({ success: false, message: 'Missing product or order ID' });
+        if (!productId) {
+            return res.status(400).json({ success: false, message: 'Missing product ID' });
         }
 
         const review = await prisma.review.findUnique({
             where: {
-                userId_productId_orderId: {
+                userId_productId: {
                     userId,
-                    productId,
-                    orderId
+                    productId
                 }
             }
         });
@@ -138,6 +138,164 @@ exports.checkReviewStatus = async (req, res) => {
     } catch (error) {
         console.error('Error checking review status:', error);
         res.status(500).json({ success: false, message: 'Error checking review status' });
+    }
+};
+
+// Eligibility for the "Write a Review" modal for a single order: which products
+// in the order the customer may still review (never reviewed before, lifetime),
+// and whether they've already given purchase-experience feedback for this order.
+exports.getOrderReviewEligibility = async (req, res) => {
+    try {
+        const { orderId } = req.query;
+        const userId = req.user.id;
+
+        if (!orderId) {
+            return res.status(400).json({ success: false, message: 'Missing order ID' });
+        }
+
+        const order = await prisma.order.findFirst({
+            where: { id: orderId, customerId: userId },
+            include: { items: { select: { productId: true } } }
+        });
+
+        if (!order) {
+            return res.status(403).json({ success: false, message: 'Order not found' });
+        }
+
+        // Distinct products in this order.
+        const productIds = [...new Set((order.items || []).map((i) => i.productId).filter(Boolean))];
+
+        // Products this customer has already reviewed (lifetime).
+        const reviewed = productIds.length
+            ? await prisma.review.findMany({
+                where: { userId, productId: { in: productIds } },
+                select: { productId: true }
+            })
+            : [];
+        const reviewedSet = new Set(reviewed.map((r) => r.productId));
+
+        // Whether purchase-experience feedback already exists for this order.
+        const experience = await prisma.experienceReview.findUnique({
+            where: { userId_orderId: { userId, orderId } },
+            select: { id: true }
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                products: productIds.map((productId) => ({
+                    productId,
+                    reviewed: reviewedSet.has(productId)
+                })),
+                experienceReviewed: !!experience
+            }
+        });
+    } catch (error) {
+        console.error('Error checking order review eligibility:', error);
+        res.status(500).json({ success: false, message: 'Error checking review eligibility' });
+    }
+};
+
+// Create a purchase-experience feedback review (one per customer per order).
+exports.createExperienceReview = async (req, res) => {
+    try {
+        let { orderId, rating, comment, images } = req.body;
+        images = await resolveVariantImageUrls(images, { folder: 'reviews' });
+        const userId = req.user.id;
+
+        if (!orderId || !rating) {
+            return res.status(400).json({ success: false, message: 'Missing required fields' });
+        }
+
+        // The order must belong to this customer.
+        const order = await prisma.order.findFirst({
+            where: { id: orderId, customerId: userId }
+        });
+        if (!order) {
+            return res.status(403).json({ success: false, message: 'You can only give feedback for your own orders' });
+        }
+
+        const existing = await prisma.experienceReview.findUnique({
+            where: { userId_orderId: { userId, orderId } }
+        });
+        if (existing) {
+            return res.status(400).json({ success: false, message: 'You have already given feedback for this order' });
+        }
+
+        const review = await prisma.experienceReview.create({
+            data: {
+                userId,
+                orderId,
+                rating: Number(rating),
+                comment,
+                images: images || [],
+                isApproved: false,
+                status: 'PENDING',
+            }
+        });
+
+        res.status(201).json({ success: true, data: review, message: 'Feedback submitted and pending approval' });
+    } catch (error) {
+        console.error('Error creating experience review:', error);
+        res.status(500).json({ success: false, message: 'Error creating feedback', error: error.message });
+    }
+};
+
+// Public: approved purchase-experience feedback for the storefront testimonials
+// strip, plus the overall M2C store rating (average + count of approved feedback).
+// Returns empty/zeroed data on any error so the homepage never breaks.
+exports.getPublicExperienceReviews = async (req, res) => {
+    try {
+        const limit = Math.min(Number(req.query.limit) || 12, 50);
+
+        const reviews = await prisma.experienceReview.findMany({
+            where: { status: 'APPROVED' },
+            include: {
+                user: {
+                    select: {
+                        name: true,
+                        image: true,
+                        country: true,
+                        addresses: {
+                            where: { isDefault: true },
+                            select: { country: true },
+                            take: 1,
+                        },
+                    }
+                }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+        });
+
+        const data = reviews.map((r) => {
+            const country = r.user?.country || r.user?.addresses?.[0]?.country || null;
+            return {
+                id: r.id,
+                rating: r.rating,
+                comment: r.comment,
+                createdAt: r.createdAt,
+                user: r.user ? { name: r.user.name, image: r.user.image, country } : null,
+            };
+        });
+
+        const agg = await prisma.experienceReview.aggregate({
+            _avg: { rating: true },
+            _count: true,
+            where: { status: 'APPROVED' },
+        });
+
+        res.status(200).json({
+            success: true,
+            data,
+            summary: {
+                average: Math.round((agg._avg.rating || 0) * 10) / 10,
+                count: agg._count || 0,
+            },
+        });
+    } catch (error) {
+        console.error('Error fetching public experience reviews:', error);
+        res.status(200).json({ success: true, data: [], summary: { average: 0, count: 0 } });
     }
 };
 
@@ -345,5 +503,130 @@ exports.deleteReview = async (req, res) => {
     } catch (error) {
         console.error('Error deleting review:', error);
         res.status(500).json({ success: false, message: 'Error deleting review', error: error.message });
+    }
+};
+
+// ==========================================
+// ADMIN — PURCHASE EXPERIENCE FEEDBACK
+// ==========================================
+
+// Get all purchase-experience feedback (admin)
+exports.getAllExperienceReviews = async (req, res) => {
+    try {
+        const { search, status, page = 1, limit = 20 } = req.query;
+        const skip = (Number(page) - 1) * Number(limit);
+
+        const where = {};
+        if (status && status !== 'all') {
+            if (status === 'pending') where.status = 'PENDING';
+            else if (status === 'approved') where.status = 'APPROVED';
+            else if (status === 'rejected') where.status = 'REJECTED';
+        }
+
+        const reviews = await prisma.experienceReview.findMany({
+            where,
+            include: {
+                user: { select: { id: true, name: true, email: true, image: true } },
+                order: { select: { id: true, orderId: true } }
+            },
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: Number(limit)
+        });
+
+        let filteredReviews = reviews;
+        if (search) {
+            const s = search.toLowerCase();
+            filteredReviews = reviews.filter((r) =>
+                (r.user?.name || '').toLowerCase().includes(s) ||
+                (r.user?.email || '').toLowerCase().includes(s) ||
+                (r.order?.orderId || '').toLowerCase().includes(s) ||
+                (r.comment || '').toLowerCase().includes(s)
+            );
+        }
+
+        const [totalCount, pendingCount, approvedCount, rejectedCount, ratingAggregate] = await Promise.all([
+            prisma.experienceReview.count(),
+            prisma.experienceReview.count({ where: { status: 'PENDING' } }),
+            prisma.experienceReview.count({ where: { status: 'APPROVED' } }),
+            prisma.experienceReview.count({ where: { status: 'REJECTED' } }),
+            prisma.experienceReview.aggregate({ _avg: { rating: true }, where: { status: 'APPROVED' } })
+        ]);
+        const avgRating = ratingAggregate._avg.rating || 0;
+
+        res.status(200).json({
+            success: true,
+            data: filteredReviews,
+            pagination: {
+                total: totalCount,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(totalCount / Number(limit))
+            },
+            stats: {
+                total: totalCount,
+                pending: pendingCount,
+                approved: approvedCount,
+                rejected: rejectedCount,
+                averageRating: Math.round(avgRating * 10) / 10
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching experience reviews:', error);
+        res.status(500).json({ success: false, message: 'Error fetching feedback', error: error.message });
+    }
+};
+
+// Update experience-review status (approve/reject)
+exports.updateExperienceReviewStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isApproved } = req.body;
+
+        if (typeof isApproved !== 'boolean') {
+            return res.status(400).json({ success: false, message: 'isApproved must be a boolean value' });
+        }
+
+        const review = await prisma.experienceReview.findUnique({ where: { id } });
+        if (!review) {
+            return res.status(404).json({ success: false, message: 'Feedback not found' });
+        }
+
+        const updatedReview = await prisma.experienceReview.update({
+            where: { id },
+            data: {
+                isApproved,
+                status: isApproved ? 'APPROVED' : 'REJECTED',
+            },
+            include: {
+                user: { select: { name: true, email: true } },
+                order: { select: { id: true, orderId: true } }
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            data: updatedReview,
+            message: `Feedback ${isApproved ? 'approved' : 'rejected'} successfully`
+        });
+    } catch (error) {
+        console.error('Error updating experience review status:', error);
+        res.status(500).json({ success: false, message: 'Error updating feedback status', error: error.message });
+    }
+};
+
+// Delete an experience review (admin)
+exports.deleteExperienceReview = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const review = await prisma.experienceReview.findUnique({ where: { id } });
+        if (!review) {
+            return res.status(404).json({ success: false, message: 'Feedback not found' });
+        }
+        await prisma.experienceReview.delete({ where: { id } });
+        res.status(200).json({ success: true, message: 'Feedback deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting experience review:', error);
+        res.status(500).json({ success: false, message: 'Error deleting feedback', error: error.message });
     }
 };

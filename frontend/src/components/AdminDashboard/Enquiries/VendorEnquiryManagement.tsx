@@ -9,7 +9,7 @@ import { Button } from '@/components/UI/Button';
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
 import Dropdown from '@/components/UI/Dropdown';
 import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar';
-import { Mail, Phone, Building2, FileText, Eye, Trash2, CheckCircle, XCircle, Search, Globe, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { Mail, Phone, Building2, FileText, Eye, Trash2, CheckCircle, XCircle, Search, Globe, ChevronLeft, ChevronRight, Clock, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { hasPermission } from '@/lib/auth';
 
@@ -39,6 +39,7 @@ export default function VendorEnquiryManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmModal, setConfirmModal] = useState<{ show: boolean; type: 'approve' | 'reject' | 'delete'; id: string; name: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   // Fetch the FULL enquiry set so the metric cards reflect global totals.
   // Search + status + date filtering is applied client-side below.
@@ -158,6 +159,25 @@ export default function VendorEnquiryManagement() {
         <p className="text-sm text-slate-500">Manage vendor registration requests</p>
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filteredEnquiries.length} of {enquiries.length} enquiries
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Stats Cards — click a card to filter the table below by that status */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {metricCards.map(({ key, label, subtitle, value, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -225,6 +245,8 @@ export default function VendorEnquiryManagement() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      )}
 
       {/* Enquiries Table */}
       <Card>

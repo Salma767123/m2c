@@ -23,10 +23,15 @@ import {
   LifeBuoy,
   Wallet,
   ArrowDownLeft,
-  ArrowUpRight
+  ArrowUpRight,
+  Ban,
+  CheckCircle2,
+  Loader2
 } from 'lucide-react'
 import { formatPrice } from '@/lib/currency'
 import { walletService, WALLET_SOURCE_LABEL, type WalletSummary } from '@/services/walletService'
+import { hasPermission } from '@/lib/auth'
+import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 
 interface CustomerViewProps {
   customerId: string
@@ -38,6 +43,35 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
   const [loading, setLoading] = useState(true)
   const [wallet, setWallet] = useState<WalletSummary | null>(null)
   const [activeTab, setActiveTab] = useState<'orders' | 'wallet' | 'support'>('orders')
+  // Suspend / reactivate flow.
+  const [confirmSuspend, setConfirmSuspend] = useState(false)
+  const [statusUpdating, setStatusUpdating] = useState(false)
+
+  const handleToggleStatus = async () => {
+    if (!customer) return
+    const target: 'active' | 'suspended' = customer.status === 'suspended' ? 'active' : 'suspended'
+    try {
+      setStatusUpdating(true)
+      await userManagementService.updateCustomerStatus(customerId, target)
+      // Reactivating restores 'active' only if the email is verified; otherwise the
+      // account falls back to 'pending' (it can't log in until verified either way).
+      const newStatus = target === 'suspended'
+        ? 'suspended'
+        : (customer.isEmailVerified ? 'active' : 'pending')
+      setCustomer({ ...customer, status: newStatus })
+      setConfirmSuspend(false)
+      showSuccessToast(
+        target === 'suspended' ? 'Account suspended' : 'Account reactivated',
+        target === 'suspended'
+          ? 'The customer can no longer log in until reactivated.'
+          : 'The customer can log in and shop again.'
+      )
+    } catch (e: any) {
+      showErrorToast('Action failed', e?.message || 'Could not update the account status.')
+    } finally {
+      setStatusUpdating(false)
+    }
+  }
 
   useEffect(() => {
     const fetchCustomer = async () => {
@@ -160,6 +194,27 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
               <h2 className="text-xl font-bold text-slate-900">{customer.name}</h2>
               <p className="text-sm text-slate-500 mt-1">Joined {new Date(customer.joinDate).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
               <div className="mt-3">{getStatusBadge(customer.status)}</div>
+
+              {/* Suspend / Reactivate — gated by the customer_management:suspend permission */}
+              {hasPermission('customer_management:suspend') && (
+                customer.status === 'suspended' ? (
+                  <button
+                    onClick={() => setConfirmSuspend(true)}
+                    disabled={statusUpdating}
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm font-semibold text-green-700 transition-colors hover:bg-green-100 disabled:opacity-60"
+                  >
+                    <CheckCircle2 className="h-4 w-4" /> Reactivate account
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setConfirmSuspend(true)}
+                    disabled={statusUpdating}
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
+                  >
+                    <Ban className="h-4 w-4" /> Suspend account
+                  </button>
+                )
+              )}
             </div>
 
             <div className="mt-6 space-y-4 border-t border-slate-200 pt-6">
@@ -487,6 +542,47 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
           )}
         </div>
       </div>
+
+      {/* Suspend / Reactivate confirmation */}
+      {confirmSuspend && customer && (() => {
+        const suspending = customer.status !== 'suspended'
+        return (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm" onClick={() => !statusUpdating && setConfirmSuspend(false)}>
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-1 flex items-center gap-2">
+                {suspending
+                  ? <Ban className="h-5 w-5 text-red-500" />
+                  : <CheckCircle2 className="h-5 w-5 text-green-500" />}
+                <h3 className="text-lg font-semibold text-slate-900">
+                  {suspending ? 'Suspend this customer?' : 'Reactivate this customer?'}
+                </h3>
+              </div>
+              <p className="mb-5 text-sm text-slate-500">
+                {suspending
+                  ? <><span className="font-medium text-slate-700">{customer.name}</span> will be blocked from logging in and placing orders until you reactivate the account. Their data and order history are kept.</>
+                  : <><span className="font-medium text-slate-700">{customer.name}</span> will be able to log in and shop again.</>}
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setConfirmSuspend(false)}
+                  disabled={statusUpdating}
+                  className="rounded-lg border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleToggleStatus}
+                  disabled={statusUpdating}
+                  className={`inline-flex items-center gap-2 rounded-lg px-6 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-60 ${suspending ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
+                >
+                  {statusUpdating && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {statusUpdating ? 'Saving…' : suspending ? 'Suspend account' : 'Reactivate account'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

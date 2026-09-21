@@ -44,7 +44,8 @@ export default function VendorOrderManagement() {
 
   const statusOptions = [
     { value: "All", label: "All Status" },
-    { value: "ORDER_CREATED", label: "Order Created" },
+    { value: "ORDER_CREATED", label: "Awaiting Acceptance" },
+    { value: "ACCEPTED_BY_VENDOR", label: "Accepted" },
     { value: "VENDOR_PROCESSING", label: "Processing" },
     { value: "PACKED_BY_VENDOR", label: "Packed" },
     { value: "IN_TRANSIT_TO_ADMIN_HUB", label: "In Transit" },
@@ -143,7 +144,9 @@ export default function VendorOrderManagement() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "ORDER_CREATED":
-        return "bg-slate-50 text-slate-700 border border-slate-200";
+        return "bg-amber-50 text-amber-700 border border-amber-200";
+      case "ACCEPTED_BY_VENDOR":
+        return "bg-cyan-50 text-cyan-700 border border-cyan-200";
       case "VENDOR_PROCESSING":
         return "bg-blue-50 text-blue-700 border border-blue-200";
       case "PACKED_BY_VENDOR":
@@ -165,7 +168,8 @@ export default function VendorOrderManagement() {
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      ORDER_CREATED: "Order Created",
+      ORDER_CREATED: "Awaiting Acceptance",
+      ACCEPTED_BY_VENDOR: "Accepted",
       VENDOR_PROCESSING: "Processing",
       PACKED_BY_VENDOR: "Packed",
       IN_TRANSIT_TO_ADMIN_HUB: "In Transit",
@@ -198,6 +202,7 @@ export default function VendorOrderManagement() {
     );
   }
 
+  const toAcceptCount = shipments.filter((s) => s.status === "ORDER_CREATED").length;
   const processingCount = shipments.filter((s) => s.status === "VENDOR_PROCESSING").length;
   const packedCount = shipments.filter((s) => s.status === "PACKED_BY_VENDOR").length;
   const inTransitCount = shipments.filter((s) => s.status === "IN_TRANSIT_TO_ADMIN_HUB").length;
@@ -211,7 +216,7 @@ export default function VendorOrderManagement() {
       </div>
 
       {/* Stats Cards (clickable filters) */}
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
         <button
           type="button"
           onClick={() => setCardFilter("All")}
@@ -225,6 +230,20 @@ export default function VendorOrderManagement() {
           </div>
           <p className="text-xl font-bold text-slate-900 mt-2">{shipments.length}</p>
           <p className="text-xs text-slate-500 mt-1">All assigned orders</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setCardFilter("ORDER_CREATED")}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-amber-200 ${statusFilter === "ORDER_CREATED" ? "border-amber-300 ring-1 ring-amber-200" : "border-slate-200/80"}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">To Accept</span>
+            <div className="p-2 bg-amber-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <Clock className="h-4 w-4 text-amber-600" />
+            </div>
+          </div>
+          <p className={`text-xl font-bold mt-2 ${toAcceptCount > 0 ? "text-amber-600" : "text-slate-900"}`}>{toAcceptCount}</p>
+          <p className="text-xs text-slate-500 mt-1">Accept within 6 hrs</p>
         </button>
         <button
           type="button"

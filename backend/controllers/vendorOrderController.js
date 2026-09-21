@@ -326,6 +326,122 @@ const updateVendorOrderStatus = async (req, res) => {
     }
 };
 
+// Vendor: Accept a newly-created order.
+// This is the first, mandatory step — an admin cannot assign a hub / proceed
+// until the vendor has accepted. Also records how long the vendor took and
+// folds it into the vendor's rolling acceptance-time average.
+const acceptVendorOrder = async (req, res) => {
+    try {
+        const vendorId = req.vendorId || req.userId;
+        const { id } = req.params;
+
+        // Resolve the shipment (ObjectId | shipmentId | orderId), scoped to this vendor.
+        const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+        let shipment = null;
+        if (isObjectId) {
+            shipment = await prisma.vendorShipment.findFirst({ where: { id, vendorId } });
+        }
+        if (!shipment) {
+            shipment = await prisma.vendorShipment.findFirst({ where: { shipmentId: id, vendorId } });
+        }
+        if (!shipment) {
+            const order = await prisma.order.findUnique({ where: { orderId: id }, select: { id: true } });
+            if (order) {
+                shipment = await prisma.vendorShipment.findFirst({ where: { orderId: order.id, vendorId } });
+            }
+        }
+        if (!shipment) {
+            return res.status(404).json({ success: false, error: 'Order not found' });
+        }
+
+        // Only a brand-new (unaccepted) shipment can be accepted. If it's already
+        // accepted (or further along), treat a duplicate click as success.
+        if (shipment.status !== 'ORDER_CREATED') {
+            if (shipment.acceptedAt) {
+                const current = await prisma.vendorShipment.findUnique({
+                    where: { id: shipment.id }, include: SHIPMENT_INCLUDE,
+                });
+                return res.json({
+                    success: true,
+                    data: await toVendorResponse(current),
+                    message: 'Order already accepted.',
+                });
+            }
+            return res.status(409).json({
+                success: false,
+                error: `This order can no longer be accepted (current status: ${shipment.status.replace(/_/g, ' ')}).`,
+            });
+        }
+
+        const now = new Date();
+        // Minutes from order creation to acceptance (clamped at 0 for clock skew).
+        const acceptanceMins = Math.max(
+            0,
+            (now.getTime() - new Date(shipment.createdAt).getTime()) / 60000,
+        );
+
+        const updatedShipment = await withWriteRetry(() =>
+            prisma.$transaction(async (tx) => {
+                const updated = await tx.vendorShipment.update({
+                    where: { id: shipment.id },
+                    data: {
+                        status: 'ACCEPTED_BY_VENDOR',
+                        acceptedAt: now,
+                        acceptanceMins,
+                        statusHistory: {
+                            create: {
+                                status: 'ACCEPTED_BY_VENDOR',
+                                updatedBy: vendorId,
+                                updatedByType: 'vendor',
+                                comment: 'Vendor accepted the order',
+                            },
+                        },
+                    },
+                    include: SHIPMENT_INCLUDE,
+                });
+
+                // Fold into the vendor's rolling acceptance-time average
+                // (kept as total/count so it updates without rescanning).
+                const vendor = await tx.vendor.findUnique({
+                    where: { id: vendorId },
+                    select: { acceptedOrdersCount: true, totalAcceptanceMins: true },
+                });
+                const count = (vendor?.acceptedOrdersCount || 0) + 1;
+                const totalMins = (vendor?.totalAcceptanceMins || 0) + acceptanceMins;
+                await tx.vendor.update({
+                    where: { id: vendorId },
+                    data: {
+                        acceptedOrdersCount: count,
+                        totalAcceptanceMins: totalMins,
+                        avgAcceptanceMins: totalMins / count,
+                    },
+                });
+
+                // Recompute the parent order's aggregate status.
+                await recomputeAndPersistOrderStatus(tx, shipment.orderId);
+                return updated;
+            }),
+        );
+
+        // Notify admins that the vendor accepted (in-app + FCM), so they can assign a hub.
+        try {
+            const { createNotificationForRole } = require('./notificationController');
+            createNotificationForRole({
+                role: 'ADMIN',
+                type: 'ORDER_ACCEPTED_BY_VENDOR',
+                title: 'Order Accepted by Vendor',
+                message: `Order #${updatedShipment.order?.orderId || ''} — ${updatedShipment.vendorName} accepted the order. You can now assign a hub.`,
+                data: { orderId: shipment.orderId, shipmentId: shipment.id, screen: 'vendor-to-hub' },
+            }).catch(() => {});
+        } catch { /* notifications are best-effort */ }
+
+        res.json({ success: true, data: await toVendorResponse(updatedShipment) });
+    } catch (error) {
+        console.error('Accept vendor order error:', error);
+        res.status(500).json({ success: false, error: 'Failed to accept order' });
+    }
+};
+
 // Vendor: Get all admin reviews + rating summary for the current vendor
 const getVendorReviews = async (req, res) => {
     try {
@@ -574,6 +690,7 @@ module.exports = {
     getVendorOrders,
     getVendorOrderById,
     updateVendorOrderStatus,
+    acceptVendorOrder,
     getVendorReviews,
     reshipVendorOrder,
 };

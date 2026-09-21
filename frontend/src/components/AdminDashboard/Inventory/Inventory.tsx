@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/UI/Table'
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
-import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Filter, Loader2, History, Edit, Trash2, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
+import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Filter, Loader2, History, Edit, Trash2, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal } from 'lucide-react'
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
 import DateRangeCalendar from '@/components/Shared/DateRangeCalendar'
@@ -135,6 +135,7 @@ const getApprovalBadge = (item: InventoryItem) => {
 }
 
 export default function Inventory() {
+  const [panelOpen, setPanelOpen] = useState(true)
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const toggleExpanded = (id: string) => setExpandedItems(prev => {
@@ -330,6 +331,25 @@ export default function Inventory() {
         )}
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filteredItems.length} of {inventoryItems.length} items
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Inventory Stats — click the first three to filter the table by stock status */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
@@ -420,6 +440,8 @@ export default function Inventory() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      )}
 
       {/* Inventory Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">

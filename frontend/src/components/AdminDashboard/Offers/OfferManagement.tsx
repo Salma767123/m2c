@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Pencil, Trash2, Percent, Calendar, Tag, Loader2, X, ImageIcon, Upload, CheckCircle, Clock, XCircle, PauseCircle, PlayCircle, ChevronDown, Download } from 'lucide-react'
+import { Plus, Pencil, Trash2, Percent, Calendar, Tag, Loader2, X, ImageIcon, Upload, CheckCircle, Clock, XCircle, PauseCircle, PlayCircle, ChevronDown, Download, SlidersHorizontal, Users } from 'lucide-react'
 import { offerService, type Offer, type OfferInput, type OfferStatus } from '@/services/offerService'
 import { categoryService } from '@/services/categoryService'
 import { adminProductService, type AdminProduct } from '@/services/adminProductService'
@@ -158,6 +158,7 @@ function discountSummary(o: Offer): string {
 }
 
 export default function OfferManagement() {
+  const [panelOpen, setPanelOpen] = useState(true)
   const [offers, setOffers] = useState<Offer[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -399,6 +400,25 @@ export default function OfferManagement() {
         </div>
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {displayedOffers.length} of {offers.length} offers
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Metric cards — click a card to filter the table by that status */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         {statCards.map(({ key, title, value, subtitle, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -425,6 +445,8 @@ export default function OfferManagement() {
           )
         })}
       </div>
+        </div>
+      )}
 
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
         {loading ? (
@@ -540,7 +562,8 @@ function toLocalInput(iso?: string) {
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16)
 }
 
-function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose: () => void; onSaved: () => void }) {
+export function OfferModal({ offer, onClose, onSaved, targetCustomerIds }: { offer: Offer | null; onClose: () => void; onSaved: () => void; targetCustomerIds?: string[] }) {
+  const targetCount = targetCustomerIds?.length || 0
   const [form, setForm] = useState<OfferInput>(
     offer
       ? {
@@ -618,6 +641,8 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
         ...form,
         startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : undefined,
         endsAt: new Date(form.endsAt).toISOString(),
+        // Customer targeting — only sent when creating from a customer selection.
+        ...(targetCount > 0 ? { targetCustomerIds } : {}),
       }
       if (offer) {
         await offerService.updateOffer(offer.id, payload)
@@ -663,6 +688,14 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
         </div>
 
         <div className="p-6 space-y-5">
+          {targetCount > 0 && (
+            <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700">
+              <Users className="h-4 w-4 shrink-0" />
+              <span>
+                This offer will apply to <span className="font-bold">{targetCount}</span> selected customer{targetCount === 1 ? '' : 's'} only — they’ll get an app notification.
+              </span>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
             <input

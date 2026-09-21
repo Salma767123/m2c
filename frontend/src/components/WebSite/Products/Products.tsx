@@ -6,7 +6,7 @@ import VendorPartnerCTA from '@/components/WebSite/VendorPartnerCTA/VendorPartne
 import Reveal from '@/components/WebSite/Shared/Reveal';
 import CategoryHero from '@/components/WebSite/Shared/CategoryHero';
 import SectionBackdrop from '@/components/WebSite/Shared/SectionBackdrop';
-import { Search, Filter, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Search, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { FaceIcon, FACE_FILTER_LABELS, type FaceValue } from '@/components/WebSite/Shared/FaceRating';
 
 /**
@@ -33,6 +33,9 @@ import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } fro
 import { useSearchParams } from 'next/navigation';
 import { productService, Product } from '@/services/productService';
 import { categoryService } from '@/services/categoryService';
+import { couponService, type ActiveCoupon } from '@/services/couponService';
+import { offerService } from '@/services/offerService';
+import type { PublicOffer } from '@/lib/offers';
 import { isVisibleInRegion } from '@/lib/currency';
 
 // Live filter facets returned by the backend (all computed from real products).
@@ -134,6 +137,45 @@ const Products = () => {
     COLLECTIONS.some((c) => c.key === collectionParam) ? (collectionParam as string) : ''
   );
 
+  // Coupons & Offers filter — pick a coupon/offer to see only the products it
+  // applies to. Selection identity is `${kind}:${id}`.
+  const [activeOffers, setActiveOffers] = useState<PublicOffer[]>([]);
+  const [activeCoupons, setActiveCoupons] = useState<ActiveCoupon[]>([]);
+  const [selectedPromo, setSelectedPromo] = useState<string>('');
+
+  // Resolve the selected coupon/offer to product/category filters. `storeWide`
+  // means "applies to everything" (no narrowing). productKeys can be ids or slugs
+  // (the backend `productKeys` param matches either).
+  const promoFilter = useMemo(() => {
+    if (!selectedPromo) return null;
+    const [kind, id] = selectedPromo.split(':');
+    if (kind === 'offer') {
+      const o = activeOffers.find((x) => x.id === id);
+      if (!o) return null;
+      if (o.scope === 'PRODUCT') return { productKeys: o.productIds || [], categories: [], storeWide: (o.productIds || []).length === 0 };
+      if (o.scope === 'CATEGORY') return { productKeys: [], categories: o.categoryNames || [], storeWide: (o.categoryNames || []).length === 0 };
+      return { productKeys: [], categories: [], storeWide: true }; // STORE
+    }
+    const c = activeCoupons.find((x) => x.id === id);
+    if (!c) return null;
+    if ((c.applicableProducts || []).length) return { productKeys: c.applicableProducts as string[], categories: [], storeWide: false };
+    if ((c.applicableCategories || []).length) return { productKeys: [], categories: c.applicableCategories as string[], storeWide: false };
+    return { productKeys: [], categories: [], storeWide: true };
+  }, [selectedPromo, activeOffers, activeCoupons]);
+
+  // Load active offers + coupons once for the Coupons & Offers filter section.
+  useEffect(() => {
+    let ignore = false;
+    Promise.all([offerService.getActiveOffers(), couponService.getActiveCoupons()])
+      .then(([offers, coupons]) => {
+        if (ignore) return;
+        setActiveOffers(offers || []);
+        setActiveCoupons(coupons || []);
+      })
+      .catch(() => { /* section hides itself when both are empty */ });
+    return () => { ignore = true; };
+  }, []);
+
   const toggleInArray = (setter: React.Dispatch<React.SetStateAction<string[]>>, value: string) => {
     setter((arr) => (arr.includes(value) ? arr.filter((x) => x !== value) : [...arr, value]));
     setCurrentPage(1);
@@ -142,7 +184,32 @@ const Products = () => {
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Desktop filter card: scroll affordance. The card is capped to the products-list
+  // height and scrolls internally, so we show up/down chevron buttons to signal
+  // (and drive) that scroll when there's more content above/below.
+  const filterScrollRef = useRef<HTMLDivElement>(null);
+  const [filterScroll, setFilterScroll] = useState({ up: false, down: false });
+  const updateFilterScroll = useCallback(() => {
+    const el = filterScrollRef.current;
+    if (!el) return;
+    const up = el.scrollTop > 8;
+    const down = el.scrollTop + el.clientHeight < el.scrollHeight - 8;
+    setFilterScroll((prev) => (prev.up === up && prev.down === down ? prev : { up, down }));
+  }, []);
+  const scrollFilters = (dir: 'up' | 'down') => {
+    const el = filterScrollRef.current;
+    if (!el) return;
+    el.scrollBy({ top: dir === 'down' ? el.clientHeight * 0.7 : -el.clientHeight * 0.7, behavior: 'smooth' });
+  };
+
   const [categoriesList, setCategoriesList] = useState<any[]>([]);
+  // Recompute the filter scroll indicators whenever the card's height (driven by
+  // the products list) or its content could have changed, and on resize.
+  useEffect(() => {
+    const raf = requestAnimationFrame(updateFilterScroll);
+    window.addEventListener('resize', updateFilterScroll);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', updateFilterScroll); };
+  });
 
   // Fetch category and subcategory names from slugs and populate dropdown
   useEffect(() => {
@@ -219,13 +286,21 @@ const Products = () => {
           ? multiCategoryNames.join(',')
           : (selectedCategory !== 'All' ? selectedCategory : undefined);
 
+        // Coupons & Offers filter: when one is picked (and it isn't store-wide), it
+        // narrows to that promo's products (by id/slug) or categories.
+        const promoProductKeys = promoFilter && !promoFilter.storeWide && promoFilter.productKeys.length
+          ? promoFilter.productKeys.join(',') : undefined;
+        const promoCategories = promoFilter && !promoFilter.storeWide && !promoProductKeys && promoFilter.categories.length
+          ? promoFilter.categories.join(',') : undefined;
+
         const params: Record<string, any> = {
           page: currentPage,
           limit: 12,
           search: searchTerm || undefined,
           // A product-set link ignores category so it shows exactly those products.
-          category: productSet.length ? undefined : categoryFilter,
+          category: productSet.length ? undefined : (promoCategories ?? categoryFilter),
           products: productSet.length ? productSet.join(',') : undefined,
+          productKeys: promoProductKeys,
           subCategory: selectedSubcategory || undefined,
           minPrice: priceRange.min > 0 ? priceRange.min : undefined,
           maxPrice: priceRange.max < 100000 ? priceRange.max : undefined,
@@ -265,7 +340,7 @@ const Products = () => {
     return () => {
       ignore = true;
     };
-  }, [currentPage, searchTerm, selectedCategory, selectedSubcategory, priceRange, sortBy, inStockOnly, selectedRating, selectedColors, selectedSizes, selectedMaterials, selectedFabricTypes, minDiscount, newArrivals, selectedCollection, searchStringParam, productsParam, multiCategoryNames]);
+  }, [currentPage, searchTerm, selectedCategory, selectedSubcategory, priceRange, sortBy, inStockOnly, selectedRating, selectedColors, selectedSizes, selectedMaterials, selectedFabricTypes, minDiscount, newArrivals, selectedCollection, searchStringParam, productsParam, multiCategoryNames, promoFilter]);
 
   // Keep the collection filter in sync when the ?collection= param changes while
   // already on this page (e.g. jumping between the home sections' "View All" links).
@@ -353,6 +428,7 @@ const Products = () => {
     setMinDiscount(0);
     setNewArrivals(false);
     setSelectedCollection('');
+    setSelectedPromo('');
     setCurrentPage(1);
   };
 
@@ -371,7 +447,8 @@ const Products = () => {
     selectedFabricTypes.length +
     (minDiscount > 0 ? 1 : 0) +
     (newArrivals ? 1 : 0) +
-    (selectedCollection ? 1 : 0);
+    (selectedCollection ? 1 : 0) +
+    (selectedPromo ? 1 : 0);
 
   // Shared filter content renderer to avoid duplication
   const renderFilterContent = (isMobileDrawer: boolean) => (
@@ -432,6 +509,68 @@ const Products = () => {
           ))}
         </div>
       </div>
+
+      {/* Coupons & Offers — pick one to see only the products it applies to. */}
+      {(activeOffers.length > 0 || activeCoupons.length > 0) && (
+        <div>
+          <h4 className="text-base font-medium text-gray-900 mb-3">Coupons &amp; Offers</h4>
+          <div className="space-y-2.5">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                name={isMobileDrawer ? 'promo-mobile' : 'promo'}
+                checked={selectedPromo === ''}
+                onChange={() => { setSelectedPromo(''); setCurrentPage(1); }}
+                className="border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
+              />
+              <span className="ml-2 text-sm font-medium text-gray-700">All</span>
+            </label>
+
+            {activeOffers.map((o) => {
+              const key = `offer:${o.id}`;
+              return (
+                <label key={key} className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name={isMobileDrawer ? 'promo-mobile' : 'promo'}
+                    checked={selectedPromo === key}
+                    onChange={() => { setSelectedPromo(key); setCurrentPage(1); if (isMobileDrawer) closeMobileFilters(); }}
+                    className="mt-0.5 border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm text-gray-800">{o.title}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#e01a1b]/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#e01a1b]">
+                      Offer{o.badge ? ` · ${o.badge}` : ''}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+
+            {activeCoupons.map((c) => {
+              const key = `coupon:${c.id}`;
+              const off = c.discountType === 'PERCENTAGE' ? `${c.discountValue}% off` : `₹${c.discountValue} off`;
+              return (
+                <label key={key} className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name={isMobileDrawer ? 'promo-mobile' : 'promo'}
+                    checked={selectedPromo === key}
+                    onChange={() => { setSelectedPromo(key); setCurrentPage(1); if (isMobileDrawer) closeMobileFilters(); }}
+                    className="mt-0.5 border-gray-300 text-[#e01a1b] focus:ring-[#e01a1b]"
+                  />
+                  <span className="min-w-0">
+                    <span className="block font-mono text-sm text-gray-800">{c.code}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#157f4a]/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#157f4a]">
+                      Coupon · {off}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Price Range Filter */}
       <div>
@@ -861,10 +1000,21 @@ const Products = () => {
               </div>
             </div>
 
-            {/* Desktop Sidebar Filters — hidden on mobile via hidden lg:block */}
+            {/* Desktop Sidebar Filters — hidden on mobile via hidden lg:block.
+                The column carries no in-flow height (its only child is absolute),
+                so the PRODUCTS grid alone decides the row height; the parent flex
+                (items-stretch) then stretches this column to that height, and the
+                absolute card fills it. Result: the filter card is always exactly
+                as tall as the products list, and its content scrolls inside when
+                it's longer (short list → short card that scrolls; tall list →
+                tall card). */}
             {showFilters && (
-              <div className="hidden lg:block w-80 shrink-0">
-                <div className="bg-gray-100 rounded-lg p-6 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+              <div className="hidden lg:block w-80 shrink-0 relative min-h-[420px]">
+                <div
+                  ref={filterScrollRef}
+                  onScroll={updateFilterScroll}
+                  className="absolute inset-0 bg-gray-100 rounded-lg p-6 overflow-y-auto scroll-smooth"
+                >
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
                     {activeFiltersCount > 0 && (
@@ -878,6 +1028,25 @@ const Products = () => {
                   </div>
                   {renderFilterContent(false)}
                 </div>
+
+                {/* Scroll-up affordance — appears once the card is scrolled down. */}
+                <button
+                  type="button"
+                  onClick={() => scrollFilters('up')}
+                  aria-label="Scroll filters up"
+                  className={`absolute left-1/2 top-2 z-10 -translate-x-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-600 shadow-md ring-1 ring-black/5 transition-all hover:bg-[#e01a1b] hover:text-white ${filterScroll.up ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </button>
+                {/* Scroll-down affordance — appears when more filters are below. */}
+                <button
+                  type="button"
+                  onClick={() => scrollFilters('down')}
+                  aria-label="Scroll filters down"
+                  className={`absolute left-1/2 bottom-2 z-10 -translate-x-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-600 shadow-md ring-1 ring-black/5 transition-all hover:bg-[#e01a1b] hover:text-white ${filterScroll.down ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </button>
               </div>
             )}
 

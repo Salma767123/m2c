@@ -265,7 +265,7 @@ class CartService {
   // Check free shipping eligibility
   async checkFreeShipping(userId: string, cartTotal: number): Promise<{ success: boolean; data?: any; message?: string }> {
     try {
-      const response = await axios.post('/coupons/check-free-shipping', { userId, cartTotal });
+      const response = await axios.post('/coupons/check-free-shipping', { userId, cartTotal, region: getRegion() });
       return response.data;
     } catch (error: any) {
       console.warn('Free shipping check failed:', error);

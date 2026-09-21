@@ -172,6 +172,7 @@ const createProduct = async (req, res) => {
       discount,
       gstPercentage,
       hsnCode,
+      returnable,
 
       // Single Unit Pricing Configuration
       singleUnitSize,
@@ -330,6 +331,8 @@ const createProduct = async (req, res) => {
           discount: discount ? parseFloat(discount) : null,
           gstPercentage: gstPercentage !== null && gstPercentage !== undefined && gstPercentage !== '' ? parseFloat(gstPercentage) : null,
           hsnCode: hsnCode ? String(hsnCode).trim() : null,
+          // Return eligibility — defaults to true unless explicitly turned off.
+          returnable: returnable === false || returnable === 'false' || returnable === 'no' ? false : true,
 
           // Single Unit Pricing Configuration
           singleUnitSize: singleUnitSize || null,
@@ -801,6 +804,9 @@ const updateProduct = async (req, res) => {
           }),
           ...(updateData.hsnCode !== undefined && {
             hsnCode: updateData.hsnCode ? String(updateData.hsnCode).trim() : null
+          }),
+          ...(updateData.returnable !== undefined && {
+            returnable: !(updateData.returnable === false || updateData.returnable === 'false' || updateData.returnable === 'no')
           }),
 
           // Single Unit Pricing Configuration
@@ -1757,6 +1763,7 @@ const createProductByAdmin = async (req, res) => {
       discount,
       gstPercentage,
       hsnCode,
+      returnable,
       adminFixedPrice, // Admin can set their own price
       priceINR,
       priceUSD,
@@ -1957,6 +1964,8 @@ const createProductByAdmin = async (req, res) => {
           discount: discount ? parseFloat(discount) : null,
           gstPercentage: gstPercentage !== null && gstPercentage !== undefined && gstPercentage !== '' ? parseFloat(gstPercentage) : null,
           hsnCode: hsnCode ? String(hsnCode).trim() : null,
+          // Return eligibility — defaults to true unless explicitly turned off.
+          returnable: returnable === false || returnable === 'false' || returnable === 'no' ? false : true,
           adminFixedPrice: numOrNull(adminFixedPrice),
           ...productPrices,
           priceVisibility: priceVisibility || 'BOTH',
@@ -2245,6 +2254,9 @@ const updateProductByAdmin = async (req, res) => {
         }),
         ...(updateData.hsnCode !== undefined && {
           hsnCode: updateData.hsnCode ? String(updateData.hsnCode).trim() : null
+        }),
+        ...(updateData.returnable !== undefined && {
+          returnable: !(updateData.returnable === false || updateData.returnable === 'false' || updateData.returnable === 'no')
         }),
         ...(updateData.adminFixedPrice !== undefined && {
           adminFixedPrice: updateData.adminFixedPrice ? parseFloat(updateData.adminFixedPrice) : null
@@ -2741,6 +2753,19 @@ const getPublicProducts = async (req, res) => {
       if (slugs.length > 0) where.slug = { in: slugs };
     }
 
+    // Product set by key (id OR slug) — used by the Coupons & Offers filter, since
+    // offers store product IDs while coupons may store slugs. AND-wrapped so it
+    // never collides with the search OR.
+    if (req.query.productKeys) {
+      const keys = String(req.query.productKeys).split(',').map((s) => s.trim()).filter(Boolean);
+      if (keys.length > 0) {
+        where.AND = [
+          ...(where.AND || []),
+          { OR: [{ id: { in: keys } }, { slug: { in: keys } }] },
+        ];
+      }
+    }
+
     if (subCategory) {
       where.subCategory = { equals: subCategory, mode: 'insensitive' };
     }
@@ -3223,6 +3248,7 @@ const getPublicProduct = async (req, res) => {
         weightUnit: true,
         dispatchTimeline: true,
         logisticsConfig: true,
+        returnable: true, // return eligibility — drives the "Easy return" badge + policy note
         createdAt: true,
         updatedAt: true,
         inventory: {

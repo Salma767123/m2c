@@ -19,6 +19,7 @@ export interface ProductFormData {
   discount?: number;
   gstPercentage?: number;
   hsnCode?: string;
+  returnable?: boolean; // Whether customers can return this product (within 7 days of delivery)
   // Vendor payout economics (attached by the backend on vendor-facing responses only).
   // What the vendor is actually paid: GST on their base price, and the per-unit total.
   vendorGstRate?: number;
@@ -301,6 +302,8 @@ class ProductService {
     subCategory?: string;
     /** Comma-separated product slugs to restrict the list to (banner product-set links). */
     products?: string;
+    /** Comma-separated product keys (id OR slug) — used by the Coupons & Offers filter. */
+    productKeys?: string;
     minPrice?: number;
     maxPrice?: number;
     sortBy?: string;

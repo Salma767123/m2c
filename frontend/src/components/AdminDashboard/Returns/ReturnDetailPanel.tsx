@@ -192,11 +192,8 @@ export default function ReturnDetailPanel({
                 <Section title="Refund information" icon={<CreditCard className="h-4 w-4" />}>
                   <dl className="space-y-2 text-sm">
                     <Row label="Refund amount" value={money(rec.refundAmount ?? rec.itemAmount, rec.currency)} strong />
-                    <Row label="Method" value={rec.refundMethod === 'WALLET'
-                      ? 'M2C Wallet (store credit)'
-                      : rec.paymentMethodLabel ? `Original · ${rec.paymentMethodLabel}` : 'Original payment method'} />
-                    <Row label="Gateway status" value={rec.refundStatus || '—'} />
-                    {rec.paymentReference && <Row label="Payment reference" value={rec.paymentReference} mono />}
+                    <Row label="Method" value="M2C Wallet (store credit)" />
+                    <Row label="Status" value={rec.status === 'Refund Completed' ? 'Credited to wallet' : (rec.refundStatus || '—')} />
                   </dl>
                 </Section>
               ) : (

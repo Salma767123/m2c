@@ -9,7 +9,7 @@ import {
 import { formatPrice } from '@/lib/currency';
 import {
   RETURN_REASONS, returnService,
-  type ReturnResolution, type RefundMethod,
+  type ReturnResolution,
 } from '@/services/returnService';
 
 interface ModalItem {
@@ -20,6 +20,7 @@ interface ModalItem {
   price: number;
   size?: string;
   color?: string;
+  returnable?: boolean;
 }
 interface ModalOrder {
   id: string;
@@ -47,7 +48,6 @@ export default function ReturnRequestModal({
   const [reasonNote, setReasonNote] = useState('');
   const [photos, setPhotos] = useState<{ id: string; dataUri: string }[]>([]);
   const [resolution, setResolution] = useState<ReturnResolution | ''>('');
-  const [refundMethod, setRefundMethod] = useState<RefundMethod | ''>('');
   const [replacementMethod, setReplacementMethod] = useState<'CREDIT' | 'ITEM' | ''>('');
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -58,6 +58,12 @@ export default function ReturnRequestModal({
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const money = (n: number) => formatPrice(n, order?.currency === 'USD' ? 'USD' : 'INR');
+
+  // Only items the admin marked return-eligible can be returned.
+  const returnableItems = useMemo(
+    () => (order?.items || []).filter((i) => i.returnable !== false),
+    [order],
+  );
 
   // Reset everything ONLY when the modal transitions closed → open. Keying this
   // off `order` identity too was the bug: after a successful submit, onSubmitted
@@ -70,9 +76,9 @@ export default function ReturnRequestModal({
     if (open && !wasOpenRef.current) {
       wasOpenRef.current = true;
       setStepIdx(0);
-      setItemId(order && order.items.length === 1 ? order.items[0].id : '');
+      setItemId(returnableItems.length === 1 ? returnableItems[0].id : '');
       setReason(''); setReasonNote(''); setPhotos([]); setResolution('');
-      setRefundMethod(''); setReplacementMethod(''); setConfirmed(false);
+      setReplacementMethod(''); setConfirmed(false);
       setSubmitting(false); setSubmitted(null); setError('');
     } else if (!open) {
       wasOpenRef.current = false;
@@ -90,8 +96,8 @@ export default function ReturnRequestModal({
   }, [open, submitting, onClose]);
 
   const selectedItem = useMemo(
-    () => order?.items.find((i) => i.id === itemId) || null,
-    [order, itemId],
+    () => returnableItems.find((i) => i.id === itemId) || null,
+    [returnableItems, itemId],
   );
   const reasonMeta = RETURN_REASONS.find((r) => r.code === reason);
   const evidenceRequired = !!reasonMeta?.requiresEvidence;
@@ -146,7 +152,7 @@ export default function ReturnRequestModal({
       return null;
     }
     if (currentStep === 'refund') {
-      if (!refundMethod) return 'Please choose where to receive your refund.';
+      // Refunds always go to the wallet — this step is informational.
       return null;
     }
     if (currentStep === 'replacement') {
@@ -182,7 +188,7 @@ export default function ReturnRequestModal({
         reasonNote: reasonNote.trim() || undefined,
         evidenceImages: photos.map((p) => p.dataUri),
         resolution: resolution as ReturnResolution,
-        refundMethod: resolution === 'REFUND' ? (refundMethod as RefundMethod) : undefined,
+        refundMethod: resolution === 'REFUND' ? 'WALLET' : undefined,
         replacementMethod: resolution === 'REPLACEMENT' ? (replacementMethod as 'CREDIT' | 'ITEM') : undefined,
         confirmed,
       });
@@ -268,11 +274,11 @@ export default function ReturnRequestModal({
               {/* STEP 1 — Item + Reason */}
               {currentStep === 'reason' && (
                 <div>
-                  {order.items.length > 1 && (
+                  {returnableItems.length > 1 && (
                     <div className="mb-5">
                       <p className="mb-2 text-sm font-semibold text-slate-800">Which item are you returning?</p>
                       <div className="space-y-2">
-                        {order.items.map((it) => (
+                        {returnableItems.map((it) => (
                           <button key={it.id} type="button" onClick={() => setItemId(it.id)}
                             className={`flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition-all ${
                               itemId === it.id ? 'border-[#e01a1b] bg-red-50/40 ring-1 ring-[#e01a1b]/20' : 'border-slate-200 hover:border-slate-300'
@@ -288,7 +294,7 @@ export default function ReturnRequestModal({
                       </div>
                     </div>
                   )}
-                  {selectedItem && order.items.length === 1 && (
+                  {selectedItem && returnableItems.length === 1 && (
                     <div className="mb-5 flex items-center gap-3 rounded-xl bg-slate-50 p-3">
                       <img src={selectedItem.image || '/assets/images/placeholder.png'} alt="" className="h-12 w-12 rounded-lg object-cover" />
                       <div className="min-w-0">
@@ -384,27 +390,33 @@ export default function ReturnRequestModal({
                 </div>
               )}
 
-              {/* STEP 4a — Refund destination: bank or wallet */}
+              {/* STEP 4a — Refund destination: always the M2C Wallet (informational) */}
               {currentStep === 'refund' && (
                 <div>
-                  <p className="text-sm font-semibold text-slate-800">Where should we send your refund?</p>
-                  <p className="mt-1 text-[13px] text-slate-500">Choose the fastest option for you.</p>
+                  <p className="text-sm font-semibold text-slate-800">Your refund</p>
+                  <p className="mt-1 text-[13px] text-slate-500">Approved refunds are added to your M2C Wallet.</p>
 
-                  <div className="mt-4 space-y-3">
-                    <PrefCard
-                      active={refundMethod === 'WALLET'} onClick={() => setRefundMethod('WALLET')}
-                      icon={<Wallet className="h-5 w-5" />} title="Add to M2C Wallet"
-                      desc="Instant store credit — use it on your next purchase."
-                      badge={<span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700"><Zap className="h-3 w-3" /> Instant</span>} />
-                    <PrefCard
-                      active={refundMethod === 'ORIGINAL'} onClick={() => setRefundMethod('ORIGINAL')}
-                      icon={<CreditCard className="h-5 w-5" />} title="Refund to original payment method"
-                      desc="Back to the account/card/UPI you paid with — 5–7 business days." />
+                  <div className="mt-4 flex items-start gap-3 rounded-xl border-2 border-emerald-200 bg-emerald-50/50 p-4">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-700">
+                      <Wallet className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                        Refund to M2C Wallet
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700"><Zap className="h-3 w-3" /> Instant</span>
+                      </p>
+                      <p className="mt-1 text-[13px] text-slate-600">
+                        {selectedItem ? <><span className="font-semibold">{money(selectedItem.price)}</span> will be added to your wallet the moment your return is approved.</> : 'The amount is added to your wallet the moment your return is approved.'}
+                      </p>
+                      <p className="mt-1 text-[12.5px] text-slate-500">Use it on your next purchase — no waiting for a bank refund.</p>
+                    </div>
                   </div>
 
-                  <p className="mt-4 flex items-start gap-2 rounded-xl bg-slate-50 p-3 text-[12px] text-slate-500">
-                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                    For your security we never ask for your card number, CVV, expiry or bank details. Bank refunds are handled entirely by our payment provider.
+                  <p className="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-[12.5px] leading-relaxed text-amber-900">
+                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    <span>
+                      Refunds are issued as <span className="font-semibold">M2C Wallet credit only</span>. You can <span className="font-semibold">withdraw your wallet balance</span> separately from your account whenever you need it.
+                    </span>
                   </p>
                 </div>
               )}
@@ -451,7 +463,7 @@ export default function ReturnRequestModal({
                     <ReviewRow label="Resolution" value={resolution === 'REFUND' ? 'Refund' : 'Replacement'} />
                     {resolution === 'REFUND' && (
                       <>
-                        <ReviewRow label="Refund to" value={refundMethod === 'WALLET' ? 'M2C Wallet (instant)' : 'Original payment method'} />
+                        <ReviewRow label="Refund to" value="M2C Wallet (instant)" />
                         <ReviewRow label="Refund amount" value={money(selectedItem.price)} strong />
                       </>
                     )}

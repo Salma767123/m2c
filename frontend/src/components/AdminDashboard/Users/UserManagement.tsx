@@ -34,7 +34,9 @@ import {
   UserCheck,
   UserX,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  SlidersHorizontal
 } from 'lucide-react';
 
 const PAGE_SIZE = 10;
@@ -65,6 +67,7 @@ export default function UserManagement() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; email: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   // Use a ref to always call the latest fetchStaff inside setInterval without resetting the interval
   const fetchStaffRef = useRef<() => void>(() => {});
@@ -296,6 +299,25 @@ export default function UserManagement() {
         </div>
       </div>
 
+      {/* Collapsible "Overview & Filters" — expand/collapse the metrics + filters */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+          Overview &amp; Filters
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <span className="text-xs text-slate-500">
+          Showing {filteredUsers.length} of {users.length} users
+        </span>
+      </div>
+
+      {panelOpen && (
+        <div className="space-y-4">
       {/* Stats Cards — click a card to filter the table below by that metric */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {statCards.map(({ key, title, value, subtitle, Icon, iconBg, iconColor, countColor, activeClass }) => {
@@ -371,6 +393,8 @@ export default function UserManagement() {
           </div>
         </div>
       </div>
+        </div>
+      )}
 
       {/* Users Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">

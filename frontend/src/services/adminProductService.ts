@@ -11,6 +11,7 @@ export interface AdminProduct {
   discount?: number;
   gstPercentage?: number;
   hsnCode?: string;
+  returnable?: boolean; // Whether customers can return this product
   adminFixedPrice?: number; // Admin's fixed price (separate from basePrice)
   singleUnitSize?: string;
   singleUnitColor?: string;
