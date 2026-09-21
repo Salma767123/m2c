@@ -16,6 +16,13 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import {
   Search,
   ShoppingCart,
@@ -26,6 +33,9 @@ import {
   Star,
   PackageSearch,
   RefreshCw,
+  Sparkles,
+  ArrowUpNarrowWide,
+  ArrowDownNarrowWide,
 } from 'lucide-react-native';
 import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
 import EmptyState from '@/components/WebSite/Shared/EmptyState';
@@ -438,6 +448,7 @@ export default function ProductsScreen() {
         onSort={() => setShowSort(true)}
         resultText={resultsContext}
         activeFiltersCount={activeFiltersCount}
+        sortLabel={sortOption.label}
       />
 
       <FlatList
@@ -720,69 +731,130 @@ function FilterSortBar({
   onSort,
   resultText,
   activeFiltersCount,
+  sortLabel,
 }: {
   onFilter: () => void;
   onSort: () => void;
   resultText: string;
   activeFiltersCount: number;
+  sortLabel: string;
 }) {
+  const active = activeFiltersCount > 0;
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        backgroundColor: '#f9fafb',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e5e7eb',
-        gap: 8,
-      }}
-    >
-      <Text style={{ flex: 1, fontSize: 12, color: '#6b7280', lineHeight: 16 }} numberOfLines={2}>
-        {resultText}
-      </Text>
-      <Pressable onPress={onSort} accessibilityRole="button" accessibilityLabel="Sort" hitSlop={4}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            borderWidth: 1,
-            borderColor: '#e5e7eb',
-            backgroundColor: '#ffffff',
-            paddingHorizontal: 12,
-            height: 36,
-            borderRadius: 8,
-          }}
-        >
-          <ArrowUpDown size={14} color="#111827" />
-          <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '600', color: '#111827' }}>
-            Sort
+    <View style={fs.bar}>
+      {/* The count reads as a status line, not a control: quiet, with the
+          current sort named under it so the list never sorts invisibly. */}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={fs.resultText} numberOfLines={1}>
+          {resultText}
+        </Text>
+        <View style={fs.sortedRow}>
+          <View style={fs.sortedDot} />
+          <Text style={fs.sortedText} numberOfLines={1}>
+            {sortLabel}
           </Text>
         </View>
-      </Pressable>
-      <Pressable onPress={onFilter} accessibilityRole="button" accessibilityLabel={`Filter${activeFiltersCount > 0 ? ` (${activeFiltersCount} active)` : ''}`} hitSlop={4}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: activeFiltersCount > 0 ? '#111827' : '#ffffff',
-            paddingHorizontal: 12,
-            height: 36,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: activeFiltersCount > 0 ? '#111827' : '#e5e7eb',
-          }}
+      </View>
+
+      {/* Sort and Filter are joined into one control rather than floating as
+          two lookalike outlines — they are the same kind of action, so they
+          read as one segmented thing. */}
+      <View style={fs.rail}>
+        <Pressable
+          onPress={onSort}
+          accessibilityRole="button"
+          accessibilityLabel={`Sort, currently ${sortLabel}`}
+          android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
+          style={fs.segment}
         >
-          <SlidersHorizontal size={14} color={activeFiltersCount > 0 ? '#ffffff' : '#111827'} />
-          <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '600', color: activeFiltersCount > 0 ? '#ffffff' : '#111827' }}>
-            {activeFiltersCount > 0 ? `Filters (${activeFiltersCount})` : 'Filter'}
-          </Text>
-        </View>
-      </Pressable>
+          <ArrowUpDown size={14} color="#1a1a1a" strokeWidth={2.2} />
+          <Text style={fs.segmentText}>Sort</Text>
+        </Pressable>
+
+        <View style={fs.railDivider} />
+
+        <Pressable
+          onPress={onFilter}
+          accessibilityRole="button"
+          accessibilityLabel={`Filter${active ? `, ${activeFiltersCount} active` : ''}`}
+          android_ripple={{ color: active ? 'rgba(255,255,255,0.18)' : 'rgba(15,23,42,0.06)' }}
+          style={[fs.segment, active && fs.segmentActive]}
+        >
+          <SlidersHorizontal size={14} color={active ? '#ffffff' : '#1a1a1a'} strokeWidth={2.2} />
+          <Text style={[fs.segmentText, active && fs.segmentTextActive]}>Filter</Text>
+          {active ? (
+            <View style={fs.count}>
+              <Text style={fs.countText}>{activeFiltersCount}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+      </View>
     </View>
   );
 }
+
+const fs = StyleSheet.create({
+  bar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eef0f3',
+  },
+  resultText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  sortedRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  sortedDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: Palette.primary },
+  sortedText: { fontFamily: Fonts.sans, fontSize: 11.5, color: '#8b8079' },
+
+  rail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e4e7eb',
+    borderRadius: 11,
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+  },
+  railDivider: { width: 1, alignSelf: 'stretch', backgroundColor: '#e4e7eb' },
+  segment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 38,
+    paddingHorizontal: 14,
+  },
+  segmentActive: { backgroundColor: Palette.primary },
+  segmentText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  segmentTextActive: { color: '#ffffff' },
+  count: {
+    minWidth: 17,
+    height: 17,
+    borderRadius: 8.5,
+    paddingHorizontal: 5,
+    backgroundColor: 'rgba(255,255,255,0.26)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countText: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+});
 
 // ─── Hero Banner ─────────────────────────────────────────────────────────────
 function HeroBanner({
@@ -824,9 +896,12 @@ function HeroBanner({
       <Text
         numberOfLines={1}
         style={{
+          fontFamily: Fonts.heading,
           color: '#ffffff',
           fontSize: 22,
-          fontWeight: '800',
+          // Poppins is static: the weight must name the loaded file
+          // (Poppins_600SemiBold), or Android fakes a bold over it.
+          fontWeight: '600',
           letterSpacing: -0.3,
           marginBottom: 4,
         }}
@@ -836,7 +911,12 @@ function HeroBanner({
       <Text
         numberOfLines={2}
         style={{
-          color: '#9ca3af',
+          fontFamily: Fonts.sans,
+          // Was #9ca3af — Tailwind's grey-400, a cool neutral meant for a white
+          // page. On the brand-red banner it reads muddy and barely separates
+          // from the ground. onBrandMuted is the brand's own soft tint, which
+          // is what this band is for.
+          color: Palette.onBrandMuted,
           fontSize: 13,
           lineHeight: 18,
         }}
@@ -1006,6 +1086,15 @@ function ListEmpty({
 
 // ─── Modals ───────────────────────────────────────────────────────────────
 
+/**
+ * Sort sheet.
+ *
+ * Was four identical rows behind four identical radio dots, so choosing a sort
+ * meant reading every label. Each option now carries its own glyph and a line
+ * saying what it actually does, and the chosen one is a filled brand card with
+ * a left accent rail rather than a dot you have to hunt for. The sheet springs
+ * up instead of sliding, and each row fades in behind it on a short stagger.
+ */
 function SortModal({
   visible,
   value,
@@ -1017,110 +1106,235 @@ function SortModal({
   onChange: (k: SortKey) => void;
   onClose: () => void;
 }) {
+  if (!visible) return null;
+  return <SortSheet value={value} onChange={onChange} onClose={onClose} />;
+}
+
+/** What each sort actually does, and the glyph that says so at a glance. */
+const SORT_META: Record<SortKey, { icon: any; hint: string }> = {
+  newest: { icon: Sparkles, hint: 'Latest arrivals first' },
+  price_asc: { icon: ArrowUpNarrowWide, hint: 'Cheapest first' },
+  price_desc: { icon: ArrowDownNarrowWide, hint: 'Most expensive first' },
+  rating_desc: { icon: Star, hint: 'Best reviewed first' },
+};
+
+function SortSheet({
+  value,
+  onChange,
+  onClose,
+}: {
+  value: SortKey;
+  onChange: (k: SortKey) => void;
+  onClose: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const lift = useSharedValue(340);
+  const fade = useSharedValue(0);
+
+  useEffect(() => {
+    lift.value = withSpring(0, { damping: 20, stiffness: 200, mass: 0.75 });
+    fade.value = withTiming(1, { duration: 200 });
+    // Shared values are stable; this is a mount-only entrance.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const scrimStyle = useAnimatedStyle(() => ({ opacity: fade.value }));
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: lift.value }] }));
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable
-        onPress={onClose}
-        accessibilityLabel="Close sort menu"
-        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
-      >
-        <Pressable>
-          <View
-            style={{
-              backgroundColor: '#ffffff',
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              paddingBottom: 32,
-            }}
-          >
-            {/* Drag handle */}
-            <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 4 }}>
-              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#e5e7eb' }} />
-            </View>
+    <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Animated.View style={[StyleSheet.absoluteFill, sm.scrim, scrimStyle]} />
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel="Close sort menu"
+        />
 
-            {/* Header */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: 20,
-                paddingVertical: 14,
-                borderBottomWidth: 1,
-                borderBottomColor: '#f3f4f6',
-              }}
-            >
-              <ArrowUpDown size={18} color="#374151" strokeWidth={2} />
-              <Text style={{ flex: 1, fontSize: 17, fontWeight: '700', color: '#111827', marginLeft: 10 }}>
-                Sort by
-              </Text>
-              <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close">
-                <X size={20} color="#6b7280" />
-              </Pressable>
-            </View>
-
-            {/* Options */}
-            <View style={{ paddingTop: 8 }}>
-              {SORT_OPTIONS.map((opt, idx) => {
-                const selected = opt.key === value;
-                return (
-                  <Pressable
-                    key={opt.key}
-                    onPress={() => onChange(opt.key)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    style={({ pressed }) => ({
-                      backgroundColor: pressed ? '#f9fafb' : selected ? '#f9fafb' : '#ffffff',
-                    })}
-                  >
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingHorizontal: 20,
-                        paddingVertical: 15,
-                        borderBottomWidth: idx < SORT_OPTIONS.length - 1 ? 1 : 0,
-                        borderBottomColor: '#f3f4f6',
-                      }}
-                    >
-                      {/* Radio dot */}
-                      <View
-                        style={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: 10,
-                          borderWidth: 2,
-                          borderColor: selected ? '#111827' : '#d1d5db',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          marginRight: 14,
-                        }}
-                      >
-                        {selected ? (
-                          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: Palette.primary }} />
-                        ) : null}
-                      </View>
-                      <Text
-                        style={{
-                          flex: 1,
-                          fontSize: 15,
-                          color: '#111827',
-                          fontWeight: selected ? '700' : '400',
-                        }}
-                      >
-                        {opt.label}
-                      </Text>
-                      {selected ? <Check size={18} color="#111827" strokeWidth={2.5} /> : null}
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
+        <Animated.View style={[sm.sheet, { paddingBottom: Math.max(insets.bottom, 16) }, sheetStyle]}>
+          <View style={sm.handleWrap}>
+            <View style={sm.handle} />
           </View>
-        </Pressable>
-      </Pressable>
+
+          <View style={sm.head}>
+            <View style={sm.headIcon}>
+              <ArrowUpDown size={17} color={Palette.primary} strokeWidth={2.2} />
+            </View>
+            <Text style={sm.headTitle}>Sort by</Text>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Close">
+              <X size={20} color="#9ca3af" />
+            </Pressable>
+          </View>
+
+          <View style={sm.list}>
+            {SORT_OPTIONS.map((opt, i) => (
+              <SortRow
+                key={opt.key}
+                index={i}
+                label={opt.label}
+                hint={SORT_META[opt.key].hint}
+                Icon={SORT_META[opt.key].icon}
+                selected={opt.key === value}
+                onPress={() => onChange(opt.key)}
+              />
+            ))}
+          </View>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
+
+function SortRow({
+  index,
+  label,
+  hint,
+  Icon,
+  selected,
+  onPress,
+}: {
+  index: number;
+  label: string;
+  hint: string;
+  Icon: any;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const enter = useSharedValue(0);
+
+  useEffect(() => {
+    // Rows arrive just behind the sheet, one after another.
+    enter.value = withDelay(90 + index * 55, withTiming(1, { duration: 240 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: enter.value,
+    transform: [{ translateY: (1 - enter.value) * 14 }],
+  }));
+
+  return (
+    <Animated.View style={style}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="radio"
+        accessibilityState={{ selected }}
+        accessibilityLabel={`${label}. ${hint}`}
+        android_ripple={{ color: 'rgba(224,26,27,0.08)' }}
+        style={[sm.row, selected && sm.rowSelected]}
+      >
+        {/* Accent rail — present only on the chosen row. */}
+        {selected ? <View style={sm.rail} /> : null}
+
+        <View style={[sm.tile, selected && sm.tileSelected]}>
+          <Icon size={17} color={selected ? '#ffffff' : '#8b8079'} strokeWidth={2.1} />
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[sm.label, selected && sm.labelSelected]}>{label}</Text>
+          <Text style={sm.hint}>{hint}</Text>
+        </View>
+
+        {selected ? (
+          <View style={sm.tick}>
+            <Check size={13} color="#ffffff" strokeWidth={3} />
+          </View>
+        ) : null}
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+const sm = StyleSheet.create({
+  scrim: { backgroundColor: 'rgba(15,23,42,0.5)' },
+  sheet: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    overflow: 'hidden',
+  },
+
+  handleWrap: { alignItems: 'center', paddingTop: 10, paddingBottom: 2 },
+  handle: { width: 38, height: 4, borderRadius: 2, backgroundColor: '#e5e7eb' },
+
+  head: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 14,
+  },
+  headIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(224,26,27,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headTitle: {
+    flex: 1,
+    fontFamily: Fonts.heading,
+    fontSize: 18,
+    // Poppins is static: the weight must name the loaded file.
+    fontWeight: '600',
+    letterSpacing: -0.4,
+    color: '#1a1a1a',
+  },
+
+  list: { paddingHorizontal: 14, paddingBottom: 8, gap: 8 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingLeft: 16,
+    paddingRight: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#eef0f3',
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+  },
+  rowSelected: { borderColor: 'rgba(224,26,27,0.3)', backgroundColor: '#fff6f6' },
+  rail: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: Palette.primary,
+  },
+
+  tile: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#f4f5f7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tileSelected: { backgroundColor: Palette.primary },
+
+  label: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 14.5,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  labelSelected: { fontFamily: Fonts.sansBold, fontWeight: '700' },
+  hint: { fontFamily: Fonts.sans, fontSize: 11.5, color: '#8b8079', marginTop: 1 },
+
+  tick: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: Palette.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
 
 function FilterModal({
   visible,
@@ -1302,15 +1516,30 @@ function FilterModal({
                   borderBottomColor: '#f3f4f6',
                 }}
               >
-                <SlidersHorizontal size={18} color="#374151" strokeWidth={2} />
-                <Text style={{ flex: 1, fontSize: 17, fontWeight: '700', color: '#111827', marginLeft: 10 }}>
-                  Filters
-                </Text>
-                <Pressable onPress={reset} accessibilityRole="button" hitSlop={8}
-                  style={{ marginRight: 14 }}
-                >
-                  <Text style={{ color: '#d97706', fontSize: 13, fontWeight: '700' }}>Reset</Text>
-                </Pressable>
+                <View style={fm.headIcon}>
+                  <SlidersHorizontal size={17} color={Palette.primary} strokeWidth={2.2} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 11 }}>
+                  <Text style={fm.headTitle}>Filters</Text>
+                  {/* Counts as you go, so the sheet says what it will do before
+                      you commit to it. */}
+                  <Text style={fm.headSub}>
+                    {draftCount > 0
+                      ? `${draftCount} selected`
+                      : 'Narrow down what you see'}
+                  </Text>
+                </View>
+                {draftCount > 0 ? (
+                  <Pressable
+                    onPress={reset}
+                    accessibilityRole="button"
+                    accessibilityLabel="Reset all filters"
+                    hitSlop={8}
+                    style={fm.resetBtn}
+                  >
+                    <Text style={fm.resetText}>Reset</Text>
+                  </Pressable>
+                ) : null}
                 <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close">
                   <X size={20} color="#6b7280" />
                 </Pressable>
@@ -1324,8 +1553,9 @@ function FilterModal({
               >
 
                 {/* ── Section: Availability ───────────────────────────── */}
-                <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>Availability</Text>
+                <View style={fm.sectionBand}>
+                  <View style={fm.sectionTick} />
+                  <Text style={fm.sectionLabel}>Availability</Text>
                 </View>
                 <Pressable
                   onPress={() => setDraft((d) => ({ ...d, inStockOnly: !d.inStockOnly }))}
@@ -1382,8 +1612,9 @@ function FilterModal({
                 </Pressable>
 
                 {/* ── Section: Collections ─────────────────────────────── */}
-                <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>Collections</Text>
+                <View style={fm.sectionBand}>
+                  <View style={fm.sectionTick} />
+                  <Text style={fm.sectionLabel}>Collections</Text>
                 </View>
                 <View style={{ backgroundColor: '#ffffff' }}>
                   <CategoryRadio
@@ -1402,8 +1633,9 @@ function FilterModal({
                 </View>
 
                 {/* ── Section: Price Range ─────────────────────────────── */}
-                <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>Price Range ($)</Text>
+                <View style={fm.sectionBand}>
+                  <View style={fm.sectionTick} />
+                  <Text style={fm.sectionLabel}>Price Range ($)</Text>
                 </View>
                 <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 }}>
                   <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -1463,8 +1695,9 @@ function FilterModal({
                 </View>
 
                 {/* ── Section: Categories ──────────────────────────────── */}
-                <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>Category</Text>
+                <View style={fm.sectionBand}>
+                  <View style={fm.sectionTick} />
+                  <Text style={fm.sectionLabel}>Category</Text>
                 </View>
                 <View style={{ backgroundColor: '#ffffff' }}>
                   <CategoryRadio
@@ -1498,8 +1731,9 @@ function FilterModal({
                 </View>
 
                 {/* ── Section: Customer Reviews ────────────────────────── */}
-                <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>Customer Reviews</Text>
+                <View style={fm.sectionBand}>
+                  <View style={fm.sectionTick} />
+                  <Text style={fm.sectionLabel}>Customer Reviews</Text>
                 </View>
                 <View style={{ backgroundColor: '#ffffff' }}>
                   {RATING_OPTIONS.map((opt, idx) => {
@@ -1576,8 +1810,9 @@ function FilterModal({
                 {/* ── Section: Discount ────────────────────────────────── */}
                 {facets && facets.maxDiscount >= 10 ? (
                   <>
-                    <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>Discount</Text>
+                    <View style={fm.sectionBand}>
+                  <View style={fm.sectionTick} />
+                      <Text style={fm.sectionLabel}>Discount</Text>
                     </View>
                     <View style={{ backgroundColor: '#ffffff' }}>
                       {DISCOUNT_BUCKETS.filter((d) => d <= facets.maxDiscount).map((d, idx) => {
@@ -1638,8 +1873,9 @@ function FilterModal({
                 {/* ── Section: Color ───────────────────────────────────── */}
                 {facets && facets.colors.length > 0 ? (
                   <>
-                    <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                    <View style={fm.sectionBand}>
+                  <View style={fm.sectionTick} />
+                      <Text style={fm.sectionLabel}>
                         Color ({facets.colors.length})
                       </Text>
                     </View>
@@ -1693,8 +1929,9 @@ function FilterModal({
                 {/* ── Section: Size ────────────────────────────────────── */}
                 {facets && facets.sizes.length > 0 ? (
                   <>
-                    <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                    <View style={fm.sectionBand}>
+                  <View style={fm.sectionTick} />
+                      <Text style={fm.sectionLabel}>
                         Size ({facets.sizes.length})
                       </Text>
                     </View>
@@ -1736,8 +1973,9 @@ function FilterModal({
                 {/* ── Section: Material ────────────────────────────────── */}
                 {facets && facets.materials.length > 0 ? (
                   <>
-                    <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>Material</Text>
+                    <View style={fm.sectionBand}>
+                  <View style={fm.sectionTick} />
+                      <Text style={fm.sectionLabel}>Material</Text>
                     </View>
                     <View style={{ backgroundColor: '#ffffff' }}>
                       {facets.materials.map((m, idx) => {
@@ -1796,8 +2034,9 @@ function FilterModal({
                 {/* ── Section: Fabric Type ─────────────────────────────── */}
                 {facets && facets.fabricTypes.length > 0 ? (
                   <>
-                    <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>Fabric Type</Text>
+                    <View style={fm.sectionBand}>
+                  <View style={fm.sectionTick} />
+                      <Text style={fm.sectionLabel}>Fabric Type</Text>
                     </View>
                     <View style={{ backgroundColor: '#ffffff' }}>
                       {facets.fabricTypes.map((f, idx) => {
@@ -1871,36 +2110,27 @@ function FilterModal({
                   flexShrink: 0,
                 }}
               >
-                <Pressable onPress={onClose} accessibilityRole="button">
-                  <View
-                    style={{
-                      height: 52,
-                      borderRadius: 12,
-                      borderWidth: 1.5,
-                      borderColor: '#e5e7eb',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: '#ffffff',
-                      paddingHorizontal: 24,
-                    }}
-                  >
-                    <Text style={{ color: '#374151', fontSize: 15, fontWeight: '600' }}>Cancel</Text>
-                  </View>
+                <Pressable
+                  onPress={onClose}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel"
+                  android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
+                  style={fm.cancelBtn}
+                >
+                  <Text style={fm.cancelText}>Cancel</Text>
                 </Pressable>
-                <Pressable onPress={apply} accessibilityRole="button" accessibilityLabel="Apply filters" style={{ flex: 1 }}>
-                  <View
-                    style={{
-                      height: 52,
-                      borderRadius: 12,
-                      backgroundColor: Palette.primary,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '700' }}>
-                      {draftCount > 0 ? `Apply ${draftCount} Filter${draftCount > 1 ? 's' : ''}` : 'Show Results'}
-                    </Text>
-                  </View>
+                <Pressable
+                  onPress={apply}
+                  accessibilityRole="button"
+                  accessibilityLabel="Apply filters"
+                  android_ripple={{ color: 'rgba(255,255,255,0.18)' }}
+                  style={fm.applyBtn}
+                >
+                  <Text style={fm.applyText}>
+                    {draftCount > 0
+                      ? `Apply ${draftCount} Filter${draftCount > 1 ? 's' : ''}`
+                      : 'Show Results'}
+                  </Text>
                 </Pressable>
               </View>
             </View>
@@ -1910,6 +2140,91 @@ function FilterModal({
     </Modal>
   );
 }
+
+const fm = StyleSheet.create({
+  sectionBand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 8,
+  },
+  sectionTick: { width: 3, height: 12, borderRadius: 2, backgroundColor: Palette.primary },
+  sectionLabel: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 11,
+    // Outfit is static: the weight must name the loaded file (Outfit_700Bold).
+    fontWeight: '700',
+    color: '#5f5550',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+
+  headIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(224,26,27,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headTitle: {
+    fontFamily: Fonts.heading,
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: -0.4,
+    color: '#1a1a1a',
+  },
+  headSub: { fontFamily: Fonts.sans, fontSize: 11.5, color: '#8b8079', marginTop: 1 },
+  resetBtn: {
+    marginRight: 12,
+    paddingHorizontal: 12,
+    height: 32,
+    justifyContent: 'center',
+    borderRadius: 999,
+    backgroundColor: '#f4f5f7',
+  },
+  resetText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#5f5550',
+  },
+
+  cancelBtn: {
+    height: 52,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  cancelText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  applyBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: Palette.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  applyText: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+});
 
 function CategoryRadio({
   label,

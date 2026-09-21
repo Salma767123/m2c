@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -24,6 +23,7 @@ import {
   HelpCircle,
   ChevronRight,
 } from 'lucide-react-native';
+import { useConfirm } from '@/components/WebSite/Shared/ConfirmDialog';
 import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
 import { useFocusEffect, useRouter } from 'expo-router';
 import ProfileTab from './ProfileTab';
@@ -81,6 +81,7 @@ const joinPhone = (code?: string, num?: string) => {
 };
 
 export default function Profile() {
+  const confirm = useConfirm();
   const { clearCart } = useCart();
   const { clearWishlist } = useWishlist();
   const [isEditing, setIsEditing] = useState(false);
@@ -195,7 +196,7 @@ export default function Profile() {
     setTimeout(scrollToForm, 220);
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     const isDirty = JSON.stringify(editedProfile) !== JSON.stringify(userProfile);
     const discard = () => {
       setEditedProfile(userProfile);
@@ -203,10 +204,13 @@ export default function Profile() {
       setIsEditing(false);
     };
     if (!isDirty) { discard(); return; }
-    Alert.alert('Discard changes?', 'Your unsaved changes will be lost.', [
-      { text: 'Keep Editing', style: 'cancel' },
-      { text: 'Discard', style: 'destructive', onPress: discard },
-    ]);
+    const ok = await confirm({
+      title: 'Discard changes?',
+      message: 'Your unsaved changes will be lost.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep Editing',
+    });
+    if (ok) discard();
   };
 
   const handleSave = async () => {
@@ -304,23 +308,22 @@ export default function Profile() {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign Out',
-        style: 'destructive',
-        onPress: async () => {
-          try { await userAuthService.logout(); } catch { /* ok */ }
-          await unregisterPushNotifications?.();
-          await userAuthService.clearAuthData();
-          clearCart();
-          clearWishlist();
-          showSuccessToast('Signed Out', 'You have been signed out');
-          router.replace('/(tabs)');
-        },
-      },
-    ]);
+  const handleLogout = async () => {
+    const ok = await confirm({
+      title: 'Sign out?',
+      message: 'Your cart and saved items stay with your account. Sign back in any time.',
+      confirmLabel: 'Sign Out',
+      icon: LogOut,
+    });
+    if (!ok) return;
+
+    try { await userAuthService.logout(); } catch { /* ok */ }
+    await unregisterPushNotifications?.();
+    await userAuthService.clearAuthData();
+    clearCart();
+    clearWishlist();
+    showSuccessToast('Signed Out', 'You have been signed out');
+    router.replace('/(tabs)');
   };
 
   const initials = () => {

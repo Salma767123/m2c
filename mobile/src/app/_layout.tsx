@@ -22,6 +22,8 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { FONT_ASSETS } from '@/lib/fonts';
 import { setExchangeRate } from '@/lib/currency';
+import ToastHost from '@/components/WebSite/Shared/ToastHost';
+import { ConfirmHost } from '@/components/WebSite/Shared/ConfirmDialog';
 import NotificationBanner from '@/components/General/NotificationBanner';
 
 // Hold the native splash until the fonts are in memory, so the app never paints
@@ -160,6 +162,9 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <CartProvider>
         <WishlistProvider>
+          {/* Holds the single confirm dialog, so any screen can ask a
+              destructive question without carrying its own modal state. */}
+          <ConfirmHost>
           <Stack>
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -176,6 +181,9 @@ export default function RootLayout() {
             onPress={() => handleNotificationNav(notification.data)}
             onDismiss={() => setNotification((prev) => ({ ...prev, visible: false }))}
           />
+          </ConfirmHost>
+          {/* Above the navigator so a toast is never clipped by a screen. */}
+          <ToastHost />
         </WishlistProvider>
       </CartProvider>
       <StatusBar style="dark" />

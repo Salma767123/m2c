@@ -6,7 +6,6 @@ import {
   Text,
   ScrollView,
   Pressable,
-  Alert,
   TextInput,
   ActivityIndicator,
   RefreshControl,
@@ -35,7 +34,9 @@ import {
   Truck,
   Star,
   Shield,
+  LogIn,
 } from 'lucide-react-native';
+import { useConfirm } from '@/components/WebSite/Shared/ConfirmDialog';
 import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -117,6 +118,7 @@ const fmt = (n: number) => fmtCurrency(n);
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Cart() {
+  const confirm = useConfirm();
   const { refreshCart, itemCount, syncStock, syncResult, allSyncResults, isSyncing, clearSyncResult } = useCart();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -413,28 +415,30 @@ export default function Cart() {
     }, 400);
   }, [isAuthenticated, refreshCart]);
 
-  const removeItem = useCallback((id: string) => {
-    Alert.alert('Remove Item', 'Remove this item from your cart?', [
-      { text: 'Keep', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          const prev = [...cartItems];
-          setCartItems((items) => items.filter((i) => i.id !== id));
-          try {
-            if (isAuthenticated) await cartService.removeFromCart(id);
-            else await cartService.removeFromLocalCart(id);
-            refreshCart();
-            showSuccessToast('Removed', 'Item removed from cart');
-          } catch {
-            setCartItems(prev);
-            showErrorToast('Error', 'Failed to remove item');
-          }
-        },
-      },
-    ]);
-  }, [isAuthenticated, cartItems, refreshCart]);
+  const removeItem = useCallback(
+    async (id: string) => {
+      const ok = await confirm({
+        title: 'Remove item?',
+        message: 'This item will be taken out of your cart. You can always add it back.',
+        confirmLabel: 'Remove',
+        cancelLabel: 'Keep',
+      });
+      if (!ok) return;
+
+      const prev = [...cartItems];
+      setCartItems((items) => items.filter((i) => i.id !== id));
+      try {
+        if (isAuthenticated) await cartService.removeFromCart(id);
+        else await cartService.removeFromLocalCart(id);
+        refreshCart();
+        showSuccessToast('Removed', 'Item removed from cart');
+      } catch {
+        setCartItems(prev);
+        showErrorToast('Error', 'Failed to remove item');
+      }
+    },
+    [confirm, isAuthenticated, cartItems, refreshCart],
+  );
 
   const applyCoupon = async () => {
     if (!promoCode.trim()) return;
@@ -541,12 +545,16 @@ export default function Cart() {
     } as any);
   }, []);
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (!isAuthenticated) {
-      Alert.alert('Login Required', 'Please login to checkout', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Login', onPress: () => router.push('/(auth)/Login') },
-      ]);
+      const ok = await confirm({
+        title: 'Sign in to check out',
+        message: 'Your cart is saved. Sign in and pick up right where you left off.',
+        confirmLabel: 'Sign In',
+        tone: 'brand',
+        icon: LogIn,
+      });
+      if (ok) router.push('/(auth)/Login');
       return;
     }
     if (hasStockIssue) {

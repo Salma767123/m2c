@@ -75,6 +75,23 @@ module.exports = {
           card: "#ffffff",
           outline: "#e5e7eb",
         },
+        // Warm neutrals — the ground the web storefront actually sits on.
+        // `ink`/`surface` above are the cool Tailwind-ish neutrals; these are
+        // the warm ones the marketing pages use (frontend globals.css), and
+        // mixing the two is what makes a screen read as "off theme".
+        warm: {
+          ink: "#1a1a1a",      // headings
+          deep: "#3d352f",     // emphasis copy
+          body: "#5f5550",     // body copy
+          soft: "#7a6d62",     // secondary copy
+          muted: "#a89a8d",    // captions, placeholders
+          ground: "#faf7f3",   // page ground
+          line: "#efe4d8",     // hairline rules
+          lineStrong: "#e6dcd0", // input + pill borders
+          blush: "#fdf3f0",    // brand-tinted notice ground
+          blushLine: "#eedad4",
+          sand: "#eee3d7",
+        },
       },
     },
   },

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, StatusBar } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, StatusBar } from 'react-native';
 import { ArrowLeft, Plus, MapPin, Home, Briefcase, Pencil, Trash2, Star } from 'lucide-react-native';
+import { useConfirm } from '@/components/WebSite/Shared/ConfirmDialog';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -20,6 +21,7 @@ const TYPE_META: Record<string, { label: string; Icon: typeof Home; bg: string; 
 };
 
 export default function AddressBook() {
+  const confirm = useConfirm();
   const insets = useSafeAreaInsets();
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,15 +85,14 @@ export default function AddressBook() {
     }
   };
 
-  const confirmDelete = (addr: SavedAddress) => {
-    Alert.alert(
-      'Delete address?',
-      "This address will be permanently removed. If it's your default, the next address becomes the default.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => handleDelete(addr.id) },
-      ],
-    );
+  const confirmDelete = async (addr: SavedAddress) => {
+    const ok = await confirm({
+      title: 'Delete address?',
+      message:
+        "This address will be permanently removed. If it's your default, the next address becomes the default.",
+      confirmLabel: 'Delete',
+    });
+    if (ok) handleDelete(addr.id);
   };
 
   const handleDelete = async (id: string) => {

@@ -7,14 +7,14 @@ import {
   Image,
   RefreshControl,
   StyleSheet,
-  StatusBar,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Tag, Percent, Clock, ArrowRight } from 'lucide-react-native';
+import { Tag, Percent, Clock, ArrowRight } from 'lucide-react-native';
+import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
 import { offerService } from '@/services/offerService';
 import { offerEndsLabel, type PublicOffer } from '@/lib/offers';
-import { Palette, Radius, Shadow } from '@/constants/theme';
+import { Fonts, Palette, Radius, Shadow } from '@/constants/theme';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 /**
@@ -72,21 +72,15 @@ export default function Offers() {
 
   return (
     <View style={s.root}>
-      <StatusBar barStyle="light-content" backgroundColor={Palette.surfaceInverse} />
-
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 10 }]}>
-        <Pressable
-          onPress={() => router.back()}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <ArrowLeft size={22} color="#ffffff" />
-        </Pressable>
-        <Text style={s.headerTitle}>Offers</Text>
-        <View style={{ width: 22 }} />
-      </View>
+      {/* Was a dark #111827 bar with a Roboto title — the last screen still
+          wearing its own masthead after the rest of the app moved onto the
+          shared one. Reached from "All offers" on the home board, so it landed
+          on a near-black header straight off a warm page. */}
+      <ScreenHeader
+        onBack={() => (router.canGoBack() ? router.back() : router.push('/(tabs)'))}
+        title="Offers"
+        subtitle="Live deals and coupons"
+      />
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
@@ -203,16 +197,6 @@ export default function Offers() {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: Palette.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Palette.surfaceInverse,
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-  },
-  headerTitle: { color: '#ffffff', fontSize: 17, fontWeight: '700' },
-
   intro: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 16, alignItems: 'center' },
   introPill: {
     flexDirection: 'row',
@@ -224,11 +208,25 @@ const s = StyleSheet.create({
     paddingVertical: 6,
     marginBottom: 10,
   },
-  introPillText: { color: Palette.primary, fontSize: 12, fontWeight: '700' },
-  introTitle: { fontSize: 24, fontWeight: '800', color: Palette.ink, letterSpacing: -0.4 },
+  introPillText: {
+    fontFamily: Fonts.sansBold,
+    color: Palette.primary,
+    fontSize: 12,
+    // Outfit is static: the weight must name the loaded file (Outfit_700Bold).
+    fontWeight: '700',
+  },
+  introTitle: {
+    fontFamily: Fonts.heading,
+    fontSize: 24,
+    // Poppins_600SemiBold is the loaded file; 800 faked a bolder one.
+    fontWeight: '600',
+    color: '#1a1a1a',
+    letterSpacing: -0.4,
+  },
   introSub: {
+    fontFamily: Fonts.sans,
     fontSize: 13,
-    color: Palette.textMuted,
+    color: '#5f5550',
     textAlign: 'center',
     marginTop: 6,
     lineHeight: 19,
@@ -251,6 +249,7 @@ const s = StyleSheet.create({
   bannerFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   bannerFallbackText: {
     color: '#ffffff',
+    fontFamily: Fonts.sansBold,
     fontSize: 30,
     fontWeight: '900',
     letterSpacing: -0.6,
@@ -264,11 +263,27 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  badgePillText: { color: Palette.primary, fontSize: 11, fontWeight: '800' },
+  badgePillText: {
+    fontFamily: Fonts.sansBold,
+    color: Palette.primary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
 
   cardBody: { padding: 14 },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: Palette.ink },
-  cardDesc: { fontSize: 12.5, color: Palette.textMuted, marginTop: 4, lineHeight: 18 },
+  cardTitle: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  cardDesc: {
+    fontFamily: Fonts.sans,
+    fontSize: 12.5,
+    color: '#5f5550',
+    marginTop: 4,
+    lineHeight: 18,
+  },
   cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -276,13 +291,30 @@ const s = StyleSheet.create({
     marginTop: 14,
   },
   endsRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  endsText: { fontSize: 11.5, fontWeight: '700', color: Palette.primary },
+  endsText: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: Palette.primary,
+  },
   shopRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  shopText: { fontSize: 13, fontWeight: '700', color: Palette.primary },
+  shopText: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 13,
+    fontWeight: '700',
+    color: Palette.primary,
+  },
 
   empty: { alignItems: 'center', paddingVertical: 64, paddingHorizontal: 32 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: Palette.ink, marginTop: 14 },
+  emptyTitle: {
+    fontFamily: Fonts.heading,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginTop: 14,
+  },
   emptySub: {
+    fontFamily: Fonts.sans,
     fontSize: 13,
     color: Palette.textMuted,
     textAlign: 'center',
@@ -299,5 +331,10 @@ const s = StyleSheet.create({
     height: 44,
     marginTop: 20,
   },
-  emptyCtaText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  emptyCtaText: {
+    fontFamily: Fonts.sansBold,
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
 });

@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Mail, Phone, MapPin, Clock, Send, Store, X } from 'lucide-react-native';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { enquiryService } from '@/services/enquiryService';
@@ -38,8 +39,8 @@ interface VendorFormData {
 
 const inputBaseStyle = { fontSize: 16, minHeight: 48, paddingVertical: 12 };
 const inputClass =
-  'w-full px-4 border border-gray-300 rounded-xl bg-white text-gray-900';
-const placeholderColor = '#9ca3af';
+  'w-full px-4 border border-warm-lineStrong rounded-xl bg-white text-warm-ink font-sans';
+const placeholderColor = '#a89a8d';
 
 export default function Contact() {
   const [formData, setFormData] = useState<ContactFormData>({
@@ -175,87 +176,110 @@ export default function Contact() {
   return (
     <View className="bg-white">
       {/* Hero Section */}
-      <View className="bg-gray-900 px-6 py-10">
-        <Text className="text-3xl font-bold text-white mb-3 text-center">Get in Touch</Text>
-        <Text className="text-sm text-gray-300 text-center leading-6">
-          Have questions about our products or want to learn more about our artisans? We'd love to
-          hear from you.
+      <View className="bg-warm-ground border-b border-warm-line px-6 py-10">
+        <View className="flex-row items-center justify-center gap-2 mb-3">
+          <View className="h-px w-6 bg-brand-500" />
+          <Text className="font-sans-semibold text-[11px] uppercase tracking-[2px] text-brand-500">
+            Customer care
+          </Text>
+        </View>
+
+        <Text className="font-heading text-[30px] leading-9 text-warm-ink text-center mb-3">
+          We&apos;re here to help
         </Text>
+
+        <Text className="font-sans text-sm text-warm-body text-center leading-6">
+          Questions about an order, a return, or when something will arrive — reach us whichever
+          way suits you.
+        </Text>
+
+        {/* The two primary routes, quoted from the same strings the directory
+            below prints. */}
+        <View className="flex-row flex-wrap justify-center gap-2.5 mt-7">
+          <View className="flex-row items-center gap-2 rounded-full border border-warm-lineStrong bg-white px-4 py-2.5">
+            <Phone size={15} color="#e01a1b" />
+            <Text className="font-sans-semibold text-sm text-warm-ink">+1 (555) 123-4567</Text>
+          </View>
+          <View className="flex-row items-center gap-2 rounded-full border border-warm-lineStrong bg-white px-4 py-2.5">
+            <Mail size={15} color="#e01a1b" />
+            <Text className="font-sans-semibold text-sm text-warm-ink">info@heritagetextiles.com</Text>
+          </View>
+        </View>
       </View>
 
       {/* Contact Information */}
       <View className="px-6 py-8">
-        <Text className="text-2xl font-bold text-gray-900 mb-5">Contact Information</Text>
+        <Text className="text-2xl font-sans-bold text-warm-ink mb-5">Contact Information</Text>
 
         <View className="gap-4">
           <View className="flex-row items-start">
-            <View className="w-11 h-11 bg-gray-700 rounded-full items-center justify-center mr-3">
-              <Mail size={20} color="#ffffff" />
+            <View className="w-11 h-11 bg-brand-50 rounded-2xl items-center justify-center mr-3 border border-warm-blushLine">
+              <Mail size={20} color="#e01a1b" />
             </View>
             <View className="flex-1">
-              <Text className="text-base font-bold text-gray-900 mb-1">Email Us</Text>
-              <Text className="text-sm text-gray-600">info@heritagetextiles.com</Text>
-              <Text className="text-sm text-gray-600">support@heritagetextiles.com</Text>
+              <Text className="text-base font-sans-bold text-warm-ink mb-1">Email Us</Text>
+              <Text className="font-sans text-sm text-warm-body">info@heritagetextiles.com</Text>
+              <Text className="font-sans text-sm text-warm-body">support@heritagetextiles.com</Text>
             </View>
           </View>
 
           <View className="flex-row items-start">
-            <View className="w-11 h-11 bg-gray-700 rounded-full items-center justify-center mr-3">
-              <Phone size={20} color="#ffffff" />
+            <View className="w-11 h-11 bg-brand-50 rounded-2xl items-center justify-center mr-3 border border-warm-blushLine">
+              <Phone size={20} color="#e01a1b" />
             </View>
             <View className="flex-1">
-              <Text className="text-base font-bold text-gray-900 mb-1">Call Us</Text>
-              <Text className="text-sm text-gray-600">+1 (555) 123-4567</Text>
-              <Text className="text-sm text-gray-600">+1 (555) 987-6543</Text>
+              <Text className="text-base font-sans-bold text-warm-ink mb-1">Call Us</Text>
+              <Text className="font-sans text-sm text-warm-body">+1 (555) 123-4567</Text>
+              <Text className="font-sans text-sm text-warm-body">+1 (555) 987-6543</Text>
             </View>
           </View>
 
           <View className="flex-row items-start">
-            <View className="w-11 h-11 bg-gray-700 rounded-full items-center justify-center mr-3">
-              <MapPin size={20} color="#ffffff" />
+            <View className="w-11 h-11 bg-brand-50 rounded-2xl items-center justify-center mr-3 border border-warm-blushLine">
+              <MapPin size={20} color="#e01a1b" />
             </View>
             <View className="flex-1">
-              <Text className="text-base font-bold text-gray-900 mb-1">Visit Us</Text>
-              <Text className="text-sm text-gray-600">123 Heritage Lane</Text>
-              <Text className="text-sm text-gray-600">Artisan District, AD 12345</Text>
-              <Text className="text-sm text-gray-600">United States</Text>
+              <Text className="text-base font-sans-bold text-warm-ink mb-1">Visit Us</Text>
+              <Text className="font-sans text-sm text-warm-body">123 Heritage Lane</Text>
+              <Text className="font-sans text-sm text-warm-body">Artisan District, AD 12345</Text>
+              <Text className="font-sans text-sm text-warm-body">United States</Text>
             </View>
           </View>
 
           <View className="flex-row items-start">
-            <View className="w-11 h-11 bg-gray-700 rounded-full items-center justify-center mr-3">
-              <Clock size={20} color="#ffffff" />
+            <View className="w-11 h-11 bg-brand-50 rounded-2xl items-center justify-center mr-3 border border-warm-blushLine">
+              <Clock size={20} color="#e01a1b" />
             </View>
             <View className="flex-1">
-              <Text className="text-base font-bold text-gray-900 mb-1">Business Hours</Text>
-              <Text className="text-sm text-gray-600">Monday - Friday: 9:00 AM - 6:00 PM</Text>
-              <Text className="text-sm text-gray-600">Saturday: 10:00 AM - 4:00 PM</Text>
-              <Text className="text-sm text-gray-600">Sunday: Closed</Text>
+              <Text className="text-base font-sans-bold text-warm-ink mb-1">Business Hours</Text>
+              <Text className="font-sans text-sm text-warm-body">Monday - Friday: 9:00 AM - 6:00 PM</Text>
+              <Text className="font-sans text-sm text-warm-body">Saturday: 10:00 AM - 4:00 PM</Text>
+              <Text className="font-sans text-sm text-warm-body">Sunday: Closed</Text>
             </View>
           </View>
         </View>
 
         {/* Additional Info */}
-        <View className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-          <Text className="text-base font-bold text-gray-900 mb-2">For Artisan Partnerships</Text>
-          <Text className="text-sm text-gray-600 mb-2 leading-6">
-            Are you a skilled artisan interested in joining our marketplace? We'd love to learn
+        <View className="mt-6 p-4 bg-warm-ground rounded-xl border border-warm-line">
+          <Text className="text-base font-sans-bold text-warm-ink mb-2">For Artisan Partnerships</Text>
+          <Text className="font-sans text-sm text-warm-body mb-2 leading-6">
+            Are you a skilled artisan interested in joining our marketplace? We&apos;d love to learn
             about your craft and explore partnership opportunities.
           </Text>
-          <Text className="text-sm text-gray-600">
-            Email us at: <Text className="font-bold">partnerships@heritagetextiles.com</Text>
+          <Text className="font-sans text-sm text-warm-body">
+            Email us at: <Text className="font-sans-bold">partnerships@heritagetextiles.com</Text>
           </Text>
         </View>
       </View>
 
       {/* Contact Form */}
-      <View className="px-6 py-8 bg-gray-50">
-        <Text className="text-2xl font-bold text-gray-900 mb-5">Send us a Message</Text>
+      <View className="px-6 py-8 bg-warm-ground">
+        <Text className="text-2xl font-sans-bold text-warm-ink mb-5">Send us a Message</Text>
 
-        <View className="bg-white p-5 rounded-2xl border border-gray-200">
+        <View className="bg-white p-5 rounded-2xl border border-warm-line">
           <View className="mb-4">
-            <Text className="text-sm font-semibold text-gray-700 mb-2">
-              Full Name <Text className="text-red-500">*</Text>
+            <Text className="text-sm font-sans-semibold text-warm-body mb-2">
+              Full Name <Text className="font-sans text-brand-500">*</Text>
             </Text>
             <TextInput
               value={formData.name}
@@ -269,8 +293,8 @@ export default function Contact() {
           </View>
 
           <View className="mb-4">
-            <Text className="text-sm font-semibold text-gray-700 mb-2">
-              Email Address <Text className="text-red-500">*</Text>
+            <Text className="text-sm font-sans-semibold text-warm-body mb-2">
+              Email Address <Text className="font-sans text-brand-500">*</Text>
             </Text>
             <TextInput
               value={formData.email}
@@ -287,8 +311,8 @@ export default function Contact() {
           </View>
 
           <View className="mb-4">
-            <Text className="text-sm font-semibold text-gray-700 mb-2">
-              Subject <Text className="text-red-500">*</Text>
+            <Text className="text-sm font-sans-semibold text-warm-body mb-2">
+              Subject <Text className="font-sans text-brand-500">*</Text>
             </Text>
             <TextInput
               value={formData.subject}
@@ -302,8 +326,8 @@ export default function Contact() {
           </View>
 
           <View className="mb-5">
-            <Text className="text-sm font-semibold text-gray-700 mb-2">
-              Message <Text className="text-red-500">*</Text>
+            <Text className="text-sm font-sans-semibold text-warm-body mb-2">
+              Message <Text className="font-sans text-brand-500">*</Text>
             </Text>
             <TextInput
               value={formData.message}
@@ -324,8 +348,8 @@ export default function Contact() {
               the admin enquiry views and the source report group these exactly
               as they group web submissions. */}
           <View className="mb-5">
-            <Text className="text-sm font-semibold text-gray-700 mb-2">
-              How did you hear about us? <Text className="text-red-500">*</Text>
+            <Text className="text-sm font-sans-semibold text-warm-body mb-2">
+              How did you hear about us? <Text className="font-sans text-brand-500">*</Text>
             </Text>
             <View className="flex-row flex-wrap" style={{ gap: 8 }}>
               {HEAR_ABOUT_US_OPTIONS.map((opt) => {
@@ -348,7 +372,7 @@ export default function Contact() {
                     className={`px-3.5 rounded-xl border ${
                       active
                         ? 'bg-brand-500 border-brand-500'
-                        : 'bg-white border-gray-300'
+                        : 'bg-white border-warm-lineStrong'
                     }`}
                     style={({ pressed }) => [
                       { minHeight: 40, justifyContent: 'center' },
@@ -356,8 +380,8 @@ export default function Contact() {
                     ]}
                   >
                     <Text
-                      className={`text-xs font-semibold ${
-                        active ? 'text-white' : 'text-gray-700'
+                      className={`text-xs font-sans-semibold ${
+                        active ? 'text-white' : 'text-warm-body'
                       }`}
                     >
                       {opt.label}
@@ -395,59 +419,70 @@ export default function Contact() {
             {isSubmitting ? (
               <>
                 <ActivityIndicator size="small" color="#ffffff" />
-                <Text className="text-white font-bold text-base ml-2">Sending...</Text>
+                <Text className="text-white font-sans-bold text-base ml-2">Sending...</Text>
               </>
             ) : (
               <>
                 <Send size={20} color="#ffffff" />
-                <Text className="text-white font-bold text-base ml-2">Send Message</Text>
+                <Text className="text-white font-sans-bold text-base ml-2">Send Message</Text>
               </>
             )}
           </Pressable>
         </View>
       </View>
 
-      {/* Vendor Invitation Section */}
-      <View className="bg-gray-900 px-6 py-10">
-        <View className="items-center">
-          <View className="w-16 h-16 bg-white rounded-full items-center justify-center mb-5">
-            <Store size={30} color="#111827" />
-          </View>
-          <Text className="text-2xl font-bold text-white mb-3 text-center">
-            Become a Vendor Partner
-          </Text>
-          <Text className="text-sm text-gray-300 text-center leading-6 mb-6">
-            Join our marketplace and showcase your products to thousands of customers. We're looking
-            for quality vendors who share our commitment to excellence.
-          </Text>
+      {/* Vendor Invitation Section
+          Was a near-black slab with white copy — the one dark band on an
+          otherwise warm page. The web gives this section a blush gradient
+          (VENDOR_GROUND: #fdf7f5 -> #f7e5e0 -> #fdf8f6, ruled top and bottom),
+          so the invitation reads as part of the page rather than an ad break. */}
+      <LinearGradient
+        colors={['#fdf7f5', '#f7e5e0', '#fdf8f6']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={{ borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#eedad4' }}
+      >
+        <View className="px-6 py-10">
+          <View className="items-center">
+            <View className="w-16 h-16 bg-brand-500 rounded-2xl items-center justify-center mb-5">
+              <Store size={30} color="#ffffff" />
+            </View>
+            <Text className="font-heading text-2xl text-warm-ink mb-3 text-center">
+              Become a Vendor Partner
+            </Text>
+            <Text className="font-sans text-sm text-warm-body text-center leading-6 mb-6">
+              Join our marketplace and showcase your products to thousands of customers. We&apos;re
+              looking for quality vendors who share our commitment to excellence.
+            </Text>
 
-          <View className="w-full mb-6 flex-row gap-3">
-            <View className="flex-1 bg-white/10 p-4 rounded-xl items-center">
-              <Text className="text-2xl font-bold text-white">10K+</Text>
-              <Text className="text-xs text-gray-300 mt-1 text-center">Customers</Text>
+            <View className="w-full mb-6 flex-row gap-3">
+              <View className="flex-1 bg-white/70 border border-warm-blushLine p-4 rounded-xl items-center">
+                <Text className="font-sans-bold text-2xl text-warm-ink">10K+</Text>
+                <Text className="font-sans text-xs text-warm-soft mt-1 text-center">Customers</Text>
+              </View>
+              <View className="flex-1 bg-white/70 border border-warm-blushLine p-4 rounded-xl items-center">
+                <Text className="font-sans-bold text-2xl text-warm-ink">500+</Text>
+                <Text className="font-sans text-xs text-warm-soft mt-1 text-center">Vendors</Text>
+              </View>
+              <View className="flex-1 bg-white/70 border border-warm-blushLine p-4 rounded-xl items-center">
+                <Text className="font-sans-bold text-2xl text-warm-ink">24/7</Text>
+                <Text className="font-sans text-xs text-warm-soft mt-1 text-center">Support</Text>
+              </View>
             </View>
-            <View className="flex-1 bg-white/10 p-4 rounded-xl items-center">
-              <Text className="text-2xl font-bold text-white">500+</Text>
-              <Text className="text-xs text-gray-300 mt-1 text-center">Vendors</Text>
-            </View>
-            <View className="flex-1 bg-white/10 p-4 rounded-xl items-center">
-              <Text className="text-2xl font-bold text-white">24/7</Text>
-              <Text className="text-xs text-gray-300 mt-1 text-center">Support</Text>
-            </View>
-          </View>
 
-          <Pressable
-            onPress={() => setShowVendorModal(true)}
-            accessibilityLabel="Open vendor application form"
-            accessibilityRole="button"
-            android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
-            className="bg-white px-8 py-4 rounded-xl flex-row items-center"
-          >
-            <Store size={20} color="#111827" />
-            <Text className="text-gray-900 font-bold text-base ml-2">Join Us as a Vendor</Text>
-          </Pressable>
+            <Pressable
+              onPress={() => setShowVendorModal(true)}
+              accessibilityLabel="Open vendor application form"
+              accessibilityRole="button"
+              android_ripple={{ color: 'rgba(255,255,255,0.18)' }}
+              className="bg-brand-500 px-8 py-4 rounded-xl flex-row items-center overflow-hidden"
+            >
+              <Store size={20} color="#ffffff" />
+              <Text className="text-white font-sans-bold text-base ml-2">Join Us as a Vendor</Text>
+            </Pressable>
+          </View>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Vendor Application Modal */}
       <Modal
@@ -462,14 +497,14 @@ export default function Contact() {
         >
           <View className="bg-white rounded-2xl max-h-[90%] overflow-hidden">
             {/* Modal Header */}
-            <View className="flex-row items-center justify-between p-5 border-b border-gray-200 bg-gray-50">
+            <View className="flex-row items-center justify-between p-5 border-b border-warm-line bg-warm-ground">
               <View className="flex-row items-center flex-1">
                 <View className="w-10 h-10 bg-brand-500 rounded-full items-center justify-center mr-3">
                   <Store size={20} color="#ffffff" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-lg font-bold text-gray-900">Vendor Application</Text>
-                  <Text className="text-xs text-gray-600">Fill in your details to join</Text>
+                  <Text className="text-lg font-sans-bold text-warm-ink">Vendor Application</Text>
+                  <Text className="font-sans text-xs text-warm-body">Fill in your details to join</Text>
                 </View>
               </View>
               <Pressable
@@ -493,8 +528,8 @@ export default function Contact() {
             >
               <View className="gap-4">
                 <View>
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">
-                    Full Name <Text className="text-red-500">*</Text>
+                  <Text className="text-sm font-sans-semibold text-warm-body mb-2">
+                    Full Name <Text className="font-sans text-brand-500">*</Text>
                   </Text>
                   <TextInput
                     value={vendorFormData.name}
@@ -508,8 +543,8 @@ export default function Contact() {
                 </View>
 
                 <View>
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">
-                    Company Name <Text className="text-red-500">*</Text>
+                  <Text className="text-sm font-sans-semibold text-warm-body mb-2">
+                    Company Name <Text className="font-sans text-brand-500">*</Text>
                   </Text>
                   <TextInput
                     value={vendorFormData.companyName}
@@ -525,8 +560,8 @@ export default function Contact() {
                 </View>
 
                 <View>
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">
-                    GST Number <Text className="text-red-500">*</Text>
+                  <Text className="text-sm font-sans-semibold text-warm-body mb-2">
+                    GST Number <Text className="font-sans text-brand-500">*</Text>
                   </Text>
                   <TextInput
                     value={vendorFormData.gstNumber}
@@ -540,13 +575,13 @@ export default function Contact() {
                     className={`${inputClass} ${gstError ? 'border-red-500' : ''}`}
                   />
                   {gstError ? (
-                    <Text className="text-xs text-red-600 mt-1">{gstError}</Text>
+                    <Text className="font-sans text-xs text-red-600 mt-1">{gstError}</Text>
                   ) : null}
                 </View>
 
                 <View>
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">
-                    Email Address <Text className="text-red-500">*</Text>
+                  <Text className="text-sm font-sans-semibold text-warm-body mb-2">
+                    Email Address <Text className="font-sans text-brand-500">*</Text>
                   </Text>
                   <TextInput
                     value={vendorFormData.email}
@@ -563,8 +598,8 @@ export default function Contact() {
                 </View>
 
                 <View>
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">
-                    Phone Number <Text className="text-red-500">*</Text>
+                  <Text className="text-sm font-sans-semibold text-warm-body mb-2">
+                    Phone Number <Text className="font-sans text-brand-500">*</Text>
                   </Text>
                   <TextInput
                     value={vendorFormData.phone}
@@ -579,8 +614,8 @@ export default function Contact() {
                 </View>
 
                 <View>
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">
-                    Website URL <Text className="text-gray-500 text-xs">(Optional)</Text>
+                  <Text className="text-sm font-sans-semibold text-warm-body mb-2">
+                    Website URL <Text className="font-sans text-warm-muted text-xs">(Optional)</Text>
                   </Text>
                   <TextInput
                     value={vendorFormData.website}
@@ -597,9 +632,9 @@ export default function Contact() {
                   />
                 </View>
 
-                <View className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <Text className="text-xs text-blue-800 leading-5">
-                    <Text className="font-bold">Note:</Text> After submitting your application, our
+                <View className="bg-warm-blush border border-warm-blushLine rounded-xl p-4">
+                  <Text className="font-sans text-xs text-warm-body leading-5">
+                    <Text className="font-sans-bold">Note:</Text> After submitting your application, our
                     team will review your details and contact you within 2-3 business days.
                   </Text>
                 </View>
@@ -612,9 +647,9 @@ export default function Contact() {
                     accessibilityRole="button"
                     android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
                     style={{ opacity: isSubmittingVendor ? 0.5 : 1 }}
-                    className="flex-1 px-6 py-3.5 border border-gray-300 rounded-xl items-center justify-center"
+                    className="flex-1 px-6 py-3.5 border border-warm-lineStrong rounded-xl items-center justify-center"
                   >
-                    <Text className="text-gray-700 font-bold">Cancel</Text>
+                    <Text className="text-warm-body font-sans-bold">Cancel</Text>
                   </Pressable>
                   <Pressable
                     onPress={handleVendorSubmit}
@@ -629,12 +664,12 @@ export default function Contact() {
                     {isSubmittingVendor ? (
                       <>
                         <ActivityIndicator size="small" color="#ffffff" />
-                        <Text className="text-white font-bold ml-2">Submitting...</Text>
+                        <Text className="text-white font-sans-bold ml-2">Submitting...</Text>
                       </>
                     ) : (
                       <>
                         <Send size={18} color="#ffffff" />
-                        <Text className="text-white font-bold ml-2">Submit</Text>
+                        <Text className="text-white font-sans-bold ml-2">Submit</Text>
                       </>
                     )}
                   </Pressable>
