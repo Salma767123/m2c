@@ -11,32 +11,27 @@ import {
 
 export default function Returns() {
   return (
-    <ScrollView className="flex-1 bg-gray-50">
-      <View className="bg-white rounded-2xl shadow-lg m-4 p-6">
-        <View className="items-center mb-8">
-          <View className="w-16 h-16 items-center justify-center mb-4">
-            <RotateCcw size={48} color="#212121" />
-          </View>
-          <Text className="text-3xl font-bold text-gray-900 text-center">
-            Returns & Exchanges
-          </Text>
-          <Text className="text-gray-600 mt-2">Easy returns within 30 days</Text>
+    <ScrollView className="flex-1 bg-warm-ground">
+      <View className="bg-white rounded-2xl border border-warm-line m-4 p-6">
+        <View className="flex-row items-center gap-2 mb-7">
+          <RotateCcw size={18} color="#e01a1b" />
+          <Text className="font-sans text-xs text-warm-muted">Easy returns within 30 days</Text>
         </View>
 
         <View className="space-y-8 gap-8">
           {/* Return Policy */}
           <View>
             <View className="flex-row items-center mb-4">
-              <Clock size={24} color="#212121" />
-              <Text className="text-xl font-bold text-gray-900 ml-3">Return Policy</Text>
+              <Clock size={24} color="#e01a1b" />
+              <Text className="text-xl font-sans-bold text-warm-ink ml-3">Return Policy</Text>
             </View>
-            <Text className="text-gray-700 mb-4 leading-6">
-              We want you to be completely satisfied with your purchase. If you're not happy with
+            <Text className="font-sans text-warm-body mb-4 leading-6">
+              We want you to be completely satisfied with your purchase. If you&apos;re not happy with
               your order, you can return it within 30 days of delivery for a full refund.
             </Text>
-            <View className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-              <Text className="text-blue-800 font-bold mb-1">30-Day Return Window</Text>
-              <Text className="text-blue-700 text-sm">
+            <View className="bg-warm-blush border border-warm-blushLine rounded-xl p-4">
+              <Text className="text-warm-ink font-sans-bold mb-1">30-Day Return Window</Text>
+              <Text className="font-sans text-warm-body text-sm">
                 Returns must be initiated within 30 days of delivery date
               </Text>
             </View>
@@ -46,30 +41,30 @@ export default function Returns() {
           <View>
             <View className="flex-row items-center mb-4">
               <CheckCircle size={24} color="#16a34a" />
-              <Text className="text-xl font-bold text-gray-900 ml-3">Eligible Items</Text>
+              <Text className="text-xl font-sans-bold text-warm-ink ml-3">Eligible Items</Text>
             </View>
             <View className="space-y-2 gap-2">
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">
                   Items in original condition with tags attached
                 </Text>
               </View>
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">Unworn and unwashed clothing</Text>
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">Unworn and unwashed clothing</Text>
               </View>
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">Electronics in original packaging</Text>
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">Electronics in original packaging</Text>
               </View>
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">Books in sellable condition</Text>
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">Books in sellable condition</Text>
               </View>
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">Home goods without damage</Text>
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">Home goods without damage</Text>
               </View>
             </View>
           </View>
@@ -78,28 +73,28 @@ export default function Returns() {
           <View>
             <View className="flex-row items-center mb-4">
               <XCircle size={24} color="#6b7280" />
-              <Text className="text-xl font-bold text-gray-900 ml-3">Non-Returnable Items</Text>
+              <Text className="text-xl font-sans-bold text-warm-ink ml-3">Non-Returnable Items</Text>
             </View>
             <View className="space-y-2 gap-2">
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">Personalized or customized items</Text>
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">Personalized or customized items</Text>
               </View>
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">Perishable goods</Text>
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">Perishable goods</Text>
               </View>
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">Intimate apparel and swimwear</Text>
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">Intimate apparel and swimwear</Text>
               </View>
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">Items damaged by misuse</Text>
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">Items damaged by misuse</Text>
               </View>
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">Digital downloads</Text>
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">Digital downloads</Text>
               </View>
             </View>
           </View>
@@ -107,39 +102,39 @@ export default function Returns() {
           {/* How to Return */}
           <View>
             <View className="flex-row items-center mb-4">
-              <Package size={24} color="#212121" />
-              <Text className="text-xl font-bold text-gray-900 ml-3">How to Return</Text>
+              <Package size={24} color="#e01a1b" />
+              <Text className="text-xl font-sans-bold text-warm-ink ml-3">How to Return</Text>
             </View>
             <View className="space-y-4 gap-4">
               <View className="flex-row items-start">
-                <View className="w-8 h-8 bg-blue-600 rounded-full items-center justify-center mr-3">
-                  <Text className="text-white font-bold text-sm">1</Text>
+                <View className="w-8 h-8 bg-brand-500 rounded-full items-center justify-center mr-3">
+                  <Text className="text-white font-sans-bold text-sm">1</Text>
                 </View>
                 <View className="flex-1">
-                  <Text className="font-bold text-gray-900 mb-1">Start Your Return</Text>
-                  <Text className="text-gray-700 text-sm leading-5">
+                  <Text className="font-sans-bold text-warm-ink mb-1">Start Your Return</Text>
+                  <Text className="font-sans text-warm-body text-sm leading-5">
                     Contact our customer service or use our online return portal
                   </Text>
                 </View>
               </View>
               <View className="flex-row items-start">
-                <View className="w-8 h-8 bg-blue-600 rounded-full items-center justify-center mr-3">
-                  <Text className="text-white font-bold text-sm">2</Text>
+                <View className="w-8 h-8 bg-brand-500 rounded-full items-center justify-center mr-3">
+                  <Text className="text-white font-sans-bold text-sm">2</Text>
                 </View>
                 <View className="flex-1">
-                  <Text className="font-bold text-gray-900 mb-1">Package Your Items</Text>
-                  <Text className="text-gray-700 text-sm leading-5">
+                  <Text className="font-sans-bold text-warm-ink mb-1">Package Your Items</Text>
+                  <Text className="font-sans text-warm-body text-sm leading-5">
                     Include all original packaging, tags, and accessories
                   </Text>
                 </View>
               </View>
               <View className="flex-row items-start">
-                <View className="w-8 h-8 bg-blue-600 rounded-full items-center justify-center mr-3">
-                  <Text className="text-white font-bold text-sm">3</Text>
+                <View className="w-8 h-8 bg-brand-500 rounded-full items-center justify-center mr-3">
+                  <Text className="text-white font-sans-bold text-sm">3</Text>
                 </View>
                 <View className="flex-1">
-                  <Text className="font-bold text-gray-900 mb-1">Ship It Back</Text>
-                  <Text className="text-gray-700 text-sm leading-5">
+                  <Text className="font-sans-bold text-warm-ink mb-1">Ship It Back</Text>
+                  <Text className="font-sans text-warm-body text-sm leading-5">
                     Use the prepaid return label we provide
                   </Text>
                 </View>
@@ -150,25 +145,25 @@ export default function Returns() {
           {/* Refund Information */}
           <View>
             <View className="flex-row items-center mb-4">
-              <AlertCircle size={24} color="#212121" />
-              <Text className="text-xl font-bold text-gray-900 ml-3">Refund Information</Text>
+              <AlertCircle size={24} color="#e01a1b" />
+              <Text className="text-xl font-sans-bold text-warm-ink ml-3">Refund Information</Text>
             </View>
             <View className="space-y-4 gap-4">
-              <View className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                <Text className="font-bold text-gray-900 mb-2">Processing Time</Text>
-                <Text className="text-gray-700 text-sm leading-5">
+              <View className="bg-warm-ground rounded-xl p-4 border border-warm-line">
+                <Text className="font-sans-bold text-warm-ink mb-2">Processing Time</Text>
+                <Text className="font-sans text-warm-body text-sm leading-5">
                   Refunds are processed within 5-7 business days after we receive your return
                 </Text>
               </View>
-              <View className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                <Text className="font-bold text-gray-900 mb-2">Refund Method</Text>
-                <Text className="text-gray-700 text-sm leading-5">
+              <View className="bg-warm-ground rounded-xl p-4 border border-warm-line">
+                <Text className="font-sans-bold text-warm-ink mb-2">Refund Method</Text>
+                <Text className="font-sans text-warm-body text-sm leading-5">
                   Refunds are issued to the original payment method used for purchase
                 </Text>
               </View>
-              <View className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                <Text className="font-bold text-gray-900 mb-2">Return Shipping</Text>
-                <Text className="text-gray-700 text-sm leading-5">
+              <View className="bg-warm-ground rounded-xl p-4 border border-warm-line">
+                <Text className="font-sans-bold text-warm-ink mb-2">Return Shipping</Text>
+                <Text className="font-sans text-warm-body text-sm leading-5">
                   We provide free return shipping labels for all eligible returns
                 </Text>
               </View>
@@ -176,15 +171,15 @@ export default function Returns() {
           </View>
 
           {/* Need Help */}
-          <View className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-            <Text className="text-xl font-bold text-gray-900 mb-4">Need Help?</Text>
-            <Text className="text-gray-700 mb-4 leading-6">
+          <View className="bg-warm-blush border border-warm-blushLine rounded-xl p-6">
+            <Text className="text-xl font-sans-bold text-warm-ink mb-4">Need Help?</Text>
+            <Text className="font-sans text-warm-body mb-4 leading-6">
               Our customer service team is here to help with your return.
             </Text>
             <View className="space-y-2 gap-2">
-              <Text className="text-gray-700">Email: returns@yourstore.com</Text>
-              <Text className="text-gray-700">Phone: (555) 123-4567</Text>
-              <Text className="text-gray-700">Hours: Monday-Friday, 9 AM - 6 PM EST</Text>
+              <Text className="font-sans text-warm-body">Email: returns@yourstore.com</Text>
+              <Text className="font-sans text-warm-body">Phone: (555) 123-4567</Text>
+              <Text className="font-sans text-warm-body">Hours: Monday-Friday, 9 AM - 6 PM EST</Text>
             </View>
           </View>
         </View>

@@ -1,5 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 import { Smartphone } from 'lucide-react-native';
 import { Reveal } from '@/components/WebSite/Shared/Reveal';
@@ -36,9 +38,16 @@ const BRAND = '#e01a1b';
 const INK = '#1a1416';
 const MUTED = '#6f625f';
 
+/* The render is 1024 x 1536 with a transparent margin; the phone's own bounds
+   inside it are 927 x 1448. Laid out at a width that leaves the copy room. */
+const PHONE_W = 236;
+const PHONE_H = Math.round((PHONE_W * 1536) / 1024);
+
 export default function DownloadApp() {
   return (
     <View style={s.section}>
+      <PhoneMockup />
+
       <Reveal distance={16} duration={620}>
         <View style={s.eyebrowRow}>
           <View style={s.eyebrowRule} />
@@ -124,7 +133,169 @@ function PlayMark() {
   );
 }
 
+/**
+ * The phone mockup and its unveiling — the piece this section was missing.
+ *
+ * The phone is one baked image: the web's screenshot warped into the frame's
+ * screen hole, with the frame composited on top. That is done offline rather
+ * than at runtime because the hole, measured out of the frame's alpha channel,
+ * is a general quad (TL+BR != TR+BL) — fitting anything to it is a PERSPECTIVE
+ * warp, and React Native's transform list has no perspective. It also halves
+ * what ships: 0.6 MB instead of the 3 MB the two source files cost.
+ *
+ * The unveiling is the web's, timing for timing: a cloth lifts off the phone
+ * diagonally after a beat, and the screen brightens as its hem clears. Straight
+ * up would be a garage door; a couple of degrees of rotation is a hand taking
+ * one corner.
+ */
+function PhoneMockup() {
+  const [shown, setShown] = useState(false);
+
+  const cloth = useRef(new Animated.Value(0)).current;
+  const dim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!shown) return;
+    Animated.parallel([
+      // transform 980ms cubic-bezier(0.62,0.02,0.3,1) 180ms
+      Animated.timing(cloth, {
+        toValue: 1,
+        duration: 980,
+        delay: 180,
+        easing: Easing.bezier(0.62, 0.02, 0.3, 1),
+        useNativeDriver: true,
+      }),
+      // The screen comes up as the hem clears it: 620ms linear, 560ms in.
+      Animated.timing(dim, {
+        toValue: 0,
+        duration: 620,
+        delay: 560,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [shown, cloth, dim]);
+
+  return (
+    /*
+     * The trigger has to be the phone coming into view, not this mounting.
+     *
+     * It was `onLayout`, which fires as soon as a view is laid out — and in a
+     * ScrollView that happens immediately, off screen. The unveiling therefore
+     * ran while the phone was still far below the fold and was long finished by
+     * the time anyone scrolled to it. The web hit the same thing and its
+     * comment says why: "the observed element has to be the thing being
+     * revealed."
+     *
+     * `threshold` is in px here, not a ratio: 140 keeps it from starting as the
+     * phone clips the bottom edge.
+     */
+    <Reveal
+      distance={0}
+      duration={1}
+      threshold={140}
+      onReveal={() => setShown(true)}
+      style={s.phoneWrap}
+    >
+      <View style={{ width: PHONE_W, height: PHONE_H }}>
+        {/* The disc the phone stands against. The web contains its colour to
+            this rather than washing the whole band. */}
+        <View style={s.disc} />
+
+        {/*
+          One image: the screenshot is warped into the frame's screen hole and
+          the frame composited on top, baked offline.
+
+          It was two — screenshot behind, frame over it — with the tilt applied
+          as a runtime transform. That cannot work. Measuring the hole out of
+          the frame's alpha channel shows it is a general quad (TL+BR != TR+BL),
+          so fitting the screenshot to it is a PERSPECTIVE warp, and React
+          Native's transform list has no perspective. The approximation put the
+          screenshot at the wrong angle and let it spill past the phone body.
+        */}
+        <Image
+          source={require('../../../../assets/images/app/phone-composite.png')}
+          style={s.phoneImg}
+          contentFit="contain"
+        />
+
+        {/* The screen brightening as the hem clears it. */}
+        <Animated.View pointerEvents="none" style={[s.screenDim, { opacity: dim }]} />
+
+        {/* The cloth. Leaves diagonally, then fades as it goes. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            s.cloth,
+            {
+              opacity: cloth.interpolate({
+                inputRange: [0, 0.75, 1],
+                outputRange: [1, 1, 0],
+              }),
+              transform: [
+                {
+                  translateY: cloth.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -PHONE_H * 1.24],
+                  }),
+                },
+                {
+                  rotate: cloth.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '-4deg'],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={['#f7efe7', '#efe2d4', '#e6d6c4']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          {/* Its own downward shadow, so the dark band travels up with the hem
+              and the screen is genuinely uncovered. */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.28)']}
+            style={s.clothHem}
+          />
+        </Animated.View>
+      </View>
+    </Reveal>
+  );
+}
+
 const s = StyleSheet.create({
+  phoneWrap: { alignItems: 'center', marginBottom: 26 },
+  phoneImg: { ...StyleSheet.absoluteFillObject, width: PHONE_W, height: PHONE_H },
+
+  /* "a single soft disc sitting behind the phone — the thing the phone stands
+     against — on a barely-there cream". */
+  disc: {
+    position: 'absolute',
+    alignSelf: 'center',
+    top: '14%',
+    width: PHONE_W * 1.5,
+    height: PHONE_W * 1.5,
+    borderRadius: PHONE_W * 0.75,
+    backgroundColor: '#f7e9e3',
+  },
+  /* Darkens the phone while the cloth is still over it. */
+  screenDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(20,14,16,0.45)',
+    borderRadius: PHONE_W * 0.1,
+  },
+
+  cloth: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: PHONE_W * 0.1,
+    overflow: 'hidden',
+  },
+  clothHem: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 46 },
+
   /* `bg-[#fdf8f5] py-14` — a full-bleed warm band, like the rest of the page's
      sections rather than a floating card. */
   section: {

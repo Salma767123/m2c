@@ -221,17 +221,14 @@ export default function DiscoverSheet({
             </View>
 
             {/* ── Categories ──
-                Was a stack of 96px photo banners, each with a black scrim and
-                the name reversed out in white over it, then a separate white
-                panel of chips below. Two problems: six of those is a very long
-                scroll inside a sheet, and the whole block ran on cool greys
-                (#f9fafb / #e5e7eb / #4b5563) while the storefront around it is
-                warm.
+                Photo banners, as the web has them: the image is the card, the
+                name reversed out over a scrim, and the subcategory chips on a
+                white panel beneath.
 
-                A row instead — the photograph as a thumbnail rather than a
-                backdrop, so the name sits on the sheet's own ground and needs
-                no scrim or text shadow to stay readable, and six categories
-                fit in roughly the space three used to take. */}
+                I had rewritten these as compact rows with the picture reduced
+                to a thumbnail. That fits more categories per screen, but it is
+                not what the web does and it gives the photographs — which are
+                the point of a discovery surface — almost nothing to say. */}
             <Text style={s.sectionLabel}>Categories</Text>
 
             {loading ? (
@@ -239,7 +236,7 @@ export default function DiscoverSheet({
                 <ActivityIndicator size="small" color="#e01a1b" />
               </View>
             ) : (
-              <View style={{ gap: 10 }}>
+              <View style={{ gap: 12 }}>
                 {panels.map((cat) => {
                   const subs = activeSubs(cat);
                   const count = cat.productCount ?? 0;
@@ -249,37 +246,45 @@ export default function DiscoverSheet({
                         onPress={() => go(`/(tabs)/categories/${cat.slug}`)}
                         accessibilityRole="button"
                         accessibilityLabel={`Browse ${cat.name}${count ? `, ${count} products` : ''}`}
-                        android_ripple={{ color: 'rgba(224,26,27,0.06)' }}
-                        style={s.catRow}
+                        android_ripple={{ color: 'rgba(255,255,255,0.12)' }}
+                        style={s.catBanner}
                       >
-                        <View style={s.catThumb}>
-                          {cat.image ? (
-                            <Image
-                              source={{ uri: cat.image }}
-                              style={StyleSheet.absoluteFill}
-                              contentFit="cover"
-                              transition={200}
-                            />
-                          ) : (
-                            <LinearGradient
-                              colors={['#e6cfcf', '#f1ded9']}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 1 }}
-                              style={StyleSheet.absoluteFill}
-                            />
-                          )}
-                        </View>
+                        {cat.image ? (
+                          <Image
+                            source={{ uri: cat.image }}
+                            style={StyleSheet.absoluteFill}
+                            contentFit="cover"
+                            transition={200}
+                          />
+                        ) : (
+                          <LinearGradient
+                            colors={['#e6cfcf', '#f1ded9']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={StyleSheet.absoluteFill}
+                          />
+                        )}
 
-                        <View style={{ flex: 1, minWidth: 0 }}>
-                          <Text style={s.catName} numberOfLines={1}>
-                            {cat.name}
-                          </Text>
-                          {count > 0 ? (
-                            <Text style={s.catCount}>{count} products</Text>
-                          ) : null}
-                        </View>
+                        {/* `from-black/70 to-transparent`, bottom-up. */}
+                        <LinearGradient
+                          colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0)']}
+                          start={{ x: 0.5, y: 1 }}
+                          end={{ x: 0.5, y: 0 }}
+                          style={StyleSheet.absoluteFill}
+                          pointerEvents="none"
+                        />
 
-                        <ArrowUpRight size={17} color="#c9bcae" strokeWidth={2.2} />
+                        <View style={s.catRow}>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={s.catName} numberOfLines={1}>
+                              {cat.name}
+                            </Text>
+                            {count > 0 ? (
+                              <Text style={s.catCount}>{count} products</Text>
+                            ) : null}
+                          </View>
+                          <ArrowUpRight size={20} color="#ffffff" strokeWidth={2} />
+                        </View>
                       </Pressable>
 
                       {subs.length > 0 ? (
@@ -424,35 +429,31 @@ const s = StyleSheet.create({
   catCard: {
     borderRadius: 16,
     borderWidth: 1,
-    // Warm hairline, matching the rest of the storefront. Was #f3f4f6.
     borderColor: '#efe4d8',
     backgroundColor: '#ffffff',
     overflow: 'hidden',
   },
-  catRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10 },
-  /* The photograph as a thumbnail rather than a backdrop — so the name sits on
-     the card's own ground and needs neither a scrim nor a text shadow. */
-  catThumb: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#f6efe8',
-  },
+  /* `h-24` — the image IS the card. */
+  catBanner: { height: 96, justifyContent: 'flex-end' },
+  catRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 12 },
   catName: {
     fontFamily: Fonts.sansSemibold,
-    fontSize: 14.5,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: '#ffffff',
+    // The scrim carries most of it; the shadow covers a pale photograph.
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  catCount: { fontFamily: Fonts.sans, fontSize: 11.5, color: '#8b8079', marginTop: 1 },
+  catCount: { fontFamily: Fonts.sans, fontSize: 11, color: 'rgba(255,255,255,0.75)' },
 
   subWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 7,
-    paddingHorizontal: 10,
-    paddingBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
   subChip: {
     borderRadius: 999,
@@ -465,8 +466,6 @@ const s = StyleSheet.create({
   },
   subText: { fontFamily: Fonts.sans, fontSize: 12.5, color: '#5f5550' },
 
-  /* A brand-tinted pill rather than a dashed grey box — this is the way on to
-     the full list, not a placeholder. */
   viewAll: {
     flexDirection: 'row',
     alignItems: 'center',

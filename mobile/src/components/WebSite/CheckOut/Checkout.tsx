@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getCurrency, getRegionalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
+import { getCurrency, getRegion, getRegionalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
 import {
   View,
   Text,
@@ -347,15 +347,30 @@ export default function Checkout() {
       return sum + price * item.quantity;
     }, 0);
     const shipping = 0;
-    const tax = cartItems.reduce((sum, item) => {
-      const hasVariant = !!(item as any).variant;
-      const price = hasVariant
-        ? getRegionalPrice((item as any).variant as any)
-        : getRegionalPrice((item.product || { basePrice: item.price }) as any);
-      const itemSubtotal = price * item.quantity;
-      const gstRate = item.product?.gstPercentage ? item.product.gstPercentage / 100 : 0;
-      return sum + itemSubtotal * gstRate;
-    }, 0);
+
+    /*
+     * GST, on the amount actually being charged — the same three corrections
+     * the cart needed: the coupon comes off BEFORE tax (each line taking its
+     * pro-rata share), tax is an `.in` concern and zero elsewhere, and every
+     * line rounds to 2dp before summing, mirroring the server's `round2`.
+     * Without these, the figure shown here disagreed with what was billed.
+     */
+    const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+    const tax =
+      getRegion() !== 'IN'
+        ? 0
+        : cartItems.reduce((sum, item) => {
+            const hasVariant = !!(item as any).variant;
+            const price = hasVariant
+              ? getRegionalPrice((item as any).variant as any)
+              : getRegionalPrice((item.product || { basePrice: item.price }) as any);
+            const gross = r2(price * item.quantity);
+            const couponShare = subtotal > 0 ? (gross / subtotal) * discountAmount : 0;
+            const net = Math.max(0, gross - couponShare);
+            const gstRate = item.product?.gstPercentage ? item.product.gstPercentage / 100 : 0;
+            return sum + r2(net * gstRate);
+          }, 0);
+
     const total = Math.max(0, subtotal + shipping + tax - discountAmount + bagCost);
 
     setOrderSummary({
@@ -1592,16 +1607,20 @@ export default function Checkout() {
                 </View>
               </View>
 
-              {/* GST */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 15, color: '#6b625b', fontWeight: '600' }}>Tax (GST)</Text>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1a1a1a', fontFamily: Fonts.sansSemibold }}>
-                  {fmtCurrency(orderSummary.tax)}
-                </Text>
-              </View>
+              {/* GST — `.in` only, matching the calculation above and the web,
+                  which shows the taxable amount and tax on that storefront
+                  alone. These rows used to print "Tax (GST) $0.00" on .com. */}
+              {getRegion() === 'IN' ? (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 15, color: '#6b625b', fontWeight: '600' }}>Tax (GST)</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: '#1a1a1a', fontFamily: Fonts.sansSemibold }}>
+                    {fmtCurrency(orderSummary.tax)}
+                  </Text>
+                </View>
+              ) : null}
 
               {/* GST per-product breakdown */}
-              {cartItems.some((item) => item.product?.gstPercentage) && (
+              {getRegion() === 'IN' && cartItems.some((item) => item.product?.gstPercentage) && (
                 <View style={{ backgroundColor: '#f9fafb', borderRadius: 12, padding: 12, gap: 4 }}>
                   {cartItems.map((item) => {
                     if (!item.product?.gstPercentage) return null;
@@ -1609,8 +1628,15 @@ export default function Checkout() {
                     const itemPrice = hasVariant
                       ? getRegionalPrice((item as any).variant as any)
                       : getRegionalPrice((item.product || { basePrice: item.price }) as any);
-                    const itemSubtotal = itemPrice * item.quantity;
-                    const itemTax = itemSubtotal * (item.product.gstPercentage / 100);
+                    // Net of this line's share of the coupon, so these rows sum
+                    // to the Tax (GST) figure rather than overshooting it.
+                    const gross = itemPrice * item.quantity;
+                    const share =
+                      orderSummary.subtotal > 0
+                        ? (gross / orderSummary.subtotal) * orderSummary.discount
+                        : 0;
+                    const itemTax =
+                      Math.max(0, gross - share) * (item.product.gstPercentage / 100);
                     return (
                       <View
                         key={item.id}

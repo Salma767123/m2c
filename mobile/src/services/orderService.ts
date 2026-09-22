@@ -20,6 +20,12 @@ export interface OrderItem {
   size?: string;
   color?: string;
   colorHex?: string;
+  /**
+   * Whether this line may be returned. The admin can mark a line ineligible,
+   * and the web hides Return when no line on the order is eligible; mobile's
+   * type did not carry the field, so it could not make that check.
+   */
+  returnable?: boolean;
   /** Shipping mode chosen for this line. */
   transportType?: 'AIR' | 'SHIP' | null;
   /** Courier partner id (resolve via lib/couriers). */

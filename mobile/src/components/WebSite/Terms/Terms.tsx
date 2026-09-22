@@ -11,24 +11,23 @@ import {
 
 export default function Terms() {
   return (
-    <ScrollView className="flex-1 bg-gray-50">
-      <View className="bg-white rounded-2xl shadow-lg m-4 p-6">
-        <View className="items-center mb-8">
-          <View className="w-16 h-16 items-center justify-center mb-4">
-            <Scale size={48} color="#212121" />
-          </View>
-          <Text className="text-3xl font-bold text-gray-900 text-center">Terms of Service</Text>
-          <Text className="text-gray-600 mt-2">Last updated: December 2024</Text>
+    <ScrollView className="flex-1 bg-warm-ground">
+      <View className="bg-white rounded-2xl border border-warm-line m-4 p-6">
+        {/* The screen header already carries the title — this used to print it
+            again. What is worth keeping is when it last changed. */}
+        <View className="flex-row items-center gap-2 mb-7">
+          <Scale size={18} color="#e01a1b" />
+          <Text className="font-sans text-xs text-warm-muted">Last updated: December 2024</Text>
         </View>
 
         <View className="space-y-8 gap-8">
           {/* Acceptance of Terms */}
           <View>
             <View className="flex-row items-center mb-4">
-              <FileText size={24} color="#212121" />
-              <Text className="text-xl font-bold text-gray-900 ml-3">Acceptance of Terms</Text>
+              <FileText size={24} color="#e01a1b" />
+              <Text className="text-xl font-sans-bold text-warm-ink ml-3">Acceptance of Terms</Text>
             </View>
-            <Text className="text-gray-700 leading-6">
+            <Text className="font-sans text-warm-body leading-6">
               By accessing and using this website, you accept and agree to be bound by the terms
               and provision of this agreement. If you do not agree to abide by the above, please do
               not use this service.
@@ -38,29 +37,29 @@ export default function Terms() {
           {/* Payment Terms */}
           <View>
             <View className="flex-row items-center mb-4">
-              <CreditCard size={24} color="#212121" />
-              <Text className="text-xl font-bold text-gray-900 ml-3">Payment Terms</Text>
+              <CreditCard size={24} color="#e01a1b" />
+              <Text className="text-xl font-sans-bold text-warm-ink ml-3">Payment Terms</Text>
             </View>
             <View className="space-y-2 gap-2">
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">
                   All prices are listed in USD and are subject to change without notice
                 </Text>
               </View>
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">Payment is due at the time of purchase</Text>
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">Payment is due at the time of purchase</Text>
               </View>
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">
                   We accept major credit cards and PayPal
                 </Text>
               </View>
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">
                   All transactions are processed securely
                 </Text>
               </View>
@@ -70,31 +69,31 @@ export default function Terms() {
           {/* Shipping and Delivery */}
           <View>
             <View className="flex-row items-center mb-4">
-              <Truck size={24} color="#212121" />
-              <Text className="text-xl font-bold text-gray-900 ml-3">Shipping and Delivery</Text>
+              <Truck size={24} color="#e01a1b" />
+              <Text className="text-xl font-sans-bold text-warm-ink ml-3">Shipping and Delivery</Text>
             </View>
             <View className="space-y-2 gap-2">
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">
                   We ship to addresses within the United States
                 </Text>
               </View>
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">
                   Delivery times vary by location and shipping method selected
                 </Text>
               </View>
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">
                   Risk of loss passes to you upon delivery to the carrier
                 </Text>
               </View>
               <View className="flex-row items-start">
-                <Text className="text-gray-700 mr-2">•</Text>
-                <Text className="text-gray-700 flex-1">
+                <Text className="font-sans text-warm-body mr-2">•</Text>
+                <Text className="font-sans text-warm-body flex-1">
                   We are not responsible for delays caused by shipping carriers
                 </Text>
               </View>
@@ -104,10 +103,10 @@ export default function Terms() {
           {/* Returns and Refunds */}
           <View>
             <View className="flex-row items-center mb-4">
-              <RefreshCw size={24} color="#212121" />
-              <Text className="text-xl font-bold text-gray-900 ml-3">Returns and Refunds</Text>
+              <RefreshCw size={24} color="#e01a1b" />
+              <Text className="text-xl font-sans-bold text-warm-ink ml-3">Returns and Refunds</Text>
             </View>
-            <Text className="text-gray-700 leading-6">
+            <Text className="font-sans text-warm-body leading-6">
               Please refer to our Returns Policy for detailed information about returns, exchanges,
               and refunds.
             </Text>
@@ -116,12 +115,12 @@ export default function Terms() {
           {/* Limitation of Liability */}
           <View>
             <View className="flex-row items-center mb-4">
-              <AlertTriangle size={24} color="#212121" />
-              <Text className="text-xl font-bold text-gray-900 ml-3">
+              <AlertTriangle size={24} color="#e01a1b" />
+              <Text className="text-xl font-sans-bold text-warm-ink ml-3">
                 Limitation of Liability
               </Text>
             </View>
-            <Text className="text-gray-700 leading-6">
+            <Text className="font-sans text-warm-body leading-6">
               In no event shall our company be liable for any direct, indirect, punitive,
               incidental, special, consequential damages or any damages whatsoever including,
               without limitation, damages for loss of use, data or profits, arising out of or in
@@ -132,10 +131,10 @@ export default function Terms() {
           {/* Governing Law */}
           <View>
             <View className="flex-row items-center mb-4">
-              <Scale size={24} color="#212121" />
-              <Text className="text-xl font-bold text-gray-900 ml-3">Governing Law</Text>
+              <Scale size={24} color="#e01a1b" />
+              <Text className="text-xl font-sans-bold text-warm-ink ml-3">Governing Law</Text>
             </View>
-            <Text className="text-gray-700 leading-6">
+            <Text className="font-sans text-warm-body leading-6">
               These terms and conditions are governed by and construed in accordance with the laws
               of the United States and you irrevocably submit to the exclusive jurisdiction of the
               courts in that State or location.

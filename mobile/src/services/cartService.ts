@@ -10,6 +10,10 @@ export interface CartItem {
   price: number;
   transportType?: 'AIR' | 'SHIP' | null;
   courier?: string | null;
+  /** A line the offer put there, not the customer — fixed quantity, not removable. */
+  isFreeGift?: boolean;
+  /** Which offer granted it, so the chooser can be reopened to change it. */
+  giftOfferId?: string | null;
 
   product?: {
     id: string;
@@ -37,12 +41,33 @@ export interface CartItem {
   };
 }
 
+/**
+ * A free gift the customer still has to choose, for a "buy A get B free" offer
+ * whose free set has more than one option.
+ */
+export interface PendingGift {
+  offerId: string;
+  offerTitle: string;
+  getQty: number;
+  freeScope?: 'PRODUCT' | 'CATEGORY' | null;
+  options: {
+    productId: string;
+    name: string;
+    image: string | null;
+    variants: { id: string; size?: string; color?: string; colorHex?: string; stock: number }[];
+  }[];
+}
+
 export interface CartResponse {
   success: boolean;
   data?: {
     items: CartItem[];
     total: number;
     itemCount: number;
+    /** Free gifts awaiting the customer's choice (drives the chooser). */
+    pendingGifts?: PendingGift[];
+    /** Chooser data for every choosable gift offer, chosen or not — powers "Change gift". */
+    giftOptions?: PendingGift[];
   };
   message?: string;
   error?: string;
@@ -82,6 +107,20 @@ class CartService {
       return response.data;
     } catch (error: any) {
       throw extractError(error, 'Failed to add item to cart');
+    }
+  }
+
+  /** Choose a free gift (for a "buy A get B free" offer whose free set has options). */
+  async addFreeGift(offerId: string, productId: string, variantId?: string): Promise<CartResponse> {
+    try {
+      const response = await axios.post(
+        '/cart/gift',
+        { offerId, productId, variantId },
+        { params: { region: getRegion() } },
+      );
+      return response.data;
+    } catch (error: any) {
+      throw extractError(error, 'Failed to add free gift');
     }
   }
 

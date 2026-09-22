@@ -43,6 +43,7 @@ import {
 } from '@/components/WebSite/CheckOut/CheckoutProcess/constants';
 import { Palette, Fonts } from '@/constants/theme';
 import OrderActionModal, { type OrderAction } from '@/components/WebSite/Order/OrderActionModal';
+import ReturnRequestModal from '@/components/WebSite/Order/ReturnRequestModal';
 import { formatPrice } from '@/lib/currency';
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
@@ -114,6 +115,11 @@ export default function OrderDetailsScreen() {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [hasReviewed, setHasReviewed] = useState(false);
   const [actionModal, setActionModal] = useState<OrderAction | null>(null);
+  /* The stepped return flow. OrderActionModal still handles CANCEL — it asks
+     one question and that is all a cancel needs. A return needs the item, the
+     evidence and the refund/replacement choice, which is what the web's
+     ReturnRequestModal collects and this now does too. */
+  const [returnOpen, setReturnOpen] = useState(false);
   const [actionSubmitting, setActionSubmitting] = useState(false);
 
   // Cancel / return. Refetches on success rather than patching local state, so
@@ -123,13 +129,11 @@ export default function OrderDetailsScreen() {
     if (!actionModal || !id) return;
     try {
       setActionSubmitting(true);
-      if (actionModal === 'cancel') {
-        const res = await orderService.cancelOrder(id, reason || undefined);
-        showSuccessToast('Order Cancelled', res.message || 'Your refund has been initiated.');
-      } else {
-        const res = await orderService.requestReturn(id, reason);
-        showSuccessToast('Return Requested', res.message || 'We will review it shortly.');
-      }
+      /* Cancel only. Returns go through ReturnRequestModal and POST /returns;
+         the branch that used to sit here called the older /orders/:id/return
+         and is no longer reachable from this screen. */
+      const res = await orderService.cancelOrder(id, reason || undefined);
+      showSuccessToast('Order Cancelled', res.message || 'Your refund has been initiated.');
       setActionModal(null);
       await fetchOrder();
     } catch (e: any) {
@@ -304,7 +308,7 @@ export default function OrderDetailsScreen() {
 
               {canReturn ? (
                 <Pressable
-                  onPress={() => setActionModal('return')}
+                  onPress={() => setReturnOpen(true)}
                   accessibilityRole="button"
                   accessibilityLabel="Request a return"
                   style={({ pressed }) => [a.actionBtn, a.actionNeutral, pressed && a.actionPressed]}
@@ -659,6 +663,16 @@ export default function OrderDetailsScreen() {
       ) : null}
 
       {/* Cancel / return */}
+      <ReturnRequestModal
+        open={returnOpen}
+        order={order}
+        onClose={() => setReturnOpen(false)}
+        onSubmitted={() => {
+          setReturnOpen(false);
+          fetchOrder();
+        }}
+      />
+
       <OrderActionModal
         action={actionModal}
         submitting={actionSubmitting}

@@ -168,6 +168,15 @@ export type RevealProps = {
   style?: any;
   /** How far into the viewport the element must come before it starts. */
   threshold?: number;
+  /**
+   * Fired once, when this element qualifies as on screen.
+   *
+   * For a component that runs its own animation but wants THIS trigger —
+   * measuring against the scroll content rather than firing on mount, which is
+   * what `onLayout` would do and would mean the animation is over before it is
+   * reached.
+   */
+  onReveal?: () => void;
 };
 
 /**
@@ -186,6 +195,7 @@ export function Reveal({
   easing = EASE_TILE,
   style,
   threshold = 60,
+  onReveal,
 }: RevealProps) {
   const { scrollY, viewportH, reduceMotion, present, contentRef } =
     useContext(RevealContext);
@@ -224,6 +234,7 @@ export function Reveal({
     if (!present || reduceMotion) {
       started.current = true;
       progress.setValue(1);
+      onReveal?.();
       return;
     }
 
@@ -231,6 +242,7 @@ export function Reveal({
     if (top > scrollY + viewportH - threshold) return;
 
     started.current = true;
+    onReveal?.();
     Animated.timing(progress, {
       toValue: 1,
       duration,
@@ -238,7 +250,7 @@ export function Reveal({
       easing,
       useNativeDriver: true,
     }).start();
-  }, [top, scrollY, viewportH, present, reduceMotion, duration, delay, easing, threshold, progress]);
+  }, [top, scrollY, viewportH, present, reduceMotion, duration, delay, easing, threshold, progress, onReveal]);
 
   const transform: any[] = [
     {

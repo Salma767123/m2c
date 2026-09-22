@@ -9,16 +9,17 @@ import {
   StyleSheet,
   Share,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import {
   Heart,
   ShoppingCart,
   Trash2,
-  ArrowRight,
   Package,
   AlertCircle,
   Share2,
+  ArrowLeft,
 } from 'lucide-react-native';
 import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
 import { router } from 'expo-router';
@@ -250,14 +251,60 @@ export default function Wishlist() {
     return (
       <View style={{ flex: 1, backgroundColor: WISHLIST_GROUND }}>
         <WishlistHeader count={0} itemCount={itemCount} />
-        <EmptyState
-          icon={Heart}
-          title="Your Wishlist is Empty"
-          subtitle="Save items you love to your wishlist and never lose track of them."
-          ctaLabel="Start Shopping"
-          ctaIcon={ArrowRight}
-          onPress={() => router.push('/(tabs)')}
-        />
+        {/*
+          The wishlist keeps its own empty state rather than the shared panel.
+          Everywhere else in the app the shared one is right — but this screen
+          is the one place the empty state IS the page, and the web gives it a
+          designed card: a blush wash, two heart watermarks bleeding off the
+          corners, and a heart pulsing inside concentric rings.
+        */}
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+          <LinearGradient
+            colors={['#fff8f4', '#fdf6f0', '#ffffff']}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.8, y: 1 }}
+            style={ws.emptyCard}
+          >
+            {/* `-right-8 -top-10 h-36 w-36 fill-current text-[#e01a1b]/[0.05]` */}
+            <Heart
+              size={144}
+              color="transparent"
+              fill="rgba(224,26,27,0.05)"
+              style={ws.watermarkTop}
+            />
+            <Heart
+              size={112}
+              color="transparent"
+              fill="rgba(224,26,27,0.04)"
+              style={ws.watermarkBottom}
+            />
+
+            <View style={ws.emptyDiscWrap}>
+              <View style={ws.emptyRing} />
+              <View style={ws.emptyDisc}>
+                <Heart size={32} color="#e01a1b" strokeWidth={1.75} />
+              </View>
+            </View>
+
+            <Text style={ws.emptyTitle}>Nothing saved yet</Text>
+            <Text style={ws.emptyBody}>
+              Tap the heart on anything you like and it will wait for you here — price and all.
+            </Text>
+
+            <Pressable
+              onPress={() => router.push('/(tabs)')}
+              accessibilityRole="button"
+              accessibilityLabel="Start Shopping"
+              android_ripple={{ color: 'rgba(255,255,255,0.18)' }}
+              style={ws.emptyCta}
+            >
+              <ArrowLeft size={16} color="#ffffff" strokeWidth={2.4} />
+              <Text style={ws.emptyCtaText}>Start Shopping</Text>
+            </Pressable>
+          </LinearGradient>
+
+          <WishlistTips />
+        </ScrollView>
       </View>
     );
   }
@@ -545,17 +592,18 @@ const TIPS = [
 
 function WishlistTips() {
   return (
-    <View style={ws.tipsCard}>
-      <Text style={ws.tipsTitle}>Wishlist Tips</Text>
-      {TIPS.map(({ Icon, title, body }) => (
-        <View key={title} style={ws.tipRow}>
-          <View style={ws.tipIcon}>
-            <Icon size={15} color={Palette.text} strokeWidth={2} />
+    <View style={{ gap: 12, marginTop: 16 }}>
+      {TIPS.map(({ Icon, title, body }, i) => (
+        <View key={title} style={ws.tipCard}>
+          {/* The numeral the web sets behind each card, barely there. */}
+          <Text style={ws.tipNumber}>{String(i + 1).padStart(2, '0')}</Text>
+
+          <View style={ws.tipMedallion}>
+            <Icon size={20} color="#e01a1b" strokeWidth={2} />
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={ws.tipTitle}>{title}</Text>
-            <Text style={ws.tipBody}>{body}</Text>
-          </View>
+
+          <Text style={ws.tipTitle}>{title}</Text>
+          <Text style={ws.tipBody}>{body}</Text>
         </View>
       ))}
     </View>
@@ -625,6 +673,114 @@ function WishlistHeader({
 }
 
 const ws = StyleSheet.create({
+  emptyCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#f2e4da',
+    paddingHorizontal: 28,
+    paddingVertical: 44,
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  watermarkTop: { position: 'absolute', right: -32, top: -40 },
+  watermarkBottom: { position: 'absolute', left: -32, bottom: -32 },
+
+  emptyDiscWrap: {
+    width: 96,
+    height: 96,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  emptyRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 48,
+    backgroundColor: 'rgba(224,26,27,0.1)',
+  },
+  emptyDisc: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#e01a1b',
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
+    // Android paints elevation only.
+    elevation: 6,
+  },
+  emptyTitle: {
+    fontFamily: Fonts.heading,
+    fontSize: 24,
+    // Poppins_600SemiBold is the loaded file.
+    fontWeight: '600',
+    letterSpacing: -0.6,
+    color: '#1a1a1a',
+    textAlign: 'center',
+  },
+  emptyBody: {
+    fontFamily: Fonts.sans,
+    fontSize: 13.5,
+    lineHeight: 20,
+    color: '#6b625b',
+    textAlign: 'center',
+    marginTop: 12,
+    maxWidth: 300,
+  },
+  emptyCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#e01a1b',
+    borderRadius: 999,
+    paddingHorizontal: 24,
+    paddingVertical: 13,
+    marginTop: 28,
+    overflow: 'hidden',
+    shadowColor: '#e01a1b',
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
+  },
+  emptyCtaText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 14.5,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+
+  tipCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#f1ece6',
+    padding: 20,
+    overflow: 'hidden',
+  },
+  tipNumber: {
+    position: 'absolute',
+    right: 16,
+    top: 6,
+    fontFamily: Fonts.heading,
+    fontSize: 44,
+    fontWeight: '600',
+    color: 'rgba(224,26,27,0.07)',
+  },
+  /* `h-12 w-12 rounded-2xl bg-[#fdeeee] ring-1 ring-[#f7dcdc]` */
+  tipMedallion: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#fdeeee',
+    borderWidth: 1,
+    borderColor: '#f7dcdc',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   headerBtn: {
     width: 40,
     height: 40,
@@ -732,26 +888,21 @@ const ws = StyleSheet.create({
   topActionPrimaryText: { fontFamily: Fonts.sansBold, fontSize: 12.5, fontWeight: '700', color: Palette.onPrimary },
 
   // ── Tips ──
-  tipsCard: {
-    marginTop: 14,
-    backgroundColor: Palette.surface,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Palette.outline,
-    padding: 16,
+  tipTitle: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 15,
+    // Outfit is static: the weight must name the loaded file (Outfit_700Bold).
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginTop: 16,
   },
-  tipsTitle: { fontFamily: Fonts.sansBold, fontSize: 15, fontWeight: '800', color: Palette.ink, marginBottom: 12 },
-  tipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
-  tipIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: Radius.full,
-    backgroundColor: Palette.outlineSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
+  tipBody: {
+    fontFamily: Fonts.sans,
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#6b625b',
+    marginTop: 6,
   },
-  tipTitle: { fontFamily: Fonts.sansBold, fontSize: 12.5, fontWeight: '700', color: Palette.ink },
-  tipBody: { fontFamily: Fonts.sans, fontSize: 11.5, lineHeight: 16, color: '#6b625b', marginTop: 1 },
 
   // Syncing indicator
   syncingRow: {

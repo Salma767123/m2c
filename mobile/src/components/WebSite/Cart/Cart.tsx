@@ -35,15 +35,17 @@ import {
   Star,
   Shield,
   LogIn,
+  Gift,
+  BadgePercent,
 } from 'lucide-react-native';
 import { useConfirm } from '@/components/WebSite/Shared/ConfirmDialog';
 import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { cartService } from '@/services/cartService';
+import { type PendingGift, cartService } from '@/services/cartService';
 import { courierService } from '@/services/courierService';
 import { couponService } from '@/services/couponService';
-import { publicProductService } from '@/services/publicProductService';
+import { type PublicProduct, publicProductService } from '@/services/publicProductService';
 import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,6 +55,11 @@ import { CartSkeleton } from '@/components/ui/Skeleton';
 import BagSelector from './BagSelector';
 import type { BagType } from '@/services/bagTypeService';
 import EmptyState from '@/components/WebSite/Shared/EmptyState';
+import GiftChooserModal from '@/components/WebSite/Cart/GiftChooserModal';
+import PaymentMark, { PAYMENT_MARKS } from '@/components/WebSite/Cart/PaymentMark';
+import ProductCard from '@/components/WebSite/ProductCard/ProductCard';
+import { PRODUCT_CARD_WIDTH, CARD_GAP } from '@/components/WebSite/ProductCard/metrics';
+import OfferCelebration from '@/components/WebSite/Shared/OfferCelebration';
 import { Palette, Radius, Fonts } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -84,6 +91,9 @@ const courierName = (id?: string | null) => (id ? (courierNameFn?.(id) ?? id) : 
 // Brand color — matches DESIGN.md primary (#E01A1B), used the same way web uses
 // `text-[#E01A1B]` / `bg-[#E01A1B]` throughout the cart page.
 const BRAND = '#E01A1B';
+/** The web's savings green — #157f4a, not Tailwind's green-600. */
+const GREEN = '#157f4a';
+
 const BRAND_DARK = '#E01A1B';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -110,6 +120,8 @@ interface CartItem {
   /** Chosen shipping mode + courier for this line (web parity). */
   transportType?: 'AIR' | 'SHIP' | null;
   courier?: string | null;
+  isFreeGift?: boolean;
+  giftOfferId?: string | null;
   variantDetails?: { size: string; color: string; colorHex?: string; sku?: string };
   product?: any;
 }
@@ -152,6 +164,24 @@ export default function Cart() {
   const [freeShippingApplied, setFreeShippingApplied] = useState(false);
   const [freeShippingMessage, setFreeShippingMessage] = useState('');
   const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [similarProducts, setSimilarProducts] = useState<PublicProduct[]>([]);
+
+  /* Free gifts awaiting the customer's choice, the chooser data for changing a
+     chosen gift, and the descriptor currently open in the chooser. The server
+     already returned all of this on /cart; mobile was discarding it. */
+  const [pendingGifts, setPendingGifts] = useState<PendingGift[]>([]);
+  const [giftOptions, setGiftOptions] = useState<PendingGift[]>([]);
+  const [giftChooser, setGiftChooser] = useState<PendingGift | null>(null);
+  const [giftInitialProduct, setGiftInitialProduct] = useState<string | undefined>(undefined);
+  const [addingGift, setAddingGift] = useState(false);
+  const [offerCelebration, setOfferCelebration] = useState<{
+    kind: 'bogo' | 'savings';
+    freeUnits?: number;
+    dealLabel?: string;
+    amount?: number;
+    offerTitle?: string;
+    offerDescription?: string;
+  } | null>(null);
 
   const [availablePromos, setAvailablePromos] = useState<
     { message: string; code?: string }[]
@@ -256,6 +286,96 @@ export default function Cart() {
     } catch { /* no offer available — expected */ }
   }, []);
 
+  /** Claim a chosen free gift, then refresh so the gift line appears. */
+  const chooseGift = async (offerId: string, productId: string, variantId?: string) => {
+    setAddingGift(true);
+    try {
+      const res = await cartService.addFreeGift(offerId, productId, variantId);
+      if (res.success) {
+        setGiftChooser(null);
+        await fetchCart();
+        showSuccessToast('Free gift added', 'Enjoy your free item!');
+      } else {
+        showErrorToast('Could not add gift', res.error || res.message || 'Please try again');
+      }
+    } catch (e: any) {
+      showErrorToast('Could not add gift', e?.message || 'Please try again');
+    } finally {
+      setAddingGift(false);
+    }
+  };
+
+  /*
+   * Products similar to what is already in the cart, drawn from those items'
+   * categories. Keyed by product+category so it does not refetch when only a
+   * quantity changes, and topped up from recent products whenever the category
+   * pool does not fill the rail — including the common case where a cart item's
+   * category contains only that item, so every category result gets filtered
+   * out as already-in-cart.
+   */
+  const cartSignature = cartItems
+    .map((i) => `${i.productId}:${i.category || ''}`)
+    .sort()
+    .join('|');
+
+  useEffect(() => {
+    if (cartItems.length === 0) {
+      setSimilarProducts([]);
+      return;
+    }
+    let cancelled = false;
+    const TARGET = 6;
+
+    (async () => {
+      const cats = Array.from(
+        new Set(cartItems.map((i) => i.category).filter(Boolean)),
+      ) as string[];
+      const inCart = new Set(cartItems.map((i) => i.productId));
+      const seen = new Set<string>();
+      const list: PublicProduct[] = [];
+
+      const addFrom = (items: PublicProduct[]) => {
+        for (const prod of items) {
+          if (list.length >= TARGET) break;
+          if (!prod || inCart.has(prod.id) || seen.has(prod.id)) continue;
+          seen.add(prod.id);
+          list.push(prod);
+        }
+      };
+
+      try {
+        if (cats.length) {
+          const results = await Promise.all(
+            cats.slice(0, 4).map((c) =>
+              publicProductService
+                .getProducts({ category: c, limit: 8 })
+                .then((r) => (r.success && r.data ? r.data.items : []))
+                .catch(() => [] as PublicProduct[]),
+            ),
+          );
+          results.forEach(addFrom);
+        }
+        if (list.length < TARGET) {
+          const r = await publicProductService.getProducts({
+            limit: 12,
+            sortBy: 'createdAt',
+            sortOrder: 'desc',
+          });
+          if (r.success && r.data) addFrom(r.data.items);
+        }
+        if (!cancelled) setSimilarProducts(list);
+      } catch {
+        /* fail open — the rail simply does not appear */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // cartSignature stands in for the items: quantities must not refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartSignature]);
+
   const fetchCart = async () => {
     try {
       setLoading(true);
@@ -265,6 +385,8 @@ export default function Cart() {
       if (auth) {
         const res = await cartService.getCart();
         if (res.success && res.data) {
+          setPendingGifts(res.data.pendingGifts || []);
+          setGiftOptions(res.data.giftOptions || []);
           setCartItems(
             res.data.items.map((item: any) => {
               const hasVariant = !!item.variant;
@@ -338,6 +460,8 @@ export default function Cart() {
                 gstPercentage: item.product?.gstPercentage,
                 transportType: item.transportType ?? null,
                 courier: item.courier ?? null,
+                isFreeGift: !!item.isFreeGift,
+                giftOfferId: item.giftOfferId ?? null,
                 variantDetails,
                 product: item.product || null,
               };
@@ -480,7 +604,6 @@ export default function Cart() {
   };
 
   const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
-  const tax = cartItems.reduce((s, i) => s + i.price * i.quantity * ((i.gstPercentage ?? 0) / 100), 0);
 
   useEffect(() => {
     if (isAuthenticated) checkFreeShippingOffers(subtotal);
@@ -514,6 +637,33 @@ export default function Cart() {
     }
     return Math.min(calc, subtotal);
   })();
+
+  /**
+   * GST, on the amount actually being charged.
+   *
+   * Three things this used to get wrong, all of which put mobile's total out of
+   * step with what the server charges:
+   *
+   *  - It taxed the GROSS line. The coupon comes off BEFORE tax, so a cart with
+   *    a coupon was shown more tax than it would be billed. Each line carries
+   *    its pro-rata share of the discount, exactly as the web does.
+   *  - It applied GST in every region. Tax is an `.in` concern — the web and
+   *    the server both gate on it, and `.com` gets zero.
+   *  - It summed raw floats. Rounding each line to 2dp first mirrors the
+   *    server's `round2`; without it the total drifted from the lines printed
+   *    above it, and the drift carried to the invoice and the charged amount.
+   */
+  const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+  const tax =
+    getRegion() !== 'IN'
+      ? 0
+      : cartItems.reduce((sum, i) => {
+          const gross = r2(i.price * i.quantity);
+          const couponShare = subtotal > 0 ? (gross / subtotal) * effectiveDiscount : 0;
+          const net = Math.max(0, gross - couponShare);
+          const gstRate = i.gstPercentage ? i.gstPercentage / 100 : 0;
+          return sum + r2(net * gstRate);
+        }, 0);
 
   const bagCost = selectedBag ? getRegionalPrice({ basePrice: selectedBag.price, priceINR: (selectedBag as any).priceINR, priceUSD: (selectedBag as any).priceUSD }) : 0;
   const total = Math.max(0, subtotal + shippingCost + tax - effectiveDiscount + bagCost);
@@ -619,6 +769,35 @@ export default function Cart() {
             <Text style={cs.syncingText}>Checking stock & prices...</Text>
           </View>
         ) : null}
+
+        {/* Free gift to claim — the buy condition is met but the free set has
+            options, so the customer chooses which gift they want. */}
+        {pendingGifts.map((pg) => (
+          <View key={pg.offerId} style={cs.giftBanner}>
+            <View style={cs.giftBannerIcon}>
+              <Gift size={20} color="#ffffff" />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={cs.giftBannerTitle}>You&apos;ve unlocked a free gift! 🎉</Text>
+              <Text style={cs.giftBannerBody}>
+                {pg.offerTitle} — choose your free item
+                {pg.getQty > 1 ? ` (×${pg.getQty})` : ''}.
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => {
+                setGiftInitialProduct(undefined);
+                setGiftChooser(pg);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Choose free gift"
+              android_ripple={{ color: 'rgba(255,255,255,0.18)' }}
+              style={cs.giftBannerBtn}
+            >
+              <Text style={cs.giftBannerBtnText}>Choose</Text>
+            </Pressable>
+          </View>
+        ))}
 
         {/* Items */}
         {cartItems.map((item) => {
@@ -833,6 +1012,36 @@ export default function Cart() {
                 )
               ) : null}
 
+              {/* A free-gift line is managed by the offer — fixed quantity, and
+                  not the customer's to remove — so it shows a note and the way
+                  to swap it, in place of the stepper. */}
+              {item.isFreeGift ? (
+                <View style={cs.giftLineRow}>
+                  <View style={cs.giftLinePill}>
+                    <Gift size={13} color="#157f4a" strokeWidth={2.2} />
+                    <Text style={cs.giftLinePillText}>Free gift · Qty {item.quantity}</Text>
+                  </View>
+                  {(() => {
+                    const chooser = giftOptions.find((g) => g.offerId === item.giftOfferId);
+                    return chooser ? (
+                      <Pressable
+                        onPress={() => {
+                          setGiftInitialProduct(item.productId);
+                          setGiftChooser(chooser);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Change gift"
+                        android_ripple={{ color: 'rgba(21,127,74,0.08)' }}
+                        style={cs.changeGiftBtn}
+                      >
+                        <RefreshCw size={13} color="#157f4a" strokeWidth={2.2} />
+                        <Text style={cs.changeGiftText}>Change gift</Text>
+                      </Pressable>
+                    ) : null;
+                  })()}
+                </View>
+              ) : (
+              <>
               {/* Stepper row */}
               <View
                 style={{
@@ -901,6 +1110,8 @@ export default function Cart() {
                   </Pressable>
                 </View>
               </View>
+              </>
+              )}
             </View>
           );
         })}
@@ -915,7 +1126,7 @@ export default function Cart() {
         <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e5e7eb' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
             <Tag size={14} color="#374151" />
-            <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151' }}>Promo Code</Text>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151' }}>Coupon</Text>
           </View>
           {appliedPromo ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f0fdf4', borderRadius: 10, padding: 12 }}>
@@ -1025,7 +1236,7 @@ export default function Cart() {
         <View style={cs.trustCard}>
           <View style={cs.trustRow}>
             <Shield size={18} color="#16a34a" />
-            <Text style={cs.trustText}>Secure checkout with SSL encryption</Text>
+            <Text style={cs.trustText}>Secure checkout. Your data is protected.</Text>
           </View>
           <View style={cs.trustRow}>
             <Truck size={18} color={BRAND} />
@@ -1035,7 +1246,41 @@ export default function Cart() {
             <Package size={18} color="#7c3aed" />
             <Text style={cs.trustText}>30-day return policy</Text>
           </View>
+
+          {/* "We accept" + the marks. Drawn as type rather than logo files —
+              the web does the same, so no asset ships for them. */}
+          <View style={cs.acceptWrap}>
+            <Text style={cs.acceptLabel}>We accept</Text>
+            <View style={cs.acceptRow}>
+              {PAYMENT_MARKS.map((m) => (
+                <PaymentMark key={m} id={m} />
+              ))}
+            </View>
+          </View>
         </View>
+
+        {/* Similar products — driven by the categories of items in the cart.
+            A two-up grid rather than the web's six-across, at the same card
+            width every other product grid in the app uses. */}
+        {similarProducts.length > 0 ? (
+          <View style={cs.similarWrap}>
+            <View style={cs.similarHead}>
+              <Package size={22} color={BRAND} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={cs.similarTitle}>You Might Also Like</Text>
+                <Text style={cs.similarSub}>Similar products based on your cart</Text>
+              </View>
+            </View>
+
+            <View style={cs.similarGrid}>
+              {similarProducts.map((prod) => (
+                <View key={prod.id} style={{ width: PRODUCT_CARD_WIDTH }}>
+                  <ProductCard product={prod} />
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
 
       </ScrollView>
 
@@ -1051,6 +1296,32 @@ export default function Cart() {
         hasStockIssue={hasStockIssue}
         hasShippingIssue={hasShippingIssue}
         onCheckout={handleCheckout}
+      />
+
+      <GiftChooserModal
+        gift={giftChooser}
+        initialProductId={giftInitialProduct}
+        busy={addingGift}
+        onClose={() => setGiftChooser(null)}
+        onChoose={(productId, variantId) =>
+          giftChooser && chooseGift(giftChooser.offerId, productId, variantId)
+        }
+      />
+
+      <OfferCelebration
+        open={!!offerCelebration}
+        onClose={() => setOfferCelebration(null)}
+        variant={offerCelebration?.kind ?? 'savings'}
+        freeUnits={offerCelebration?.freeUnits}
+        dealLabel={offerCelebration?.dealLabel}
+        amountLabel={
+          offerCelebration?.kind === 'savings' && offerCelebration.amount != null
+            ? fmt(offerCelebration.amount)
+            : undefined
+        }
+        offerTitle={offerCelebration?.offerTitle}
+        offerDescription={offerCelebration?.offerDescription}
+        autoCloseMs={6000}
       />
     </View>
   );
@@ -1134,12 +1405,31 @@ function StickyCheckout({
     >
       {expanded ? (
         <View style={{ marginBottom: 10, gap: 6 }}>
-          <SummaryRow label="Subtotal" value={fmt(subtotal)} />
+          <SummaryRow label="Items subtotal" value={fmt(subtotal)} />
           {tax > 0 ? <SummaryRow label="Tax (GST)" value={fmt(tax)} /> : null}
-          {discount > 0 ? <SummaryRow label="Discount" value={`-${fmt(discount)}`} color="#16a34a" /> : null}
+          {discount > 0 ? (
+            <SummaryRow label="Product discount" value={`−${fmt(discount)}`} color={GREEN} />
+          ) : null}
           {bagCost > 0 ? <SummaryRow label={`Bag (${bagName})`} value={fmt(bagCost)} /> : null}
-          <SummaryRow label="Shipping" value={shipping > 0 ? fmt(shipping) : 'Free'} color={shipping > 0 ? undefined : '#16a34a'} />
+          <SummaryRow
+            label="Delivery charges"
+            value={shipping > 0 ? fmt(shipping) : 'FREE'}
+            color={shipping > 0 ? undefined : GREEN}
+          />
           <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 2 }} />
+
+          {/* The one line that states the point of a markdowns store. The web
+              puts it directly above the total in its own green band; mobile
+              had no equivalent at all. */}
+          {discount > 0 ? (
+            <View style={cs.saveBand}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <BadgePercent size={15} color={GREEN} />
+                <Text style={cs.saveBandLabel}>You save</Text>
+              </View>
+              <Text style={cs.saveBandValue}>{fmt(discount)}</Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -1151,7 +1441,7 @@ function StickyCheckout({
           hitSlop={8}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Text style={{ fontSize: 13, color: '#6b7280' }}>Total</Text>
+            <Text style={{ fontSize: 13, color: '#6b7280' }}>Total payable</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
               {expanded ? <ChevronDown size={14} color={BRAND} strokeWidth={2.5} /> : <ChevronRight size={14} color={BRAND} strokeWidth={2.5} />}
               <Text style={{ fontSize: 12, color: BRAND, fontWeight: '600' }}>
@@ -1272,6 +1562,158 @@ function SyncBanner({
 
 // ─── Hoisted styles ───────────────────────────────────────────────────────────
 const cs = StyleSheet.create({
+  similarWrap: { marginTop: 24 },
+  similarHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  similarTitle: {
+    fontFamily: Fonts.heading,
+    fontSize: 20,
+    // Poppins_600SemiBold is the loaded file.
+    fontWeight: '600',
+    letterSpacing: -0.5,
+    color: '#1a1a1a',
+  },
+  similarSub: { fontFamily: Fonts.sans, fontSize: 12.5, color: '#6b625b', marginTop: 1 },
+  similarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: CARD_GAP,
+    justifyContent: 'space-between',
+  },
+
+  saveBand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#eaf7ef',
+    borderWidth: 1,
+    borderColor: '#cdebd8',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginTop: 2,
+  },
+  saveBandLabel: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 13,
+    fontWeight: '600',
+    color: GREEN,
+  },
+  saveBandValue: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 15,
+    // Outfit is static: the weight must name the loaded file (Outfit_700Bold).
+    fontWeight: '700',
+    color: GREEN,
+  },
+
+  acceptWrap: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f6efe6' },
+  acceptLabel: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    color: '#b3a99f',
+    textAlign: 'center',
+  },
+  acceptRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+  },
+
+  giftLineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  giftLinePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#eaf7ef',
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+  },
+  giftLinePillText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#157f4a',
+  },
+  changeGiftBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#c9e9d5',
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    overflow: 'hidden',
+  },
+  changeGiftText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#157f4a',
+  },
+
+  giftBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#f3d9a0',
+    backgroundColor: '#fff9ec',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+  },
+  giftBannerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#157f4a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  giftBannerTitle: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 13.5,
+    // Outfit is static: the weight must name the loaded file (Outfit_700Bold).
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  giftBannerBody: {
+    fontFamily: Fonts.sans,
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#7a5a52',
+    marginTop: 2,
+  },
+  giftBannerBtn: {
+    backgroundColor: '#157f4a',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    overflow: 'hidden',
+  },
+  giftBannerBtnText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+
   offersBlock: { marginTop: 12 },
   offersLabel: {
     fontSize: 10.5,

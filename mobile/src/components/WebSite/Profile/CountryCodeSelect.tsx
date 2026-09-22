@@ -14,7 +14,14 @@ interface CountryCodeSelectProps {
 }
 
 
-export default function CountryCodeSelect({ value, onChange, disabled }: CountryCodeSelectProps) {
+export default function CountryCodeSelect({
+  value,
+  onChange,
+  disabled,
+  /** Drop the trigger's own border, radius and fill — for use inside a
+   *  field that already draws them. */
+  bare = false,
+}: CountryCodeSelectProps & { bare?: boolean }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const insets = useSafeAreaInsets();
@@ -57,7 +64,12 @@ export default function CountryCodeSelect({ value, onChange, disabled }: Country
         accessibilityRole="button"
         accessibilityLabel="Select country code"
         accessibilityState={{ expanded: open, disabled: !!disabled }}
-        style={[styles.trigger, { backgroundColor: triggerBg, borderColor: triggerBorder }]}
+        style={[
+          styles.trigger,
+          bare
+            ? { borderWidth: 0, borderRadius: 0, backgroundColor: 'transparent', minWidth: 0 }
+            : { backgroundColor: triggerBg, borderColor: triggerBorder },
+        ]}
       >
         <View style={styles.triggerInner}>
           {!!selected && <Text style={styles.flag}>{selected.flag}</Text>}

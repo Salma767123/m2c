@@ -1,21 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { Image } from 'expo-image';
-import { Package, LayoutGrid } from 'lucide-react-native';
+import { Sparkles } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { categoryService } from '@/services/categoryService';
-import { Palette, Radius } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
+import DiscoverSheet from '@/components/WebSite/Header/DiscoverSheet';
 
 /**
- * Quick-category rail that sits between the header and the hero — the mobile
- * counterpart of frontend/src/components/WebSite/CategoryStrip/CategoryStrip.tsx.
+ * The category ribbon under the header — the mobile counterpart of
+ * frontend/src/components/WebSite/Header/CategoryRibbon/CategoryRibbon.tsx at
+ * its own mobile breakpoint.
  *
- * Circular brand-tinted tiles, a leading "All" shortcut, and nothing at all until
- * at least one active category exists (same fail-quiet rule as the web).
+ * A recessed groove rail carrying "✦ EXPLORE", a hairline, then the categories
+ * as uppercase chips. This used to be a row of circular photo tiles with a
+ * leading "All" shortcut — a different shape, and a different offer: "All"
+ * linked to the categories list, where the web's first item opens the discovery
+ * menu instead.
+ *
+ * Nothing renders until at least one active category exists — the same
+ * fail-quiet rule the web follows.
  */
 
-const TILE = 56;
-const ITEM_W = 68;
+/* The ribbon's own tokens, straight from the web component. */
+const INK = '#1a1416'; // warm near-black — resting label
+const RED = '#e01a1b'; // accent
+const GROOVE = '#f3efed'; // the recessed rail the labels ride in
+
 const MAX_CATEGORIES = 12;
 
 interface StripCategory {
@@ -27,6 +37,7 @@ interface StripCategory {
 
 export default function CategoryStrip() {
   const [categories, setCategories] = useState<StripCategory[]>([]);
+  const [discoverOpen, setDiscoverOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,87 +64,94 @@ export default function CategoryStrip() {
 
   return (
     <View style={s.wrap} accessibilityRole="menubar" accessibilityLabel="Browse categories">
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.track}
-      >
-        {/* Leading "All" shortcut */}
+      <View style={s.rail}>
         <Pressable
-          onPress={() => router.push('/(tabs)/categories' as any)}
+          onPress={() => setDiscoverOpen(true)}
           accessibilityRole="button"
-          accessibilityLabel="All categories"
-          style={s.item}
+          accessibilityLabel="Explore — browse the marketplace"
+          hitSlop={6}
+          style={s.explore}
         >
-          <View style={[s.tile, s.tileAll]}>
-            <LayoutGrid size={21} color={Palette.primary} />
-          </View>
-          <Text style={[s.label, s.labelAll]} numberOfLines={1}>
-            All
-          </Text>
+          {/* The web sets a literal ✦ glyph here; a drawn sparkle renders the
+              same at any font and cannot fall back to tofu. */}
+          <Sparkles size={12} color={RED} strokeWidth={2.4} />
+          <Text style={s.exploreText}>Explore</Text>
         </Pressable>
 
-        {categories.map((cat) => (
-          <Pressable
-            key={cat.id}
-            onPress={() => router.push(`/(tabs)/categories/${cat.slug}` as any)}
-            accessibilityRole="button"
-            accessibilityLabel={cat.name}
-            style={s.item}
-          >
-            <View style={s.tile}>
-              {cat.image ? (
-                <Image source={{ uri: cat.image }} style={s.tileImage} contentFit="cover" transition={150} />
-              ) : (
-                <Package size={22} color={Palette.primary} />
-              )}
-            </View>
-            <Text style={s.label} numberOfLines={2}>
-              {cat.name}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+        <View style={s.divider} />
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.track}
+        >
+          {categories.map((cat) => (
+            <Pressable
+              key={cat.id}
+              onPress={() => router.push(`/(tabs)/categories/${cat.slug}` as any)}
+              accessibilityRole="button"
+              accessibilityLabel={cat.name}
+              android_ripple={{ color: 'rgba(26,20,22,0.06)' }}
+              style={s.chip}
+            >
+              <Text style={s.chipText} numberOfLines={1}>
+                {cat.name}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+
+      <DiscoverSheet visible={discoverOpen} onClose={() => setDiscoverOpen(false)} />
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: {
-    backgroundColor: Palette.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Palette.outlineSubtle,
-    paddingVertical: 10,
-  },
-  track: { paddingHorizontal: 12, gap: 14 },
-  item: { width: ITEM_W, alignItems: 'center' },
-  tile: {
-    width: TILE,
-    height: TILE,
-    borderRadius: Radius.full,
-    backgroundColor: Palette.primaryContainer,
+  /* `h-[58px] items-center px-3` */
+  wrap: { height: 58, justifyContent: 'center', paddingHorizontal: 12 },
+
+  /* `h-[42px] w-full items-center gap-2.5 rounded-2xl pl-3 pr-1.5` over the
+     groove, with the web's inset hairline standing in for its inset shadow —
+     React Native has no inset box-shadow. */
+  rail: {
+    height: 42,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+    gap: 10,
+    borderRadius: 16,
+    paddingLeft: 12,
+    paddingRight: 6,
+    backgroundColor: GROOVE,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    borderColor: 'rgba(26,20,22,0.05)',
   },
-  // The "All" tile is outlined rather than filled, so it reads as a shortcut
-  // rather than another category.
-  tileAll: {
-    backgroundColor: Palette.surface,
-    borderWidth: 1,
-    borderColor: Palette.brandBorder,
-    borderStyle: 'dashed',
-  },
-  tileImage: { width: '100%', height: '100%' },
-  label: {
+
+  explore: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  /* `text-[11px] font-bold uppercase tracking-[0.2em]` */
+  exploreText: {
+    fontFamily: Fonts.sansBold,
     fontSize: 11,
-    fontWeight: '600',
-    color: Palette.text,
-    textAlign: 'center',
-    marginTop: 6,
-    lineHeight: 14,
+    // Outfit is static: the weight must name the loaded file (Outfit_700Bold).
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 2.2,
+    color: INK,
   },
-  labelAll: { color: Palette.primary, fontWeight: '700' },
+
+  /* `h-5 w-px` */
+  divider: { width: 1, height: 20, backgroundColor: 'rgba(26,20,22,0.18)', flexShrink: 0 },
+
+  track: { alignItems: 'center', gap: 4, paddingRight: 6 },
+  /* `rounded-[10px] px-3.5 py-1.5` */
+  chip: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 6, overflow: 'hidden' },
+  /* `text-[12px] font-semibold uppercase tracking-[0.08em]` */
+  chipText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.96,
+    color: INK,
+  },
 });

@@ -16,16 +16,17 @@ import {
   LogOut,
   Camera,
   Package,
-  Heart,
   MapPin,
-  ShoppingCart,
   LifeBuoy,
-  HelpCircle,
   ChevronRight,
+  RotateCcw,
+  Wallet,
 } from 'lucide-react-native';
 import { useConfirm } from '@/components/WebSite/Shared/ConfirmDialog';
+import EmptyState from '@/components/WebSite/Shared/EmptyState';
 import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
 import { useFocusEffect, useRouter } from 'expo-router';
+import AccountDiscovery from './AccountDiscovery';
 import ProfileTab from './ProfileTab';
 import type { UserProfile } from './types';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
@@ -35,6 +36,7 @@ import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { ProfileSkeleton } from '@/components/ui/Skeleton';
 import { Palette, Fonts } from '@/constants/theme';
+import { getRegion } from '@/lib/currency';
 
 // Warm palette — 1:1 with the web storefront so the two clients read as the
 // same product. The mobile theme's neutral ramp is cooler (slate); these warm
@@ -344,7 +346,7 @@ export default function Profile() {
   if (isLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: WARM.pageGround }}>
-        <ScreenHeader icon={User} title="My Profile" />
+        <ScreenHeader icon={User} title="My Profile" subtitle="Manage your profile and account settings" />
         <ProfileSkeleton />
       </View>
     );
@@ -354,21 +356,17 @@ export default function Profile() {
   if (!isAuthenticated) {
     return (
       <View style={{ flex: 1, backgroundColor: WARM.pageGround }}>
-        <ScreenHeader icon={User} title="My Profile" />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-            <User size={40} color="#d1d5db" />
-          </View>
-          <Text style={{ fontFamily: Fonts.sansBold, fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 6 }}>Login Required</Text>
-          <Text style={{ fontFamily: Fonts.sans, fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24 }}>
-            Sign in to view and manage your profile.
-          </Text>
-          <Pressable onPress={() => router.push('/(auth)/Login' as any)} accessibilityRole="button">
-            <View style={{ backgroundColor: Palette.primary, paddingHorizontal: 28, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontFamily: Fonts.sansBold, color: '#fff', fontSize: 15, fontWeight: '700' }}>Login to Continue</Text>
-            </View>
-          </Pressable>
-        </View>
+        <ScreenHeader icon={User} title="My Profile" subtitle="Manage your profile and account settings" />
+        {/* Hand-rolled, and so missed when the app's empty states were unified:
+            a grey disc instead of the brand one, and a title at weight 800 over
+            the 700 file that is actually loaded. */}
+        <EmptyState
+          icon={User}
+          title="Login Required"
+          subtitle="Sign in to view and manage your profile."
+          ctaLabel="Login to Continue"
+          onPress={() => router.push('/(auth)/Login' as any)}
+        />
       </View>
     );
   }
@@ -379,7 +377,7 @@ export default function Profile() {
       style={{ flex: 1, backgroundColor: WARM.pageGround }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScreenHeader icon={User} title="My Profile" />
+      <ScreenHeader icon={User} title="My Profile" subtitle="Manage your profile and account settings" />
 
       <ScrollView
         ref={scrollRef}
@@ -437,10 +435,10 @@ export default function Profile() {
                   Bold in Palette.ink (#111827), the blue-tinted neutral. */}
               <Text
                 style={{
-                  fontFamily: Fonts.heading,
-                  fontSize: 18,
+                  fontFamily: Fonts.sansSemibold,
+                  // `text-[15px] font-semibold text-[#1a1a1a]`.
+                  fontSize: 15,
                   fontWeight: '600',
-                  letterSpacing: -0.4,
                   color: '#1a1a1a',
                 }}
               >
@@ -449,9 +447,9 @@ export default function Profile() {
                   .filter(Boolean)
                   .join(' ') || 'My Account'}
               </Text>
-              <Text style={{ fontFamily: Fonts.sans, fontSize: 13, color: WARM.textMuted, marginTop: 2 }}>{userProfile.email}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 }}>
-                <Text style={{ fontFamily: Fonts.sansSemibold, fontSize: 11, color: WARM.textSubtle, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' }}>
+                {/* `text-[11px] font-medium uppercase tracking-[0.1em] text-[#a89a8d]` */}
+                <Text style={{ fontFamily: Fonts.sansMedium, fontSize: 11, color: '#a89a8d', textTransform: 'uppercase', letterSpacing: 1.1, fontWeight: '500', marginTop: 4 }}>
                   Member since {memberSince()}
                 </Text>
               </View>
@@ -491,12 +489,36 @@ export default function Profile() {
         {/* Quick links — mirrors the web sidebar nav tabs: Orders, Addresses,
             Wishlist, Cart, Support, Contact. */}
         <View style={{ marginHorizontal: 16, marginBottom: 14, backgroundColor: Palette.surface, borderRadius: 16, borderWidth: 1, borderColor: WARM.cardBorder, overflow: 'hidden' }}>
-          <MenuItem icon={<Package size={18} color={Palette.primary} />} label="My Orders" onPress={() => router.push('/(tabs)/orders' as any)} />
-          <MenuItem icon={<MapPin size={18} color={Palette.primary} />} label="Saved Addresses" onPress={() => router.push('/(any)/saved-addresses' as any)} />
-          <MenuItem icon={<Heart size={18} color={Palette.primary} />} label="My Wishlist" onPress={() => router.push('/(tabs)/wishlist' as any)} />
-          <MenuItem icon={<ShoppingCart size={18} color={Palette.primary} />} label="My Cart" onPress={() => router.push('/(tabs)/cart' as any)} />
-          <MenuItem icon={<LifeBuoy size={18} color={Palette.primary} />} label="My Support Tickets" onPress={() => router.push('/(any)/support' as any)} />
-          <MenuItem icon={<HelpCircle size={18} color={Palette.primary} />} label="Contact Us" onPress={() => router.push('/(any)/contact' as any)} last />
+          <MenuItem
+            icon={<MapPin size={18} color={Palette.primary} />}
+            label="Saved Addresses"
+            onPress={() => router.push('/(any)/saved-addresses' as any)}
+          />
+          <MenuItem
+            icon={<Package size={18} color={Palette.primary} />}
+            label="Order History"
+            onPress={() => router.push('/(tabs)/orders' as any)}
+          />
+          {/* Returns & Replacements is an INR-region feature: the web gates the
+              whole tab behind `getRegion() === 'IN'` and hides it on .com. */}
+          {getRegion() === 'IN' ? (
+            <MenuItem
+              icon={<RotateCcw size={18} color={Palette.primary} />}
+              label="Returns & Replacements"
+              onPress={() => router.push('/(any)/returns-replacements' as any)}
+            />
+          ) : null}
+          <MenuItem
+            icon={<Wallet size={18} color={Palette.primary} />}
+            label="My Wallet"
+            onPress={() => router.push('/(any)/wallet' as any)}
+          />
+          <MenuItem
+            icon={<LifeBuoy size={18} color={Palette.primary} />}
+            label="Support"
+            onPress={() => router.push('/(any)/support' as any)}
+            last
+          />
         </View>
 
         {/* Profile form — Edit/Save/Cancel now live on the card header, matching
@@ -516,6 +538,10 @@ export default function Profile() {
             onCancel={handleCancel}
             onGoToAddresses={() => router.push('/(any)/saved-addresses' as any)}
           />
+
+          {/* Two discovery rails the web shows under Profile Information:
+              orders awaiting a review, and this shopper's recently viewed. */}
+          <AccountDiscovery />
         </View>
 
         {/* Sign out */}

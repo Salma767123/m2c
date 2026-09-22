@@ -8,12 +8,10 @@ import {
   RefreshControl,
   ActivityIndicator,
   StyleSheet,
-  StatusBar,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  ArrowLeft,
   Plus,
   LifeBuoy,
   ChevronRight,
@@ -22,6 +20,7 @@ import {
   CircleAlert,
 } from 'lucide-react-native';
 import EmptyState from '@/components/WebSite/Shared/EmptyState';
+import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
 import { supportService, type SupportTicket } from '@/services/supportService';
 import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
@@ -50,7 +49,6 @@ import {
 type SupportView = 'list' | 'create' | 'detail';
 
 export default function SupportTickets() {
-  const insets = useSafeAreaInsets();
   // `?new=1` (from the header's support icon) jumps straight to the raise form.
   const { new: createParam } = useLocalSearchParams<{ new?: string }>();
   const [view, setView] = useState<SupportView>(createParam === '1' ? 'create' : 'list');
@@ -84,27 +82,21 @@ export default function SupportTickets() {
     setRefreshing(false);
   }, [load]);
 
+  /* This screen was the last one still drawing its own masthead: a dark
+     inverse bar with a bare arrow and 17pt centred text carrying no
+     fontFamily, so it rendered in Roboto while every neighbouring screen
+     rendered in Poppins at 24. It is the shared header now, like the rest. */
   const header = (
-    <View style={[s.header, { paddingTop: insets.top + 10 }]}>
-      <Pressable
-        onPress={() => (view === 'list' ? router.back() : setView('list'))}
-        hitSlop={10}
-        accessibilityRole="button"
-        accessibilityLabel={view === 'list' ? 'Go back' : 'Back to my tickets'}
-      >
-        <ArrowLeft size={22} color="#ffffff" />
-      </Pressable>
-      <Text style={s.headerTitle}>
-        {view === 'create' ? 'New Ticket' : view === 'detail' ? 'Ticket' : 'Support'}
-      </Text>
-      <View style={{ width: 22 }} />
-    </View>
+    <ScreenHeader
+      title={view === 'create' ? 'New Ticket' : view === 'detail' ? 'Ticket' : 'Support'}
+      eyebrow={view === 'list' ? 'Help centre' : 'Support'}
+      onBack={() => (view === 'list' ? router.back() : setView('list'))}
+    />
   );
 
   if (authed === false) {
     return (
       <View style={s.root}>
-        <StatusBar barStyle="light-content" backgroundColor={Palette.surfaceInverse} />
         {header}
         <View style={s.empty}>
           <LifeBuoy size={44} color={Palette.outlineVariant} />
@@ -126,7 +118,6 @@ export default function SupportTickets() {
 
   return (
     <View style={s.root}>
-      <StatusBar barStyle="light-content" backgroundColor={Palette.surfaceInverse} />
       {header}
 
       {view === 'create' ? (
@@ -629,15 +620,6 @@ function ChipRow({
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: Palette.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Palette.surfaceInverse,
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-  },
-  headerTitle: { color: '#ffffff', fontSize: 17, fontWeight: '700' },
 
   card: {
     backgroundColor: Palette.surface,

@@ -27,6 +27,7 @@ import {
   Trash2,
   LifeBuoy,
   Headset,
+  Bell,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -38,6 +39,8 @@ import { useWishlist } from '@/context/WishlistContext';
 import { getRegionalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
 import { Palette, Radius, Shadow, Fonts } from '@/constants/theme';
 import DiscoverSheet from './DiscoverSheet';
+import NotificationSheet from './NotificationSheet';
+import { appNotificationService } from '@/services/appNotificationService';
 
 /* ── Hoisted constants (allocated once) ───────────────────────────────────── */
 const RECENT_SEARCHES_KEY = 'recent_searches';
@@ -58,6 +61,8 @@ export function Header() {
   const [isFocused, setIsFocused] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [discoverVisible, setDiscoverVisible] = useState(false);
+  const [notifVisible, setNotifVisible] = useState(false);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
 
   // Suggestions state
   const [suggestions, setSuggestions] = useState<PublicProduct[]>([]);
@@ -78,6 +83,21 @@ export function Header() {
       }
     });
   }, []);
+
+  /*
+   * Unread count for the bell badge. Fetched once on mount and refreshed when
+   * the sheet closes — the web polls, but a phone header polling in the
+   * background is battery spent on a number nobody is looking at.
+   */
+  useEffect(() => {
+    let alive = true;
+    appNotificationService.getUnreadCount().then((c) => {
+      if (alive) setUnreadNotifs(c);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [notifVisible]);
 
   const saveRecent = useCallback(async (query: string) => {
     const updated = [query, ...recentSearches.filter((r) => r !== query)].slice(0, MAX_RECENT);
@@ -229,6 +249,27 @@ export function Header() {
                   </View>
                 ) : null}
               </Pressable>
+              {/* Notifications — the web's NotificationDropdown. Mobile had a
+                  push-token service but nothing that read the feed, so there
+                  was no bell at all. */}
+              <Pressable
+                onPress={() => setNotifVisible(true)}
+                accessibilityLabel={
+                  unreadNotifs > 0
+                    ? `Notifications, ${unreadNotifs} unread`
+                    : 'Notifications'
+                }
+                accessibilityRole="button"
+                style={s.iconBtn}
+              >
+                <Bell size={22} color={Palette.onBrand} />
+                {unreadNotifs > 0 ? (
+                  <View style={[s.badge, s.badgeBrand]}>
+                    <Text style={s.badgeText}>{unreadNotifs > 99 ? '99+' : unreadNotifs}</Text>
+                  </View>
+                ) : null}
+              </Pressable>
+
                  <Pressable
                 onPress={() => router.push('/(tabs)/cart' as any)}
                 accessibilityLabel="View cart"
@@ -419,6 +460,12 @@ export function Header() {
 
       <Sidebar visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
       <DiscoverSheet visible={discoverVisible} onClose={() => setDiscoverVisible(false)} />
+
+      <NotificationSheet
+        visible={notifVisible}
+        onClose={() => setNotifVisible(false)}
+        onUnreadChange={setUnreadNotifs}
+      />
     </>
   );
 }

@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { ArrowLeft, ShoppingCart, Package, Share2, Heart } from 'lucide-react-native';
+import { recordRecentlyViewed } from '@/lib/browsingHistory';
 import { publicProductService, PublicProduct } from '@/services/publicProductService';
 import { showErrorToast } from '@/lib/toast-utils';
 import ProductDetail from '@/components/WebSite/Home/ProductDetail';
@@ -162,6 +163,9 @@ export default function ProductDetailScreen() {
       const response = await publicProductService.getProduct(id as string);
       if (response.success && response.data) {
         setProduct(response.data);
+        // Feeds the "Recently viewed" rail on Profile, as the web's
+        // ProductDetail does on its own fetch.
+        recordRecentlyViewed(response.data.id);
       } else {
         showErrorToast('Error', 'Failed to load product details');
       }

@@ -29,6 +29,11 @@ import {
   Copy,
   ExternalLink,
   Calendar,
+  LifeBuoy,
+  Star,
+  ShoppingCart,
+  Eye,
+  Sparkles,
 } from 'lucide-react-native';
 import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
 import { router } from 'expo-router';
@@ -37,13 +42,24 @@ import { userAuthService } from '@/services/userAuthService';
 import { showErrorToast, showSuccessToast } from '@/lib/toast-utils';
 import { OrdersSkeleton } from '@/components/ui/Skeleton';
 import { Palette, Radius, Fonts } from '@/constants/theme';
-import { formatPrice } from '@/lib/currency';
+import { getRegionalPrice, getRegion, formatPrice } from '@/lib/currency';
 import { WebView } from 'react-native-webview';
 import * as Clipboard from 'expo-clipboard';
 import axios from '@/lib/axios';
 import { courierName, courierTrackingUrl } from '@/lib/couriers';
 import OrderActionModal, { type OrderAction } from '@/components/WebSite/Order/OrderActionModal';
 import EmptyState from '@/components/WebSite/Shared/EmptyState';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  publicProductService,
+  type PublicProduct,
+} from '@/services/publicProductService';
+import ReturnRequestModal from '@/components/WebSite/Order/ReturnRequestModal';
+import {
+  returnService,
+  returnStatusStyle,
+  type ReturnRequest,
+} from '@/services/returnService';
 
 /* `bg-slate-50` — #f8fafc. The order list is one of the few pages the web
    keeps on a cool ground rather than a warm one, so this follows it rather
@@ -76,11 +92,15 @@ const getStatus = (s: string): StatusInfo => STATUS_MAP[normalizeStatus(s)];
 
 /** Same options as the web list's status dropdown. */
 const STATUS_FILTERS = [
-  { value: 'all', label: 'All' },
+  { value: 'all', label: 'All Orders' },
   { value: 'processing', label: 'Processing' },
   { value: 'shipped', label: 'Shipped' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'cancelled', label: 'Cancelled' },
+  /* "Returned" is not an order status — it means a return request exists for
+     the order. Returns are INR-only, so the web gates this option on region
+     and so does the chip below. */
+  { value: 'returned', label: 'Returned' },
 ] as const;
 
 type StatusFilter = (typeof STATUS_FILTERS)[number]['value'];
@@ -136,6 +156,10 @@ export default function OrdersScreen() {
   const [actionModal, setActionModal] = useState<{ order: Order; type: OrderAction } | null>(null);
   const [actionSubmitting, setActionSubmitting] = useState(false);
   const [trackOrder, setTrackOrder] = useState<Order | null>(null);
+  const [returnModalOrder, setReturnModalOrder] = useState<Order | null>(null);
+  /* Latest return request per order code — drives the Return control's state
+     and the badge that replaces it once a return has been raised. */
+  const [returnsByOrder, setReturnsByOrder] = useState<Record<string, ReturnRequest>>({});
   const [invoiceHtml, setInvoiceHtml] = useState<string | null>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
 
@@ -161,10 +185,27 @@ export default function OrdersScreen() {
     }
   };
 
+  const fetchMyReturns = useCallback(async () => {
+    try {
+      const res = await returnService.getMyReturns();
+      const map: Record<string, ReturnRequest> = {};
+      // Newest-first from the API, so the first seen per order is the latest.
+      for (const r of res.data || []) if (!map[r.orderCode]) map[r.orderCode] = r;
+      setReturnsByOrder(map);
+    } catch {
+      /* non-blocking — the Return control just falls back to its default */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuth) fetchMyReturns();
+  }, [isAuth, fetchMyReturns]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchOrders();
-  }, []);
+    fetchMyReturns();
+  }, [fetchMyReturns]);
 
   /** Show every line of an order inline, as the web's chevron toggle does. */
   const toggleExpand = useCallback((orderId: string) => {
@@ -185,13 +226,11 @@ export default function OrdersScreen() {
       if (!actionModal) return;
       setActionSubmitting(true);
       try {
-        if (actionModal.type === 'cancel') {
-          const res = await orderService.cancelOrder(actionModal.order.id, reason || undefined);
-          showSuccessToast('Order Cancelled', res.message || 'Your order has been cancelled.');
-        } else {
-          const res = await orderService.requestReturn(actionModal.order.id, reason);
-          showSuccessToast('Return Requested', res.message || 'We will review it shortly.');
-        }
+        /* Cancel only. Returns go through ReturnRequestModal and POST /returns;
+           the branch that used to sit here called the older
+           /orders/:id/return and is no longer reachable from this screen. */
+        const res = await orderService.cancelOrder(actionModal.order.id, reason || undefined);
+        showSuccessToast('Order Cancelled', res.message || 'Your order has been cancelled.');
         setActionModal(null);
         await fetchOrders();
       } catch (err: any) {
@@ -254,9 +293,11 @@ export default function OrdersScreen() {
       if (!matchesSearch) return false;
       if (!withinDates(o.orderDate || o.createdAt)) return false;
       if (statusFilter === 'all') return true;
+      // "Returned" asks whether a return exists, not what the order's status is.
+      if (statusFilter === 'returned') return !!returnsByOrder[o.orderId];
       return normalizeStatus(o.status).includes(statusFilter);
     });
-  }, [orders, search, statusFilter, withinDates]);
+  }, [orders, search, statusFilter, withinDates, returnsByOrder]);
 
   const active = filtered.filter((o) => !['delivered', 'cancelled'].includes(normalizeStatus(o.status)));
   const history = filtered.filter((o) => ['delivered', 'cancelled'].includes(normalizeStatus(o.status)));
@@ -344,7 +385,7 @@ export default function OrdersScreen() {
             contentContainerStyle={{ gap: 8 }}
             style={{ flexGrow: 0 }}
           >
-            {STATUS_FILTERS.map((f) => {
+            {STATUS_FILTERS.filter((f) => f.value !== 'returned' || getRegion() === 'IN').map((f) => {
               const isActive = statusFilter === f.value;
               return (
                 <Pressable
@@ -402,17 +443,28 @@ export default function OrdersScreen() {
             padding: 4,
           }}
         >
-          <SegTab label="Active" count={active.length} active={tab === 'active'} onPress={() => setTab('active')} />
-          <SegTab label="History" count={history.length} active={tab === 'history'} onPress={() => setTab('history')} />
+          {/* The web stacks two sections, "Current Orders" and "Past Orders".
+              A phone switches between them rather than scrolling past one to
+              reach the other, but the words are the web's. */}
+          <SegTab label="Current" count={active.length} active={tab === 'active'} onPress={() => setTab('active')} />
+          <SegTab label="Past" count={history.length} active={tab === 'history'} onPress={() => setTab('history')} />
         </View>
       </View>
 
       {display.length === 0 ? (
-        /* "Nothing matched your filters" is a different problem from "you have no
+        /* The panels below stay even with no orders — the web shows them either
+           way, and an account with nothing in it is exactly when somewhere to
+           go next is worth offering. */
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: 12 }}
+          showsVerticalScrollIndicator={false}
+        >
+        {/* "Nothing matched your filters" is a different problem from "you have no
            orders" — offering Start Shopping to someone mid-search is unhelpful, so
-           the filtered case offers a way back out of the filters instead. */
-        isFiltering ? (
+           the filtered case offers a way back out of the filters instead. */}
+        {isFiltering ? (
           <EmptyState
+            fill={false}
             icon={Package}
             title="No Orders Found"
             subtitle="Try adjusting your search, status or dates"
@@ -421,6 +473,7 @@ export default function OrdersScreen() {
           />
         ) : (
           <EmptyState
+            fill={false}
             icon={Package}
             title="No Orders Found"
             subtitle={
@@ -431,7 +484,9 @@ export default function OrdersScreen() {
             ctaLabel="Start Shopping"
             onPress={() => router.push('/(tabs)' as any)}
           />
-        )
+        )}
+        <SidebarSections />
+        </ScrollView>
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingTop: 12, paddingBottom: 40, gap: 12 }}
@@ -448,9 +503,11 @@ export default function OrdersScreen() {
               onInvoice={() => downloadInvoice(order.id)}
               invoiceBusy={loadingInvoice}
               onCancel={() => setActionModal({ order, type: 'cancel' })}
-              onReturn={() => setActionModal({ order, type: 'return' })}
+              onReturn={() => setReturnModalOrder(order)}
+              existingReturn={returnsByOrder[order.orderId]}
             />
           ))}
+          <SidebarSections />
         </ScrollView>
       )}
 
@@ -461,6 +518,17 @@ export default function OrdersScreen() {
         submitting={actionSubmitting}
         onSubmit={submitAction}
         onClose={() => setActionModal(null)}
+      />
+
+      <ReturnRequestModal
+        open={!!returnModalOrder}
+        order={returnModalOrder}
+        onClose={() => setReturnModalOrder(null)}
+        onSubmitted={() => {
+          setReturnModalOrder(null);
+          fetchOrders();
+          fetchMyReturns();
+        }}
       />
 
       <TrackOrderModal order={trackOrder} onClose={() => setTrackOrder(null)} />
@@ -728,6 +796,7 @@ function OrderCard({
   invoiceBusy,
   onCancel,
   onReturn,
+  existingReturn,
 }: {
   order: Order;
   expanded: boolean;
@@ -737,6 +806,8 @@ function OrderCard({
   invoiceBusy: boolean;
   onCancel: () => void;
   onReturn: () => void;
+  /** The latest return raised against this order, if any. */
+  existingReturn?: ReturnRequest;
 }) {
   const status = getStatus(order.status);
   const items = order.items || [];
@@ -747,8 +818,25 @@ function OrderCard({
   // Gating copied from the web list card (and matching orders/[id].tsx).
   const canCancel = CANCELLABLE_STATUSES.has(order.status);
   const returnStatus = order.returnRequest?.status;
+  /*
+   * Returns are an INR feature: the web offers Return only when the order is
+   * DELIVERED, its currency is not USD, and at least one line is still
+   * return-eligible. A delivered USD order gets Contact Support instead —
+   * mobile used to offer Return on both, and the request would have been
+   * rejected server-side.
+   */
+  const delivered = order.status === 'DELIVERED';
+  const hasReturnableItem = (order.items || []).some(
+    (it) => it.returnable !== false,
+  );
   const canReturn =
-    order.status === 'DELIVERED' && returnStatus !== 'Requested' && returnStatus !== 'Approved';
+    delivered &&
+    order.currency !== 'USD' &&
+    hasReturnableItem &&
+    !existingReturn &&
+    returnStatus !== 'Requested' &&
+    returnStatus !== 'Approved';
+  const showContactSupport = delivered && order.currency === 'USD' && !existingReturn;
   const returnPending = returnStatus === 'Requested';
   const refund = order.refundStatus;
   const showRefund = !!refund && ['INITIATED', 'PROCESSED', 'MANUAL'].includes(refund);
@@ -870,7 +958,9 @@ function OrderCard({
           <ChevronRight size={15} color="#fff" strokeWidth={2.5} />
         </Pressable>
 
-        {order.trackingReference ? (
+        {/* Nothing left to track once it has arrived — the web hides this on a
+            delivered order and mobile kept showing it. */}
+        {order.trackingReference && normalized !== 'delivered' ? (
           <Pressable
             onPress={onTrack}
             accessibilityRole="button"
@@ -910,7 +1000,26 @@ function OrderCard({
           </Pressable>
         ) : null}
 
-        {canReturn ? (
+        {/* A return already exists → its status replaces the button, so a second
+            one cannot be raised for the same order. */}
+        {existingReturn ? (
+          (() => {
+            const rst = returnStatusStyle(existingReturn.status);
+            return (
+              <Pressable
+                onPress={() => router.push('/(any)/returns-replacements' as any)}
+                accessibilityRole="button"
+                accessibilityLabel={`Return ${existingReturn.status}. View return details`}
+                style={[os.statePill, { backgroundColor: rst.bg }]}
+              >
+                <View style={[os.statusDot, { backgroundColor: rst.dot }]} />
+                <Text style={[os.statePillText, { color: rst.text, marginLeft: 5 }]}>
+                  Return · {existingReturn.status}
+                </Text>
+              </Pressable>
+            );
+          })()
+        ) : canReturn ? (
           <Pressable
             onPress={onReturn}
             accessibilityRole="button"
@@ -919,6 +1028,16 @@ function OrderCard({
           >
             <RotateCcw size={14} color="#334155" />
             <Text style={os.actionOutlineNeutralText}>Return</Text>
+          </Pressable>
+        ) : showContactSupport ? (
+          <Pressable
+            onPress={() => router.push('/(any)/support' as any)}
+            accessibilityRole="button"
+            accessibilityLabel="Contact support about this order"
+            style={[os.actionBtn, os.actionOutlineNeutral]}
+          >
+            <LifeBuoy size={14} color="#334155" />
+            <Text style={os.actionOutlineNeutralText}>Contact Support</Text>
           </Pressable>
         ) : null}
 
@@ -945,8 +1064,339 @@ function OrderCard({
   );
 }
 
+// ─── Sidebar sections ─────────────────────────────────────────────────────────
+/**
+ * Top Selling, Best Seller and Quick Actions.
+ *
+ * I had skipped these as "web layout concerns" — the web puts them in a column
+ * beside the orders and a phone has no column. But they are not layout: they
+ * are three panels of content, and the web stacks them under the orders at its
+ * own mobile width. They stack here too.
+ *
+ * Fails silently, as the web's does: a sidebar that cannot load should cost the
+ * page a panel, not an error.
+ */
+function SidebarSections() {
+  const [topSelling, setTopSelling] = useState<PublicProduct[]>([]);
+  const [bestSellers, setBestSellers] = useState<PublicProduct[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [topRes, bestRes] = await Promise.all([
+          publicProductService.getProducts({
+            sortBy: 'rating',
+            sortOrder: 'desc',
+            limit: 4,
+            inStock: true,
+          }),
+          publicProductService.getProductsByTag('Best Seller', 4),
+        ]);
+        if (!alive) return;
+        if (topRes.success && topRes.data) setTopSelling(topRes.data.items);
+        if (bestRes.success && bestRes.data) setBestSellers(bestRes.data.items);
+      } catch {
+        /* the sidebar failing silently is okay */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  return (
+    <View style={{ gap: 12, paddingHorizontal: 16, paddingBottom: 32 }}>
+      <ProductPanel
+        title="Top Selling Products"
+        Icon={Star}
+        iconColor="#eab308"
+        items={topSelling}
+        ctaLabel="View All Products"
+        ctaColor="#e01a1b"
+        ctaBorder="rgba(224,26,27,0.3)"
+        onCta={() => router.push('/(any)/products' as any)}
+        showDiscount={false}
+      />
+
+      <ProductPanel
+        title="Best Seller"
+        Icon={Package}
+        iconColor="#16a34a"
+        items={bestSellers}
+        ctaLabel="View Best Sellers"
+        ctaColor="#16a34a"
+        ctaBorder="#bbf7d0"
+        onCta={() => router.push({ pathname: '/(any)/products', params: { collection: 'best-seller' } })}
+        emptyText="No Best Sellers found"
+        showDiscount
+      />
+
+      <View style={os.panel}>
+        <Text style={os.panelTitle}>Quick Actions</Text>
+        <View style={{ gap: 8 }}>
+          {[
+            { Icon: Package, color: '#e01a1b', label: 'Browse Products', to: '/(any)/products' },
+            { Icon: ShoppingCart, color: '#16a34a', label: 'View Cart', to: '/(tabs)/cart' },
+            { Icon: Eye, color: '#e01a1b', label: 'Account Settings', to: '/(tabs)/profile' },
+          ].map(({ Icon, color, label, to }) => (
+            <Pressable
+              key={label}
+              onPress={() => router.push(to as any)}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
+              style={os.quickRow}
+            >
+              <Icon size={18} color={color} />
+              <Text style={os.quickLabel}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function ProductPanel({
+  title,
+  Icon,
+  iconColor,
+  items,
+  ctaLabel,
+  ctaColor,
+  ctaBorder,
+  onCta,
+  emptyText = 'Loading...',
+  showDiscount,
+}: {
+  title: string;
+  Icon: any;
+  iconColor: string;
+  items: PublicProduct[];
+  ctaLabel: string;
+  ctaColor: string;
+  ctaBorder: string;
+  onCta: () => void;
+  emptyText?: string;
+  showDiscount: boolean;
+}) {
+  return (
+    <View style={os.panel}>
+      <View style={os.panelHead}>
+        <Icon size={18} color={iconColor} />
+        <Text style={os.panelTitle}>{title}</Text>
+      </View>
+
+      <View style={{ gap: 10 }}>
+        {items.map((p) => {
+          const rating = Number(p.rating) || 0;
+          const reviews = Number(p.reviews) || 0;
+          const price = getRegionalPrice(p);
+          const discount = Number((p as any).discount) || 0;
+          const img = p.images?.find((i) => i.isPrimary)?.url || p.images?.[0]?.url;
+
+          return (
+            <Pressable
+              key={p.id}
+              onPress={() => router.push({ pathname: '/(any)/products/[id]', params: { id: p.id } })}
+              accessibilityRole="button"
+              accessibilityLabel={p.name}
+              android_ripple={{ color: 'rgba(15,23,42,0.05)' }}
+              style={os.productRow}
+            >
+              <View style={os.productThumb}>
+                {img ? (
+                  <Image source={{ uri: img }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                ) : (
+                  <Package size={20} color="#94a3b8" />
+                )}
+              </View>
+
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={os.productName} numberOfLines={2}>
+                  {p.name}
+                </Text>
+
+                <View style={os.productPriceRow}>
+                  <Text style={os.productPrice}>{formatPrice(price)}</Text>
+                  {showDiscount && discount > 0 ? (
+                    <View style={os.offChip}>
+                      <Text style={os.offChipText}>{discount}% OFF</Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                {/* The web shows a rating badge once a product has reviews, and
+                    a "New" badge until then — so the row is never a bare name. */}
+                {reviews > 0 ? (
+                  <LinearGradient
+                    colors={['#F5A524', '#F59E0B']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={os.ratingChip}
+                  >
+                    <Text style={os.ratingScore}>{rating.toFixed(1)}</Text>
+                    <Sparkles size={10} color="#ffffff" fill="#ffffff" strokeWidth={1.5} />
+                    <Text style={os.ratingCount}>{reviews}</Text>
+                  </LinearGradient>
+                ) : (
+                  <LinearGradient
+                    colors={['#6366F1', '#8B5CF6']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={os.newChip}
+                  >
+                    <Text style={os.newChipText}>New</Text>
+                  </LinearGradient>
+                )}
+              </View>
+            </Pressable>
+          );
+        })}
+
+        {items.length === 0 ? <Text style={os.panelEmpty}>{emptyText}</Text> : null}
+      </View>
+
+      <Pressable
+        onPress={onCta}
+        accessibilityRole="button"
+        accessibilityLabel={ctaLabel}
+        android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
+        style={[os.panelCta, { borderColor: ctaBorder }]}
+      >
+        <Text style={[os.panelCtaText, { color: ctaColor }]}>{ctaLabel}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 // ─── Styles ────────────────────────────────────────────────────────
 const os = StyleSheet.create({
+  panel: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 16,
+  },
+  panelHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  panelTitle: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 16,
+    // Outfit is static: the weight must name the loaded file (Outfit_700Bold).
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 0,
+  },
+  panelEmpty: {
+    fontFamily: Fonts.sans,
+    fontSize: 13,
+    color: '#94a3b8',
+    textAlign: 'center',
+    paddingVertical: 14,
+  },
+  panelCta: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 10,
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  panelCtaText: { fontFamily: Fonts.sansMedium, fontSize: 13.5, fontWeight: '500' },
+
+  productRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    padding: 10,
+  },
+  productThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  productName: {
+    fontFamily: Fonts.sansMedium,
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 17,
+    color: '#0f172a',
+  },
+  productPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
+  productPrice: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  offChip: {
+    backgroundColor: '#dcfce7',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  offChipText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#15803d',
+  },
+
+  ratingChip: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    marginTop: 5,
+  },
+  ratingScore: { fontFamily: Fonts.sansBold, fontSize: 10.5, fontWeight: '700', color: '#ffffff' },
+  ratingCount: { fontFamily: Fonts.sans, fontSize: 10.5, color: 'rgba(255,255,255,0.85)' },
+  newChip: {
+    alignSelf: 'flex-start',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginTop: 5,
+  },
+  newChipText: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    color: '#ffffff',
+  },
+
+  quickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    overflow: 'hidden',
+  },
+  quickLabel: {
+    fontFamily: Fonts.sansMedium,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0f172a',
+  },
+
   // ── Header ──────────────────────────────────────────────────────────────
   header: {
     backgroundColor: '#fff',
