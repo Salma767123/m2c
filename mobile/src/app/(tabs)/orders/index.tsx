@@ -20,8 +20,8 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  ChevronRight,
   ChevronDown,
+  Check,
   Search,
   X,
   Download,
@@ -136,7 +136,7 @@ const money = (n: number, currency?: string | null) =>
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function OrdersScreen() {
-  const [tab, setTab] = useState<'active' | 'history'>('active');
+  const [statusOpen, setStatusOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   /* Date range. Held as YYYY-MM-DD strings exactly as the web does, so the
@@ -301,7 +301,13 @@ export default function OrdersScreen() {
 
   const active = filtered.filter((o) => !['delivered', 'cancelled'].includes(normalizeStatus(o.status)));
   const history = filtered.filter((o) => ['delivered', 'cancelled'].includes(normalizeStatus(o.status)));
-  const display = tab === 'active' ? active : history;
+  /* "Returned" is an Indian-market status; elsewhere the option would filter
+     to a list that can never have anything in it. */
+  const statusOptions = STATUS_FILTERS.filter(
+    (f) => f.value !== 'returned' || getRegion() === 'IN',
+  );
+  const statusLabel =
+    statusOptions.find((f) => f.value === statusFilter)?.label ?? 'All Orders';
   const isFiltering =
     search.trim().length > 0 || statusFilter !== 'all' || fromDate !== '' || toDate !== '';
 
@@ -375,34 +381,23 @@ export default function OrdersScreen() {
           </View>
         </View>
 
-        {/* Status. The web uses a dropdown; chips keep the current selection
-            visible without a tap and give a proper touch target. */}
+        {/* Status. A dropdown, like the web's and like the rest of this card —
+            a scrolling row of chips was the odd control out between two text
+            fields and two date fields, and the options past the fourth were off
+            the right edge with nothing to say so. */}
         <View style={{ marginTop: 12 }}>
           <Text style={os.fieldLabel}>Status</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8 }}
-            style={{ flexGrow: 0 }}
+          <Pressable
+            onPress={() => setStatusOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Status, ${statusLabel}`}
+            accessibilityState={{ expanded: statusOpen }}
+            android_ripple={{ color: 'rgba(15,23,42,0.05)' }}
+            style={os.selectBox}
           >
-            {STATUS_FILTERS.filter((f) => f.value !== 'returned' || getRegion() === 'IN').map((f) => {
-              const isActive = statusFilter === f.value;
-              return (
-                <Pressable
-                  key={f.value}
-                  onPress={() => setStatusFilter(f.value)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: isActive }}
-                  accessibilityLabel={`Filter by ${f.label}`}
-                  style={[os.filterChip, isActive && os.filterChipActive]}
-                >
-                  <Text style={[os.filterChipText, isActive && os.filterChipTextActive]}>
-                    {f.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+            <Text style={os.selectValue} numberOfLines={1}>{statusLabel}</Text>
+            <ChevronDown size={18} color={Palette.textMuted} />
+          </Pressable>
         </View>
 
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
@@ -432,26 +427,7 @@ export default function OrdersScreen() {
         ) : null}
       </View>
 
-      {/* Segmented tab control */}
-      {/* Segmented tab control */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            backgroundColor: '#e9eaee',
-            borderRadius: 12,
-            padding: 4,
-          }}
-        >
-          {/* The web stacks two sections, "Current Orders" and "Past Orders".
-              A phone switches between them rather than scrolling past one to
-              reach the other, but the words are the web's. */}
-          <SegTab label="Current" count={active.length} active={tab === 'active'} onPress={() => setTab('active')} />
-          <SegTab label="Past" count={history.length} active={tab === 'history'} onPress={() => setTab('history')} />
-        </View>
-      </View>
-
-      {display.length === 0 ? (
+      {filtered.length === 0 ? (
         /* The panels below stay even with no orders — the web shows them either
            way, and an account with nothing in it is exactly when somewhere to
            go next is worth offering. */
@@ -476,11 +452,7 @@ export default function OrdersScreen() {
             fill={false}
             icon={Package}
             title="No Orders Found"
-            subtitle={
-              tab === 'active'
-                ? "You haven't placed any orders yet"
-                : 'Completed and cancelled orders will appear here.'
-            }
+            subtitle="You haven't placed any orders yet"
             ctaLabel="Start Shopping"
             onPress={() => router.push('/(tabs)' as any)}
           />
@@ -493,20 +465,34 @@ export default function OrdersScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111827" />}
         >
-          {display.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              expanded={expanded.has(order.id)}
-              onToggleExpand={() => toggleExpand(order.id)}
-              onTrack={() => setTrackOrder(order)}
-              onInvoice={() => downloadInvoice(order.id)}
-              invoiceBusy={loadingInvoice}
-              onCancel={() => setActionModal({ order, type: 'cancel' })}
-              onReturn={() => setReturnModalOrder(order)}
-              existingReturn={returnsByOrder[order.orderId]}
-            />
-          ))}
+          {/* Two stacked sections, as the web has them. This was a segmented
+              tab control, on the reasoning that a phone should switch rather
+              than scroll — but that hides half the orders behind a control,
+              and the web scrolls through both at its own phone width. */}
+          {([
+            { key: 'active', title: 'Current Orders', rows: active },
+            { key: 'history', title: 'Past Orders', rows: history },
+          ] as const).map((section) =>
+            section.rows.length > 0 ? (
+              <View key={section.key} style={{ gap: 12 }}>
+                <Text style={os.sectionTitle}>{section.title}</Text>
+                {section.rows.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    expanded={expanded.has(order.id)}
+                    onToggleExpand={() => toggleExpand(order.id)}
+                    onTrack={() => setTrackOrder(order)}
+                    onInvoice={() => downloadInvoice(order.id)}
+                    invoiceBusy={loadingInvoice}
+                    onCancel={() => setActionModal({ order, type: 'cancel' })}
+                    onReturn={() => setReturnModalOrder(order)}
+                    existingReturn={returnsByOrder[order.orderId]}
+                  />
+                ))}
+              </View>
+            ) : null,
+          )}
           <SidebarSections />
         </ScrollView>
       )}
@@ -532,6 +518,44 @@ export default function OrdersScreen() {
       />
 
       <TrackOrderModal order={trackOrder} onClose={() => setTrackOrder(null)} />
+
+      {/* Status options. A sheet rather than an anchored menu: that is how a
+          phone picks from a list, and it keeps the choices clear of the
+          keyboard the search field above may have raised. */}
+      <Modal visible={statusOpen} transparent animationType="fade" onRequestClose={() => setStatusOpen(false)}>
+        <Pressable
+          style={os.sheetBackdrop}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          onPress={() => setStatusOpen(false)}
+        />
+        <View style={[os.sheet, { paddingBottom: 24 }]}>
+          <View style={os.sheetHandle} />
+          <Text style={os.sheetTitle}>Status</Text>
+          <ScrollView bounces={false} style={{ maxHeight: 360 }}>
+            {statusOptions.map((f) => {
+              const isActive = statusFilter === f.value;
+              return (
+                <Pressable
+                  key={f.value}
+                  onPress={() => {
+                    setStatusFilter(f.value);
+                    setStatusOpen(false);
+                  }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isActive }}
+                  accessibilityLabel={f.label}
+                  android_ripple={{ color: 'rgba(224,26,27,0.08)' }}
+                  style={[os.sheetRow, isActive && { backgroundColor: '#fdf3f0' }]}
+                >
+                  <Text style={[os.sheetRowText, isActive && { color: '#7a0f10' }]}>{f.label}</Text>
+                  {isActive ? <Check size={18} color={Palette.primary} strokeWidth={2.4} /> : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </Modal>
 
       {/* Invoice — the backend returns rendered HTML. */}
       <Modal
@@ -728,63 +752,6 @@ function DateField({
 }
 
 // ─── Segmented Tab ──────────────────────────────────────────────────────────────
-function SegTab({
-  label,
-  count,
-  active,
-  onPress,
-}: {
-  label: string;
-  count: number;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="tab"
-      accessibilityState={{ selected: active }}
-      accessibilityLabel={`${label}, ${count} orders`}
-      style={{ flex: 1 }}
-    >
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: 40,
-          borderRadius: 9,
-          backgroundColor: active ? '#fff' : 'transparent',
-          gap: 6,
-          shadowColor: active ? '#0f172a' : 'transparent',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: active ? 0.1 : 0,
-          shadowRadius: 3,
-          elevation: active ? 2 : 0,
-        }}
-      >
-        <Text style={{ fontFamily: Fonts.sansBold, fontSize: 14, fontWeight: '700', color: active ? '#0f172a' : '#64748b' }}>
-          {label}
-        </Text>
-        <View
-          style={{
-            minWidth: 22,
-            height: 20,
-            borderRadius: 10,
-            paddingHorizontal: 6,
-            backgroundColor: active ? '#111827' : '#d6d8dd',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={{ fontFamily: Fonts.sansBold, fontSize: 11, fontWeight: '800', color: active ? '#fff' : '#475569' }}>
-            {count}
-          </Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
 function OrderCard({
@@ -817,6 +784,7 @@ function OrderCard({
 
   // Gating copied from the web list card (and matching orders/[id].tsx).
   const canCancel = CANCELLABLE_STATUSES.has(order.status);
+  const StatusIcon = status.icon;
   const returnStatus = order.returnRequest?.status;
   /*
    * Returns are an INR feature: the web offers Return only when the order is
@@ -858,18 +826,34 @@ function OrderCard({
         accessibilityLabel={`Order ${order.orderId}, ${status.label}, total ${money(order.totalAmount, order.currency)}`}
         android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
       >
-        {/* Header: order id + date / status */}
+        {/* Header — the status glyph leads, then the order number, with the
+            pill on the right. The glyph is the web's: a clock while an order is
+            being processed, a lorry once it ships, a tick when it lands, a
+            cross when it does not. Mobile had the pill alone, so the state was
+            readable only by stopping to read a word. */}
         <View style={os.cardHead}>
-          <View style={{ flex: 1, marginRight: 12 }}>
-            <Text style={os.orderNo}>#{order.orderId}</Text>
-            <Text style={os.orderDate}>
-              {orderService.formatDate(order.orderDate || order.createdAt)}
-            </Text>
-          </View>
+          <StatusIcon size={18} color={status.dot} strokeWidth={2} />
+          {/* No "#". The order number already reads as one — ORD-2026-128754831
+              — and the web prints it bare. */}
+          <Text style={os.orderNo} numberOfLines={1}>{order.orderId}</Text>
           <View style={[os.statusPill, { backgroundColor: status.bg }]}>
-            <View style={[os.statusDot, { backgroundColor: status.dot }]} />
             <Text style={[os.statusText, { color: status.fg }]}>{status.label}</Text>
           </View>
+        </View>
+
+        <View style={os.cardSub}>
+          <Text style={os.orderDate}>
+            Placed on {orderService.formatDate(order.orderDate || order.createdAt)}
+          </Text>
+          {/* The total, up here with the facts rather than in a labelled band
+              at the foot of the card. It is the number anyone scanning a list
+              of orders is looking for. */}
+          <Text style={os.orderTotal}>{money(order.totalAmount, order.currency)}</Text>
+          {order.trackingReference ? (
+            <Text style={os.trackingLine} numberOfLines={1}>
+              Tracking: {order.trackingReference}
+            </Text>
+          ) : null}
         </View>
 
         {/* Item preview */}
@@ -888,8 +872,8 @@ function OrderCard({
                     <Package size={22} color="#94a3b8" />
                   )}
                 </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={os.itemName} numberOfLines={1}>
+                <View style={{ flex: 1, marginLeft: 12, minWidth: 0 }}>
+                  <Text style={os.itemName} numberOfLines={2}>
                     {it.productName}
                   </Text>
                   <Text style={os.itemMeta}>
@@ -902,6 +886,16 @@ function OrderCard({
                       ? `  ·  +${extraCount} more ${extraCount === 1 ? 'item' : 'items'}`
                       : ''}
                   </Text>
+                </View>
+
+                {/* What the line costs, and what one of them costs. The card
+                    showed neither, so a two-item order gave no way to tell
+                    which half of the total came from where. */}
+                <View style={os.itemMoney}>
+                  <Text style={os.itemTotal}>{money(it.totalPrice, order.currency)}</Text>
+                  {it.quantity > 1 ? (
+                    <Text style={os.itemEach}>{money(it.unitPrice, order.currency)} each</Text>
+                  ) : null}
                 </View>
               </View>
             ))}
@@ -938,25 +932,45 @@ function OrderCard({
         </View>
       ) : null}
 
-      {/* Total */}
-      <View style={os.totalRow}>
-        <View>
-          <Text style={os.totalLabel}>Total</Text>
-          <Text style={os.totalValue}>{money(order.totalAmount, order.currency)}</Text>
-        </View>
-      </View>
+      {/* Actions.
 
-      {/* Actions */}
-      <View style={os.actionRow}>
+          View Details and Download Invoice are the two every order has, so
+          they run full width and stacked, as on the web. They used to sit in
+          the same wrapping row as Track, Cancel and Return, which left the
+          primary action at whatever width happened to be left over on its
+          line — sometimes half a card, sometimes a third. */}
+      <View style={os.primaryActions}>
         <Pressable
           onPress={openDetail}
           accessibilityRole="button"
           accessibilityLabel="View details"
-          style={[os.actionBtn, os.actionPrimary]}
+          android_ripple={{ color: 'rgba(255,255,255,0.18)' }}
+          style={os.primaryBtn}
         >
-          <Text style={os.actionPrimaryText}>View Details</Text>
-          <ChevronRight size={15} color="#fff" strokeWidth={2.5} />
+          <Eye size={16} color="#ffffff" strokeWidth={2.2} />
+          <Text style={os.primaryBtnText}>View Details</Text>
         </Pressable>
+
+        <Pressable
+          onPress={onInvoice}
+          disabled={invoiceBusy}
+          accessibilityRole="button"
+          accessibilityLabel="Download invoice"
+          accessibilityState={{ disabled: invoiceBusy, busy: invoiceBusy }}
+          android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
+          style={[os.invoiceBtn, invoiceBusy && { opacity: 0.6 }]}
+        >
+          {invoiceBusy ? (
+            <ActivityIndicator size="small" color="#334155" />
+          ) : (
+            <Download size={16} color="#334155" strokeWidth={2.2} />
+          )}
+          <Text style={os.invoiceBtnText}>Download Invoice</Text>
+        </Pressable>
+      </View>
+
+      {/* Everything else an order may or may not offer. */}
+      <View style={os.actionRow}>
 
         {/* Nothing left to track once it has arrived — the web hides this on a
             delivered order and mobile kept showing it. */}
@@ -971,22 +985,6 @@ function OrderCard({
             <Text style={os.actionOutlineBrandText}>Track Order</Text>
           </Pressable>
         ) : null}
-
-        <Pressable
-          onPress={onInvoice}
-          disabled={invoiceBusy}
-          accessibilityRole="button"
-          accessibilityLabel="Download invoice"
-          accessibilityState={{ disabled: invoiceBusy, busy: invoiceBusy }}
-          style={[os.actionBtn, os.actionMuted, invoiceBusy && { opacity: 0.6 }]}
-        >
-          {invoiceBusy ? (
-            <ActivityIndicator size="small" color="#334155" />
-          ) : (
-            <Download size={14} color="#334155" />
-          )}
-          <Text style={os.actionMutedText}>Invoice</Text>
-        </Pressable>
 
         {canCancel ? (
           <Pressable
@@ -1273,6 +1271,86 @@ function ProductPanel({
 
 // ─── Styles ────────────────────────────────────────────────────────
 const os = StyleSheet.create({
+  /* The two section mastheads. `font-playfair text-xl font-semibold` on the
+     web, which resolves to the heading face here. */
+  sectionTitle: {
+    fontFamily: Fonts.heading,
+    fontSize: 20,
+    // Poppins is static: the weight must name the loaded file.
+    fontWeight: '600',
+    letterSpacing: -0.5,
+    color: '#1a1a1a',
+    marginTop: 4,
+  },
+
+  /* The status trigger, built to the same measurements as the search and date
+     fields beside it so the four read as one stack. */
+  selectBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e6dcd0',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 14,
+    overflow: 'hidden',
+  },
+  selectValue: {
+    flex: 1,
+    fontFamily: Fonts.sansMedium,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#1a1a1a',
+  },
+
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(26,20,22,0.45)',
+  },
+  sheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#e2d8cc',
+    marginBottom: 14,
+  },
+  sheetTitle: {
+    fontFamily: Fonts.heading,
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+    color: '#1a1a1a',
+    marginBottom: 10,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 52,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+  },
+  sheetRowText: {
+    fontFamily: Fonts.sansMedium,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#1a1a1a',
+  },
+
   panel: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
@@ -1507,18 +1585,6 @@ const os = StyleSheet.create({
     includeFontPadding: false,
   },
 
-  filterChip: {
-    paddingHorizontal: 14,
-    height: 32,
-    borderRadius: Radius.full,
-    justifyContent: 'center',
-    backgroundColor: Palette.surface,
-    borderWidth: 1,
-    borderColor: Palette.outline,
-  },
-  filterChipActive: { backgroundColor: Palette.primary, borderColor: Palette.primary },
-  filterChipText: { fontFamily: Fonts.sansSemibold, fontSize: 12.5, fontWeight: '600', color: Palette.text },
-  filterChipTextActive: { color: Palette.onPrimary },
 
   // ── Order card ──────────────────────────────────────────────────────────
   card: {
@@ -1537,29 +1603,88 @@ const os = StyleSheet.create({
   cardHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
     paddingHorizontal: 16,
     paddingTop: 14,
-    paddingBottom: 12,
   },
   orderNo: {
+    flex: 1,
+    minWidth: 0,
     fontFamily: Fonts.sansBold,
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: '700',
     color: '#0f172a',
     letterSpacing: -0.2,
   },
-  orderDate: { fontFamily: Fonts.sans, fontSize: 12, color: '#64748b', marginTop: 2 },
+  cardSub: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 },
+  orderDate: { fontFamily: Fonts.sans, fontSize: 12.5, color: '#64748b' },
+  orderTotal: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#0f172a',
+    letterSpacing: -0.3,
+    marginTop: 8,
+  },
+  trackingLine: { fontFamily: Fonts.sans, fontSize: 12, color: '#64748b', marginTop: 3 },
+  /* No dot: the glyph beside the order number already carries the state, and
+     a dot inside the pill next to it said the same thing twice. */
   statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: 20,
   },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontFamily: Fonts.sansBold, fontSize: 12, fontWeight: '700' },
+
+  /* Full width, stacked, and separated from the items by the card's own rule
+     — the web's arrangement for the two actions every order has. */
+  primaryActions: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    marginTop: 12,
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f3f5',
+  },
+  primaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 46,
+    borderRadius: 999,
+    backgroundColor: '#e01a1b',
+    overflow: 'hidden',
+    shadowColor: '#e01a1b',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    // Android paints elevation only.
+    elevation: 3,
+  },
+  primaryBtnText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 14.5,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  invoiceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 46,
+    borderRadius: 999,
+    backgroundColor: '#f1f3f5',
+    overflow: 'hidden',
+  },
+  invoiceBtnText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 14.5,
+    fontWeight: '600',
+    color: '#334155',
+  },
 
   itemRow: {
     flexDirection: 'row',
@@ -1581,6 +1706,9 @@ const os = StyleSheet.create({
   },
   itemName: { fontFamily: Fonts.sansBold, fontSize: 14, fontWeight: '700', color: '#0f172a' },
   itemMeta: { fontFamily: Fonts.sans, fontSize: 12, color: '#64748b', marginTop: 3 },
+  itemMoney: { alignItems: 'flex-end', marginLeft: 10 },
+  itemTotal: { fontFamily: Fonts.sansBold, fontSize: 14, fontWeight: '700', color: '#0f172a' },
+  itemEach: { fontFamily: Fonts.sans, fontSize: 11.5, color: '#94a3b8', marginTop: 2 },
 
   expandRow: {
     flexDirection: 'row',
@@ -1610,29 +1738,6 @@ const os = StyleSheet.create({
   },
   etaText: { fontFamily: Fonts.sans, fontSize: 12.5, color: '#c41617' },
 
-  totalRow: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    marginTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f3f5',
-  },
-  totalLabel: {
-    fontFamily: Fonts.sansBold,
-    fontSize: 11,
-    color: '#94a3b8',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  totalValue: {
-    fontFamily: Fonts.sansBold,
-    fontSize: 19,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginTop: 1,
-    letterSpacing: -0.3,
-  },
 
   actionRow: {
     flexDirection: 'row',
@@ -1651,13 +1756,6 @@ const os = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: Radius.full,
   },
-  actionPrimary: { backgroundColor: Palette.primary, paddingRight: 10 },
-  actionPrimaryText: {
-    fontFamily: Fonts.sansBold,
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fff',
-  },
   actionOutlineBrand: { borderWidth: 1, borderColor: Palette.primary },
   actionOutlineBrandText: {
     fontFamily: Fonts.sansSemibold,
@@ -1666,13 +1764,6 @@ const os = StyleSheet.create({
     color: Palette.primary,
   },
   /* `bg-slate-100 text-slate-700` */
-  actionMuted: { backgroundColor: '#f1f5f9' },
-  actionMutedText: {
-    fontFamily: Fonts.sansSemibold,
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#334155',
-  },
   /* `border-red-300 text-red-600` */
   actionOutlineDanger: { borderWidth: 1, borderColor: '#fca5a5' },
   actionOutlineDangerText: {

@@ -31,6 +31,7 @@ import ProfileTab from './ProfileTab';
 import type { UserProfile } from './types';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { userAuthService } from '@/services/userAuthService';
+import { setUserAvatarImage } from '@/lib/userAvatar';
 import { userProfileService } from '@/services/userProfileService';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
@@ -154,6 +155,10 @@ export default function Profile() {
         };
         setUserProfile(profile);
         setEditedProfile(profile);
+        // The server is the authority on the photo — a session stored before
+        // the account last changed it would otherwise keep the drawer and the
+        // Profile tab on the old one.
+        setUserAvatarImage(profile.image || '');
       }
      } catch (e: any) {
       showErrorToast('Load Failed', e.message || 'Unable to load profile');
@@ -255,9 +260,11 @@ export default function Profile() {
     }
   };
 
-  // Mirror the new photo into the stored auth session so the sidebar avatar
-  // updates instantly (same mechanism login uses on the web).
+  // Mirror the new photo into the stored auth session, then tell the shared
+  // avatar store. The write alone was never enough: nothing read it back, so
+  // the drawer and the Profile tab kept the old photo until the app restarted.
   const syncStoredImage = async (image: string) => {
+    setUserAvatarImage(image);
     try {
       const raw = await userAuthService.getUserData();
       if (raw) {
@@ -265,7 +272,7 @@ export default function Profile() {
         await AsyncStorage.setItem('userData', JSON.stringify(raw));
       }
     } catch {
-      // non-fatal — avatar will refresh on next reload
+      // non-fatal — the store already carries the new photo for this session
     }
   };
 

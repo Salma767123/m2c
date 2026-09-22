@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Pressable, Dimensions } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { RefreshCw, PackageSearch } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import ProductCard from '../ProductCard/ProductCard';
-import { PRODUCT_CARD_WIDTH } from '../ProductCard/metrics';
+import { PRODUCT_CARD_WIDTH, CARD_GUTTER } from '../ProductCard/metrics';
 import { UnrollReveal } from '@/components/WebSite/Shared/Reveal';
 
 import { publicProductService, PublicProduct } from '@/services/publicProductService';
@@ -19,10 +19,7 @@ const UNROLL_STAGGER_MS = 170;
 
 // Matches frontend Featured/Products.tsx: FEATURED_COUNT = 6.
 const LIMIT = 6;
-const H_MARGIN = 12;
-const CARD_PAD = 14;
 const GRID_GAP = 12;
-const screenWidth = Dimensions.get('window').width;
 // One shared width for every product grid in the app.
 const CARD_WIDTH = PRODUCT_CARD_WIDTH;
 
@@ -100,15 +97,17 @@ function SectionCard({
       colors={['#faf6f0', '#f4ebe0', '#f8f2ea']}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
+      /* `border-y` and nothing else: a band running edge to edge, which is
+         what the web's <section> is. It had been given a 20pt radius and a
+         12pt side margin on top of the no-side-borders rule — a shape that is
+         neither a band nor a card, and one that cost every product card inside
+         it 10pt of width. */
       style={{
         marginTop: 10,
-        marginHorizontal: H_MARGIN,
-        borderRadius: 20,
-        padding: CARD_PAD,
+        paddingVertical: 18,
+        paddingHorizontal: CARD_GUTTER,
         borderTopWidth: 1,
         borderBottomWidth: 1,
-        borderLeftWidth: 0,
-        borderRightWidth: 0,
         borderColor: '#ece0d2',
       }}
     >

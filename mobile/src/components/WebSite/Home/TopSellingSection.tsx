@@ -11,7 +11,7 @@ import {
 import { ChevronLeft, ChevronRight, RefreshCw, PackageSearch } from 'lucide-react-native';
 import { router } from 'expo-router';
 import ProductCard from '../ProductCard/ProductCard';
-import { PRODUCT_CARD_WIDTH } from '../ProductCard/metrics';
+import { PRODUCT_CARD_WIDTH, CARD_GUTTER } from '../ProductCard/metrics';
 import { Reveal, EASE_CARD } from '@/components/WebSite/Shared/Reveal';
 import { publicProductService, PublicProduct } from '@/services/publicProductService';
 import { Palette, Fonts } from '@/constants/theme';
@@ -52,8 +52,6 @@ const CARD_STAGGER_MS = 85;
 const CARD_MS = 620;
 
 const LIMIT = 8; // a rail can carry more than a 4-up grid
-const H_MARGIN = 12;
-const CARD_PAD = 14;
 const RAIL_GAP = 12;
 
 /* Card width stays PRODUCT_CARD_WIDTH rather than the web's 240px. The web's
@@ -141,6 +139,17 @@ export default function TopSellingSection() {
     <View style={s.card}>
       <SectionHeading section="topSelling" />
 
+      {/* Part of the masthead, not a footer. The web sets this pill in the
+          lead column directly under the copy — "the standard pill, same as
+          Featured and Best Sellers" — and deliberately moved the rail's arrows
+          OUT from beside it and under the cards, because a control belongs
+          with the thing it controls. Mobile had done the opposite: arrows
+          under the rail, but the pill after them, so the section closed on its
+          call to action rather than opening on one. */}
+      <View style={s.ctaWrap}>
+        <SectionCta section="topSelling" onPress={goToAll} />
+      </View>
+
       {state === 'loading' ? (
         <Rail>
           {Array.from({ length: 3 }).map((_, i) => (
@@ -189,8 +198,6 @@ export default function TopSellingSection() {
           </View>
         </>
       )}
-
-      <SectionCta section="topSelling" onPress={goToAll} />
     </View>
   );
 }
@@ -271,20 +278,18 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
 }
 
 const s = StyleSheet.create({
+  /* `bg-white py-8` — a band, as on the web. It was a rounded white card with
+     a border, a shadow and 12pt side margins floating on a white page, which
+     gave it an outline it did not need and took 10pt of width off every card
+     in the rail. */
   card: {
     marginTop: 10,
-    marginHorizontal: H_MARGIN,
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    paddingVertical: CARD_PAD,
-    paddingHorizontal: CARD_PAD,
-    borderWidth: 1,
-    borderColor: '#eceef1',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    paddingVertical: 18,
+    paddingHorizontal: CARD_GUTTER,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#f1ece6',
   },
 
   /* `alignItems: stretch` so every card in the rail takes the height of the
@@ -293,9 +298,11 @@ const s = StyleSheet.create({
      below its neighbour's — which is exactly what the rail was doing. */
   railContent: {
     gap: RAIL_GAP,
-    paddingRight: CARD_PAD,
+    paddingRight: CARD_GUTTER,
     alignItems: 'stretch',
   },
+
+  ctaWrap: { marginBottom: 18 },
 
   railBtnRow: {
     flexDirection: 'row',

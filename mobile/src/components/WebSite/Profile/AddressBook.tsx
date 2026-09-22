@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, StatusBar } from 'react-native';
-import { ArrowLeft, Plus, MapPin, Home, Briefcase, Pencil, Trash2, Star } from 'lucide-react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
+import { Plus, MapPin, Home, Briefcase, Pencil, Trash2, Star } from 'lucide-react-native';
 import { useConfirm } from '@/components/WebSite/Shared/ConfirmDialog';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ScreenHeader from '@/components/WebSite/Shared/ScreenHeader';
+import EmptyState from '@/components/WebSite/Shared/EmptyState';
 import {
   addressService,
   MAX_SAVED_ADDRESSES,
@@ -12,14 +14,39 @@ import {
 } from '@/services/addressService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import AddressFormModal from './AddressFormModal';
-import { Palette } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
 
-const TYPE_META: Record<string, { label: string; Icon: typeof Home; bg: string; fg: string }> = {
-  home: { label: 'Home', Icon: Home, bg: '#ecfdf5', fg: '#047857' },
-  work: { label: 'Work', Icon: Briefcase, bg: '#eef2ff', fg: '#4338ca' },
-  other: { label: 'Other', Icon: MapPin, bg: '#f1f5f9', fg: '#475569' },
+/**
+ * Warm palette, 1:1 with the web's AddressBook.tsx.
+ *
+ * This screen was slate throughout — #111827, #6b7280, #374151, #e5e7eb — and
+ * set every string with a bare fontSize and no `fontFamily` at all, so on
+ * Android the whole page rendered in Roboto beside screens rendering in Outfit
+ * and Poppins. Both are fixed here.
+ */
+const WARM = {
+  ink: '#1a1a1a',
+  body: '#5f5550',
+  muted: '#7a6d62',
+  subtle: '#a89a8d',
+  line: '#efe4d8',
+  lineSoft: '#f2e9df',
+  ground: '#faf7f3',
+  red: '#e01a1b',
+  deep: '#c41617',
+  dark: '#7a0f10',
+  defaultBg: '#fdf8f6',
+  defaultLine: '#e8d2cb',
+} as const;
+
+/* The type chip is one neutral pill for all three, as on the web. It used to
+   take a different tint per type — mint, indigo, slate — which made "Home" and
+   "Work" read as statuses rather than as labels. */
+const TYPE_META: Record<string, { label: string; Icon: typeof Home }> = {
+  home: { label: 'Home', Icon: Home },
+  work: { label: 'Work', Icon: Briefcase },
+  other: { label: 'Other', Icon: MapPin },
 };
-
 export default function AddressBook() {
   const confirm = useConfirm();
   const insets = useSafeAreaInsets();
@@ -118,55 +145,37 @@ export default function AddressBook() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-
-      {/* Header */}
-      <View
-        style={{
-          backgroundColor: '#fff',
-          paddingHorizontal: 8,
-          paddingTop: insets.top + 8,
-          paddingBottom: 12,
-          borderBottomWidth: 1,
-          borderBottomColor: '#e5e7eb',
-          flexDirection: 'row',
-          alignItems: 'center',
-        }}
-      >
-        <Pressable
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          hitSlop={6}
-          style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
-        >
-          <ArrowLeft size={22} color="#111827" />
-        </Pressable>
-        <View style={{ flex: 1, marginLeft: 4 }}>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Saved Addresses</Text>
-          <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>
-            {addresses.length} of {MAX_SAVED_ADDRESSES} addresses used
-          </Text>
-        </View>
-      </View>
+    <View style={s.screen}>
+      <ScreenHeader
+        title="Saved Addresses"
+        eyebrow="Where we deliver"
+        subtitle={`${addresses.length} of ${MAX_SAVED_ADDRESSES} saved`}
+        onBack={() => router.back()}
+      />
 
       {loading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#111827" />
+        <View style={s.loading}>
+          <ActivityIndicator size="large" color={WARM.red} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100, gap: 12 }} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: 110, gap: 12 }}
+          showsVerticalScrollIndicator={false}
+        >
           {addresses.length === 0 ? (
-            <View style={{ alignItems: 'center', paddingVertical: 48, paddingHorizontal: 24, borderWidth: 2, borderColor: '#e2e8f0', borderStyle: 'dashed', borderRadius: 16, backgroundColor: '#fff' }}>
-              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                <MapPin size={28} color="#9ca3af" />
-              </View>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 4 }}>No saved addresses yet</Text>
-              <Text style={{ fontSize: 13, color: '#6b7280', textAlign: 'center', lineHeight: 19 }}>
-                Save your shipping addresses to check out faster next time.
-              </Text>
-            </View>
+            /* The shared empty state, not a dashed box. A dashed border means
+               "drop something here" — it is an upload affordance, and around a
+               list it made a finished screen look unbuilt. The web's Profile
+               note says exactly this about the frame it removed. */
+            <EmptyState
+              fill={false}
+              icon={MapPin}
+              title="No saved addresses yet"
+              subtitle="Save your shipping addresses to check out faster next time."
+              ctaLabel="Add address"
+              ctaIcon={Plus}
+              onPress={openAdd}
+            />
           ) : (
             addresses.map((addr) => {
               const meta = TYPE_META[addr.type] || TYPE_META.other;
@@ -175,59 +184,83 @@ export default function AddressBook() {
               return (
                 <View
                   key={addr.id}
-                  style={{
-                    borderWidth: addr.isDefault ? 2 : 1,
-                    borderColor: addr.isDefault ? '#111827' : '#e5e7eb',
-                    borderRadius: 16,
-                    backgroundColor: '#fff',
-                    padding: 16,
-                  }}
+                  /* 1px, not 2px. The web's note: "A 2px border around every
+                     card put more ink into the frames than into the addresses
+                     inside them. The default card is marked by a warm tint and
+                     its badge rather than by a heavier line." Mobile had the
+                     2px, and in near-black. */
+                  style={[s.card, addr.isDefault && s.cardDefault]}
                 >
-                  {/* Top row — type + default */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: meta.bg, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
-                      <Icon size={12} color={meta.fg} />
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: meta.fg }}>{meta.label}</Text>
+                  <View style={s.cardTop}>
+                    <View style={s.typeChip}>
+                      <Icon size={14} color={WARM.subtle} />
+                      <Text style={s.typeChipText}>{meta.label}</Text>
                     </View>
                     {addr.isDefault ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Palette.primary, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
-                        <Star size={10} color="#fff" fill="#fff" />
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>Default</Text>
+                      <View style={s.defaultChip}>
+                        <Star size={11} color="#ffffff" fill="#ffffff" />
+                        <Text style={s.defaultChipText}>Default</Text>
                       </View>
                     ) : null}
                   </View>
 
-                  {/* Address details */}
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>{addr.name}</Text>
-                  <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 1 }}>{addr.phone}</Text>
-                  <Text style={{ fontSize: 13, color: '#374151', marginTop: 6, lineHeight: 19 }}>
-                    {addr.address}{addr.addressLine2 ? `, ${addr.addressLine2}` : ''}
-                  </Text>
-                  <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19 }}>
-                    {addr.city}, {addr.state} {addr.zipCode}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 1 }}>{addr.country || 'United States'}</Text>
+                  {/* The recipient is the line you scan for when you have three
+                      of these, so it is set larger than the address beneath it
+                      rather than one weight heavier at the same size. */}
+                  <Text style={s.name}>{addr.name}</Text>
+                  <Text style={s.phone}>{addr.phone}</Text>
 
-                  {/* Actions */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f3f4f6' }}>
+                  <View style={{ marginTop: 12, gap: 2 }}>
+                    <Text style={s.addrLine}>
+                      {addr.address}{addr.addressLine2 ? `, ${addr.addressLine2}` : ''}
+                    </Text>
+                    <Text style={s.addrLine}>
+                      {addr.city}, {addr.state} {addr.zipCode}
+                    </Text>
+                    <Text style={s.country}>{addr.country || '—'}</Text>
+                  </View>
+
+                  <View style={s.actions}>
                     <View style={{ flexDirection: 'row', gap: 6 }}>
-                      <Pressable onPress={() => openEdit(addr)} disabled={busy} accessibilityRole="button" accessibilityLabel={`Edit ${meta.label} address`} hitSlop={4}>
-                        <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', opacity: busy ? 0.5 : 1 }}>
-                          <Pencil size={15} color="#475569" />
-                        </View>
+                      <Pressable
+                        onPress={() => openEdit(addr)}
+                        disabled={busy}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Edit ${meta.label} address`}
+                        hitSlop={4}
+                        style={[s.iconBtn, busy && { opacity: 0.5 }]}
+                      >
+                        <Pencil size={16} color={WARM.muted} />
                       </Pressable>
-                      <Pressable onPress={() => confirmDelete(addr)} disabled={busy} accessibilityRole="button" accessibilityLabel={`Delete ${meta.label} address`} hitSlop={4}>
-                        <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#E01A1B', alignItems: 'center', justifyContent: 'center', opacity: busy ? 0.5 : 1 }}>
-                          <Trash2 size={15} color="#E01A1B" />
-                        </View>
+                      <Pressable
+                        onPress={() => confirmDelete(addr)}
+                        disabled={busy}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete ${meta.label} address`}
+                        hitSlop={4}
+                        /* This was a SOLID #E01A1B plate carrying a #E01A1B
+                           glyph — a red square with an invisible icon in it. */
+                        style={[s.iconBtn, s.iconBtnDanger, busy && { opacity: 0.5 }]}
+                      >
+                        <Trash2 size={16} color={WARM.deep} />
                       </Pressable>
                     </View>
+
                     {!addr.isDefault ? (
-                      <Pressable onPress={() => handleSetDefault(addr)} disabled={busy} accessibilityRole="button" accessibilityLabel="Set as default address" hitSlop={4}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, minHeight: 40, justifyContent: 'center' }}>
-                          {busy ? <ActivityIndicator size="small" color="#374151" /> : <Star size={13} color="#374151" />}
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151' }}>Set as default</Text>
-                        </View>
+                      <Pressable
+                        onPress={() => handleSetDefault(addr)}
+                        disabled={busy}
+                        accessibilityRole="button"
+                        accessibilityLabel="Set as default address"
+                        hitSlop={4}
+                        style={s.setDefault}
+                      >
+                        {busy ? (
+                          <ActivityIndicator size="small" color={WARM.dark} />
+                        ) : (
+                          <Star size={13} color={WARM.dark} />
+                        )}
+                        <Text style={s.setDefaultText}>Set as default</Text>
                       </Pressable>
                     ) : null}
                   </View>
@@ -237,32 +270,26 @@ export default function AddressBook() {
           )}
 
           {atLimit ? (
-            <Text style={{ fontSize: 12, color: '#6b7280', textAlign: 'center', marginTop: 4 }}>
-              You've reached the {MAX_SAVED_ADDRESSES}-address limit. Delete one to add a new address.
+            <Text style={s.limitNote}>
+              You&apos;ve reached the {MAX_SAVED_ADDRESSES}-address limit. Delete one to add a new address.
             </Text>
           ) : null}
         </ScrollView>
       )}
 
-      {/* Add Address — sticky bottom button */}
-      {!loading && !atLimit ? (
-        <View
-          style={{
-            position: 'absolute',
-            left: 0, right: 0, bottom: 0,
-            paddingHorizontal: 16,
-            paddingTop: 12,
-            paddingBottom: Math.max(insets.bottom, 16),
-            backgroundColor: '#fff',
-            borderTopWidth: 1,
-            borderTopColor: '#e5e7eb',
-          }}
-        >
-          <Pressable onPress={openAdd} accessibilityRole="button" accessibilityLabel="Add new address">
-            <View style={{ height: 52, borderRadius: 14, backgroundColor: Palette.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <Plus size={18} color="#fff" />
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>Add Address</Text>
-            </View>
+      {/* Add Address — sticky, so it is reachable with three addresses on
+          screen and with none. */}
+      {!loading && !atLimit && addresses.length > 0 ? (
+        <View style={[s.dock, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <Pressable
+            onPress={openAdd}
+            accessibilityRole="button"
+            accessibilityLabel="Add new address"
+            android_ripple={{ color: 'rgba(255,255,255,0.18)' }}
+            style={s.addBtn}
+          >
+            <Plus size={18} color="#ffffff" strokeWidth={2.4} />
+            <Text style={s.addBtnText}>Add address</Text>
           </Pressable>
         </View>
       ) : null}
@@ -277,3 +304,121 @@ export default function AddressBook() {
     </View>
   );
 }
+
+const s = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: WARM.ground },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  card: {
+    borderWidth: 1,
+    borderColor: WARM.line,
+    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    padding: 20,
+  },
+  cardDefault: { borderColor: WARM.defaultLine, backgroundColor: WARM.defaultBg },
+
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 },
+  /* `rounded-full border border-[#e6dcd0] bg-[#faf7f3] text-[#5f5550]` */
+  typeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#e6dcd0',
+    backgroundColor: WARM.ground,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  typeChipText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.9,
+    color: WARM.body,
+  },
+  defaultChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    backgroundColor: WARM.red,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  defaultChipText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.9,
+    color: '#ffffff',
+  },
+
+  name: { fontFamily: Fonts.sansSemibold, fontSize: 15, fontWeight: '600', color: WARM.ink },
+  phone: { fontFamily: Fonts.sans, fontSize: 13, color: WARM.muted, marginTop: 2 },
+  addrLine: { fontFamily: Fonts.sans, fontSize: 13.5, lineHeight: 21, color: WARM.body },
+  country: { fontFamily: Fonts.sans, fontSize: 12, color: WARM.subtle, marginTop: 2 },
+
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: WARM.lineSoft,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: WARM.ground,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtnDanger: { backgroundColor: '#fdf3f0' },
+  setDefault: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, minHeight: 40 },
+  setDefaultText: { fontFamily: Fonts.sansSemibold, fontSize: 12.5, fontWeight: '600', color: WARM.dark },
+
+  limitNote: {
+    fontFamily: Fonts.sans,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: WARM.muted,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+
+  dock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: WARM.lineSoft,
+  },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 50,
+    borderRadius: 999,
+    backgroundColor: WARM.red,
+    overflow: 'hidden',
+    shadowColor: WARM.red,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    // Android paints elevation only.
+    elevation: 4,
+  },
+  addBtnText: { fontFamily: Fonts.sansSemibold, fontSize: 15, fontWeight: '600', color: '#ffffff' },
+});

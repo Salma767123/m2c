@@ -14,7 +14,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
-import { Eye, Package, PenLine } from 'lucide-react-native';
+import { Eye, Package, PenLine, Star } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { getRecentlyViewed } from '@/lib/browsingHistory';
 import { publicProductService, type PublicProduct } from '@/services/publicProductService';
@@ -103,12 +103,20 @@ export default function AccountDiscovery() {
   if (pending.length === 0 && recent.length === 0) return null;
 
   return (
-    <View style={{ gap: 22 }}>
+    /* Each rail sits in its own white card — `rounded-2xl bg-white p-5 ring-1
+       ring-[#efe6df]`. They were bare on the page ground, so on the profile's
+       warm linen they read as loose content under the form rather than as two
+       panels of their own. */
+    <View style={{ gap: 14, marginTop: 20, marginHorizontal: 16 }}>
       {pending.length > 0 ? (
-        <View>
+        <View style={s.card}>
           <View style={s.head}>
             <PenLine size={15} color="#e01a1b" />
             <Text style={s.title}>Awaiting your review</Text>
+            {/* The count the web sets beside the title. */}
+            <View style={s.countChip}>
+              <Text style={s.countChipText}>{pending.length}</Text>
+            </View>
           </View>
           <Text style={s.blurb}>
             You bought these — share what you think and help other shoppers.
@@ -148,8 +156,8 @@ export default function AccountDiscovery() {
                   android_ripple={{ color: 'rgba(224,26,27,0.08)' }}
                   style={s.reviewBtn}
                 >
-                  <PenLine size={13} color="#e01a1b" />
-                  <Text style={s.reviewBtnText}>Review</Text>
+                  <Star size={13} color="#ffffff" fill="#ffffff" />
+                  <Text style={s.reviewBtnText}>Write review</Text>
                 </Pressable>
               </View>
             ))}
@@ -158,7 +166,7 @@ export default function AccountDiscovery() {
       ) : null}
 
       {recent.length > 0 ? (
-        <View>
+        <View style={s.card}>
           <View style={s.head}>
             <Eye size={15} color="#e01a1b" />
             <Text style={s.title}>Recently viewed</Text>
@@ -177,6 +185,8 @@ export default function AccountDiscovery() {
                 accessibilityLabel={p.name}
                 style={s.tile}
               >
+                {/* `w-36 rounded-2xl border border-[#efe6df] bg-white p-2` —
+                    the image sits INSIDE a card rather than being the card. */}
                 <View style={s.tileImage}>
                   {p.images?.[0]?.url ? (
                     <Image
@@ -214,7 +224,35 @@ export default function AccountDiscovery() {
 }
 
 const s = StyleSheet.create({
+  /* `rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgba(90,60,40,0.05)]
+     ring-1 ring-[#efe6df]` */
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#efe6df',
+    padding: 18,
+    shadowColor: '#5a3c28',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    // Android paints elevation only.
+    elevation: 1,
+  },
+
   head: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  countChip: {
+    borderRadius: 999,
+    backgroundColor: '#fdf1ef',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  countChipText: {
+    fontFamily: Fonts.sansSemibold,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#c41617',
+  },
   title: {
     fontFamily: Fonts.sansBold,
     fontSize: 14,
@@ -250,29 +288,37 @@ const s = StyleSheet.create({
     color: '#1a1a1a',
   },
   rowMeta: { fontFamily: Fonts.sans, fontSize: 11.5, color: '#8b8079', marginTop: 1 },
+  /* Filled, not outlined. This is the one thing the rail is asking for, and
+     an outlined chip beside a white card reads as a tag rather than a button. */
   reviewBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(224,26,27,0.25)',
-    backgroundColor: '#fff8f8',
+    backgroundColor: '#e01a1b',
     borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
     overflow: 'hidden',
   },
   reviewBtnText: {
     fontFamily: Fonts.sansSemibold,
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '600',
-    color: '#e01a1b',
+    color: '#ffffff',
   },
 
-  tile: { width: 116 },
+  /* `w-36` — 144, with the image square inside the card's own 8pt padding. */
+  tile: {
+    width: 144,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#efe6df',
+    backgroundColor: '#ffffff',
+    padding: 8,
+  },
   tileImage: {
-    width: 116,
-    height: 116,
+    width: '100%',
+    aspectRatio: 1,
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#f6efe8',
@@ -281,17 +327,19 @@ const s = StyleSheet.create({
   },
   tileName: {
     fontFamily: Fonts.sansMedium,
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '500',
     lineHeight: 16,
     color: '#1a1a1a',
-    marginTop: 6,
+    marginTop: 8,
   },
+  /* Brand red, as on the web. It was near-black, which made the price the
+     quietest thing on a tile whose whole job is to get you back to it. */
   tilePrice: {
     fontFamily: Fonts.sansBold,
     fontSize: 13,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: '#e01a1b',
     marginTop: 2,
   },
 });

@@ -27,9 +27,9 @@ import SectionHeading, { SectionCta } from './SectionHeading';
  * grounds exist to prevent. This section is now the web's blush band:
  * full-bleed, with a rule top and bottom rather than a floating card.
  *
- * The horizontal padding is CARD_GUTTER — the same 26 the floating sections
- * reach through their 12pt margin plus 14pt padding — so going full-bleed
- * changes the ground without moving the card width by a single point.
+ * The horizontal padding is CARD_GUTTER, the app's one grid inset, so every
+ * product grid — here, the home rails, the products list — lands on the same
+ * card width.
  */
 const BEST_SELLER_COUNT = 6; // the web's BEST_SELLER_COUNT
 

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, ActivityIndicator, StatusBar, Platform, Share as RNShare } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, StatusBar, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { ArrowLeft, ShoppingCart, Package, Share2, Heart } from 'lucide-react-native';
+import { ArrowLeft, ShoppingCart, Package, Heart } from 'lucide-react-native';
 import { recordRecentlyViewed } from '@/lib/browsingHistory';
 import { publicProductService, PublicProduct } from '@/services/publicProductService';
 import { showErrorToast } from '@/lib/toast-utils';
@@ -11,7 +11,17 @@ import ProductDetail from '@/components/WebSite/Home/ProductDetail';
 import { useCart } from '@/context/CartContext';
 import { ProductDetailSkeleton } from '@/components/ui/Skeleton';
 import { useWishlist } from '@/context/WishlistContext';
-import { Palette } from '@/constants/theme';
+
+/**
+ * This bar is white, like the main Header and like the web's.
+ *
+ * It was solid brand red, so everything on it was painted white — the back
+ * arrow, the product title, all three glyphs, and both badge fills. On white
+ * every one of those is invisible, so the repaint had to carry all of them
+ * across rather than swap a single fill.
+ */
+const WHITE_BAR = '#ffffff';
+const BAR_INK = '#e01a1b';
 
 // Truncate to N words, append "..." if excess
 function truncateWords(text: string, maxWords = 10): string {
@@ -33,22 +43,11 @@ const TopBar = ({
 }) => {
   const { itemCount } = useCart();
   const { wishlistCount } = useWishlist();
-  const handleShare = async () => {
-    try {
-      if (typeof Haptics !== 'undefined') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      await RNShare.share({
-        message: `Check out this product: ${title}`,
-      });
-    } catch (error) {
-      console.error('Sharing error:', error);
-    }
-  };
-
   return (
     <>
     <View
       className="pb-3.5 px-4 flex-row items-center justify-between"
-      style={{ paddingTop: insets.top + 12, backgroundColor: Palette.headerSurface }}
+      style={{ paddingTop: insets.top + 12, backgroundColor: WHITE_BAR }}
     >
       <Pressable
         onPress={async () => {
@@ -62,9 +61,10 @@ const TopBar = ({
         })}
         className="flex-row items-center gap-2 flex-1 mr-3"
       >
-        <ArrowLeft size={22} color="#ffffff" />
+        <ArrowLeft size={22} color={BAR_INK} />
         <Text
-          className="text-white text-base font-bold flex-shrink"
+          className="text-base font-bold flex-shrink"
+          style={{ color: '#1a1a1a' }}
           numberOfLines={1}
         >
           {truncateWords(title, 15)}
@@ -72,18 +72,6 @@ const TopBar = ({
       </Pressable>
 
       <View className="flex-row items-center gap-4">
-        <Pressable
-          onPress={handleShare}
-          accessibilityRole="button"
-          accessibilityLabel="Share Product"
-          style={({ pressed }) => ({
-            opacity: pressed ? 0.6 : 1,
-          })}
-          className="p-1"
-        >
-          <Share2 size={22} color="#ffffff" />
-        </Pressable>
-
         <Pressable
           onPress={async () => {
              if (typeof Haptics !== 'undefined') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -96,16 +84,17 @@ const TopBar = ({
           })}
           className="p-1 relative"
         >
-          <Heart size={22} color={Palette.onBrand} />
+          <Heart size={22} color={BAR_INK} />
           {wishlistCount > 0 && (
-            // White-on-red, not red-on-red. The header is brand red now, so a
-            // red badge would disappear into it — the same rule the main Header
-            // states: on brand chrome, accents are white or near-white, never red.
+            // Red fill, white digits, white ring — the web's
+            // `bg-[#e01a1b] text-white ring-2 ring-white`. It was inverted
+            // (white fill, red digits) only to survive a red bar; on white
+            // that reads as a hole punched in the header, not a count.
             <View
               className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full items-center justify-center px-1"
-              style={{ backgroundColor: Palette.onBrand, borderWidth: 1.5, borderColor: Palette.headerSurface }}
+              style={{ backgroundColor: BAR_INK, borderWidth: 1.5, borderColor: WHITE_BAR }}
             >
-              <Text className="text-[9px] font-bold" style={{ color: Palette.primary }}>
+              <Text className="text-[9px] font-bold" style={{ color: '#ffffff' }}>
                 {wishlistCount > 99 ? '99+' : wishlistCount}
               </Text>
             </View>
@@ -124,15 +113,16 @@ const TopBar = ({
           })}
           className="p-1 relative"
         >
-          <ShoppingCart size={22} color={Palette.onBrand} />
+          <ShoppingCart size={22} color={BAR_INK} />
           {itemCount > 0 && (
-            // Cart keeps amber so "items waiting" stays its own signal, distinct
-            // from the wishlist badge — again matching the main Header.
+            // Red as well, like the wishlist badge and like the web — the
+            // amber was mobile's own signal for "items waiting", and the
+            // main Header dropped it when that bar went white.
             <View
               className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full items-center justify-center px-1"
-              style={{ backgroundColor: Palette.warning, borderWidth: 1.5, borderColor: Palette.headerSurface }}
+              style={{ backgroundColor: BAR_INK, borderWidth: 1.5, borderColor: WHITE_BAR }}
             >
-              <Text className="text-[9px] font-bold" style={{ color: Palette.surfaceInverse }}>
+              <Text className="text-[9px] font-bold" style={{ color: '#ffffff' }}>
                 {itemCount > 99 ? '99+' : itemCount}
               </Text>
             </View>
@@ -140,8 +130,10 @@ const TopBar = ({
         </Pressable>
       </View>
     </View>
-    {/* Darker bottom edge, so the bar reads as an object — same as the main Header. */}
-    <View style={{ height: 3, backgroundColor: Palette.headerEdge }} />
+    {/* Brand edge, so the bar reads as an object — same as the main Header.
+        It was Brand[700]: a deeper step was needed to separate a red edge from
+        a red bar, and on white that deep shade reads as a bruise. */}
+    <View style={{ height: 3, backgroundColor: BAR_INK }} />
     </>
   );
 };
@@ -180,7 +172,7 @@ export default function ProductDetailScreen() {
   if (loading) {
     return (
       <View className="flex-1 bg-slate-50">
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
         <TopBar insets={insets} router={router} />
         <ProductDetailSkeleton />
       </View>
@@ -191,7 +183,7 @@ export default function ProductDetailScreen() {
   if (!product) {
     return (
       <View className="flex-1 bg-slate-50">
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
         <TopBar insets={insets} router={router} />
         <View className="flex-1 items-center justify-center px-8">
           <View className="w-20 h-20 rounded-full bg-gray-100 items-center justify-center mb-5">
@@ -227,7 +219,7 @@ export default function ProductDetailScreen() {
   // ── Main ──────────────────────────────────────────────────────────────────
   return (
     <View className="flex-1 bg-slate-50">
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       <TopBar title={product.name} insets={insets} router={router} />
       <ProductDetail product={product} productId={id as string} />
     </View>

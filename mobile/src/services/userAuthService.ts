@@ -1,5 +1,6 @@
 import axios from '@/lib/axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { refreshUserAvatar } from '@/lib/userAvatar';
 
 export interface UserRegisterData {
   email: string;
@@ -135,6 +136,7 @@ class UserAuthService {
       // left a stale 'true' behind, so a later sign-in with the box UNchecked
       // still inherited the previous session's "remember me".
       await AsyncStorage.setItem('rememberMe', rememberMe ? 'true' : 'false');
+      await refreshUserAvatar();
     } catch (error) {
       console.error('Failed to store auth data:', error);
     }
@@ -184,6 +186,7 @@ class UserAuthService {
   async clearAuthData(): Promise<void> {
     try {
       await AsyncStorage.multiRemove(['userToken', 'userData', 'rememberMe', 'userID']);
+      await refreshUserAvatar();
     } catch (error) {
       console.error('Failed to clear auth data:', error);
     }

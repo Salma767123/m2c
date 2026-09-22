@@ -12,12 +12,14 @@ import { Dimensions } from 'react-native';
  *   browse products (390 − 12·2 − 8) / 2          = 179
  *   search results  w-[48%]                       ≈ 168
  *
- * `GUTTER` is 26 because that is what the home rails already effectively use —
- * a 12pt section margin plus 14pt of section padding. Matching it here means
- * the rails keep their geometry and the three full-bleed screens come to them,
- * rather than every screen moving at once.
+ * `GUTTER` was 26 — a 12pt section margin plus 14pt of section padding, which
+ * is what the home sections reached when each floated as its own rounded card.
+ * Those are full-width bands now, as they are on the web, so the margin is
+ * gone and the gutter is the page's own: `px-4`, which is what the web sets
+ * for these grids. The cards gain 10pt each on a 390pt screen and land on 173,
+ * exactly the width the web gives them.
  */
-export const CARD_GUTTER = 26;
+export const CARD_GUTTER = 16;
 export const CARD_GAP = 12;
 export const CARD_COLUMNS = 2;
 

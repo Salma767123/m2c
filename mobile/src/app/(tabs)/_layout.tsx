@@ -14,7 +14,9 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Image } from 'expo-image';
 import { useCart } from '@/context/CartContext';
+import { useUserAvatar } from '@/lib/userAvatar';
 import { Palette, Radius } from '@/constants/theme';
 import {
   Home,
@@ -57,11 +59,13 @@ interface TabItemProps {
   isActive: boolean;
   badge?: number;
   badgeColor?: string;
+  /** Profile only: the customer's photo, drawn in place of the glyph. */
+  avatarUri?: string;
   onPress: () => void;
 }
 
 const TabItem = memo(function TabItem({
-  label, icon: Icon, isActive, badge, badgeColor, onPress,
+  label, icon: Icon, isActive, badge, badgeColor, avatarUri, onPress,
 }: TabItemProps) {
   const progress = useSharedValue(isActive ? 1 : 0);
 
@@ -100,11 +104,25 @@ const TabItem = memo(function TabItem({
 
       <Animated.View style={animatedIconStyle}>
         <View className="relative">
-          <Icon
-            color={isActive ? Palette.primary : Palette.textSubtle}
-            size={22}
-            strokeWidth={isActive ? 2.4 : 1.8}
-          />
+          {avatarUri ? (
+            /* The customer's own face, where a generic person glyph used to be.
+               The ring takes the tab's colour so the photo still reads as
+               selected or not — a photograph alone carries no active state. */
+            <View
+              style={[
+                ts.avatarRing,
+                { borderColor: isActive ? Palette.primary : Palette.outline },
+              ]}
+            >
+              <Image source={{ uri: avatarUri }} style={ts.avatarPhoto} contentFit="cover" />
+            </View>
+          ) : (
+            <Icon
+              color={isActive ? Palette.primary : Palette.textSubtle}
+              size={22}
+              strokeWidth={isActive ? 2.4 : 1.8}
+            />
+          )}
           {badge != null && badge > 0 ? (
             <TabBadge count={badge} color={badgeColor || Palette.primary} />
           ) : null}
@@ -135,6 +153,7 @@ export default function TabLayout() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { itemCount } = useCart();
+  const avatar = useUserAvatar();
 
   const activeIndex = getActiveIndex(pathname);
   const { width } = useWindowDimensions();
@@ -250,6 +269,7 @@ export default function TabLayout() {
               isActive={activeIndex === idx}
               badge={getBadge(tab)}
               badgeColor={getBadgeColor(tab)}
+              avatarUri={tab.name === 'profile' && avatar.isAuth ? avatar.image : undefined}
               onPress={() => handleTabPress(tab.name, idx)}
             />
           ))}
@@ -312,6 +332,17 @@ const ts = StyleSheet.create({
     borderRadius: Radius.full,
     backgroundColor: Palette.primary,
   },
+  /* 24 rather than the glyph's 22: a circle reads smaller than an outline of
+     the same box, so matching the numbers would make the photo look shrunken. */
+  avatarRing: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+    backgroundColor: Palette.disabled,
+  },
+  avatarPhoto: { width: '100%', height: '100%' },
   label: {
     marginTop: 3,
     fontSize: 9.5,

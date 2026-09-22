@@ -15,7 +15,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import {
   Search,
-  User,
   ShoppingCart,
   Menu,
   Sparkles,
@@ -25,8 +24,6 @@ import {
   TrendingUp,
   ArrowUpRight,
   Trash2,
-  LifeBuoy,
-  Headset,
   Bell,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -42,6 +39,19 @@ import DiscoverSheet from './DiscoverSheet';
 import NotificationSheet from './NotificationSheet';
 import { appNotificationService } from '@/services/appNotificationService';
 
+/* The header's mark, and the only one it draws.
+
+   It used to prefer `companyLogo` from company info and fall back to this. The
+   configured logo is the wide wordmark: at header height its lettering came
+   out around 7pt — legible as a shape, not as words — so the header takes the
+   emblem directly rather than whichever file the admin last uploaded.
+
+   The header alone uses m2c.png — the wide wordmark. Every other surface
+   (drawer, footer, auth, splash) stays on logo4.png, whose boxes are cut for
+   its taller 0.62 ratio, and the drawer still shows the live logo because its
+   180×64 plate is the size that file was drawn for. */
+const STATIC_LOGO = require('../../../../assets/m2c.png');
+
 /* ── Hoisted constants (allocated once) ───────────────────────────────────── */
 const RECENT_SEARCHES_KEY = 'recent_searches';
 const MAX_RECENT = 8;
@@ -50,9 +60,24 @@ const fmt = (n: number) => fmtCurrency(n);
  *  which must match exactly or the shadow detaches from the visible edge. */
 const HEADER_RADIUS = Radius.xl;
 
+/**
+ * The bar is white, like the web's (`<header className="... bg-white">`).
+ *
+ * It used to be solid brand red, which meant everything on it — glyphs,
+ * wordmark, search field, badge digits — was painted white or a translucent
+ * white wash from the `onBrand*` set. On white those are invisible, so the
+ * repaint had to carry all of them across rather than swap one fill: red ink
+ * on a white bar, exactly the way the web draws it.
+ */
+const WHITE_BAR = '#ffffff';
+const BAR_INK = '#e01a1b';
+/** Placeholder and the clear glyph inside the search field. */
+const FIELD_MUTED = '#a89a8d';
+
 // ─── Main Header ─────────────────────────────────────────────────────────────
 export function Header() {
   const insets = useSafeAreaInsets();
+
   const { itemCount } = useCart();
   const { wishlistCount } = useWishlist();
   const router = useRouter();
@@ -199,28 +224,29 @@ export function Header() {
           the same view — so they have to be separated. */}
       <View style={s.headerShell} onLayout={onHeaderLayout}>
         <View style={[s.headerBg, { paddingTop: insets.top }]}>
-          <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-          {/* ── Top bar: Menu, Brand, Icons ─────────────────────────────────── */}
+          <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+          {/* ── Top bar: Brand, Icons, Menu ─────────────────────────────────── */}
           <View style={s.topBar}>
             <View style={s.topBarLeft}>
-             <Pressable
-  onPress={async () => {
-    if (typeof Haptics !== 'undefined') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setSidebarVisible(true);
-  }}
-  accessibilityLabel="Open menu"
-  accessibilityRole="button"
-  style={s.iconBtn}
->
-  <Menu size={24} color={Palette.onBrand} />
-</Pressable>
               <Pressable
                 onPress={() => router.push('/(tabs)' as any)}
                 accessibilityLabel="Go to home"
                 accessibilityRole="button"
+                hitSlop={8}
+                /* The button needs a width of its own.
+
+                   Without it a Pressable is sized BY its child, and the mark
+                   below asks for `width: '100%'` — a percentage of this
+                   Pressable. Each waits on the other, React Native resolves
+                   the percentage to 0, and the logo does not draw at all. */
+                style={s.brandPress}
               >
-                <Text style={s.brandName}>M2C MarkDowns</Text>
-                <Text style={s.brandSub}>Private Limited</Text>
+                <Image
+                  source={STATIC_LOGO}
+                  style={s.brandLogo}
+                  contentFit="contain"
+                  contentPosition="left center"
+                />
               </Pressable>
             </View>
 
@@ -233,16 +259,29 @@ export function Header() {
                 accessibilityRole="button"
                 style={s.iconBtn}
               >
-                <Sparkles size={22} color={Palette.onBrand} />
+                <Sparkles size={22} color={BAR_INK} />
               </Pressable>
 
+              <Pressable
+                onPress={() => router.push('/(tabs)/cart' as any)}
+                accessibilityLabel="View cart"
+                accessibilityRole="button"
+                style={s.iconBtn}
+              >
+                <ShoppingCart size={22} color={BAR_INK} />
+                {itemCount > 0 ? (
+                  <View style={[s.badge, s.badgeAmber]}>
+                    <Text style={s.badgeTextDark}>{itemCount > 99 ? '99+' : itemCount}</Text>
+                  </View>
+                ) : null}
+              </Pressable>
               <Pressable
                 onPress={() => router.push('/(tabs)/wishlist' as any)}
                 accessibilityLabel="View wishlist"
                 accessibilityRole="button"
                 style={s.iconBtn}
               >
-                <Heart size={22} color={Palette.onBrand} />
+                <Heart size={22} color={BAR_INK} />
                 {wishlistCount > 0 ? (
                   <View style={[s.badge, s.badgeBrand]}>
                     <Text style={s.badgeText}>{wishlistCount > 99 ? '99+' : wishlistCount}</Text>
@@ -262,7 +301,7 @@ export function Header() {
                 accessibilityRole="button"
                 style={s.iconBtn}
               >
-                <Bell size={22} color={Palette.onBrand} />
+                <Bell size={22} color={BAR_INK} />
                 {unreadNotifs > 0 ? (
                   <View style={[s.badge, s.badgeBrand]}>
                     <Text style={s.badgeText}>{unreadNotifs > 99 ? '99+' : unreadNotifs}</Text>
@@ -270,35 +309,24 @@ export function Header() {
                 ) : null}
               </Pressable>
 
-                 <Pressable
-                onPress={() => router.push('/(tabs)/cart' as any)}
-                accessibilityLabel="View cart"
-                accessibilityRole="button"
-                style={s.iconBtn}
-              >
-                <ShoppingCart size={22} color={Palette.onBrand} />
-                {itemCount > 0 ? (
-                  <View style={[s.badge, s.badgeAmber]}>
-                    <Text style={s.badgeTextDark}>{itemCount > 99 ? '99+' : itemCount}</Text>
-                  </View>
-                ) : null}
-              </Pressable>
+              {/* The menu, last in the row.
+
+                  It was first, in the top-left — the desktop convention, and
+                  the one place on a 6" screen a thumb cannot reach without
+                  shifting grip. The actions it sits beside are all on this
+                  side already, so the whole bar is now reachable from where
+                  the hand already is, and the logo gets the corner it should
+                  have had. */}
               <Pressable
-                onPress={() => router.push('/(tabs)/profile' as any)}
-                accessibilityLabel="View profile"
+                onPress={async () => {
+                  if (typeof Haptics !== 'undefined') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setSidebarVisible(true);
+                }}
+                accessibilityLabel="Open menu"
                 accessibilityRole="button"
                 style={s.iconBtn}
               >
-                <User size={22} color={Palette.onBrand} />
-              </Pressable>
-           
-               <Pressable
-                onPress={() => router.push('/(any)/support?new=1' as any)}
-                accessibilityLabel="Raise a support ticket"
-                accessibilityRole="button"
-                style={s.iconBtn}
-              >
-                <Headset size={22} color={Palette.onBrand} />
+                <Menu size={24} color={BAR_INK} />
               </Pressable>
             </View>
           </View>
@@ -306,14 +334,14 @@ export function Header() {
           {/* ── Search bar ──────────────────────────────────────────────────── */}
           <View style={s.searchWrap}>
             <View style={s.searchBar}>
-              <Search size={18} color={Palette.onBrand} style={s.searchIcon} />
+              <Search size={18} color={BAR_INK} style={s.searchIcon} />
               <TextInput
                 ref={inputRef}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 onFocus={() => setIsFocused(true)}
                 placeholder="Search products..."
-                placeholderTextColor={Palette.onBrand}
+                placeholderTextColor={FIELD_MUTED}
                 style={s.searchInput}
                 onSubmitEditing={() => handleSearch()}
                 returnKeyType="search"
@@ -328,7 +356,7 @@ export function Header() {
                   accessibilityHint="Clears the search text"
                   accessibilityRole="button"
                 >
-                  <X size={16} color={Palette.onBrand} />
+                  <X size={16} color={FIELD_MUTED} />
                 </Pressable>
               ) : null}
               {showOverlay ? (
@@ -526,22 +554,22 @@ export default Header;
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  /* Header — a solid brand-red panel with a curved bottom edge, so it reads as
-     an object sitting over the page rather than a band welded to the top of it.
-     Only the BOTTOM corners are rounded: the top edge runs under the status bar,
-     where a radius would leave two odd notches of wallpaper.
+  /* Header — a white panel with a curved bottom edge, so it reads as an object
+     sitting over the page rather than a band welded to the top of it. Only the
+     BOTTOM corners are rounded: the top edge runs under the status bar, where a
+     radius would leave two odd notches of wallpaper.
 
-     Anything drawn on this panel comes from the `onBrand*` tokens — see the note
-     in constants/theme.ts on why the neutral `onInverse*` set and the brand ramp
-     itself are both wrong here. */
+     Everything drawn on it is brand red on white. The `onBrand*` tokens that
+     used to serve this panel are for SOLID brand chrome only and are all a step
+     of white — see the note in constants/theme.ts. */
   headerShell: {
-    backgroundColor: Palette.headerSurface,
+    backgroundColor: WHITE_BAR,
     borderBottomLeftRadius: HEADER_RADIUS,
     borderBottomRightRadius: HEADER_RADIUS,
     ...Shadow.dropdown,
   },
   headerBg: {
-    backgroundColor: Palette.headerSurface,
+    backgroundColor: WHITE_BAR,
     borderBottomLeftRadius: HEADER_RADIUS,
     borderBottomRightRadius: HEADER_RADIUS,
     overflow: 'hidden',
@@ -551,23 +579,37 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 6,
   },
-  topBarLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  topBarLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 },
+  topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 0 },
 iconBtn: { padding: 8, position: 'relative' },
 
-  brandName: { fontFamily: Fonts.sansBold, fontSize: 15, fontWeight: '700', color: Palette.onBrand, letterSpacing: 0.3, marginLeft: 8 ,marginTop: -2},
-  brandSub: { fontFamily: Fonts.sansMedium, fontSize: 10, color: Palette.onBrand, fontWeight: '500', marginLeft: 8 ,marginTop: -2 },
+  /* m2c.png is 1303 x 326 — a 4:1 lockup, so the box is a landscape strip.
+     The square 64 x 64 box the round emblem used would have drawn this at
+     64 x 16: `contain` fits the LONG side, and a wordmark scaled to a sixth of
+     its height is a smear, not a logo.
 
-  /* Darker red hairline along the bottom edge. On the web the accent strip is
-     red against a dark bar; with the bar itself red that inverts — the edge has
-     to be a deeper step or the header bleeds into the page below it.
+     156 x 39 — the lockup's own 4:1, and 39 matches the height of the icon
+     buttons beside it, so the bar reads as one line.
+
+     That is more than a 360pt screen has to give: five buttons at 38 plus
+     their gaps come to 198, the bar's padding is 32, and 130 is left. The cap
+     is a `maxWidth` against `width: '100%'` for exactly that reason — the mark
+     takes the full 156 wherever there is room and quietly narrows to whatever
+     is left where there is not, rather than pushing a button off the edge. */
+  brandPress: { flex: 1, minWidth: 0 },
+  brandLogo: { width: '100%', maxWidth: 156, height: 39 },
+
+  /* Brand hairline along the bottom edge. It was Brand[700] — a deeper step
+     was needed to separate a red edge from a red bar. On white that deep red
+     reads as a bruise, so it takes the brand red itself, the same accent the
+     drawer's rule and the tab bar's rail use.
 
      It stays a plain rectangle: the parent's `overflow: 'hidden'` bends it to the
      curve. Giving it its own radii would not work — RN clamps a corner radius to
      half the box height, so a 3px strip can never echo a 24px curve. */
-  accentBar: { height: 3, backgroundColor: Palette.headerEdge },
+  accentBar: { height: 3, backgroundColor: BAR_INK },
 
   // Badges
   badge: {
@@ -575,14 +617,16 @@ iconBtn: { padding: 8, position: 'relative' },
     minWidth: 18, height: 18, borderRadius: Radius.full,
     alignItems: 'center', justifyContent: 'center',
     // Ring matches the bar so the badge reads as punched out of it.
-    paddingHorizontal: 4, borderWidth: 1.5, borderColor: Palette.headerSurface,
+    paddingHorizontal: 4, borderWidth: 1.5, borderColor: WHITE_BAR,
   },
-  // Both badges must contrast against red, so neither can BE red: wishlist goes
-  // white-on-red, cart keeps amber so "items waiting" stays its own signal.
-  badgeBrand: { backgroundColor: Palette.onBrand },
-  badgeAmber: { backgroundColor: Palette.warning },
-  badgeText: { fontFamily: Fonts.sansBold, color: Palette.primary, fontSize: 9, fontWeight: '800' },
-  badgeTextDark: { fontFamily: Fonts.sansBold, color: Palette.surfaceInverse, fontSize: 9, fontWeight: '800' },
+  /* With the bar white, both badges are red with white digits and a white
+     ring — `bg-[#e01a1b] text-white ring-2 ring-white`, exactly the web's.
+     They were inverted (white fill, red digits) only because they had to
+     survive a red bar; on white that reads as a hole, not a count. */
+  badgeBrand: { backgroundColor: BAR_INK },
+  badgeAmber: { backgroundColor: BAR_INK },
+  badgeText: { fontFamily: Fonts.sansBold, color: '#ffffff', fontSize: 9, fontWeight: '800' },
+  badgeTextDark: { fontFamily: Fonts.sansBold, color: '#ffffff', fontSize: 9, fontWeight: '800' },
 
   // Search bar
   // Extra bottom padding vs. the old square bar: the corner curve eats into the
@@ -591,10 +635,13 @@ iconBtn: { padding: 8, position: 'relative' },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Palette.onBrandGlass,
+    // A glass wash needed a coloured bar under it to read as an inset field;
+    // over white it was invisible. Warm ground and warm line instead, the same
+    // pair every form field on the site uses.
+    backgroundColor: '#faf7f3',
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Palette.onBrandGlassBorder,
+    borderColor: '#e6dcd0',
     height: 46,
   },
   searchIcon: { marginLeft: 14 },
@@ -602,7 +649,7 @@ iconBtn: { padding: 8, position: 'relative' },
     flex: 1,
     paddingHorizontal: 10,
     paddingVertical: 0,
-    color: Palette.onBrand,
+    color: '#1a1a1a',
     fontFamily: Fonts.sans,
     fontSize: 15,
     height: 46,
@@ -617,9 +664,7 @@ iconBtn: { padding: 8, position: 'relative' },
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Plain white — this sits on the red bar, where any step of the brand ramp
-  // (including primaryOnDark) is near-invisible.
-  cancelText: { fontFamily: Fonts.sansSemibold, color: Palette.onBrand, fontSize: 13, fontWeight: '600' },
+  cancelText: { fontFamily: Fonts.sansSemibold, color: BAR_INK, fontSize: 13, fontWeight: '600' },
 
   // Overlay
   overlay: {

@@ -15,7 +15,6 @@ import * as Haptics from 'expo-haptics';
 import {
   Heart,
   ShoppingCart,
-  Trash2,
   Package,
   AlertCircle,
   Share2,
@@ -415,6 +414,30 @@ export default function Wishlist() {
                 </View>
               ) : null}
 
+              {/* Remove.
+
+                  A filled heart on a saved item is the one control everybody
+                  already knows how to switch off, which is why the web made it
+                  replace the red Remove button that used to compete with Add
+                  to Cart at the foot of every row. Mobile still had that older
+                  version — a bare trash glyph in a danger chip, third in the
+                  action row.
+
+                  The web pins it to the top-right of its card's image. This
+                  card is a compact row whose thumbnail is only 64pt, far too
+                  small to carry a 32pt disc, so it pins to the top-right of
+                  the CARD instead — the same corner, against the only edge
+                  that exists here. */}
+              <Pressable
+                onPress={() => removeItem(item.productId, displayName)}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${displayName} from wishlist`}
+                hitSlop={8}
+                style={ws.unheart}
+              >
+                <Heart size={16} color="#e01a1b" fill="#e01a1b" strokeWidth={2} />
+              </Pressable>
+
               <View style={{ flexDirection: 'row', padding: 12, gap: 12 }}>
                 {/* Image — 64px compact */}
                 <Pressable
@@ -456,8 +479,9 @@ export default function Wishlist() {
                   </View>
                 </Pressable>
 
-                {/* Info + actions */}
-                <View style={{ flex: 1 }}>
+                {/* Info + actions. The right inset is the heart's lane — the
+                    product name is two lines and would otherwise run under it. */}
+                <View style={{ flex: 1, paddingRight: 26 }}>
                   {/* `truncate text-[10px] font-semibold uppercase
                       tracking-[0.12em] text-[#a1948a]` — the web sets this as
                       plain text, not a pill. */}
@@ -548,14 +572,6 @@ export default function Wishlist() {
                       <Share2 size={12} color={Palette.text} strokeWidth={2.25} />
                     </Pressable>
 
-                    <Pressable
-                      onPress={() => removeItem(item.productId, displayName)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Remove ${displayName} from wishlist`}
-                      style={ws.actionDanger}
-                    >
-                      <Trash2 size={12} color={Palette.error} strokeWidth={2.25} />
-                    </Pressable>
                   </View>
                 </View>
               </View>
@@ -851,13 +867,25 @@ const ws = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionDanger: {
+  /* `absolute right-2 top-2 h-8 w-8 rounded-full bg-white/92
+     shadow-[0_2px_8px_rgba(0,0,0,0.14)]` */
+  unheart: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 10,
     width: 32,
     height: 32,
     borderRadius: Radius.full,
-    backgroundColor: Palette.errorContainer,
+    backgroundColor: 'rgba(255,255,255,0.92)',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    // Android paints elevation only.
+    elevation: 3,
   },
 
   // ── Top actions ──

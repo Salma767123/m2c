@@ -1,9 +1,9 @@
-// ThemeProvider/DarkTheme/DefaultTheme come from React Navigation, not expo-router —
-// expo-router re-exports neither. Importing them from 'expo-router' makes all three
+// ThemeProvider/DefaultTheme come from React Navigation, not expo-router —
+// expo-router re-exports neither. Importing them from 'expo-router' makes both
 // `undefined`, and <ThemeProvider> then renders a JSX element with an undefined type,
 // which crashes NativeWind's JSX wrapper ("Cannot read property 'displayName' of
 // undefined" in maybeHijackSafeAreaProvider) before the app draws a single frame.
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LogBox } from 'react-native';
@@ -13,7 +13,6 @@ import {
   ReanimatedLogLevel,
 } from 'react-native-reanimated';
 import '../../global.css';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { CartProvider } from '@/context/CartContext';
 import { WishlistProvider } from '@/context/WishlistContext';
 import { userAuthService } from '@/services/userAuthService';
@@ -68,7 +67,6 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const router = useRouter();
   const [notification, setNotification] = useState({
     visible: false,
@@ -158,8 +156,18 @@ export default function RootLayout() {
 
   if (!ready) return null;
 
+  /*
+    Always the light theme.
+
+    This followed the system scheme, and React Navigation's DarkTheme paints its
+    background near-black (rgb(1,1,1)). Nothing else in the app has a dark mode —
+    every screen paints white or linen, the status bar is pinned dark, and the
+    palette's dark block goes unread — so on a phone set to dark the navigator
+    drew a black frame behind a light app. It showed as black around the tab
+    bar's rounded corners and in the strip beneath it.
+  */
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={DefaultTheme}>
       <CartProvider>
         <WishlistProvider>
           {/* Holds the single confirm dialog, so any screen can ask a

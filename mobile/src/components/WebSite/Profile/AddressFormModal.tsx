@@ -17,6 +17,25 @@ import {
   toE164,
 } from '../CheckOut/CheckoutProcess/constants';
 import type { SavedAddress, AddressPayload, AddressType } from '@/services/addressService';
+import { Fonts } from '@/constants/theme';
+
+/**
+ * Warm palette and brand faces, matching the rest of the account screens.
+ *
+ * Every string in this form was set with a bare `fontSize` and no
+ * `fontFamily`, so on Android the whole sheet rendered in Roboto while the
+ * screen that opened it rendered in Outfit. The colours were slate — #111827,
+ * #374151, #e2e8f0, #f8fafc — against a storefront that is linen and oxblood.
+ */
+const WARM = {
+  ink: '#1a1a1a',
+  body: '#5f5550',
+  subtle: '#a89a8d',
+  line: '#e6dcd0',
+  lineSoft: '#eee6dc',
+  ground: '#faf7f3',
+  red: '#e01a1b',
+} as const;
 
 interface AddressFormModalProps {
   open: boolean;
@@ -247,7 +266,7 @@ export default function AddressFormModal({
             backgroundColor: '#f9fafb',
           }}
         >
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>
+          <Text style={{ fontFamily: Fonts.heading, fontSize: 20, fontWeight: '600', letterSpacing: -0.4, color: WARM.ink }}>
             {editing ? 'Edit Address' : 'Add New Address'}
           </Text>
           <Pressable onPress={onClose} disabled={submitting} accessibilityRole="button" accessibilityLabel="Close" hitSlop={4}>
@@ -275,19 +294,24 @@ export default function AddressFormModal({
                     accessibilityState={{ selected: active }}
                     style={{ flex: 1 }}
                   >
+                    {/* `border-[#e01a1b] bg-red-50/40 text-[#c41617]` when
+                        selected — the same selected-chip the wallet's payout
+                        method toggle uses. It was a 2px near-black outline on
+                        a near-white fill, which reads as disabled rather than
+                        chosen. */}
                     <View style={{
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 6,
-                      paddingVertical: 12,
+                      paddingVertical: 13,
                       borderRadius: 12,
-                      borderWidth: 2,
-                      borderColor: active ? '#111827' : '#e5e7eb',
-                      backgroundColor: active ? '#f9fafb' : '#fff',
+                      borderWidth: 1,
+                      borderColor: active ? WARM.red : WARM.line,
+                      backgroundColor: active ? '#fdf3f0' : '#ffffff',
                     }}>
-                      <Icon size={16} color={active ? '#111827' : '#6b7280'} />
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: active ? '#111827' : '#6b7280' }}>{opt.label}</Text>
+                      <Icon size={16} color={active ? '#7a0f10' : WARM.subtle} />
+                      <Text style={{ fontFamily: Fonts.sansSemibold, fontSize: 13, fontWeight: '600', color: active ? '#7a0f10' : WARM.body }}>{opt.label}</Text>
                     </View>
                   </Pressable>
                 );
@@ -432,7 +456,7 @@ export default function AddressFormModal({
                     borderRadius: 12,
                     backgroundColor: '#f8fafc',
                   }}>
-                    <Text style={{ flex: 1, fontSize: 14, color: form.state ? '#111827' : '#9ca3af', fontWeight: form.state ? '600' : '400' }}>
+                    <Text style={{ flex: 1, fontFamily: Fonts.sans, fontSize: 15, color: form.state ? WARM.ink : WARM.subtle }}>
                       {form.state ? selectedStateName || form.state : 'Select State'}
                     </Text>
                     <ChevronDown size={16} color="#6b7280" />
@@ -486,11 +510,11 @@ export default function AddressFormModal({
                 {(lockedDefault || form.isDefault) ? <Check size={14} color="#fff" strokeWidth={3} /> : null}
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, color: '#374151', fontWeight: '500' }}>Set as default shipping address</Text>
+                <Text style={{ fontFamily: Fonts.sansMedium, fontSize: 14, fontWeight: '500', color: WARM.ink }}>Set as default shipping address</Text>
                 {hasNoAddressesYet ? (
-                  <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>Your first address is always the default.</Text>
+                  <Text style={{ fontFamily: Fonts.sans, fontSize: 11.5, lineHeight: 16, color: WARM.subtle, marginTop: 3 }}>Your first address is always the default.</Text>
                 ) : editingCurrentDefault ? (
-                  <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>This is your current default. Set another address as default to change it.</Text>
+                  <Text style={{ fontFamily: Fonts.sans, fontSize: 11.5, lineHeight: 16, color: WARM.subtle, marginTop: 3 }}>This is your current default. Set another address as default to change it.</Text>
                 ) : null}
               </View>
             </View>
@@ -499,7 +523,7 @@ export default function AddressFormModal({
           {/* Submit error */}
           {submitError ? (
             <View style={{ backgroundColor: '#E01A1B', borderWidth: 1, borderColor: '#E01A1B', borderRadius: 12, padding: 12 }}>
-              <Text style={{ fontSize: 13, color: '#E01A1B', fontWeight: '600' }}>{submitError}</Text>
+              <Text style={{ fontFamily: Fonts.sansSemibold, fontSize: 13, fontWeight: '600', color: WARM.red }}>{submitError}</Text>
             </View>
           ) : null}
         </ScrollView>
@@ -519,13 +543,13 @@ export default function AddressFormModal({
         >
           <Pressable onPress={onClose} disabled={submitting} accessibilityRole="button" accessibilityLabel="Cancel" style={{ flex: 1 }}>
             <View style={{ height: 52, borderRadius: 14, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', opacity: submitting ? 0.5 : 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>Cancel</Text>
+              <Text style={{ fontFamily: Fonts.sansSemibold, fontSize: 15, fontWeight: '600', color: WARM.body }}>Cancel</Text>
             </View>
           </Pressable>
           <Pressable onPress={handleSubmit} disabled={submitting} accessibilityRole="button" accessibilityLabel={editing ? 'Save changes' : 'Add address'} style={{ flex: 1.5 }}>
             <View style={{ height: 52, borderRadius: 14, backgroundColor: submitting ? '#9ca3af' : '#111827', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               {submitting ? <ActivityIndicator size="small" color="#fff" /> : null}
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>
+              <Text style={{ fontFamily: Fonts.sansSemibold, fontSize: 15, fontWeight: '600', color: '#ffffff' }}>
                 {editing ? 'Save Changes' : 'Add Address'}
               </Text>
             </View>
@@ -536,7 +560,7 @@ export default function AddressFormModal({
         <Modal visible={statePickerVisible} animationType="slide" presentationStyle="pageSheet">
           <View style={{ flex: 1, backgroundColor: '#fff' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: insets.top + 8, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' }}>
-              <Text style={{ fontSize: 17, fontWeight: '700', color: '#111827' }}>
+              <Text style={{ fontFamily: Fonts.heading, fontSize: 17, fontWeight: '600', letterSpacing: -0.3, color: WARM.ink }}>
                 Select State {country ? `· ${country.name}` : ''}
               </Text>
               <Pressable onPress={() => setStatePickerVisible(false)} accessibilityRole="button" accessibilityLabel="Close state picker" hitSlop={4}>
@@ -554,7 +578,7 @@ export default function AddressFormModal({
                   placeholder="Search states..."
                   placeholderTextColor="#9ca3af"
                   autoFocus
-                  style={{ flex: 1, fontSize: 14, color: '#111827' }}
+                  style={{ flex: 1, fontFamily: Fonts.sans, fontSize: 15, color: WARM.ink }}
                 />
               </View>
             </View>
@@ -584,8 +608,8 @@ export default function AddressFormModal({
                       borderBottomColor: '#f3f4f6',
                     }}>
                       <View>
-                        <Text style={{ fontSize: 15, fontWeight: isSelected ? '700' : '500', color: isSelected ? '#0369a1' : '#111827' }}>{state.name}</Text>
-                        <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>{state.isoCode}</Text>
+                        <Text style={{ fontFamily: isSelected ? Fonts.sansSemibold : Fonts.sansMedium, fontSize: 15, fontWeight: isSelected ? '600' : '500', color: isSelected ? '#7a0f10' : WARM.ink }}>{state.name}</Text>
+                        <Text style={{ fontFamily: Fonts.sans, fontSize: 12, color: WARM.subtle, marginTop: 2 }}>{state.isoCode}</Text>
                       </View>
                       {isSelected ? <Check size={18} color="#0369a1" strokeWidth={2.5} /> : null}
                     </View>
@@ -594,7 +618,7 @@ export default function AddressFormModal({
               })}
               {filteredStates.length === 0 ? (
                 <View style={{ padding: 40, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 14, color: '#6b7280' }}>No states found</Text>
+                  <Text style={{ fontFamily: Fonts.sans, fontSize: 14, color: WARM.body }}>No states found</Text>
                 </View>
               ) : null}
             </ScrollView>
@@ -608,15 +632,35 @@ export default function AddressFormModal({
 // ─── Sub-components ─────────────────────────────────────────────────────────
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
-    <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 }}>
-      {label}{required ? <Text style={{ color: '#E01A1B' }}> *</Text> : null}
+    <Text
+      style={{
+        fontFamily: Fonts.sansSemibold,
+        fontSize: 13,
+        fontWeight: '600',
+        color: WARM.body,
+        marginBottom: 8,
+      }}
+    >
+      {label}{required ? <Text style={{ color: WARM.red }}> *</Text> : null}
     </Text>
   );
 }
 
 function ErrorText({ text }: { text?: string }) {
   if (!text) return null;
-  return <Text style={{ fontSize: 11, color: '#E01A1B', marginTop: 4, fontWeight: '600' }}>{text}</Text>;
+  return (
+    <Text
+      style={{
+        fontFamily: Fonts.sansSemibold,
+        fontSize: 12,
+        fontWeight: '600',
+        color: WARM.red,
+        marginTop: 5,
+      }}
+    >
+      {text}
+    </Text>
+  );
 }
 
 function FormInput({ hasError, onFocus, onBlur, ...rest }: React.ComponentProps<typeof TextInput> & { hasError?: boolean }) {
@@ -624,21 +668,24 @@ function FormInput({ hasError, onFocus, onBlur, ...rest }: React.ComponentProps<
   return (
     <TextInput
       {...rest}
-      placeholderTextColor="#9ca3af"
+      placeholderTextColor={WARM.subtle}
       onFocus={(e) => { setFocused(true); onFocus?.(e); }}
       onBlur={(e) => { setFocused(false); onBlur?.(e); }}
+      /* One field definition, matching ProfileTab: 1px warm line, 12pt radius,
+         15pt type. The focus ring is brand red rather than near-black — black
+         on cream read as "disabled and selected" at the same time. */
       style={{
         width: '100%',
-        paddingHorizontal: 14,
-        paddingVertical: 14,
-        minHeight: 48,
-        borderWidth: 1.5,
-        borderColor: hasError ? '#E01A1B' : focused ? '#111827' : '#e2e8f0',
+        paddingHorizontal: 16,
+        paddingVertical: 13,
+        minHeight: 50,
+        borderWidth: 1,
+        borderColor: hasError ? WARM.red : focused ? WARM.red : WARM.line,
         borderRadius: 12,
-        backgroundColor: focused ? '#fff' : '#f8fafc',
-        fontSize: 14,
-        color: '#111827',
-        fontWeight: '500',
+        backgroundColor: focused ? '#ffffff' : WARM.ground,
+        fontFamily: Fonts.sans,
+        fontSize: 15,
+        color: WARM.ink,
       }}
     />
   );

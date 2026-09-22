@@ -33,6 +33,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Palette, Radius, Shadow } from '@/constants/theme';
 import { categoryService, type Category } from '@/services/categoryService';
 import { userAuthService } from '@/services/userAuthService';
+import { useUserAvatar, avatarInitials, refreshUserAvatar } from '@/lib/userAvatar';
 import { companyInfoService } from '@/services/companyInfoService';
 
 const STATIC_LOGO = require('../../../../assets/images/logo4.png');
@@ -75,6 +76,10 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  /* The photo comes from the shared store, not from this screen's own read, so
+     changing it on the Profile screen updates the drawer and the Profile tab
+     together instead of one of them going stale. */
+  const avatar = useUserAvatar();
 
   // Load dynamic company logo (cached first, then fresh from API)
   useEffect(() => {
@@ -92,6 +97,8 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
       try {
         const auth = await userAuthService.isAuthenticated();
         setIsAuth(auth);
+        // Opening the drawer is a good moment to re-read the session.
+        await refreshUserAvatar();
         if (auth) {
           const data = await userAuthService.getUserData();
           if (data) {
@@ -146,9 +153,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
   };
 
   const statusBarH = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 50;
-  const initials = userName
-    ? userName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
-    : '';
+  const initials = avatarInitials(userName);
 
   // Render-order counter → each piece gets its own stagger slot.
   let order = -1;
@@ -195,8 +200,6 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
                 contentFit="contain"
               />
             </View>
-            <Text style={s.brandName}>M2C MarkDowns</Text>
-            <Text style={s.brandSub}>Private Limited</Text>
           </LinearGradient>
 
           {/* Brand rule — the drawer's echo of the header's accent edge. */}
@@ -226,7 +229,14 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
                     style={s.accountCard}
                   >
                     <View style={s.avatar}>
-                      {isAuth && initials ? (
+                      {isAuth && avatar.image ? (
+                        <Image
+                          source={{ uri: avatar.image }}
+                          style={s.avatarPhoto}
+                          contentFit="cover"
+                          transition={160}
+                        />
+                      ) : isAuth && initials ? (
                         <Text style={s.avatarText}>{initials}</Text>
                       ) : (
                         <UserIcon size={20} color={Palette.onBrand} />
@@ -476,12 +486,9 @@ const s = StyleSheet.create({
     borderRadius: 18,
     paddingHorizontal: 18,
     paddingVertical: 8,
-    marginBottom: 10,
     ...Shadow.cardHover,
   },
   logo: { width: 180, height: 64 },
-  brandName: { fontSize: 16, fontWeight: '700', color: Palette.onInverse },
-  brandSub: { fontSize: 11, color: 'rgba(255,255,255,0.62)', marginTop: 1 },
   brandRule: { height: 3, backgroundColor: Palette.primary },
 
   // Account card
@@ -507,7 +514,12 @@ const s = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.35)',
     alignItems: 'center', justifyContent: 'center',
     marginRight: 12,
+    // Clips a photo to the well's radius.
+    overflow: 'hidden',
   },
+  /* Fills the translucent well rather than sitting inside it, so a photo
+     reads as the avatar itself and not as a picture pasted onto one. */
+  avatarPhoto: { ...StyleSheet.absoluteFillObject, borderRadius: Radius.lg },
   avatarText: { color: Palette.onBrand, fontSize: 16, fontWeight: '800' },
   accountName: { fontSize: 14.5, fontWeight: '700', color: Palette.onBrand },
   accountSub: { fontSize: 11.5, color: Palette.onBrand, marginTop: 2 },

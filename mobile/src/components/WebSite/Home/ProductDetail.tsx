@@ -14,7 +14,9 @@ import {
   ChevronDown, ShoppingCart, Tag, Check,
   Plane, Ship as ShipIcon, AlertTriangle, Info, Box,
   User, Award, Clock, X, Copy,
+  Share2, ChevronRight,
 } from 'lucide-react-native';
+import { Share } from 'react-native';
 import { calculateLogistics, formatWeight, formatDimensions, type LogisticsConfig } from '@/lib/logistics';
 import {
   getRegionalPrice, getRegionalOriginalPrice, formatPrice as fmtCurrency,
@@ -38,6 +40,35 @@ import PromotionalPopup from '@/components/WebSite/PromotionalPopup/PromotionalP
 import CourierBadge from '@/components/Shared/CourierBadge';
 import { ProductCard } from '@/components/WebSite/ProductCard/ProductCard';
 import { Palette, Fonts } from '@/constants/theme';
+
+/**
+ * The four grounds the "Why choose this" cards rotate through, verbatim from
+ * the web's PROMISE_MOTIFS. Each promise takes the next one, so a list of
+ * three is olive, blue, terracotta — never three of the same colour.
+ *
+ * Mobile coloured these from each promise's own meaning instead — green for
+ * dispatch, blue for shipping, violet for variants. That is a different
+ * system: it makes the card's colour carry information, so two green cards in
+ * a row read as a pair, and it leaves the numeral and the rule the web sets
+ * with nowhere to take their colour from.
+ */
+const PROMISE_MOTIFS = [
+  { card: '#f7f5ec', ring: '#e8e4d3', numeral: '#c2c79f', iconBg: '#edeada', iconFg: '#78814e', rule: '#78814e', blob: 'rgba(120,129,78,0.25)' },
+  { card: '#eef4fc', ring: '#dae7f6', numeral: '#a7c3e6', iconBg: '#dfebf9', iconFg: '#1f5faa', rule: '#1f5faa', blob: 'rgba(31,95,170,0.20)' },
+  { card: '#fdf7f2', ring: '#f2e2d3', numeral: '#eab48c', iconBg: '#fbe9da', iconFg: '#c86a2e', rule: '#c86a2e', blob: 'rgba(200,106,46,0.30)' },
+  { card: '#faf7f3', ring: '#ebe1d6', numeral: '#c8b6a5', iconBg: '#f0e7dc', iconFg: '#6b5240', rule: '#6b5240', blob: 'rgba(138,106,76,0.30)' },
+] as const;
+
+/* The icon's plate is a different shape on every motif: a soft arch, a circle,
+   a rounded square, then a hexagon. React Native has no clip-path, so the
+   hexagon becomes the roundest of the four rather than a bad imitation — the
+   point is that the four differ, not that one has six sides. */
+const MOTIF_ICON_SHAPE = [
+  { borderTopLeftRadius: 18, borderTopRightRadius: 18, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 },
+  { borderRadius: 20 },
+  { borderRadius: 8 },
+  { borderRadius: 14 },
+] as const;
 
 interface ProductDetailProps {
   product: PublicProduct;
@@ -69,6 +100,11 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
   const [categoryCoupon, setCategoryCoupon] = useState<PopupCoupon | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const reviewsY = useRef(0);
+  const descY = useRef(0);
+  /* Six rows, then the rest on request — the web's SPEC_PREVIEW. The whole
+     table in the hero is a wall of thirteen lines beside the price; the top
+     few are what anyone actually checks before deciding. */
+  const [showAllSpecs, setShowAllSpecs] = useState(false);
 
   // ── "Select shipping for a cart line" mode ──────────────────────────────
   const params = useLocalSearchParams<{
@@ -125,6 +161,22 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
 
   const goReviews = () => scrollRef.current?.scrollTo({ y: Math.max(0, reviewsY.current - 8), animated: true });
   const onReviewsLayout = (e: LayoutChangeEvent) => { reviewsY.current = e.nativeEvent.layout.y; };
+  const goDescription = () => scrollRef.current?.scrollTo({ y: Math.max(0, descY.current - 8), animated: true });
+  const onDescLayout = (e: LayoutChangeEvent) => { descY.current = e.nativeEvent.layout.y; };
+
+  /* The page had no way to send a product to anyone — and this is the page
+     people want to send, not the listing it came from. */
+  const shareProduct = async () => {
+    try {
+      await Share.share({
+        title: product.name,
+        message: `${product.name}
+${fmt(offeredPrice || 0)}`,
+      });
+    } catch {
+      // A cancelled share sheet is not a failure.
+    }
+  };
 
   // ── Offers / coupon / related data loads ───────────────────────────────
   useEffect(() => {
@@ -418,11 +470,11 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
       weave: 'Type of Weave', composition: 'Composition',
     };
     const FS_UNITS: Record<string, string> = { weightValue: 'g', length: 'cm', breadth: 'cm', gsm: 'GSM' };
-    const items: { label: string; value: string }[] = [];
+    const items: { label: string; value: string; hex?: string }[] = [];
     if (product.baseSku) items.push({ label: 'Product Code', value: product.baseSku });
     if (product.category) items.push({ label: 'Category', value: product.category });
     if (!product.hasVariants && product.singleUnitSize) items.push({ label: 'Size', value: product.singleUnitSize });
-    if (!product.hasVariants && product.singleUnitColor) items.push({ label: 'Color', value: product.singleUnitColor });
+    if (!product.hasVariants && product.singleUnitColor) items.push({ label: 'Color', value: product.singleUnitColor, hex: product.singleUnitColorHex });
     if (product.material) items.push({ label: 'Material', value: product.material });
     if (product.fabricType) items.push({ label: 'Fabric', value: product.fabricType });
     if (product.dimensions) items.push({ label: 'Dimensions', value: product.dimensions });
@@ -456,16 +508,16 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
   const makerName = showMaker ? manufacturerDisplayName(maker) : '';
 
   // ── "Why choose this?" — derived from real data (mirrors web rail) ──────
-  const whyChoose: { icon: any; color: string; bg: string; iconBg: string; title: string; desc: string }[] = [];
-  if (product.dispatchTimeline) whyChoose.push({ icon: Truck, color: '#16a34a', bg: '#f0fdf4', iconBg: '#dcfce7', title: 'Fast Dispatch', desc: 'Fast delivery' });
-  if (logisticsResult && logisticsResult.totalShippingCost === 0) whyChoose.push({ icon: ShipIcon, color: '#2563eb', bg: '#eff6ff', iconBg: '#dbeafe', title: 'Free Shipping', desc: 'No shipping charge on this item' });
-  if (product.hasVariants && visibleVariants.length > 0) whyChoose.push({ icon: Box, color: '#7c3aed', bg: '#f5f3ff', iconBg: '#ede9fe', title: 'Multiple Options', desc: `${visibleVariants.length} variant${visibleVariants.length === 1 ? '' : 's'} to choose from` });
-  if (currentStock > 0) whyChoose.push({ icon: Check, color: '#059669', bg: '#ecfdf3', iconBg: '#d1fae5', title: 'In Stock', desc: `${currentStock} unit${currentStock === 1 ? '' : 's'} available now` });
+  const whyChoose: { icon: any; title: string; desc: string }[] = [];
+  if (product.dispatchTimeline) whyChoose.push({ icon: Truck, title: 'Fast Dispatch', desc: 'Fast delivery' });
+  if (logisticsResult && logisticsResult.totalShippingCost === 0) whyChoose.push({ icon: ShipIcon, title: 'Free Shipping', desc: 'No shipping charge on this item' });
+  if (product.hasVariants && visibleVariants.length > 0) whyChoose.push({ icon: Box, title: 'Multiple Options', desc: `${visibleVariants.length} variant${visibleVariants.length === 1 ? '' : 's'} to choose from` });
+  if (currentStock > 0) whyChoose.push({ icon: Check, title: 'In Stock', desc: `${currentStock} unit${currentStock === 1 ? '' : 's'} available now` });
   if (showMaker && maker) {
     const detail = (maker.experience && maker.experience.trim())
       ? `${maker.experience} of experience`
       : (maker.role && maker.role.trim() ? maker.role : `Crafted by ${manufacturerDisplayName(maker)}`);
-    whyChoose.push({ icon: Award, color: '#E01A1B', bg: '#FCE8E8', iconBg: '#ffe4e4', title: 'Trusted Manufacturer', desc: detail });
+    whyChoose.push({ icon: Award, title: 'Trusted Manufacturer', desc: detail });
   }
 
   return (
@@ -593,11 +645,41 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
 
       {/* ── Product Header ──────────────────────────────────────────────────── */}
       <View className="bg-white mt-2 px-5 pt-5 pb-4">
-        {product.category ? (
-          <View className="flex-row items-center mb-2">
-            <Text className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
-              {product.category}{product.subCategory ? ` › ${product.subCategory}` : ''}
-            </Text>
+        {/* Breadcrumb — where you are in the catalogue.
+
+            This was one line of uppercase grey caption, `CATEGORY › SUB`, with
+            no Home, no links, and set in a weight that made it read as a label
+            on the title rather than as navigation. The web's is three real
+            links with chevron separators. */}
+        {product.category || product.subCategory ? (
+          <View style={s.crumbRow}>
+            <Pressable onPress={() => router.push('/(tabs)' as any)} accessibilityRole="link" hitSlop={6}>
+              <Text style={s.crumbLink}>Home</Text>
+            </Pressable>
+            {product.category ? (
+              <>
+                <ChevronRight size={12} color="#d1d5db" />
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(any)/products',
+                      params: { category: product.category as string },
+                    })
+                  }
+                  accessibilityRole="link"
+                  hitSlop={6}
+                  style={s.crumbShrink}
+                >
+                  <Text style={s.crumbLink} numberOfLines={1}>{product.category}</Text>
+                </Pressable>
+              </>
+            ) : null}
+            {product.subCategory ? (
+              <>
+                <ChevronRight size={12} color="#d1d5db" />
+                <Text style={[s.crumbCurrent, s.crumbShrink]} numberOfLines={1}>{product.subCategory}</Text>
+              </>
+            ) : null}
           </View>
         ) : null}
 
@@ -614,26 +696,41 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
           >
             {product.name}
           </Text>
-          <Pressable
-            onPress={handleToggleWishlist}
-            disabled={isTogglingWishlist}
-            accessibilityRole="button"
-            accessibilityLabel={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
-            accessibilityHint="Double tap to toggle wishlist"
-            style={s.wishlistButton}
-            className="items-center justify-center"
-          >
-            {isTogglingWishlist ? (
-              <ActivityIndicator size="small" color={Palette.primary} />
-            ) : (
-              <Heart
-                size={20}
-                color={isWishlisted ? '#ef4444' : '#9ca3af'}
-                fill={isWishlisted ? '#ef4444' : 'transparent'}
-                strokeWidth={2}
-              />
-            )}
-          </Pressable>
+          <View style={s.titleActions}>
+            {/* Share. The page had no way to send a product to anyone — and
+                this is the page people want to send, not the listing it came
+                from. The web has had this button; mobile never did. */}
+            <Pressable
+              onPress={shareProduct}
+              accessibilityRole="button"
+              accessibilityLabel="Share this product"
+              style={s.roundBtn}
+            >
+              <Share2 size={20} color="#9ca3af" />
+            </Pressable>
+
+            <Pressable
+              onPress={handleToggleWishlist}
+              disabled={isTogglingWishlist}
+              accessibilityRole="button"
+              accessibilityLabel={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
+              accessibilityHint="Double tap to toggle wishlist"
+              /* `bg-red-50` when saved, `bg-gray-50` when not — the disc says
+                 so as well as the glyph. It was the same grey either way. */
+              style={[s.roundBtn, isWishlisted && s.roundBtnOn]}
+            >
+              {isTogglingWishlist ? (
+                <ActivityIndicator size="small" color={Palette.primary} />
+              ) : (
+                <Heart
+                  size={20}
+                  color={isWishlisted ? '#ef4444' : '#9ca3af'}
+                  fill={isWishlisted ? '#ef4444' : 'transparent'}
+                  strokeWidth={2}
+                />
+              )}
+            </Pressable>
+          </View>
         </View>
 
         {/* FaceRating row + "See all reviews" — matches the web product detail */}
@@ -682,6 +779,72 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
           </View>
           <Text className="text-[11px] text-gray-400 mt-1.5">Inclusive of all taxes</Text>
         </View>
+
+        {/* ── About this item ──
+            The opening of the description, with the rest further down rather
+            than repeated here. Mobile had the text but buried ALL of it in a
+            section four screens down, which is the problem the web's note
+            describes: "we had the text but buried all of it under a tab the
+            shopper had to go looking for." */}
+        {product.description ? (
+          <View style={{ marginTop: 18 }}>
+            <Text style={s.heroHeading}>About this item</Text>
+            <Text style={s.aboutText} numberOfLines={4}>
+              {product.description}
+            </Text>
+            {product.description.length > 200 ? (
+              <Pressable
+                onPress={goDescription}
+                accessibilityRole="button"
+                accessibilityLabel="Read the full description"
+                style={s.heroLinkRow}
+                hitSlop={6}
+              >
+                <Text style={s.heroLink}>Read full description</Text>
+                <ChevronRight size={14} color={Palette.primary} strokeWidth={2.5} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* ── Specifications ──
+            The whole table, six rows at a time. It used to sit only in its own
+            band far below; the web moved it up here, beside the price, because
+            these are the rows anyone checks before deciding. */}
+        {specItems.length > 0 ? (
+          <View style={{ marginTop: 20 }}>
+            <Text style={s.heroHeading}>Specifications</Text>
+            <View style={s.specTable}>
+              {(showAllSpecs ? specItems : specItems.slice(0, 6)).map((f, i) => (
+                <View key={f.label} style={[s.specRow, i > 0 && s.specRowDivided]}>
+                  <Text style={s.specLabel}>{f.label}</Text>
+                  <View style={s.specValueWrap}>
+                    {f.hex ? <View style={[s.specSwatch, { backgroundColor: f.hex }]} /> : null}
+                    <Text style={s.specValue}>{f.value}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+            {specItems.length > 6 ? (
+              <Pressable
+                onPress={() => setShowAllSpecs((v) => !v)}
+                accessibilityRole="button"
+                style={s.heroLinkRow}
+                hitSlop={6}
+              >
+                <Text style={s.heroLink}>
+                  {showAllSpecs ? 'Show less' : `Show all ${specItems.length} specifications`}
+                </Text>
+                <ChevronDown
+                  size={16}
+                  color={Palette.primary}
+                  strokeWidth={2.5}
+                  style={showAllSpecs ? { transform: [{ rotate: '180deg' }] } : undefined}
+                />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
       </View>
 
       {/* ── Variants ────────────────────────────────────────────────────────── */}
@@ -1133,7 +1296,7 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
           instructions simply has no care section rather than an empty tab. */}
 
       {product.description || (product.tags && product.tags.length) ? (
-        <View style={s.infoSection}>
+        <View style={s.infoSection} onLayout={onDescLayout}>
           <Text style={[s.serif, s.infoHeading]}>Product description</Text>
           {product.description ? (
             <>
@@ -1163,21 +1326,6 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
               ))}
             </View>
           ) : null}
-        </View>
-      ) : null}
-
-      {specItems.length > 0 ? (
-        <View style={s.infoSection}>
-          <Text style={[s.serif, s.infoHeading]}>Specifications</Text>
-          <View style={{ gap: 4 }}>
-            {specItems.map((item, i) => (
-              <View key={i} className="flex-row items-center py-2.5" style={i > 0 ? s.specRowBorder : undefined}>
-                <Text className="text-[13px] text-gray-500 whitespace-nowrap">{item.label}</Text>
-                <View style={s.specDots} />
-                <Text className="text-[13px] font-semibold text-gray-900 text-right">{item.value}</Text>
-              </View>
-            ))}
-          </View>
         </View>
       ) : null}
 
@@ -1364,21 +1512,62 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
       {/* ── Why choose this? — derived from real data ──────────────────────── */}
       {whyChoose.length > 0 ? (
         <View className="bg-white mt-2 px-5 py-5">
-          <Text className="text-[15px] font-bold text-gray-900 mb-4" style={s.serif}>Why choose this?</Text>
-          {whyChoose.map((item, i) => {
-            const Icon = item.icon;
-            return (
-              <View key={i} className="flex-row items-center rounded-2xl p-3.5 mb-2" style={{ backgroundColor: item.bg }}>
-                <View className="w-10 h-10 rounded-xl items-center justify-center mr-3" style={{ backgroundColor: item.iconBg }}>
-                  <Icon size={20} color={item.color} />
+          {/* Masthead — a tick in its own tinted plate, the title, and a line
+              saying what the list is. Mobile had the title on its own. */}
+          <View style={s.whyHead}>
+            <View style={s.whyHeadMark}>
+              <Check size={16} color={Palette.primary} strokeWidth={2.2} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[s.serif, s.whyTitle]}>Why choose this</Text>
+              <Text style={s.whySub}>What you get with this order</Text>
+            </View>
+          </View>
+
+          <View style={{ gap: 10 }}>
+            {whyChoose.map((item, i) => {
+              const Icon = item.icon;
+              const m = PROMISE_MOTIFS[i % PROMISE_MOTIFS.length];
+              return (
+                <View key={i} style={[s.whyCard, { backgroundColor: m.card, borderColor: m.ring }]}>
+                  {/* The corner flourish, one of three by position. The web's
+                      fourth is a dot grid — a repeating radial background,
+                      which React Native has no equivalent for — so those cards
+                      take a blob rather than a poor imitation of one. */}
+                  {i % 4 === 1 ? (
+                    <View style={[s.whyBlobBL, { backgroundColor: m.blob }]} pointerEvents="none" />
+                  ) : i % 4 === 2 ? (
+                    <>
+                      <View style={[s.whyBlobTR, { backgroundColor: m.blob }]} pointerEvents="none" />
+                      <View style={s.whyBracketTR} pointerEvents="none" />
+                      <View style={s.whyBracketBL} pointerEvents="none" />
+                    </>
+                  ) : (
+                    <View style={[s.whyBlobTR, { backgroundColor: m.blob }]} pointerEvents="none" />
+                  )}
+
+                  {/* The numeral the web sets in the card's top-left corner. */}
+                  <Text style={[s.serif, s.whyNumeral, { color: m.numeral }]}>
+                    {String(i + 1).padStart(2, '0')}
+                  </Text>
+
+                  <View
+                    style={[
+                      s.whyIcon,
+                      MOTIF_ICON_SHAPE[i % MOTIF_ICON_SHAPE.length],
+                      { backgroundColor: m.iconBg },
+                    ]}
+                  >
+                    <Icon size={20} color={m.iconFg} strokeWidth={1.6} />
+                  </View>
+
+                  <Text style={[s.serif, s.whyCardTitle]}>{item.title}</Text>
+                  <Text style={s.whyCardDesc}>{item.desc}</Text>
+                  <View style={[s.whyRule, { backgroundColor: m.rule }]} />
                 </View>
-                <View className="flex-1">
-                  <Text className="text-[13px] font-bold text-gray-900">{item.title}</Text>
-                  <Text className="text-[11px] text-gray-500 mt-0.5">{item.desc}</Text>
-                </View>
-              </View>
-            );
-          })}
+              );
+            })}
+          </View>
         </View>
       ) : null}
 
@@ -1763,11 +1952,101 @@ const s = StyleSheet.create({
   paginationDot: { height: 6, borderRadius: 3 },
   paginationDotActive: { width: 20, backgroundColor: Palette.primary },
   paginationDotInactive: { width: 6, backgroundColor: '#d1d5db' },
-  wishlistButton: {
+  whyHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16 },
+  /* `h-9 w-9 rounded-xl bg-[#e01a1b]/[0.08]` */
+  whyHeadMark: {
+    width: 36, height: 36, borderRadius: 12,
+    backgroundColor: 'rgba(224,26,27,0.08)',
+    alignItems: 'center', justifyContent: 'center',
+    marginTop: 2,
+  },
+  whyTitle: { fontSize: 20, fontWeight: '600', letterSpacing: -0.5, color: '#1a1a1a' },
+  whySub: { fontFamily: Fonts.sans, fontSize: 12.5, color: '#a1948a', marginTop: 2 },
+
+  /* `rounded-2xl px-4 py-3.5 text-center ring-1`, standing up — which is the
+     web's own layout below lg, where each card has room to stand. */
+  whyCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 14,
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  whyNumeral: { position: 'absolute', left: 14, top: 10, fontSize: 20, fontWeight: '600', letterSpacing: -0.4 },
+  whyBlobTR: { position: 'absolute', right: -20, top: -20, width: 56, height: 56, borderRadius: 28 },
+  whyBlobBL: { position: 'absolute', left: -32, bottom: -32, width: 96, height: 96, borderRadius: 48 },
+  whyBracketTR: {
+    position: 'absolute', right: 10, top: 10, width: 24, height: 24,
+    borderTopWidth: 2, borderRightWidth: 2, borderTopRightRadius: 6,
+    borderColor: 'rgba(200,106,46,0.7)',
+  },
+  whyBracketBL: {
+    position: 'absolute', left: 10, bottom: 10, width: 24, height: 24,
+    borderBottomWidth: 2, borderLeftWidth: 2, borderBottomLeftRadius: 6,
+    borderColor: 'rgba(200,106,46,0.7)',
+  },
+  whyIcon: {
+    width: 40, height: 40,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    // Android paints elevation only.
+    elevation: 1,
+  },
+  whyCardTitle: { fontSize: 13.5, fontWeight: '600', lineHeight: 18, color: '#2b2320', marginTop: 10, textAlign: 'center' },
+  whyCardDesc: { fontFamily: Fonts.sans, fontSize: 11.5, lineHeight: 16, color: '#8a807a', marginTop: 2, textAlign: 'center', maxWidth: 240 },
+  whyRule: { width: 28, height: 2, borderRadius: 999, marginTop: 6 },
+
+  crumbRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
+  /* `text-[11px] text-gray-500`, with the current page in gray-700 medium. */
+  crumbLink: { fontFamily: Fonts.sans, fontSize: 11.5, color: '#6b7280' },
+  crumbCurrent: { fontFamily: Fonts.sansMedium, fontSize: 11.5, fontWeight: '500', color: '#374151' },
+  /* Long category names must not push the trail past the screen. */
+  crumbShrink: { flexShrink: 1, minWidth: 0 },
+
+  titleActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  roundBtn: {
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#f3f4f6',
     alignItems: 'center', justifyContent: 'center',
   },
+  /* `bg-red-50` */
+  roundBtnOn: { backgroundColor: '#fef2f2', borderColor: '#fee2e2' },
+
+  /* `text-[14px] font-bold uppercase tracking-[0.08em] text-gray-900` — the
+     hero's two section titles, which are set in the UI face, not the heading
+     face the lower bands use. */
+  heroHeading: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 14,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1.1,
+    color: '#111827',
+    marginBottom: 8,
+  },
+  aboutText: { fontFamily: Fonts.sans, fontSize: 14.5, lineHeight: 22, color: '#4b5563' },
+  heroLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: 8 },
+  heroLink: { fontFamily: Fonts.sansSemibold, fontSize: 14, fontWeight: '600', color: '#E01A1B' },
+
+  /* `divide-y divide-gray-100 rounded-xl ring-1 ring-black/[0.06]` */
+  specTable: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+  },
+  specRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
+  specRowDivided: { borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  specLabel: { width: 96, flexShrink: 0, fontFamily: Fonts.sans, fontSize: 14, color: '#6b7280' },
+  specValueWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  specSwatch: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: '#d1d5db' },
+  specValue: { flex: 1, fontFamily: Fonts.sansMedium, fontSize: 14, fontWeight: '500', color: '#111827' },
   thumbnailStrip: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   thumbnail: { borderWidth: 2.5 },
   thumbnailActive: { borderColor: Palette.primary },
@@ -1812,8 +2091,6 @@ const s = StyleSheet.create({
   // Description / specs
   descriptionText: { fontSize: 13, color: '#4b5563', lineHeight: 21 },
   descriptionClamped: { overflow: 'hidden' },
-  specRowBorder: { borderTopWidth: 1, borderTopColor: '#f3f4f6' },
-  specDots: { flex: 1, borderBottomWidth: 1, borderStyle: 'dotted', borderColor: 'rgba(209,213,219,0.8)', marginHorizontal: 10, marginBottom: 4 },
   carePill: { borderWidth: 1, borderColor: '#e5e7eb' },
   careStepBadge: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#ffffff', borderWidth: 1.5, borderColor: Palette.primary, alignItems: 'center', justifyContent: 'center' },
   shipBox: { borderWidth: 1, borderColor: '#E01A1B' },

@@ -303,13 +303,23 @@ function ProductCardImpl({ product, onAddToCart, onToggleWishlist }: ProductCard
           hitSlop={6}
           accessibilityRole="button"
           accessibilityLabel={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
-          style={[s.heartChip, isInWishlist && s.heartChipOn]}
+          style={s.heartChip}
         >
+          {/* Saved and unsaved differ in the HEART, not in the disc. Mobile
+              inverted the whole control — a solid red disc carrying a white
+              heart — which reads as a different button rather than the same
+              one switched on, and loses the frosted disc that keeps the glyph
+              visible over both light and dark photographs.
+
+              `fill-[#e01a1b] text-[#e01a1b] scale-110` when saved, and
+              `fill-[#e01a1b]/10 text-[#e01a1b]` when not: unsaved is still a
+              red heart, just barely filled. */}
           <Heart
             size={16}
-            color={isInWishlist ? "#ffffff" : "#E01A1B"}
-            fill={isInWishlist ? "#ffffff" : "rgba(224,26,27,0.1)"}
+            color="#E01A1B"
+            fill={isInWishlist ? "#E01A1B" : "rgba(224,26,27,0.1)"}
             strokeWidth={2.2}
+            style={isInWishlist ? s.heartOn : undefined}
           />
         </Pressable>
 
@@ -438,7 +448,8 @@ const s = StyleSheet.create({
     // Android paints elevation only.
     elevation: 2,
   },
-  heartChipOn: { backgroundColor: "#e01a1b", borderColor: "#e01a1b" },
+  /* `scale-110` on the saved glyph — the disc stays put. */
+  heartOn: { transform: [{ scale: 1.1 }] },
   /* `absolute top-1.5 left-1.5 bg-[#22c55e] rounded-md` with a green glow. */
   discountPill: {
     position: "absolute",
